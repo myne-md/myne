@@ -30,7 +30,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { labelColorVar } from "../decorations";
 import type { TitleRecord } from "../loadNoteBatch";
-import { TASK_KIND_VALUE } from "../../dialect";
+import { DRAWING_KIND_VALUE, TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
 import { StatusMark } from "../../components/Spinner";
@@ -631,9 +631,22 @@ function TitleLine({
     );
   }
   if (record.title === null) {
+    // A drawing names its kind (myne-md/myne#653 follow-up). "Untitled" alone
+    // reads as an empty NOTE, and an unnamed drawing row is otherwise
+    // indistinguishable from one until it is opened, which is the one row a
+    // reader cannot resolve by looking harder.
+    //
+    // The task kind deliberately keeps the plain word. It already carries a
+    // trailing badge in `markers` above, so naming the kind in the text too
+    // would say it twice on one row; a drawing has no badge, which is exactly
+    // why it needs the word.
+    const placeholder =
+      record.kind === DRAWING_KIND_VALUE
+        ? t("notes.row.untitledDrawing")
+        : t("notes.row.untitled");
     return (
       <div style={titleUntitledStyle}>
-        {t("notes.row.untitled")}
+        {placeholder}
         {markers}
       </div>
     );

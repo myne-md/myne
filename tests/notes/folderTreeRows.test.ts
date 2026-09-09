@@ -12,6 +12,7 @@ import {
   buildContainerRank,
   buildFavoriteRows,
   flattenVisibleRows,
+  orderContainerChildren,
   pruneFavorites,
   toggleFavoriteList,
   visibleNoteIds,
@@ -75,12 +76,12 @@ describe("buildContainerRank", () => {
 describe("flattenVisibleRows", () => {
   it("flattens an empty vault to no rows (no section header)", () => {
     const { cache, tree } = build([]);
-    expect(flattenVisibleRows(tree, cache, new Set())).toEqual([]);
+    expect(flattenVisibleRows(tree, cache, new Set(), {}, null)).toEqual([]);
   });
 
   it("renders folderless notes at root level (no Vault root section)", () => {
     const { cache, tree } = build([rec("a", null, 2), rec("b", null, 1)]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     // No section rows at all; loose notes lead at depth 0 by recency.
     expect(kinds(rows)).toEqual(["note", "note"]);
     expect(ids(rows)).toEqual(["a", "b"]); // newer first (updatedAt desc)
@@ -89,7 +90,7 @@ describe("flattenVisibleRows", () => {
 
   it("expands ancestor folders and indents the note by depth", () => {
     const { cache, tree } = build([rec("n1", "Projects/Myne/")]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     expect(kinds(rows)).toEqual(["folder", "folder", "note"]);
     const [projects, myne, note] = rows;
     expect(projects).toMatchObject({ kind: "folder", depth: 0 });
@@ -101,7 +102,7 @@ describe("flattenVisibleRows", () => {
   it("hides descendants of a collapsed folder", () => {
     const { cache, tree } = build([rec("n1", "Projects/Myne/")]);
     // node.key is the folded path; Projects/ folds to "projects/".
-    const rows = flattenVisibleRows(tree, cache, new Set(["projects/"]));
+    const rows = flattenVisibleRows(tree, cache, new Set(["projects/"]), {}, null);
     expect(kinds(rows)).toEqual(["folder"]);
     expect(rows[0]).toMatchObject({ collapsed: true });
     expect(visibleNoteIds(rows)).toEqual([]); // the note is hidden
@@ -109,7 +110,7 @@ describe("flattenVisibleRows", () => {
 
   it("renders an empty deliberate folder with empty:true and no notes", () => {
     const { cache, tree } = build([], ["Drafts/"]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     expect(kinds(rows)).toEqual(["folder"]);
     expect(rows[0]).toMatchObject({ kind: "folder", empty: true });
   });
@@ -118,7 +119,7 @@ describe("flattenVisibleRows", () => {
     // A folder whose only note is its index note: the index note is NOT a row,
     // yet the folder is not "empty" (it has a folder note, opened by double-click).
     const { cache, tree } = build([rec("idx", "Notes/", 0, true)]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     expect(kinds(rows)).toEqual(["folder"]);
     expect(rows[0]).toMatchObject({ kind: "folder", empty: false });
     expect(visibleNoteIds(rows)).toEqual([]); // the index note is not a row
@@ -129,14 +130,14 @@ describe("flattenVisibleRows", () => {
       rec("idx", "Notes/", 2, true),
       rec("sib", "Notes/", 1),
     ]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     expect(kinds(rows)).toEqual(["folder", "note"]);
     expect(visibleNoteIds(rows)).toEqual(["sib"]);
   });
 
   it("default (no item_order): folders sort before loose notes at root", () => {
     const { cache, tree } = build([rec("a", null, 2), rec("b", null, 1)], ["Box/"]);
-    const rows = flattenVisibleRows(tree, cache, new Set());
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     // Unlisted: folder first, then notes by recency.
     expect(ids(rows)).toEqual(["Box", "a", "b"]);
   });
@@ -148,7 +149,7 @@ describe("flattenVisibleRows", () => {
     );
     // Root container (`""`) sequence interleaves the loose notes and folders.
     const itemOrder = { "": ["n1", "Apple/", "n2", "Zebra/"] };
-    const rows = flattenVisibleRows(tree, cache, new Set(), itemOrder);
+    const rows = flattenVisibleRows(tree, cache, new Set(), itemOrder, null);
     expect(ids(rows)).toEqual(["n1", "Apple", "n2", "Zebra"]);
   });
 
@@ -159,9 +160,13 @@ describe("flattenVisibleRows", () => {
     ]);
     // Default would be folders-first (Sub before d); the `work/` container's
     // own sequence puts the note d before the Sub subfolder (MYND-596).
-    const rows = flattenVisibleRows(tree, cache, new Set(), {
-      "work/": ["d", "Work/Sub/"],
-    });
+    const rows = flattenVisibleRows(
+      tree,
+      cache,
+      new Set(),
+      { "work/": ["d", "Work/Sub/"] },
+      null,
+    );
     expect(kinds(rows)).toEqual(["folder", "note", "folder", "note"]);
     expect(ids(rows)).toEqual(["Work", "d", "Sub", "s"]);
     expect(visibleNoteIds(rows)).toEqual(["d", "s"]);
@@ -172,7 +177,7 @@ describe("flattenVisibleRows", () => {
       rec("x", null, 100), // newest, but unlisted
       rec("y", null, 1), // oldest, but listed
     ]);
-    const rows = flattenVisibleRows(tree, cache, new Set(), { "": ["y"] });
+    const rows = flattenVisibleRows(tree, cache, new Set(), { "": ["y"] }, null);
     // y is listed (index 0) so it leads despite being older than x.
     expect(visibleNoteIds(rows)).toEqual(["y", "x"]);
   });
@@ -196,7 +201,7 @@ describe("buildFavoriteRows + pruneFavorites (Favorites — MYND-183)", () => {
   it("favorite + tree rows for the same note keep distinct keys", () => {
     const favRows = buildFavoriteRows(["a"], cache);
     const { cache: c2, tree } = build([rec("a", "Work/")]);
-    const treeRows = flattenVisibleRows(tree, c2, new Set());
+    const treeRows = flattenVisibleRows(tree, c2, new Set(), {}, null);
     const favKey = favRows[0]!.key;
     const noteRow = treeRows.find((r) => r.kind === "note");
     expect(favKey).toBe("fav-a");
@@ -231,9 +236,92 @@ describe("visibleNoteIds — dedupe across Favorites + tree", () => {
   it("visits a note shown in both sections once, Favorites copy first", () => {
     const { cache, tree } = build([rec("a", null, 2), rec("b", null, 1)]);
     const favRows = buildFavoriteRows(["b"], cache); // b is favorited
-    const treeRows = flattenVisibleRows(tree, cache, new Set());
+    const treeRows = flattenVisibleRows(tree, cache, new Set(), {}, null);
     // Favorites first, then the tree — b appears in both; nav visits it once.
     const nav = visibleNoteIds([...favRows, ...treeRows]);
     expect(nav).toEqual(["b", "a"]); // b (from Favorites) first, then a; no dup b
+  });
+});
+
+// myne-md/myne#654, a new note landed at the bottom of the sidebar file tree.
+//
+// It was already first among its container's NOTES (unlisted notes sort by
+// recency, newest first). What put it at the bottom is that folders sort before
+// notes, so in a vault with any structure the whole notes block sits under every
+// folder. `pinFirst` is a transient key that outranks everything, including the
+// manual `item_order` sequence.
+//
+// Deliberately NOT persisted, and two cases below are about that rather than
+// about ordering: writing the id into `item_order` would make every note ever
+// created a permanently hand-ordered entry inside a blob re-encrypted on every
+// write, and flipping folders-before-notes would bury the folders under every
+// loose note. `orderContainerChildren`'s header carries the full argument.
+describe("the just-created note pins to the top of its container", () => {
+  // A UUIDv7 whose embedded millisecond timestamp really is `ms`. Built rather
+  // than hand-written: made-up hex decodes to 1970, so the "newest" note sorts
+  // LAST and the test fails for a reason unrelated to the code under it.
+  const uuidv7At = (ms: number): string => {
+    const hex = ms.toString(16).padStart(12, "0");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-7000-8000-000000000001`;
+  };
+  const NEW = uuidv7At(Date.parse("2026-09-04T12:00:00Z"));
+  const OLD = uuidv7At(Date.parse("2026-01-01T00:00:00Z"));
+
+  // Real records through the real tree derivation, so a `FolderNode` field
+  // change fails here instead of sliding past an `as never`.
+  const scene = () =>
+    build(
+      [
+        rec(OLD, null, Date.parse("2026-01-01T00:00:00Z")),
+        // A brand-new note has no `updated:` yet; recency falls back to its id.
+        rec(NEW, null, Date.parse("2026-09-04T12:00:00Z")),
+        rec("p1", "Projects/"),
+        rec("a1", "Archive/"),
+      ],
+      ["Projects/", "Archive/"],
+    );
+
+  const rootKeys = (pin: string | null, order: string[] = []) => {
+    const { cache, tree } = scene();
+    return orderContainerChildren(
+      tree.roots,
+      tree.unfiledNoteIds,
+      cache,
+      buildContainerRank(order),
+      pin,
+    ).map((c) => (c.kind === "folder" ? c.node.key : c.id));
+  };
+
+  it("sorts above every folder, which is where the bug lived", () => {
+    expect(rootKeys(NEW)[0]).toBe(NEW);
+  });
+
+  it("sorts above a hand-arranged item_order sequence too", () => {
+    // A pin a manual sequence could outvote would be invisible in exactly the
+    // vaults whose owners arrange their sidebar, the ones most likely to
+    // notice a new note appearing somewhere unexpected.
+    expect(rootKeys(NEW, ["projects/", OLD])[0]).toBe(NEW);
+  });
+
+  // The other direction, and what keeps this from being "notes before folders"
+  // wearing a different name: with no pin the established order is untouched.
+  it("changes nothing when there is no pin", () => {
+    expect(rootKeys(null)).toEqual(["archive/", "projects/", NEW, OLD]);
+  });
+
+  it("ignores a pin naming something this container does not hold", () => {
+    expect(rootKeys("p1")).toEqual(["archive/", "projects/", NEW, OLD]);
+  });
+
+  it("pins a FOLDER key just as readily, since the rule is by key", () => {
+    // Not something anything does today, but the comparator is key-based and a
+    // reader should not have to guess whether it special-cases notes.
+    expect(rootKeys("projects/")[0]).toBe("projects/");
+  });
+
+  it("flattenVisibleRows passes the pin through to every container", () => {
+    const { cache, tree } = scene();
+    const rows = flattenVisibleRows(tree, cache, new Set(), {}, NEW);
+    expect(ids(rows)[0]).toBe(NEW);
   });
 });

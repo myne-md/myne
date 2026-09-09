@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 
 // ── IPC-boundary module mocks ──────────────────────────────────────────────
 const createNote = vi.fn();
+const createDrawing = vi.fn();
 const mutateDeliberateFolders = vi.fn();
 const prefsRead = vi.fn();
 const deleteNote = vi.fn();
@@ -34,6 +35,11 @@ const hydrateVaultIndicesOnUnlock = vi.fn();
 
 vi.mock("../../src/notes/createNote", () => ({
   createNote: (...a: unknown[]) => createNote(...a),
+}));
+// myne#653 split the two create paths on whether they enter sidebar rename, so
+// the drawing one has to be drivable here to assert that it still does.
+vi.mock("../../src/notes/createDrawing", () => ({
+  createDrawing: (...a: unknown[]) => createDrawing(...a),
 }));
 // myne-md/myne#613: the create path registers the folder it just filled, so the
 // write has to be observable here. `prefsRead` and `normalizeNewNoteLocation`
@@ -171,7 +177,7 @@ describe("useSelectedNote — select / open", () => {
 });
 
 describe("useSelectedNote — create", () => {
-  it("createAndStartRename seeds an optimistic Untitled row, selects + renames it", async () => {
+  it("createAndStartRename seeds an optimistic Untitled row and selects it", async () => {
     createNote.mockResolvedValue("new-id");
     const { result } = renderHook(() => useSelectedNote(), { wrapper });
     let id = "";
@@ -180,10 +186,32 @@ describe("useSelectedNote — create", () => {
     });
     expect(id).toBe("new-id");
     expect(result.current.selectedId).toBe("new-id");
-    expect(result.current.renamingId).toBe("new-id");
+    // myne#653: creating a note must NOT enter sidebar rename. The note carries
+    // its own `title:` field now, and seeding rename here pulled focus into an
+    // input that vanishes on blur, leaving a fresh note untitleable from
+    // either place. Asserted as `null` rather than omitted, because "we stopped
+    // setting it" is the fix and an absent assertion would not notice it coming
+    // back.
+    expect(result.current.renamingId).toBeNull();
+    // myne#654: it IS recorded as the session's newest create, which is what
+    // pins it to the top of its container in the tree.
+    expect(result.current.justCreatedId).toBe("new-id");
     const row = result.current.cache.get("new-id");
     expect(row?.title).toBeNull(); // Untitled placeholder
     expect(reindexNote).toHaveBeenCalledWith("new-id");
+  });
+
+  it("a drawing create DOES enter rename, it has no in-note title field", async () => {
+    createDrawing.mockResolvedValue("draw-id");
+    const { result } = renderHook(() => useSelectedNote(), { wrapper });
+    await act(async () => {
+      await result.current.createDrawingAndStartRename();
+    });
+    // The asymmetry with the note case above is deliberate, not leftover: a
+    // drawing's body is a fenced Excalidraw scene, so the sidebar rename is the
+    // only place its name can come from.
+    expect(result.current.renamingId).toBe("draw-id");
+    expect(result.current.justCreatedId).toBe("draw-id");
   });
 
   it("a foldered create refreshes the row to settle its folder", async () => {

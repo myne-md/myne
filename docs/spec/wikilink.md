@@ -135,7 +135,7 @@ Wikilink chips are registered with `EditorView.atomicRanges` so that:
 - **Backspace** (cursor immediately right of the chip) deletes the entire chip in one keystroke, including the `[[ ]]` delimiters in the source.
 - **Forward delete** (cursor immediately left of the chip) deletes the entire chip likewise.
 - **Left / right arrow** keys skip over the chip in one motion.
-- **Selection** spanning the chip selects the chip atomically — partial chip selection is not possible via cursor navigation. Mouse drag-selection is permitted to span the chip; in that case the underlying source `[[…]]` becomes part of the selection at byte level.
+- **Selection** spanning the chip selects the chip atomically **while it is rendered**. Partial chip selection is not possible via cursor navigation in that state. Once the chip has lifted (§5.4: the caret is at its start or inside it, or a selection overlaps it) the range is no longer atomic, so the caret and a selection move through the raw `[[…]]` a character at a time. Mouse drag-selection is permitted to span a rendered chip; in that case the underlying source becomes part of the selection at byte level.
 
 Atomicity applies to **all** recognized wikilink forms.
 
@@ -155,11 +155,17 @@ On a conflict between a path-form link's baked-in folder segment and the target 
 
 Broken wikilinks render with a distinct chip style: lighter foreground color, no underline, italic display text. The "Create note on click" affordance for broken wikilinks is deferred to v0.1.x.
 
-### 5.4 Cursor behavior — chip stays atomic regardless of cursor position
+### 5.4 Cursor behavior. The chip lifts for the caret that is ON it, and only that one
 
-Unlike other markdown decorations (headings, bold, links), **wikilink chips do not lift on cursor entry**. A line containing a wikilink shows the chip whether the cursor is on the line or off it. To edit a wikilink's source, the user either deletes the chip atomically and types a new one, or uses an explicit "edit wikilink" affordance (deferred — not in baseline).
+A wikilink chip lifts to its raw, editable `[[…]]` text when the caret is **at the chip's start or strictly inside it**, or when a selection overlaps it. A caret anywhere else on the line, including immediately after the closing `]]`, leaves every chip on that line rendered. This is the "edit wikilink affordance" the baseline deferred: it is the reveal itself.
 
-This is intentional: lifting a wikilink chip would expose `[[vault/relative/path.md|Display]]` as raw text on the active line, which the secondary persona experiences as "this is suddenly a programmer tool". The chip stays.
+The interval is half-open on purpose, and each end carries its own reason.
+
+**Not at `to`.** That is where the caret sits the instant a `]]` is typed. Revealing there meant a link the user had just written never rendered, so nothing ever confirmed that a link had been created; the writer had to move the caret off the line to find out. Leaving `to` out is what makes a finished wikilink render immediately.
+
+**At `from`.** The chip is an atomic range while it renders, so a caret can never be strictly inside one to trigger a reveal: atomic motion skips it. Arrowing leftward across a chip parks the caret at `from`, which reveals it and drops the atomicity, so the next press moves into the text. Arriving from the right lands on `to`, which does not reveal, so the atomic jump carries the caret to `from` and the reveal happens one press later.
+
+**This supersedes the original rule**, which was that chips never lift and the whole line stays rendered. What that cost is why it changed: putting the caret anywhere on a row tore every link on it open once the implementation used a line-scoped predicate, while the task checkbox on the same row stayed rendered, and a freshly typed link never rendered at all. The concern behind the original rule stands and is answered by the narrowing rather than abandoned: raw `[[vault/relative/path.md|Display]]` is shown only for the one chip the caret is in, never for its neighbours and never for a caret that is merely passing along the line. Provenance: myne-md/myne#659, and the decision entry it carries.
 
 ### 5.5 Folder-target resolution (MYND-370)
 

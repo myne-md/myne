@@ -76,6 +76,7 @@ import { acceptTagIntoView } from "../ai/acceptTagIntoView";
 import * as capabilities from "../../platform/capabilities";
 import { toggleTaskSwallowingRefusal } from "../toggleTask";
 import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-query-block";
+import { TITLE_FIELD_TESTID } from "@myne/editor/decorations/frontmatter";
 import { resolveCoverAttachmentId } from "../views/cardsView";
 import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
@@ -651,7 +652,7 @@ export function PaneView({
       if (scroller !== null) scroller.scrollTop = 0;
       return;
     }
-    applyScrollAnchor(view, anchor);
+    applyScrollAnchor(view, anchor, noteId);
   }, [content, activeId]);
 
   // myne-md/myne#600: a width change re-wraps the text, so the pixel the reader
@@ -663,6 +664,33 @@ export function PaneView({
     if (scroller === null || typeof ResizeObserver === "undefined") return;
     let lastWidth = scroller.clientWidth;
     const settle = trailingEdge(SCROLL_SETTLE_MS);
+    // myne-md/myne#652: never move the viewport out from under a pointer.
+    //
+    // The reported symptom was a click that jumped the editor 10-20 lines and
+    // selected everything it skipped. This restore is how: `clientWidth` changes
+    // for reasons that have nothing to do with the sidebar, most often the
+    // vertical scrollbar appearing or disappearing as the rendered height
+    // crosses the viewport, which a click can cause on its own by revealing a
+    // line's markup and making it taller. The restore then scrolls while the
+    // button is still down, and the browser reads the jump as a drag, so the
+    // skipped range is selected.
+    //
+    // Suppressing rather than deferring is the right half: the reader is looking
+    // at where they clicked, and putting a remembered line back is exactly what
+    // they do not want at that moment. A later resize restores as normal.
+    let pointerDown = false;
+    const onPointerDown = () => {
+      pointerDown = true;
+    };
+    const onPointerUp = () => {
+      pointerDown = false;
+    };
+    scroller.addEventListener("pointerdown", onPointerDown);
+    // On `window`, not the scroller: a drag that ends outside the pane (over the
+    // sidebar, past the window edge) never delivers `pointerup` to the scroller,
+    // and a flag stuck on would disable the restore for the rest of the session.
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     // Coalesced to the end of the resize, not per observation. Dragging the
     // split divider fires this once per frame, and each firing dispatched a
     // CodeMirror transaction carrying a `scrollIntoView`, whose own scroll then
@@ -673,17 +701,21 @@ export function PaneView({
       if (width === lastWidth) return; // height-only change: nothing re-wrapped
       lastWidth = width;
       settle.run(() => {
+        if (pointerDown) return; // myne#652, see the listeners above.
         const view = outlineViewRef.current;
         const noteId = activeIdRef.current;
         if (view === null || noteId === null) return;
         const anchor = recallScroll(noteId);
-        if (anchor !== undefined) applyScrollAnchor(view, anchor);
+        if (anchor !== undefined) applyScrollAnchor(view, anchor, noteId);
       });
     });
     observer.observe(scroller);
     return () => {
       settle.cancel();
       observer.disconnect();
+      scroller.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
     };
   }, []);
 
@@ -747,6 +779,38 @@ export function PaneView({
     },
     [recomputeActiveHeading],
   );
+
+  // myne#653's third criterion: the caret lands in the new note's title field.
+  //
+  // Creating a note no longer opens the sidebar's inline rename, and a note
+  // with a `title:` field that nobody is in is only two thirds of the fix: the
+  // user still has to find where the name goes. This puts them there.
+  //
+  // Keyed on the id rather than on a boolean so it fires once per created note,
+  // and guarded on THIS pane showing it so a split does not fight over focus.
+  // A `querySelector` rather than a ref because the field is a CodeMirror
+  // widget's DOM, rebuilt on every decoration pass, so a ref captured here
+  // would be stale by the time the note's body has mounted.
+  const focusedCreateRef = useRef<NoteId | null>(null);
+  useEffect(() => {
+    const created = ctx.justCreatedId;
+    if (created === null || created !== activeId || !focused) return;
+    if (focusedCreateRef.current === created) return;
+    const scroller = outlineScrollerRef.current;
+    if (scroller === null) return;
+    // Next frame: the body has just been handed to the editor and the
+    // frontmatter widget is built during its first measure pass.
+    const raf = requestAnimationFrame(() => {
+      const field = scroller.querySelector<HTMLInputElement>(
+        `[data-testid="${TITLE_FIELD_TESTID}"]`,
+      );
+      if (field === null) return;
+      focusedCreateRef.current = created;
+      field.focus();
+      field.select();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [ctx.justCreatedId, activeId, focused, content]);
 
   // MYND-617: results for every task-query block in this pane's document. The
   // editor finds the blocks and renders rows; what a query MEANS is decided
@@ -910,7 +974,7 @@ export function PaneView({
             if (!cancelled && scroller !== null) scroller.scrollTop = 0;
           });
         } else if (swappedView !== null) {
-          applyScrollAnchor(swappedView, remembered);
+          applyScrollAnchor(swappedView, remembered, activeId);
         }
         return () => {
           cancelled = true;

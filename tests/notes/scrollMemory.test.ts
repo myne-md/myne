@@ -16,8 +16,10 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
   applyScrollAnchor,
+  beginScrollRestore,
   evictClosedTabs,
   forgetScroll,
+  isRestoringScroll,
   readScrollAnchor,
   recallScroll,
   rememberScroll,
@@ -146,7 +148,7 @@ describe("applyScrollAnchor", () => {
   it("dispatches CodeMirror's scrollIntoView rather than assigning a scrollTop", () => {
     const view = stubbedView(0, 0);
     const dispatch = vi.spyOn(view, "dispatch");
-    applyScrollAnchor(view, { pos: 120, offsetPx: -20 });
+    applyScrollAnchor(view, { pos: 120, offsetPx: -20 }, "n1");
     expect(dispatch).toHaveBeenCalledTimes(1);
     const spec = dispatch.mock.calls[0]![0] as { effects?: unknown };
     expect(spec.effects).toBeDefined();
@@ -155,7 +157,7 @@ describe("applyScrollAnchor", () => {
   it("clamps a position past the end of a document that has since shrunk", () => {
     const view = stubbedView(0, 0);
     const dispatch = vi.spyOn(view, "dispatch");
-    applyScrollAnchor(view, { pos: 10_000, offsetPx: 0 });
+    applyScrollAnchor(view, { pos: 10_000, offsetPx: 0 }, "n1");
     // Dispatching a position outside the document throws; the clamp is what
     // keeps a stale anchor from taking the editor down with it.
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -189,5 +191,77 @@ describe("evictClosedTabs", () => {
     const cache = new Map<string, unknown>([["n1", {}], ["n2", {}]]);
     evictClosedTabs(new Set(["n1", "n2"]), new Set(["n2"]), cache);
     expect([...cache.keys()]).toEqual(["n2"]);
+  });
+});
+
+// myne-md/myne#651, a note walked one notch down the viewport on every sidebar
+// toggle and never walked back.
+//
+// The cause is a feedback loop with no damping, not a bad measurement.
+// `applyScrollAnchor` scrolls; that scroll fires the pane's scroll listener; the
+// listener calls `rememberScroll`, storing where the restore actually landed. A
+// restore is exact only when nothing changed, and it runs precisely because the
+// pane's width changed and re-wrapped the text, so the LINE goes back and its
+// offset within it does not. The residue is written over the anchor, so the next
+// restore starts from the drifted value and adds its own.
+describe("a restore does not write its own drift back", () => {
+  it("holds the anchor steady across ten restore cycles", () => {
+    // Each cycle reports a position 3px off from where it was asked to land ,
+    // the residue a re-wrap leaves. Before the fix that compounded to 30px,
+    // which is more than a line.
+    rememberScroll("n1", stubbedView(120, 80), stubbedScroller());
+    const original = recallScroll("n1");
+    expect(original).toEqual({ pos: 120, offsetPx: 30 });
+
+    for (let i = 1; i <= 10; i++) {
+      const view = stubbedView(120, 80 + i * 3); // the drifted reading
+      applyScrollAnchor(view, recallScroll("n1")!, "n1");
+      // The restore's own scroll reporting back, exactly as the pane's listener
+      // does. Suppressed, so it must change nothing.
+      rememberScroll("n1", view, stubbedScroller());
+    }
+
+    expect(recallScroll("n1")).toEqual(original);
+  });
+
+  // Non-vacuity, and the half that proves the anchor is not simply frozen.
+  it("remembers a genuine scroll once the window has passed", () => {
+    rememberScroll("n1", stubbedView(120, 80), stubbedScroller());
+    applyScrollAnchor(stubbedView(120, 80), recallScroll("n1")!, "n1");
+
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10_000);
+    expect(isRestoringScroll("n1")).toBe(false);
+
+    rememberScroll("n1", stubbedView(120, 200), stubbedScroller());
+    expect(recallScroll("n1")?.offsetPx).toBe(150);
+  });
+
+  // Per note: restoring one pane's note must not silence the remember for a
+  // different note the reader is scrolling in another pane.
+  it("suppresses only the note being restored", () => {
+    const t0 = 5_000_000;
+    beginScrollRestore("n1", t0);
+    expect(isRestoringScroll("n1", t0 + 100)).toBe(true);
+    expect(isRestoringScroll("n2", t0 + 100)).toBe(false);
+  });
+
+  it("covers PaneView's whole settle chain, not just the scroll", () => {
+    // The write to suppress arrives on the trailing edge of a 120ms timer that
+    // starts when the scroll lands, so a window shorter than that is the bug
+    // back. Asserted as a property rather than by reading the constant, so
+    // tightening it fails here.
+    const t0 = 6_000_000;
+    beginScrollRestore("n1", t0);
+    expect(isRestoringScroll("n1", t0 + 240)).toBe(true);
+  });
+
+  it("clears the in-flight marks on reset, like the anchors themselves", () => {
+    // `resetScrollMemory` runs on every vault-leaving path
+    // (`check-frontend-lock-teardown.mjs` asserts it). A mark left behind
+    // outlives its vault and silences the first scroll write of the next
+    // session's note with the same id.
+    beginScrollRestore("n1");
+    resetScrollMemory();
+    expect(isRestoringScroll("n1")).toBe(false);
   });
 });

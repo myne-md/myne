@@ -20,6 +20,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
+  nameNewNote,
   createNote,
   dismissImporterOffer,
   unlockToEditor,
@@ -59,8 +60,7 @@ async function createNoteInFolder(
   title: string,
 ): Promise<void> {
   await contextMenuPick(s, folder, "new-note");
-  await (await s.byTestId("notes.rename-input")).sendKeys(`${title}`);
-  await s.waitForGone(testIdSelector("notes.rename-input"));
+  await nameNewNote(s, title);
 }
 
 describeE2E("fa1 folder-archive lifecycle (folder-archive)", () => {

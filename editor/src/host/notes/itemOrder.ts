@@ -103,12 +103,35 @@ export type OrderedNoteRecord = { updatedAt?: Date | null };
  * children sort after all listed ones — folders before notes (by folded name),
  * then notes by recency (`updatedAt` desc, UUIDv7 fallback). Notes not in
  * `cache` are dropped (the windowing gate).
+ *
+ * `pinFirst` is the one key that sorts above all of that, the note the user
+ * just created (myne#654). It is **transient session state, never persisted**,
+ * and that is the whole design. A new note was already first among its
+ * container's notes (recency desc), but "folders before notes" put it below
+ * every folder, which in a vault with any structure reads as the bottom of the
+ * tree. Two fixes were rejected before this one and the reasons are worth
+ * keeping: writing the new note into `item_order` at index 0 makes every note
+ * ever created a permanently hand-ordered entry, so that array grows without
+ * bound inside the re-encrypted-on-every-write `vault.prefs` blob; and flipping
+ * the folders-before-notes rule buries the folders under every loose note,
+ * which is a worse version of the complaint. A single transient pin costs
+ * nothing, changes no convention, and stops mattering the moment the next note
+ * is created.
+ *
+ * **Required, not defaulted.** A default here is the arm that never fires
+ * (`CLAUDE.md`), and it cost something real before it was made required: the
+ * drag-reorder baseline in `useFolderManagement.ts` reuses this comparator on
+ * the promise that "the sidebar's render order IS the reorder baseline", and it
+ * silently took the default, so a drag while a pin was live computed a sequence
+ * against a list nobody was looking at. Requiring it turned that into a compile
+ * error at the one site that had it wrong.
  */
 export function orderContainerChildren(
   folders: readonly FolderNode[],
   noteIds: readonly NoteId[],
   cache: ReadonlyMap<NoteId, OrderedNoteRecord>,
   rank: ReadonlyMap<string, number>,
+  pinFirst: string | null,
 ): Child[] {
   const children: Child[] = [
     ...folders.map((node) => ({ kind: "folder" as const, node })),
@@ -122,6 +145,16 @@ export function orderContainerChildren(
     cache.get(id)?.updatedAt?.getTime() ?? uuidv7Ms(id) ?? 0;
 
   children.sort((a, b) => {
+    // myne#654: the just-created note sorts above everything in its container,
+    // folders included. It outranks the manual sequence too, deliberately ,
+    // this is a transient "here is the thing you just made" pin, not an
+    // ordering opinion, and it must not be silently outvoted by a container the
+    // user had already arranged by hand.
+    if (pinFirst !== null) {
+      const pa = keyOf(a) === pinFirst;
+      const pb = keyOf(b) === pinFirst;
+      if (pa !== pb) return pa ? -1 : 1;
+    }
     const ra = rank.get(keyOf(a)) ?? MAX;
     const rb = rank.get(keyOf(b)) ?? MAX;
     if (ra !== rb) return ra - rb;
