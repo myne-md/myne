@@ -30,7 +30,22 @@ export interface ChatTurnJson {
   text: string;
   error?: boolean;
   agentSummary?: AgentSummaryJson;
+  /** Newer-writer fields ride through opaquely (forward tolerance), mirroring
+   *  desktop's `rest`: a hydrate plus re-persist must not strip them. */
+  rest?: Record<string, unknown>;
 }
+
+/** Every turn key this reader knows. Anything else on a parsed turn is a
+ *  newer writer's field and rides in `rest` (forward tolerance), mirroring
+ *  desktop's `KNOWN_TURN_KEYS`. */
+const KNOWN_TURN_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "kind",
+  "role",
+  "text",
+  "error",
+  "agentSummary",
+]);
 
 /** The settled-run summary a turn keeps. Mirrors desktop's `AgentTurnSummary`
  *  (same field names, same meanings); `proposal` rides along frozen so a
@@ -110,11 +125,87 @@ export function parseTranscript(payload: string): ChatTurnJson[] | null {
     const turn: ChatTurnJson = { id, kind, role, text };
     if (raw["error"] === true) turn.error = true;
     if (isRecord(raw["agentSummary"])) {
-      turn.agentSummary = raw["agentSummary"] as unknown as AgentSummaryJson;
+      const summary = parseAgentSummary(raw["agentSummary"]);
+      if (summary !== null) turn.agentSummary = summary;
     }
+    // Residual unknown fields ride through opaquely (forward tolerance): a
+    // turn carrying a field added by a newer writer keeps it across this
+    // client's hydrate plus re-persist instead of losing it on the next
+    // settle (which would strip it cluster-wide on merge).
+    const rest: Record<string, unknown> = {};
+    for (const key of Object.keys(raw)) {
+      if (!KNOWN_TURN_KEYS.has(key)) rest[key] = raw[key];
+    }
+    if (Object.keys(rest).length > 0) turn.rest = rest;
     turns.push(turn);
   }
   return turns;
+}
+
+/** Closed end set, mirroring desktop's `AgentTurnEnd` (same vocabulary, so a
+ *  value valid on one twin parses on the other). */
+const AGENT_SUMMARY_ENDS: ReadonlySet<string> = new Set([
+  "finished",
+  "awaitingScope",
+  "cancelled",
+  "exhaustedIterations",
+  "stalled",
+]);
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** Validate a persisted agent summary. `null` when malformed: the turn keeps
+ *  its text but the summary is dropped, so a corrupt summary cannot flow into
+ *  render paths (`summary.length`) while user text is never the price. */
+function parseAgentSummary(raw: Record<string, unknown>): AgentSummaryJson | null {
+  const { runId, summary, edits, newNotes, notesRead, iterations, charsOffDevice, end } = raw;
+  if (typeof runId !== "string" || typeof summary !== "string") return null;
+  if (
+    !isFiniteNumber(edits) ||
+    !isFiniteNumber(newNotes) ||
+    !isFiniteNumber(notesRead) ||
+    !isFiniteNumber(iterations)
+  ) {
+    return null;
+  }
+  if (charsOffDevice !== null && !isFiniteNumber(charsOffDevice)) return null;
+  if (typeof end !== "string" || !AGENT_SUMMARY_ENDS.has(end)) return null;
+  const out: AgentSummaryJson = {
+    runId,
+    summary,
+    edits,
+    newNotes,
+    notesRead,
+    iterations,
+    charsOffDevice,
+    end,
+  };
+  if (isRecord(raw["proposal"])) {
+    const proposal = raw["proposal"];
+    const editsOk =
+      Array.isArray(proposal["edits"]) &&
+      proposal["edits"].every(
+        (e) =>
+          isRecord(e) &&
+          typeof e["noteId"] === "string" &&
+          typeof e["anchor"] === "string" &&
+          typeof e["replacement"] === "string",
+      );
+    const newNotesOk =
+      Array.isArray(proposal["newNotes"]) &&
+      proposal["newNotes"].every(
+        (n) =>
+          isRecord(n) &&
+          typeof n["title"] === "string" &&
+          typeof n["body"] === "string" &&
+          (typeof n["folder"] === "string" || n["folder"] === null),
+      );
+    if (!editsOk || !newNotesOk) return null;
+    out.proposal = proposal as AgentSummaryJson["proposal"];
+  }
+  return out;
 }
 
 /** One model-bound turn: the only shape the run's history argument takes. */
@@ -251,7 +342,7 @@ export function stageTranscript(id: string | null, turns: readonly ChatTurnJson[
  *  slot while a background `flushChatHistoryNow` can run concurrently with
  *  `persistPair`'s flush, and two in-flight flushes would otherwise land in
  *  IPC-completion order (an older transcript after a newer one, silently
- *  losing turns — the desktop twin closes the same shape with its `seq`
+ *  losing turns: the desktop twin closes the same shape with its `seq`
  *  rule). Each execution reads the CURRENT slot, so every flush in the queue
  *  writes the newest staged payload and the dedup collapses the rest. */
 export function flushPendingTranscript(): Promise<string | null> {

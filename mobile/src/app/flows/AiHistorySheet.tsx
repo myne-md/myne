@@ -11,7 +11,7 @@
 // caller stays the single owner of the active conversation. What it owns is
 // the list's own loading/error/rename/delete-arm UI state.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -101,7 +101,10 @@ const SMALL_BUTTON: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-semibold)",
   cursor: "pointer",
-  padding: "6px 8px",
+  padding: "var(--space-2) var(--space-3)",
+  // 44px touch floor on the client where every tap is a finger: the token
+  // padding alone sizes below it on one-line labels.
+  minHeight: 44,
 };
 
 const DELETE_CONFIRM_BUTTON: CSSProperties = {
@@ -162,6 +165,18 @@ export function AiHistorySheet({
     };
   }, []);
 
+  // Dialog focus: move into the card on open, return to the opener on close.
+  // (No full focus trap: the sheet holds no tabbable loop worth trapping;
+  // Escape and scrim-tap are the exits.)
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    cardRef.current?.focus();
+    return () => {
+      opener?.focus?.();
+    };
+  }, []);
+
   async function commitRename(id: string): Promise<void> {
     const title = draft.trim();
     if (title.length === 0) {
@@ -199,8 +214,11 @@ export function AiHistorySheet({
         // Scrim tap dismisses; taps inside the card must not bubble up to it.
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
     >
-      <div style={CARD}>
+      <div ref={cardRef} tabIndex={-1} style={CARD}>
         <div style={BODY}>
           <h2 id="ai-history-title" data-testid="ai.history-title" style={TITLE}>
             {t("editor.chrome.rightPanel.aiChat.historyTitle")}
@@ -257,6 +275,12 @@ export function AiHistorySheet({
                   ) : deletingId === row.id ? (
                     <>
                       <span style={ROW_TITLE}>{row.title}</span>
+                      <span data-testid="ai.conversation-delete-title" style={ROW_TITLE}>
+                        {t("editor.chrome.rightPanel.aiChat.historyDeleteTitle")}
+                      </span>
+                      <span data-testid="ai.conversation-delete-body" style={META}>
+                        {t("editor.chrome.rightPanel.aiChat.historyDeleteBody")}
+                      </span>
                       <button
                         type="button"
                         data-testid="ai.conversation-delete-confirm"

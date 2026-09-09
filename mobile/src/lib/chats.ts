@@ -14,7 +14,8 @@ export type ChatsReadErrorKind =
   | "Io"
   | "InvalidVaultMeta"
   | "CatalogUnreadable"
-  | "ConversationUnreadable";
+  | "ConversationUnreadable"
+  | "ConversationNotFound";
 
 export interface ChatsReadError {
   kind: ChatsReadErrorKind;

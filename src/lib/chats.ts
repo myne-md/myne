@@ -23,7 +23,10 @@ export type ChatsReadErrorKind =
   // A conversation file failed under a live catalog row. Carries no detail:
   // the caller named the conversation in its own request. The catalog row
   // is NOT dropped in response (§ 9.24.4).
-  | "ConversationUnreadable";
+  | "ConversationUnreadable"
+  // The named conversation is tombstoned or has no catalog row. Reads check
+  // liveness first, so a deleted conversation stays unreadable by id.
+  | "ConversationNotFound";
 
 /** Mirror of Rust `ChatsReadError` (serde `tag = "kind", content = "detail"`). */
 export interface ChatsReadError {

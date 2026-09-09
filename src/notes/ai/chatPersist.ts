@@ -293,11 +293,25 @@ export interface ChatPersistSnapshot {
   id: string | null;
   payload: string;
   seq: number;
+  /** Wipe epoch at capture time. A lock/switch wipe bumps the module epoch;
+   *  an attempt from an older epoch drops instead of writing, stashing, or
+   *  retrying, so an in-flight persist can never resurrect plaintext after
+   *  the wipe nor replay vault A's turns into vault B's store. */
+  epoch: number;
 }
 
 let persistSeq = 0;
 
+// Wipe epoch for the persist queue. Bumped by `clearChatPersistForLock` on
+// every vault-leaving path; attempts captured before the bump are stale.
+let persistWipeEpoch = 0;
+
 async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): Promise<void> {
+  if (snap.epoch !== persistWipeEpoch) {
+    // A lock/switch wipe landed after this snapshot was captured: stale,
+    // drop. No write, no stash, no retry, no lagging flag.
+    return;
+  }
   if (
     lastPersisted !== null &&
     lastPersisted.id === snap.id &&
@@ -334,7 +348,7 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
     // (a create replays as a create). Dropped by `clearChatPersistForLock`
     // on the vault-leaving paths: the lock wipe is total, and a replay that
     // crossed a vault switch would write vault A's turns into vault B's store.
-    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq };
+    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch };
     setLagging(true);
     if (attempt < PERSIST_RETRIES) {
       if (retryTimer !== null) clearTimeout(retryTimer);
@@ -378,6 +392,7 @@ export function installChatPersistence(): void {
       id: getActiveConversationId(),
       payload: serializeTranscript(getChat().turns),
       seq: ++persistSeq,
+      epoch: persistWipeEpoch,
     };
     void enqueueSnapshot(0, snap).catch(() => {
       // Unreachable (persistSnapshotOnce catches internally); kept so the
@@ -400,6 +415,7 @@ export function installChatPersistence(): void {
 export function clearChatPersistForLock(): void {
   lastPersisted = null;
   unsavedAppend = null;
+  persistWipeEpoch++;
   if (retryTimer !== null) {
     clearTimeout(retryTimer);
     retryTimer = null;
@@ -459,6 +475,12 @@ export async function hydrateActiveConversation(): Promise<void> {
   // the lagging flag for the next attempt.
   if (unsavedAppend !== null) {
     const stash = unsavedAppend;
+    if (stash.epoch !== persistWipeEpoch) {
+      // A wipe landed without clearing the stash (or the stash predates it):
+      // never replay across a vault-leaving boundary. Drop, do not write.
+      unsavedAppend = null;
+      setLagging(false);
+    } else
     try {
       if (stash.id === null) {
         const created = await chatsCreate(stash.payload);

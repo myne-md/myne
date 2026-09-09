@@ -40,6 +40,12 @@ pub enum ChatsReadError {
     /// an IPC-bound error would be the enum's first payload of that kind).
     #[error("a conversation is unreadable")]
     ConversationUnreadable,
+    /// The named conversation is tombstoned in the catalog (deleted) or has
+    /// no catalog row at all. Reads consult catalog liveness first, so a
+    /// deleted conversation stays unreadable by id even when its file erase
+    /// failed and the bytes are still on disk.
+    #[error("conversation not found")]
+    ConversationNotFound,
 }
 
 impl From<IoFailureKind> for ChatsReadError {
