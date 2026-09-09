@@ -47,6 +47,7 @@
 //! | [`SubkeyRole::PrefsSyncId`]            | `prefs-sync-id`           |
 //! | [`SubkeyRole::CustomThemesKey`]        | `custom-themes-key`       |
 //! | [`SubkeyRole::ThemesSyncId`]           | `themes-sync-id`          |
+//! | [`SubkeyRole::MembershipKey`]          | `membership-key`          |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -212,6 +213,15 @@ const ROLE_STR_THEMES_SYNC_ID: &[u8] = b"themes-sync-id";
 /// `"graph-layout-blob"`.
 const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 
+/// Registered role string for the v0.2 vault membership field KEK (encrypts the
+/// sealed account id in `vault.meta` §9.3.1, the account/vault split,
+/// `decisions.md` 2026-09-07). Load-bearing: drift silently changes the KEK.
+/// Derived under the v0.2 context prefix (the field is NTV5-only), NOT v0.1:
+/// `root_key`-derived (like prefs/search/workspace), so it is `itemsKey`-independent
+/// and survives a later epoch rotation. DISTINCT from the AAD role string
+/// `"membership-blob"`.
+const ROLE_STR_MEMBERSHIP_KEY: &[u8] = b"membership-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -331,6 +341,14 @@ pub enum SubkeyRole {
     /// backed up. Distinct from every other blob KEK so the families stay
     /// domain-separated.
     GraphLayoutKey,
+    /// KEK for the v0.2 vault membership field (`vault.meta` §9.3.1). Encrypts the
+    /// sealed account id under XChaCha20-Poly1305 (CTX commitment outer),
+    /// derived under the v0.2 context prefix because the field is NTV5-only.
+    /// `root_key`-derived (like prefs/search/workspace), so it is
+    /// `itemsKey`-independent and survives a later epoch rotation. Distinct from
+    /// every other blob KEK so the families stay domain-separated; distinct from
+    /// the AAD role `"membership-blob"`.
+    MembershipKey,
 }
 
 impl SubkeyRole {
@@ -346,7 +364,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 17] = [
+    pub const ALL: [SubkeyRole; 18] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -364,6 +382,7 @@ impl SubkeyRole {
         SubkeyRole::CustomThemesKey,
         SubkeyRole::ThemesSyncId,
         SubkeyRole::GraphLayoutKey,
+        SubkeyRole::MembershipKey,
     ];
 
     /// Registered role string (the part appended after the
@@ -388,6 +407,7 @@ impl SubkeyRole {
             SubkeyRole::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
             SubkeyRole::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
             SubkeyRole::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
+            SubkeyRole::MembershipKey => ROLE_STR_MEMBERSHIP_KEY,
         }
     }
 }
@@ -500,6 +520,7 @@ mod tests {
                 SubkeyRole::CustomThemesKey => 14,
                 SubkeyRole::ThemesSyncId => 15,
                 SubkeyRole::GraphLayoutKey => 16,
+                SubkeyRole::MembershipKey => 17,
             }
         }
 
@@ -801,6 +822,27 @@ mod tests {
     }
 
     #[test]
+    fn membership_key_role_string_matches_spec_registry() {
+        // Registry entry "myne.v0.2 membership-key" (§3.4; §9.3.1). KEK for the
+        // sealed vault membership field; drift silently changes the KEK.
+        assert_eq!(SubkeyRole::MembershipKey.role_str(), b"membership-key");
+    }
+
+    #[test]
+    fn membership_key_is_distinct_from_other_root_key_blobs() {
+        // The membership KEK must differ from every other root_key-derived blob
+        // KEK so the families stay domain-separated (HKDF info-string property).
+        let root = [0u8; 32];
+        let mk = derive_subkey(&root, SubkeyRole::MembershipKey);
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
+        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+    }
+
+    #[test]
     fn graph_layout_key_is_distinct_from_other_root_key_blobs() {
         // vault.graph (layout cache) is its own blob family — its KEK must be
         // domain-separated from its structural siblings, most importantly the
@@ -1023,6 +1065,7 @@ mod tests {
                 SubkeyRole::CustomThemesKey => "custom-themes-key",
                 SubkeyRole::ThemesSyncId => "themes-sync-id",
                 SubkeyRole::GraphLayoutKey => "graph-layout-key",
+                SubkeyRole::MembershipKey => "membership-key",
             }
         }
 
@@ -1321,7 +1364,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key — every variant of the SubkeyRole enum, enforced by the SubkeyRole::ALL coverage pin in the companion runner. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key. MembershipKey derives under the v0.2 prefix and is pinned by the hkdf-sha256/v0.2 category instead. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
@@ -1369,5 +1412,96 @@ mod tests {
 
         std::fs::write("/tmp/myne_hkdf_sha256_vectors.json", dump.as_bytes())
             .expect("write hkdf vectors dump");
+    }
+
+    /// Emit the v0.2 `hkdf-sha256` vectors for paste into the companion repo
+    /// (`vectors/hkdf-sha256/v0.2/cases.json`).
+    ///
+    /// The membership KEK derives under the v0.2 context prefix
+    /// (`derive_subkey_v0_2`, info `'myne.v0.2 membership-key'`), so it cannot
+    /// live in the v0.1 category, whose envelope promises v0.1 info bytes.
+    /// Same zero/alpha roots as the v0.1 family for cross-version eyeballing.
+    /// Run: `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_subkey_v0_2_vectors_for_paste() {
+        extern crate std;
+        use sha2::Digest;
+
+        fn pseudorandom_root(label: &[u8]) -> [u8; 32] {
+            let digest = sha2::Sha256::digest(label);
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&digest);
+            out
+        }
+
+        let zero_root: [u8; 32] = [0u8; 32];
+        let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
+
+        let cases: [(&str, &str, &[u8; 32], bool); 2] = [
+            (
+                "zero-root-membership-key",
+                "All-zero root_key with the MembershipKey role (§3.4; §9.3.1). KEK for the sealed vault membership field (the account/vault split, decisions.md 2026-09-07); role string 'membership-key' (14 ASCII bytes). Derived under the v0.2 context prefix because the field is NTV5-only: info is 'myne.v0.2 membership-key' (24 bytes). root_key-derived (like prefs/search/workspace), so it is itemsKey-independent. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
+                &zero_root,
+                false,
+            ),
+            (
+                "prn-alpha-membership-key",
+                "Pseudorandom alpha root with the MembershipKey role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.2 membership-key') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'membership-key' is DISTINCT from the AAD role string 'membership-blob' (aad_membership_blob): two different load-bearing strings in the same feature.",
+                &alpha,
+                true,
+            ),
+        ];
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4 + §10.7\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the membership KEK: the one role that derives under the v0.2 context prefix (info='myne.v0.2 '||role) because its field is NTV5-only. Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        for (i, (slug, desc, root, include_info)) in cases.iter().enumerate() {
+            let subkey = derive_subkey_v0_2(root, SubkeyRole::MembershipKey);
+
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"hkdf-sha256/v0.2/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(desc)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex_lower(root.as_slice())
+            ));
+            dump.push_str("      \"input_role\": \"membership-key\",\n");
+            if *include_info {
+                let mut info = alloc::vec::Vec::new();
+                info.extend_from_slice(HKDF_PREFIX_V0_2);
+                info.extend_from_slice(SubkeyRole::MembershipKey.role_str());
+                dump.push_str(&alloc::format!(
+                    "      \"informational_info_utf8_hex\": \"{}\",\n",
+                    hex_lower(&info)
+                ));
+            }
+            dump.push_str(&alloc::format!(
+                "      \"expected_subkey_hex\": \"{}\"\n",
+                hex_lower(&*subkey)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_hkdf_sha256_v0_2_vectors.json", dump.as_bytes())
+            .expect("write hkdf v0.2 vectors dump");
     }
 }

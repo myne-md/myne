@@ -104,6 +104,7 @@ pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
         items_key_id: [7u8; 16],
         items_key_nonce: [8u8; 24],
         enc_items_key: [9u8; 64],
+        membership: None,
     };
     std::fs::write(
         dir.join("vault.meta"),

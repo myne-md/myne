@@ -189,9 +189,7 @@ mod tests {
     /// Build a real v0.2 (`NTV5`) `vault.meta` under `password`, returning the
     /// serialized bytes plus the `root_key` and `items_key` it wraps (so the
     /// test can assert the unlock path recovers them byte-exactly).
-    fn build_v0_2_vault(
-        password: &str,
-    ) -> ([u8; protocol::VAULT_META_LEN], [u8; 32], [u8; 32], String) {
+    fn build_v0_2_vault(password: &str) -> (Vec<u8>, [u8; 32], [u8; 32], String) {
         let account = protocol::generate_account_number().expect("account");
         let phrase = protocol::generate_recovery_phrase().expect("phrase");
         let root_key = protocol::generate_root_key().expect("root_key");
@@ -258,6 +256,7 @@ mod tests {
             items_key_id,
             items_key_nonce: nonce_items,
             enc_items_key: enc_items.as_slice().try_into().expect("64 bytes"),
+            membership: None,
         };
         let bytes = protocol::serialize_vault_meta_v0_2(&meta);
         let phrase_normalized = phrase.join_normalized().to_string();

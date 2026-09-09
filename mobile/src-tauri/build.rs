@@ -280,6 +280,22 @@ fn main() {
                 ]),
             )
             .plugin(
+                // Account record (the account/vault split, myne-md/myne#684):
+                // shared from `myne-core`; the same FOUR commands the desktop
+                // registers. On iOS the keychain exists so grouping works; on
+                // Android `platform_keychain` has no backend, so the store holds
+                // nothing and vaults show standalone (never an error, never
+                // plaintext). Adding a command here without a matching entry in
+                // `permissions/account/default.toml` is a security bug.
+                "account",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "account_list",
+                    "account_rename",
+                    "account_move",
+                    "account_split",
+                ]),
+            )
+            .plugin(
                 // Custom themes (MYT1, §9.21): shared from `myne-core`, but ONE
                 // command of desktop's five — mobile is a read-only consumer of
                 // a store the desktop authors, and the other four must not be

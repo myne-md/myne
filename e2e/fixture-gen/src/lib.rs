@@ -216,6 +216,7 @@ pub fn build_fixture_in(
         items_key_id,
         items_key_nonce,
         enc_items_key,
+        membership: None,
     };
 
     Ok(Fixture {
@@ -223,7 +224,9 @@ pub fn build_fixture_in(
         password: password.to_string(),
         phrase: phrase.words().join(" "),
         account: account.display.clone(),
-        meta_bytes: serialize_vault_meta_versioned(generation, &meta),
+        meta_bytes: serialize_vault_meta_versioned(generation, &meta)
+            .try_into()
+            .expect("fixture meta is always the 345-byte base layout (membership: None)"),
         generation,
         account_hash: account.hash,
         root_key,

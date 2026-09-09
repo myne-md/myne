@@ -29,8 +29,8 @@
 //! [`encode_vault_meta_v0_2`].
 
 use crate::aead::{
-    aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_vault_items_key_wrap_v0_2, aead_open_ctx,
-    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    aad_membership_blob, aad_password_wrap_v0_2, aad_recovery_wrap_v0_2,
+    aad_vault_items_key_wrap_v0_2, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
 };
 use crate::error::ProtocolError;
 use crate::kdf::{
@@ -39,10 +39,12 @@ use crate::kdf::{
 use crate::subkey::{derive_subkey_v0_2, SubkeyRole};
 use crate::types::{KdfParams, MetaVersion};
 use crate::vault_meta::{
-    parse_vault_meta, serialize_vault_meta, VaultMeta, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
-    VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION, VAULT_META_WRAPPED_ITEMS_KEY_LEN,
-    VAULT_META_WRAPPED_ROOT_KEY_LEN,
+    parse_vault_meta, serialize_vault_meta, Membership, VaultMeta, MEMBERSHIP_ACCOUNT_ID_LEN,
+    MEMBERSHIP_CIPHERTEXT_LEN, MEMBERSHIP_FIELD_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
+    VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION, VAULT_META_V0_2_WITH_MEMBERSHIP_LEN,
+    VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
+use alloc::vec::Vec;
 use zeroize::Zeroizing;
 
 /// `NTV5` magic (offset 0) — the v0.2 `vault.meta` family (`protocol.md` §10.3
@@ -56,23 +58,39 @@ pub const VAULT_META_V0_2_PROTOCOL_VERSION: u8 = 0x02;
 /// `MYV1` layout (§9.3) with the `NTV5` magic + `0x02` version. The field bytes
 /// are produced by the shared [`serialize_vault_meta`], so a v0.1/v0.2 layout
 /// drift is impossible by construction.
-pub fn serialize_vault_meta_v0_2(meta: &VaultMeta) -> [u8; VAULT_META_LEN] {
-    let mut out = serialize_vault_meta(meta);
+///
+/// When `meta.membership` is `Some`, the sealed membership field (§9.3.1) is
+/// appended after the base 345-byte layout and the `reserved` byte at offset 5
+/// is set to `0x01`, producing a 417-byte blob. When it is `None`, the blob is
+/// the base 345 bytes with `reserved` `0x00` (an unmigrated vault). The return
+/// type is `Vec<u8>` because the field is optional and the length varies.
+pub fn serialize_vault_meta_v0_2(meta: &VaultMeta) -> Vec<u8> {
+    let mut out = serialize_vault_meta(meta).to_vec();
     out[0..4].copy_from_slice(&VAULT_META_V0_2_MAGIC);
     out[4] = VAULT_META_V0_2_PROTOCOL_VERSION;
+    if let Some(membership) = &meta.membership {
+        out[5] = 0x01;
+        out.extend_from_slice(&membership.nonce);
+        out.extend_from_slice(&membership.enc);
+    }
     out
 }
 
-/// Parse a 345-byte `NTV5` slice into a [`VaultMeta`]. Rejects a wrong length,
-/// non-`NTV5` magic, or non-`0x02` version with [`ProtocolError::InvalidVaultMeta`].
+/// Parse an `NTV5` slice into a [`VaultMeta`]. Accepts both the base 345-byte
+/// layout (no membership field, `reserved` `0x00`) and the 417-byte layout with
+/// the membership field (`reserved` `0x01`). Rejects a wrong length, non-`NTV5`
+/// magic, non-`0x02` version, or a `reserved` byte other than `0x00`/`0x01` with
+/// [`ProtocolError::InvalidVaultMeta`].
 ///
 /// After validating the magic + version, it delegates the field extraction to the
 /// shared [`parse_vault_meta`] by presenting the identical trailing bytes under
 /// the v0.1 magic/version — `NTV5` and `MYV1` differ ONLY in bytes `[0..5]`, and
 /// no extracted field lives there — so the two parsers can never disagree about
-/// what a byte at any later offset means.
+/// what a byte at any later offset means. The membership field (when present) is
+/// read from the trailing 72 bytes and carried as `membership: Some(..)`; it is
+/// NOT AEAD-opened here (that needs `root_key`, which the parser does not hold).
 pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
-    if bytes.len() != VAULT_META_LEN {
+    if bytes.len() != VAULT_META_LEN && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
         return Err(ProtocolError::InvalidVaultMeta);
     }
     if bytes[0..4] != VAULT_META_V0_2_MAGIC {
@@ -81,11 +99,36 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
     if bytes[4] != VAULT_META_V0_2_PROTOCOL_VERSION {
         return Err(ProtocolError::InvalidVaultMeta);
     }
+    let reserved = bytes[5];
+    if reserved != 0x00 && reserved != 0x01 {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let has_membership = reserved == 0x01;
+    if has_membership && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    if !has_membership && bytes.len() != VAULT_META_LEN {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+
     let mut as_v0_1 = [0u8; VAULT_META_LEN];
-    as_v0_1.copy_from_slice(bytes);
+    as_v0_1.copy_from_slice(&bytes[..VAULT_META_LEN]);
     as_v0_1[0..4].copy_from_slice(&VAULT_META_MAGIC);
     as_v0_1[4] = VAULT_META_PROTOCOL_VERSION;
-    parse_vault_meta(&as_v0_1)
+    as_v0_1[5] = 0x00;
+    let mut meta = parse_vault_meta(&as_v0_1)?;
+
+    if has_membership {
+        let mut nonce = [0u8; AEAD_NONCE_LEN];
+        nonce.copy_from_slice(&bytes[VAULT_META_LEN..VAULT_META_LEN + AEAD_NONCE_LEN]);
+        let mut enc = [0u8; MEMBERSHIP_CIPHERTEXT_LEN];
+        enc.copy_from_slice(
+            &bytes[VAULT_META_LEN + AEAD_NONCE_LEN..VAULT_META_LEN + MEMBERSHIP_FIELD_LEN],
+        );
+        meta.membership = Some(Membership { nonce, enc });
+    }
+
+    Ok(meta)
 }
 
 /// Classify a `vault.meta` blob by its magic — `MYV1` → [`MetaVersion::V0_1`],
@@ -190,8 +233,13 @@ pub fn encode_vault_meta_v0_2_raw(
         items_key_id: *items_key_id,
         items_key_nonce: *items_key_nonce,
         enc_items_key,
+        membership: None,
     };
-    Ok(serialize_vault_meta_v0_2(&meta))
+    let out = serialize_vault_meta_v0_2(&meta);
+    debug_assert_eq!(out.len(), VAULT_META_LEN);
+    let mut arr = [0u8; VAULT_META_LEN];
+    arr.copy_from_slice(&out);
+    Ok(arr)
 }
 
 /// Unwrap the v0.2 `root_key` from an `NTV5` `vault.meta` under the **password**
@@ -252,7 +300,7 @@ pub fn rewrite_vault_meta_password_side_v0_2(
     new_password: &str,
     fresh_salt: &[u8; ARGON2_SALT_LEN],
     fresh_nonce: &[u8; AEAD_NONCE_LEN],
-) -> Result<[u8; VAULT_META_LEN], ProtocolError> {
+) -> Result<Vec<u8>, ProtocolError> {
     let kdf_params = existing.kdf_params;
     let password_wrap_key = derive_password_wrap_key_v0_2(
         new_password,
@@ -278,6 +326,7 @@ pub fn rewrite_vault_meta_password_side_v0_2(
         items_key_id: existing.items_key_id,
         items_key_nonce: existing.items_key_nonce,
         enc_items_key: existing.enc_items_key,
+        membership: existing.membership.clone(),
     };
     Ok(serialize_vault_meta_v0_2(&new_meta))
 }
@@ -295,7 +344,7 @@ pub fn rewrite_vault_meta_password_side_versioned(
     new_password: &str,
     fresh_salt: &[u8; ARGON2_SALT_LEN],
     fresh_nonce: &[u8; AEAD_NONCE_LEN],
-) -> Result<[u8; VAULT_META_LEN], ProtocolError> {
+) -> Result<Vec<u8>, ProtocolError> {
     match version {
         MetaVersion::V0_1 => crate::vault_meta::rewrite_vault_meta_password_side(
             existing,
@@ -303,7 +352,8 @@ pub fn rewrite_vault_meta_password_side_versioned(
             new_password,
             fresh_salt,
             fresh_nonce,
-        ),
+        )
+        .map(|arr| arr.to_vec()),
         MetaVersion::V0_2 => rewrite_vault_meta_password_side_v0_2(
             existing,
             root_key,
@@ -341,12 +391,9 @@ pub fn derive_items_key_v0_2(
 /// whatever it was handed — and on a v0.2 record that produces a blob claiming
 /// v0.1 over v0.2 wrap bytes, which no credential opens and which strands every
 /// `NC05` note behind an unreachable `itemsKey`.
-pub fn serialize_vault_meta_versioned(
-    version: MetaVersion,
-    meta: &VaultMeta,
-) -> [u8; VAULT_META_LEN] {
+pub fn serialize_vault_meta_versioned(version: MetaVersion, meta: &VaultMeta) -> Vec<u8> {
     match version {
-        MetaVersion::V0_1 => crate::vault_meta::serialize_vault_meta(meta),
+        MetaVersion::V0_1 => crate::vault_meta::serialize_vault_meta(meta).to_vec(),
         MetaVersion::V0_2 => serialize_vault_meta_v0_2(meta),
     }
 }
@@ -385,6 +432,50 @@ fn to_key(
     let mut k = Zeroizing::new([0u8; AEAD_KEY_LEN]);
     k.copy_from_slice(&pt);
     Ok(k)
+}
+
+/// Seal the account id into a [`Membership`] field (`vault.meta` §9.3.1), under
+/// `membership_key = derive_subkey_v0_2(root_key, MembershipKey)` with the
+/// `aad_membership_blob` AAD. `_raw`: the caller supplies the nonce (CSPRNG).
+///
+/// The account id is a 16-byte UUIDv7. The seal is `NTV5`-only, so the KEK and
+/// AAD are both v0.2. Returns the sealed field; the caller attaches it to a
+/// [`VaultMeta`] and serializes with [`serialize_vault_meta_v0_2`].
+pub fn seal_membership_raw(
+    root_key: &[u8; AEAD_KEY_LEN],
+    account_id: &[u8; MEMBERSHIP_ACCOUNT_ID_LEN],
+    account_number_hash: &[u8; 16],
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Membership, ProtocolError> {
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_membership_blob(account_number_hash);
+    let sealed = aead_seal_ctx(&membership_key, nonce, account_id, &aad)?;
+    debug_assert_eq!(sealed.len(), MEMBERSHIP_CIPHERTEXT_LEN);
+    let mut enc = [0u8; MEMBERSHIP_CIPHERTEXT_LEN];
+    enc.copy_from_slice(&sealed);
+    Ok(Membership { nonce: *nonce, enc })
+}
+
+/// Unseal the account id from a [`Membership`] field. Returns
+/// [`ProtocolError::AeadFailure`] on a tampered field or a wrong `root_key` (the
+/// field is bound to its vault via `account_number_hash` in the AAD, so a field
+/// copied from another vault fails here). The caller maps the failure to its own
+/// non-distinguishing error; a tampered membership field must never surface as a
+/// partial read.
+pub fn unseal_membership(
+    root_key: &[u8; AEAD_KEY_LEN],
+    membership: &Membership,
+    account_number_hash: &[u8; 16],
+) -> Result<Zeroizing<[u8; MEMBERSHIP_ACCOUNT_ID_LEN]>, ProtocolError> {
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_membership_blob(account_number_hash);
+    let pt = aead_open_ctx(&membership_key, &membership.nonce, &membership.enc, &aad)?;
+    if pt.len() != MEMBERSHIP_ACCOUNT_ID_LEN {
+        return Err(ProtocolError::AeadFailure);
+    }
+    let mut account_id = Zeroizing::new([0u8; MEMBERSHIP_ACCOUNT_ID_LEN]);
+    account_id.copy_from_slice(&pt);
+    Ok(account_id)
 }
 
 #[cfg(test)]
@@ -560,6 +651,91 @@ mod tests {
         );
     }
 
+    #[test]
+    fn membership_seal_unseal_round_trips() {
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &nonce).expect("seal");
+        let recovered = unseal_membership(&ROOT, &membership, &ACCT).expect("unseal");
+        assert_eq!(*recovered, account_id);
+    }
+
+    #[test]
+    fn membership_tamper_fails_closed() {
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let mut membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &nonce).expect("seal");
+        membership.enc[0] ^= 0x01;
+        assert!(matches!(
+            unseal_membership(&ROOT, &membership, &ACCT),
+            Err(ProtocolError::AeadFailure)
+        ));
+    }
+
+    #[test]
+    fn membership_binds_account_number_hash() {
+        // A field sealed for one vault must not open under another vault's hash.
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &nonce).expect("seal");
+        let other_hash = [0xEE; 16];
+        assert!(matches!(
+            unseal_membership(&ROOT, &membership, &other_hash),
+            Err(ProtocolError::AeadFailure)
+        ));
+    }
+
+    #[test]
+    fn serialize_with_membership_is_417_bytes_and_round_trips() {
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &nonce).expect("seal");
+
+        let mut meta = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        meta.membership = Some(membership);
+
+        let blob = serialize_vault_meta_v0_2(&meta);
+        assert_eq!(blob.len(), VAULT_META_V0_2_WITH_MEMBERSHIP_LEN);
+        assert_eq!(blob[5], 0x01, "reserved byte flags the membership field");
+
+        let parsed = parse_vault_meta_v0_2(&blob).expect("parse 417-byte NTV5");
+        let m = parsed.membership.expect("membership present");
+        assert_eq!(
+            *unseal_membership(&ROOT, &m, &ACCT).expect("unseal"),
+            account_id
+        );
+    }
+
+    #[test]
+    fn serialize_without_membership_is_345_bytes() {
+        let meta = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        let blob = serialize_vault_meta_v0_2(&meta);
+        assert_eq!(blob.len(), VAULT_META_LEN);
+        assert_eq!(blob[5], 0x00, "reserved byte stays 0x00 when absent");
+    }
+
+    #[test]
+    fn parse_rejects_reserved_byte_other_than_zero_or_one() {
+        let mut blob = encode().to_vec();
+        blob[5] = 0x02;
+        assert!(matches!(
+            parse_vault_meta_v0_2(&blob),
+            Err(ProtocolError::InvalidVaultMeta)
+        ));
+    }
+
+    #[test]
+    fn parse_rejects_membership_flag_with_wrong_length() {
+        // reserved=0x01 but only 345 bytes: the flag promises a field that is not
+        // there, which is a structural reject, not a silent absent read.
+        let mut blob = encode().to_vec();
+        blob[5] = 0x01;
+        assert!(matches!(
+            parse_vault_meta_v0_2(&blob),
+            Err(ProtocolError::InvalidVaultMeta)
+        ));
+    }
+
     /// Emit the `v0.2` cross-impl vectors for `vault-meta` (`NTV5`) as JSON,
     /// ready to paste into the companion repo (myne-md/myne#441).
     ///
@@ -611,6 +787,7 @@ mod tests {
             items_key_id: [0x61; 16],
             items_key_nonce: [0x62; 24],
             enc_items_key: [0x63; 64],
+            membership: None,
         };
         let ntv5 = serialize_vault_meta_v0_2(&meta);
         assert_eq!(&ntv5[0..4], VAULT_META_V0_2_MAGIC.as_slice());
@@ -696,5 +873,81 @@ mod tests {
         std::println!("    }}");
         std::println!("  ]");
         std::println!("}}");
+    }
+
+    /// Emit the membership-field vectors for `vault-meta/v0.2` as a JSON array
+    /// fragment, ready to splice into the companion repo's `cases.json`. The
+    /// three cases pin the field's three states: absent (345 bytes, `reserved`
+    /// 0x00), present (417 bytes, `reserved` 0x01, a known account id sealed
+    /// under a known root_key), and tampered (a flipped ciphertext byte must
+    /// fail `unseal_membership` closed). Driven through the live codec so the
+    /// vectors pin the bytes, not an opinion about the bytes.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act. Run with:
+    /// `cargo test -p protocol --lib emit_membership_vectors_for_paste -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn emit_membership_vectors_for_paste() {
+        extern crate std;
+
+        fn hex(b: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(b.len() * 2);
+            for x in b {
+                s.push_str(&alloc::format!("{x:02x}"));
+            }
+            s
+        }
+
+        // A base NTV5 meta (no membership) built from the same fixture the
+        // canonical-roundtrip case uses, so the absent case is byte-comparable.
+        let base = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        let absent = serialize_vault_meta_v0_2(&base);
+        assert_eq!(absent.len(), VAULT_META_LEN);
+
+        // Present: seal a known account id under a known root_key.
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &nonce).expect("seal");
+        let mut present_meta = base.clone();
+        present_meta.membership = Some(membership.clone());
+        let present = serialize_vault_meta_v0_2(&present_meta);
+        assert_eq!(present.len(), VAULT_META_V0_2_WITH_MEMBERSHIP_LEN);
+
+        // Tampered: flip a ciphertext byte; unseal must fail closed.
+        let mut tampered = membership.clone();
+        tampered.enc[0] ^= 0x01;
+        assert!(unseal_membership(&ROOT, &tampered, &ACCT).is_err());
+        let mut tampered_meta = base.clone();
+        tampered_meta.membership = Some(tampered);
+        let tampered_blob = serialize_vault_meta_v0_2(&tampered_meta);
+
+        std::println!("[");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/membership-absent\",");
+        std::println!("    \"description\": \"An NTV5 vault.meta with no membership field: 345 bytes, reserved byte 0x00. parse_vault_meta_v0_2 must accept it and report membership: None (unmigrated). Generated by `cargo test -p protocol --lib emit_membership_vectors_for_paste -- --ignored --nocapture`.\",");
+        std::println!("    \"case_kind\": \"membership_absent\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&absent));
+        std::println!("    \"expected_membership\": \"absent\"");
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/membership-present\",");
+        std::println!("    \"description\": \"An NTV5 vault.meta with the membership field present: 417 bytes, reserved byte 0x01, a 16-byte account id sealed under membership_key (root_key = 0x11.., account_number_hash = 0x44.., nonce = 0xCD..). parse_vault_meta_v0_2 must accept it and unseal_membership must recover the account id.\",");
+        std::println!("    \"case_kind\": \"membership_present\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&present));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"expected_account_id_hex\": \"{}\"", hex(&account_id));
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/membership-tampered\",");
+        std::println!("    \"description\": \"The membership-present blob with the first ciphertext byte flipped. unseal_membership must fail closed (AeadFailure), never a partial read.\",");
+        std::println!("    \"case_kind\": \"membership_tampered\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&tampered_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"tamper_offset\": 369,");
+        std::println!("    \"expected_error\": \"aead_failure\"");
+        std::println!("  }}");
+        std::println!("]");
     }
 }

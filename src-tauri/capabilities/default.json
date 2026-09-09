@@ -42,6 +42,7 @@
     "graph-layout:default",
     "detached-window:default",
     "vault-label:default",
+    "account:default",
     "screen-capture:default",
     "spell:default",
     "clipper-pairing:default",

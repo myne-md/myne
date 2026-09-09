@@ -596,6 +596,6 @@
     "measured execution count to exceed it, and this one is checked against a real",
     "run of the merged tree rather than left as arithmetic."
   ],
-  "stable": 357,
+  "stable": 358,
   "stable_max_failures": 0
 }

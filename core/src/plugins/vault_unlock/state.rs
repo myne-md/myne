@@ -286,6 +286,26 @@ impl VaultRuntimeState {
             .min()
     }
 
+    /// Best-effort slot-anchor refresh after an out-of-band `vault.meta`
+    /// write (myne-md/myne#684).
+    ///
+    /// The unlock-time membership stamp writes `vault.meta` AFTER the slot
+    /// captured its `vault_meta_bytes_hash`, which would leave the anchor
+    /// stale and make the next change-password spuriously fail its disk CAS
+    /// check with `VaultMetaChangedExternally`. The refresh is conditional:
+    /// it applies only when the entry still holds `expected` (the hash of the
+    /// bytes the writer read), so a concurrent rotation that landed first
+    /// keeps its anchor and this write is the one that looks stale, never
+    /// the rotation. No error surface: on mismatch the next unlock heals.
+    pub async fn refresh_meta_hash_if(&self, id: VaultId, expected: [u8; 32], new_hash: [u8; 32]) {
+        let mut slots = self.slots.write().await;
+        if let Some(Slot::Unlocked(uv)) = slots.get_mut(&id) {
+            if uv.vault_meta_bytes_hash == expected {
+                uv.vault_meta_bytes_hash = new_hash;
+            }
+        }
+    }
+
     /// Best-effort **synchronous** read of [`Self::active_vault_id`], for a
     /// caller that cannot await (myne-md/myne#437).
     ///

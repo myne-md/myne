@@ -41,8 +41,10 @@
 // hex (`src/CLAUDE.md` design-token discipline).
 
 import {
+  Fragment,
   useEffect,
   useReducer,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -61,6 +63,19 @@ import {
   orderByLastUnlock,
   stableVaultNumber,
 } from "../lib/vault-list";
+import {
+  listAccounts,
+  renameAccount,
+  moveVault,
+  splitVault,
+  accountIdForVault,
+  accountCommandErrorKind,
+  groupVaultsByAccount,
+  truncateLabelToBytes,
+} from "../lib/account";
+import type { AccountView, AccountCommandErrorKind } from "../lib/account";
+import { isVaultUnlocked } from "../lib/vault-unlock";
+import { ContextMenu, type ContextMenuItem } from "../notes/components/ContextMenu";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
 
@@ -88,17 +103,17 @@ interface VaultPickerProps {
 // boot-probe IoError, which routes to the fail-closed unlock surface).
 type PickerState =
   | { kind: "loading" }
-  | { kind: "loaded"; vaults: VaultSummary[] }
+  | { kind: "loaded"; vaults: VaultSummary[]; accounts: AccountView[] }
   | { kind: "failed" };
 
 type PickerAction =
-  | { type: "loaded"; vaults: VaultSummary[] }
+  | { type: "loaded"; vaults: VaultSummary[]; accounts: AccountView[] }
   | { type: "failed" };
 
 function reducer(state: PickerState, action: PickerAction): PickerState {
   switch (action.type) {
     case "loaded":
-      return { kind: "loaded", vaults: action.vaults };
+      return { kind: "loaded", vaults: action.vaults, accounts: action.accounts };
     case "failed":
       return { kind: "failed" };
     default:
@@ -132,6 +147,36 @@ function rowLabel(
     vault.label ??
     t("vaultPicker.vaultFallback", { n: stableVaultNumber(vaults, vault.id) })
   );
+}
+
+/**
+ * The account label for a group header, or `null` when the vaults in that group
+ * are standalone (no account). An account with an empty label shows the neutral
+ * "Account" fallback, exactly as a vault with no name shows "Vault N".
+ */
+function accountLabel(account: AccountView | null, t: TFunction): string {
+  if (account === null) return "";
+  return account.label === "" ? t("vaultPicker.accountFallback") : account.label;
+}
+
+/**
+ * Grouping lives in `../lib/account` (`groupVaultsByAccount`, shared with the
+ * recovery select and the mobile picker); this file keeps only the label.
+ */
+
+/**
+ * User-facing copy for an account-grouping failure. The narrowed kinds get
+ * their own sentence; everything else (Io, Backend, VaultNotFound, unknown)
+ * shares the generic one, because the picker renders standalone either way.
+ */
+function accountErrorCopy(
+  kind: AccountCommandErrorKind | null,
+  t: TFunction,
+): string {
+  if (kind === "Hidden") return t("vaultPicker.accountHidden");
+  if (kind === "LabelTooLong") return t("vaultPicker.labelTooLong");
+  if (kind === "RecordUnreadable") return t("vaultPicker.accountUnreadable");
+  return t("vaultPicker.accountError");
 }
 
 // ── Card chrome ──────────────────────────────────────────────────────────
@@ -270,6 +315,76 @@ const ROW_META_STYLE: CSSProperties = {
   color: "var(--ink-3)",
 };
 
+// The account group header: a small, secondary-ink label above a group of
+// vault rows. Standalone vaults (no account) render no header, so the header
+// only ever names a real grouping.
+const GROUP_HEADER_STYLE: CSSProperties = {
+  flexShrink: 0,
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--ink-3)",
+  padding: "var(--space-2) var(--space-1) 0",
+};
+
+// Account-grouping failure banner: danger ink on the danger wash, so a
+// grouping failure reads as an error and never as a second subline.
+const ACCOUNTS_ERROR_STYLE: CSSProperties = {
+  flexShrink: 0,
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--danger)",
+  background: "var(--danger-soft)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-2) var(--space-3)",
+};
+
+// Inline rename form: one row, input growing, two buttons. Tokens only.
+const RENAME_FORM_STYLE: CSSProperties = {
+  flexShrink: 0,
+  margin: 0,
+  display: "flex",
+  gap: "var(--space-2)",
+  alignItems: "center",
+};
+
+const RENAME_INPUT_STYLE: CSSProperties = {
+  flexGrow: 1,
+  minWidth: 0,
+  fontSize: "var(--text-base)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--ink-1)",
+  background: "var(--paper)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-2) var(--space-3)",
+};
+
+const RENAME_SAVE_STYLE: CSSProperties = {
+  flexShrink: 0,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--paper)",
+  background: "var(--accent)",
+  border: "none",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-2) var(--space-3)",
+  cursor: "pointer",
+};
+
+const RENAME_CANCEL_STYLE: CSSProperties = {
+  flexShrink: 0,
+  fontSize: "var(--text-sm)",
+  color: "var(--ink-2)",
+  background: "transparent",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-2) var(--space-3)",
+  cursor: "pointer",
+};
+
 const CHEVRON_STYLE: CSSProperties = {
   color: "var(--ink-3)",
   flexShrink: 0,
@@ -401,18 +516,37 @@ function VaultRow({
   label,
   meta,
   onSelect,
+  onContextMenu,
+  rowRef,
 }: {
   vault: VaultSummary;
   label: string;
   meta: string;
   onSelect: (vaultId: VaultId) => void;
+  onContextMenu: (vault: VaultSummary, pos: { x: number; y: number }) => void;
+  rowRef: (vaultId: VaultId, el: HTMLButtonElement | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const real = vault.label != null;
   return (
     <button
       type="button"
+      ref={(el) => rowRef(vault.id, el)}
       onClick={() => onSelect(vault.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu(vault, { x: e.clientX, y: e.clientY });
+      }}
+      onKeyDown={(e) => {
+        // Keyboard path to the same menu: the ContextMenu key, or
+        // Shift+F10, opens it anchored under the row. A control
+        // reachable only by right-click strands keyboard users.
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          onContextMenu(vault, { x: rect.left + 24, y: rect.bottom + 4 });
+        }
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -447,10 +581,28 @@ export function VaultPicker({ onSelect, onCreateAnother,
   onRestoreBackup, onJoinDevice }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
+  // The last account-grouping failure, shown as a banner. `null` is no error.
+  // Grouping failures never strand the picker: the list renders standalone.
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  // Inline rename form state. `null` is no form; the menu closes when it opens.
+  const [renaming, setRenaming] = useState<{ vault: VaultSummary; draft: string } | null>(null);
+  // Whether some vault is unlocked. Account mutations (rename/move/split) are
+  // refused while locked (backend `Locked`), so the menu offers them only
+  // when unlocked; the locked picker stays a read surface.
+  const [unlocked, setUnlocked] = useState(false);
+  // Row buttons by vault id, so closing the menu can return focus to the row
+  // that opened it (keyboard path).
+  const rowRefs = useRef(new Map<VaultId, HTMLButtonElement>());
   // Soft top/bottom edges on the vault list once it outgrows the card.
   const { ref: listRef, fadeProps: listFade } = useScrollEdges<HTMLDivElement>();
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
+  // The open row context menu (rename / move / split), or null when closed.
+  const [menu, setMenu] = useState<{
+    vault: VaultSummary;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // MYND-628 — re-show the window after an idle-lock hid it. This screen is a
   // locked boot surface exactly like `Unlock`, and at TWO OR MORE vaults it is
@@ -460,13 +612,48 @@ export function VaultPicker({ onSelect, onCreateAnother,
   // to click the dock icon or relaunch to get it back.
   useRevealAfterIdleLock();
 
-  useEffect(() => {
+  const reload = () => {
     let cancelled = false;
     void (async () => {
-      const result = await listVaults();
+      const vaultsPromise = listVaults();
+      // A grouping failure is NOT a list failure. Only KeychainUnavailable
+      // (no keychain, no record, no grouping by design) degrades silently to
+      // standalone; every other failure surfaces the banner while the vaults
+      // still render.
+      const accountsPromise = listAccounts().then(
+        (accounts) => ({ ok: true as const, accounts }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
+      const [vaultsResult, accountsOutcome] = await Promise.all([
+        vaultsPromise,
+        accountsPromise,
+      ]);
       if (cancelled) return;
-      if ("ok" in result) {
-        dispatch({ type: "loaded", vaults: orderByLastUnlock(result.ok) });
+      void isVaultUnlocked().then((ok) => {
+        if (!cancelled) setUnlocked(ok);
+      });
+      let accounts: AccountView[] = [];
+      if (accountsOutcome.ok) {
+        accounts = accountsOutcome.accounts;
+        setAccountsError(null);
+      } else if (
+        accountCommandErrorKind(accountsOutcome.error) === "KeychainUnavailable"
+      ) {
+        setAccountsError(null);
+      } else {
+        setAccountsError(
+          accountErrorCopy(
+            accountCommandErrorKind(accountsOutcome.error),
+            t,
+          ),
+        );
+      }
+      if ("ok" in vaultsResult) {
+        dispatch({
+          type: "loaded",
+          vaults: orderByLastUnlock(vaultsResult.ok),
+          accounts,
+        });
       } else {
         // List-level IO failure. The picker is reached only at ≥2 vaults
         // (the boot probe already saw them), so this is a transient
@@ -478,7 +665,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
     return () => {
       cancelled = true;
     };
-  }, []);
+  };
+
+  useEffect(reload, []);
 
   if (state.kind === "loading") {
     return (
@@ -514,21 +703,138 @@ export function VaultPicker({ onSelect, onCreateAnother,
     );
   }
 
+  const groups = groupVaultsByAccount(state.vaults, state.accounts);
+
+  // Run an account mutation, then reload truth. Failures surface the banner;
+  // a failed write is never silent and never leaves stale grouping on screen.
+  const runAccountAction = (fn: () => Promise<unknown>) => {
+    setAccountsError(null);
+    void (async () => {
+      try {
+        await fn();
+      } catch (e) {
+        setAccountsError(accountErrorCopy(accountCommandErrorKind(e), t));
+      }
+      reload();
+    })();
+  };
+
+  const closeMenuAndRefocusRow = (vaultId: VaultId) => {
+    setMenu(null);
+    rowRefs.current.get(vaultId)?.focus();
+  };
+
+  // Account actions are offered only for member vaults. A standalone vault
+  // (no account, keychain-less device, or hidden names) has no account to
+  // rename or move from, and every command would answer VaultNotFound, so
+  // offering them is offering a guaranteed failure.
+  const menuAccountId =
+    menu !== null && state.kind === "loaded"
+      ? accountIdForVault(state.accounts, menu.vault.id)
+      : null;
+  const menuAccount =
+    menuAccountId !== null && state.kind === "loaded"
+      ? (state.accounts.find((a) => a.id === menuAccountId) ?? null)
+      : null;
+  const moveDestinations =
+    state.kind === "loaded"
+      ? state.accounts.filter(
+          (a) => a.id !== menuAccountId && a.vaults.length > 0,
+        )
+      : [];
+  const menuItems: ContextMenuItem[] =
+    menu !== null && menuAccount !== null && unlocked
+      ? [
+          {
+            id: "picker.account-rename",
+            label: t("vaultPicker.renameAccount"),
+            onSelect: () => {
+              const vault = menu.vault;
+              setMenu(null);
+              setRenaming({ vault, draft: menuAccount.label });
+              setAccountsError(null);
+            },
+          },
+          {
+            id: "picker.account-move-new",
+            label: t("vaultPicker.moveToNewAccount"),
+            onSelect: () => {
+              const vault = menu.vault;
+              setMenu(null);
+              runAccountAction(() => splitVault(vault.id));
+            },
+          },
+          // The destination is chosen from the other accounts, never typed:
+          // the backend needs the TARGET VAULT id, and a typed label can
+          // never be one. Each child anchors on its account's first member.
+          ...(moveDestinations.length > 0
+            ? [
+                {
+                  id: "picker.account-move",
+                  label: t("vaultPicker.moveToAccount"),
+                  children: moveDestinations.map((a, i) => ({
+                    id: `picker.account-move-to-${i}`,
+                    label: accountLabel(a, t),
+                    onSelect: () => {
+                      const vault = menu.vault;
+                      setMenu(null);
+                      runAccountAction(() => moveVault(vault.id, a.vaults[0] as VaultId));
+                    },
+                  })),
+                  onSelect: () => {},
+                } satisfies ContextMenuItem,
+              ]
+            : []),
+        ]
+      : [];
+
+  const commitRename = (e?: { preventDefault: () => void }) => {
+    e?.preventDefault();
+    const target = renaming;
+    if (target === null || target.draft.trim() === "") return;
+    const label = target.draft.trim();
+    setRenaming(null);
+    runAccountAction(() => renameAccount(target.vault.id, label));
+  };
+
   return (
     <PickerCard>
       <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
+      {accountsError !== null && (
+        <p
+          role="alert"
+          data-testid="picker.account-error"
+          style={ACCOUNTS_ERROR_STYLE}
+        >
+          {accountsError}
+        </p>
+      )}
       {/* The fade is applied here rather than baked into LIST_STYLE because it
           is conditional on scroll position; see `useScrollEdges.ts` for why a
           fixed mask on both edges is wrong at rest. */}
       <div ref={listRef} style={LIST_STYLE} {...listFade}>
-        {state.vaults.map((vault) => (
-          <VaultRow
-            key={vault.id}
-            vault={vault}
-            label={rowLabel(vault, state.vaults, t)}
-            meta={lastUnlockText(vault.last_unlock, t)}
-            onSelect={onSelect}
-          />
+        {groups.map((group) => (
+          <Fragment key={group.account?.id ?? "__standalone__"}>
+            {group.account !== null && (
+              <p style={GROUP_HEADER_STYLE} data-testid="picker.account-header">
+                {accountLabel(group.account, t)}
+              </p>
+            )}
+            {group.vaults.map((vault) => (
+              <VaultRow
+                key={vault.id}
+                vault={vault}
+                label={rowLabel(vault, state.vaults, t)}
+                meta={lastUnlockText(vault.last_unlock, t)}
+                onSelect={onSelect}
+                onContextMenu={(v, pos) => setMenu({ vault: v, x: pos.x, y: pos.y })}
+                rowRef={(id, el) => {
+                  if (el === null) rowRefs.current.delete(id);
+                  else rowRefs.current.set(id, el);
+                }}
+              />
+            ))}
+          </Fragment>
         ))}
       </div>
       <CreateAnother
@@ -536,6 +842,59 @@ export function VaultPicker({ onSelect, onCreateAnother,
         onRestoreBackup={onRestoreBackup}
         onJoinDevice={onJoinDevice}
       />
+      {renaming !== null && (
+        <form onSubmit={commitRename} style={RENAME_FORM_STYLE}>
+          <input
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
+            value={renaming.draft}
+            maxLength={512}
+            placeholder={t("vaultPicker.renamePlaceholder")}
+            aria-label={t("vaultPicker.renameAccount")}
+            data-testid="picker.rename-input"
+            style={RENAME_INPUT_STYLE}
+            onChange={(e) =>
+              setRenaming({
+                vault: renaming.vault,
+                // 512 UTF-8 bytes, the backend `ACCOUNT_LABEL_MAX_LEN`: a
+                // multibyte draft can pass `maxLength` and still trip
+                // `LabelTooLong`, so truncate here instead of failing there.
+                draft: truncateLabelToBytes(e.target.value, 512),
+              })
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setRenaming(null);
+              }
+            }}
+          />
+          <button
+            type="submit"
+            disabled={renaming.draft.trim() === ""}
+            data-testid="picker.rename-save"
+            style={RENAME_SAVE_STYLE}
+          >
+            {t("vaultPicker.renameSave")}
+          </button>
+          <button
+            type="button"
+            data-testid="picker.rename-cancel"
+            style={RENAME_CANCEL_STYLE}
+            onClick={() => setRenaming(null)}
+          >
+            {t("vaultPicker.renameCancel")}
+          </button>
+        </form>
+      )}
+      {menu !== null && menuItems.length > 0 && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menuItems}
+          onClose={() => closeMenuAndRefocusRow(menu.vault.id)}
+        />
+      )}
     </PickerCard>
   );
 }

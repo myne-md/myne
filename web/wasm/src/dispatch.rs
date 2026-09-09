@@ -1803,6 +1803,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::creation(),
                 host_ctx(),
                 vault_io(),
+                myne_core::vault_label::key::platform_keychain(),
             )
             .await
             {
