@@ -32,6 +32,9 @@ const SUMMARY: VaultExportSummary = {
   folders: 9,
   excluded_trashed: 3,
   excluded_snapshots: 7,
+  snapshots: 0,
+  failed: 0,
+  trashed: 0,
 };
 
 function setupWithDir(dir = "/Users/u/Documents") {
