@@ -2,22 +2,22 @@
 # Picked up under the `detached-window:` ACL namespace because `build.rs` declares
 # it as an `InlinedPlugin`. Granted to the MAIN window by capabilities/default.json.
 #
-# Two commands, both main-window-only. The host SPAWN: page context holds no
+# Two commands, both main-window-only. The host-side OPEN: page context holds no
 # window-create grant, so this command is the only door to a pop-out window (a
-# detached window does not spawn further windows). The SNAPSHOT: the main window
+# detached window does not open further windows). The SNAPSHOT: the main window
 # reads the open pop-outs' geometry to persist them into MYW1 for restore (myne#678
-# task 6); it returns window bounds + note ids, never content. The spawned window's
+# task 6); it returns window bounds + note ids, never content. The opened window's
 # own surface is the separate `detached-note` capability (myne#677), not these.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the detached-window plugin: the main window's pop-out spawn + geometry-snapshot commands."
+description = "Default permission set for the detached-window plugin: the main window's pop-out open + geometry-snapshot commands."
 permissions = ["allow-detached-window-open", "allow-detached-window-snapshot"]
 
 [[permission]]
 identifier = "allow-detached-window-open"
-description = "Allow invoking detached-window:detached_window_open (host-spawn a note-<id> pop-out window carrying the detached-note capability, inject the target note id, optionally restore its saved geometry, and register it; main-window-only)."
+description = "Allow invoking detached-window:detached_window_open (open a note-<id> pop-out window carrying the detached-note capability, inject the target note id, optionally restore its saved geometry, and register it; main-window-only)."
 commands.allow = ["detached_window_open"]
 
 [[permission]]

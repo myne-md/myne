@@ -629,9 +629,14 @@ export function VaultPicker({ onSelect, onCreateAnother,
         accountsPromise,
       ]);
       if (cancelled) return;
-      void isVaultUnlocked().then((ok) => {
-        if (!cancelled) setUnlocked(ok);
-      });
+      // A probe the host cannot answer (web, or a partial test mock) reads as
+      // locked, which is the safe direction: the mutation menu stays hidden
+      // rather than offering an action the backend will refuse.
+      void isVaultUnlocked()
+        .then((ok) => {
+          if (!cancelled) setUnlocked(ok);
+        })
+        .catch(() => {});
       let accounts: AccountView[] = [];
       if (accountsOutcome.ok) {
         accounts = accountsOutcome.accounts;
