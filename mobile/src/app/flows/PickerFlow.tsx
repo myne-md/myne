@@ -244,9 +244,12 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         }
       }
       if (cancelled) return;
-      void isVaultUnlocked().then((ok) => {
-        if (!cancelled) setUnlocked(ok);
-      });
+      void isVaultUnlocked()
+        .then((ok) => {
+          if (!cancelled) setUnlocked(ok);
+        })
+        // A probe the host cannot answer reads as locked, the safe direction.
+        .catch(() => {});
       if ("ok" in result) {
         setVaults(orderByLastUnlock(result.ok));
         setAccounts(accts);
