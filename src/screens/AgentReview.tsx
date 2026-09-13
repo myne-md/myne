@@ -1,7 +1,8 @@
 // The agent review screen (myne-md/myne#529, tasks 10, 11 and 13).
 //
-// A full screen rather than a side panel or a modal, and that is not a layout
-// preference. Half the decisions this feature rests on assume approval is a
+// A dialog of its own rather than a panel at the edge of the editor or a
+// dismissable modal (myne-md/myne#549), and that is not a layout preference.
+// Half the decisions this feature rests on assume approval is a
 // separate, attention-requiring act: the scope model, the no-cap answer and the
 // SYNC-17 restatement all lean on the user actually reading what they approve. A
 // panel at the edge of the editor makes it a thing beside the work; a modal
@@ -24,7 +25,13 @@
 //      place must never be mistaken for one that was not needed.
 //
 // The diff itself is the existing `<DiffView>` over `diffWithSegments`; nothing
-// about how a diff looks is invented here.
+// about how a diff looks is invented here. It renders in `split` mode
+// (myne-md/myne#664): approving a change asks "what is this replacing?", and
+// `<DiffView>`'s own header already records that a gutter marker is the worse
+// answer to that question than a column is. The two columns are labelled from
+// here rather than by the component, because `<DiffView>` renders note text and
+// never copy of its own. There is no unified/split toggle: one mode is a
+// decision, a toggle is a surface to own.
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -584,7 +591,16 @@ function EditRowView({
           </Button>
         ) : null}
       </div>
-      <DiffView diff={diff} mode="unified" />
+      {/* An append diffs an empty anchor against the new text, so its left
+          column is empty under a heading reading "in the note now". That is the
+          honest answer for an append rather than a layout defect: it replaces
+          nothing. */}
+      <DiffView
+        diff={diff}
+        mode="split"
+        leftLabel={t("agent.review.diffCurrent")}
+        rightLabel={t("agent.review.diffProposed")}
+      />
     </article>
   );
 }
