@@ -84,10 +84,13 @@ async function openTasksDestination(page: Page): Promise<void> {
   await page.getByTestId("workspace.tab-tasks").click();
 }
 
-/** Pick a folder from the filter row's Select (a portal listbox). */
-async function pickFolder(page: Page, prefix: string, name: string): Promise<void> {
-  await page.getByTestId(`${prefix}.folderFilter`).click();
-  await page.getByRole("option", { name }).click();
+/** Open the filter builder if closed, select the Folder axis, pick a value. */
+async function pickFolder(page: Page, prefix: string, value: string): Promise<void> {
+  if ((await page.getByTestId(`${prefix}.filtersPanel`).count()) === 0) {
+    await page.getByTestId(`${prefix}.filtersButton`).click();
+  }
+  await page.getByTestId(`${prefix}.builderTab.folder`).click();
+  await page.getByTestId(`${prefix}.builderOption.folder.${value}`).click();
 }
 
 test.describe("mobile task surfaces", () => {
@@ -139,10 +142,15 @@ test.describe("mobile task surfaces", () => {
     // clock) and the undated bucket each get a labelled section.
     await expect(page.getByTestId("tasks.vault.section.overdue")).toBeVisible();
     await expect(page.getByTestId("tasks.vault.section.none")).toBeVisible();
-    // The filter row replaced the old four tabs.
-    await expect(page.getByTestId("tasks.vault.status")).toBeVisible();
-    await expect(page.getByTestId("tasks.vault.folderFilter")).toBeVisible();
+    // The toolbar is search plus a single Filters button; the axes live in the
+    // builder behind it (myne-md/myne#656 review).
     await expect(page.getByTestId("tasks.vault.search")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.filtersButton")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.filtersPanel")).toHaveCount(0);
+    await page.getByTestId("tasks.vault.filtersButton").click();
+    await expect(page.getByTestId("tasks.vault.filtersPanel")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.builderTab.status")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.builderTab.folder")).toBeVisible();
   });
 
   test("the folder filter narrows (AND)", async ({ page }) => {
@@ -155,7 +163,7 @@ test.describe("mobile task surfaces", () => {
     await expect(page.getByText("send the invoice")).toBeVisible();
     await expect(page.getByText("buy milk")).toHaveCount(0);
 
-    await pickFolder(page, "tasks.vault", "All folders");
+    await pickFolder(page, "tasks.vault", "any");
     await expect(page.getByText("buy milk")).toBeVisible();
   });
 

@@ -19,10 +19,10 @@ import { DEFAULT_TASK_VIEW, type TaskView } from "../taskView";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { useWorkspace } from "../workspaceContext";
 import { useSelectedNote } from "../sidebarState";
-import { taskViewOf, type WorkspaceItem, type PaneId } from "../workspaceState";
+import type { WorkspaceItem, PaneId } from "../workspaceState";
 
 /** The vault-wide task list, mounted as a pane body. */
-export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
+export function TasksPane({ paneId }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
   const ws = useWorkspace();
   const tasks = useLiveVaultTasks();
   // myne#279: "today" follows the display timezone when one is set; myne#557:
@@ -30,7 +30,8 @@ export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceIte
   const { timeZone: zone } = useDateTimeDisplay();
   const today = useLocalToday(zone);
 
-  const view = item.kind === "tasks" ? taskViewOf(item) : DEFAULT_TASK_VIEW;
+  // Container-level, so closing and reopening the tab restores the filters.
+  const view = ws.taskView;
   const onViewChange = useCallback(
     (next: TaskView) => ws.setTaskViewState(paneId, next),
     [ws, paneId],
@@ -87,6 +88,7 @@ export function NoteTasksPanel(): ReactElement {
       onViewChange={setView}
       onToggle={onToggle}
       testIdPrefix="notePanel.tasks"
+      minimal
     />
   );
 }

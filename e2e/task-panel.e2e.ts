@@ -40,17 +40,18 @@ async function rowTexts(s: Session): Promise<string[]> {
   return Promise.all(rows.map((r) => r.text()));
 }
 
-/** Pick an option from a panel `Select` by its visible label. */
-async function pickSelect(s: Session, testId: string, label: string): Promise<void> {
-  await (await s.byTestId(testId)).click();
-  const options = await s.byTestIdAll(`${testId}-option`);
-  for (const option of options) {
-    if ((await option.text()).trim() === label) {
-      await option.click();
-      return;
-    }
+/** Open the filter builder if closed, then pick an axis value. */
+async function pickBuilderValue(
+  s: Session,
+  prefix: string,
+  axis: string,
+  value: string,
+): Promise<void> {
+  if ((await s.byTestIdAll(`${prefix}.filtersPanel`)).length === 0) {
+    await (await s.byTestId(`${prefix}.filtersButton`)).click();
   }
-  throw new Error(`option "${label}" not found in ${testId}`);
+  await (await s.byTestId(`${prefix}.builderTab.${axis}`)).click();
+  await (await s.byTestId(`${prefix}.builderOption.${axis}.${value}`)).click();
 }
 
 describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", () => {
@@ -95,12 +96,12 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
 
         // 2. The due filter narrows. `Upcoming` is a rolling seven days, so
         //    neither an overdue task nor a 2030 one can be in it.
-        await pickSelect(s, "tasks.dueFilter", "Upcoming");
+        await pickBuilderValue(s, "tasks", "due", "upcoming");
         await s.waitUntil(
           async () => ((await rowTexts(s)).length === 0 ? true : null),
           { label: "neither task is in the upcoming window" },
         );
-        await pickSelect(s, "tasks.dueFilter", "Any date");
+        await pickBuilderValue(s, "tasks", "due", "any");
 
         // 3. Search narrows the list client-side over the live array — item 6 —
         //    and a query that matches nothing says so about the QUERY rather

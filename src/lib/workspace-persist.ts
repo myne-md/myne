@@ -146,6 +146,9 @@ export function serializeWorkspaces(container: NamedWorkspaces): string {
       : {}),
     ...(encodedGraphSettings ? { graphSettings: encodedGraphSettings } : {}),
     ...(encodedTaskDisplay ? { taskDisplay: encodedTaskDisplay } : {}),
+    // Container-level last task view (myne-md/myne#656 review): stored here so a
+    // closed-and-reopened Tasks tab restores its filters. Already the delta shape.
+    ...(container.taskView ? { taskView: container.taskView } : {}),
     // myne#678 task 6 (SYNC-10): open detached (pop-out) windows to restore next
     // launch, omit-when-empty (same discipline as `expandedFolders`). A
     // pre-feature reader tolerates the unknown field; a reader on a vault with no
@@ -314,6 +317,9 @@ export function deserializeWorkspaces(
   if (graphSettings) result.graphSettings = graphSettings;
   if (taskDisplay) result.taskDisplay = taskDisplay;
   if (detached.length > 0) result.detached = detached;
+  // Container-level last task view. Reuses the item parser by faking its shape.
+  const containerTaskView = parseTaskView({ taskView: obj.taskView }).taskView;
+  if (containerTaskView !== undefined) result.taskView = containerTaskView;
   return result;
 }
 
@@ -351,7 +357,14 @@ function parseTaskView(o: Record<string, unknown>): { taskView?: PersistedTaskVi
     v.due = raw.due;
   }
   if (typeof raw.noteId === "string" && raw.noteId !== "") v.noteId = raw.noteId;
-  if (typeof raw.folder === "string" && raw.folder !== "") v.folder = raw.folder;
+  if (Array.isArray(raw.folders)) {
+    const folders = raw.folders.filter((f): f is string => typeof f === "string" && f !== "");
+    if (folders.length > 0) v.folders = folders;
+  }
+  // Migration: the first multi-folder shape was a single `folder` string.
+  if (v.folders === undefined && typeof raw.folder === "string" && raw.folder !== "") {
+    v.folders = [raw.folder];
+  }
   if (Array.isArray(raw.tags)) {
     const tags = raw.tags.filter((t): t is string => typeof t === "string" && t !== "");
     if (tags.length > 0) v.tags = tags;
@@ -376,9 +389,9 @@ function parseTaskView(o: Record<string, unknown>): { taskView?: PersistedTaskVi
       v.due = o.taskFilter;
     }
   }
-  if (v.folder === undefined && typeof o.taskScope === "object" && o.taskScope !== null) {
+  if (v.folders === undefined && typeof o.taskScope === "object" && o.taskScope !== null) {
     const s = o.taskScope as Record<string, unknown>;
-    if (typeof s.folder === "string" && s.folder !== "") v.folder = s.folder;
+    if (typeof s.folder === "string" && s.folder !== "") v.folders = [s.folder];
     if (v.tags === undefined && Array.isArray(s.tags)) {
       const tags = s.tags.filter((t): t is string => typeof t === "string" && t !== "");
       if (tags.length > 0) v.tags = tags;

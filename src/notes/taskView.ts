@@ -20,7 +20,7 @@ import {
   sortTasks,
   taskDate,
 } from "./taskFilters";
-import { filterTasksByScope } from "./taskScope";
+import { folderInScope, tagsInScope } from "./taskScope";
 import { taskDescription } from "../dialect/taskFieldWriter";
 import { taskRowKey } from "./taskWriteCore";
 
@@ -56,14 +56,15 @@ export type TaskSectionKey =
   | "done";
 
 /**
- * Everything the panel persists with its tab. `folder`/`tags` are the existing
- * `TaskScope` axes; `noteId` narrows to one file, which is the "separate by
- * file" the fixed tabs could not express.
+ * Everything the panel persists with its tab. `folders` is MULTI-select (a user
+ * may want two projects at once) and OR'd; tags are OR'd too; `noteId` narrows
+ * to one file, and only ever offers notes inside the selected folders, so the
+ * two axes cannot contradict each other.
  */
 export type TaskView = {
   readonly status: TaskStatusFilter;
   readonly due: TaskDueFilter;
-  readonly folder: string | null;
+  readonly folders: readonly string[];
   readonly noteId: string | null;
   readonly tags: readonly string[];
   readonly priority: TaskPriorityFilter;
@@ -73,7 +74,7 @@ export type TaskView = {
 export const DEFAULT_TASK_VIEW: TaskView = {
   status: "undone",
   due: "any",
-  folder: null,
+  folders: [],
   noteId: null,
   tags: [],
   priority: "any",
@@ -203,10 +204,10 @@ function sortDone(tasks: readonly VaultTask[]): VaultTask[] {
 /**
  * Filter, partition and sort in one step — what the panel actually calls.
  *
- * Scope (folder/tags) goes through the shared `filterTasksByScope`, and the
- * remaining axes through `matchesView`, so neither adds a second predicate
- * language. `search` is passed separately because it is transient (never
- * persisted with the tab), unlike the rest of the view.
+ * Scope uses the shared `folderInScope`/`tagsInScope` predicates (folders OR'd
+ * with each other, tags OR'd with each other) and the remaining axes go through
+ * `matchesView`, so neither adds a second predicate language. `search` is passed
+ * separately because it is transient (never persisted with the tab).
  */
 export function partitionTasks(
   tasks: readonly VaultTask[],
@@ -216,12 +217,13 @@ export function partitionTasks(
   search = "",
 ): TaskSection[] {
   const q = search.trim().toLowerCase();
-  const scoped = filterTasksByScope(
-    tasks,
-    { folder: view.folder, tags: view.tags },
-    tagsOf,
-  );
-  const matched = scoped.filter((task) => {
+  const matched = tasks.filter((task) => {
+    // Folders OR: no folder selected means "any folder". A task matching ANY
+    // selected folder passes.
+    if (view.folders.length > 0 && !view.folders.some((f) => folderInScope(f, task.noteFolder))) {
+      return false;
+    }
+    if (!tagsInScope(view.tags, tagsOf(task.noteId))) return false;
     if (view.noteId !== null && task.noteId !== view.noteId) return false;
     if (!matchesView(task, view, today)) return false;
     if (q !== "" && !taskSearchText(task).toLowerCase().includes(q)) return false;

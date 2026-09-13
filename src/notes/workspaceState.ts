@@ -114,7 +114,7 @@ export type PersistedTaskView = {
   status?: TaskStatusFilter;
   due?: TaskDueFilter;
   noteId?: string;
-  folder?: string;
+  folders?: readonly string[];
   tags?: readonly string[];
   priority?: TaskPriorityFilter;
   sort?: TaskSort;
@@ -743,15 +743,8 @@ export function setTaskViewState(
     if (t.kind !== "tasks") return t;
     const rest: Record<string, unknown> = { ...t };
     delete rest.taskView;
-    const v: PersistedTaskView = {};
-    if (view.status !== DEFAULT_TASK_VIEW.status) v.status = view.status;
-    if (view.due !== "any") v.due = view.due;
-    if (view.noteId !== null) v.noteId = view.noteId;
-    if (view.folder !== null && view.folder !== "") v.folder = view.folder;
-    if (view.tags.length > 0) v.tags = [...view.tags];
-    if (view.priority !== "any") v.priority = view.priority;
-    if (view.sort !== "due") v.sort = view.sort;
-    if (Object.keys(v).length > 0) rest.taskView = v;
+    const v = taskViewToPersisted(view);
+    if (v !== undefined) rest.taskView = v;
     return rest as WorkspaceItem;
   };
   return {
@@ -764,19 +757,36 @@ export function setTaskViewState(
   };
 }
 
+/** The persisted delta of a `TaskView`, or `undefined` when all-default. */
+export function taskViewToPersisted(view: TaskView): PersistedTaskView | undefined {
+  const v: PersistedTaskView = {};
+  if (view.status !== DEFAULT_TASK_VIEW.status) v.status = view.status;
+  if (view.due !== "any") v.due = view.due;
+  if (view.noteId !== null) v.noteId = view.noteId;
+  if (view.folders.length > 0) v.folders = [...view.folders];
+  if (view.tags.length > 0) v.tags = [...view.tags];
+  if (view.priority !== "any") v.priority = view.priority;
+  if (view.sort !== "due") v.sort = view.sort;
+  return Object.keys(v).length > 0 ? v : undefined;
+}
+
+/** Resolve a persisted view (or none) to a full `TaskView`. */
+export function resolveTaskView(p: PersistedTaskView | undefined): TaskView {
+  return {
+    status: p?.status ?? DEFAULT_TASK_VIEW.status,
+    due: p?.due ?? "any",
+    noteId: p?.noteId ?? null,
+    folders: p?.folders ?? [],
+    tags: p?.tags ?? [],
+    priority: p?.priority ?? "any",
+    sort: p?.sort ?? "due",
+  };
+}
+
 /** Read a task tab's persisted view back as a full `TaskView`. */
 export function taskViewOf(item: WorkspaceItem): TaskView {
   if (item.kind !== "tasks") return DEFAULT_TASK_VIEW;
-  const p = item.taskView ?? {};
-  return {
-    status: p.status ?? DEFAULT_TASK_VIEW.status,
-    due: p.due ?? "any",
-    noteId: p.noteId ?? null,
-    folder: p.folder ?? null,
-    tags: p.tags ?? [],
-    priority: p.priority ?? "any",
-    sort: p.sort ?? "due",
-  };
+  return resolveTaskView(item.taskView);
 }
 
 /**
@@ -1019,6 +1029,12 @@ export type NamedWorkspaces = {
    *  global (one chip-colour choice across every task surface) like
    *  `graphSettings`. Omit-when-default (see `taskDisplay.ts`). */
   taskDisplay?: TaskDisplaySettings;
+  /** The LAST task view (filters + sort), stored at the CONTAINER level so it
+   *  survives closing and reopening the Tasks tab (myne-md/myne#656 review).
+   *  Window-global; omit-when-default. The per-tab copy on the item is written
+   *  too, for migration and for a second pane, but this is what a reopened tab
+   *  restores from. */
+  taskView?: PersistedTaskView;
 };
 
 /** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */

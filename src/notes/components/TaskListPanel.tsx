@@ -1,22 +1,19 @@
 // The task list body (MYND-616, redesigned for myne-md/myne#656).
 //
 // ONE body for both surfaces. The vault-wide tab and the note-scoped right-panel
-// tab differ by the `scope` prop and by which task list they are handed —
-// nothing else.
+// tab differ by the `rowScope` prop and by which task list they are handed.
 //
-// **The design, as decided in the #656 grill:**
-//   - section headers (Overdue / Today / Upcoming / Later / No date, then a flat
-//     Done section) REPLACE the old four date tabs; section order is fixed and
-//     attention-first, and each header carries its own count;
-//   - a curated filter row replaces the tabs: status (undone/all/done), due
-//     window, folder, note, tag, priority, and a within-section sort;
-//   - the list is hand-rolled WINDOWED (a vault can hold thousands of tasks),
-//     with fixed-height rows and a sticky section header;
-//   - the search box filters the live array client-side.
+// **Toolbar, as revised after review:** a long search field with a `Filters`
+// button. The button opens a TWO-PANE builder that starts CLOSED (only the axis
+// list) and reveals an axis's values on click, with hover feedback everywhere.
+// Filters in force show as removable accent chips under the search, with a
+// `Clear all` at the end of the row; the builder carries its own `Clear all` in
+// a header at the top and a per-axis reset beside each applied value. The
+// note-scoped panel passes `minimal` and gets just the search field. Section
+// headers scroll with their rows.
 //
-// EMPTY-STATE TONE IS A CONSTRAINT. The canon forbids a green check and the
-// product voice is honest rather than congratulatory: an empty week is stated,
-// not celebrated. No confetti, no tick.
+// The list is hand-rolled WINDOWED (a vault can hold thousands of tasks), with
+// fixed-height rows.
 
 import {
   useCallback,
@@ -29,8 +26,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { TaskRow, type TaskRowData, type TaskRowScope } from "@myne/editor/host/notes/TaskRow";
-import { Select } from "../../components/primitives/Select";
-import { Segmented } from "../../components/primitives/Segmented";
+import { Icon } from "../../components/primitives/Icon";
 import { taskDescription } from "../../dialect/taskFieldWriter";
 import {
   DEFAULT_TASK_VIEW,
@@ -39,44 +35,34 @@ import {
   partitionTasks,
   type TaskDueFilter,
   type TaskPriorityFilter,
-  type TaskSectionKey,
   type TaskSort,
   type TaskStatusFilter,
   type TaskView,
 } from "../taskView";
+import { folderInScope } from "../taskScope";
 import { visibleDepths } from "../taskTree";
 import { taskRowKey } from "../taskWriteCore";
-import {
-  TASK_ROW_HEIGHT,
-  computeTaskWindow,
-  flattenTaskList,
-  type TaskListItem,
-} from "../taskWindowing";
+import { TASK_ROW_HEIGHT, computeTaskWindow, flattenTaskList } from "../taskWindowing";
 import type { VaultTask } from "../taskIndex";
 
 export type TaskListPanelProps = {
   tasks: readonly VaultTask[];
-  /** The persisted view (filters + sort). */
   view: TaskView;
   today: string;
-  /** Which surface this is — passed straight through to every row. */
   rowScope: TaskRowScope;
-  /** Per-note tags, for the scope selector's tag half. */
   tagsOf?: (noteId: string) => readonly string[];
-  /** True while the index is still being built. */
   rebuilding?: boolean;
   onViewChange: (next: TaskView) => void;
   onToggle?: (task: VaultTask) => void;
   onOpen?: (task: VaultTask) => void;
   testIdPrefix?: string;
+  /** Strip the toolbar to a single search field (the note-scoped panel). */
+  minimal?: boolean;
 };
 
 const NO_TAGS: readonly string[] = [];
+const PRIORITIES = ["highest", "high", "medium", "low", "lowest"] as const;
 
-/**
- * Project an index record into what a row needs. `depth` is the visible-relative
- * indent the tree helper computed.
- */
 function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
     key: taskRowKey(task),
@@ -92,6 +78,15 @@ function toRowData(task: VaultTask, depth: number): TaskRowData {
   };
 }
 
+/** Inline styles cannot express `:hover`, so each interactive row owns a flag. */
+function useHover(): [
+  boolean,
+  { onMouseEnter: () => void; onMouseLeave: () => void },
+] {
+  const [hover, setHover] = useState(false);
+  return [hover, { onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) }];
+}
+
 const PANEL_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -99,26 +94,299 @@ const PANEL_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
-const FILTER_ROW_STYLE: CSSProperties = {
+const TOOLBAR_STYLE: CSSProperties = {
+  position: "relative",
   display: "flex",
-  flexWrap: "wrap",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  padding: "var(--space-3)",
+};
+
+// The rule under the toolbar spans the CONTENT width, so it lines up with the
+// search field rather than the panel edges (myne-md/myne#656 review).
+const SEPARATOR_STYLE: CSSProperties = {
+  height: 1,
+  background: "var(--line-1)",
+};
+
+const SEARCH_ROW_STYLE: CSSProperties = {
+  display: "flex",
   alignItems: "center",
-  gap: "var(--space-1)",
-  padding: "6px 8px",
-  borderBottom: "1px solid var(--line-1)",
+  gap: "var(--space-2)",
 };
 
 const SEARCH_STYLE: CSSProperties = {
-  flex: "1 1 120px",
-  minWidth: 90,
+  flex: "1 1 auto",
+  minWidth: 0,
   boxSizing: "border-box",
-  padding: "var(--space-1) var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
   background: "var(--paper)",
   color: "var(--fg-1)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
+};
+
+const FILTERS_BUTTON_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "var(--space-2) var(--space-3)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  cursor: "pointer",
+};
+
+const FILTERS_BUTTON_HOVER_STYLE: CSSProperties = {
+  ...FILTERS_BUTTON_STYLE,
+  background: "var(--paper-2)",
+  color: "var(--fg-1)",
+};
+
+const FILTERS_COUNT_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const CHIPS_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "var(--space-1)",
+};
+
+const CHIP_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "2px 8px",
+  border: "1px solid var(--accent-soft)",
+  borderRadius: "var(--radius-pill)",
+  background: "var(--accent-soft)",
+  color: "var(--accent)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  cursor: "pointer",
+};
+
+const CHIP_HOVER_STYLE: CSSProperties = {
+  ...CHIP_STYLE,
+  border: "1px solid var(--accent)",
+};
+
+const INLINE_CLEAR_STYLE: CSSProperties = {
+  marginLeft: "var(--space-1)",
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  cursor: "pointer",
+  textDecoration: "underline",
+};
+
+const INLINE_CLEAR_HOVER_STYLE: CSSProperties = {
+  ...INLINE_CLEAR_STYLE,
+  color: "var(--danger)",
+};
+
+const BUILDER_BACKDROP_STYLE: CSSProperties = {
+  position: "fixed",
+  inset: "0",
+  zIndex: 40,
+};
+
+// An OVERLAY anchored to the toolbar (right-aligned), not a flow child: opening
+// the builder must not push the list down (myne-md/myne#656 review). Anchoring
+// to the full-width toolbar and capping the width at the pane keeps it on
+// screen, which anchoring to the narrow button did not.
+const BUILDER_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  right: "var(--space-3)",
+  zIndex: 41,
+  display: "flex",
+  flexDirection: "column",
+  width: "min(calc(100% - var(--space-6)), 420px)",
+  boxSizing: "border-box",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  overflow: "hidden",
+};
+
+const BUILDER_HEADER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--line-1)",
+};
+
+const BUILDER_TITLE_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_BODY_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+};
+
+const BUILDER_LEFT_STYLE: CSSProperties = {
+  flex: "0 0 168px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  padding: "var(--space-2)",
+  borderRight: "1px solid var(--line-1)",
+  background: "var(--paper-2)",
+};
+
+const BUILDER_LEFT_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+};
+
+const BUILDER_LEFT_ITEM_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "var(--space-1)",
+  padding: "var(--space-2) var(--space-2)",
+  border: "none",
+  borderRadius: "var(--radius-2)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const BUILDER_LEFT_ITEM_HOVER_STYLE: CSSProperties = {
+  ...BUILDER_LEFT_ITEM_STYLE,
+  background: "var(--paper-3)",
+};
+
+const BUILDER_LEFT_ITEM_ACTIVE_STYLE: CSSProperties = {
+  ...BUILDER_LEFT_ITEM_STYLE,
+  background: "var(--paper)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_APPLIED_STYLE: CSSProperties = {
+  color: "var(--accent)",
+  fontSize: "var(--text-xs)",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  maxWidth: "100%",
+};
+
+const RESET_X_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 20,
+  height: 20,
+  padding: 0,
+  border: "none",
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+  cursor: "pointer",
+};
+
+const RESET_X_HOVER_STYLE: CSSProperties = {
+  ...RESET_X_STYLE,
+  color: "var(--danger)",
+  background: "var(--paper-3)",
+};
+
+const BUILDER_RIGHT_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  padding: "var(--space-2)",
+  maxHeight: 300,
+  overflowY: "auto",
+};
+
+const BUILDER_EMPTY_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-5) var(--space-3)",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "center",
+};
+
+const BUILDER_RIGHT_TITLE_STYLE: CSSProperties = {
+  padding: "0 var(--space-2) var(--space-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const BUILDER_VALUE_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  width: "100%",
+  padding: "var(--space-2) var(--space-2)",
+  border: "none",
+  borderRadius: "var(--radius-2)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const BUILDER_VALUE_HOVER_STYLE: CSSProperties = {
+  ...BUILDER_VALUE_STYLE,
+  background: "var(--paper-2)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_VALUE_ACTIVE_STYLE: CSSProperties = {
+  ...BUILDER_VALUE_STYLE,
+  background: "var(--paper-3)",
+  color: "var(--fg-1)",
+  fontWeight: "var(--weight-medium)",
+};
+
+const BUILDER_VALUE_LABEL_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const SCROLL_STYLE: CSSProperties = {
@@ -151,16 +419,6 @@ const HEADER_COUNT_STYLE: CSSProperties = {
   fontWeight: 500,
 };
 
-const STICKY_STYLE: CSSProperties = {
-  ...HEADER_BASE,
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  zIndex: 2,
-  borderBottom: "1px solid var(--line-1)",
-};
-
 const ROW_WRAP_STYLE: CSSProperties = {
   height: TASK_ROW_HEIGHT,
   boxSizing: "border-box",
@@ -176,21 +434,384 @@ const EMPTY_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
-/** A section header: label + count, used both in flow and pinned. */
-function SectionHeader({
-  section,
-  count,
+/** A removable applied-filter chip; only the remove glyph turns red on hover. */
+function FilterChip({
+  label,
+  testId,
+  onRemove,
+}: {
+  label: string;
+  testId: string;
+  onRemove: () => void;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  return (
+    <button
+      type="button"
+      style={hover ? CHIP_HOVER_STYLE : CHIP_STYLE}
+      data-testid={testId}
+      {...handlers}
+      onClick={onRemove}
+    >
+      {label}
+      <span style={{ display: "inline-flex", color: hover ? "var(--danger)" : "inherit" }}>
+        <Icon name="x" size={12} />
+      </span>
+    </button>
+  );
+}
+
+type BuilderSection = "status" | "due" | "folder" | "note" | "tag" | "priority" | "sort";
+const BUILDER_SECTIONS: readonly BuilderSection[] = [
+  "status",
+  "due",
+  "folder",
+  "note",
+  "tag",
+  "priority",
+  "sort",
+];
+
+function BuilderLeftRow({
+  label,
+  applied,
+  active,
+  onSelect,
+  onReset,
+  testId,
+}: {
+  label: string;
+  applied: string | null;
+  active: boolean;
+  onSelect: () => void;
+  onReset: () => void;
+  testId: string;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  const [resetHover, resetHandlers] = useHover();
+  return (
+    <div style={BUILDER_LEFT_ROW_STYLE}>
+      <button
+        type="button"
+        style={
+          active
+            ? BUILDER_LEFT_ITEM_ACTIVE_STYLE
+            : hover
+              ? BUILDER_LEFT_ITEM_HOVER_STYLE
+              : BUILDER_LEFT_ITEM_STYLE
+        }
+        {...handlers}
+        aria-expanded={active}
+        data-testid={testId}
+        onClick={onSelect}
+      >
+        <span>{label}</span>
+        {applied === null ? null : (
+          <span style={BUILDER_APPLIED_STYLE} data-testid={`${testId}-applied`}>
+            {applied}
+          </span>
+        )}
+      </button>
+      {applied === null ? null : (
+        <button
+          type="button"
+          style={resetHover ? RESET_X_HOVER_STYLE : RESET_X_STYLE}
+          {...resetHandlers}
+          aria-label={`Clear ${label}`}
+          data-testid={`${testId}-reset`}
+          onClick={onReset}
+        >
+          <Icon name="x" size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BuilderValueRow({
+  label,
+  active,
+  onSelect,
+  testId,
+}: {
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+  testId: string;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  return (
+    <button
+      type="button"
+      style={active ? BUILDER_VALUE_ACTIVE_STYLE : hover ? BUILDER_VALUE_HOVER_STYLE : BUILDER_VALUE_STYLE}
+      {...handlers}
+      aria-checked={active}
+      role="menuitemradio"
+      data-testid={testId}
+      onClick={onSelect}
+    >
+      <Icon
+        name="check"
+        size={14}
+        style={{ flex: "0 0 auto", color: "var(--accent)", opacity: active ? 1 : 0 }}
+      />
+      <span style={BUILDER_VALUE_LABEL_STYLE}>{label}</span>
+    </button>
+  );
+}
+
+/**
+ * The two-pane filter builder. It opens with only the axis list; clicking an
+ * axis reveals its values on the right. The header carries `Clear all`, and each
+ * applied axis has its own reset beside it.
+ */
+function TaskFilterBuilder({
+  view,
+  onViewChange,
+  folderOptions,
+  noteOptions,
+  tagOptions,
   testIdPrefix,
 }: {
-  section: TaskSectionKey;
-  count: number;
+  view: TaskView;
+  onViewChange: (next: TaskView) => void;
+  folderOptions: readonly string[];
+  noteOptions: readonly (readonly [string, string])[];
+  tagOptions: readonly string[];
   testIdPrefix: string;
 }): ReactElement {
   const { t } = useTranslation();
+  // Starts CLOSED: no axis is chosen until the user clicks one.
+  const [section, setSection] = useState<BuilderSection | null>(null);
+  const [clearHover, clearHandlers] = useHover();
+  const setView = (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch });
+
+  const axisLabel: Record<BuilderSection, string> = {
+    status: t("tasks.axis.status"),
+    due: t("tasks.axis.due"),
+    folder: t("tasks.axis.folder"),
+    note: t("tasks.axis.note"),
+    tag: t("tasks.axis.tag"),
+    priority: t("tasks.axis.priority"),
+    sort: t("tasks.axis.sort"),
+  };
+
+  const currentValue = (s: BuilderSection): string => {
+    switch (s) {
+      case "status":
+        return view.status;
+      case "due":
+        return view.due;
+      case "folder":
+        return "";
+      case "note":
+        return view.noteId ?? "";
+      case "tag":
+        return "";
+      case "priority":
+        return view.priority;
+      case "sort":
+        return view.sort;
+    }
+  };
+
+  /** Whether a value row reads as checked — membership for multi axes. */
+  const isActive = (s: BuilderSection, value: string): boolean => {
+    if (s === "folder") return value === "" ? view.folders.length === 0 : view.folders.includes(value);
+    if (s === "tag") return value === "" ? view.tags.length === 0 : view.tags.includes(value);
+    return value === currentValue(s);
+  };
+
+  const appliedLabel = (s: BuilderSection): string | null => {
+    // Multi-select axes show the FIRST value plus a "+N" count, so the fixed
+    // left column never widens or wraps (myne-md/myne#656 review).
+    const multi = (list: readonly string[]): string | null =>
+      list.length === 0 ? null : list.length === 1 ? list[0]! : `${list[0]!} +${list.length - 1}`;
+    if (s === "folder") return multi(view.folders);
+    if (s === "tag") return multi(view.tags);
+    const v = currentValue(s);
+    switch (s) {
+      case "status":
+        return v === DEFAULT_TASK_VIEW.status ? null : t(`tasks.status.${v}`);
+      case "due":
+        return v === "any" ? null : t(`tasks.due.${v}`);
+      case "note":
+        return v === "" ? null : (noteOptions.find(([id]) => id === v)?.[1] ?? null);
+      case "priority":
+        return v === "any" ? null : t(`tasks.priority.${v}`);
+      case "sort":
+        return v === "due" ? null : t(`tasks.sort.${v}`);
+    }
+  };
+
+  const clearAxis = (s: BuilderSection): void => {
+    switch (s) {
+      case "status":
+        setView({ status: DEFAULT_TASK_VIEW.status });
+        break;
+      case "due":
+        setView({ due: "any" });
+        break;
+      case "folder":
+        setView({ folders: [] });
+        break;
+      case "note":
+        setView({ noteId: null });
+        break;
+      case "tag":
+        setView({ tags: [] });
+        break;
+      case "priority":
+        setView({ priority: "any" });
+        break;
+      case "sort":
+        setView({ sort: "due" });
+        break;
+    }
+  };
+
+  const valuesFor = (s: BuilderSection): { value: string; label: string }[] => {
+    switch (s) {
+      case "status":
+        return [
+          { value: "undone", label: t("tasks.status.undone") },
+          { value: "all", label: t("tasks.status.all") },
+          { value: "done", label: t("tasks.status.done") },
+        ];
+      case "due":
+        return [
+          { value: "any", label: t("tasks.due.any") },
+          { value: "overdue", label: t("tasks.due.overdue") },
+          { value: "today", label: t("tasks.due.today") },
+          { value: "upcoming", label: t("tasks.due.upcoming") },
+          { value: "later", label: t("tasks.due.later") },
+          { value: "none", label: t("tasks.due.none") },
+        ];
+      case "folder":
+        return [
+          { value: "", label: t("tasks.view.allFolders") },
+          ...folderOptions.map((f) => ({ value: f, label: f })),
+        ];
+      case "note":
+        return [
+          { value: "", label: t("tasks.view.allNotes") },
+          ...noteOptions.map(([id, title]) => ({ value: id, label: title })),
+        ];
+      case "tag":
+        return [
+          { value: "", label: t("tasks.view.anyTag") },
+          ...tagOptions.map((tag) => ({ value: tag, label: tag })),
+        ];
+      case "priority":
+        return [
+          { value: "any", label: t("tasks.view.anyPriority") },
+          ...PRIORITIES.map((p) => ({ value: p, label: t(`tasks.priority.${p}`) })),
+        ];
+      case "sort":
+        return [
+          { value: "due", label: t("tasks.sort.due") },
+          { value: "dueDesc", label: t("tasks.sort.dueDesc") },
+          { value: "priority", label: t("tasks.sort.priority") },
+          { value: "note", label: t("tasks.sort.note") },
+        ];
+    }
+  };
+
+  const choose = (s: BuilderSection, value: string): void => {
+    switch (s) {
+      case "status":
+        setView({ status: value as TaskStatusFilter });
+        break;
+      case "due":
+        setView({ due: value as TaskDueFilter });
+        break;
+      case "folder":
+        setView({
+          folders:
+            value === ""
+              ? []
+              : view.folders.includes(value)
+                ? view.folders.filter((f) => f !== value)
+                : [...view.folders, value],
+        });
+        break;
+      case "note":
+        setView({ noteId: value === "" ? null : value });
+        break;
+      case "tag":
+        setView({
+          tags:
+            value === ""
+              ? []
+              : view.tags.includes(value)
+                ? view.tags.filter((x) => x !== value)
+                : [...view.tags, value],
+        });
+        break;
+      case "priority":
+        setView({ priority: value as TaskPriorityFilter });
+        break;
+      case "sort":
+        setView({ sort: value as TaskSort });
+        break;
+    }
+  };
+
   return (
-    <div style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${section}`}>
-      <span>{t(`tasks.section.${section}`)}</span>
-      <span style={HEADER_COUNT_STYLE}>{count}</span>
+    <div
+      style={BUILDER_STYLE}
+      role="dialog"
+      aria-label={t("tasks.filters.title")}
+      data-testid={`${testIdPrefix}.filtersPanel`}
+    >
+      <div style={BUILDER_HEADER_STYLE}>
+        <span style={BUILDER_TITLE_STYLE}>{t("tasks.filters.title")}</span>
+        <button
+          type="button"
+          style={clearHover ? INLINE_CLEAR_HOVER_STYLE : INLINE_CLEAR_STYLE}
+          {...clearHandlers}
+          data-testid={`${testIdPrefix}.clearFiltersBuilder`}
+          onClick={() => onViewChange(DEFAULT_TASK_VIEW)}
+        >
+          {t("tasks.filters.clearAll")}
+        </button>
+      </div>
+      <div style={BUILDER_BODY_STYLE}>
+        <div style={BUILDER_LEFT_STYLE}>
+          {BUILDER_SECTIONS.map((s) => (
+            <BuilderLeftRow
+              key={s}
+              label={axisLabel[s]}
+              applied={appliedLabel(s)}
+              active={s === section}
+              testId={`${testIdPrefix}.builderTab.${s}`}
+              onSelect={() => setSection(s)}
+              onReset={() => clearAxis(s)}
+            />
+          ))}
+        </div>
+        <div style={BUILDER_RIGHT_STYLE} data-testid={`${testIdPrefix}.filtersValues`}>
+          {section === null ? (
+            <div style={BUILDER_EMPTY_STYLE} data-testid={`${testIdPrefix}.filtersHint`}>
+              <Icon name="list" size={20} />
+              <span>{t("tasks.filters.selectHint")}</span>
+            </div>
+          ) : (
+            <>
+              <span style={BUILDER_RIGHT_TITLE_STYLE}>{axisLabel[section]}</span>
+              {valuesFor(section).map((opt) => (
+                <BuilderValueRow
+                  key={opt.value === "" ? "__any" : opt.value}
+                  label={opt.label}
+                  active={isActive(section, opt.value)}
+                  testId={`${testIdPrefix}.builderOption.${section}.${opt.value === "" ? "any" : opt.value}`}
+                  onSelect={() => choose(section, opt.value)}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -206,17 +827,19 @@ export function TaskListPanel({
   onToggle,
   onOpen,
   testIdPrefix = "tasks",
+  minimal = false,
 }: TaskListPanelProps): ReactElement {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [filtersHover, filtersHandlers] = useHover();
+  const [clearHover, clearHandlers] = useHover();
 
   const sections = useMemo(
     () => partitionTasks(tasks, view, today, tagsOf ?? (() => NO_TAGS), search),
     [tasks, view, today, tagsOf, search],
   );
 
-  // Nesting resolved against the FULL live set, so a parent filtered out still
-  // promotes its child to depth 0 rather than hiding it.
   const depths = useMemo(() => {
     const visible = new Set<string>();
     for (const section of sections) for (const task of section.tasks) visible.add(taskRowKey(task));
@@ -225,7 +848,6 @@ export function TaskListPanel({
 
   const items = useMemo(() => flattenTaskList(sections, depths), [sections, depths]);
 
-  // ── Windowing ──────────────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(0);
@@ -248,8 +870,6 @@ export function TaskListPanel({
     };
   }, []);
 
-  // A new filter/search means a new list; keeping the old scroll offset would
-  // strand the user mid-way down rows that no longer exist.
   useEffect(() => {
     const el = scrollRef.current;
     if (el === null) return;
@@ -259,24 +879,68 @@ export function TaskListPanel({
 
   const window_ = computeTaskWindow(items, scrollTop, viewport);
   const slice = items.slice(window_.start, window_.end);
-  const sticky =
-    window_.stickyPinned && window_.stickyIndex >= 0
-      ? (items[window_.stickyIndex] as Extract<TaskListItem, { kind: "header" }>)
-      : null;
 
-  // ── Filter options, derived from the live set (no separate data source) ─────
   const folderOptions = useMemo(() => distinctFolders(tasks), [tasks]);
   const tagOptions = useMemo(() => distinctTags(tasks, tagsOf ?? (() => NO_TAGS)), [tasks, tagsOf]);
+  // A note is only offered when it is inside a selected folder, so the Folder
+  // and Note axes cannot contradict each other (myne-md/myne#656 review).
   const noteOptions = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const task of tasks) if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("tasks.view.untitled"));
+    for (const task of tasks) {
+      if (view.folders.length > 0 && !view.folders.some((f) => folderInScope(f, task.noteFolder))) {
+        continue;
+      }
+      if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("tasks.view.untitled"));
+    }
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [tasks, t]);
+  }, [tasks, t, view.folders]);
+
+  // If a folder is (re)selected that excludes the chosen note, drop the note
+  // filter rather than showing an impossible combination.
+  useEffect(() => {
+    if (view.noteId === null || view.folders.length === 0) return;
+    const task = tasks.find((x) => x.noteId === view.noteId);
+    if (task === undefined) return;
+    if (!view.folders.some((f) => folderInScope(f, task.noteFolder))) {
+      onViewChange({ ...view, noteId: null });
+    }
+  }, [view, tasks, onViewChange]);
 
   const setView = useCallback(
     (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch }),
     [onViewChange, view],
   );
+
+  const chips = useMemo(() => {
+    const out: { key: string; label: string; clear: () => void }[] = [];
+    if (view.status !== DEFAULT_TASK_VIEW.status) {
+      out.push({ key: "status", label: t(`tasks.status.${view.status}`), clear: () => setView({ status: DEFAULT_TASK_VIEW.status }) });
+    }
+    if (view.due !== "any") {
+      out.push({ key: "due", label: `${t("tasks.axis.due")}: ${t(`tasks.due.${view.due}`)}`, clear: () => setView({ due: "any" }) });
+    }
+    for (const folder of view.folders) {
+      out.push({
+        key: `folder:${folder}`,
+        label: `${t("tasks.axis.folder")}: ${folder}`,
+        clear: () => setView({ folders: view.folders.filter((f) => f !== folder) }),
+      });
+    }
+    if (view.noteId !== null) {
+      const title = noteOptions.find(([id]) => id === view.noteId)?.[1] ?? t("tasks.view.untitled");
+      out.push({ key: "note", label: `${t("tasks.axis.note")}: ${title}`, clear: () => setView({ noteId: null }) });
+    }
+    for (const tag of view.tags) {
+      out.push({ key: `tag:${tag}`, label: `${t("tasks.axis.tag")}: ${tag}`, clear: () => setView({ tags: view.tags.filter((x) => x !== tag) }) });
+    }
+    if (view.priority !== "any") {
+      out.push({ key: "priority", label: `${t("tasks.axis.priority")}: ${t(`tasks.priority.${view.priority}`)}`, clear: () => setView({ priority: "any" }) });
+    }
+    if (view.sort !== "due") {
+      out.push({ key: "sort", label: `${t("tasks.axis.sort")}: ${t(`tasks.sort.${view.sort}`)}`, clear: () => setView({ sort: "due" }) });
+    }
+    return out;
+  }, [view, t, noteOptions, setView]);
 
   const emptyKind = ((): "rebuilding" | "search" | "vault" | "filter" | null => {
     if (rebuilding) return "rebuilding";
@@ -286,133 +950,109 @@ export function TaskListPanel({
     return "filter";
   })();
 
-  const statusOptions = useMemo(
-    () => [
-      { value: "undone", label: t("tasks.status.undone") },
-      { value: "all", label: t("tasks.status.all") },
-      { value: "done", label: t("tasks.status.done") },
-    ],
-    [t],
-  );
-
   return (
     <div style={PANEL_STYLE} data-testid={`${testIdPrefix}.panel`}>
-      <div style={FILTER_ROW_STYLE} data-testid={`${testIdPrefix}.filters`}>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("tasks.search.placeholder")}
-          aria-label={t("tasks.search.label")}
-          style={SEARCH_STYLE}
-          data-testid={`${testIdPrefix}.search`}
-        />
-        <Segmented
-          options={statusOptions}
-          value={view.status}
-          onChange={(v) => setView({ status: v as TaskStatusFilter })}
-          ariaLabel={t("tasks.view.statusLabel")}
-          testId={`${testIdPrefix}.status`}
-        />
-        <Select
-          value={view.due}
-          options={[
-            { value: "any", label: t("tasks.due.any") },
-            { value: "overdue", label: t("tasks.due.overdue") },
-            { value: "today", label: t("tasks.due.today") },
-            { value: "upcoming", label: t("tasks.due.upcoming") },
-            { value: "later", label: t("tasks.due.later") },
-            { value: "none", label: t("tasks.due.none") },
-          ]}
-          onChange={(v) => setView({ due: v as TaskDueFilter })}
-          aria-label={t("tasks.view.dueLabel")}
-          testId={`${testIdPrefix}.dueFilter`}
-        />
-        <Select
-          value={view.folder ?? ""}
-          options={[{ value: "", label: t("tasks.view.allFolders") }, ...folderOptions.map((f) => ({ value: f, label: f }))]}
-          onChange={(v) => setView({ folder: v === "" ? null : v })}
-          aria-label={t("tasks.view.folderLabel")}
-          testId={`${testIdPrefix}.folderFilter`}
-        />
-        <Select
-          value={view.noteId ?? ""}
-          options={[{ value: "", label: t("tasks.view.allNotes") }, ...noteOptions.map(([id, title]) => ({ value: id, label: title }))]}
-          onChange={(v) => setView({ noteId: v === "" ? null : v })}
-          aria-label={t("tasks.view.noteLabel")}
-          testId={`${testIdPrefix}.noteFilter`}
-        />
-        <Select
-          value={view.tags[0] ?? ""}
-          options={[{ value: "", label: t("tasks.view.anyTag") }, ...tagOptions.map((tag) => ({ value: tag, label: tag }))]}
-          onChange={(v) => setView({ tags: v === "" ? [] : [v] })}
-          aria-label={t("tasks.view.tagLabel")}
-          testId={`${testIdPrefix}.tagFilter`}
-        />
-        <Select
-          value={view.priority}
-          options={[
-            { value: "any", label: t("tasks.view.anyPriority") },
-            ...(["highest", "high", "medium", "low", "lowest"] as const).map((p) => ({ value: p, label: t(`tasks.priority.${p}`) })),
-          ]}
-          onChange={(v) => setView({ priority: v as TaskPriorityFilter })}
-          aria-label={t("tasks.view.priorityLabel")}
-          testId={`${testIdPrefix}.priorityFilter`}
-        />
-        <Select
-          value={view.sort}
-          options={[
-            { value: "due", label: t("tasks.sort.due") },
-            { value: "dueDesc", label: t("tasks.sort.dueDesc") },
-            { value: "priority", label: t("tasks.sort.priority") },
-            { value: "note", label: t("tasks.sort.note") },
-          ]}
-          onChange={(v) => setView({ sort: v as TaskSort })}
-          aria-label={t("tasks.view.sortLabel")}
-          testId={`${testIdPrefix}.sort`}
-        />
-      </div>
-
-      <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0 }}>
-        <div ref={scrollRef} style={SCROLL_STYLE} data-testid={`${testIdPrefix}.scroll`}>
-          {emptyKind !== null ? (
-            <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
-              {t(`tasks.empty.${emptyKind}`, { query: search.trim() })}
-            </div>
-          ) : (
-            <>
-              <div style={{ height: window_.topPad }} aria-hidden="true" />
-              {slice.map((item) =>
-                item.kind === "header" ? (
-                  <SectionHeader
-                    key={item.id}
-                    section={item.section}
-                    count={item.count}
-                    testIdPrefix={testIdPrefix}
-                  />
-                ) : (
-                  <div key={item.id} style={ROW_WRAP_STYLE}>
-                    <TaskRow
-                      task={toRowData(item.task, item.depth)}
-                      scope={rowScope}
-                      today={today}
-                      testIdPrefix={`${testIdPrefix}.row`}
-                      {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
-                      {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
-                    />
-                  </div>
-                ),
-              )}
-              <div style={{ height: window_.bottomPad }} aria-hidden="true" />
-            </>
+      <div style={TOOLBAR_STYLE}>
+        <div style={SEARCH_ROW_STYLE}>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("tasks.search.placeholder")}
+            aria-label={t("tasks.search.label")}
+            style={SEARCH_STYLE}
+            data-testid={`${testIdPrefix}.search`}
+          />
+          {minimal ? null : (
+            <button
+              type="button"
+              style={filtersHover ? FILTERS_BUTTON_HOVER_STYLE : FILTERS_BUTTON_STYLE}
+              {...filtersHandlers}
+              aria-expanded={builderOpen}
+              aria-haspopup="dialog"
+              data-testid={`${testIdPrefix}.filtersButton`}
+              onClick={() => setBuilderOpen((o) => !o)}
+            >
+              <Icon name="settings" size={13} />
+              {t("tasks.filters.button")}
+              {chips.length > 0 ? (
+                <span style={FILTERS_COUNT_STYLE} data-testid={`${testIdPrefix}.filtersCount`}>
+                  {chips.length}
+                </span>
+              ) : null}
+            </button>
           )}
         </div>
-        {sticky !== null && emptyKind === null ? (
-          <div style={STICKY_STYLE} data-testid={`${testIdPrefix}.stickyHeader`}>
-            <span>{t(`tasks.section.${sticky.section}`)}</span>
-            <span style={HEADER_COUNT_STYLE}>{sticky.count}</span>
+
+        {!minimal && builderOpen ? (
+          <>
+            <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
+            <TaskFilterBuilder
+              view={view}
+              onViewChange={onViewChange}
+              folderOptions={folderOptions}
+              noteOptions={noteOptions}
+              tagOptions={tagOptions}
+              testIdPrefix={testIdPrefix}
+            />
+          </>
+        ) : null}
+
+        {!minimal && chips.length > 0 ? (
+          <div style={CHIPS_ROW_STYLE} data-testid={`${testIdPrefix}.appliedFilters`}>
+            {chips.map((chip) => (
+              <FilterChip
+                key={chip.key}
+                label={chip.label}
+                testId={`${testIdPrefix}.applied.${chip.key}`}
+                onRemove={chip.clear}
+              />
+            ))}
+            <button
+              type="button"
+              style={clearHover ? INLINE_CLEAR_HOVER_STYLE : INLINE_CLEAR_STYLE}
+              {...clearHandlers}
+              data-testid={`${testIdPrefix}.clearFilters`}
+              onClick={() => onViewChange(DEFAULT_TASK_VIEW)}
+            >
+              {t("tasks.filters.clearAll")}
+            </button>
           </div>
         ) : null}
+
+        <div style={SEPARATOR_STYLE} aria-hidden="true" />
+      </div>
+
+      <div ref={scrollRef} style={SCROLL_STYLE} data-testid={`${testIdPrefix}.scroll`}>
+        {emptyKind !== null ? (
+          <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
+            {t(`tasks.empty.${emptyKind}`, { query: search.trim() })}
+          </div>
+        ) : (
+          <>
+            <div style={{ height: window_.topPad }} aria-hidden="true" />
+            {slice.map((item) =>
+              item.kind === "header" ? (
+                <div key={item.id} style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${item.section}`}>
+                  <span>{t(`tasks.section.${item.section}`)}</span>
+                  <span style={HEADER_COUNT_STYLE}>{item.count}</span>
+                </div>
+              ) : (
+                <div key={item.id} style={ROW_WRAP_STYLE}>
+                  <TaskRow
+                    task={toRowData(item.task, item.depth)}
+                    scope={rowScope}
+                    today={today}
+                    testIdPrefix={`${testIdPrefix}.row`}
+                    {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
+                    {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+                  />
+                </div>
+              ),
+            )}
+            <div style={{ height: window_.bottomPad }} aria-hidden="true" />
+          </>
+        )}
       </div>
     </div>
   );
