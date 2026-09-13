@@ -150,12 +150,12 @@ describe("keyboard operation", () => {
       onCommit: () => {},
     });
     // The grid has ~35 day buttons but a roving tabindex leaves one tabbable;
-    // with the month nav, clear, add-time, commit and cancel buttons that is
-    // seven stops.
+    // with the month nav, the Today/Tomorrow quick picks, clear, add-time,
+    // commit and cancel buttons that is nine stops.
     const tabbable = [
       ...surface()!.querySelectorAll<HTMLElement>("button, [tabindex]"),
     ].filter((el) => el.tabIndex >= 0);
-    expect(tabbable.length).toBe(7);
+    expect(tabbable.length).toBe(9);
     handle.close();
     anchor.remove();
   });
