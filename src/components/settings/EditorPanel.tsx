@@ -37,6 +37,7 @@ import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
 import { SettingRow } from "./SettingRow";
 import { Segmented } from "../primitives/Segmented";
+import { Switch } from "../primitives/Switch";
 import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useWorkspace } from "../../notes/workspaceContext";
@@ -326,13 +327,39 @@ function TaskChipInkSetting(): ReactNode {
               label: t(`settings.editor.taskChipColor.${c}`),
             }))}
             value={value}
-            onChange={(v) => ws.setTaskDisplay({ chipColor: v as TaskChipColor })}
+            onChange={(v) => ws.setTaskDisplay({ ...ws.taskDisplay, chipColor: v as TaskChipColor })}
             ariaLabel={t("settings.editor.taskChipColor.label")}
             ariaDescribedBy={helperId}
             testId="settings.editor.taskChipColor.control"
           />
         </div>
       )}
+    />
+  );
+}
+
+/**
+ * Settings -> Editor -> Tasks: icon-only priority chips (myne-md/myne#656 item
+ * 5). Device-local; applied through a root attribute so a live editor does not
+ * need reconfiguring.
+ */
+function TaskChipIconOnlySetting(): ReactNode {
+  const { t } = useTranslation();
+  const ws = useWorkspace();
+  return (
+    <SettingRow
+      label={t("settings.editor.taskChipIconOnly.label")}
+      helper={t("settings.editor.taskChipIconOnly.help")}
+      testId="settings.editor.taskChipIconOnly"
+      anchorId="settings.editor.taskChipIconOnly"
+      control={
+        <Switch
+          checked={ws.taskDisplay.iconOnly}
+          onChange={(next) => ws.setTaskDisplay({ ...ws.taskDisplay, iconOnly: next })}
+          ariaLabel={t("settings.editor.taskChipIconOnly.label")}
+          testId="settings.editor.taskChipIconOnly.control"
+        />
+      }
     />
   );
 }
@@ -431,6 +458,8 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
       >
         {/* Task chip ink colour (myne-md/myne#656 item 4) — device-local. */}
         <TaskChipInkSetting />
+        {/* Icon-only priority chips (myne-md/myne#656 item 5) — device-local. */}
+        <TaskChipIconOnlySetting />
       </SettingsSection>
 
       {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /

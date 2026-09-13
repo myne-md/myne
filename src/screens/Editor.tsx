@@ -781,10 +781,13 @@ function EditorChrome({
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--task-chip-ink", TASK_CHIP_INK[ws.taskDisplay.chipColor]);
+    if (ws.taskDisplay.iconOnly) root.setAttribute("data-task-chip-icon-only", "true");
+    else root.removeAttribute("data-task-chip-icon-only");
     return () => {
       root.style.removeProperty("--task-chip-ink");
+      root.removeAttribute("data-task-chip-icon-only");
     };
-  }, [ws.taskDisplay.chipColor]);
+  }, [ws.taskDisplay.chipColor, ws.taskDisplay.iconOnly]);
   // myne#681 task 2 (SYNC-11): in a detached (pop-out) window, set when the note
   // this window holds is deleted from ANOTHER surface (a `notes://deleted` event
   // whose payload matches `detachedNoteId`). The window then shows a terminal

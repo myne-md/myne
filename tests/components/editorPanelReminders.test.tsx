@@ -37,7 +37,7 @@ vi.mock("../../src/hooks/usePrefs", () => ({
 // reminder wire, not the task display.
 vi.mock("../../src/notes/workspaceContext", () => ({
   useWorkspace: () => ({
-    taskDisplay: { chipColor: "theme" },
+    taskDisplay: { chipColor: "theme", iconOnly: false },
     setTaskDisplay: vi.fn(),
   }),
 }));

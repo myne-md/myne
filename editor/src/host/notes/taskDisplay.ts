@@ -18,10 +18,16 @@ export interface TaskDisplaySettings {
    *  the pre-feature look. There is deliberately no "fill" option: the canon
    *  forbids state-as-fill (`taskChipToken.ts`). */
   chipColor: TaskChipColor;
+  /** Hide the word on a PRIORITY chip, leaving its icon (myne-md/myne#656 item
+   *  5). Applied through a root attribute + CSS rather than at widget-build
+   *  time, so flipping it recolours a live editor without reconfiguring
+   *  CodeMirror. */
+  iconOnly: boolean;
 }
 
 export const DEFAULT_TASK_DISPLAY: Readonly<TaskDisplaySettings> = {
   chipColor: "theme",
+  iconOnly: false,
 };
 
 /**
@@ -36,15 +42,17 @@ export const TASK_CHIP_INK: Record<TaskChipColor, string> = {
   muted: "var(--fg-3)",
 };
 
-/** Encode omit-when-default; `undefined` drops the whole key. */
+/** Encode omit-when-default, field by field; `undefined` drops the whole key. */
 export function encodeTaskDisplay(
   settings: TaskDisplaySettings,
 ): Record<string, unknown> | undefined {
-  if (settings.chipColor === DEFAULT_TASK_DISPLAY.chipColor) return undefined;
-  return { chipColor: settings.chipColor };
+  const out: Record<string, unknown> = {};
+  if (settings.chipColor !== DEFAULT_TASK_DISPLAY.chipColor) out.chipColor = settings.chipColor;
+  if (settings.iconOnly !== DEFAULT_TASK_DISPLAY.iconOnly) out.iconOnly = settings.iconOnly;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** Decode defensively: anything not a known colour becomes the default. */
+/** Decode defensively: anything not a known value becomes the default. */
 export function decodeTaskDisplay(raw: unknown): TaskDisplaySettings {
   if (typeof raw !== "object" || raw === null) return { ...DEFAULT_TASK_DISPLAY };
   const o = raw as Record<string, unknown>;
@@ -53,5 +61,6 @@ export function decodeTaskDisplay(raw: unknown): TaskDisplaySettings {
     chipColor: (TASK_CHIP_COLORS as readonly unknown[]).includes(color)
       ? (color as TaskChipColor)
       : DEFAULT_TASK_DISPLAY.chipColor,
+    iconOnly: typeof o.iconOnly === "boolean" ? o.iconOnly : DEFAULT_TASK_DISPLAY.iconOnly,
   };
 }

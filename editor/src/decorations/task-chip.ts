@@ -59,6 +59,7 @@ import { parseTaskFields, parseTaskInstant, type TaskFields } from "@myne/dialec
 import { planTaskFieldWrite } from "@myne/dialect/taskFieldWriter";
 import { parseRecurrenceSpec } from "@myne/dialect/recurrence";
 import { canRecur } from "@myne/dialect/taskRecurrence";
+import { taskChipIcon } from "@myne/editor/host/notes/taskChipIcon";
 
 /** The kinds a chip can be. `remind` joined in myne#280 — the read side already
  *  mapped its `⏰` marker, and it is the field the notification scheduler
@@ -348,6 +349,12 @@ class TaskChipWidget extends WidgetType {
      * one name that could talk somebody into writing it back.
      */
     private readonly label: string,
+    /**
+     * The raw field value (`ChipSpan.value`), used ONLY to choose the priority
+     * icon (myne-md/myne#656 item 4). Never rendered and never committed; the
+     * bytes a write uses come from the tracked span, not from here.
+     */
+    private readonly value: string,
     /** Source position, part of widget IDENTITY — see `eq`. */
     private readonly from: number,
   ) {
@@ -397,7 +404,13 @@ class TaskChipWidget extends WidgetType {
       "aria-label",
       `${FIELD_NAME[this.kind]()}, ${this.label}`,
     );
-    span.textContent = this.label;
+    // Leading icon + label. The label is ALWAYS present and hidden by CSS when
+    // the icon-only setting is on (myne-md/myne#656 items 4/5), so toggling the
+    // setting never requires rebuilding a widget or reconfiguring CodeMirror.
+    const label = document.createElement("span");
+    label.className = "cm-task-chip-label";
+    label.textContent = this.label;
+    span.append(taskChipIcon(this.kind, this.value), label);
     return span;
   }
 
@@ -498,7 +511,7 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
       }
       decorations.push(
         Decoration.replace({
-          widget: new TaskChipWidget(span.kind, span.label, span.from),
+          widget: new TaskChipWidget(span.kind, span.label, span.value, span.from),
         }).range(span.from, span.to),
       );
     }

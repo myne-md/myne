@@ -72,7 +72,12 @@ const CHIP_BLOCK_CANCEL = "calc(-0.867em - 1px)";
 export function taskChipCmTheme(): Record<string, Record<string, string>> {
   return {
     ".cm-task-chip": {
-      display: "inline-block",
+      // inline-flex so the leading icon and the label sit on one centred line;
+      // still an inline-level box, so the zero-height margin box below keeps
+      // working.
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "0.33em",
       padding: `${TASK_CHIP_TOKEN.paddingY} ${TASK_CHIP_TOKEN.paddingX}`,
       marginInline: "1px",
       // The zero-height margin box (see `CHIP_BLOCK_CANCEL`): the row is laid
@@ -97,6 +102,17 @@ export function taskChipCmTheme(): Record<string, Record<string, string>> {
       // the label out of the pill — the same trap the tag chip documents, and
       // one of the two layout carve-outs MYND-614 task 9 is about.
       textIndent: "0",
+    },
+    ".cm-task-chip-icon": {
+      width: "1em",
+      height: "1em",
+      flex: "0 0 auto",
+    },
+    // Icon-only mode (myne-md/myne#656 item 5): the label is always in the DOM
+    // and hidden here, so flipping the setting is a root-attribute change with
+    // no widget rebuild and no CodeMirror reconfiguration. Scoped to priority.
+    "[data-task-chip-icon-only] .cm-task-chip-priority .cm-task-chip-label": {
+      display: "none",
     },
     ".cm-task-chip:hover": {
       backgroundColor: TASK_CHIP_TOKEN.bgHover,

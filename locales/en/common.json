@@ -3391,6 +3391,10 @@
         "muted": "Muted",
         "sample": "Aug 1",
         "theme": "Theme"
+      },
+      "taskChipIconOnly": {
+        "help": "Show a priority as its icon only, instead of the word.",
+        "label": "Icon-only priority"
       }
     },
     "search": {

@@ -31,7 +31,12 @@ describe("the chip colour enum", () => {
 
   it("is omit-when-default", () => {
     expect(encodeTaskDisplay(DEFAULT_TASK_DISPLAY)).toBeUndefined();
-    expect(encodeTaskDisplay({ chipColor: "accent" })).toEqual({ chipColor: "accent" });
+    expect(encodeTaskDisplay({ ...DEFAULT_TASK_DISPLAY, chipColor: "accent" })).toEqual({
+      chipColor: "accent",
+    });
+    expect(encodeTaskDisplay({ ...DEFAULT_TASK_DISPLAY, iconOnly: true })).toEqual({
+      iconOnly: true,
+    });
   });
 
   it("decodes anything unknown to the default", () => {
@@ -47,7 +52,14 @@ describe("the chip colour enum", () => {
     ]) {
       expect(decodeTaskDisplay(junk)).toEqual(DEFAULT_TASK_DISPLAY);
     }
-    expect(decodeTaskDisplay({ chipColor: "muted" })).toEqual({ chipColor: "muted" });
+    expect(decodeTaskDisplay({ chipColor: "muted" })).toEqual({
+      chipColor: "muted",
+      iconOnly: false,
+    });
+    expect(decodeTaskDisplay({ iconOnly: true })).toEqual({
+      chipColor: "theme",
+      iconOnly: true,
+    });
   });
 });
 
@@ -59,9 +71,9 @@ describe("the container round-trip", () => {
 
   it("persists a non-default colour and round-trips it", () => {
     const back = deserializeWorkspaces(
-      serializeWorkspaces(container({ taskDisplay: { chipColor: "accent" } })),
+      serializeWorkspaces(container({ taskDisplay: { chipColor: "accent", iconOnly: true } })),
     );
-    expect(back?.taskDisplay).toEqual({ chipColor: "accent" });
+    expect(back?.taskDisplay).toEqual({ chipColor: "accent", iconOnly: true });
   });
 
   it("stays byte-neutral (no key) for the default", () => {

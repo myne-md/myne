@@ -467,6 +467,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.editor.taskChipColor.label",
     descriptionKey: "settings.editor.taskChipColor.help",
   },
+  {
+    id: "editor.task-chip-icon-only",
+    panelId: "editor",
+    testid: "settings.editor.taskChipIconOnly",
+    titleKey: "settings.editor.taskChipIconOnly.label",
+    descriptionKey: "settings.editor.taskChipIconOnly.help",
+  },
 
   // ── Files ──────────────────────────────────────────────────────────────────
   {

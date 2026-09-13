@@ -257,6 +257,27 @@ describe("recurrence and priority chips (task 4)", () => {
     }
     teardown(view, host);
   });
+
+  it("every chip carries an icon and a label, so icon-only is a CSS decision (myne-md/myne#656)", () => {
+    const { view, host } = mount(
+      "- [ ] x [due:: 2026-08-01] [priority:: highest]\n",
+    );
+    for (const el of host.querySelectorAll("[data-task-chip]")) {
+      // Both parts are always in the DOM; the icon-only setting hides the
+      // label at the root rather than changing what a widget builds.
+      expect(el.querySelector("svg.cm-task-chip-icon"), "icon").not.toBeNull();
+      expect(el.querySelector(".cm-task-chip-label"), "label").not.toBeNull();
+    }
+    const priority = host.querySelector('[data-task-chip="priority"]');
+    expect(
+      priority?.querySelector(".cm-task-chip-label")?.textContent,
+      "the priority label is present",
+    ).toBeTruthy();
+    // The priority icon encodes the LEVEL by shape, so an icon-only chip still
+    // distinguishes highest from lowest.
+    expect(priority?.querySelector("svg.cm-task-chip-icon")?.children.length).toBeGreaterThan(0);
+    teardown(view, host);
+  });
 });
 
 describe("the canon's prohibitions", () => {
