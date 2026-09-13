@@ -175,6 +175,9 @@ fn main() {
                 "ai_provider_has_key",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
+                // myne-md/myne#699 left ribbon.
+                "set_ribbon_items",
+                "set_ribbon_visible",
                 // developer-mode (MYND-593): named here too, though not
                 // strictly required (the plugin's own InlinedPlugin
                 // declaration above is what creates the `prefs:` ACL

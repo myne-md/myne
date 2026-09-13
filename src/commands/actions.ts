@@ -11,6 +11,7 @@
 // stage), it's just not yet built.
 
 import type { CommandAction } from "./registry";
+import type { IconName } from "../lib/icons";
 import * as capabilities from "../platform/capabilities";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 import { foldAll, unfoldAll } from "@codemirror/language";
@@ -275,6 +276,7 @@ function applyBuiltinTheme(choice: ThemeChoice | null): void {
 const THEME_CYCLE: readonly (ThemeChoice | null)[] = [null, "light", "dark", "amoled"];
 const cycleThemeAction: CommandAction = {
   id: "appearance.cycle-theme",
+  ribbon: { icon: "sun" },
   get label() {
     return i18n.t("commands.actions.cycleTheme.label");
   },
@@ -409,6 +411,7 @@ function notesAction(
   labelKey: string,
   invoke: CommandAction["run"],
   needsNote = true,
+  ribbonIcon?: IconName,
 ): CommandAction {
   return {
     id,
@@ -418,6 +421,7 @@ function notesAction(
     get category() {
       return i18n.t("commands.actions.category.notes");
     },
+    ...(ribbonIcon !== undefined ? { ribbon: { icon: ribbonIcon } } : {}),
     visibility: needsNote ? editorWithNote : editorOnly,
     run: invoke,
   };
@@ -457,6 +461,7 @@ const newNoteAction = notesAction(
   "commands.actions.newNote.label",
   (c) => c.onNewNote(),
   false,
+  "plus",
 );
 const duplicateNoteAction = notesAction("note.duplicate", "commands.actions.duplicateNote.label", (c) =>
   c.onDuplicateNote(),
@@ -608,6 +613,7 @@ const revealVaultFolderAction: CommandAction = {
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
+  ribbon: { icon: "lock" },
   get label() {
     return i18n.t("commands.actions.lockVault.label");
   },
@@ -622,6 +628,7 @@ const lockVaultAction: CommandAction = {
 
 const openSettingsAction: CommandAction = {
   id: "app.open-settings",
+  ribbon: { icon: "settings" },
   get label() {
     return i18n.t("commands.actions.openSettings.label");
   },
@@ -638,6 +645,7 @@ const openSettingsAction: CommandAction = {
 
 const backupVaultAction: CommandAction = {
   id: "vault.backup",
+  ribbon: { icon: "download" },
   get label() {
     return i18n.t("commands.actions.backupVault.label");
   },
@@ -691,6 +699,7 @@ const importObsidianAction: CommandAction = {
 
 const manageTemplatesAction: CommandAction = {
   id: "templates.manage",
+  ribbon: { icon: "layout-grid" },
   get label() {
     return i18n.t("commands.actions.manageTemplates.label");
   },
@@ -707,6 +716,7 @@ const manageTemplatesAction: CommandAction = {
 
 const newNoteFromTemplateAction: CommandAction = {
   id: "templates.new-note",
+  ribbon: { icon: "file-plus" },
   get label() {
     return i18n.t("commands.actions.newNoteFromTemplate.label");
   },
@@ -724,6 +734,7 @@ const newNoteFromTemplateAction: CommandAction = {
 
 const openTodayNoteAction: CommandAction = {
   id: "daily.open-today",
+  ribbon: { icon: "calendar-days" },
   get label() {
     return i18n.t("commands.actions.openTodayNote.label");
   },
@@ -741,6 +752,7 @@ const openTodayNoteAction: CommandAction = {
 
 const openThisWeekNoteAction: CommandAction = {
   id: "periodic.open-this-week",
+  ribbon: { icon: "calendar-plus" },
   get label() {
     return i18n.t("commands.actions.openThisWeekNote.label");
   },
@@ -759,6 +771,7 @@ const openThisWeekNoteAction: CommandAction = {
 
 const openThisMonthNoteAction: CommandAction = {
   id: "periodic.open-this-month",
+  ribbon: { icon: "calendar" },
   get label() {
     return i18n.t("commands.actions.openThisMonthNote.label");
   },
@@ -773,6 +786,7 @@ const openThisMonthNoteAction: CommandAction = {
 
 const randomNoteAction: CommandAction = {
   id: "notes.random",
+  ribbon: { icon: "shuffle" },
   get label() {
     return i18n.t("commands.actions.randomNote.label");
   },
@@ -790,6 +804,7 @@ const randomNoteAction: CommandAction = {
 
 const openAttachmentsAction: CommandAction = {
   id: "attachments.open",
+  ribbon: { icon: "paperclip" },
   get label() {
     return i18n.t("commands.actions.openAttachments.label");
   },
@@ -1129,6 +1144,7 @@ const exportNoteTxtAction: CommandAction = {
 
 const showGraphAction: CommandAction = {
   id: "graph.show",
+  ribbon: { icon: "share-2" },
   get label() {
     return i18n.t("commands.actions.showGraph.label");
   },
@@ -1151,6 +1167,7 @@ const showTasksAction: CommandAction = {
   // moment a user rebinds one — a rename silently drops their keybinding — so
   // this string must not change even if the surface is renamed.
   id: "tasks.show",
+  ribbon: { icon: "list-todo" },
   get label() {
     return i18n.t("commands.actions.showTasks.label");
   },
@@ -1167,6 +1184,7 @@ const showTasksAction: CommandAction = {
 
 const showTagsAction: CommandAction = {
   id: "tags.show",
+  ribbon: { icon: "hash" },
   get label() {
     return i18n.t("commands.actions.showTags.label");
   },
@@ -1202,6 +1220,7 @@ const importBaseViewAction: CommandAction = {
 
 const showViewsAction: CommandAction = {
   id: "views.show",
+  ribbon: { icon: "layout-grid" },
   get label() {
     return i18n.t("commands.actions.showViews.label");
   },
@@ -1219,6 +1238,7 @@ const showViewsAction: CommandAction = {
 
 const toggleLeftSidebarAction: CommandAction = {
   id: "view.toggle-notes-sidebar",
+  ribbon: { icon: "panel-left" },
   get label() {
     return i18n.t("commands.actions.toggleLeftSidebar.label");
   },
@@ -1233,6 +1253,7 @@ const toggleLeftSidebarAction: CommandAction = {
 
 const toggleRightSidebarAction: CommandAction = {
   id: "view.toggle-backlinks-sidebar",
+  ribbon: { icon: "panel-right" },
   get label() {
     return i18n.t("commands.actions.toggleRightSidebar.label");
   },
@@ -1299,6 +1320,7 @@ const toggleSourceAction: CommandAction = {
 
 const toggleFocusAction: CommandAction = {
   id: "view.toggle-focus",
+  ribbon: { icon: "maximize-2" },
   get label() {
     return i18n.t("commands.actions.toggleFocus.label");
   },

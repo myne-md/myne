@@ -45,7 +45,9 @@ import {
   shouldOpenIntoFocusedPane,
 } from "../notes/selectionBridges";
 import { CommandPalette } from "../components/CommandPalette";
-import type { CommandContext } from "../commands";
+import { LeftRibbon } from "../notes/components/LeftRibbon";
+import { ribbonCommands } from "../notes/ribbonCommands";
+import { COMMAND_ACTIONS, type CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
 import { useConflictMaterializer } from "../hooks/useConflictMaterializer";
 import type { KeybindEntry } from "../commands/keybindEngine";
@@ -97,7 +99,7 @@ import {
   hoverSurface,
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
-import { SettingsModal } from "../components/SettingsModal";
+import { SettingsModal, type PanelId } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
@@ -788,6 +790,24 @@ function EditorChrome({
       root.removeAttribute("data-task-chip-icon-only");
     };
   }, [ws.taskDisplay.chipColor, ws.taskDisplay.iconOnly]);
+  // Panel Settings should open on (myne-md/myne#699): the left ribbon's
+  // "Customize ribbon…" asks for Appearance; every other entry point clears it.
+  const [settingsPanel, setSettingsPanel] = useState<PanelId | null>(null);
+  const openSettings = useCallback(
+    (panel: PanelId | null = null) => {
+      setSettingsPanel(panel);
+      setSettingsOpen(true);
+    },
+    [setSettingsOpen],
+  );
+  // The rail is a sibling subtree, so its right-click entry reaches Settings
+  // through the service locator.
+  useEffect(() => {
+    ribbonCommands.customizeRibbon = () => openSettings("appearance");
+    return () => {
+      ribbonCommands.customizeRibbon = undefined;
+    };
+  }, [openSettings]);
   // myne#681 task 2 (SYNC-11): in a detached (pop-out) window, set when the note
   // this window holds is deleted from ANOTHER surface (a `notes://deleted` event
   // whose payload matches `detachedNoteId`). The window then shows a terminal
@@ -1136,6 +1156,12 @@ function EditorChrome({
   // note it was popped out for is its only surface and no sidebar can open
   // another (SYNC-6). This is the render half of the single-note seed above.
   const detached = detachedNoteId != null;
+  // Whether the left ribbon is actually on screen (myne-md/myne#699). Mirrors
+  // `LeftRibbon`'s own hidden conditions plus the show/hide pref, and gates the
+  // title-band rule so a ribbon that is off leaves no stray line at the edge.
+  const ribbonShown =
+    barPrefs.ribbon_visible !== false &&
+    !(focusActive || detached || forced.forceLeftCollapsed);
   const leftCollapsed =
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive || detached;
   const rightCollapsed =
@@ -2218,6 +2244,10 @@ function EditorChrome({
           minHeight: 0,
         }}
       >
+        {/* Left ribbon (myne-md/myne#699): a far-left icon column independent of
+            the notes sidebar, so collapsing the tree does not hide it. Hidden in
+            focus mode and under the width-forced collapse. */}
+        <LeftRibbon hidden={focusActive || detached || forced.forceLeftCollapsed} />
         <SidebarBootstrap />
         {/* Always mounted (even when collapsed) so the width collapse/expand
             animates instead of popping - SidebarPane drives the width 0↔open
@@ -2244,6 +2274,12 @@ function EditorChrome({
                   flexShrink: 0,
                   // Ground painted by SidebarPane - see its comment.
                   borderInlineEnd: "1px solid var(--line-1)",
+                  // Bottom rule at the traffic-light strip's edge, so the title
+                  // band joins the ribbon's rule and the tab strip's own bottom
+                  // border. Only while the ribbon is shown: with the ribbon off
+                  // there is no left column to continue, and the line would be a
+                  // stray segment at the window edge (myne-md/myne#699).
+                  borderBottom: ribbonShown ? "1px solid var(--line-1)" : undefined,
                 }}
               />
               <SidebarVaultSwitcher
@@ -2394,7 +2430,7 @@ function EditorChrome({
         </div>
       )}
       <BottomBar
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => openSettings()}
         onShowGraph={() => ws.openGraph()}
         onShowTags={() => {
           setTagsSeed(null);
@@ -2512,6 +2548,7 @@ function EditorChrome({
       <SettingsModal
         vaultId={vaultId}
         open={settingsOpen}
+        initialPanel={settingsPanel ?? undefined}
         onClose={() => setSettingsOpen(false)}
         onShowToast={showToastMessage}
         onForceRelock={onForceRelock}
@@ -2661,7 +2698,7 @@ function EditorChrome({
         }}
         onOpenSettings={() => {
           setPaletteOpen(false);
-          setSettingsOpen(true);
+          openSettings();
         }}
         onManageTemplates={() => {
           setPaletteOpen(false);
@@ -3681,6 +3718,25 @@ function CommandPaletteHost({
       onDeleteWorkspace,
     ],
   );
+  // Left-ribbon bridge (myne-md/myne#699): the rail renders in the Editor's
+  // layout row, a sibling subtree, so it reaches the live command context
+  // through `ribbonCommands`. Same service-locator shape as `sidebarCommands`.
+  useEffect(() => {
+    ribbonCommands.run = (id) => {
+      const action = COMMAND_ACTIONS.find((a) => a.id === id);
+      if (action !== undefined && action.visibility(commandCtx) === "show") {
+        void action.run(commandCtx);
+      }
+    };
+    ribbonCommands.visibility = (id) => {
+      const action = COMMAND_ACTIONS.find((a) => a.id === id);
+      return action?.visibility(commandCtx) ?? "hidden";
+    };
+    return () => {
+      ribbonCommands.run = undefined;
+      ribbonCommands.visibility = undefined;
+    };
+  }, [commandCtx]);
   // Stable note predicates (fresh identity only when the cache changes): they
   // sit in the palette's snippet-effect deps, and an inline arrow's per-render
   // identity would re-run that effect - re-issuing its `note_read` decrypts -

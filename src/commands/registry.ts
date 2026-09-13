@@ -18,6 +18,7 @@ import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { NoteId } from "../notes/sidebarState";
 import type { Period } from "../notes/dailyNote";
 import type { PrefsView } from "../lib/prefs";
+import type { IconName } from "../lib/icons";
 
 export type AppStageName =
   | "welcome"
@@ -250,6 +251,14 @@ export type CommandAction = {
   /** Optional helper text shown when the action is disabled. */
   disabledHint?: string;
   /**
+   * Opt-in left-ribbon metadata (myne-md/myne#699). A command is
+   * ribbon-eligible **if and only if** it declares this, and the icon is the
+   * glyph the rail renders. Declared at the command so eligibility cannot drift
+   * from the registry; commands left unmarked (destructive, structural,
+   * context-fragile) are not pinnable.
+   */
+  ribbon?: { icon: IconName };
+  /**
    * Whether the action shows up in the palette and whether it's runnable.
    * Called every render with the current app context.
    */
@@ -257,3 +266,17 @@ export type CommandAction = {
   /** Invocation handler. May be async. */
   run: (ctx: CommandContext) => void | Promise<void>;
 };
+
+/**
+ * The curated default rail a fresh vault starts with (myne-md/myne#699). This
+ * is the CLIENT-side default: the stored `ribbon_items` pref is `null` until the
+ * user configures the rail, and this list is what renders in that state. Every
+ * id here must exist in the registry and declare `ribbon` (the metadata test
+ * enforces it). Kept next to `CommandAction` because eligibility is defined
+ * there; the resolver lives in `src/notes/ribbonItems.ts`.
+ */
+export const RIBBON_DEFAULT_IDS: readonly string[] = [
+  "note.new",
+  "daily.open-today",
+  "periodic.open-this-week",
+];

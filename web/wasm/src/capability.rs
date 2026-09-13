@@ -137,6 +137,11 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_daily_folder",
     "plugin:prefs|set_daily_template",
     "plugin:prefs|set_periodic_note_setting",
+    // myne-md/myne#699: the left-ribbon layout + visibility are vault content
+    // that must round-trip on every client, even before the web client grows the
+    // rail affordance.
+    "plugin:prefs|set_ribbon_items",
+    "plugin:prefs|set_ribbon_visible",
     "plugin:prefs|set_new_note_location",
     "plugin:prefs|set_editor_text_size",
     "plugin:prefs|set_editor_line_spacing",

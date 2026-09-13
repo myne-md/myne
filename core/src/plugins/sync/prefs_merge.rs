@@ -743,6 +743,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         attachment_ocr_enabled: local.attachment_ocr_enabled,
         auto_lock_seconds: local.auto_lock_seconds,
         bar_items_order: local.bar_items_order.clone(),
+        // myne-md/myne#699: the rail layout is a per-device chrome choice, like
+        // bar_items_order above, so the local value always survives the merge.
+        ribbon_items: local.ribbon_items.clone(),
+        ribbon_visible: local.ribbon_visible,
         // myne-cli epic (MYND-490): a per-machine door + performance knob — the
         // local value always survives the merge, same discipline as ai_enabled.
         cli_enabled: local.cli_enabled,
