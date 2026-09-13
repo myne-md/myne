@@ -75,7 +75,7 @@ describe("visibleDepths", () => {
     const leaf = task({ noteId: "n", lineIndex: 2, rawLine: "    - [ ] leaf" });
     const depths = visibleDepths([root, mid, leaf], new Set([key(root), key(leaf)]));
     expect(depths.get(key(root))).toBe(0);
-    // The authored parent (`mid`) is hidden, so `leaf` is a root — not depth 1.
+    // The authored parent (`mid`) is hidden, so `leaf` is a root - not depth 1.
     expect(depths.get(key(leaf))).toBe(0);
   });
 
@@ -115,7 +115,7 @@ describe("visibleDepths", () => {
     const c = task({ noteId: "n", lineIndex: 2, rawLine: "  - [ ] c" });
     const depths = visibleDepths([a, b, c], new Set([key(a), key(b), key(c)]));
     // `c` is indented 2, less than `b` at 4, so the stack pops back past `b` to
-    // `a` — it is a child of `a`, not of `b`.
+    // `a` - it is a child of `a`, not of `b`.
     expect(depths.get(key(c))).toBe(1);
   });
 });

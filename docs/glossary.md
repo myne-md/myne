@@ -2728,9 +2728,9 @@ Used in: `decisions.md` 2026-07-28; MYND-620
 
 ### **scope selector** &nbsp; 📦 *Product*
 
-The narrowing control on a [task panel](#task-panel): **one folder** (single-select, subtree-inclusive) **AND any of several tags** (multi-select, OR'd).
+The narrowing control on a [task panel](#task-panel): **any of several folders** (multi-select, subtree-inclusive, OR'd) **AND any of several tags** (multi-select, OR'd). A note narrowed to one file only offers notes inside the selected folders, so the two axes cannot contradict each other.
 
-***Myne-divergent* in the half people expect to be an AND**: several selected tags are OR'd, not AND'd. Most notes carry one of a user's top-level tags rather than several, so AND'ing two selections returns empty for most real choices — and a selector that usually yields nothing reads as broken rather than precise. Folder and tags are then AND'd with each other.
+***Myne-divergent* in both halves people expect to be an AND**: several selected folders are OR'd with each other, and several selected tags are OR'd with each other, rather than AND'd. AND'ing two tag selections returns empty for most real choices, since most notes carry one of a user's top-level tags rather than several, and a selector that usually yields nothing reads as broken rather than precise. The folder axis and the tag axis are then AND'd with each other.
 
 It adds **no expressiveness to the query surface**: every scope it can express is one of the closed `FilterNode` leaves the saved-views work already froze (`inFolder` / `hasTag` / `and` / `or` / `all`), which is checkable rather than merely asserted.
 

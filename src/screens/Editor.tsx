@@ -1,4 +1,4 @@
-// Terminal post-vault-creation screen — empty shell.
+// Terminal post-vault-creation screen - empty shell.
 //
 // Mounted by App.tsx when stage transitions to "editor" from
 // <CreateVault>'s onComplete callback (which fires from <ReadyStep>'s
@@ -13,7 +13,7 @@
 // (there is no sync server, no per-note encryption pipeline yet);
 // the account-number chip is a static MY-XXXX-… placeholder
 // (the real account number is owned by <CreateVault>'s reducer and
-// not threaded through to App-level — it becomes a vault-unlock
+// not threaded through to App-level - it becomes a vault-unlock
 // concern when that feature lands). The status-bar word counter is
 // live (MYND-143): it counts the active note's body words, frontmatter
 // excluded, on a short debounce.
@@ -297,7 +297,7 @@ import { ornamentRole } from "@myne/ornaments";
 import { rewriteSelectionToEditor } from "../notes/ai/rewriteToEditor";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
-// bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
+// bundle (tag-system #2 / MYND-46, task-1 criterion - confirmed as a separate
 // build chunk). (GraphPane's shell is statically imported by PaneView and lazies
 // only its heavy d3 canvas; TagBrowser has no comparable static host, so the whole modal
 // splits.)
@@ -316,7 +316,7 @@ const STATUS_TEXT_STYLE: CSSProperties = {
  * Poll cadence (ms) for the MYND-308 coalesced workspace flush. The timer fires
  * often (~30 s) but the pure `shouldFlushWorkspace` gate only permits an actual
  * disk write ≤ once per `WORKSPACE_FLUSH_INTERVAL_MS` (5 min) of dirty activity,
- * so the blob's mtime stays a coarse (≤ ~5 min) signal — the SYNC-6 mtime-defense
+ * so the blob's mtime stays a coarse (≤ ~5 min) signal - the SYNC-6 mtime-defense
  * relaxation, bounded + documented.
  */
 const COALESCED_FLUSH_POLL_MS = 30_000;
@@ -377,7 +377,7 @@ const NEXT_VIEW_MODE: Record<ViewMode, ViewMode> = {
  * story 1). The offer shows whenever an unlocked editor mounts AND this flag is
  * unset; picking "Choose folder…" or "Not now" sets it, so it appears until the
  * user dismisses it once and then never again (the migration wedge). A
- * non-sensitive UI boolean — a per-vault `vault.prefs` flag is a possible future
+ * non-sensitive UI boolean - a per-vault `vault.prefs` flag is a possible future
  * hardening (it would survive a localStorage clear + scope per-vault), but
  * device-local is sufficient for v0.1.
  */
@@ -397,7 +397,7 @@ interface EditorProps {
    * The ACTIVE vault's id, threaded from `stage.vaultId` (#250).
    *
    * `undefined` only on the boot-probe slot-priority entry (a post-reload
-   * editor), where no WebView-side id exists yet — the component resolves the
+   * editor), where no WebView-side id exists yet - the component resolves the
    * authoritative answer from the runtime slot in that case. Everything that
    * targets a vault (the danger-zone delete, the backup scheduler, the Settings
    * schedule block) reads the resolved value rather than ordering a
@@ -409,14 +409,14 @@ interface EditorProps {
   /**
    * Settings → Storage "Restore from backup…" (MYND-56): routes OUT of the
    * editor into the pre-unlock-class restore Stage flow (`editor.restore-backup`).
-   * The vault stays Unlocked — restore never touches the slot map.
+   * The vault stays Unlocked - restore never touches the slot map.
    */
   onRestoreBackup: () => void;
   /**
    * Callback invoked when the user clicks the Lock affordance in the
    * editor's bottom bar. The parent (App.tsx) dispatches the
    * `editor.lock` Stage transition → `unlock(Exists)` (no intermediate
-   * "locked" screen — the user lands directly on the password form).
+   * "locked" screen - the user lands directly on the password form).
    * This component fires `vault_lock()` IPC (idempotent) before
    * invoking the callback so the slot is wiped before the unlock form
    * renders.
@@ -462,20 +462,20 @@ interface EditorProps {
    * Route to vault creation from the switcher dropdown's "Create another
    * vault" footer (MYND-205 task 5). App.tsx dispatches `editor.create-vault`
    * → the existing vault-creation flow (the same target as the picker's
-   * "Create another" affordance). Optional — omitted → the footer is hidden
+   * "Create another" affordance). Optional - omitted → the footer is hidden
    * alongside the switcher (single-vault / pre-task-5 state).
    */
   onCreateAnother?: () => void;
   /**
    * Open the device-join modal from the switcher dropdown's "Add this device to
-   * an account" footer (myne#221). App.tsx tears this vault down first — flush +
-   * `vault_lock()` + `editor.lock` — and opens the modal it mounts globally over
+   * an account" footer (myne#221). App.tsx tears this vault down first - flush +
+   * `vault_lock()` + `editor.lock` - and opens the modal it mounts globally over
    * the resulting unlock screen, because `sync_join_account` unlocks a DIFFERENT
    * vault and SYNC-1 zeroizes this one on the way.
    *
    * Optional and capability-gated by App.tsx: a client that holds one container
    * per origin cannot bootstrap a second vault, and an unavailable affordance is
-   * omitted rather than disabled. Absence hides that one row, not the switcher —
+   * omitted rather than disabled. Absence hides that one row, not the switcher -
    * so it is deliberately NOT part of `SidebarVaultSwitcher`'s null gate.
    */
   onJoinDevice?: () => void;
@@ -522,16 +522,16 @@ export function Editor({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<EditorToast | null>(null);
 
-  // myne#279 — publish the resolved date/time display settings into the shared
+  // myne#279 - publish the resolved date/time display settings into the shared
   // store every formatting surface reads. Mounted once, here, so nothing below
   // has to thread the three prefs down to the rows that print a date.
   useDateTimeDisplaySync();
 
-  // #250 — the authoritative active-vault id for every vault-targeting surface
+  // #250 - the authoritative active-vault id for every vault-targeting surface
   // below. Prefer the id the stage already carries; fall back to the runtime
   // slot ONLY where the stage has none (post-reload editor entry). The old
   // answer, `resolveActiveVaultId()`, ordered the non-authoritative
-  // `registry.json` cache — which only the password path ever stamped, so a
+  // `registry.json` cache - which only the password path ever stamped, so a
   // quick-unlocked or recovered session pointed the delete at another vault.
   const [activeId, setActiveId] = useState<string | null>(stageVaultId ?? null);
   useEffect(() => {
@@ -557,7 +557,7 @@ export function Editor({
         const ok = await isVaultUnlocked();
         setSlotPopulated(ok);
       } catch (e) {
-        // IPC error itself is treated as invalid state — fail-closed
+        // IPC error itself is treated as invalid state - fail-closed
         // UI instead of the editor body. Surface to dev console so a
         // genuinely broken IPC channel doesn't masquerade as a
         // slot-empty signal silently.
@@ -593,7 +593,7 @@ export function Editor({
     : null;
   // The unsynced set as of the loss. `useUnsyncedEdits` is polled here rather
   // than reached for from `EditorChrome` because THIS component is the one that
-  // survives the loss — the editor body unmounts, and with it any memory of what
+  // survives the loss - the editor body unmounts, and with it any memory of what
   // had not been pushed.
   const { unsyncedIds: unsyncedNoteIds } = useUnsyncedEdits();
   const lostUnsyncedRef = useRef<string[] | null>(null);
@@ -606,11 +606,11 @@ export function Editor({
   const lostUnsyncedTitles = lostUnsyncedRef.current ?? [];
 
   // Cmd/Ctrl+, (toggle Settings) now flows through the central keybind engine as
-  // the rebindable `app.open-settings` command (#184 track D) — a WorkspaceHotkeys
+  // the rebindable `app.open-settings` command (#184 track D) - a WorkspaceHotkeys
   // entry wired to `setSettingsOpen`, no longer a hardcoded window listener here.
 
   if (slotPopulated === null) {
-    // Loading shim — the IPC takes microseconds (single RwLock read);
+    // Loading shim - the IPC takes microseconds (single RwLock read);
     // a flash of nothing is invisible at human latency. Returning
     // null avoids any flash of the editor body before the guard
     // result arrives.
@@ -626,14 +626,14 @@ export function Editor({
     return (
       <DeviceRevoked
         onEraseLocalCopy={async () => {
-          // Lock first, then erase — the desktop ordering, and for the same
+          // Lock first, then erase - the desktop ordering, and for the same
           // reason: keys must be gone before the bytes they could still read
           // are, so a failure part-way never leaves an unlocked session over a
           // half-erased container.
           await lockVault().catch(() => {});
           clearAgentForLock();
           // ONE erase (task 72), not a second implementation. The target is
-          // required since #250 — a lock has already emptied the slot, so the
+          // required since #250 - a lock has already emptied the slot, so the
           // id must come from the stage-resolved value captured above, not from
           // a post-lock probe that would answer `null`.
           if (activeId != null) await deleteVault(activeId).catch(() => {});
@@ -653,7 +653,7 @@ export function Editor({
             // Reuse the ONE erase (task 72) rather than writing a second: the
             // remaining container is unusable either way, and a second erase
             // path is a second thing to keep correct. A failure here is not
-            // fatal — the boot probe re-routes regardless, and a browser that
+            // fatal - the boot probe re-routes regardless, and a browser that
             // could not erase an already-broken store has lost nothing more.
             if (activeId != null) await deleteVault(activeId).catch(() => {});
             onResetRequested?.();
@@ -676,7 +676,7 @@ export function Editor({
         onCtaClick={() => {
           void (async () => {
             // vault_lock is idempotent (Ok(()) on already-empty slot)
-            // — safe to call regardless of whether the slot is
+            // - safe to call regardless of whether the slot is
             // genuinely empty or the IPC failed.
             await lockVault().catch(() => {
               // Even if lock rejects, we still want to re-probe
@@ -691,7 +691,7 @@ export function Editor({
 
   return (
     <SidebarStateProvider>
-      {/* display:contents marker — the E2E suites' "editor mounted"
+      {/* display:contents marker - the E2E suites' "editor mounted"
           signal (SYNC-8 testid pass). Renders after the mount-time
           vault_is_unlocked guard has passed, so its presence implies
           the Rust slot agreed with the React stage. */}
@@ -720,13 +720,13 @@ export function Editor({
 }
 
 /**
- * Inner editor body — mounts inside `<SidebarStateProvider>` so it can
+ * Inner editor body - mounts inside `<SidebarStateProvider>` so it can
  * use `useSelectedNote()`. Owns the loaded-body state, the autosave
  * hook, Tauri close-intercept (T28), editor-blur listener (T29), and
  * the BottomBar's save-status / Lock-flush wiring.
  */
 /** The Editor's single bottom-right toast: a message plus an optional
- *  inline action (the export flow's "Show in folder", MYND-116 task 4 —
+ *  inline action (the export flow's "Show in folder", MYND-116 task 4 -
  *  the soft-trash Undo precedent lives in NoteList's own toast). */
 type EditorToast = {
   message: string;
@@ -735,7 +735,7 @@ type EditorToast = {
 };
 
 type EditorChromeProps = {
-  /** The resolved active vault id (#250) — `null` while still resolving. Feeds
+  /** The resolved active vault id (#250) - `null` while still resolving. Feeds
    *  the backup scheduler and the Settings panels that target a vault. */
   vaultId: string | null;
   onLock?: () => void;
@@ -775,7 +775,7 @@ function EditorChrome({
   const ws = useWorkspace();
   // Task-chip ink is a device-local display choice (myne-md/myne#656 item 4).
   // Published as a CSS variable at the document root so BOTH the panel rows and
-  // the editor's inline chips follow it by construction — no per-surface
+  // the editor's inline chips follow it by construction - no per-surface
   // plumbing, no CodeMirror theme recompilation. `chipColor` is a closed enum,
   // so only a token this app owns ever reaches the style.
   useEffect(() => {
@@ -812,11 +812,11 @@ function EditorChrome({
     [setToast],
   );
   /** MYND-643: copy a note's body to the clipboard. Takes the target note id
-   *  explicitly — the export modal's Copy fires for the note the pre-flight is
+   *  explicitly - the export modal's Copy fires for the note the pre-flight is
    *  about, which the sidebar context-menu path raises for a note that is not
    *  necessarily open (the ne4 defect: falling back to `ctx.selectedId` copied
    *  nothing when nothing was open). A clipboard write has no visible result,
-   *  so success MUST toast — otherwise the button reads as broken — and so must
+   *  so success MUST toast - otherwise the button reads as broken - and so must
    *  failure, or the user pastes stale content believing it worked. */
   const copyNoteMarkdownById = useCallback(
     async (id: string) => {
@@ -855,7 +855,7 @@ function EditorChrome({
   // Pre-flight "Include N attachments" modal (MYND-116 task 3): the flow
   // asks through a promise-backed hook; the payload state mounts the
   // modal, and settling either way unmounts it. Identical from the
-  // context-menu and palette paths — both receive the same hooks.
+  // context-menu and palette paths - both receive the same hooks.
   const [exportPreflight, setExportPreflight] = useState<{
     count: number;
     noteId: string;
@@ -868,7 +868,7 @@ function EditorChrome({
       }),
     [],
   );
-  // PDF pre-export exclusion notice (MYND-255 task 5) — same promise-
+  // PDF pre-export exclusion notice (MYND-255 task 5) - same promise-
   // backed pattern: the payload state mounts `NotePdfExportNotice`, and
   // settling either way unmounts it.
   const [pdfPreflight, setPdfPreflight] = useState<{
@@ -883,7 +883,7 @@ function EditorChrome({
     [],
   );
   // Egress disclosure for the DOWNLOAD delivery path (phase3-web-client task
-  // 98) — same promise-backed pattern again. Reached only where `nativeSaveAs`
+  // 98) - same promise-backed pattern again. Reached only where `nativeSaveAs`
   // is absent: on desktop the save dialog's title carries the sentence and the
   // flows never call this.
   const [egressPreflight, setEgressPreflight] = useState<{
@@ -930,7 +930,7 @@ function EditorChrome({
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
-  // Whole-vault markdown export modal (MYND-211 task 3) — same Editor-local
+  // Whole-vault markdown export modal (MYND-211 task 3) - same Editor-local
   // boolean carve-out; opened from Settings → Storage and the palette.
   const [vaultExportOpen, setVaultExportOpen] = useState<boolean>(false);
   // Scope-dropdown options: the sidebar's folder-tree source, derived only
@@ -945,7 +945,7 @@ function EditorChrome({
   // tag (set by the editor `#tag` chip, #3, to open filtered to one tag).
   const [tagsOpen, setTagsOpen] = useState<boolean>(false);
   const [tagsSeed, setTagsSeed] = useState<string | null>(null);
-  // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
+  // MYND-53 - Obsidian importer: the active-import modal + the onboarding offer
   // (shown on editor mount until dismissed once; IMPORTER_OFFER_KEY).
   const [importerOpen, setImporterOpen] = useState<boolean>(false);
   const [offerOpen, setOfferOpen] = useState<boolean>(false);
@@ -965,7 +965,7 @@ function EditorChrome({
     try {
       window.localStorage.setItem(IMPORTER_OFFER_KEY, "1");
     } catch {
-      // Best-effort — if persistence fails the worst case is the offer reappears.
+      // Best-effort - if persistence fails the worst case is the offer reappears.
     }
   }, []);
 
@@ -992,20 +992,20 @@ function EditorChrome({
       void noteList()
         .then((ids) => ctx.refreshAll(ids))
         .catch(() => {
-          /* sidebar stays as-is until the next refresh — non-fatal */
+          /* sidebar stays as-is until the next refresh - non-fatal */
         });
     },
     [ctx, showToastMessage, t],
   );
 
-  // Cmd/Ctrl+Shift+G opens the whole-vault graph tab (MYND-198, SYNC-7) — the
+  // Cmd/Ctrl+Shift+G opens the whole-vault graph tab (MYND-198, SYNC-7) - the
   // third entry point alongside the command-palette action + BottomBar button.
   // Now the rebindable `graph.show` command routed through the keybind engine
   // (#184 track D), a WorkspaceHotkeys entry → `ws.openGraph()`; no longer a
   // hardcoded window listener here.
   // Editor `#tag` chip click (tag-system #3 / MYND-45): the chip decoration
   // dispatches a bubbling `myne-open-tag` event; open the tag browser seeded to
-  // that tag. A single Editor-level listener (the modal is Editor-global) — no
+  // that tag. A single Editor-level listener (the modal is Editor-global) - no
   // per-pane prop threading.
   useEffect(() => {
     const onOpenTag = (e: Event) => {
@@ -1020,7 +1020,7 @@ function EditorChrome({
   }, []);
   // A task written from a LIST surface (MYND-616 task 8) changes a note's bytes
   // out-of-band of any pane's own autosave, so every open pane must re-read.
-  // `reloadOpenNote` is the existing blanket bump used after a sync pull — each
+  // `reloadOpenNote` is the existing blanket bump used after a sync pull - each
   // pane applies its own dirty guard, so it never clobbers in-flight typing.
   useEffect(() => {
     const onWritten = (): void => ctx.reloadOpenNote();
@@ -1031,7 +1031,7 @@ function EditorChrome({
   // decoration dispatches a bubbling `myne-open-task-chip` event; open the
   // field editor anchored to that chip and write the result back through the
   // single writer seam. Same Editor-level-listener shape as the `#tag` chip
-  // above, and for the same reason — no per-pane prop threading.
+  // above, and for the same reason - no per-pane prop threading.
   //
   // Because the chips never open on caret entry, this listener is the ONLY way
   // to edit these values in live mode. It is therefore load-bearing rather than
@@ -1040,7 +1040,7 @@ function EditorChrome({
   // SAME implementation (`installTaskChipEditor`) rather than two copies.
   useEffect(() => installTaskChipEditor(), []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
-  // Bottom-bar readout (save status + word count) — reported up by
+  // Bottom-bar readout (save status + word count) - reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
   // own content load, autosave, word count, and the surgical sidebar
   // refresh-after-save; the chrome just mirrors the focused pane's readout.
@@ -1071,7 +1071,7 @@ function EditorChrome({
 
   // Task reminders, in-app tier (MYND-618). Mounted in THIS component rather than
   // the outer `Editor`, and the reason is structural: the task index reads the
-  // sidebar's live/trashed set, so it needs `<SidebarStateProvider>` — which is
+  // sidebar's live/trashed set, so it needs `<SidebarStateProvider>` - which is
   // what this component is inside. In the outer one the hook would also run on
   // the fail-closed path, where no provider exists and no editor body renders.
   // It reads `barPrefs` rather than calling `usePrefs` again, since a second call
@@ -1085,7 +1085,7 @@ function EditorChrome({
   // app. `ReminderPayload` carries `{id, at}` and nothing else; resolving the id
   // back to its task here to quote the text would make that contract look soft,
   // while a reminder can still surface over a shared screen. It says a reminder
-  // is due — the task surfaces say which.
+  // is due - the task surfaces say which.
   const reminderTasks = useLiveVaultTasks();
   const reminderNotifier = useMemo(
     () =>
@@ -1113,7 +1113,7 @@ function EditorChrome({
     visibleIds?: string[];
   } | null>(null);
 
-  // MYND-192 — transient responsive auto-collapse. When the window gets too
+  // MYND-192 - transient responsive auto-collapse. When the window gets too
   // narrow to fit the center editor + sidebars, the backlinks (right) pane
   // yields first, then the notes (left). It is a non-persisted override:
   // effective collapse = the user's persisted choice OR a width-forced
@@ -1141,19 +1141,19 @@ function EditorChrome({
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive || detached;
   // macOS floats the traffic lights over the top-left, so windowed builds inset
-  // the sidebar toggle past them. In fullscreen the traffic lights are hidden —
+  // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
   const isFullscreen = useIsFullscreen();
   const leftToggleX =
     HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
   const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
 
-  // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
+  // Reveal the Saved Views surface (MYND-274) - the "Views" section lives in the
   // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
   // nudges the section to scroll into view + briefly highlight so the click
   // always lands somewhere visible (even when the sidebar was already open). A
   // width-forced collapse can't be toggled away (MYND-192) and the section would
-  // be unmounted, so there is nothing to reveal — bail without firing the signal.
+  // be unmounted, so there is nothing to reveal - bail without firing the signal.
   // Shared by the palette `views.show` action + the BottomBar `editor.views-cta`
   // (SYNC-7).
   const revealViews = useCallback(() => {
@@ -1166,7 +1166,7 @@ function EditorChrome({
 
   // Expand the left sidebar for the palette's sidebar-owned surfaces (Wave 4:
   // new folder / trash / archive). Their UI lives inside the left SidebarPane,
-  // which is `inert` while collapsed — including focus mode — so the actions
+  // which is `inert` while collapsed - including focus mode - so the actions
   // would no-op or open a ghost surface without this. Same reveal discipline as
   // `revealViews` above: exit focus mode, un-collapse a manual collapse, and
   // report a width-forced collapse (MYND-192) as unexpandable so the caller
@@ -1185,7 +1185,7 @@ function EditorChrome({
   }, [layout, forced.forceLeftCollapsed, focusActive, exitFocus]);
 
   // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
-  // single `.base` file (no new capability — dialog:allow-open already granted),
+  // single `.base` file (no new capability - dialog:allow-open already granted),
   // run the shipped import entry point (read → parse → map → persist into
   // vault.prefs), and surface a concise SYNC-12 summary toast. The picked path's
   // parent directory is the root passed to the root-confined importer read seam.
@@ -1200,7 +1200,7 @@ function EditorChrome({
         },
       ],
     });
-    if (picked === null) return; // cancelled — no toast
+    if (picked === null) return; // cancelled - no toast
     try {
       // The root-confining directory split lives in importBase (sealed seam).
       const tally = await importBaseFilePath(picked);
@@ -1222,7 +1222,7 @@ function EditorChrome({
       if (e instanceof BaseParseError) {
         setToast({ message: t("editor.chrome.baseImport.notValid"), variant: "error" });
       } else if (e instanceof BaseImportPersistError) {
-        // Count-only (SYNC-12) — never surface the failed view's name in copy.
+        // Count-only (SYNC-12) - never surface the failed view's name in copy.
         setToast({
           message: t("editor.chrome.baseImport.stoppedAfter", {
             count: e.persistedCount,
@@ -1235,13 +1235,13 @@ function EditorChrome({
   }, [setToast, t]);
 
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
-  // (from ANY source — row click, keyboard nav, command palette, favorites,
+  // (from ANY source - row click, keyboard nav, command palette, favorites,
   // jump-from-attachment) closes the Attachments view and returns the center
   // pane to that note's editor. Keying on `selectedId` makes the swap general:
   // opening Attachments does NOT change `selectedId`, so this never fires when
   // the user enters the library; it fires only when the selection genuinely
   // changes. The sidebar's Attachments entry and a note row are therefore
-  // mutually exclusive in the active highlight — opening one deactivates the
+  // mutually exclusive in the active highlight - opening one deactivates the
   // other. Skips the initial mount so a fresh editor doesn't redundantly
   // re-assert "editor" (it already starts there).
   const selectionInitRef = useRef(true);
@@ -1256,7 +1256,7 @@ function EditorChrome({
   // MYND-173: the generic file-card's "Reveal in library" action fires a window
   // event (the card lives in a CM6 widget, outside React). Open the attachments
   // library in response. Select-by-id within the library is deferred (PRD open
-  // question) — this opens the library unfocused, which is the sanctioned
+  // question) - this opens the library unfocused, which is the sanctioned
   // first-cut fallback.
   useEffect(() => {
     const onReveal = () => setCenterView("attachments");
@@ -1301,7 +1301,7 @@ function EditorChrome({
   // from the moment it loaded, so `myne daily --append` landed on disk and the
   // pane's next autosave wrote its stale body straight over it. With sync OFF
   // there is no base-hash guard to catch it, and the snapshot window hides the
-  // loss — the overwriting save coalesces with the pane's earlier ones, so the
+  // loss - the overwriting save coalesces with the pane's earlier ones, so the
   // CLI's line never gets a revision of its own to restore from.
   //
   // Same listener shape and same handler as the sync pull above, deliberately:
@@ -1335,7 +1335,7 @@ function EditorChrome({
   }, []);
 
   // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
-  // emits `PREFS_SYNC_APPLIED_EVENT` (never for the user's own IPC writes —
+  // emits `PREFS_SYNC_APPLIED_EVENT` (never for the user's own IPC writes -
   // their own resolve is the signal). Bridge it into the two local refresh
   // signals so an incoming vault rename / shared-pref change shows live: the
   // switcher's window event (chip + rows) and the prefs nonce (usePrefs
@@ -1362,7 +1362,7 @@ function EditorChrome({
     };
   }, []);
 
-  // MYND-166 selection bridges — two one-way syncs that never loop
+  // MYND-166 selection bridges - two one-way syncs that never loop
   // (A only fires for a note open in NO pane; B only mirrors):
   //  A) a selection arriving via a non-pane path (a freshly-created note,
   //     the command palette, a backlink / template / today-note open, the
@@ -1404,7 +1404,7 @@ function EditorChrome({
 
   const focusedActive = ws.focusedLeaf.activeTab;
   // reading-source-modes (MYND-299): the focused note tab's effective view mode
-  // for the BottomBar switcher — the tab's own mode, else the default pref, else
+  // for the BottomBar switcher - the tab's own mode, else the default pref, else
   // live; null when no note tab is active (hides the switcher).
   const focusedTabViewMode: ViewMode | null =
     focusedActive !== null && focusedActive.kind === "note"
@@ -1416,7 +1416,7 @@ function EditorChrome({
     focusedActive?.kind === "note" ? focusedActive.id : null;
   // Per-note "not yet on the server" (phase3-web-client task 23). The sidebar
   // row carries the same marker; this repeats it in the bottom bar so the state
-  // is still visible with the sidebar collapsed — which is the layout a user
+  // is still visible with the sidebar collapsed - which is the layout a user
   // writing at length is most likely to be in.
   const { unsyncedIds: unsyncedNoteIds, credentialPending } = useUnsyncedEdits();
   const focusedNoteUnsynced =
@@ -1447,12 +1447,12 @@ function EditorChrome({
     select(focusedActiveNoteId);
   }, [focusedActiveNoteId, focusedIsLive, select]);
 
-  // MYND-121 — report window-level activity to the backend auto-lock idle
+  // MYND-121 - report window-level activity to the backend auto-lock idle
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
   // runs exactly while a lockable session is live.
   useActivityHeartbeat();
 
-  // MYND-351 — automatic local-backup scheduler (Model A: runs only while the
+  // MYND-351 - automatic local-backup scheduler (Model A: runs only while the
   // app is open and a vault is unlocked, i.e. exactly while this Editor is
   // mounted). A backup must never fail silently: a fresh failure (debounced so
   // a persistent failure toasts once) surfaces the quiet alert; success is a
@@ -1467,7 +1467,7 @@ function EditorChrome({
   // workspace flush registry (each PaneView registers its `flushIfDirty`).
   // Per-pane PaneViews own content load, autosave, the surgical sidebar
   // refresh-after-save (title/H1 → row label), and the `contentReloadNonce`
-  // re-sync (rename / snapshot restore) — so the chrome only orchestrates
+  // re-sync (rename / snapshot restore) - so the chrome only orchestrates
   // the cross-pane flush.
   const flushAll = ws.flushAll;
   const markDetached = ws.markDetached;
@@ -1543,7 +1543,7 @@ function EditorChrome({
     return () => window.removeEventListener("blur", onBlur);
   }, [detachedNoteId, flushAll]);
 
-  // MYND-166 / MYND-308 — restore the persisted workspace CONTAINER ONCE on
+  // MYND-166 / MYND-308 - restore the persisted workspace CONTAINER ONCE on
   // mount (unlock). A missing / unreadable / malformed descriptor leaves the
   // default single empty pane (spec § 9.7.4). Runs after the slot guard, so the
   // backend read is Slot::Unlocked-gated. The descriptor is the MYW1 0x02
@@ -1553,7 +1553,7 @@ function EditorChrome({
   // consistency fallback to the first slot when the pointer is stale/missing).
   const restoreContainer = ws.restoreContainer;
   const restoredRef = useRef(false);
-  // MYND-462 — set when the "Default file to open" preference is "empty" or
+  // MYND-462 - set when the "Default file to open" preference is "empty" or
   // "specific", i.e. we deliberately did NOT restore the saved workspace this
   // session. The staging effect reads this to suppress its workspace-blob writes
   // until the user actively changes the layout, so opening with a non-default
@@ -1589,7 +1589,7 @@ function EditorChrome({
           );
           return;
         }
-        // MYND-462 — read the "Default file to open" preference first; it decides
+        // MYND-462 - read the "Default file to open" preference first; it decides
         // whether we restore the saved workspace at all. `prefsRead` also carries
         // the MYP1 `active_workspace` pointer used by the "last" branch below.
         let startupMode = "last";
@@ -1606,7 +1606,7 @@ function EditorChrome({
 
         if (startupMode === "empty") {
           // Ignore the saved workspace; keep the component's default single empty
-          // pane. The blob is NOT cleared — the staging guard below stops a quit
+          // pane. The blob is NOT cleared - the staging guard below stops a quit
           // from overwriting it, so toggling back to "Last opened" restores it.
           nonDefaultStartupRef.current = true;
           return;
@@ -1695,14 +1695,14 @@ function EditorChrome({
   const activeWorkspaceIdRef = useRef<SlotId>(ws.activeWorkspaceId);
   descriptorRef.current = serializeWorkspaces(ws.workspacesSnapshot());
   activeWorkspaceIdRef.current = ws.activeWorkspaceId;
-  // MYND-308 — set by the staging effect on any container change; the coalesced
+  // MYND-308 - set by the staging effect on any container change; the coalesced
   // flush timer (and a graceful-exit save) clears it after a successful write.
   const workspaceDirtyRef = useRef(false);
-  // Timestamp (ms) of the last actual blob flush — the coalescing reference.
+  // Timestamp (ms) of the last actual blob flush - the coalescing reference.
   // `null` ≡ never flushed → flush as soon as dirty.
   const lastFlushAtMsRef = useRef<number | null>(null);
   // Persist the workspace container + the MYP1 active pointer (graceful-exit /
-  // coalesced — never on every switch, so the blob mtime stays a low-resolution
+  // coalesced - never on every switch, so the blob mtime stays a low-resolution
   // signal). Writes the descriptor first, then the active-slot pointer.
   // The last successful detached-window snapshot, so a transient snapshot IPC
   // failure during a persist falls back to it instead of erasing the restore
@@ -1728,15 +1728,15 @@ function EditorChrome({
       const detached = snap ?? lastDetachedRef.current;
       await workspaceWrite(withDetached(descriptorRef.current, detached));
       await setActiveWorkspace(activeWorkspaceIdRef.current);
-      // Graceful-exit save counts as a flush — reset the coalescing window so
+      // Graceful-exit save counts as a flush - reset the coalescing window so
       // the timer doesn't redundantly re-write moments later.
       lastFlushAtMsRef.current = Date.now();
       workspaceDirtyRef.current = false;
     } catch {
-      // Best-effort — a failed convenience write never blocks lock/close.
+      // Best-effort - a failed convenience write never blocks lock/close.
     }
   }, []);
-  // MYND-271 Task 8 — persist the VaultIndices to the encrypted vault.indices
+  // MYND-271 Task 8 - persist the VaultIndices to the encrypted vault.indices
   // (MYI1) blob on graceful exit (same cadence as the workspace descriptor:
   // lock / idle-lock grace / quit, never per-edit). Best-effort + must run
   // while still unlocked (before vault_lock zeroizes the keys); the next
@@ -1745,7 +1745,7 @@ function EditorChrome({
     try {
       await vaultIndicesPersist();
     } catch {
-      // Best-effort — a failed index persist never blocks lock/close.
+      // Best-effort - a failed index persist never blocks lock/close.
     }
   }, []);
 
@@ -1764,17 +1764,17 @@ function EditorChrome({
     [flushAll, persistWorkspace, persistVaultIndices],
   );
 
-  // MYND-166 / MYND-308 — mirror the current container into the backend's
+  // MYND-166 / MYND-308 - mirror the current container into the backend's
   // in-RAM staging slot on every change (incl. the restored/default state on
   // mount). The backend flushes it to vault.workspace on `ExitRequested`, so an
   // app QUIT (Cmd+Q / app-menu Quit) persists the layout even though it never
-  // fires the window's `onCloseRequested`. Staging is RAM-only — it never writes
+  // fires the window's `onCloseRequested`. Staging is RAM-only - it never writes
   // the blob, so its mtime stays a low-resolution lock/quit signal. The whole
   // `{slots, activeId}` container is staged (so a slot save / switch survives a
   // quit), and the staged change marks the coalesced-flush path dirty.
   useEffect(() => {
     if (!restoreSettled) return; // don't stage the pre-restore default layout
-    // MYND-462 — for a non-default startup ("empty" / "specific") the layout we
+    // MYND-462 - for a non-default startup ("empty" / "specific") the layout we
     // mounted is NOT the saved workspace, so skip the FIRST staging pass (which
     // would overwrite the saved blob on quit), then clear the guard so genuine
     // user layout edits this session still stage + persist as usual.
@@ -1804,7 +1804,7 @@ function EditorChrome({
     // `focusedPaneId` change on every layout edit of the active slot.
     // `expandedFolders` (MYND-455) is its OWN dep: the container ops spread
     // `{...c}`, which preserves `slots`/`activeId` identity, so a sidebar
-    // folder toggle would otherwise never mark the blob dirty — and a Cmd+Q
+    // folder toggle would otherwise never mark the blob dirty - and a Cmd+Q
     // would flush the stale staged container and lose the expand set.
     // `graphSettings` (graph-connection-ux-polish task 5) is the same shape of
     // dep for the same reason: a graph-panel toggle only changes that one
@@ -1819,12 +1819,12 @@ function EditorChrome({
     ws.graphSettings,
   ]);
 
-  // MYND-308 (SYNC-6, mtime-defense) — coalesced background flush. The
+  // MYND-308 (SYNC-6, mtime-defense) - coalesced background flush. The
   // graceful-exit save (lock / close / quit / switch-vault) is the always-flush
   // path; this adds a periodic flush so a CRASH loses ≤ ~5 min of layout work.
   // A ~30 s interval polls the pure `shouldFlushWorkspace` decision against the
   // dirty flag + the last-flush timestamp (≤ once per `WORKSPACE_FLUSH_INTERVAL_MS`
-  // = 5 min). NEVER a per-switch file write — switches only set `dirty`, the
+  // = 5 min). NEVER a per-switch file write - switches only set `dirty`, the
   // timer decides when to actually touch the blob. `persistWorkspace` writes BOTH
   // the container (MYW1) and the active pointer (MYP1).
   useEffect(() => {
@@ -1846,7 +1846,7 @@ function EditorChrome({
     return () => clearInterval(id);
   }, [restoreSettled, persistWorkspace]);
 
-  // T28 — Tauri close-intercept. Block window close until pending saves
+  // T28 - Tauri close-intercept. Block window close until pending saves
   // flush (every pane), then persist the workspace descriptor. Safe to
   // no-op when running outside Tauri (browser dev fallback).
   useEffect(() => {
@@ -1870,7 +1870,7 @@ function EditorChrome({
           await runFlushChain(flushSteps, "closing");
           // `destroy()`, NOT `close()`: the capability ACL grants
           // `core:window:allow-destroy` but deliberately NOT `allow-close`
-          // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
+          // (TB6 surface - see lib/app-window.ts). `close()` rejects under the
           // permission system, so the window would never close. On Windows the
           // title-bar X is the only quit affordance (no macOS Cmd+Q →
           // RunEvent::ExitRequested path), so that left the app unclosable while
@@ -1882,10 +1882,10 @@ function EditorChrome({
         // `onCloseRequested` registers asynchronously: the component can
         // unmount (e.g. lock → Unlock screen) while this await is still in
         // flight. Without re-checking `cancelled` here the listener attaches
-        // AFTER cleanup ran and is never removed — a leak that follows onto
+        // AFTER cleanup ran and is never removed - a leak that follows onto
         // later screens. Its mere presence makes Tauri `prevent_close()` the
         // native title-bar X (manager/window.rs `has_js_listener`), so on
-        // Windows — where the X is the only quit affordance — the app can wedge
+        // Windows - where the X is the only quit affordance - the app can wedge
         // unclosable. Mirror the vault-lock-imminent effect below +
         // CreateVault's registration guard.
         if (cancelled) fn();
@@ -1903,7 +1903,7 @@ function EditorChrome({
   }, [flushSteps]);
 
   // Web graceful exit (MYND-574 task 93). The Tauri close-intercept above is a
-  // no-op in a browser — its own catch says so — which meant every tab close
+  // no-op in a browser - its own catch says so - which meant every tab close
   // silently dropped the newest edit, the workspace descriptor, the vault
   // indices and the graph layout. On the one client where an unsynced edit is
   // all that stands between the user and real loss.
@@ -1912,7 +1912,7 @@ function EditorChrome({
   // coverage this task must not disturb, and on desktop this seam is a no-op, so
   // the two cannot both fire.
   //
-  // The `kind` split is load-bearing. `pagehide` is a real exit — flush
+  // The `kind` split is load-bearing. `pagehide` is a real exit - flush
   // everything. `hidden` is a tab switch that MAY become a discard, so content
   // is flushed (integrity) and `vault.workspace` deliberately is not: writing it
   // per visibility flip would turn its mtime into an editor-activity log, which
@@ -1922,7 +1922,7 @@ function EditorChrome({
     return onExitIntent(async (kind) => {
       setUnsavedGuard("flushing", true);
       try {
-        // Same chain, same ordering, one call — `kind` carries the ONE
+        // Same chain, same ordering, one call - `kind` carries the ONE
         // difference (a hidden tab must not write `vault.workspace`, whose mtime
         // is a lock/quit signal), so the divergence is a named parameter rather
         // than two sequences that happen to differ by a line.
@@ -1933,13 +1933,13 @@ function EditorChrome({
     });
   }, [flushSteps]);
 
-  // Task 88 — the second, much longer-lived holder of the same guard.
+  // Task 88 - the second, much longer-lived holder of the same guard.
   //
   // A password change is reported as complete only once the server acknowledges
   // the new `vault.meta`. Until then this browser expects the new password and
   // every other device still expects the old one, and clearing this browser's
   // copy loses the change: on web there is no recovery phrase, so the only other
-  // remedy is a native client with the old password — which the user has just
+  // remedy is a native client with the old password - which the user has just
   // been told is no longer their password.
   //
   // So closing the tab while it is pending is the one exit worth interrupting.
@@ -1953,10 +1953,10 @@ function EditorChrome({
     return () => setUnsavedGuard("credential-push-pending", false);
   }, [credentialPending]);
 
-  // MYND-121 — flush every pane on idle-lock imminent. The backend idle
+  // MYND-121 - flush every pane on idle-lock imminent. The backend idle
   // timer emits `vault-lock-imminent` before its grace window; flush any
   // unsaved edit so the autosave deltas persist before the keys zeroize.
-  // Best-effort — the backend proceeds when the grace elapses regardless.
+  // Best-effort - the backend proceeds when the grace elapses regardless.
   // Mirrors the close-intercept's listen / unlisten + cancelled-guard
   // shape; no-op outside Tauri (browser dev shim).
   useEffect(() => {
@@ -1991,12 +1991,12 @@ function EditorChrome({
     };
   }, [flushSteps]);
 
-  // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
+  // Lock button flush-then-lock - `decisions.md` 2026-05-07 canonical
   // flush-on-lock, now across all panes; persist the workspace before lock.
   const handleLockFlushed = useCallback(async () => {
     // The chain is best-effort and CANNOT skip the lock (task 93). It used to be
     // a bare `await` sequence ending in `lockVault()`, so a rejection from any
-    // writer skipped every step after it — including the lock. A transient write
+    // writer skipped every step after it - including the lock. A transient write
     // failure did not merely lose a cache: it cancelled the auto-lock, leaving
     // the keys live in the Worker and the plaintext mounted, past the idle
     // deadline, with nothing said.
@@ -2019,7 +2019,7 @@ function EditorChrome({
     onLock?.();
   }, [flushSteps, onLock]);
 
-  // Idle auto-lock where the platform has no OS-level idle detection — the web
+  // Idle auto-lock where the platform has no OS-level idle detection - the web
   // client (phase3-web-client task 43). Desktop keeps `src-tauri/src/auto_lock.rs`
   // and this is inert there, so the two never race to lock the same vault.
   //
@@ -2045,7 +2045,7 @@ function EditorChrome({
     onIdle: () => void handleLockFlushed(),
   });
 
-  // named-workspaces (MYND-308) — palette command handlers. The BottomBar
+  // named-workspaces (MYND-308) - palette command handlers. The BottomBar
   // dropdown is the primary discoverable surface for switch + save-as; the
   // palette commands are the in-focus-mode escape (the bar fades). Save-as and
   // rename ask for a name via the in-WebView text prompt (`window.prompt` is a
@@ -2080,7 +2080,7 @@ function EditorChrome({
       if (name !== null) renameWorkspace(active.id, name);
     })();
   }, [ws, renameWorkspace, t]);
-  // Rename a SPECIFIC slot (the per-row pencil in the bottom-bar switcher) — vs
+  // Rename a SPECIFIC slot (the per-row pencil in the bottom-bar switcher) - vs
   // handleRenameWorkspace which renames the active slot (the palette command).
   const handleRenameWorkspaceById = useCallback(
     (id: SlotId) => {
@@ -2184,7 +2184,7 @@ function EditorChrome({
           prior vault + tears it down, before the Stage routes to the target's
           unlock screen. The styled account-chip dropdown (task 5) owns the
           full switch UI; this overlay just makes the lock+flush window
-          visible until then. No confirm-discard dialog — the flush is
+          visible until then. No confirm-discard dialog - the flush is
           automatic. */}
       {switching && <SwitchingOverlay />}
       {/* Sync banners (MYND-426 reconcile / MYND-427 integrity), above the
@@ -2212,7 +2212,7 @@ function EditorChrome({
       >
         <SidebarBootstrap />
         {/* Always mounted (even when collapsed) so the width collapse/expand
-            animates instead of popping — SidebarPane drives the width 0↔open
+            animates instead of popping - SidebarPane drives the width 0↔open
             transition and marks the pane `inert` while collapsed. */}
         <SidebarPane
           side="left"
@@ -2234,7 +2234,7 @@ function EditorChrome({
                 style={{
                   height: STRIP_HEIGHT,
                   flexShrink: 0,
-                  // Ground painted by SidebarPane — see its comment.
+                  // Ground painted by SidebarPane - see its comment.
                   borderInlineEnd: "1px solid var(--line-1)",
                 }}
               />
@@ -2260,7 +2260,7 @@ function EditorChrome({
               minWidth: 0,
               // Allow this column to shrink below content height so the nested
               // AttachmentsLibrary scroll area is bounded (flexbox min-height
-              // trap — the strip is fixed, the library fills + scrolls).
+              // trap - the strip is fixed, the library fills + scrolls).
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -2308,7 +2308,7 @@ function EditorChrome({
         )}
         {centerView !== "attachments" &&
           // Same condition as the right toggle: a non-note tab has no note for
-          // the backlinks/outline sidebar to describe, so it is not shown — and
+          // the backlinks/outline sidebar to describe, so it is not shown - and
           // the sidebar can never be left open with its toggle gone
           // (myne-md/myne#656 review).
           ws.focusedLeaf.activeTab?.kind === "note" && (
@@ -2359,7 +2359,7 @@ function EditorChrome({
         />
       </div>
       {/* The right panel (backlinks / outline / …) is about the OPEN note, so its
-          toggle only shows while a note is actually open — not on the new-tab
+          toggle only shows while a note is actually open - not on the new-tab
           chooser or the attachments view. Mirror PaneView's `inNewTabState`
           (`pendingNewTab || activeTab === null`) for the FOCUSED pane, so an open
           "+ New tab" over existing tabs still hides it. */}
@@ -2480,7 +2480,7 @@ function EditorChrome({
           />
         ) : (
           // Bar-wide menu (right-clicked empty bar space): the visibility
-          // checklist — the only path to restore a hidden item.
+          // checklist - the only path to restore a hidden item.
           <ContextMenu
             x={barMenu.x}
             y={barMenu.y}
@@ -2512,7 +2512,7 @@ function EditorChrome({
           // Keep Settings open BEHIND the importer (both are z-1000 modals and
           // the importer renders later in the DOM, so it layers on top). Closing
           // the importer returns to Settings rather than dumping to the editor
-          // (#206 — "actions like import notes close off the settings pane").
+          // (#206 - "actions like import notes close off the settings pane").
           setImporterOpen(true);
         }}
         onOpenGraph={() => {
@@ -2542,7 +2542,7 @@ function EditorChrome({
         onClose={() => setVaultExportOpen(false)}
         folders={vaultExportFolders}
       />
-      {/* MYND-567: the `myne://theme/install` confirmation gate. Self-driving —
+      {/* MYND-567: the `myne://theme/install` confirmation gate. Self-driving -
           it drains the deep-link latch on mount and listens for warm arrivals,
           so it needs no state from Editor. Mounted HERE (and only here) because
           Editor is the post-unlock stage: that is what holds a link arriving on
@@ -2551,7 +2551,7 @@ function EditorChrome({
           `deferred` yields to the first-run importer offer. Both are focus-
           trapping modals at the same z-index, so showing them together would
           have the two traps fight over focus; the offer is the onboarding gate
-          and wins. Deferring only delays — the request stays latched and the
+          and wins. Deferring only delays - the request stays latched and the
           dialog opens as soon as the offer is dismissed. */}
       <ThemeInstallDialog deferred={offerOpen} />
       <TemplatesManager
@@ -2668,7 +2668,7 @@ function EditorChrome({
           setSnapshotsOpen(true);
         }}
         onExportNoteMarkdown={() => {
-          // Same shared flow as the sidebar context-menu item (MYND-116) —
+          // Same shared flow as the sidebar context-menu item (MYND-116) -
           // zero divergence. The action is hidden when no note is selected
           // (registry visibility), so the null check is defensive only.
           setPaletteOpen(false);
@@ -2679,7 +2679,7 @@ function EditorChrome({
           );
         }}
         onExportNotePdf={() => {
-          // PDF sibling (MYND-255) — same shared-flow discipline as the
+          // PDF sibling (MYND-255) - same shared-flow discipline as the
           // markdown action above.
           setPaletteOpen(false);
           const id = ctx.selectedId;
@@ -2689,7 +2689,7 @@ function EditorChrome({
           );
         }}
         onExportNoteHtml={() => {
-          // HTML sibling (MYND-340) — same shared-flow discipline.
+          // HTML sibling (MYND-340) - same shared-flow discipline.
           setPaletteOpen(false);
           const id = ctx.selectedId;
           if (id === null) return;
@@ -2698,7 +2698,7 @@ function EditorChrome({
           );
         }}
         onExportNoteTxt={() => {
-          // Plain-text sibling (MYND-340) — same shared-flow discipline.
+          // Plain-text sibling (MYND-340) - same shared-flow discipline.
           setPaletteOpen(false);
           const id = ctx.selectedId;
           if (id === null) return;
@@ -2729,7 +2729,7 @@ function EditorChrome({
         }}
         onToggleLeftSidebar={() => {
           setPaletteOpen(false);
-          // MYND-192 — a width-forced collapse can't be toggled away (and
+          // MYND-192 - a width-forced collapse can't be toggled away (and
           // must not persist a manual flip the narrow window imposed).
           if (!forced.forceLeftCollapsed) layout.toggleLeftCollapsed();
         }}
@@ -2777,7 +2777,7 @@ function EditorChrome({
         }}
       />
       {/* Browser-extension clip dispatch listener (desktop-ingest, MYND-442,
-          TB10). Mounted here — inside the workspace providers — so the success
+          TB10). Mounted here - inside the workspace providers - so the success
           notice's "view" affordance opens the newly-clipped note via the
           workspace note-open. */}
       <ClipDispatchListener
@@ -2787,12 +2787,12 @@ function EditorChrome({
           });
         }}
         onNoteCreated={() => {
-          // A clip sealed a new note — reload the sidebar so it appears live
+          // A clip sealed a new note - reload the sidebar so it appears live
           // (same note_list → refreshAll path the boot + "+ New Note" use).
           void noteList()
             .then((ids) => ctx.refreshAll(ids))
             .catch(() => {
-              /* sidebar stays as-is until the next refresh — non-fatal */
+              /* sidebar stays as-is until the next refresh - non-fatal */
             });
         }}
       />
@@ -2818,7 +2818,7 @@ function EditorChrome({
         onCopy={() => {
           // MYND-643: resolve the pre-flight as CANCELLED so the export flow
           // stops cleanly (it must not also write a file), then copy the note
-          // the modal is ABOUT. It is captured from the pre-flight — NOT
+          // the modal is ABOUT. It is captured from the pre-flight - NOT
           // `ctx.selectedId`, which is null/wrong when the flow was raised from
           // the sidebar context-menu on a note that is not open (the ne4 defect).
           // Resolving with a choice would run the save-dialog path we replace.
@@ -2857,7 +2857,7 @@ function EditorChrome({
         action={toast?.action}
         variant={toast?.variant}
         // Action-bearing toasts (export success "Show in folder") get the
-        // soft-trash Undo precedent's 6 s window (NoteList.tsx) — 2.5 s is
+        // soft-trash Undo precedent's 6 s window (NoteList.tsx) - 2.5 s is
         // not enough to read the message AND click the inline action.
         durationMs={toast?.action !== undefined ? 6000 : 2500}
         onDone={() => setToast(null)}
@@ -2869,7 +2869,7 @@ function EditorChrome({
           nothing at all, silently, which is why those surfaces had grown label
           swaps and silences instead. It now mounts once in `App.tsx`, above the
           stage switch, so every stage can reach it. */}
-      {/* ASM-6→B / #422: the calm "updated from another device" hint. Headless —
+      {/* ASM-6→B / #422: the calm "updated from another device" hint. Headless -
           it pushes an info toast into the <Toaster> above when the sync cycle
           reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}
       <RemoteMergeHint />
@@ -2912,7 +2912,7 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 };
 
 // Sidebar toggles float in the editor's top corners (the OS title-bar row),
-// Obsidian-style — there is no separate top bar; each top pane's tab strip
+// Obsidian-style - there is no separate top bar; each top pane's tab strip
 // rises into that row. These constants place the toggles clear of the macOS
 // traffic lights and size the clearance the underlying top surface (sidebar
 // header or a corner pane's strip) must reserve so nothing collides.
@@ -2926,16 +2926,16 @@ const RIGHT_TOGGLE_X = 8;
 const LEFT_CONTROLS_WIDTH =
   TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
 /** Right clearance: the top-right surface must keep its content before this.
- *  Reserves room for BOTH floated controls — the note-actions "…" menu plus the
- *  right-sidebar toggle beside it — so a collapsed-right pane's tab strip never
+ *  Reserves room for BOTH floated controls - the note-actions "…" menu plus the
+ *  right-sidebar toggle beside it - so a collapsed-right pane's tab strip never
  *  slides under either. */
 const RIGHT_CLEARANCE =
   RIGHT_TOGGLE_X + 2 * TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP + 8;
 
 /**
  * The Notion-style workspace switcher row at the top of the left sidebar,
- * above the Notes list (MYND-166). Full-width chip — mark + vault name +
- * chevron — with a downward dropdown. Carries the sidebar's right + bottom
+ * above the Notes list (MYND-166). Full-width chip - mark + vault name +
+ * chevron - with a downward dropdown. Carries the sidebar's right + bottom
  * hairlines so the edge is continuous and it separates from the Notes list.
  * Hidden when there's no vault info to show (the switcher self-suppresses).
  */
@@ -2958,10 +2958,10 @@ function SidebarVaultSwitcher({
     <div
       style={{
         flexShrink: 0,
-        // Sits below the traffic-light clearance row, so normal padding — no
+        // Sits below the traffic-light clearance row, so normal padding - no
         // bottom divider (it reads as a header above the Notes list directly).
         padding: "8px 8px 6px",
-        // Ground painted by SidebarPane — see its comment.
+        // Ground painted by SidebarPane - see its comment.
         borderInlineEnd: "1px solid var(--line-1)",
       }}
     >
@@ -2984,7 +2984,7 @@ function TitleBarToggle({
   side: "left" | "right";
   collapsed: boolean;
   onToggle: () => void;
-  /** MYND-192 — true when the sidebar is collapsed by a too-narrow window;
+  /** MYND-192 - true when the sidebar is collapsed by a too-narrow window;
    *  the toggle is inert (can't expand into space that isn't there, and
    *  must not persist a manual flip the responsive override imposed). */
   disabled?: boolean;
@@ -3025,7 +3025,7 @@ function TitleBarToggle({
  * Back / forward note-navigation button (MYND-260), sitting in the top-left
  * cluster immediately right of the left sidebar toggle. Browser-style: steps
  * the focused pane through the sequence of notes it has shown. Disabled
- * (greyed) when there is no history in that direction — matching the
+ * (greyed) when there is no history in that direction - matching the
  * `TitleBarToggle` disabled treatment.
  */
 function TitleBarNavButton({
@@ -3073,10 +3073,10 @@ function TitleBarNavButton({
 type CommandPaletteHostProps = {
   open: boolean;
   onClose: () => void;
-  /** Re-open the palette — used to pop back from a QuickPicker sub-flow on
+  /** Re-open the palette - used to pop back from a QuickPicker sub-flow on
    *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
   onReopen: () => void;
-  /** Which surface the center pane shows — the note-actions "…" menu hides on
+  /** Which surface the center pane shows - the note-actions "…" menu hides on
    *  the attachments view (it acts on the focused note, absent there). */
   centerView: CenterView;
   onOpenSettings: () => void;
@@ -3108,7 +3108,7 @@ type CommandPaletteHostProps = {
   onSwitchWorkspace: () => void;
   onRenameWorkspace: () => void;
   onDeleteWorkspace: () => void;
-  /** Show a toast (with an optional undo action) — the note-actions "…" menu's
+  /** Show a toast (with an optional undo action) - the note-actions "…" menu's
    *  convert-to-template / convert-to-note items announce themselves through it. */
   setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
@@ -3174,12 +3174,12 @@ function CommandPaletteHost({
   // The QuickPicker's cancel pops back to the command palette (the picker reads
   // as stacked on top of it). That is right for a palette-initiated picker, but
   // the note-actions "…" menu opens the SAME move-to-folder picker while the
-  // palette is closed — so its cancel must NOT summon a palette the user never
+  // palette is closed - so its cancel must NOT summon a palette the user never
   // opened. Set for that one invocation path; consumed on the next picker close.
   const suppressPaletteReopenRef = useRef(false);
   // Deferred empty-trash confirm (the palette `trash.empty` action): the
   // trashed count at request time, null when closed. A permanent purge never
-  // fires straight from the palette — this renders the same count-aware
+  // fires straight from the palette - this renders the same count-aware
   // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
   // Rendered as a sibling like `picker`, so it survives the palette closing.
   const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<
@@ -3208,16 +3208,16 @@ function CommandPaletteHost({
   // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
   // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
   const paletteWs = useWorkspace();
-  // (The palette's real-time-sync toggle was dropped in the develop merge — the
+  // (The palette's real-time-sync toggle was dropped in the develop merge - the
   // sync engine now manages SSE as an always-on baseline with an info-only
   // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
   // mock removed on develop.)
   // Drop the ephemeral AI render stores when the editor session tears down
-  // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
+  // (lock / vault-switch unmounts this host) - the AS1 artifacts (summary text +
   // the chat transcript) never outlive the open vault (SYNC-8;
   // conversational-ai-chat task 12: the chat transcript is RAM-only, wiped on
   // lock. Unlike the summary it is vault-scoped, so it is NOT cleared on a mere
-  // note switch below — only here, on the vault teardown). Tag suggestions are
+  // note switch below - only here, on the vault teardown). Tag suggestions are
   // not among them: the band's state is per-pane React state (MYND-651), torn
   // down with the pane rather than through a module store.
   useEffect(
@@ -3229,8 +3229,8 @@ function CommandPaletteHost({
   );
   // Also drop the AI render stores when the SELECTED NOTE changes (the host
   // stays mounted across a note switch, so the unmount cleanup above does not
-  // fire). Without this, note A's summary lingers — and could be inserted into
-  // note B — after switching. Bumping the run epoch (inside the clear) also
+  // fire). Without this, note A's summary lingers - and could be inserted into
+  // note B - after switching. Bumping the run epoch (inside the clear) also
   // drops any of A's in-flight runs so they never resolve onto B.
   useEffect(() => {
     clearAiOutput();
@@ -3294,7 +3294,7 @@ function CommandPaletteHost({
     [ctx, setToast, t],
   );
   // "Open random note" (MYND-323): serendipitous review. Picks uniformly from the
-  // live, non-template notes (mirrors sidebar visibility — trashed/templates are
+  // live, non-template notes (mirrors sidebar visibility - trashed/templates are
   // excluded). With ≥2 eligible notes the current one is dropped so the pick
   // always moves; the empty case shows a toast, never a modal.
   const onOpenRandomNote = useCallback(async () => {
@@ -3328,7 +3328,7 @@ function CommandPaletteHost({
       aiEnabled: aiPrefs.ai_enabled,
       // The live prefs view for the toggle/cycle/set palette actions (Wave 1+).
       prefs: aiPrefs,
-      // Wave 2 — layout / panes / tabs / navigation, dispatched to the workspace.
+      // Wave 2 - layout / panes / tabs / navigation, dispatched to the workspace.
       onSplitRight: () => paletteWs.splitFocused("row"),
       onSplitDown: () => paletteWs.splitFocused("column"),
       onClosePane: () => paletteWs.closePane(paletteWs.focusedPaneId),
@@ -3374,7 +3374,7 @@ function CommandPaletteHost({
       onGoBack: () => paletteWs.goBack(),
       onGoForward: () => paletteWs.goForward(),
       onTogglePreview: () => paletteWs.toggleCompanion(paletteWs.focusedPaneId),
-      // Wave 3 — note ops (via the sidebar-state ctx) + right-panel tabs.
+      // Wave 3 - note ops (via the sidebar-state ctx) + right-panel tabs.
       onNewNote: () => void ctx.createAndStartRename().catch(() => {}),
       onDuplicateNote: () => {
         if (ctx.selectedId !== null) void ctx.duplicateAndOpen(ctx.selectedId).catch(() => {});
@@ -3411,7 +3411,7 @@ function CommandPaletteHost({
         if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
       },
       onEmptyTrash: (viaKey: boolean) => {
-        // Permanent purge — request the count-aware confirm instead of firing
+        // Permanent purge - request the count-aware confirm instead of firing
         // directly (the TrashPanel footer's flow); the purge runs on confirm.
         const count = trashedRecords(ctx.cache).length;
         if (count > 0) setEmptyTrashConfirm({ count, viaKey });
@@ -3421,7 +3421,7 @@ function CommandPaletteHost({
         const id = ctx.selectedId;
         // #252: re-read disk truth, then toggle. `favorites` is a whole-sequence
         // write, so deriving `next` from THIS component's `usePrefs` snapshot
-        // dropped every favourite starred from the sidebar since it last read —
+        // dropped every favourite starred from the sidebar since it last read -
         // and `favorites` is `SharedDiscipline::SequenceLww`, so the truncation
         // won on every other device. Reading first makes the write depend on
         // what is stored rather than on which surface rendered more recently.
@@ -3430,7 +3430,7 @@ function CommandPaletteHost({
         // snapshot-holding surface gets the same treatment rather than each
         // re-deriving the sequence from whatever it last rendered.
         void toggleFavoriteOnDisk(id).catch(() => {
-          // A failed read must not fall back to the stale snapshot — that is
+          // A failed read must not fall back to the stale snapshot - that is
           // the write this fix exists to prevent.
         });
       },
@@ -3438,7 +3438,7 @@ function CommandPaletteHost({
       onShowOutline: () => void revealRightPanelTab("outline"),
       onShowUnlinked: () => void revealRightPanelTab("unlinked"),
       onRestoreBackup,
-      // Palette-gap #32 — move the selected note to a folder via the QuickPicker.
+      // Palette-gap #32 - move the selected note to a folder via the QuickPicker.
       // Targets are the vault's folders (from the sidebar cache) plus any empty
       // "deliberate" folders, sorted, with "Vault root" (empty id → null) first.
       onMoveNote: () => {
@@ -3446,7 +3446,7 @@ function CommandPaletteHost({
         const noteId = ctx.selectedId;
         const folders = new Set<string>();
         for (const rec of ctx.cache.values()) {
-          // Live, non-template notes only — a folder that survives solely on
+          // Live, non-template notes only - a folder that survives solely on
           // trashed/archived/template notes isn't a sidebar destination.
           if (rec.trashed !== null || rec.archived !== null || rec.template) continue;
           if (rec.folder) folders.add(rec.folder);
@@ -3466,14 +3466,14 @@ function CommandPaletteHost({
           },
         });
       },
-      // Palette-gap #31 — apply a saved custom theme via the QuickPicker. Lists
-      // the vault's custom themes (MYND-486: names from the vault.themes store —
+      // Palette-gap #31 - apply a saved custom theme via the QuickPicker. Lists
+      // the vault's custom themes (MYND-486: names from the vault.themes store -
       // every stored theme is valid); picking one reads its palette, persists it
       // as the active choice, and applies it live (the CustomThemesSection apply
       // path).
       onApplyCustomTheme: () => {
         void (async () => {
-          // Each entry already carries its palette — MYND-486 makes the single
+          // Each entry already carries its palette - MYND-486 makes the single
           // `vault.themes` blob decrypt every palette to answer a list at all,
           // so hold them by name and apply the picked one directly instead of
           // buying it back with a second full decrypt via `readCustomTheme`.
@@ -3501,7 +3501,7 @@ function CommandPaletteHost({
       },
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
-      // tasks 3–4): reveal the render target, grab the focused pane's live view
+      // tasks 3-4): reveal the render target, grab the focused pane's live view
       // via the `getActiveEditorView` registry (the palette pattern), then drive
       // the tested `runSummarizeToStore` pipeline (resolve → truncate → blocking
       // `infer` → ephemeral render). Returns stub output until Candle.
@@ -3511,7 +3511,7 @@ function CommandPaletteHost({
         if (view === null) return;
         // SYNC-14 fail-closed: never summarize a note in an excluded folder, and
         // never run when the note's folder is unknown (no selection / not cached)
-        // — an unknown folder must not default to root and slip past the gate.
+        // - an unknown folder must not default to root and slip past the gate.
         if (ctx.selectedId === null) return;
         const cached = ctx.cache.get(ctx.selectedId);
         if (cached === undefined) return;
@@ -3568,7 +3568,7 @@ function CommandPaletteHost({
         // The orchestration lives in `rewriteToEditor` so its FAILURE path can
         // be tested (#191 task 6). It used to be an un-`catch`ed IIFE right
         // here, which meant an engine rejection produced no toast, no error and
-        // no document change — indistinguishable, from the user's seat, from
+        // no document change - indistinguishable, from the user's seat, from
         // the action never having fired.
         void rewriteSelectionToEditor({
           view,
@@ -3637,7 +3637,7 @@ function CommandPaletteHost({
       aiPrefs,
       paletteWs,
       // onMoveNote / onApplyCustomTheme resolve their QuickPicker strings via
-      // `t` at run time — a language switch must rebuild them.
+      // `t` at run time - a language switch must rebuild them.
       t,
       onRestoreBackup,
       revealRightPanelTab,
@@ -3675,7 +3675,7 @@ function CommandPaletteHost({
   );
   // Stable note predicates (fresh identity only when the cache changes): they
   // sit in the palette's snippet-effect deps, and an inline arrow's per-render
-  // identity would re-run that effect — re-issuing its `note_read` decrypts —
+  // identity would re-run that effect - re-issuing its `note_read` decrypts -
   // on every unrelated host render.
   const isTrashed = useCallback(
     (id: string) => ctx.cache.get(id)?.trashed != null,
@@ -3686,7 +3686,7 @@ function CommandPaletteHost({
     [ctx.cache],
   );
   // The editor-chrome "…" menu (Obsidian-style). It reuses the SAME
-  // `commandCtx` note-action handlers the palette dispatches — a second surface
+  // `commandCtx` note-action handlers the palette dispatches - a second surface
   // onto one IPC path, never a second path. It only exists while a note is open
   // in the focused pane, mirroring the right-sidebar toggle's own gate (which
   // lives in `EditorChrome`), so the two float side by side; `centerView` is
@@ -3696,7 +3696,7 @@ function CommandPaletteHost({
     paletteWs.focusedLeaf.activeTab?.kind === "note" &&
     paletteWs.pendingNewTabPaneId !== paletteWs.focusedPaneId;
   // The note the "…" menu acts on (the focused-pane note the other items use).
-  // Its template flag flips the convert item between promote and demote — the
+  // Its template flag flips the convert item between promote and demote - the
   // dead `convertNoteToTemplate` wire (nothing called it) and the modal-only
   // `convertTemplateToNote`, surfaced where you author.
   const activeNoteId = ctx.selectedId;
@@ -3737,7 +3737,7 @@ function CommandPaletteHost({
     const forward = toTemplate ? convertNoteToTemplate : convertTemplateToNote;
     const inverse = toTemplate ? convertTemplateToNote : convertNoteToTemplate;
     // The convert wrote the `template:` flag straight to disk, out of band of
-    // the open pane's buffer — the frontmatter-vs-buffer staleness class that
+    // the open pane's buffer - the frontmatter-vs-buffer staleness class that
     // `settleFrontmatterWrite` above exists for.
     const settle = () => settleFrontmatterWrite(id);
     void forward(id)
@@ -4006,8 +4006,8 @@ function CommandPaletteHost({
           setPicker(null);
           suppressPaletteReopenRef.current = false;
         }}
-        // Cancel (Esc / backdrop) pops back to the command palette — the picker
-        // is stacked on top of it (the palette closed when the action ran) —
+        // Cancel (Esc / backdrop) pops back to the command palette - the picker
+        // is stacked on top of it (the palette closed when the action ran) -
         // UNLESS the "…" menu opened it with the palette closed (see the ref).
         onClose={() => {
           const suppress = suppressPaletteReopenRef.current;
@@ -4051,7 +4051,7 @@ function CommandPaletteHost({
             void ctx
               .emptyTrashWithSync(ids)
               .then((result) => {
-                // Best-effort bulk purge — report a remaining count on partial
+                // Best-effort bulk purge - report a remaining count on partial
                 // failure (the palette has no status line, so toast it).
                 if (result.failed.length > 0) {
                   showAttachmentToast(
@@ -4073,22 +4073,22 @@ function CommandPaletteHost({
  * Initial-boot sidebar refresh: `note_list` → chunked `loadNoteBatch`
  * → cache populate. Runs once on mount inside the provider tree.
  *
- * Also owns the global Cmd+N keymap (T25) — wired here so the
+ * Also owns the global Cmd+N keymap (T25) - wired here so the
  * shortcut fires regardless of which pane is focused.
  *
- * Returns `null` — purely a side-effect mount. The actual sidebar
+ * Returns `null` - purely a side-effect mount. The actual sidebar
  * surface is `<NotesSidebarList>` rendered as a sibling.
  */
 function SidebarBootstrap() {
   const ctx = useSelectedNote();
   const booted = useRef(false);
-  // MYND-574 task 64 — the deep link resolves HERE, and only here, because this
+  // MYND-574 task 64 - the deep link resolves HERE, and only here, because this
   // is the one place that has the authoritative note list. A URL is untrusted
   // input and a bookmark outlives the note it points at, so the id is checked
   // against `note_list` before it is opened; an id that is not there is dropped
   // and the user lands in an empty editor, never on an error. `routeReady`
   // gates the URL binding below: nothing may rewrite the address bar until this
-  // settles, or a reload (which always lands locked on web — the keys are RAM)
+  // settles, or a reload (which always lands locked on web - the keys are RAM)
   // would throw away the note it was asked to restore.
   const [routeReady, setRouteReady] = useState(false);
   useEffect(() => {
@@ -4135,7 +4135,7 @@ function SidebarBootstrap() {
 
   // Global Cmd/Ctrl+N → create new note. Folded into the rebindable
   // `note.new-tab` command as a second default chord (Mod-t, Mod-n) so it is
-  // listed + rebindable (#184 C) — the WorkspaceHotkeys `note.new-tab` entry runs
+  // listed + rebindable (#184 C) - the WorkspaceHotkeys `note.new-tab` entry runs
   // the same `createAndStartRename`; no longer a hardcoded window listener here.
 
   return null;
@@ -4157,11 +4157,11 @@ function SidebarBootstrap() {
  */
 // In-code DEFAULT chords for the keybind dispatcher (hotkeys epic, MYND-304).
 // Sourced from the single bindable-command catalog (no second copy of the
-// chord literals — the catalog is the one place defaults live). The dispatcher
+// chord literals - the catalog is the one place defaults live). The dispatcher
 // only fires the ids it has entries for, so passing the full catalog (including
 // the commands handled elsewhere) is harmless; the user override
 // (vault.prefs.keymap) shadows these per id. Ctrl+Tab is deliberately NOT a
-// catalog-rebindable default — see the inline handler note below.
+// catalog-rebindable default - see the inline handler note below.
 const KEYBIND_DEFAULTS: Readonly<Record<string, string[]>> = catalogDefaults();
 
 function WorkspaceHotkeys({
@@ -4235,18 +4235,18 @@ function WorkspaceHotkeys({
       { id: "view.toggle-focus", scope: {}, run: () => onToggleFocus() },
       // command-palette (MYND-86 + MYND-40): default Mod-k / Mod-p, both toggle
       // the same unified palette. `scope: {}` reproduces the old hardcoded
-      // listener's gate exactly — stands down in plain inputs (rename/search),
+      // listener's gate exactly - stands down in plain inputs (rename/search),
       // stays live inside the CM6 editor surface. The dispatcher's preventDefault
       // also suppresses the WebView's native Print dialog on Cmd+P.
       // Survives a modal on purpose (myne#336): this chord is how the user
       // CLOSES the palette, so gating it under "a modal is open" would trap
       // them in it.
       { id: "palette.toggle", scope: { allowInModal: true }, run: () => onTogglePalette() },
-      // #184 track D — these three were hardcoded window listeners (settings,
+      // #184 track D - these three were hardcoded window listeners (settings,
       // graph) or palette-only with an INERT declared chord (tasks); routing them
       // through the engine is what makes the panel's "rebindable" mark honest and
       // their default chords actually fire.
-      // Same reasoning as `palette.toggle` above — it is the close chord too.
+      // Same reasoning as `palette.toggle` above - it is the close chord too.
       { id: "app.open-settings", scope: { allowInModal: true }, run: () => onToggleSettings() },
       { id: "graph.show", scope: {}, run: () => ws.openGraph() },
       { id: "tasks.show", scope: {}, run: () => ws.openTasks() },
@@ -4268,19 +4268,19 @@ function WorkspaceHotkeys({
     defaults: KEYBIND_DEFAULTS,
     overrides: prefs.keymap,
     stageName: "editor",
-    // myne#336 — both of these were hardcoded, so the two gates the engine
+    // myne#336 - both of these were hardcoded, so the two gates the engine
     // documents never engaged.
     //
     // `activeModal: null` meant "window shortcuts stand down under a modal"
     // was never true: under a modal the user believes is exclusive, window
-    // chords silently acted on the workspace behind it — tabs closed, notes
+    // chords silently acted on the workspace behind it - tabs closed, notes
     // were created into an unreachable inline rename, the center view changed,
     // pane history moved. Nothing is overwritten, but the user comes back to a
     // workspace that is not the one they left, with no record of what changed.
     //
     // `selectedNoteId: null` made `ctx.hasSelectedNote` permanently false, so
     // any entry declaring `scope.requiresNote` would silently never fire. Inert
-    // today because no entry uses the flag — which is exactly how it would have
+    // today because no entry uses the flag - which is exactly how it would have
     // stayed until the first one did.
     selectedNoteId: ctx.selectedId,
     activeModal,
@@ -4300,7 +4300,7 @@ function WorkspaceHotkeys({
     return () => window.removeEventListener(CLOSE_ACTIVE_TAB_EVENT, onCloseTab);
   }, [ws]);
 
-  // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane. Kept as a
+  // Ctrl+Tab / Ctrl+Shift+Tab - cycle tabs in the focused pane. Kept as a
   // literal-Ctrl inline handler OUTSIDE the rebindable keymap: Ctrl+Tab is a
   // cross-platform browser convention (literal Ctrl on every OS), but the
   // engine's `Mod` token maps `ctrlKey`→`Mod` on non-mac, so a literal Ctrl
@@ -4309,7 +4309,7 @@ function WorkspaceHotkeys({
   // deferral); revisit if cross-platform literal-Ctrl bindings become rebindable.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Stand down while typing in a plain input (sidebar rename / search) —
+      // Stand down while typing in a plain input (sidebar rename / search) -
       // the CM6 surface is not "plain-input", so tab-cycle stays live there.
       if (focusKindOf(e.target) === "plain-input") return;
       if (!(e.ctrlKey && e.key === "Tab")) return;
@@ -4348,18 +4348,18 @@ function WorkspaceHotkeys({
 /**
  * The open note's backlinks pane (knowledge-graph-ux #1 / MYND-195). Wires the
  * placeholder RightSidebar to the live `backlinks()` query: which notes link
- * here, as count-only clickable source cards (no body snippet — grill Q1),
+ * here, as count-only clickable source cards (no body snippet - grill Q1),
  * alphabetical, self-link hidden, `ctx.open` navigation. No bespoke locked
- * state — the Editor unmounts on lock and its mount-time fail-closed guard
+ * state - the Editor unmounts on lock and its mount-time fail-closed guard
  * covers the race. Stays live via the vault-wide index-changed nonce (SYNC-5):
  * any note's save/rename/move re-queries; the reference-equal bail guards renders.
  */
 /**
- * The right panel — a multi-tab surface (right-panel tabs) modeled on the bottom
+ * The right panel - a multi-tab surface (right-panel tabs) modeled on the bottom
  * bar: multiple NON-closable tabs (Backlinks / Unlinked mentions / Outline) that
  * drag-reorder and right-click hide/restore, with ONE active tab at a time. The
  * WHOLE-panel show/hide stays the existing `rightCollapsed` toggle (title-bar
- * button + palette command) — unchanged. Each tab body is its own component
+ * button + palette command) - unchanged. Each tab body is its own component
  * (`BacklinksTab`, `UnlinkedMentionsSection` in `asTab` mode, `OutlineTab`); this
  * container owns only the strip, the active-tab/order/hidden prefs, and the two
  * right-click menus (the per-tab move/hide + the strip-wide restore checklist).
@@ -4389,7 +4389,7 @@ function RightSidebar() {
   );
   // Insert `[[openTitle]]` into the mentioning note. The target is always a
   // DIFFERENT note (self is excluded from the candidates), so the SYNC-15 guard
-  // resolves to a plain disk write — `openNoteDirty: false` is correct in the
+  // resolves to a plain disk write - `openNoteDirty: false` is correct in the
   // single-pane v1.1 editor (no live buffer for a non-open note to clobber).
   const handleLinkMention = useCallback(
     async (mention: UnlinkedMention): Promise<boolean> => {
@@ -4410,7 +4410,7 @@ function RightSidebar() {
   );
   // The AI Chat tab is only offered when AI is actually on (#225): with it off
   // the tab was a dead affordance whose body just pointed the user to Settings.
-  // Gated on `ai_enabled` (the feature state), NOT `developer_mode` — turning
+  // Gated on `ai_enabled` (the feature state), NOT `developer_mode` - turning
   // Developer mode off must never disable a running feature (#181 cli6/vm4), and
   // on web `ai_enabled` is always false (no localAi capability), so the tab is
   // absent there too. Folded into `hidden` so BOTH the strip AND the active-tab
@@ -4461,11 +4461,11 @@ function RightSidebar() {
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
-        // Ground painted by SidebarPane — see its comment.
+        // Ground painted by SidebarPane - see its comment.
         borderInlineStart: "1px solid var(--line-1)",
       }}
     >
-      {/* Tab strip — drag-reorder + right-click hide/restore (bottom-bar
+      {/* Tab strip - drag-reorder + right-click hide/restore (bottom-bar
           pattern), single active tab. Right-clicking empty strip space opens the
           restore checklist even when every tab is hidden (the only restore path). */}
       <div
@@ -4493,7 +4493,7 @@ function RightSidebar() {
           const isActive = id === active;
           const label = t(tab.labelKey);
           return (
-            // Icon-only tabs (the dar-sağ-panel convention — Obsidian/Logseq):
+            // Icon-only tabs (the dar-sağ-panel convention - Obsidian/Logseq):
             // the label rides the tooltip + aria-label so three tabs always fit a
             // 280px panel and the strip keeps a right-click-able empty area.
             <button
@@ -4562,7 +4562,7 @@ function RightSidebar() {
             </button>
           );
         })}
-        {/* Trailing flex spacer — keeps tabs left-aligned and gives the
+        {/* Trailing flex spacer - keeps tabs left-aligned and gives the
             strip-wide restore checklist a reliable empty right-click target (it
             has no onContextMenu of its own, so the event bubbles to the strip). */}
         <div data-testid="editor.right-panel-tabs-rest" style={{ flex: 1, alignSelf: "stretch" }} />
@@ -4608,7 +4608,7 @@ function RightSidebar() {
             onInsert={(text) => {
               // "Insert into note" (note-summarization task 5, SYNC-17): append a
               // `## Summary` block to the focused note and let the normal autosave
-              // path (note_save/MY01) persist it — byte-identical to a hand-typed
+              // path (note_save/MY01) persist it - byte-identical to a hand-typed
               // block, only on this explicit click.
               const view = getActiveEditorView();
               if (view === null) return;
@@ -4716,7 +4716,7 @@ function RightSidebar() {
 
 /**
  * One resizable/collapsible sidebar slot (MYND-137). When collapsed it
- * renders NOTHING — the pane is fully hidden (MYND-166 removed the thin
+ * renders NOTHING - the pane is fully hidden (MYND-166 removed the thin
  * re-expand rail; toggling is the top-bar buttons + command palette).
  * Otherwise a width-driven `position: relative` wrapper holding the sidebar
  * `children` plus the inner-edge {@link ResizeHandle} (the handle is
@@ -4752,7 +4752,7 @@ function SidebarPane({
   // active resize: a drag changes `width` every pointermove, and an active
   // width transition there would make the pane lag behind the cursor. Arming
   // it permanently (rather than only just-after a collapse flip) is what makes
-  // the toggle animate reliably — the transition is already on the element
+  // the toggle animate reliably - the transition is already on the element
   // when the width change commits, instead of racing an effect that turns it
   // on after the browser has already painted the new width.
   // Reduced-motion is honoured globally (tokens.css zeroes transition-duration).
@@ -4776,8 +4776,8 @@ function SidebarPane({
   return (
     <div
       // The pane's own box, and the element a layout scenario measures. It is
-      // rendered in BOTH states — a collapsed pane is this same div at width 0,
-      // not an absent one — so a width read distinguishes collapsed from open
+      // rendered in BOTH states - a collapsed pane is this same div at width 0,
+      // not an absent one - so a width read distinguishes collapsed from open
       // without a scenario having to tell "collapsed" from "not mounted yet".
       // That distinction is the whole of what `e2e/window-resize-collapse.e2e.ts`
       // and `e2e/rtl-mirror-sweep.e2e.ts` assert, and both were written against
@@ -4796,7 +4796,7 @@ function SidebarPane({
         flexShrink: 0,
         // THE PANEL GROUND IS PAINTED HERE, not by the blocks inside.
         //
-        // The role has always been on this element — but every child painted an
+        // The role has always been on this element - but every child painted an
         // opaque `--paper-2` of its own, and the ornament layer is `z-index: -1`
         // inside the host's own stacking context: above the HOST's background,
         // below everything the host contains. So a theme's surface texture,
@@ -4850,7 +4850,7 @@ function SidebarPane({
  * Transient full-pane overlay shown while a multi-vault switch's
  * `vault_lock()` IPC is in flight (MYND-205). The lock is microseconds-to-
  * low-ms (it includes the graceful `flushIfDirty`), so this is a brief
- * scrim with a spinner + "saving…" copy — it makes the lock+flush window
+ * scrim with a spinner + "saving…" copy - it makes the lock+flush window
  * visible and blocks stray interaction until the Stage routes to the
  * target's unlock screen. Design-token-only styling; the styled switcher
  * dropdown (task 5) may relocate the "saving…" affordance into the dropdown
@@ -4887,11 +4887,11 @@ function SwitchingOverlay() {
 
 interface BottomBarProps {
   /** Lock callback that awaits the autosave flush before firing
-   *  `lockVault()` and the parent's onLock — wired by `EditorChrome`. */
+   *  `lockVault()` and the parent's onLock - wired by `EditorChrome`. */
   onLockFlushed: () => Promise<void>;
   onOpenSettings?: () => void;
   /** Open the whole-vault graph (the persistent wedge-first-class affordance,
-   *  SYNC-7) — parallel to the settings gear. */
+   *  SYNC-7) - parallel to the settings gear. */
   onShowGraph?: () => void;
   /** Open the tag browser (persistent affordance, SYNC-7 refinement, MYND-46). */
   onShowTags?: () => void;
@@ -4904,10 +4904,10 @@ interface BottomBarProps {
    *  time from the previous note and confuse the user). */
   hideSaveStatus?: boolean;
   /** Whether the focused note's latest bytes are not yet on the server
-   *  (phase3-web-client task 23) — trails the save readout. */
+   *  (phase3-web-client task 23) - trails the save readout. */
   saveStatusUnsynced?: boolean;
   /** Whole-note statistics of the active note (frontmatter + markdown syntax
-   *  excluded). `null` hides the readout entirely — same rationale as
+   *  excluded). `null` hides the readout entirely - same rationale as
    *  `hideSaveStatus`: with no note selected the values would be meaningless. */
   stats?: DocStats | null;
   /** Statistics of the current non-empty selection; when non-null the readout
@@ -4941,7 +4941,7 @@ interface BottomBarProps {
   hiddenItems: string[];
   /** Right-click handler that opens the visibility menu (wired by
    *  `EditorChrome`). Set on the bar root so even a fully-hidden bar stays
-   *  right-clickable — the only restore path. */
+   *  right-clickable - the only restore path. */
   onContextMenu?: (e: ReactMouseEvent) => void;
   /** Bottom-bar reorder: the user's stored right-cluster display order
    *  (`prefs.bar_items_order`). Resolved against the canonical default at
@@ -4949,7 +4949,7 @@ interface BottomBarProps {
   barItemsOrder: string[];
   /** Persist a new right-cluster order after a drag-drop reorder. */
   onReorder: (order: string[]) => void;
-  /** Right-click handler for a SPECIFIC bar item — opens the per-item menu
+  /** Right-click handler for a SPECIFIC bar item - opens the per-item menu
    *  (move left / move right / hide). `visibleIds` is the currently-rendered
    *  ordered id list, used for the move-availability checks. */
   onItemContextMenu: (
@@ -5194,7 +5194,7 @@ function BottomBar({
     "vim-mode": () => {
       // Renders only while vim is on (mode is null otherwise), so a user who
       // never enables it sees a bottom bar identical to today's. `aria-live`
-      // makes the transition audible — modal state must not be a purely visual
+      // makes the transition audible - modal state must not be a purely visual
       // signal (story 12).
       if (vimMode === null) return null;
       return (
@@ -5273,7 +5273,7 @@ function BottomBar({
     <div
       data-testid="editor.bottom-bar"
       data-editor-chrome
-      // Chrome, for ornament purposes (myne#394) — same role as the tab strip.
+      // Chrome, for ornament purposes (myne#394) - same role as the tab strip.
       {...ornamentRole("chrome")}
       onContextMenu={onContextMenu}
       style={{
@@ -5374,7 +5374,7 @@ function BottomBar({
 }
 
 /**
- * named-workspaces (MYND-308 task 5) — the bottom-bar workspace switcher: a chip
+ * named-workspaces (MYND-308 task 5) - the bottom-bar workspace switcher: a chip
  * showing the active workspace name with a dropdown listing the slots to switch
  * to plus a "Save current as…" affordance. Carries `data-editor-chrome` so it
  * fades with the rest of the chrome in focus mode (the `[data-focus-active]` CSS

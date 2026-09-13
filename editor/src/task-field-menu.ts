@@ -8,7 +8,7 @@
 // and the tracked span is anchored to the caret's task line instead of an
 // existing chip's range. `applyTaskFieldEdit` already appends a missing field at
 // line end (it reads `parseTaskFields`, sets the one kind, and lets
-// `planTaskFieldWrite` serialize), so "add" and "edit" are one function — which
+// `planTaskFieldWrite` serialize), so "add" and "edit" are one function - which
 // is exactly why this file emits no task-field bytes of its own and the
 // single-writer grep stays clean.
 //
@@ -16,7 +16,7 @@
 // their chrome (`.cm-task-field-menu`) lives in `task-surfaces.css`. It is not
 // imported here directly: importing `./task-field-editor` below pulls that
 // module in, and its own top-level `import "./task-surfaces.css"` loads the
-// stylesheet the moment this file is evaluated — before the menu can render.
+// stylesheet the moment this file is evaluated - before the menu can render.
 
 import { EditorView } from "@codemirror/view";
 import { openModal } from "./host/lib/imperative-modal";
@@ -37,7 +37,7 @@ import { canRecur } from "@myne/dialect/taskRecurrence";
 import { taskChipIcon } from "@myne/editor/host/notes/taskChipIcon";
 import i18n from "@myne/editor/i18n";
 
-/** Menu order — the same stable order the writer serializes in. */
+/** Menu order - the same stable order the writer serializes in. */
 const MENU_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
 /**
@@ -45,7 +45,7 @@ const MENU_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priori
  * one task field on the caret's task line.
  *
  * The tracked span is the whole line, mapped through document changes for as
- * long as the editor is open — the identical protection a chip edit needs
+ * long as the editor is open - the identical protection a chip edit needs
  * (`task-chip.ts`'s pending-chip field), because a background autosave rewrites
  * the frontmatter stamp about a second after any edit and would otherwise shift
  * the line out from under the commit. If the line is deleted while the editor is
@@ -69,7 +69,7 @@ export function openTaskFieldAdd(
   // The menu opens this editor while a tracked span is ALREADY live, so the
   // editor BORROWS that handle rather than minting a second one: exactly one
   // span is mapped through document changes for as long as either surface is
-  // open. A borrowed handle is never ended here — the menu owns its lifetime.
+  // open. A borrowed handle is never ended here - the menu owns its lifetime.
   const borrowed = opts?.handle;
   const edit = borrowed ?? beginTaskFieldEdit(view, { from: line.from, to: line.to, kind });
   openTaskFieldEditor({
@@ -79,7 +79,7 @@ export function openTaskFieldAdd(
     onCommit: (next) => {
       const span = edit.current();
       if (borrowed === undefined) edit.end();
-      // Null means the line was deleted while the editor was open — declining is
+      // Null means the line was deleted while the editor was open - declining is
       // the only correct answer (mirrors the chip listener).
       if (span === null) {
         opts?.onEditorClose?.();
@@ -94,8 +94,8 @@ export function openTaskFieldAdd(
       }
       // myne#276: a `repeat` with nothing to repeat FROM is inert by
       // construction, and the menu let you mint one with no warning of any
-      // kind. Rather than refuse the write — the rule the user typed is
-      // correct, and refusing it would discard it — offer the anchor it needs,
+      // kind. Rather than refuse the write - the rule the user typed is
+      // correct, and refusing it would discard it - offer the anchor it needs,
       // in the same surface, immediately. Declining leaves the rule on the line
       // with its inline explanation (`task-chip.ts`), so nothing is lost either
       // way.
@@ -104,7 +104,7 @@ export function openTaskFieldAdd(
         return;
       }
       // Re-read the line from the post-write document. Clamped, because a
-      // document that shrank under a concurrent change must not throw here —
+      // document that shrank under a concurrent change must not throw here -
       // an offer of a due date is not worth an exception on the save path.
       const written = view.state.doc.lineAt(
         Math.min(span.from, view.state.doc.length),
@@ -114,7 +114,7 @@ export function openTaskFieldAdd(
         return;
       }
       // The chained due editor borrows the SAME handle, so its own close is what
-      // finally reports the editor as closed — not this repeat one, which has
+      // finally reports the editor as closed - not this repeat one, which has
       // already handed off.
       openTaskFieldAdd(view, written.from, "due", anchor, opts);
     },
@@ -129,7 +129,7 @@ export function openTaskFieldAdd(
  * Open the "add field" mini-menu anchored to the `+` affordance.
  *
  * A kind the line already carries is relabelled "Edit …" and routes through the
- * same opener (which prefills it) — strictly more useful than hiding it, and it
+ * same opener (which prefills it) - strictly more useful than hiding it, and it
  * reuses the seam. The menu is an anchored popover, not a blocking dialog, so it
  * uses the transparent-backdrop `openModal` shape `task-field-editor.ts` uses,
  * getting focus-trap + Esc + backdrop-click dismissal for free.
@@ -139,7 +139,7 @@ export function openTaskFieldAdd(
  * is categorically different from its neighbours: the other rows open an editor
  * to change a value, this one performs an action and closes. The test for
  * showing it is deliberately "can this occurrence be skipped", not "does this
- * line carry a repeat field" — offering an action that would silently do nothing
+ * line carry a repeat field" - offering an action that would silently do nothing
  * on an unreadable or anchorless rule is the same failure the chip layer forbids
  * itself in `decorations/task-chip.ts`.
  */
@@ -159,7 +159,7 @@ export function openTaskFieldMenu(opts: {
   //
   // EVERY row needs this, not just the skip row. A menu is easily open for
   // longer than the ~1 s autosave that rewrites the frontmatter `updated:`
-  // stamp, and any growth above the task line moves it forward — so the offset
+  // stamp, and any growth above the task line moves it forward - so the offset
   // captured at open time lands in the PRECEDING line by the time a row is
   // clicked. Nothing downstream guards it: `planTaskFieldWrite` rewrites
   // whatever line text it is handed, so `[due:: …]` could be appended to an

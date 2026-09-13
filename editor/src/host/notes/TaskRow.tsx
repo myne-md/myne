@@ -1,7 +1,7 @@
 // The shared task row (MYND-616, task 1).
 //
 // ONE row component for every task surface: the vault-wide tab, the note-scoped
-// right-panel tab, and — later — the query block. It lives in the **shared
+// right-panel tab, and - later - the query block. It lives in the **shared
 // package from day one** rather than in the desktop tree, because the mobile
 // surfaces consume it too and moving it afterwards would break two repositories
 // in the same change.
@@ -11,7 +11,7 @@
 // written for exactly this consumer and already exports `taskChipStyle()`.
 //
 // SCOPE, not caller identity. The row takes `scope` and decides for itself what
-// context to show — the source note is redundant in a note-scoped panel and
+// context to show - the source note is redundant in a note-scoped panel and
 // essential in a vault-wide list. Branching on "who mounted me" would put that
 // knowledge in three places and let them disagree; a parameter keeps it here.
 //
@@ -20,8 +20,7 @@
 //     box and struck-through text, never a tick glyph;
 //   - **completion is the one ruled exception to state-never-by-fill** in this
 //     panel: the box and the strike are ACCENT (`docs/design/README.md`
-//     "Task completion", `docs/decisions/ui/0586`). Everywhere else — the date
-//     chip's overdue ink, the editor's inline affordances — state stays text,
+//     "Task completion", `docs/decisions/ui/0587`). Everywhere else — the date
 //     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
@@ -52,7 +51,7 @@ export type TaskRowScope = "vault" | "note" | "query";
 export type TaskRowData = {
   /** Stable identity for React keys and for the toggle callback. */
   key: string;
-  /** The task's text — marker and fields already stripped (`taskDescription`). */
+  /** The task's text - marker and fields already stripped (`taskDescription`). */
   text: string;
   completed: boolean;
   /**
@@ -69,7 +68,7 @@ export type TaskRowData = {
   priority?: string;
   /**
    * The record's raw line was truncated, so it cannot be written (MYND-612
-   * task 5). The row still renders — dropping it would make the task vanish —
+   * task 5). The row still renders - dropping it would make the task vanish -
    * but its checkbox is disabled and says why.
    */
   oversized?: boolean;
@@ -129,13 +128,13 @@ function ChipGlyph({ kind }: { kind: "due" | "remind" }): ReactElement {
  * reminder**.
  *
  * A task carrying only a reminder would otherwise read as undated and drop out
- * of every dated view — which is the case `remind` being absolute exists to
+ * of every dated view - which is the case `remind` being absolute exists to
  * support ("remind me Tuesday to call my mother"). The same axis is used by the
  * filter predicates; this function is display-side only and does not define it.
  *
  * Normalizes here rather than at each consumer. `TaskRowData` promises
  * optional-or-absent, but the `MYI1` row serializes `Option<String>` as `null`,
- * so a client whose boundary skipped the `taskWire.ts` decoder hands one down —
+ * so a client whose boundary skipped the `taskWire.ts` decoder hands one down -
  * and `undefined ?? null` is `null`, which `=== undefined` misses. Both
  * consumers then break differently: `isOverdue` slices a non-string (the iOS
  * Tasks-tab crash), and the render guard emits an empty date chip. One `== null`
@@ -150,7 +149,7 @@ function rowDate(task: TaskRowData): string | undefined {
  * Whether the row's date is in the past.
  *
  * Compares `YYYY-MM-DD` prefixes as strings, which is exact for that format and
- * needs no date library — the shape is fixed normatively by
+ * needs no date library - the shape is fixed normatively by
  * `markdown-dialect.md` §3.6.4, so this is consuming the type authority rather
  * than adding a second one. A date carrying a time still compares correctly
  * because the day prefix is what is sliced.
@@ -192,7 +191,7 @@ const BOX_BASE: CSSProperties = {
 function boxStyle(completed: boolean, disabled: boolean): CSSProperties {
   return {
     ...BOX_BASE,
-    // A completed box is FILLED, not ticked — the canon forbids a green check.
+    // A completed box is FILLED, not ticked - the canon forbids a green check.
     // The fill is the ACCENT (myne-md/myne#656, decided in the panel grill),
     // which is the one place completion is allowed to read as state; the editor
     // keeps its neutral inline treatment.
@@ -246,7 +245,7 @@ const STACK_STYLE: CSSProperties = {
 };
 
 /** The second line. Left-aligned under the text, not right-aligned like the
- *  single-line meta block — a right-aligned second line reads as a separate
+ *  single-line meta block - a right-aligned second line reads as a separate
  *  column rather than as this row's own detail. */
 const SECOND_LINE_STYLE: CSSProperties = {
   display: "flex",
@@ -341,7 +340,7 @@ export function TaskRow({
         <span
           style={{
             ...taskChipStyle(),
-            // State as coloured TEXT, never as a fill — the canon's rule, and
+            // State as coloured TEXT, never as a fill - the canon's rule, and
             // the reason this chip's background stays neutral while overdue.
             color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.ink,
           }}
@@ -388,7 +387,19 @@ export function TaskRow({
       data-task-scope={scope}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      {...(onOpen === undefined ? {} : { onClick: () => onOpen(task) })}
+      {...(onOpen === undefined
+        ? {}
+        : {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick: () => onOpen(task),
+            onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen(task);
+              }
+            },
+          })}
       {...(depth > 0 ? { "data-depth": String(depth) } : {})}
     >
       <span
@@ -405,7 +416,7 @@ export function TaskRow({
         title={task.oversized === true ? i18n.t("tasks.row.tooLongToWrite") : undefined}
         tabIndex={disabled ? -1 : 0}
         // myne#284: the class carries a touch-only hit-area expander. The box
-        // stays 14×14 visually — the density is the point of this row — while
+        // stays 14×14 visually - the density is the point of this row - while
         // a coarse pointer gets the 44×44 the platform minimums ask for.
         className="myne-task-checkbox"
         style={{ ...boxStyle(task.completed, disabled), ...(stacked ? { marginTop: 3 } : {}) }}

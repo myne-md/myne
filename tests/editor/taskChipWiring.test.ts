@@ -35,7 +35,7 @@ afterEach(() => {
  * copy" of the shape buried inside `src/screens/Editor.tsx`, because that copy
  * could not be mounted here. The shape now lives in the shared editor package
  * (`installTaskChipEditor`), imported by BOTH desktop and mobile, so this test
- * exercises the **real** wire rather than a lookalike — and the gap it was
+ * exercises the **real** wire rather than a lookalike - and the gap it was
  * written to catch (a client that renders chips but installs no listener) is now
  * one line to get wrong instead of a whole duplicated block.
  */
@@ -108,7 +108,7 @@ describe("clicking a chip opens its editor", () => {
     expect(el.getAttribute("data-value")).toBe("high");
   });
 
-  it("opens from the keyboard too — the chip is the only route in live mode", () => {
+  it("opens from the keyboard too - the chip is the only route in live mode", () => {
     cleanup.push(installChipListener());
     const { host } = mount();
     const el = chip(host, "due");
@@ -116,7 +116,7 @@ describe("clicking a chip opens its editor", () => {
     expect(surface()).not.toBeNull();
   });
 
-  it("does nothing when no listener is installed — the gap this file exists for", () => {
+  it("does nothing when no listener is installed - the gap this file exists for", () => {
     const { host } = mount();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     // This is what shipped: the event fires into nothing.
@@ -152,8 +152,8 @@ describe("committing reaches the document", () => {
 
   it("commits against the CURRENT span after an edit above shifted every offset", () => {
     // The stale-offset trap, and it corrupts rather than fails. The popover
-    // stays open while the editor is live — a background autosave rewrites the
-    // frontmatter stamp about a second after any edit — so the offsets captured
+    // stays open while the editor is live - a background autosave rewrites the
+    // frontmatter stamp about a second after any edit - so the offsets captured
     // at click time no longer point at the field. Writing at them lands the new
     // value in whatever text has moved into that position; here, the heading.
     // The change-mapped StateField is what makes that unrepresentable.
@@ -169,7 +169,7 @@ describe("committing reaches the document", () => {
     const text = view.state.doc.toString();
     expect(text).toContain("# A heading inserted above");
     expect(text).toContain("[due:: 2026-09-09]");
-    // Nothing was written into the heading — the failure a stale offset causes.
+    // Nothing was written into the heading - the failure a stale offset causes.
     expect(text.startsWith("# A heading inserted above\n\n- [ ] pay the rent")).toBe(true);
   });
 
@@ -199,7 +199,7 @@ describe("committing reaches the document", () => {
 // committed exactly what that input held, so a chip carrying `2026-08-01 14:30`
 // came back as `2026-08-01`. `applyTaskFieldEdit` re-typed it through
 // `parseTaskInstant`, got `{date}` with no `time`, and the writer emitted a real
-// edit because the line differed — so the wall-clock time the user wrote was
+// edit because the line differed - so the wall-clock time the user wrote was
 // deleted from the note and autosaved, with no warning. Chips never open on
 // caret entry, so this popover is the ONLY way to touch the value.
 describe("a due chip carrying a time (myne#331)", () => {

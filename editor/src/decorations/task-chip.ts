@@ -1,4 +1,4 @@
-// Inline task-field chip decorations (MYND-614 tasks 3 + 4 — due, repeat, priority).
+// Inline task-field chip decorations (MYND-614 tasks 3 + 4 - due, repeat, priority).
 //
 // Renders a task line's `due` field as a compact chip. Structurally the tag-chip
 // twin: built within the visible range, registered through the cursor-aware
@@ -15,17 +15,17 @@
 // literal source text and the buffer is never rewritten by this layer; writes go
 // through the single writer seam (`dialect/src/taskFieldWriter.ts`).
 //
-// REVEAL POLICY (task 5) — deliberately NOT the tag chip's.
+// REVEAL POLICY (task 5) - deliberately NOT the tag chip's.
 //
 // A task field is a structured value, not prose, so it follows the wikilink rule
 // rather than the tag rule: the chip does **not** open into raw text when the
 // caret arrives. Two reasons. A date is not something you edit by retyping
-// characters — task 6's editor is the way in, which is why that editor has to be
+// characters - task 6's editor is the way in, which is why that editor has to be
 // complete and keyboard-reachable from day one. And a line carrying three chips
 // would reflow every time the caret travelled it.
 //
 // The chip DOES open while the find panel is open. Otherwise a search finds a
-// match inside hidden text, moves the caret there, and highlights nothing —
+// match inside hidden text, moves the caret there, and highlights nothing -
 // strictly worse than not finding it. The precedent exists for block decorations
 // (`revealActive` already folds `searchPanelOpen` in); the inline path simply
 // never got the same condition, which is the hole the shipped tag chip still has.
@@ -61,7 +61,7 @@ import { parseRecurrenceSpec } from "@myne/dialect/recurrence";
 import { canRecur } from "@myne/dialect/taskRecurrence";
 import { taskChipIcon } from "@myne/editor/host/notes/taskChipIcon";
 
-/** The kinds a chip can be. `remind` joined in myne#280 — the read side already
+/** The kinds a chip can be. `remind` joined in myne#280 - the read side already
  *  mapped its `⏰` marker, and it is the field the notification scheduler
  *  actually reads, so leaving it un-chipped meant the reminder feature was
  *  reachable only by hand-typing the field into the markdown. */
@@ -70,8 +70,8 @@ export type ChipKind = "due" | "remind" | "repeat" | "priority";
 /**
  * Which fields get a chip, and what each is called.
  *
- * Each entry maps every spelling of a field — Myne's key plus the Obsidian emoji
- * markers — onto one canonical kind, so the chip does not care which dialect the
+ * Each entry maps every spelling of a field - Myne's key plus the Obsidian emoji
+ * markers - onto one canonical kind, so the chip does not care which dialect the
  * file happens to use. Priority's five emoji are their own value, hence the
  * separate value map below.
  */
@@ -100,7 +100,7 @@ const PRIORITY_EMOJI_LABEL: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * Whether a field's value types, per the dialect's authority — never a second
+ * Whether a field's value types, per the dialect's authority - never a second
  * date parser and never a second rule grammar here (§3.6.4's
  * consume-never-redefine rule).
  *
@@ -108,13 +108,13 @@ const PRIORITY_EMOJI_LABEL: ReadonlyMap<string, string> = new Map([
  * sits on carries an anchor date to advance from (MYND-615 task 10; myne#197).
  * This is the one field where a false "types" is not merely cosmetic: a rule
  * Myne cannot read must LOOK unread, because the silent alternative is
- * data-loss-shaped — the user believes the task repeats, completes it, nothing
+ * data-loss-shaped - the user believes the task repeats, completes it, nothing
  * appears, and they find out by missing something months later.
  *
  * The **line** is what makes the second half possible. Asking only whether the
  * vocabulary can *parse* the rule was the gap: `[repeat:: every day]` with no
  * date parses perfectly and then does nothing at all, which is exactly the
- * failure the paragraph above describes — it just wasn't covered, because the
+ * failure the paragraph above describes - it just wasn't covered, because the
  * question was about the value rather than about the record.
  */
 function valueTypes(
@@ -122,7 +122,7 @@ function valueTypes(
   value: string,
   lineText: string,
 ): boolean {
-  // `remind` is the same TaskInstant shape as `due` — one date parser, never a
+  // `remind` is the same TaskInstant shape as `due` - one date parser, never a
   // second one (§3.6.4's consume-never-redefine rule).
   if (kind === "due" || kind === "remind") return parseTaskInstant(value) !== null;
   if (kind === "priority") return PRIORITY_WORDS.has(value.toLowerCase());
@@ -154,7 +154,7 @@ const INVALID_HINT_KEY: Readonly<Record<ChipKind, string>> = {
 function invalidHintKey(kind: ChipKind, value: string): string {
   // Reaching here means the field failed to type. For `repeat` that leaves two
   // possibilities, and if the vocabulary DOES read the rule then the failure was
-  // the anchor — saying "Myne doesn't recognise this rule" would send the user
+  // the anchor - saying "Myne doesn't recognise this rule" would send the user
   // to fix a rule that is already correct.
   if (kind === "repeat" && parseRecurrenceSpec(value).ok) {
     return "editor.taskField.repeatNoAnchor";
@@ -233,10 +233,10 @@ const PRIORITY_WORDS: ReadonlySet<string> = new Set([
 export type ChipSpan = {
   from: number;
   to: number;
-  /** Canonical kind — `due` / `repeat` / `priority`, dialect-independent. */
+  /** Canonical kind - `due` / `repeat` / `priority`, dialect-independent. */
   kind: ChipKind;
   /**
-   * The VALUE, in source form — the bytes that are in the file, and the bytes an
+   * The VALUE, in source form - the bytes that are in the file, and the bytes an
    * editor commits back. Kept separate from {@link label} so a localized display
    * can never travel back into a write.
    */
@@ -261,13 +261,13 @@ export type ChipSpan = {
   /**
    * Whether the value TYPED (MYND-614 task 8). A field whose value does not
    * parse renders as raw source text with a subtle failure hint rather than as a
-   * chip — never a blank chip, and never a silently corrected value.
+   * chip - never a blank chip, and never a silently corrected value.
    */
   typed: boolean;
   /**
    * The i18n key of the hint to show while {@link typed} is false, naming both
-   * what Myne could not read and what follows from it. Meaningless — and unread
-   * — when the value typed.
+   * what Myne could not read and what follows from it. Meaningless - and unread
+   * - when the value typed.
    */
   hintKey: string;
 };
@@ -280,7 +280,7 @@ export type ChipSpan = {
  *
  * Also read by the add-field flow (`task-field-menu.ts`) to learn which kinds a
  * line already carries and, for a present one, prefill the editor with its
- * source value — so the same predicate that renders the chips decides "add" vs
+ * source value - so the same predicate that renders the chips decides "add" vs
  * "edit", and no second field scanner exists.
  */
 export function chipRangesIn(state: EditorState, from: number, to: number): ChipSpan[] {
@@ -299,7 +299,7 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
       const folded = key.replace(/️$/, "").toLowerCase();
       const kind = CHIP_KINDS.get(folded);
       if (kind === undefined) return false;
-      // A priority emoji carries no value node — the marker is the value.
+      // A priority emoji carries no value node - the marker is the value.
       const emojiValue = PRIORITY_EMOJI_LABEL.get(folded);
       const source = emojiValue ?? value;
       if (source === "") return false;
@@ -355,7 +355,7 @@ class TaskChipWidget extends WidgetType {
      * bytes a write uses come from the tracked span, not from here.
      */
     private readonly value: string,
-    /** Source position, part of widget IDENTITY — see `eq`. */
+    /** Source position, part of widget IDENTITY - see `eq`. */
     private readonly from: number,
   ) {
     super();
@@ -367,7 +367,7 @@ class TaskChipWidget extends WidgetType {
    * CodeMirror reuses widget DOM when `eq` returns true. Two chips with the same
    * due date on different lines are equal by value alone, so a value-only `eq`
    * lets the editor reuse one chip's DOM for the other after an edit shifts
-   * lines — and a click then resolves against the wrong range.
+   * lines - and a click then resolves against the wrong range.
    */
   eq(other: TaskChipWidget): boolean {
     return (
@@ -382,7 +382,7 @@ class TaskChipWidget extends WidgetType {
     span.setAttribute("tabindex", "0");
     span.setAttribute("data-testid", `editor.task-chip-${this.kind}`);
     span.setAttribute("data-task-chip", this.kind);
-    // The position is NOT baked into a closure — it rides a data attribute the
+    // The position is NOT baked into a closure - it rides a data attribute the
     // handler re-reads live (see `taskChipAt`), because the DOM outlives the
     // offset it was built at.
     span.setAttribute("data-chip-from", String(this.from));
@@ -425,7 +425,7 @@ class TaskChipWidget extends WidgetType {
  * Non-editable, non-focusable and outside the document text: it renders after
  * the field it explains and contributes no bytes, so the note on disk is exactly
  * what the user typed. `side: 1` keeps it to the RIGHT of the span, and the
- * position is part of widget identity for the same reason the chip's is — two
+ * position is part of widget identity for the same reason the chip's is - two
  * anchorless repeats on different lines are otherwise equal, and CodeMirror
  * would reuse one's DOM for the other.
  */
@@ -445,7 +445,7 @@ class TaskFieldHintWidget extends WidgetType {
     const span = document.createElement("span");
     span.className = "cm-task-field-hint";
     span.setAttribute("data-testid", "editor.task-field-hint");
-    // Decorative relative to the text it follows — the same sentence is already
+    // Decorative relative to the text it follows - the same sentence is already
     // the field's `title`, so announcing it twice is noise.
     span.setAttribute("aria-hidden", "true");
     span.textContent = i18n.t(this.hintKey);
@@ -460,7 +460,7 @@ class TaskFieldHintWidget extends WidgetType {
 /**
  * Whether task chips are currently revealed as raw source text.
  *
- * **Never on caret** — unlike every cursor-aware decoration around it — and
+ * **Never on caret** - unlike every cursor-aware decoration around it - and
  * **always while the find panel is open**. Reading mode overrides both.
  */
 export function taskChipsRevealed(state: EditorState): boolean {
@@ -477,7 +477,7 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
         // Raw source text plus a subtle failure hint, following the math-error
         // widget: never a blank chip, never a silently corrected value. A mark
         // decoration leaves the characters in place, so the text stays editable
-        // AND stays clickable — and the bytes are untouched, which is what lets
+        // AND stays clickable - and the bytes are untouched, which is what lets
         // the user fix the value by reading what they actually wrote.
         decorations.push(
           Decoration.mark({
@@ -494,7 +494,7 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
         // The other three hints describe the very characters under the cursor:
         // an unreadable date, an unknown priority word, an unrecognised rule.
         // Reading the text IS the diagnosis, so a hover hint adds detail rather
-        // than carrying the whole message. `repeatNoAnchor` is different — the
+        // than carrying the whole message. `repeatNoAnchor` is different - the
         // rule the user is staring at is correct, and what is missing is a due
         // date that is not on the line at all. From their side the entire signal
         // was "the chip didn't appear", which reads as a parser bug. So this one
@@ -523,7 +523,7 @@ function buildTaskChipDecorations(view: EditorView): DecorationSet {
 }
 
 /**
- * Atomic ranges for chipped due fields — **the same predicate over the same
+ * Atomic ranges for chipped due fields - **the same predicate over the same
  * scope** as the builder above, so arrow keys and backspace treat a chip as one
  * unit and no off-screen raw text is ever made atomic.
  */
@@ -534,7 +534,7 @@ function taskChipAtomicRanges(view: EditorView) {
   if (taskChipsRevealed(view.state)) return Decoration.none;
   for (const { from, to } of view.visibleRanges) {
     for (const span of chipRangesIn(view.state, from, to)) {
-      // A malformed field renders as raw text, so it must not be atomic — the
+      // A malformed field renders as raw text, so it must not be atomic - the
       // user has to be able to put the caret inside and fix it.
       if (!span.typed) continue;
       ranges.push(Decoration.replace({}).range(span.from, span.to));
@@ -551,7 +551,7 @@ function taskChipAtomicRanges(view: EditorView) {
  *
  * The rendered `data-chip-from` is only a hint: an edit above the line shifts
  * every offset below it, and CodeMirror may reuse the DOM node. So the authority
- * is `posAtDOM` plus a fresh tree walk — the attribute is used only to
+ * is `posAtDOM` plus a fresh tree walk - the attribute is used only to
  * disambiguate when a position sits exactly between two adjacent fields.
  */
 export function taskChipAt(view: EditorView, target: HTMLElement): ChipSpan | null {
@@ -571,7 +571,7 @@ export const TASK_CHIP_EVENT = "myne-open-task-chip";
 
 export type TaskChipEventDetail = {
   kind: ChipKind;
-  /** The value in SOURCE form, never the localized label — this is what the
+  /** The value in SOURCE form, never the localized label - this is what the
    *  field editor prefills with and what a commit writes back. */
   value: string;
   from: number;
@@ -584,7 +584,7 @@ export function taskChipDecorations(): readonly Extension[] {
     makeGatedDecorationPlugin(
       buildTaskChipDecorations,
       // The find panel drives reveal here, and `openSearchPanel` changes neither
-      // doc, viewport, selection nor focus — so the default gate would never
+      // doc, viewport, selection nor focus - so the default gate would never
       // fire and a chip would sit on top of the match the user just searched for.
       (update) => searchPanelOpen(update.startState) !== searchPanelOpen(update.state),
     ),
@@ -604,7 +604,7 @@ export function taskChipDecorations(): readonly Extension[] {
         event.preventDefault();
         // Dispatched on the CHIP, not on `view.dom`. It bubbles either way, but
         // the target is what a listener uses to recover the element it must
-        // anchor a popover to — and `view.dom` is the chip's ANCESTOR, so a
+        // anchor a popover to - and `view.dom` is the chip's ANCESTOR, so a
         // `closest("[data-task-chip]")` from there finds nothing. Getting this
         // wrong makes the chips render and do nothing.
         chip.dispatchEvent(
@@ -647,7 +647,7 @@ export function taskChipDecorations(): readonly Extension[] {
  *
  * They are stale in a way that CORRUPTS rather than fails: an insertion above
  * the task line shifts every offset below it, and writing at the captured
- * position lands the new value in whatever text now occupies it — a heading, in
+ * position lands the new value in whatever text now occupies it - a heading, in
  * the case that first exposed this. Re-finding the chip by DOM does not help,
  * because CodeMirror recreates widget DOM on the same change that invalidates
  * the offsets.
@@ -670,7 +670,7 @@ const pendingChipField = StateField.define<PendingChip | null>({
     // span, so typing next to a chip never silently widens what a commit
     // replaces. `MapMode.TrackDel` yields null when a deletion crossed the
     // position, which is how a field deleted out from under an open popover
-    // becomes null instead of collapsing onto whatever replaced it — plain
+    // becomes null instead of collapsing onto whatever replaced it - plain
     // mapping hands back the replacement's own bounds, and the commit then
     // writes into text the user never opened.
     const from = tr.changes.mapPos(value.from, -1, MapMode.TrackDel);
@@ -684,7 +684,7 @@ const pendingChipField = StateField.define<PendingChip | null>({
 export type TaskFieldEditHandle = {
   /** The span as it stands now, or null if it no longer exists. */
   current: () => PendingChip | null;
-  /** Stop tracking. Idempotent in effect — a second call just re-clears. */
+  /** Stop tracking. Idempotent in effect - a second call just re-clears. */
   end: () => void;
 };
 
@@ -692,7 +692,7 @@ export type TaskFieldEditHandle = {
  * Begin tracking a chip edit. Call on open; call `end()` on commit or dismiss.
  *
  * The dispatch carries only an effect and no changes, so it adds nothing to
- * undo history — opening a popover is not an edit.
+ * undo history - opening a popover is not an edit.
  */
 export function beginTaskFieldEdit(
   view: EditorView,
@@ -717,7 +717,7 @@ export function beginTaskFieldEdit(
  *     mean two undos for one visible action.
  *   - **The whole line converts** to Myne's write format, including fields the
  *     user did not touch. That follows from the dialect rule that only lines
- *     directly changed adopt canonical forms — and it has a real cost, accepted
+ *     directly changed adopt canonical forms - and it has a real cost, accepted
  *     at the epic level: a task imported from Obsidian and then edited here drops
  *     out of that user's Obsidian Tasks view. This function is where that becomes
  *     active rather than latent.
@@ -745,14 +745,14 @@ export function applyTaskFieldEdit(
   } else if (span.kind === "repeat") {
     next.repeat = nextValue === "" ? undefined : nextValue;
   } else {
-    // `due` and `remind` (myne#280) — the SAME `TaskInstant` shape, typed
+    // `due` and `remind` (myne#280) - the SAME `TaskInstant` shape, typed
     // through the dialect's own instant parser, so the single typing authority
     // stays there AND no task-field byte string is built here.
     const key = span.kind; // "due" | "remind"
     const instant = nextValue === "" ? null : parseTaskInstant(nextValue);
     next[key] = instant ?? undefined;
     if (instant === null && nextValue !== "") {
-      // A value the parser refuses is preserved verbatim rather than dropped —
+      // A value the parser refuses is preserved verbatim rather than dropped -
       // the editor will render it as raw text with a hint (task 8).
       next.malformed = [
         ...current.malformed.filter((f) => f.key !== key),

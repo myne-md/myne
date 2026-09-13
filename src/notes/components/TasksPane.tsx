@@ -3,8 +3,8 @@
 // `TaskListPanel`.
 //
 // They differ in exactly three things: which task list they hand down, the
-// `rowScope` they pass, and where their view state lives. Everything else — the
-// sections, the filter row, the windowing, the rows — is the same component.
+// `rowScope` they pass, and where their view state lives. Everything else - the
+// sections, the filter row, the windowing, the rows - is the same component.
 //
 // The vault-wide tab keeps its view (filters + sort) **with the tab** in the
 // workspace descriptor. The note-scoped panel keeps it in component state: the
@@ -21,9 +21,10 @@ import { useWorkspace } from "../workspaceContext";
 import { useSelectedNote } from "../sidebarState";
 import { requestRevealTask } from "../views/revealTaskSignal";
 import type { WorkspaceItem, PaneId } from "../workspaceState";
+import { taskViewOf } from "../workspaceState";
 
 /** The vault-wide task list, mounted as a pane body. */
-export function TasksPane({ paneId }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
+export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
   const ws = useWorkspace();
   const tasks = useLiveVaultTasks();
   // myne#279: "today" follows the display timezone when one is set; myne#557:
@@ -32,7 +33,10 @@ export function TasksPane({ paneId }: { paneId: PaneId; item: WorkspaceItem }): 
   const today = useLocalToday(zone);
 
   // Container-level, so closing and reopening the tab restores the filters.
-  const view = ws.taskView;
+  // On a vault written before the container field existed, fall back to the
+  // tab's own persisted view instead of silently dropping it (myne-md/myne#656
+  // review).
+  const view = ws.taskViewIsSet ? ws.taskView : taskViewOf(item);
   const onViewChange = useCallback(
     (next: TaskView) => ws.setTaskViewState(paneId, next),
     [ws, paneId],
@@ -76,7 +80,7 @@ export function NoteTasksPanel(): ReactElement {
   const [view, setView] = useState<TaskView>({ ...DEFAULT_TASK_VIEW, status: "all" });
 
   // Every record already carries its note, so narrowing needs no new query
-  // capability — the point task 5 makes about the two surfaces sharing data.
+  // capability - the point task 5 makes about the two surfaces sharing data.
   const tasks = useMemo(
     () => (selectedId === null ? [] : all.filter((t) => t.noteId === selectedId)),
     [all, selectedId],

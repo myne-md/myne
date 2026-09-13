@@ -1,4 +1,4 @@
-// `workspaceState` — pure, React-free model for the editor's multi-tab +
+// `workspaceState` - pure, React-free model for the editor's multi-tab +
 // split-pane workspace (MYND-166, Task 1; extended to heterogeneous
 // note|view items by MYND-274 Saved Views #4 / SYNC-10).
 //
@@ -6,10 +6,10 @@
 // pure exported functions so tests can exercise every transition without
 // rendering a tree. The React Context wrapper + multi-buffer residency
 // layer over this in later tasks (Task 2/3); this slice introduces NO
-// React UI and NO Tauri/IPC calls — it is the data model only.
+// React UI and NO Tauri/IPC calls - it is the data model only.
 //
 // **Tab items are tagged (MYND-274).** A pane's tab strip holds
-// `WorkspaceItem`s — `{ kind: "note"; id } | { kind: "view"; id }` — not bare
+// `WorkspaceItem`s - `{ kind: "note"; id } | { kind: "view"; id }` - not bare
 // note ids, so a saved view opens as a first-class tab alongside notes. Every
 // op takes/returns the tagged item; identity is structural (`sameItem` /
 // `itemKey`), so a note and a view may share an id-string without collision.
@@ -23,8 +23,8 @@
 //    the only leaf leaves it *tabless* (the empty-editor-shell), not gone.
 //  - **Global duplicate-forbid.** An item opens at most ONCE across the
 //    whole workspace (by `(kind,id)`). Every "open" of an already-open item
-//    degrades to a REVEAL — focus the pane + activate the tab that already
-//    holds it — never a second instance. This is what keeps autosave to one
+//    degrades to a REVEAL - focus the pane + activate the tab that already
+//    holds it - never a second instance. This is what keeps autosave to one
 //    buffer per `.myn` (Task 2) and the persisted descriptor a clean
 //    partition.
 //  - **`focusedPaneId` always references an existing leaf.**
@@ -46,25 +46,25 @@ import type { DetachedEntry } from "./detachedRestore";
 /** Opaque identifier for a pane (leaf or split node). */
 export type PaneId = string;
 
-/** A saved-view id (MYND-274). Distinct id-space from `NoteId` — the `kind`
+/** A saved-view id (MYND-274). Distinct id-space from `NoteId` - the `kind`
  *  tag, not the id, discriminates a view tab from a note tab. */
 export type ViewId = string;
 
 /** The whole-vault graph is a singleton tab: there is exactly one graph per
  *  workspace, so its id is a fixed sentinel (the global duplicate-forbid
- *  invariant then makes "open graph" idempotent — a reveal, never a 2nd tab). */
+ *  invariant then makes "open graph" idempotent - a reveal, never a 2nd tab). */
 export const GRAPH_TAB_ID = "graph";
 
 /** The vault-wide task list is a singleton tab too, for the same reason the
  *  graph is: there is exactly one per workspace, so a fixed sentinel id makes
- *  "open tasks" idempotent — a reveal, never a second tab (MYND-616). */
+ *  "open tasks" idempotent - a reveal, never a second tab (MYND-616). */
 export const TASKS_TAB_ID = "tasks";
 
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
  * buffer renders. `"live"` is the default WYSIWYG editing surface; `"reading"`
  * is read-only with decorations fully rendered; `"source"` shows raw markdown
- * with decorations off. **Omit-when-default** — `undefined` / absent ≡ `"live"`.
+ * with decorations off. **Omit-when-default** - `undefined` / absent ≡ `"live"`.
  */
 export type ViewMode = "live" | "reading" | "source";
 
@@ -75,7 +75,7 @@ export type ViewMode = "live" | "reading" | "source";
  *
  * `pinned` is an Obsidian-style per-tab flag (tab-modes / MYND-320): a pinned
  * tab is close-protected, and navigating from it opens a NEW tab in the same
- * pane rather than replacing it. It is **omit-when-default** — `undefined` /
+ * pane rather than replacing it. It is **omit-when-default** - `undefined` /
  * absent means unpinned. It is NOT part of identity: `itemKey` / `sameItem`
  * ignore it, so the global `(kind,id)` duplicate-forbid invariant is unaffected.
  *
@@ -96,7 +96,7 @@ export type WorkspaceItem =
    *
    * **Omit-when-default**, exactly like `pinned` and `viewMode`, so a tab left
    * on its defaults stays byte-identical to a pre-feature descriptor. The
-   * descriptor is opaque to the storage codec — no format change.
+   * descriptor is opaque to the storage codec - no format change.
    */
   | {
       kind: "tasks";
@@ -120,14 +120,14 @@ export type PersistedTaskView = {
   sort?: TaskSort;
 };
 
-/** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
+/** Stable string key for an item - `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
  *  (identity is `(kind,id)` only). */
 export function itemKey(item: WorkspaceItem): string {
   return `${item.kind}:${item.id}`;
 }
 
-/** Structural equality of two items (same `kind` AND `id`). Ignores `pinned` —
+/** Structural equality of two items (same `kind` AND `id`). Ignores `pinned` -
  *  identity is `(kind,id)`, so a pin flip never changes which tab an item is. */
 export function sameItem(a: WorkspaceItem, b: WorkspaceItem): boolean {
   return a.kind === b.kind && a.id === b.id;
@@ -143,7 +143,7 @@ export function itemViewMode(item: WorkspaceItem): ViewMode {
   return item.viewMode ?? "live";
 }
 
-/** Wrap a note id as a tab item — the convenience callers use at the boundary. */
+/** Wrap a note id as a tab item - the convenience callers use at the boundary. */
 export function noteItem(id: NoteId): WorkspaceItem {
   return { kind: "note", id };
 }
@@ -153,12 +153,12 @@ export function viewItem(id: ViewId): WorkspaceItem {
   return { kind: "view", id };
 }
 
-/** The whole-vault graph tab item (singleton — see [`GRAPH_TAB_ID`]). */
+/** The whole-vault graph tab item (singleton - see [`GRAPH_TAB_ID`]). */
 export function graphItem(): WorkspaceItem {
   return { kind: "graph", id: GRAPH_TAB_ID };
 }
 
-/** The vault-wide task-list tab item (singleton — see [`TASKS_TAB_ID`]). */
+/** The vault-wide task-list tab item (singleton - see [`TASKS_TAB_ID`]). */
 export function tasksItem(): WorkspaceItem {
   return { kind: "tasks", id: TASKS_TAB_ID };
 }
@@ -177,14 +177,14 @@ export function parseItemKey(key: string): WorkspaceItem {
 
 /**
  * A leaf pane: owns an ordered tab strip (`tabs`) and the currently
- * active tab within it (`activeTab`, `null` only when the strip is empty —
+ * active tab within it (`activeTab`, `null` only when the strip is empty -
  * the empty-editor-shell case for the last pane).
  *
  * `stacked` is the per-leaf-pane tab-layout flag (tab-modes / MYND-319): when
  * set, the pane renders its tabs as a horizontally-scrolling, partially-
  * overlapping deck instead of the normal strip. It is a per-LEAF flag so it
  * composes with the recursive split-pane tree (one pane stacked, another
- * normal). **Omit-when-default** — `undefined` / absent means not stacked.
+ * normal). **Omit-when-default** - `undefined` / absent means not stacked.
  */
 export type LeafPane = {
   kind: "leaf";
@@ -266,7 +266,7 @@ export function findItemPane(
   return null;
 }
 
-/** The focused leaf. Never `null` — `focusedPaneId` is an enforced invariant. */
+/** The focused leaf. Never `null` - `focusedPaneId` is an enforced invariant. */
 export function focusedLeaf(state: WorkspaceState): LeafPane {
   return findLeaf(state.root, state.focusedPaneId)!;
 }
@@ -277,7 +277,7 @@ export function activeItem(state: WorkspaceState): WorkspaceItem | null {
 }
 
 /**
- * Every open item across all panes — the eager-residency set (one buffer
+ * Every open item across all panes - the eager-residency set (one buffer
  * is mounted per entry). The duplicate-forbid invariant guarantees no
  * repeats, so this is already a set in list form.
  */
@@ -286,7 +286,7 @@ export function allOpenItems(state: WorkspaceState): WorkspaceItem[] {
 }
 
 /**
- * The active-tab item of each leaf — the *visible* buffers (the ones that
+ * The active-tab item of each leaf - the *visible* buffers (the ones that
  * additionally mount a live editor / view surface). Tabless panes contribute
  * nothing.
  */
@@ -428,7 +428,7 @@ export function reveal(state: WorkspaceState, item: WorkspaceItem): WorkspaceSta
  * open elsewhere → reveal. Empty focused pane → seed its first tab.
  *
  * **Pin-aware (tab-modes / MYND-320, Obsidian-full):** when the focused
- * pane's active tab is PINNED, the reuse-the-active-slot path is suppressed —
+ * pane's active tab is PINNED, the reuse-the-active-slot path is suppressed -
  * the open APPENDS a new tab (like {@link openInNewTab}) so the pinned tab is
  * never replaced. A non-pinned active tab keeps the original reuse behavior.
  */
@@ -478,7 +478,7 @@ export function openInNewTab(
 /**
  * Explicit "Open to the side": split the focused pane (row) into a new
  * leaf holding `item`, and focus it. Already open elsewhere → reveal
- * (no new pane — single-instance wins over the split intent).
+ * (no new pane - single-instance wins over the split intent).
  */
 export function openToSide(
   state: WorkspaceState,
@@ -502,8 +502,8 @@ export function openToSide(
 
 /**
  * Split `paneId` along `direction` into a fresh *empty* leaf (the user
- * then opens an item into it), and focus the new leaf. The empty pane —
- * not a duplicated item — is deliberate: duplicates are forbidden, so a
+ * then opens an item into it), and focus the new leaf. The empty pane -
+ * not a duplicated item - is deliberate: duplicates are forbidden, so a
  * split can't clone the source the way VS Code does.
  */
 export function splitPane(
@@ -530,8 +530,8 @@ export function splitPane(
 /**
  * Drop `item` onto `toPaneId`'s tab strip at `toIndex`. If the item is
  * already open somewhere this is a move / reorder (delegates to
- * {@link moveTab}); otherwise — a sidebar-origin drop of a not-yet-open
- * item — it is inserted into the target pane and activated. Focus follows
+ * {@link moveTab}); otherwise - a sidebar-origin drop of a not-yet-open
+ * item - it is inserted into the target pane and activated. Focus follows
  * to the target. No-op if `toPaneId` isn't a leaf.
  */
 export function dropItemOnPane(
@@ -561,7 +561,7 @@ export function dropItemOnPane(
 /**
  * Drag-to-split: split `targetPaneId` along `direction`, placing `item`
  * in a fresh leaf on `side` (`"before"` = left/top, `"after"` = right/
- * bottom), and focus that new leaf. Move semantics — if the item is open
+ * bottom), and focus that new leaf. Move semantics - if the item is open
  * elsewhere it leaves that pane first (duplicate-forbid), collapsing an
  * emptied source. No-op when the item is already the target pane's sole
  * tab (nothing to split out) or the target isn't a leaf.
@@ -577,13 +577,13 @@ export function splitPaneWithItem(
   const target = findLeaf(state.root, targetPaneId);
   if (target === null) return state;
   const fromPaneId = findItemPane(state, item);
-  // Degenerate: dragging a pane's only tab onto its own edge — there is
+  // Degenerate: dragging a pane's only tab onto its own edge - there is
   // nothing to split out (it would have to be in two places, which the
   // duplicate-forbid invariant rejects).
   if (fromPaneId === targetPaneId && target.tabs.length <= 1) return state;
 
   // Carry the source tab's `pinned` flag onto the moved item (a pinned tab
-  // stays pinned after a drag-to-split) — the caller's `item` may be a bare
+  // stays pinned after a drag-to-split) - the caller's `item` may be a bare
   // `(kind,id)` handle with no flag.
   const moved: WorkspaceItem =
     fromPaneId !== null
@@ -591,7 +591,7 @@ export function splitPaneWithItem(
       : item;
 
   // 1. Detach the item from its current pane (if open). `detachTab` (the
-  //    unguarded form — a pinned tab relocates, it doesn't close) collapses an
+  //    unguarded form - a pinned tab relocates, it doesn't close) collapses an
   //    emptied non-last source; the degenerate guard above ensures the target
   //    itself survives this removal.
   let s = state;
@@ -688,7 +688,7 @@ export function setPinned(
 /**
  * Set the per-tab `viewMode` on `item`'s tab within `paneId` (reading-source-
  * modes / MYND-299). No-op if that pane doesn't hold the item. Mirrors
- * {@link setPinned}: the flag is written omit-when-default — setting `"reading"`
+ * {@link setPinned}: the flag is written omit-when-default - setting `"reading"`
  * or `"source"` writes the key; setting `"live"` (the default) DROPS the key so
  * a default-mode tab serializes byte-identical to a pre-feature tab. Both the
  * `tabs` entry and `activeTab` (when it is this item) are kept in sync.
@@ -826,7 +826,7 @@ export function toggleStacked(
  * tree collapses, relocating focus if it lived there.
  *
  * **Close-guarded (tab-modes / MYND-320):** a PINNED tab is not closed by the
- * normal close path — closing it is a no-op (the user must unpin first). This
+ * normal close path - closing it is a no-op (the user must unpin first). This
  * is enforced against the flag stored in the strip, not the caller's `item`.
  */
 export function closeTab(
@@ -837,7 +837,7 @@ export function closeTab(
   const leaf = findLeaf(state.root, paneId);
   if (leaf === null || !leaf.tabs.some((t) => sameItem(t, item))) return state;
   // Close-guard: a pinned tab can't be closed via this user-facing path (unpin
-  // first). Internal detach during a move/split uses `detachTab` (no guard) —
+  // first). Internal detach during a move/split uses `detachTab` (no guard) -
   // a pinned tab still drags to another pane / splits; it just can't be CLOSED.
   const stored = leaf.tabs.find((t) => sameItem(t, item));
   if (stored !== undefined && isPinned(stored)) return state;
@@ -898,7 +898,7 @@ function detachTab(
  * Cross-pane move that empties the source removes the source pane (the
  * "drag the last tab out closes that pane" rule) and collapses the tree.
  * No-op if either pane / the item is missing. The item is never
- * duplicated — it leaves the source as it enters the target.
+ * duplicated - it leaves the source as it enters the target.
  */
 export function moveTab(
   state: WorkspaceState,
@@ -912,7 +912,7 @@ export function moveTab(
   if (from === null || to === null || !from.tabs.some((t) => sameItem(t, item)))
     return state;
 
-  // Move the STORED tab (preserving its `pinned` flag) — the caller's `item`
+  // Move the STORED tab (preserving its `pinned` flag) - the caller's `item`
   // may be a bare `(kind,id)` handle. A pinned tab stays pinned after a move.
   const moved = from.tabs.find((t) => sameItem(t, item)) ?? item;
 
@@ -980,14 +980,14 @@ export function closePane(
 }
 
 // ============================================================
-// Named workspaces — N slots over the per-slot descriptor (MYND-308 task 2).
+// Named workspaces - N slots over the per-slot descriptor (MYND-308 task 2).
 //
 // Backward-compat by construction: each slot's `state` is an ordinary
 // `WorkspaceState`, so every existing reducer/selector above keeps operating on
 // the ACTIVE slot's descriptor unchanged. The container is a NEW layer; no
 // existing consumer is forced to change. The container rides the MYW1 0x02
 // opaque blob (the inner descriptor sealed under `session_state_key`); no Rust
-// parsing — Rust only ticks the format version (MYND-308 task 1).
+// parsing - Rust only ticks the format version (MYND-308 task 1).
 // ============================================================
 
 /** Stable slot identifier (a uuid-like string; the app wires
@@ -1006,13 +1006,13 @@ export type WorkspaceSlot = {
 export type NamedWorkspaces = {
   slots: WorkspaceSlot[];
   activeId: SlotId;
-  /** Sidebar file-tree folder-expand state (MYND-455) — the folded keys of
+  /** Sidebar file-tree folder-expand state (MYND-455) - the folded keys of
    *  OPEN folders. Window-global (one set for the sidebar, not per-slot), so it
    *  lives at the container level. Omit-when-empty on serialize (no format
    *  bump). Container ops spread `{...c}`, so it survives switch/save/rename;
    *  `emptyNamedWorkspaces` omits it (a fresh vault opens collapsed). */
   expandedFolders?: readonly string[];
-  /** Graph pane settings (graph-connection-ux-polish task 5) — the physics +
+  /** Graph pane settings (graph-connection-ux-polish task 5) - the physics +
    *  appearance controls behind the graph pane's gear. Device-local, window-
    *  global (one set for the graph, not per-slot) like `expandedFolders`.
    *  Omit-when-default (see `graphSettings.ts`); a fresh container leaves it
@@ -1025,7 +1025,7 @@ export type NamedWorkspaces = {
    *  field, a fresh container has none). Restored clamped onto a currently-
    *  connected display (`planDetachedRestore`). */
   detached?: readonly DetachedEntry[];
-  /** Task-surface display (myne-md/myne#656 item 4) — device-local, window-
+  /** Task-surface display (myne-md/myne#656 item 4) - device-local, window-
    *  global (one chip-colour choice across every task surface) like
    *  `graphSettings`. Omit-when-default (see `taskDisplay.ts`). */
   taskDisplay?: TaskDisplaySettings;
@@ -1063,7 +1063,7 @@ export function emptyNamedWorkspaces(
   };
 }
 
-/** Wrap a bare descriptor as a single-slot container — the migration shape for
+/** Wrap a bare descriptor as a single-slot container - the migration shape for
  *  a legacy single-`WorkspaceState` payload (MYND-308 task 2). */
 export function wrapAsSingleSlot(
   state: WorkspaceState,
@@ -1079,13 +1079,13 @@ export function listSlots(container: NamedWorkspaces): WorkspaceSlot[] {
 }
 
 /** The active slot, or `null` when `activeId` dangles (a self-heal caller then
- *  falls back to the first slot — see {@link resolveActiveSlot}). */
+ *  falls back to the first slot - see {@link resolveActiveSlot}). */
 export function activeSlot(container: NamedWorkspaces): WorkspaceSlot | null {
   return container.slots.find((s) => s.id === container.activeId) ?? null;
 }
 
 /**
- * The active slot's descriptor — the bridge existing reducers/selectors plug
+ * The active slot's descriptor - the bridge existing reducers/selectors plug
  * into. Falls back to the FIRST slot when `activeId` dangles (defensive; the
  * container always has ≥1 slot, so this never returns from an empty list).
  */
@@ -1138,7 +1138,7 @@ export function createSlot(
 /**
  * "Save as…": clone the ACTIVE slot's current descriptor under a new `name` and
  * switch to the clone (the original slot is left untouched). The clone is a
- * structural snapshot — later edits to either slot don't bleed across.
+ * structural snapshot - later edits to either slot don't bleed across.
  */
 export function saveAsSlot(
   container: NamedWorkspaces,
@@ -1203,7 +1203,7 @@ export function deleteSlot(
  * The slot id to activate given a persisted `active_workspace` pref pointer
  * (MYP1, MYND-308 task 3): the pref's id when it names an existing slot,
  * otherwise the first slot's id (the consistency fallback for a stale/missing
- * pointer). Pure — the caller self-heals the pref on the next write.
+ * pointer). Pure - the caller self-heals the pref on the next write.
  */
 export function resolveActiveSlot(
   slots: WorkspaceSlot[],
@@ -1221,7 +1221,7 @@ export function resolveActiveSlot(
 /**
  * Coalescing-flush decision (MYND-308 task 4): whether the staged MYW1
  * descriptor should be flushed to disk NOW. True at most once per ~5 minutes of
- * activity, and only while dirty. Pure — `nowMs` is injected (the app layer owns
+ * activity, and only while dirty. Pure - `nowMs` is injected (the app layer owns
  * the timer + Date.now + the flush-on-graceful-exit/lock path; this is only the
  * decision). `lastFlushAtMs === null` means "never flushed" → flush as soon as
  * dirty.
@@ -1241,7 +1241,7 @@ export function shouldFlushWorkspace(args: {
 
 /**
  * Revert the active slot to a last-persisted descriptor ("Reset to snapshot",
- * MYND-308 task 4). Pure — the caller supplies the last-persisted `WorkspaceState`
+ * MYND-308 task 4). Pure - the caller supplies the last-persisted `WorkspaceState`
  * (e.g. from re-deserializing the staged/on-disk blob). No-op shape if the
  * container has no active slot (falls back to setting the first slot).
  */
@@ -1253,7 +1253,7 @@ export function resetActiveToSnapshot(
 }
 
 /** Deep structural clone of a descriptor (slot snapshots must not alias the
- *  source tree). Pure data — `structuredClone` is sufficient and dependency-free. */
+ *  source tree). Pure data - `structuredClone` is sufficient and dependency-free. */
 function cloneState(state: WorkspaceState): WorkspaceState {
   return structuredClone(state);
 }

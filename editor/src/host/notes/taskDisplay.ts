@@ -6,7 +6,7 @@
 // **The stored value never reaches a style position.** `chipColor` is a closed
 // enum, and it selects a KEY in `TASK_CHIP_INK`, whose values are tokens this
 // module owns. So a tampered descriptor cannot land an arbitrary string in a
-// style — the worst it can do is fail the membership check and decode to the
+// style - the worst it can do is fail the membership check and decode to the
 // default. That is the value-shape validation the issue requires, done at the
 // source instead of by a downstream sanitizer.
 

@@ -3,7 +3,7 @@
 // The chip's editor (MYND-614 task 6).
 //
 // Because chips never open on caret entry (task 5), this surface is the ONLY way
-// to edit these values in live mode — so "complete and fully keyboard-reachable
+// to edit these values in live mode - so "complete and fully keyboard-reachable
 // from day one" is a correctness property, not polish. The tests below check that
 // directly: every control focusable, Escape changes nothing, focus restored.
 
@@ -57,7 +57,7 @@ describe("opens from every chip kind", () => {
       onCommit: () => {},
     });
     // The primary control is a hand-rolled combobox, and there is NO free-text
-    // rule box in the surface — a rule is assembled and serialized, never typed.
+    // rule box in the surface - a rule is assembled and serialized, never typed.
     // The only text input is the numeric step, which is a `role="spinbutton"`.
     const el = input();
     expect(el.getAttribute("role")).toBe("combobox");
@@ -276,7 +276,7 @@ describe("the repeat control assembles canonical rules from choices", () => {
   //
   // The assertion has to be on the inline `display`, not on `hidden`: this lane
   // applies no CSS (`vitest.config.ts` sets no `css` option), so `hidden` reads
-  // `true` whether or not the row is actually off screen — which is precisely
+  // `true` whether or not the row is actually off screen - which is precisely
   // why the original defect was invisible here. The real-CSS guard is the
   // scenario in `e2e/task-chips.e2e.ts`.
   const FAMILY_ROW_MARKER: ReadonlyArray<readonly [string, string]> = [
@@ -286,7 +286,7 @@ describe("the repeat control assembles canonical rules from choices", () => {
     ["ordinal", "editor.recurrence-ordinal"],
   ];
 
-  /** The family row owning `testId` — the marker element itself, or its row. */
+  /** The family row owning `testId` - the marker element itself, or its row. */
   function rowFor(root: HTMLElement, testId: string): HTMLElement {
     const el = root.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
     return el.classList.contains("cm-recurrence-row")
@@ -328,7 +328,7 @@ describe("the repeat control assembles canonical rules from choices", () => {
 // The controls are hand-rolled (myne-md/myne#656): a combobox + listbox, a
 // spinbutton and a switch, all built from buttons / inputs so the token layer
 // reaches them. "Fully keyboard-reachable" is a correctness property here
-// because chips never open on caret entry — this surface is the only way to
+// because chips never open on caret entry - this surface is the only way to
 // edit these values in live mode.
 describe("the hand-rolled controls are keyboard-operable (myne-md/myne#656)", () => {
   function familyTrigger(): HTMLElement {
@@ -394,7 +394,7 @@ describe("the hand-rolled controls are keyboard-operable (myne-md/myne#656)", ()
     anchor.remove();
   });
 
-  it("Escape closes the listbox only — the surface and the value are untouched", () => {
+  it("Escape closes the listbox only - the surface and the value are untouched", () => {
     const anchor = anchorEl();
     const onCancel = vi.fn();
     const handle = openTaskFieldEditor({
@@ -550,7 +550,7 @@ describe("lifecycle", () => {
     anchor.remove();
   });
 
-  it("anchors to a bare rect, not only an element — the slash caret path", () => {
+  it("anchors to a bare rect, not only an element - the slash caret path", () => {
     // `/due` has no element to point at, only a `coordsAtPos` rectangle. The
     // editor must position off that just as it does off a chip.
     const handle = openTaskFieldEditor({
@@ -665,7 +665,7 @@ describe("the optional time control", () => {
     anchor.remove();
   });
 
-  it("commits nothing for a bare time — that is not a TaskInstant", () => {
+  it("commits nothing for a bare time - that is not a TaskInstant", () => {
     // A control must not be able to produce bytes the parser refuses.
     const anchor = anchorEl();
     const onCommit = vi.fn();

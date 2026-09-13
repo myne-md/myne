@@ -14,7 +14,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * A pending "scroll to this task line" request. `line` is 0-based, and `text`
- * is the task's raw line — the editor matches on it so a line that has SHIFTED
+ * is the task's raw line - the editor matches on it so a line that has SHIFTED
  * (or a body that has not finished loading) still lands correctly.
  */
 export interface RevealTaskRequest {

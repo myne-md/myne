@@ -1,11 +1,11 @@
 // Flow-logic: the mobile task surfaces (MYND-620 tasks 3, 4, 8; panel redesigned
-// for myne-md/myne#656). Headless Chromium + mock IPC — NOT end-to-end.
+// for myne-md/myne#656). Headless Chromium + mock IPC - NOT end-to-end.
 //
 // What this tier is for here is stated in the task itself: **a navigation change
 // must not be able to silently remove these surfaces.** So the assertions are
 // about existence and routing (the destination is in the bar, one tap reaches
 // it, the sheet opens from the editor and shows only that note), and about the
-// one behaviour that spans surfaces — that ticking from a list writes to the
+// one behaviour that spans surfaces - that ticking from a list writes to the
 // **note the task came from**, not to whatever note happens to be open.
 //
 // It does NOT re-test filtering or sorting. Those are the desktop's code, used
@@ -15,14 +15,14 @@
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "./mock-ipc";
 
-/** Two notes, four tasks — enough that a vault-wide list is visibly wider than
+/** Two notes, four tasks - enough that a vault-wide list is visibly wider than
  *  a note-scoped one, which is the distinction under test.
  *
  *  The undated rows spell their absent fields as `null` rather than omitting the
  *  keys, because that is what `vault_indices_tasks` actually answers with: Rust's
  *  `Option<String>` serializes as `null`, and the struct cannot gain a
  *  `skip_serializing_if` (it is also the on-disk `MYI1` payload). A fixture that
- *  omitted them would be testing a shape the app never receives — and did, until
+ *  omitted them would be testing a shape the app never receives - and did, until
  *  the All filter crashed on it (myne-md/myne-mobile#36). */
 const TASKS = [
   {
@@ -100,7 +100,7 @@ test.describe("mobile task surfaces", () => {
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
 
-    // In the bar itself — the information-architecture decision this task made,
+    // In the bar itself - the information-architecture decision this task made,
     // and the one a navigation change could silently undo.
     const destination = page.getByTestId("workspace.tab-tasks");
     await expect(destination).toBeVisible();
@@ -119,8 +119,8 @@ test.describe("mobile task surfaces", () => {
 
   test("a task the index reports with null dates renders, undated", async ({ page }) => {
     // The one tier that runs the real chain in a browser: the mobile fetch, the
-    // shared panel, the shared row. The desktop cannot reproduce this at all —
-    // it decodes at its own boundary — so if this surface is going to regress,
+    // shared panel, the shared row. The desktop cannot reproduce this at all -
+    // it decodes at its own boundary - so if this surface is going to regress,
     // it regresses here or nowhere (myne-md/myne-mobile#36).
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
@@ -190,7 +190,7 @@ test.describe("mobile task surfaces", () => {
     await openTasksDestination(page);
 
     // Tick a task belonging to note-b while nothing is open. The write must
-    // land in note-b — a list that wrote to "the current note" would corrupt a
+    // land in note-b - a list that wrote to "the current note" would corrupt a
     // different note every time.
     const row = page
       .getByTestId("tasks.vault.row.row")
