@@ -86,10 +86,15 @@ export function NoteTasksPanel(): ReactElement {
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
-  const onOpen = useCallback((task: VaultTask) => {
-    // The note is already open; ask its focused pane to scroll to the line.
-    if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
-  }, []);
+  const onOpen = useCallback(
+    (task: VaultTask) => {
+      // Make sure the note is open (it may not be, even when selected), then ask
+      // its pane to scroll to the line.
+      ws.openInFocused(task.noteId);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
+    },
+    [ws],
+  );
 
   return (
     <TaskListPanel

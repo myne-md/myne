@@ -374,7 +374,9 @@ export function TaskRow({
     <div
       style={{
         ...rowStyle(depth, compactX),
-        background: hover ? "var(--paper-2)" : "transparent",
+        // A clearly visible hover: the row is a navigation target, and a
+        // pointer alone was not enough to read (myne-md/myne#656 review).
+        background: hover ? "var(--paper-3)" : "transparent",
         // A two-line row aligns its checkbox with the FIRST line, not the
         // block's vertical centre (myne-md/myne#656 review).
         alignItems: stacked ? "flex-start" : "center",
