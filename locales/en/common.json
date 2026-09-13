@@ -93,6 +93,8 @@
       "noteHeading_other": "{{count}} changes",
       "changedLines_one": "{{count}} line",
       "changedLines_other": "{{count}} lines",
+      "diffCurrent": "In the note now",
+      "diffProposed": "After this change",
       "removalFlag": {
         "trashed": "Moves this note to Trash",
         "deleted": "Deletes this note on every device",
