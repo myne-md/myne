@@ -225,6 +225,24 @@ describe("the search box", () => {
   });
 });
 
+describe("rows", () => {
+  it("strips a due field that carries a time (myne-md/myne#656 review)", () => {
+    const { host, cleanup } = render(
+      panel({
+        view: view({ status: "all" }),
+        tasks: [
+          task({
+            due: "2026-09-13 12:30",
+            rawLine: "- [ ] left ribbon implementation [due:: 2026-09-13 12:30]",
+          }),
+        ],
+      }),
+    );
+    expect(q(host, "tasks.row.text")?.textContent).toBe("left ribbon implementation");
+    cleanup();
+  });
+});
+
 describe("nesting", () => {
   it("indents a child row under its visible parent", () => {
     const { host, cleanup } = render(

@@ -40,6 +40,7 @@ import { saveNote } from "../saveNote";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
+import { peekRevealTask, useRevealTaskNonce } from "../views/revealTaskSignal";
 import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal";
 import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
@@ -405,6 +406,15 @@ export function PaneView({
   // its body settles. The nonce bumps per click so re-clicking the same anchor
   // re-fires the scroll.
   const [scrollAnchor, setScrollAnchor] = useState<ScrollAnchorRequest>(null);
+  // Task-list click-through (myne-md/myne#656 review): scroll to a task's line.
+  const [revealLine, setRevealLine] = useState<{ line: number; nonce: number } | null>(null);
+  const revealTaskNonce = useRevealTaskNonce();
+  useEffect(() => {
+    const req = peekRevealTask();
+    if (req === null || !focused || activeId === null) return;
+    if (req.noteId !== activeId) return;
+    setRevealLine({ line: req.line, nonce: req.nonce });
+  }, [revealTaskNonce, focused, activeId]);
   // reading-source-modes (MYND-299): side-by-side preview companion — a PaneView-
   // local, read-only Reading mirror of the SAME `content` buffer. It is NOT a
   // workspace item (the global duplicate-forbid `(kind,id)` invariant is
@@ -1539,6 +1549,7 @@ export function PaneView({
             onAcceptTagSuggestion={handleAcceptTagSuggestion}
             onDismissTagSuggestion={handleDismissTagSuggestion}
             scrollAnchor={activeScrollAnchor}
+            revealLine={revealLine}
             // outline-scroll-tracking: hand the live view to the pane so it can
             // watch the scroller and report the top heading to the Outline tab.
             onReady={handleEditorReady}

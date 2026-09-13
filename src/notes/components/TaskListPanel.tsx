@@ -1035,6 +1035,30 @@ export function TaskListPanel({
           <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
             {t(`tasks.empty.${emptyKind}`, { query: search.trim() })}
           </div>
+        ) : minimal ? (
+          // The note-scoped panel is small and its rows carry an inline date
+          // under the text, so they are variable-height: render them in flow
+          // rather than through the fixed-height window (myne-md/myne#656).
+          items.map((item) =>
+            item.kind === "header" ? (
+              <div key={item.id} style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${item.section}`}>
+                <span>{t(`tasks.section.${item.section}`)}</span>
+                <span style={HEADER_COUNT_STYLE}>{item.count}</span>
+              </div>
+            ) : (
+              <TaskRow
+                key={item.id}
+                task={toRowData(item.task, item.depth)}
+                scope={rowScope}
+                today={today}
+                compactX
+                inlineDate
+                testIdPrefix={`${testIdPrefix}.row`}
+                {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
+                {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+              />
+            ),
+          )
         ) : (
           <>
             <div style={{ height: window_.topPad }} aria-hidden="true" />
@@ -1050,7 +1074,6 @@ export function TaskListPanel({
                     task={toRowData(item.task, item.depth)}
                     scope={rowScope}
                     today={today}
-                    compactX={minimal}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
