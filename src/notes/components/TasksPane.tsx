@@ -45,7 +45,7 @@ export function TasksPane({ paneId }: { paneId: PaneId; item: WorkspaceItem }): 
     (task: VaultTask) => {
       // Open the note, then ask the focused pane to scroll to the task's line.
       ws.openInFocused(task.noteId);
-      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex, task.rawLine);
     },
     [ws],
   );
@@ -91,7 +91,7 @@ export function NoteTasksPanel(): ReactElement {
       // Make sure the note is open (it may not be, even when selected), then ask
       // its pane to scroll to the line.
       ws.openInFocused(task.noteId);
-      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex, task.rawLine);
     },
     [ws],
   );

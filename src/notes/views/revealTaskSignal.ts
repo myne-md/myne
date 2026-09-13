@@ -12,10 +12,15 @@
 
 import { useSyncExternalStore } from "react";
 
-/** A pending "scroll to this task line" request. `line` is 0-based. */
+/**
+ * A pending "scroll to this task line" request. `line` is 0-based, and `text`
+ * is the task's raw line — the editor matches on it so a line that has SHIFTED
+ * (or a body that has not finished loading) still lands correctly.
+ */
 export interface RevealTaskRequest {
   readonly noteId: string;
   readonly line: number;
+  readonly text: string;
   readonly nonce: number;
 }
 
@@ -23,10 +28,10 @@ let request: RevealTaskRequest | null = null;
 let nonce = 0;
 const listeners = new Set<() => void>();
 
-/** Ask the focused pane showing `noteId` to scroll to the task on `line`. */
-export function requestRevealTask(noteId: string, line: number): void {
+/** Ask the pane showing `noteId` to scroll to the task on `line`. */
+export function requestRevealTask(noteId: string, line: number, text: string): void {
   nonce += 1;
-  request = { noteId, line, nonce };
+  request = { noteId, line, text, nonce };
   for (const listener of listeners) listener();
 }
 
