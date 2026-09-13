@@ -411,10 +411,14 @@ export function PaneView({
   const revealTaskNonce = useRevealTaskNonce();
   useEffect(() => {
     const req = peekRevealTask();
-    if (req === null || !focused || activeId === null) return;
+    if (req === null || activeId === null) return;
+    // NOT gated on `focused`: the click comes from the right-panel / tasks tab,
+    // which does not focus this pane, and requiring focus made only the FIRST
+    // click scroll (myne-md/myne#656 review). A note is open in one pane only
+    // (global duplicate-forbid), so `activeId` matching is unambiguous.
     if (req.noteId !== activeId) return;
     setRevealLine({ line: req.line, nonce: req.nonce });
-  }, [revealTaskNonce, focused, activeId]);
+  }, [revealTaskNonce, activeId]);
   // reading-source-modes (MYND-299): side-by-side preview companion — a PaneView-
   // local, read-only Reading mirror of the SAME `content` buffer. It is NOT a
   // workspace item (the global duplicate-forbid `(kind,id)` invariant is

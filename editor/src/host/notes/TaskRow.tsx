@@ -375,6 +375,9 @@ export function TaskRow({
       style={{
         ...rowStyle(depth, compactX),
         background: hover ? "var(--paper-2)" : "transparent",
+        // A two-line row aligns its checkbox with the FIRST line, not the
+        // block's vertical centre (myne-md/myne#656 review).
+        alignItems: stacked ? "flex-start" : "center",
         // The whole row is the navigation target when the caller can open the
         // task (myne-md/myne#656 review).
         cursor: onOpen === undefined ? "default" : "pointer",
@@ -403,7 +406,7 @@ export function TaskRow({
         // stays 14×14 visually — the density is the point of this row — while
         // a coarse pointer gets the 44×44 the platform minimums ask for.
         className="myne-task-checkbox"
-        style={boxStyle(task.completed, disabled)}
+        style={{ ...boxStyle(task.completed, disabled), ...(stacked ? { marginTop: 3 } : {}) }}
         data-testid={`${testIdPrefix}.checkbox`}
         onClick={(e) => {
           e.stopPropagation();

@@ -131,6 +131,14 @@ describe("taskDescription strips the marker even without a trailing separator", 
     expect(taskDescription("- [x] buy milk")).toBe("buy milk");
   });
 
+  it("strips a field on an indented (nested) task line", () => {
+    // Parsed in isolation a 4-space indented line reads as a code block, so the
+    // field was never located and its raw text leaked into the description
+    // (myne-md/myne#656 review).
+    expect(taskDescription("    - [ ] child [due:: 2026-09-13 12:30]")).toBe("child");
+    expect(taskDescription("  - [ ] child [priority:: high]")).toBe("child");
+  });
+
   it("still refuses a line the parser does not see as a task", () => {
     // `- [ ]foo` has no separator, so GFM reads an ordinary bullet whose text
     // begins with "[ ]". The stripping regex being laxer must not make
