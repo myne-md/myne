@@ -19,6 +19,7 @@ import { DEFAULT_TASK_VIEW, type TaskView } from "../taskView";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { useWorkspace } from "../workspaceContext";
 import { useSelectedNote } from "../sidebarState";
+import { requestRevealTask } from "../views/revealTaskSignal";
 import type { WorkspaceItem, PaneId } from "../workspaceState";
 
 /** The vault-wide task list, mounted as a pane body. */
@@ -40,7 +41,14 @@ export function TasksPane({ paneId }: { paneId: PaneId; item: WorkspaceItem }): 
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
-  const onOpen = useCallback((task: VaultTask) => ws.openInFocused(task.noteId), [ws]);
+  const onOpen = useCallback(
+    (task: VaultTask) => {
+      // Open the note, then ask the focused pane to scroll to the task's line.
+      ws.openInFocused(task.noteId);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
+    },
+    [ws],
+  );
 
   return (
     <TaskListPanel
@@ -78,6 +86,10 @@ export function NoteTasksPanel(): ReactElement {
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
+  const onOpen = useCallback((task: VaultTask) => {
+    // The note is already open; ask its focused pane to scroll to the line.
+    if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex);
+  }, []);
 
   return (
     <TaskListPanel
@@ -87,6 +99,7 @@ export function NoteTasksPanel(): ReactElement {
       rowScope="note"
       onViewChange={setView}
       onToggle={onToggle}
+      onOpen={onOpen}
       testIdPrefix="notePanel.tasks"
       minimal
     />

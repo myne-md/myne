@@ -25,9 +25,17 @@
 //     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
-import { useState, type CSSProperties, type KeyboardEvent, type ReactElement } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactElement,
+} from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
+import { taskChipIcon } from "./taskChipIcon";
 import "./task-row.css";
 import { formatStoredValue } from "../lib/datetimeFormat";
 import { useDateTimeDisplay } from "../lib/useDateTimeDisplay";
@@ -93,7 +101,28 @@ export type TaskRowProps = {
   /** Tighter horizontal padding, for the narrow note-scoped panel
    *  (myne-md/myne#656 review). */
   compactX?: boolean;
+  /**
+   * Render the date under the text as an accent icon + label instead of the
+   * right-hand chip, for the narrow note-scoped panel (myne-md/myne#656 review).
+   */
+  inlineDate?: boolean;
 };
+
+/** The chip's leading Lucide glyph, as a React element. */
+function ChipGlyph({ kind }: { kind: "due" | "remind" }): ReactElement {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el !== null) el.replaceChildren(taskChipIcon(kind, ""));
+  }, [kind]);
+  return (
+    <span
+      ref={ref}
+      style={{ display: "inline-flex", width: 12, height: 12, flex: "0 0 auto" }}
+      aria-hidden="true"
+    />
+  );
+}
 
 /**
  * The date the row files this task under: the due date, **falling back to the
@@ -224,6 +253,14 @@ const SECOND_LINE_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
+const INLINE_DATE_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  color: "var(--accent)",
+  fontSize: "var(--text-xs)",
+};
+
 const META_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -257,7 +294,9 @@ export function TaskRow({
   testIdPrefix = "task-row",
   twoLine = false,
   compactX = false,
+  inlineDate = false,
 }: TaskRowProps): ReactElement {
+  const stacked = twoLine || inlineDate;
   const overdue = isOverdue(task, today);
   // myne#279: the row used to render the raw stored string, which meant a raw
   // ISO date and a time that was silently dropped by the `[0,10]` slice on the
@@ -285,14 +324,22 @@ export function TaskRow({
   // exactly the drift one shared component exists to prevent.
   const meta = (
     <>
-      {date === undefined ? null : (
+      {date === undefined ? null : inlineDate ? (
+        // Inline date (note-scoped panel): accent icon + text, no pill.
+        <span
+          style={INLINE_DATE_STYLE}
+          data-testid={`${testIdPrefix}.due`}
+          data-overdue={overdue ? "true" : undefined}
+        >
+          <ChipGlyph kind={task.due != null ? "due" : "remind"} />
+          {date}
+        </span>
+      ) : (
         <span
           style={{
             ...taskChipStyle(),
             // State as coloured TEXT, never as a fill — the canon's rule, and
             // the reason this chip's background stays neutral while overdue.
-            // On the two-line layout this is also where the overdue indicator
-            // lives, which is what the second line is for.
             color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.ink,
           }}
           data-testid={`${testIdPrefix}.due`}
@@ -308,7 +355,10 @@ export function TaskRow({
           type="button"
           style={NOTE_STYLE}
           data-testid={`${testIdPrefix}.note`}
-          onClick={() => onOpen?.(task)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen?.(task);
+          }}
           title={task.noteTitle}
         >
           {task.noteTitle}
@@ -319,11 +369,18 @@ export function TaskRow({
 
   return (
     <div
-      style={{ ...rowStyle(depth, compactX), background: hover ? "var(--paper-2)" : "transparent" }}
+      style={{
+        ...rowStyle(depth, compactX),
+        background: hover ? "var(--paper-2)" : "transparent",
+        // The whole row is the navigation target when the caller can open the
+        // task (myne-md/myne#656 review).
+        cursor: onOpen === undefined ? "default" : "pointer",
+      }}
       data-testid={`${testIdPrefix}.row`}
       data-task-scope={scope}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      {...(onOpen === undefined ? {} : { onClick: () => onOpen(task) })}
       {...(depth > 0 ? { "data-depth": String(depth) } : {})}
     >
       <span
@@ -345,11 +402,14 @@ export function TaskRow({
         className="myne-task-checkbox"
         style={boxStyle(task.completed, disabled)}
         data-testid={`${testIdPrefix}.checkbox`}
-        onClick={toggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
         onKeyDown={onBoxKey}
       />
 
-      {twoLine ? (
+      {stacked ? (
         <span style={STACK_STYLE} data-testid={`${testIdPrefix}.stack`}>
           <span
             style={{

@@ -202,6 +202,10 @@ export type CMEditorProps = {
    *  body settles (`value` change) so the click→scroll never races the async
    *  note load. */
   scrollAnchor?: ScrollAnchorRequest;
+  /** Scroll to a line (0-based) and focus the editor — the task lists'
+   *  click-through (myne-md/myne#656 review). Re-fires when `nonce` changes and
+   *  retries as the body settles, exactly like `scrollAnchor`. */
+  revealLine?: { line: number; nonce: number } | null;
   /** editor-line-numbers (MYND-314): show the line-number gutter. Pushed into
    *  the editor's line-number compartment (re-mount-free) whenever it changes,
    *  so toggling the `editor_line_numbers` pref updates the open note live while
@@ -278,7 +282,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, revealLine = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -775,6 +779,25 @@ export function CMEditor(props: CMEditorProps) {
       effects: EditorView.scrollIntoView(from, { y: "start" }),
     });
   }, [scrollAnchor, value]);
+
+  // Task-list click-through (myne-md/myne#656 review): scroll to a line and
+  // focus. Clamped so a shrinking body cannot throw; re-armed per nonce, and it
+  // retries as the body settles because `value` is a dependency.
+  const appliedRevealLineNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || revealLine === null) return;
+    if (appliedRevealLineNonceRef.current === revealLine.nonce) return;
+    const doc = view.state.doc;
+    const lineNo = Math.max(1, Math.min(revealLine.line + 1, doc.lines));
+    const pos = doc.line(lineNo).from;
+    appliedRevealLineNonceRef.current = revealLine.nonce;
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
+    view.focus();
+  }, [revealLine, value]);
 
   // Relay the chip click-to-navigate event (dispatched on the editor DOM by the
   // wikilink chip extension) to the `onOpenWikilink` callback.
