@@ -165,9 +165,12 @@ const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
-  height: "100%",
+  // NO fixed height here: the windowed list wraps each row in a fixed-height
+  // box that centres it, while the note-scoped panel renders rows in flow with
+  // their natural (two-line) height (myne-md/myne#656 review).
+  width: "100%",
   boxSizing: "border-box",
-  padding: "0 8px",
+  padding: "var(--space-1) 8px",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",

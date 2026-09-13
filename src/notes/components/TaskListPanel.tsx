@@ -430,6 +430,10 @@ const ROW_WRAP_STYLE: CSSProperties = {
   height: TASK_ROW_HEIGHT,
   boxSizing: "border-box",
   overflow: "hidden",
+  // The row no longer carries `height: 100%`, so the fixed-height window box
+  // centres it (myne-md/myne#656 review).
+  display: "flex",
+  alignItems: "center",
 };
 
 const EMPTY_STYLE: CSSProperties = {
