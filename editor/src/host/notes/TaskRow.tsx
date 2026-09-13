@@ -90,6 +90,9 @@ export type TaskRowProps = {
    * case.
    */
   twoLine?: boolean;
+  /** Tighter horizontal padding, for the narrow note-scoped panel
+   *  (myne-md/myne#656 review). */
+  compactX?: boolean;
 };
 
 /**
@@ -174,11 +177,15 @@ function boxStyle(completed: boolean, disabled: boolean): CSSProperties {
  * to the flat row and only nested rows move. The step is a spacing token, so a
  * theme that re-scales the scale re-scales the tree with it.
  */
-function rowStyle(depth: number): CSSProperties {
-  if (depth <= 0) return ROW_STYLE;
+function rowStyle(depth: number, compactX: boolean): CSSProperties {
+  const start = compactX ? "var(--space-1)" : "var(--space-2)";
+  const base = compactX
+    ? { ...ROW_STYLE, padding: `0 ${start}` }
+    : ROW_STYLE;
+  if (depth <= 0) return base;
   return {
-    ...ROW_STYLE,
-    paddingInlineStart: `calc(var(--space-2) + var(--space-4) * ${depth})`,
+    ...base,
+    paddingInlineStart: `calc(${start} + var(--space-4) * ${depth})`,
   };
 }
 
@@ -249,6 +256,7 @@ export function TaskRow({
   onOpen,
   testIdPrefix = "task-row",
   twoLine = false,
+  compactX = false,
 }: TaskRowProps): ReactElement {
   const overdue = isOverdue(task, today);
   // myne#279: the row used to render the raw stored string, which meant a raw
@@ -311,7 +319,7 @@ export function TaskRow({
 
   return (
     <div
-      style={{ ...rowStyle(depth), background: hover ? "var(--paper-2)" : "transparent" }}
+      style={{ ...rowStyle(depth, compactX), background: hover ? "var(--paper-2)" : "transparent" }}
       data-testid={`${testIdPrefix}.row`}
       data-task-scope={scope}
       onMouseEnter={() => setHover(true)}

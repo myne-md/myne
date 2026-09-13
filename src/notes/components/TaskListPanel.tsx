@@ -102,6 +102,13 @@ const TOOLBAR_STYLE: CSSProperties = {
   padding: "var(--space-3)",
 };
 
+// The note-scoped panel is narrow; its horizontal padding is a third of the
+// vault panel's (myne-md/myne#656 review).
+const MINIMAL_TOOLBAR_STYLE: CSSProperties = {
+  ...TOOLBAR_STYLE,
+  padding: "var(--space-2) var(--space-1)",
+};
+
 // The rule under the toolbar spans the CONTENT width, so it lines up with the
 // search field rather than the panel edges (myne-md/myne#656 review).
 const SEPARATOR_STYLE: CSSProperties = {
@@ -952,7 +959,7 @@ export function TaskListPanel({
 
   return (
     <div style={PANEL_STYLE} data-testid={`${testIdPrefix}.panel`}>
-      <div style={TOOLBAR_STYLE}>
+      <div style={minimal ? MINIMAL_TOOLBAR_STYLE : TOOLBAR_STYLE}>
         <div style={SEARCH_ROW_STYLE}>
           <input
             type="search"
@@ -1043,6 +1050,7 @@ export function TaskListPanel({
                     task={toRowData(item.task, item.depth)}
                     scope={rowScope}
                     today={today}
+                    compactX={minimal}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
