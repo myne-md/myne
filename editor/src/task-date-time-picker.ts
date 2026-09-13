@@ -79,25 +79,18 @@ function shiftMonths(iso: string, months: number): string {
   return isoOf(new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), day)));
 }
 
-/** The locale's first day of the week, in `Date.getUTCDay()` terms
- *  (`0` = Sunday). `Intl.Locale`'s week info is the only correct source; older
- *  runtimes fall back to Monday, the ISO default the rest of Myne uses. */
-function firstWeekday(locale: string): number {
-  try {
-    const loc = new Intl.Locale(locale) as Intl.Locale & {
-      weekInfo?: { firstDay?: number };
-      getWeekInfo?: () => { firstDay?: number };
-    };
-    const info =
-      typeof loc.getWeekInfo === "function" ? loc.getWeekInfo() : loc.weekInfo;
-    if (info !== undefined && typeof info.firstDay === "number") {
-      return info.firstDay % 7;
-    }
-  } catch {
-    // No `Intl.Locale` week info on this runtime, so fall through.
-  }
-  return 1;
-}
+/**
+ * Monday, in `Date.getUTCDay()` terms (`1`), the ISO default the rest of Myne
+ * uses.
+ *
+ * Deliberately NOT read from the host's `Intl.Locale` week info. The shared tree
+ * must not derive its calendar conventions from the host: what a user SEES is a
+ * function of their Myne settings, and what is STORED is a function of neither.
+ * The weekday and month NAMES still come from `Intl` (locale is a display
+ * choice), but the column order is fixed. Enforced by
+ * `tests/notes/taskFieldsDisplayInvariant.test.ts`.
+ */
+const FIRST_WEEKDAY = 1;
 
 function weekdayLabels(locale: string, first: number): string[] {
   const fmt = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
@@ -200,7 +193,7 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
   valueLabel.setAttribute("data-testid", "editor.task-date-value");
   dateSection.appendChild(valueLabel);
 
-  const start = firstWeekday(display.locale);
+  const start = FIRST_WEEKDAY;
 
   const grid = document.createElement("div");
   grid.className = "cm-date-grid";

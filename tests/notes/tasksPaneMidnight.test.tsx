@@ -199,6 +199,16 @@ vi.mock("../../src/notes/taskIndex", () => ({
 vi.mock("../../src/notes/workspaceContext", () => ({
   useWorkspace: () => ({
     setTaskViewState: vi.fn(),
+    // Container-level view, narrowed to the due-today window.
+    taskView: {
+      status: "undone",
+      due: "today",
+      folders: [],
+      noteId: null,
+      tags: [],
+      priority: "any",
+      sort: "due",
+    },
     flushAll: vi.fn(),
     openInFocused: vi.fn(),
   }),
