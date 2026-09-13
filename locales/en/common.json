@@ -1327,6 +1327,7 @@
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
       "menuEdit": "Edit {{field}}",
+      "selectField": "Select a field to add",
       "menuTitle": "Add field",
       "noDate": "No date",
       "repeatNoAnchor": "This task has no date to repeat from, so it won't repeat. Add a due date to start it.",

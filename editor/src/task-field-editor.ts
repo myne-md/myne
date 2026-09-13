@@ -74,9 +74,23 @@ export type TaskFieldEditorOptions = {
    * shipped untranslated.
    */
   labels?: { commit?: string; cancel?: string; field?: string };
+  /**
+   * Mount into this element (the two-pane menu's right pane) instead of
+   * creating a modal. The CALLER owns the backdrop, the focus trap and
+   * Escape/Enter routing (myne-md/myne#656 review).
+   */
+  host?: HTMLElement;
 };
 
-export type TaskFieldEditorHandle = { close: () => void };
+export type TaskFieldEditorHandle = {
+  close: () => void;
+  /**
+   * When hosted: consume an Escape. Returns `true` if a select listbox was open
+   * and has been closed (so the host should NOT also close the pane). Absent on
+   * the modal path, where `openModal` already routes Escape.
+   */
+  escape?: () => boolean;
+};
 
 /** The body of the surface: its root element, the value it currently holds, and
  *  the control that should take initial focus. */
@@ -729,7 +743,7 @@ function buildBody(kind: TaskFieldKind, value: string, popup: FieldPopupHost): F
 export function openTaskFieldEditor(
   options: TaskFieldEditorOptions,
 ): TaskFieldEditorHandle {
-  const { anchor, kind, value, onCommit, onCancel, labels } = options;
+  const { anchor, kind, value, onCommit, onCancel, labels, host } = options;
 
   let committed = false;
 
@@ -755,7 +769,10 @@ export function openTaskFieldEditor(
     return true;
   };
 
-  const modal = openModal({
+  // The modal path (a chip click or a slash command). The HOSTED path mounts
+  // into the two-pane menu's right pane and leaves backdrop, trap and
+  // Escape/Enter routing to the menu (myne-md/myne#656 review).
+  const modal = host === undefined ? openModal({
     backdropStyle: {
       // A full-screen but transparent backdrop: this is an anchored popover, not
       // a blocking dialog, so it must not dim — but it does need to span the
@@ -768,7 +785,7 @@ export function openTaskFieldEditor(
     },
     onDismiss: () => {
       if (closeActivePopup()) return;
-      modal.close();
+      modal?.close();
       if (!committed) onCancel?.();
     },
     onEnter: (e) => {
@@ -793,7 +810,7 @@ export function openTaskFieldEditor(
       }
       commit();
     },
-  });
+  }) : null;
 
   const surface = document.createElement("div");
   surface.className = "cm-task-field-editor";
@@ -802,8 +819,13 @@ export function openTaskFieldEditor(
   surface.setAttribute("data-testid", "editor.task-field-editor");
   // Set inline too, not only in the stylesheet: `computePosition`'s left/top are
   // inline and only take effect once the surface is out of normal flow, and a
-  // bare test DOM never applies the imported CSS.
-  surface.style.position = "fixed";
+  // bare test DOM never applies the imported CSS. Hosted in a pane, it flows.
+  if (host === undefined) surface.style.position = "fixed";
+
+  const close = (): void => {
+    if (modal !== null) modal.close();
+    else surface.remove();
+  };
 
   const body = buildBody(kind, value, popupHost);
   surface.appendChild(body.root);
@@ -828,41 +850,64 @@ export function openTaskFieldEditor(
   function commit(): void {
     committed = true;
     const next = body.getValue();
-    modal.close();
+    close();
     onCommit(next);
   }
 
   commitButton.addEventListener("click", commit);
   cancelButton.addEventListener("click", () => {
-    modal.close();
+    close();
     onCancel?.();
   });
 
-  modal.backdrop.appendChild(surface);
+  if (host !== undefined) {
+    host.replaceChildren(surface);
+    // Enter commits from inside the pane, with the same listbox / date carve-outs
+    // the modal path encodes.
+    surface.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.(".cm-date-picker, .cm-time-picker") &&
+        !target.closest?.(".cm-date-day")
+      ) {
+        return;
+      }
+      if (activePopup !== null) return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.classList.contains("cm-select-trigger")) {
+        return;
+      }
+      e.preventDefault();
+      commit();
+    });
+    body.focusTarget.focus();
+  } else {
+    modal!.backdrop.appendChild(surface);
 
-  // Position after mounting so the surface has measurable dimensions. The
-  // positioner owns the viewport clamp and the above/below flip. An element
-  // anchor is measured live; a bare rect (the slash caret coordinate) is used
-  // as-is.
-  const rect =
-    anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
-  const placed = computePosition({
-    anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-    surfaceWidth: surface.offsetWidth || 240,
-    surfaceHeight: surface.offsetHeight || 96,
-    preferredPlacement: "below",
-  });
-  surface.style.left = `${placed.left}px`;
-  surface.style.top = `${placed.top}px`;
+    // Position after mounting so the surface has measurable dimensions. The
+    // positioner owns the viewport clamp and the above/below flip. An element
+    // anchor is measured live; a bare rect (the slash caret coordinate) is used
+    // as-is.
+    const rect =
+      anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
+    const placed = computePosition({
+      anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      surfaceWidth: surface.offsetWidth || 240,
+      surfaceHeight: surface.offsetHeight || 96,
+      preferredPlacement: "below",
+    });
+    surface.style.left = `${placed.left}px`;
+    surface.style.top = `${placed.top}px`;
 
-  // Trap on the surface, not the backdrop, so a backdrop click still dismisses.
-  // Initial focus is the body's primary control: the whole surface is reachable
-  // by keyboard alone from here — Tab cycles the controls and wraps.
-  modal.installTrap(surface, body.focusTarget);
+    // Trap on the surface, not the backdrop, so a backdrop click still dismisses.
+    // Initial focus is the body's primary control: the whole surface is reachable
+    // by keyboard alone from here — Tab cycles the controls and wraps.
+    modal!.installTrap(surface, body.focusTarget);
+  }
 
   return {
-    close: () => {
-      modal.close();
-    },
+    close,
+    ...(host === undefined ? {} : { escape: closeActivePopup }),
   };
 }

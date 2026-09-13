@@ -21,7 +21,11 @@
 import { EditorView } from "@codemirror/view";
 import { openModal } from "./host/lib/imperative-modal";
 import { computePosition, type Rect } from "./positioning";
-import { openTaskFieldEditor, type TaskFieldKind } from "./task-field-editor";
+import {
+  openTaskFieldEditor,
+  type TaskFieldEditorHandle,
+  type TaskFieldKind,
+} from "./task-field-editor";
 import {
   applyTaskFieldEdit,
   beginTaskFieldEdit,
@@ -160,28 +164,19 @@ export function openTaskFieldMenu(opts: {
   // clicked. Nothing downstream guards it: `planTaskFieldWrite` rewrites
   // whatever line text it is handed, so `[due:: …]` could be appended to an
   // unrelated task, to prose, or to a YAML line inside the frontmatter block,
-  // corrupting it. And if the document SHRANK past the captured offset — a
-  // shorter remote version arriving — `doc.lineAt` threw a `RangeError` out of
-  // the click handler after `modal.close()` had already run, so the menu simply
-  // vanished.
+  // corrupting it.
   //
   // Tracking has to begin HERE rather than on click: by click time the offsets
-  // have already moved. Ended on every exit, so an abandoned menu leaves no
-  // tracking behind — EXCEPT while a field editor borrows it: the row handler
-  // below hands this handle to the editor and deliberately does not end it, so
-  // exactly one tracked span stays live across both surfaces (myne-md/myne#656).
+  // have already moved. Ended when the MENU closes, since the hosted editor
+  // writes through this same handle rather than minting its own.
   const tracked: TaskFieldEditHandle = beginTaskFieldEdit(view, {
     from: line.from,
     to: line.to,
     kind: "repeat",
   });
 
-  // True between a row opening the field editor and that editor closing (commit
-  // or cancel). While it holds, the menu's own dismiss must do NOTHING: the
-  // editor is the innermost trap, its Escape is the one that means "close the
-  // editor", and tearing the menu (and therefore the borrowed span) down behind
-  // it would end the very handle the editor is still writing through.
-  let editorOpen = false;
+  // The editor currently mounted in the right pane, if any.
+  let activeEditor: TaskFieldEditorHandle | null = null;
 
   const modal = openModal({
     backdropStyle: {
@@ -191,7 +186,15 @@ export function openTaskFieldMenu(opts: {
       zIndex: "2147483000",
     },
     onDismiss: () => {
-      if (editorOpen) return;
+      // Escape peels one layer at a time: an open listbox, then the pane, then
+      // the menu itself.
+      if (activeEditor !== null) {
+        if (activeEditor.escape?.()) return;
+        activeEditor.close();
+        activeEditor = null;
+        renderHint();
+        return;
+      }
       tracked.end();
       modal.close();
     },
@@ -199,19 +202,85 @@ export function openTaskFieldMenu(opts: {
 
   const surface = document.createElement("div");
   surface.className = "cm-task-field-menu";
-  surface.setAttribute("role", "menu");
+  surface.setAttribute("role", "dialog");
   surface.setAttribute("aria-label", i18n.t("editor.taskField.menuTitle"));
   surface.setAttribute("data-testid", "editor.task-field-menu");
   // Inline position too, not only in the stylesheet: computePosition's left/top
   // are inline and a bare test DOM never applies the imported CSS.
   surface.style.position = "fixed";
 
+  const list = document.createElement("div");
+  list.className = "cm-task-field-menu-list";
+  list.setAttribute("role", "menu");
+  const pane = document.createElement("div");
+  pane.className = "cm-task-field-menu-pane";
+  surface.append(list, pane);
+
+  const hint = document.createElement("div");
+  hint.className = "cm-task-field-menu-hint";
+  hint.setAttribute("data-testid", "editor.task-field-menu-hint");
+  hint.textContent = i18n.t("editor.taskField.selectField");
+  const renderHint = (): void => {
+    pane.replaceChildren(hint);
+  };
+
   // myne#276: whether picking **Repeat** here would mint an inert rule. The
   // line carries no `due` and no `remind`, so whatever rule the user chooses
-  // has nothing to repeat FROM. Say so on the row, before they commit — the
-  // previous signal was a `title=` tooltip on the resulting raw text, which
-  // requires already knowing where to hover.
+  // has nothing to repeat FROM. Say so on the row, before they commit.
   const repeatNeedsAnchor = !present.has("due") && !present.has("remind");
+
+  // Open `kind`'s editor in the right pane, mounting it with `host` so the menu
+  // owns the backdrop, the trap and the Escape/Enter routing.
+  const openKind = (kind: TaskFieldKind): void => {
+    // The line as it stands NOW, not as it stood when the menu opened
+    // (myne#326). Null means the line was deleted while the menu was open.
+    const span = tracked.current();
+    if (span === null) {
+      tracked.end();
+      modal.close();
+      return;
+    }
+    const existing = chipRangesIn(view.state, line.from, line.to).find(
+      (s) => s.kind === kind,
+    );
+    activeEditor?.close();
+    activeEditor = openTaskFieldEditor({
+      host: pane,
+      anchor,
+      kind,
+      value: existing?.value ?? "",
+      onCommit: (next) => {
+        activeEditor = null;
+        const current = tracked.current();
+        if (current === null) {
+          renderHint();
+          return;
+        }
+        // The tracked handle was made with kind `repeat`; the field actually
+        // being written overrides it.
+        if (!applyTaskFieldEdit(view, { ...current, kind }, next)) {
+          renderHint();
+          return;
+        }
+        // An anchorless repeat is inert; offer its anchor in the same pane
+        // rather than refusing the write (myne#276).
+        if (kind === "repeat" && next !== "") {
+          const written = view.state.doc.lineAt(
+            Math.min(current.from, view.state.doc.length),
+          );
+          if (!canRecur(written.text)) {
+            openKind("due");
+            return;
+          }
+        }
+        renderHint();
+      },
+      onCancel: () => {
+        activeEditor = null;
+        renderHint();
+      },
+    });
+  };
 
   let firstRow: HTMLButtonElement | null = null;
   for (const kind of MENU_KINDS) {
@@ -238,41 +307,16 @@ export function openTaskFieldMenu(opts: {
       note.textContent = i18n.t("editor.taskField.repeatNeedsDate");
       row.appendChild(note);
     }
-    row.addEventListener("click", () => {
-      // Capture the row's live rect — the field editor anchors to where the row
-      // is, and the menu stays mounted so the row is still here.
-      const rect = row.getBoundingClientRect();
-      // The line as it stands NOW, not as it stood when the menu opened
-      // (myne#326). Null means the line was deleted while the menu was open, and
-      // declining is the only correct answer — the same rule the skip row and
-      // the field editor already follow.
-      const span = tracked.current();
-      if (span === null) {
-        tracked.end();
-        modal.close();
-        return;
-      }
-      // Hand the menu's ONE tracked handle to the editor and keep it live: the
-      // editor borrows it instead of minting a second, so the span keeps mapping
-      // through document changes on both sides of the handoff. The editor's
-      // close flips `editorOpen` back so the next Escape reaches the menu.
-      editorOpen = true;
-      openTaskFieldAdd(view, span.from, kind, rect, {
-        handle: tracked,
-        onEditorClose: () => {
-          editorOpen = false;
-        },
-      });
-    });
+    row.addEventListener("click", () => openKind(kind));
     if (firstRow === null) firstRow = row;
-    surface.appendChild(row);
+    list.appendChild(row);
   }
 
   if (canSkipOccurrence(line.text)) {
     const separator = document.createElement("div");
     separator.className = "cm-task-field-menu-sep";
     separator.setAttribute("role", "separator");
-    surface.appendChild(separator);
+    list.appendChild(separator);
 
     const row = document.createElement("button");
     row.type = "button";
@@ -287,17 +331,18 @@ export function openTaskFieldMenu(opts: {
       if (span !== null) skipOccurrence(view, span.from);
     });
     if (firstRow === null) firstRow = row;
-    surface.appendChild(row);
+    list.appendChild(row);
   }
 
+  renderHint();
   modal.backdrop.appendChild(surface);
 
   // Position after mounting so the surface has measurable dimensions.
   const rect = anchor.getBoundingClientRect();
   const placed = computePosition({
     anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-    surfaceWidth: surface.offsetWidth || 200,
-    surfaceHeight: surface.offsetHeight || 120,
+    surfaceWidth: surface.offsetWidth || 420,
+    surfaceHeight: surface.offsetHeight || 200,
     preferredPlacement: "below",
   });
   surface.style.left = `${placed.left}px`;
