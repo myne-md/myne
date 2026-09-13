@@ -27,6 +27,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
+import { setRibbonItems } from "../lib/prefs";
+import { resolveRibbonItems, ribbonEligibleIds } from "../notes/ribbonItems";
 import { Icon } from "./primitives/Icon";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Keycaps } from "./primitives/Keycaps";
@@ -585,6 +587,27 @@ export function CommandPalette({
     return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
   }, [query, ctx, noteHits, isTrashed, isTemplate, isArchived, t]);
 
+  // Left-ribbon pin state (myne-md/myne#699). The rail and this palette read the
+  // same `ribbon_items` pref, so a pin here shows up there with no extra wiring;
+  // the write bumps the prefs nonce, which re-reads and re-renders this palette.
+  const ribbonEligible = useMemo(() => ribbonEligibleIds(), []);
+  const ribbonPinned = useMemo(
+    () => resolveRibbonItems(ctx.prefs.ribbon_items, ribbonEligible),
+    [ctx.prefs.ribbon_items, ribbonEligible],
+  );
+  const pinnedSet = useMemo(() => new Set(ribbonPinned), [ribbonPinned]);
+  const togglePin = useCallback(
+    (id: string) => {
+      const next = pinnedSet.has(id)
+        ? ribbonPinned.filter((x) => x !== id)
+        : [...ribbonPinned, id];
+      // Best-effort: the palette has no error surface. The Appearance roster is
+      // where a failed prefs write is surfaced and rolled back.
+      void setRibbonItems(next).catch(() => {});
+    },
+    [pinnedSet, ribbonPinned],
+  );
+
   // Clamp selected index when row count changes.
   useEffect(() => {
     if (selectedIndex >= rows.length) {
@@ -682,6 +705,19 @@ export function CommandPalette({
         }
         // Enter on a no-op completion falls through to run the highlighted result.
       }
+      // Alt+P toggles the highlighted row's ribbon pin (myne-md/myne#699): the
+      // keyboard path, so pinning is not mouse-only. `e.code` rather than
+      // `e.key`, because on macOS Option+P reports key "π" and would otherwise
+      // both miss the toggle and type a character into the query. A
+      // non-eligible or note row is a no-op rather than an error.
+      if (e.altKey && e.code === "KeyP") {
+        e.preventDefault();
+        const row = rows[selectedIndex];
+        if (row?.kind === "action" && row.action.ribbon !== undefined) {
+          togglePin(row.action.id);
+        }
+        return;
+      }
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setSelectedIndex((i) => (rows.length === 0 ? 0 : (i + 1) % rows.length));
@@ -704,7 +740,7 @@ export function CommandPalette({
         return;
       }
     },
-    [rows, selectedIndex, runRow, close, flushNoteSearch, suggestions, suggestIndex, query],
+    [rows, selectedIndex, runRow, close, flushNoteSearch, suggestions, suggestIndex, query, togglePin],
   );
 
   const onBackdropClick = useCallback(
@@ -820,6 +856,8 @@ export function CommandPalette({
                     row.kind === "note" && row.attachmentId === null
                       ? snippets.get(row.id)
                       : undefined,
+                    row.kind === "action" ? pinnedSet.has(row.action.id) : false,
+                    togglePin,
                   )}
                 </Fragment>
               );
@@ -837,7 +875,9 @@ function renderRow(
   selected: boolean,
   runRow: (row: Row, viaKey: boolean) => void | Promise<void>,
   t: (key: string) => string,
-  snippet?: MatchSnippet,
+  snippet: MatchSnippet | undefined,
+  pinned: boolean,
+  togglePin: (id: string) => void,
 ) {
   const isDisabled = row.kind === "action" && row.visibility === "disabled";
   const baseStyle = isDisabled
@@ -882,6 +922,35 @@ function renderRow(
           <span style={{ flex: 1 }}>{row.action.label}</span>
           {row.action.category !== undefined && (
             <span style={CATEGORY_STYLE}>{row.action.category}</span>
+          )}
+          {/* Left-ribbon pin toggle (myne-md/myne#699): only ribbon-eligible
+              actions show it, and a disabled action offers nothing to pin. */}
+          {!isDisabled && row.action.ribbon !== undefined && (
+            <button
+              type="button"
+              aria-label={pinned ? t("commandPalette.unpin") : t("commandPalette.pin")}
+              title={pinned ? t("commandPalette.unpin") : t("commandPalette.pin")}
+              data-testid="palette.pin"
+              data-command-id={row.action.id}
+              data-pinned={pinned ? "true" : "false"}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePin(row.action.id);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                border: 0,
+                background: "transparent",
+                color: pinned ? "var(--accent)" : "var(--fg-3)",
+                cursor: "pointer",
+              }}
+            >
+              <Icon name="pin" size={16} />
+            </button>
           )}
           {isDisabled && row.action.disabledHint !== undefined && (
             <span style={HINT_STYLE}>{row.action.disabledHint}</span>

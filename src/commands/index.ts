@@ -1,4 +1,5 @@
 export { COMMAND_ACTIONS } from "./actions";
+export { RIBBON_DEFAULT_IDS } from "./registry";
 export type {
   ActionVisibility,
   AppStageName,

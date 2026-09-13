@@ -1434,6 +1434,14 @@ The WebAssembly/asm.js build of libsodium for JavaScript environments. **Myne's 
 
 Used in: `spec/protocol.md` §5.1.4 (third-party guidance only)
 
+### **left ribbon** &nbsp; 📦 *Product*
+
+The slim icon column at the editor's far-left edge (myne-md/myne#699) that renders a user-chosen, user-ordered set of **registry command ids** as buttons. It is independent of the notes sidebar: collapsing the tree does not hide the rail, which hides only in focus mode and under a width-forced collapse. A command is pinnable if and only if it declares ribbon metadata (an icon) on its `CommandAction`, so eligibility cannot drift from the registry. The layout persists per vault in the encrypted `vault.prefs` (`ribbon_items`, with `ribbon_visible` for the show/hide toggle), both **DeviceLocal** like the bottom-bar and right-panel orders. The rail resolves each pinned command through the registry's per-state visibility: a `hidden` command drops out and the rail reflows, a `disabled` one stays dimmed with its hint. Customized from the Appearance-panel roster, the command palette's Pin toggle, or the rail's own right-click and drag.
+
+*Not to be confused with* [ornament primitive](#ornament-primitive), the `ribbon` value a custom theme may select a custom theme may select.
+
+Used in: `docs/spec/protocol.md` §9.5.2 (`ribbon_items` / `ribbon_visible`); `myne-md/myne#699`
+
 ### **libsodium-sys-stable / sodiumoxide** &nbsp; 🛠️ *Tooling*
 
 Rust FFI bindings to the libsodium C library. **Evaluated and rejected — neither is a Myne dependency.** An early stack sketch had the Rust crypto layer bind libsodium through one of these with RustCrypto crates as a fallback; `decisions.md` 2026-04-28 supersedes that clause by name and makes the **RustCrypto stack** the primary Rust provider, chiefly because FFI bindings would drag a vendored C tarball, `cc-rs`, and a per-platform C-compiler matrix into the reproducible-build story (`threat-model.md` §6, TB7/TB9). `protocol/Cargo.toml` names no libsodium binding. The entry is kept for the audit trail. See [libsodium](#libsodium), [RustCrypto](#rustcrypto).

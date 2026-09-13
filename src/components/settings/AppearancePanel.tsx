@@ -45,6 +45,7 @@ import {
 import { applyTheme } from "../../lib/theme";
 import { applyAccent, readAccent, writeAccent } from "../../lib/accentColor";
 import { CustomThemesSection } from "./CustomThemesSection";
+import { RibbonCustomizeSettings } from "./RibbonCustomizeSettings";
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
 // `labelKey` holds the i18n key (resolved at render, not import) so a language
@@ -700,6 +701,8 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
         activeCustom={activeCustom}
         onActiveCustomChange={setActiveCustom}
       />
+
+      <RibbonCustomizeSettings />
     </div>
   );
 }

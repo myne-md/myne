@@ -353,6 +353,12 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     ("reminder_horizon_days", PrefClass::DeviceLocal),
     ("reminders_enabled", PrefClass::DeviceLocal),
+    // myne-md/myne#699. **DeviceLocal**, like every sibling layout pref
+    // (`bar_items_order`, `right_panel_tab_order`, the editor_toolbar /
+    // editor_slash orders): the rail is how THIS machine's chrome is arranged,
+    // so the local value always survives the merge.
+    ("ribbon_items", PrefClass::DeviceLocal),
+    ("ribbon_visible", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
     ("right_panel_hidden_tabs", PrefClass::DeviceLocal),
     ("right_panel_tab_order", PrefClass::DeviceLocal),
@@ -513,6 +519,8 @@ mod tests {
             show_note_timestamps: _,
             reminders_enabled: _,
             reminder_horizon_days: _,
+            ribbon_items: _,
+            ribbon_visible: _,
             show_task_marker: _,
             spell_enabled: _,
             spell_languages: _,
@@ -587,6 +595,8 @@ mod tests {
             "periodic_notes",
             "reminder_horizon_days",
             "reminders_enabled",
+            "ribbon_items",
+            "ribbon_visible",
             "right_panel_active_tab",
             "right_panel_hidden_tabs",
             "right_panel_tab_order",

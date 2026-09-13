@@ -275,6 +275,35 @@ pub struct PrefsView {
     #[serde(default = "default_true")]
     pub reminders_enabled: bool,
 
+    /// The left ribbon's ordered pinned command ids (myne-md/myne#699).
+    ///
+    /// **`Option` on purpose.** `None` means the user has never configured the
+    /// rail, so the client renders its curated default set; `Some([])` is a
+    /// deliberately emptied rail and stays empty. A plain `Vec` could not tell
+    /// those apart under the codec's omit-when-empty discipline, which would
+    /// re-seed the defaults on a rail the user emptied. **Device-local** for the
+    /// merge, like `bar_items_order` / `right_panel_tab_order`: the rail is a
+    /// per-device chrome arrangement, so another device's rail never merges into
+    /// this one. The enclosing `vault.prefs` blob still rides the sync wire and
+    /// seeds a fresh device (see `sync-protocol.md` 10.2.1), so "device-local"
+    /// is a merge classification and not "never leaves the device".
+    /// **Non-load-bearing** (a tampered value can at worst rearrange or hide
+    /// rail buttons), so there is no protective-envelope clamp. Canonical key
+    /// `ribbon_items`, sorting after `reminders_enabled` (`re` < `ri`) and
+    /// before `ribbon_visible`.
+    #[serde(default)]
+    pub ribbon_items: Option<Vec<String>>,
+
+    /// Whether THIS DEVICE shows the left ribbon (myne-md/myne#699). Default
+    /// `true`. **Device-local** for the same reason as `ribbon_items`.
+    /// Inverted default polarity like `show_note_timestamps`, so the
+    /// serde-derive path needs `default = "default_true"`; the encoder emits it
+    /// only when `false`, keeping an untouched vault byte-identical. Canonical
+    /// key `ribbon_visible`, sorting after `ribbon_items` and before
+    /// `right_panel_active_tab`.
+    #[serde(default = "default_true")]
+    pub ribbon_visible: bool,
+
     /// How many days ahead this device registers reminders with the operating
     /// system (MYND-618). `None` means the client's built-in horizon.
     ///
@@ -1477,6 +1506,8 @@ impl Default for PrefsView {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -2335,6 +2366,25 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // vault stays byte-identical.
     if !prefs.reminders_enabled {
         out.extend_from_slice(b"\"reminders_enabled\":false,");
+    }
+
+    // ribbon_items (canonical key 'ribbon_items' — after reminders_enabled
+    // ['re' < 'ri'], before ribbon_visible, myne-md/myne#699). `Option` so
+    // `Some([])` (a deliberately emptied rail) is EMITTED as `[]` while `None`
+    // (never configured) is omitted, which is what lets the client seed its
+    // curated default only when the key is absent.
+    if let Some(ref items) = prefs.ribbon_items {
+        out.extend_from_slice(b"\"ribbon_items\":");
+        push_ordered_string_array(&mut out, items);
+        out.push(b',');
+    }
+
+    // ribbon_visible (canonical key 'ribbon_visible' — after ribbon_items
+    // ['ribbon_i' < 'ribbon_v'], before right_panel_active_tab ['rib' < 'rig'],
+    // myne-md/myne#699). Default `true`, so only a `false` is written; an
+    // untouched vault stays byte-identical.
+    if !prefs.ribbon_visible {
+        out.extend_from_slice(b"\"ribbon_visible\":false,");
     }
 
     // right_panel_active_tab (canonical key 'right_panel_a…' — after
@@ -3233,6 +3283,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // omit-when-default rule, so a pre-MYND-618 blob parses unchanged.
     let reminders_enabled =
         parse_optional_bool_field(rest, &mut cursor, b"\"reminders_enabled\":")?.unwrap_or(true);
+    // ribbon_items + ribbon_visible (keys 'ribbon' — after reminders_enabled
+    // ['re' < 'ri'], before right_panel_* ['rib' < 'rig'], myne-md/myne#699).
+    // `ribbon_items` uses the Option-returning array parse so ABSENT (never
+    // configured) stays distinguishable from PRESENT-but-EMPTY (deliberately
+    // emptied); `ribbon_visible` is omit-when-default, absent → `true`.
+    let ribbon_items = parse_optional_array_field_opt(rest, &mut cursor, b"\"ribbon_items\":")?;
+    let ribbon_visible =
+        parse_optional_bool_field(rest, &mut cursor, b"\"ribbon_visible\":")?.unwrap_or(true);
     // right_panel_* (keys 'r' — after paired_extensions ['p' < 'r'], before
     // saved_views ['r' < 'sav']). Parsed from the same monotonic cursor in
     // canonical order (active < hidden < tab_order) so the following saved_views /
@@ -3396,6 +3454,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         periodic_notes,
         reminder_horizon_days,
         reminders_enabled,
+        ribbon_items,
+        ribbon_visible,
         right_panel_active_tab,
         right_panel_hidden_tabs,
         right_panel_tab_order,
@@ -3761,28 +3821,41 @@ fn parse_json_bool(bytes: &[u8]) -> Option<(bool, &[u8])> {
     }
 }
 
-/// Parse an OPTIONAL canonical string-array field whose key marker is
-/// `marker`, searching `rest` from `*cursor` onward. On a hit, advances
-/// `*cursor` past the closing `]` and returns the decoded list; on a miss
-/// returns an empty list and leaves `*cursor` unchanged. Searching from a
-/// monotonically-advancing cursor (rather than from 0) keeps the canonical
-/// key-order discipline load-bearing — a later field's key marker is only
-/// matched after the prior field's array span.
-fn parse_optional_array_field(
+/// Parse an OPTIONAL canonical string-array field that must distinguish ABSENT
+/// from PRESENT-but-EMPTY (`ribbon_items`), searching `rest` from `*cursor`
+/// onward. On a hit, advances `*cursor` past the closing `]` and returns
+/// `Some(list)`; on a miss returns `None` and leaves `*cursor` unchanged.
+fn parse_optional_array_field_opt(
     rest: &[u8],
     cursor: &mut usize,
     marker: &[u8],
-) -> Result<Vec<String>, PrefsBlobError> {
+) -> Result<Option<Vec<String>>, PrefsBlobError> {
     match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let array_start = *cursor + rel_idx + marker.len();
             let (list, consumed) = parse_json_string_array(&rest[array_start..])
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             *cursor = array_start + consumed;
-            Ok(list)
+            Ok(Some(list))
         }
-        None => Ok(Vec::new()),
+        None => Ok(None),
     }
+}
+
+/// Parse an OPTIONAL canonical string-array field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward. On a hit, advances
+/// `*cursor` past the closing `]` and returns the decoded list; on a miss
+/// returns an empty list and leaves `*cursor` unchanged. Searching from a
+/// monotonically-advancing cursor (rather than from 0) keeps the canonical
+/// key-order discipline load-bearing: a later field's key marker is only
+/// matched after the prior field's array span. Delegates the walk to
+/// [`parse_optional_array_field_opt`], collapsing the miss arm.
+fn parse_optional_array_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<String>, PrefsBlobError> {
+    Ok(parse_optional_array_field_opt(rest, cursor, marker)?.unwrap_or_default())
 }
 
 /// Parse an OPTIONAL canonical string→string object field whose key marker is
@@ -4442,6 +4515,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -4524,6 +4599,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -5028,6 +5105,8 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
+                ribbon_items: None,
+                ribbon_visible: true,
                 reminder_horizon_days: None,
                 show_task_marker: true,
                 folder_icons: Default::default(),
@@ -5112,6 +5191,8 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
+                ribbon_items: None,
+                ribbon_visible: true,
                 reminder_horizon_days: None,
                 show_task_marker: true,
                 folder_icons: Default::default(),
@@ -6926,6 +7007,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -6963,6 +7046,8 @@ mod tests {
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7228,6 +7313,8 @@ mod tests {
         let prefs = PrefsView {
             show_note_timestamps: false,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             ..PrefsView::default()
@@ -7244,6 +7331,8 @@ mod tests {
         let original = PrefsView {
             show_note_timestamps: false,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             ..PrefsView::default()
@@ -7272,6 +7361,8 @@ mod tests {
         let prefs = PrefsView {
             show_note_timestamps: false,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: false,
             ..PrefsView::default()
@@ -7287,6 +7378,8 @@ mod tests {
     fn show_task_marker_false_round_trips() {
         let original = PrefsView {
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: false,
             ..PrefsView::default()
@@ -7356,6 +7449,8 @@ mod tests {
     fn reminders_enabled_false_round_trips() {
         let original = PrefsView {
             reminders_enabled: false,
+            ribbon_items: None,
+            ribbon_visible: true,
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
@@ -7413,6 +7508,8 @@ mod tests {
         // not merely look untidy — it fails to parse.
         let original = PrefsView {
             reminders_enabled: false,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: Some(14),
             right_panel_active_tab: Some(String::from("backlinks")),
             ..PrefsView::default()
@@ -7426,6 +7523,107 @@ mod tests {
         assert_eq!(decoded.reminder_horizon_days, Some(14));
         assert!(!decoded.reminders_enabled);
         assert_eq!(decoded.right_panel_active_tab.as_deref(), Some("backlinks"));
+    }
+
+    #[test]
+    fn ribbon_items_none_is_omitted_and_some_round_trips() {
+        // `None` (never configured) is omitted so an untouched vault stays
+        // byte-identical; `Some(list)` is emitted verbatim (order is payload).
+        let none = PrefsView {
+            ribbon_items: None,
+            ..PrefsView::default()
+        };
+        assert_eq!(
+            canonical_json_encode(&none).as_slice(),
+            br#"{"screen_capture_protection":true}"#
+        );
+
+        let some = PrefsView {
+            ribbon_items: Some(alloc::vec![
+                String::from("note.new-tab"),
+                String::from("note.open-today"),
+            ]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&some);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"ribbon_items":["note.new-tab","note.open-today"],"screen_capture_protection":true}"#
+        );
+        assert_eq!(
+            canonical_json_decode(&encoded)
+                .expect("decode")
+                .ribbon_items,
+            Some(alloc::vec![
+                String::from("note.new-tab"),
+                String::from("note.open-today"),
+            ])
+        );
+    }
+
+    #[test]
+    fn ribbon_items_some_empty_round_trips_as_empty_not_none() {
+        // The load-bearing distinction: a deliberately emptied rail must NOT
+        // decode back to `None` (which would re-seed the curated defaults).
+        let emptied = PrefsView {
+            ribbon_items: Some(Vec::new()),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&emptied);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"ribbon_items":[],"screen_capture_protection":true}"#
+        );
+        assert_eq!(
+            canonical_json_decode(&encoded)
+                .expect("decode")
+                .ribbon_items,
+            Some(Vec::new())
+        );
+    }
+
+    #[test]
+    fn ribbon_visible_false_round_trips_and_absent_decodes_to_true() {
+        let hidden = PrefsView {
+            ribbon_visible: false,
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&hidden);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"ribbon_visible":false,"screen_capture_protection":true}"#
+        );
+        assert!(
+            !canonical_json_decode(&encoded)
+                .expect("decode")
+                .ribbon_visible
+        );
+        // Absent key reads as shown (the default), the omit-when-default rule.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(decoded.ribbon_visible);
+    }
+
+    #[test]
+    fn ribbon_fields_sort_between_reminders_and_right_panel() {
+        let original = PrefsView {
+            reminders_enabled: false,
+            ribbon_items: Some(alloc::vec![String::from("palette.toggle")]),
+            ribbon_visible: false,
+            right_panel_active_tab: Some(String::from("backlinks")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"reminders_enabled":false,"ribbon_items":["palette.toggle"],"ribbon_visible":false,"right_panel_active_tab":"backlinks","screen_capture_protection":true}"#
+        );
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(
+            decoded.ribbon_items,
+            Some(alloc::vec![String::from("palette.toggle")])
+        );
+        assert!(!decoded.ribbon_visible);
     }
 
     #[test]
@@ -7475,6 +7673,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7563,6 +7763,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7654,6 +7856,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7740,6 +7944,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7886,6 +8092,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -7997,6 +8205,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -8094,6 +8304,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -8261,6 +8473,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -8372,6 +8586,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: map_of(&[("Projects/", "book")]),
@@ -8722,6 +8938,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -8808,6 +9026,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -8896,6 +9116,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -9052,6 +9274,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -9183,6 +9407,8 @@ mod tests {
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -9508,6 +9734,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -9598,6 +9826,8 @@ mod tests {
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
+            ribbon_items: None,
+            ribbon_visible: true,
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
@@ -9958,6 +10188,8 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
+                ribbon_items: None,
+                ribbon_visible: true,
                 reminder_horizon_days: None,
                 show_task_marker: true,
                 folder_icons: Default::default(),
@@ -10041,6 +10273,8 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 reminders_enabled: true,
+                ribbon_items: None,
+                ribbon_visible: true,
                 reminder_horizon_days: None,
                 show_task_marker: true,
                 folder_icons: Default::default(),
@@ -10118,6 +10352,8 @@ mod tests {
             transcription_enabled: false,
             show_note_timestamps: false,
             reminders_enabled: false,
+            ribbon_items: None,
+            ribbon_visible: true,
             show_task_marker: false,
             // positive-opt-in bools
             developer_mode: true,
@@ -11495,6 +11731,59 @@ mod tests {
     ///   and the bare-decimal u64 epoch encoding.
     /// - `decrypt-last-backup-at`: round-trip of the blob above; decoders
     ///   must surface the epoch value.
+    #[test]
+    #[ignore = "vector generator; run explicitly and splice the JSON into myne-test-vectors"]
+    fn emit_ribbon_fields_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        // 0xF2, the next free entry after the sibling generators' 0xF1.
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            ribbon_items: Some(alloc::vec![
+                String::from("note.new"),
+                String::from("periodic.open-this-week"),
+            ]),
+            ribbon_visible: false,
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"ribbon_items":["note.new","periodic.open-this-week"],"ribbon_visible":false,"screen_capture_protection":true}"#.as_slice(),
+        );
+        let blob =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce).expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+
+        let desc_enc = "myne-md/myne#699 left-ribbon fields (vault.prefs). ribbon_items is Some([...]) (a CONFIGURED rail; order is the payload, preserved verbatim) and ribbon_visible is false, the only value the encoder emits because true is omitted. Pins the canonical key order ribbon_items < ribbon_visible < screen_capture_protection. Generated by `cargo test -p protocol --lib emit_ribbon_fields_prefs_vectors -- --ignored`.";
+        let desc_dec = "Round-trip with encrypt-ribbon-fields: the blob decodes back to a PrefsView carrying ribbon_items + ribbon_visible=false + screen_capture_protection=true under the same root_key + account_number_hash. Verifies decoders surface the two fields from their canonical position between reminders_enabled and right_panel_active_tab, and that an explicitly emptied rail (Some([])) is distinct from a never-configured one (absent).";
+
+        let enc_line = alloc::format!(
+                "{{\n \"vector_id\": \"vault-prefs/v0.1/encrypt-ribbon-fields\",\n \"description\": \"{}\",\n \"case_kind\": \"encrypt\",\n \"input_root_key_hex\": \"{}\",\n \"input_account_number_hash_hex\": \"{}\",\n \"input_plaintext_canonical_utf8_hex\": \"{}\",\n \"input_prefs_nonce_hex\": \"{}\",\n \"informational_prefs_key_hex\": \"{}\",\n \"expected_prefs_blob_hex\": \"{}\"\n}}",
+                json_escape(desc_enc),
+                hex_lower(&root_a),
+                hex_lower(&account_hash_a),
+                hex_lower(&canonical),
+                hex_lower(&nonce),
+                hex_lower(&*prefs_key_a),
+                hex_lower(&blob),
+        );
+        let dec_line = alloc::format!(
+                "{{\n \"vector_id\": \"vault-prefs/v0.1/decrypt-ribbon-fields\",\n \"description\": \"{}\",\n \"case_kind\": \"decrypt_ok\",\n \"input_blob_hex\": \"{}\",\n \"input_root_key_hex\": \"{}\",\n \"input_account_number_hash_hex\": \"{}\",\n \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n \"expected_prefs_view\": {{\n  \"ribbon_items\": [\"note.new\", \"periodic.open-this-week\"],\n  \"ribbon_visible\": false,\n  \"screen_capture_protection\": true\n }}\n}}",
+                json_escape(desc_dec),
+                hex_lower(&blob),
+                hex_lower(&root_a),
+                hex_lower(&account_hash_a),
+                hex_lower(&canonical),
+        );
+        std::println!("{enc_line}");
+        std::println!("{dec_line}");
+    }
+
     #[test]
     #[ignore]
     fn emit_last_backup_at_prefs_vectors() {

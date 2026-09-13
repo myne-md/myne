@@ -195,6 +195,12 @@ interface SettingsModalProps {
   vaultId: string | null;
   open: boolean;
   onClose: () => void;
+  /**
+   * Panel to select when the modal opens. Used by the left ribbon's
+   * "Customize ribbon…" entry to land on Appearance. Absent means Account.
+   * Re-applied on every open, so a gear reopen after a rail reopen starts from
+   * this value again (or Account when undefined). */
+  initialPanel?: PanelId;
   /** Storage → "Back up vault…" (MYND-56): closes Settings, opens the
    *  export progress modal (engine MYND-32). */
   onBackupVault?: () => void;
@@ -406,6 +412,7 @@ export function SettingsModal({
   vaultId,
   open,
   onClose,
+  initialPanel,
   onBackupVault,
   onRestoreBackup,
   onExportVault,
@@ -430,7 +437,12 @@ export function SettingsModal({
       ),
     [prefs.developer_mode],
   );
-  const [selected, setSelected] = useState<PanelId>("account");
+  const [selected, setSelected] = useState<PanelId>(initialPanel ?? "account");
+  // Apply the requested panel each time the modal opens (the ribbon's
+  // "Customize ribbon…" passes "appearance").
+  useEffect(() => {
+    if (open) setSelected(initialPanel ?? "account");
+  }, [open, initialPanel]);
   // If the selected panel drops out of the roster (Developer mode turned off
   // while its group was open), fall back to Account rather than stranding the
   // content pane on a panel no longer reachable from the rail.
