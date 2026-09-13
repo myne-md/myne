@@ -34,20 +34,141 @@
   color: var(--fg-1, #23221e);
 }
 
-/* Date + optional time, side by side (myne#280). The time is secondary — a
-   date-only task is the common case — so it takes the narrower share. */
+/* Myne-owned date + optional time picker (myne-md/myne#614). This replaced the
+   platform `<input type="date">` / `<input type="time">`, which rendered in the
+   WebView's own region format and could not be reached by this stylesheet. */
 .cm-task-field-datetime {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.cm-task-field-datetime input[type="date"] {
+.cm-date-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cm-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.cm-date-month {
   flex: 1 1 auto;
-  min-width: 0;
+  text-align: center;
+  font-weight: var(--weight-semibold);
+  color: var(--fg-1, #23221e);
 }
 
-.cm-task-field-datetime input[type="time"] {
-  flex: 0 0 auto;
+.cm-date-value {
+  text-align: center;
+  color: var(--fg-2, #6b6a63);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-date-weekdays,
+.cm-date-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cm-date-weekday {
+  text-align: center;
+  color: var(--fg-3, #8a8981);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-medium, 500);
+}
+
+.cm-date-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Each cell is a flex box so its day button fills it; the cell owns the grid
+   semantics and the button inside owns the interactivity. */
+.cm-date-cell {
+  display: flex;
+}
+
+/* `.cm-task-field-editor button` is more specific than a bare `.cm-date-day`, so
+   every button the picker owns is scoped through the surface. */
+.cm-task-field-editor .cm-date-nav,
+.cm-task-field-editor .cm-date-day,
+.cm-task-field-editor .cm-time-meridiem,
+.cm-task-field-editor .cm-time-add,
+.cm-task-field-editor .cm-time-remove {
+  min-height: var(--space-6);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-1, #23221e);
+  font-weight: var(--weight-medium, 500);
+}
+
+.cm-task-field-editor .cm-date-nav {
+  min-width: var(--space-6);
+  padding: var(--space-0);
+  font-size: var(--text-lg, 1.125rem);
+  line-height: 1;
+}
+
+.cm-task-field-editor .cm-date-day {
+  flex: 1 1 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-task-field-editor .cm-date-day:hover {
+  background: var(--bg-2, #f1f0ec);
+}
+
+.cm-task-field-editor .cm-date-day.is-today {
+  border-color: var(--line-2, #c8c7c1);
+}
+
+.cm-task-field-editor .cm-date-day.is-selected,
+.cm-task-field-editor .cm-date-day[aria-selected="true"] {
+  background: var(--accent, #2c4a7a);
+  border-color: var(--accent, #2c4a7a);
+  color: var(--accent-on, #ffffff);
+  font-weight: var(--weight-semibold);
+}
+
+.cm-date-day-blank {
+  pointer-events: none;
+}
+
+.cm-time-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.cm-task-field-editor .cm-time-spin {
+  min-height: var(--space-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-1, #fbfaf7);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-time-colon {
+  color: var(--fg-3, #8a8981);
+}
+
+.cm-task-field-editor .cm-time-add,
+.cm-task-field-editor .cm-time-meridiem,
+.cm-task-field-editor .cm-time-remove {
+  min-height: var(--space-6);
+  padding: var(--space-1) var(--space-3);
+  border-color: var(--line-2, #c8c7c1);
 }
 
 /* One consistent control skin for every native input/select the surfaces use. */

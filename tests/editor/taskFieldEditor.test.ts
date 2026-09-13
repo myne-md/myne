@@ -29,7 +29,7 @@ function input(): HTMLElement {
 }
 
 describe("opens from every chip kind", () => {
-  it("opens for a due field with a native date input", () => {
+  it("opens for a due field with a Myne-owned calendar picker", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({
       anchor,
@@ -38,10 +38,12 @@ describe("opens from every chip kind", () => {
       onCommit: () => {},
     });
     expect(surface()).not.toBeNull();
-    const el = input() as HTMLInputElement;
-    expect(el.tagName).toBe("INPUT");
-    expect(el.type).toBe("date");
-    expect(el.value).toBe("2026-08-01");
+    // The primary control is a day button in the calendar grid, not a native
+    // input (myne-md/myne#614 replaced the platform control).
+    const selected = surface()!.querySelector('[data-date="2026-08-01"]')!;
+    expect(selected.parentElement!.getAttribute("aria-selected")).toBe("true");
+    expect(selected.getAttribute("data-testid")).toBe("editor.task-field-input");
+    expect(surface()!.querySelector('[data-testid="editor.task-date-value"]')).not.toBeNull();
     handle.close();
     anchor.remove();
   });
@@ -126,7 +128,7 @@ describe("opens from every chip kind", () => {
 });
 
 describe("keyboard operation", () => {
-  it("focuses the input on open, so the surface is usable without a mouse", () => {
+  it("focuses the primary control on open, so the surface is usable without a mouse", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({
       anchor,
@@ -139,7 +141,7 @@ describe("keyboard operation", () => {
     anchor.remove();
   });
 
-  it("exposes every control as focusable — input, commit, cancel", () => {
+  it("keeps exactly one day tabbable, plus the time and action controls", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({
       anchor,
@@ -147,9 +149,13 @@ describe("keyboard operation", () => {
       value: "2026-08-01",
       onCommit: () => {},
     });
-    // date + time (myne#280) + commit + cancel.
-    const focusables = surface()!.querySelectorAll("input, select, button");
-    expect(focusables.length).toBe(4);
+    // The grid has ~35 day buttons but a roving tabindex leaves one tabbable;
+    // with the month nav, clear, add-time, commit and cancel buttons that is
+    // seven stops.
+    const tabbable = [
+      ...surface()!.querySelectorAll<HTMLElement>("button, [tabindex]"),
+    ].filter((el) => el.tabIndex >= 0);
+    expect(tabbable.length).toBe(7);
     handle.close();
     anchor.remove();
   });
@@ -159,10 +165,12 @@ describe("keyboard operation", () => {
     const onCommit = vi.fn();
     openTaskFieldEditor({ anchor, kind: "due", value: "2026-08-01", onCommit });
 
-    (input() as HTMLInputElement).value = "2026-09-09";
+    // Pick a different day, then Enter: the modal's Enter commits whatever the
+    // picker currently holds.
+    surface()!.querySelector<HTMLElement>('[data-date="2026-08-15"]')!.click();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
-    expect(onCommit).toHaveBeenCalledWith("2026-09-09");
+    expect(onCommit).toHaveBeenCalledWith("2026-08-15");
     anchor.remove();
   });
 
@@ -171,10 +179,10 @@ describe("keyboard operation", () => {
     const onCommit = vi.fn();
     openTaskFieldEditor({ anchor, kind: "due", value: "2026-08-01", onCommit });
 
-    (input() as HTMLInputElement).value = "2026-09-09";
+    surface()!.querySelector<HTMLElement>('[data-date="2026-08-15"]')!.click();
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
-    expect(onCommit).toHaveBeenCalledWith("2026-09-09");
+    expect(onCommit).toHaveBeenCalledWith("2026-08-15");
     anchor.remove();
   });
 });
@@ -477,7 +485,7 @@ describe("Escape dismisses without changing anything", () => {
     const onCancel = vi.fn();
     openTaskFieldEditor({ anchor, kind: "due", value: "2026-08-01", onCommit, onCancel });
 
-    (input() as HTMLInputElement).value = "2026-12-31";
+    surface()!.querySelector<HTMLElement>('[data-date="2026-08-20"]')!.click();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(onCommit).not.toHaveBeenCalled();
@@ -562,26 +570,34 @@ describe("lifecycle", () => {
 // ── myne#280: an optional time, and `remind` as a fourth kind ───────────────
 //
 // `TaskInstant` has always been `{ date, time? }` and the writer has always
-// round-tripped a time; what was missing was any way to AUTHOR one. So a task
-// could be due "on a day" but never "at 14:00", and `remind` — the field the
-// notification scheduler actually reads — was reachable only by hand-typing the
-// field into the markdown.
+// round-tripped a time; what was missing was any way to AUTHOR one. myne#614
+// then replaced the platform date/time inputs with the Myne-owned picker, so
+// these drive that control instead of setting `.value` on a native input.
 describe("the optional time control", () => {
-  function timeInput(): HTMLInputElement {
-    return document.querySelector('[data-testid="editor.task-field-time"]')!;
+  function hour(): HTMLElement {
+    return document.querySelector('[data-testid="editor.task-time-hour"]')!;
+  }
+  function minute(): HTMLElement {
+    return document.querySelector('[data-testid="editor.task-time-minute"]')!;
+  }
+  function addTime(): HTMLElement {
+    return document.querySelector('[data-testid="editor.task-time-add"]')!;
+  }
+  function commitButton(): HTMLElement {
+    return document.querySelector('[data-testid="editor.task-field-commit"]')!;
   }
 
-  it("is present beside the date for due and remind", () => {
+  it("offers to add a time for due and remind", () => {
     for (const kind of ["due", "remind"] as const) {
       const anchor = anchorEl();
       const handle = openTaskFieldEditor({ anchor, kind, value: "", onCommit: () => {} });
-      expect(timeInput()).toBeTruthy();
+      expect(addTime()).toBeTruthy();
       handle.close();
       anchor.remove();
     }
   });
 
-  it("starts empty for a date-only value — the common case", () => {
+  it("starts with no time for a date-only value, the common case", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({
       anchor,
@@ -589,7 +605,8 @@ describe("the optional time control", () => {
       value: "2026-08-01",
       onCommit: () => {},
     });
-    expect(timeInput().value).toBe("");
+    expect(document.querySelector('[data-testid="editor.task-time-hour"]')).toBeNull();
+    expect(addTime()).toBeTruthy();
     handle.close();
     anchor.remove();
   });
@@ -603,30 +620,48 @@ describe("the optional time control", () => {
         value: stored,
         onCommit: () => {},
       });
-      expect(timeInput().value).toBe("09:00");
+      // The stored hour/minute round-trip; only the display form is localized.
+      expect(Number(hour().getAttribute("aria-valuenow"))).toBe(9);
+      expect(minute().getAttribute("aria-valuenow")).toBe("0");
       handle.close();
       anchor.remove();
     }
   });
 
-  it("commits a date-only value when the time is left empty", () => {
+  it("steps the hour with the arrow keys, wrapping at midnight", () => {
+    const anchor = anchorEl();
+    const handle = openTaskFieldEditor({
+      anchor,
+      kind: "due",
+      value: "2026-08-01 09:00",
+      onCommit: () => {},
+    });
+    hour().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    expect(Number(hour().getAttribute("aria-valuenow"))).toBe(8);
+    hour().dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+    expect(Number(hour().getAttribute("aria-valuenow"))).toBe(12); // 00:00 in a 12h locale
+    handle.close();
+    anchor.remove();
+  });
+
+  it("commits a date-only value when no time was added", () => {
     const anchor = anchorEl();
     const onCommit = vi.fn();
-    openTaskFieldEditor({ anchor, kind: "due", value: "", onCommit });
-    (input() as HTMLInputElement).value = "2026-09-09";
-    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    openTaskFieldEditor({ anchor, kind: "due", value: "2026-09-01", onCommit });
+    surface()!.querySelector<HTMLElement>('[data-date="2026-09-09"]')!.click();
+    commitButton().click();
     expect(onCommit).toHaveBeenCalledWith("2026-09-09");
     anchor.remove();
   });
 
-  it("commits date + time when a time is set", () => {
+  it("commits date + time once a time is added", () => {
     const anchor = anchorEl();
     const onCommit = vi.fn();
-    openTaskFieldEditor({ anchor, kind: "remind", value: "", onCommit });
-    (input() as HTMLInputElement).value = "2026-09-09";
-    timeInput().value = "14:00";
-    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
-    expect(onCommit).toHaveBeenCalledWith("2026-09-09 14:00");
+    openTaskFieldEditor({ anchor, kind: "remind", value: "2026-09-01", onCommit });
+    surface()!.querySelector<HTMLElement>('[data-date="2026-09-09"]')!.click();
+    addTime().click(); // seeds 09:00
+    commitButton().click();
+    expect(onCommit).toHaveBeenCalledWith("2026-09-09 09:00");
     anchor.remove();
   });
 
@@ -635,8 +670,8 @@ describe("the optional time control", () => {
     const anchor = anchorEl();
     const onCommit = vi.fn();
     openTaskFieldEditor({ anchor, kind: "due", value: "", onCommit });
-    timeInput().value = "14:00";
-    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    addTime().click(); // a time, but no day chosen
+    commitButton().click();
     expect(onCommit).toHaveBeenCalledWith("");
     anchor.remove();
   });

@@ -74,6 +74,20 @@ function fieldInput(): HTMLInputElement | HTMLSelectElement {
   return document.querySelector('[data-testid="editor.task-field-input"]')!;
 }
 
+/** Pick `iso` on the Myne-owned calendar, moving to its month first (myne#614
+ *  replaced the native date input, which had a `.value` setter). Bidirectional
+ *  so the helper does not depend on the wall-clock month it runs in. */
+function pickDay(iso: string): void {
+  const editor = surface()!;
+  const prev = editor.querySelector('[data-testid="editor.task-date-prev"]') as HTMLElement;
+  const next = editor.querySelector('[data-testid="editor.task-date-next"]') as HTMLElement;
+  for (let i = 0; i < 120 && editor.querySelector(`[data-date="${iso}"]`) === null; i += 1) {
+    const shown = editor.querySelector("[data-date]")?.getAttribute("data-date") ?? "";
+    (iso < shown ? prev : next).click();
+  }
+  editor.querySelector<HTMLElement>(`[data-date="${iso}"]`)!.click();
+}
+
 describe("clicking a chip opens its editor", () => {
   it("opens for a due chip, prefilled with the SOURCE value", () => {
     cleanup.push(installChipListener());
@@ -81,7 +95,7 @@ describe("clicking a chip opens its editor", () => {
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(surface()).not.toBeNull();
-    expect((fieldInput() as HTMLInputElement).value).toBe("2026-08-01");
+    expect(fieldInput().getAttribute("data-date")).toBe("2026-08-01");
   });
 
   it("opens for a priority chip with the five levels", () => {
@@ -116,7 +130,7 @@ describe("committing reaches the document", () => {
     const { view, host } = mount();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     expect(view.state.doc.toString()).toContain("[due:: 2026-09-09]");
@@ -130,7 +144,7 @@ describe("committing reaches the document", () => {
     const before = view.state.doc.toString();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    (fieldInput() as HTMLInputElement).value = "2026-12-31";
+    pickDay("2026-12-31");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(view.state.doc.toString()).toBe(before);
@@ -149,7 +163,7 @@ describe("committing reaches the document", () => {
 
     view.dispatch({ changes: { from: 0, insert: "# A heading inserted above\n\n" } });
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     const text = view.state.doc.toString();
@@ -171,7 +185,7 @@ describe("committing reaches the document", () => {
     view.dispatch({ changes: { from: line.from, to: line.to, insert: "gone" } });
     const after = view.state.doc.toString();
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     expect(view.state.doc.toString()).toBe(after);

@@ -8,11 +8,12 @@
 //     and backdrop click;
 //   - `computePosition` (positioning.ts) for the viewport clamp and above/below
 //     flip, so the surface never opens off-screen;
-//   - the platform `<input type="date">`, which MYND-614 task 1 measured as
-//     fully supported on both reachable WebViews (macOS WKWebView and Linux
-//     WebKitGTK: type retained, `showPicker()` callable, `valueAsDate`
-//     round-trips, invalid values rejected). That measurement is what makes the
-//     due field a thin wrapper rather than a hand-rolled calendar grid.
+//   - `buildTaskDateTimeControl` (task-date-time-picker.ts), the Myne-owned date
+//     + time picker for the due / remind fields. It replaced the platform
+//     `<input type="date">` / `<input type="time">`, whose visible format is the
+//     WebView's region setting and ignored the `date_format` / `time_format`
+//     prefs (myne-md/myne#614; the reversal and what changed since the earlier
+//     measurement are recorded in `design-notes/editor/0586-*`);
 //   - for the repeat field, the shared recurrence model
 //     (`@myne/dialect/recurrence`): the rule is **assembled from controls and
 //     serialized to canonical English**, never typed. That is `markdown-dialect.md`
@@ -32,6 +33,7 @@
 import "./task-surfaces.css";
 import { computePosition, type Rect } from "./positioning";
 import { openModal } from "./host/lib/imperative-modal";
+import { buildTaskDateTimeControl } from "./task-date-time-picker";
 import i18n from "@myne/editor/i18n";
 import {
   formatRecurrenceSpec,
@@ -709,46 +711,13 @@ function buildBody(kind: TaskFieldKind, value: string, popup: FieldPopupHost): F
     return { root: select.root, getValue: () => select.getValue(), focusTarget: select.el };
   }
 
-  // `due` and `remind` — the native date control (task 1's measurement) PLUS an
-  // optional native time control (myne#280).
-  //
-  // `TaskInstant` has always been `{ date, time? }` and the writer has always
-  // round-tripped a time; what was missing was any way to author one, so a task
-  // could be due "on a day" but never "at 14:00", and `remind` — the field the
-  // notification scheduler actually reads — was reachable only by hand-typing
-  // the field into the markdown.
-  //
-  // The time is OPTIONAL and empty by default, because a date-only task is what
-  // most tasks want: an empty time serializes to a bare date, exactly as before.
-  const row = document.createElement("div");
-  row.className = "cm-task-field-datetime";
-
-  const date = document.createElement("input");
-  date.type = "date";
-  date.value = value.slice(0, 10);
-  date.setAttribute("data-testid", "editor.task-field-input");
-  row.appendChild(date);
-
-  const time = document.createElement("input");
-  time.type = "time";
-  // The stored separator is either `T` or a space; both are accepted by the
-  // parser, and the writer emits one canonically — so read past whichever is
-  // there rather than assuming.
-  time.value = /^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})/.exec(value)?.[1] ?? "";
-  time.setAttribute("data-testid", "editor.task-field-time");
-  time.setAttribute("aria-label", i18n.t("editor.taskField.timeLabel"));
-  row.appendChild(time);
-
-  return {
-    root: row,
-    getValue: () => {
-      // No date means no field at all — a bare time is not a `TaskInstant`, and
-      // emitting one would produce bytes the parser refuses.
-      if (date.value === "") return "";
-      return time.value === "" ? date.value : `${date.value} ${time.value}`;
-    },
-    focusTarget: date,
-  };
+  // `due` and `remind`: the Myne-owned date + optional time picker
+  // (myne-md/myne#614). Replaces the platform `<input type="date">` /
+  // `<input type="time">` whose visible format was the WebView's region setting
+  // and could not be styled or localized by the page. The stored bytes are
+  // unchanged (`YYYY-MM-DD`, optionally ` HH:mm`, wall clock, no zone); see the
+  // picker module header for the full contract.
+  return buildTaskDateTimeControl(value);
 }
 
 /**
@@ -803,6 +772,17 @@ export function openTaskFieldEditor(
       if (!committed) onCancel?.();
     },
     onEnter: (e) => {
+      // Enter on the picker's own secondary controls belongs to them: the month
+      // arrows, Add/Remove time, the AM/PM toggle and Clear must activate, not
+      // commit the whole field. A day cell still commits, so Enter on the
+      // focused (and therefore selected) day is the fast path.
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.(".cm-date-picker, .cm-time-picker") &&
+        !target.closest?.(".cm-date-day")
+      ) {
+        return;
+      }
       e.preventDefault();
       if (activePopup !== null) return;
       // A combobox trigger owns Enter (it opens the listbox); committing here
