@@ -67,15 +67,31 @@ describeE2E("tc1 task-field chips render, open, and write (MYND-614)", () => {
           { label: "one priority chip" },
         );
 
-        // 2. Clicking a chip opens the field editor. The `due` editor is a
-        //    native `<input type="date">`, so this proves the OPEN path for the
-        //    one field whose control is a platform widget.
+        // 2. Clicking a chip opens the field editor. The `due` editor is the
+        //    Myne-owned calendar picker now (myne-md/myne#614), whose primary
+        //    control is a day button, so this proves the OPEN path for the field
+        //    whose control is a grid rather than a text box.
         await (await s.byTestId("editor.task-chip-due")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
-        // Escape goes to the FIELD INPUT, which is what holds focus while the
+        // Escape goes to the FIELD CONTROL, which is what holds focus while the
         // editor is open — `.cm-content` is not focusable then (tc2's pattern).
         await (await s.byTestId("editor.task-field-input")).sendKeys(ESCAPE_KEY);
         await s.waitForGone(testIdSelector("editor.task-field-editor"));
+
+        // 2b. Pick a day on the calendar and commit, so the new control's WRITE
+        //     path is proven end to end, not only its open/close. The stored
+        //     value is 2026-08-01, so the grid opens on August 2026 and the 15th
+        //     is a visible cell with no month navigation.
+        await (await s.byTestId("editor.task-chip-due")).click();
+        await s.waitForElement(testIdSelector("editor.task-field-editor"));
+        await (await s.waitForElement('[data-date="2026-08-15"]')).click();
+        await (await s.byTestId("editor.task-field-commit")).click();
+        await waitForSaved(s);
+        await s.waitUntil(
+          async () =>
+            (await editorSourceText(s)).includes("[due:: 2026-08-15]") ? true : null,
+          { label: "picked date reached the file" },
+        );
 
         // 3. A value change lands in the FILE — the point of the whole path.
         //    Driven through `repeat`, whose editor is a CONTROL, not a text box

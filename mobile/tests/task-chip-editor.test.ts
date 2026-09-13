@@ -78,8 +78,12 @@ describe("the shared field editor loads through mobile's module graph", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({ anchor, kind: "due", value: "2026-08-01", onCommit: () => {} });
     expect(surface()).not.toBeNull();
+    // myne#614: the due control is the Myne calendar now, so the primary
+    // control is the day button for the stored date rather than a native input.
     expect(
-      (document.querySelector('[data-testid="editor.task-field-input"]') as HTMLInputElement).value,
+      document
+        .querySelector('[data-testid="editor.task-field-input"]')
+        ?.getAttribute("data-date"),
     ).toBe("2026-08-01");
     handle.close();
     anchor.remove();

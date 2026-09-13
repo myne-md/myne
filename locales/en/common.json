@@ -1316,22 +1316,31 @@
     },
     "taskField": {
       "addAffordance": "Add task field",
+      "addTime": "Add time",
+      "clear": "Clear",
+      "dateGrid": "Choose a date",
+      "dateNext": "Next month",
+      "datePrev": "Previous month",
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
       "menuEdit": "Edit {{field}}",
       "menuTitle": "Add field",
+      "noDate": "No date",
       "repeatNoAnchor": "This task has no date to repeat from, so it won't repeat. Add a due date to start it.",
       "repeatNeedsDate": "Needs a due date to repeat from",
+      "removeTime": "Remove time",
       "save": "Save",
       "skipOccurrence": "Skip this occurrence",
+      "timeHour": "Hour",
+      "timeMeridiem": "AM or PM",
+      "timeMinute": "Minute",
       "title": {
         "due": "Due date",
         "repeat": "Repeat",
         "priority": "Priority",
         "remind": "Reminder"
       },
-      "timeLabel": "Time (optional)",
       "invalidRemind": "Myne can't read this date, so it won't remind you."
     },
     "toolbar": {
