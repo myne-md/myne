@@ -70,12 +70,28 @@ export function serializeTaskFields(fields: TaskFields): string {
 
 /** Byte ranges of every `TaskField` node on the line, in document order. */
 function fieldRanges(line: string, tree?: Tree): ByteRange[] {
-  const t = tree ?? parser.parse(line);
+  if (tree !== undefined) {
+    const ranges: ByteRange[] = [];
+    tree.iterate({
+      enter: (n) => {
+        if (n.name !== "TaskField") return undefined;
+        ranges.push({ start: n.from, end: n.to });
+        return false;
+      },
+    });
+    return ranges;
+  }
+  // No tree: parse the line in isolation. An INDENTED line parsed alone can be
+  // read as an indented code block (CommonMark), so a deeply nested task yields
+  // no `TaskField` and its raw `[due:: …]` leaks into the description. Strip the
+  // indent for the parse and shift the ranges back (myne-md/myne#656 review).
+  const indent = /^[ \t]*/.exec(line)?.[0].length ?? 0;
+  const t = parser.parse(line.slice(indent));
   const ranges: ByteRange[] = [];
   t.iterate({
     enter: (n) => {
       if (n.name !== "TaskField") return undefined;
-      ranges.push({ start: n.from, end: n.to });
+      ranges.push({ start: n.from + indent, end: n.to + indent });
       return false;
     },
   });
