@@ -58,6 +58,8 @@ import {
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
   setTaskViewState as setTaskViewStateOp,
+  resolveTaskView,
+  taskViewToPersisted,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
   switchToSlot as switchToSlotOp,
@@ -297,6 +299,9 @@ export type WorkspaceApi = {
   /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
   setTaskViewState: (paneId: PaneId, next: TaskView) => void;
+  /** The LAST task view, container-level, so closing and reopening the Tasks
+   *  tab restores the filters (myne-md/myne#656 review). */
+  taskView: TaskView;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -632,8 +637,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const setTaskViewState = useCallback(
     (paneId: PaneId, next: TaskView) => {
       setState((s) => setTaskViewStateOp(s, paneId, next));
+      // Mirror to the container so a CLOSED-and-reopened Tasks tab restores the
+      // filters instead of resetting them (myne-md/myne#656 review).
+      setContainer((c) => ({ ...c, taskView: taskViewToPersisted(next) }));
     },
-    [],
+    [setContainer],
   );
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
@@ -850,6 +858,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setGraphSettings,
       taskDisplay: container.taskDisplay ?? DEFAULT_TASK_DISPLAY,
       setTaskDisplay,
+      taskView: resolveTaskView(container.taskView),
       restoreContainer,
       saveWorkspaceAs,
       switchWorkspace,

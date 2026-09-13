@@ -25,7 +25,7 @@
 //     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
-import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type ReactElement } from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
 import "./task-row.css";
@@ -259,6 +259,7 @@ export function TaskRow({
   const raw = rowDate(task);
   const date = raw === undefined ? undefined : formatStoredValue(raw, display);
   const depth = task.depth ?? 0;
+  const [hover, setHover] = useState(false);
   const disabled = task.oversized === true || onToggle === undefined;
 
   const toggle = (): void => {
@@ -310,9 +311,11 @@ export function TaskRow({
 
   return (
     <div
-      style={rowStyle(depth)}
+      style={{ ...rowStyle(depth), background: hover ? "var(--paper-2)" : "transparent" }}
       data-testid={`${testIdPrefix}.row`}
       data-task-scope={scope}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       {...(depth > 0 ? { "data-depth": String(depth) } : {})}
     >
       <span

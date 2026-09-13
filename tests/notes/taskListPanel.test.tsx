@@ -117,31 +117,78 @@ describe("sections (myne-md/myne#656)", () => {
   });
 });
 
-describe("the filter row", () => {
-  it("reports status changes rather than owning the state", () => {
-    const onViewChange = vi.fn();
-    const { host, cleanup } = render(panel({ onViewChange }));
+describe("the filter builder (myne-md/myne#656 review)", () => {
+  const openBuilder = (host: HTMLElement): void => {
     act(() =>
-      q(host, "tasks.status-all")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+      q(host, "tasks.filtersButton")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
     );
-    expect(onViewChange).toHaveBeenCalledWith({ ...DEFAULT_TASK_VIEW, status: "all" });
+  };
+
+  it("keeps the toolbar to search plus a Filters button until it is opened", () => {
+    const { host, cleanup } = render(panel());
+    expect(q(host, "tasks.search")).not.toBeNull();
+    expect(q(host, "tasks.filtersButton")).not.toBeNull();
+    // The axes are NOT cluttering the toolbar.
+    expect(q(host, "tasks.status")).toBeNull();
+    expect(q(host, "tasks.dueFilter")).toBeNull();
     cleanup();
   });
 
-  it("offers the independent axes", () => {
+  it("opens with the axis list only, then reveals the chosen axis's values", () => {
     const { host, cleanup } = render(panel());
-    for (const id of [
-      "tasks.search",
-      "tasks.status",
-      "tasks.dueFilter",
-      "tasks.folderFilter",
-      "tasks.noteFilter",
-      "tasks.tagFilter",
-      "tasks.priorityFilter",
-      "tasks.sort",
-    ]) {
-      expect(q(host, id), id).not.toBeNull();
+    openBuilder(host);
+    for (const axis of ["status", "due", "folder", "note", "tag", "priority", "sort"]) {
+      expect(q(host, `tasks.builderTab.${axis}`), axis).not.toBeNull();
     }
+    // Open on first open: the right pane shows the "select an axis" hint, not
+    // values, until an axis is chosen.
+    expect(q(host, "tasks.filtersHint")).not.toBeNull();
+    expect(q(host, "tasks.builderOption.status.undone")).toBeNull();
+    act(() =>
+      q(host, "tasks.builderTab.status")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    expect(q(host, "tasks.filtersHint")).toBeNull();
+    expect(q(host, "tasks.builderOption.status.undone")).not.toBeNull();
+    cleanup();
+  });
+
+  it("resets one axis from the builder and all of them from the header or the chip row", () => {
+    const onViewChange = vi.fn();
+    const { host, cleanup } = render(panel({ onViewChange, view: view({ status: "all", priority: "high" }) }));
+    openBuilder(host);
+    act(() =>
+      q(host, "tasks.builderTab.status-reset")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    expect(onViewChange).toHaveBeenCalledWith(expect.objectContaining({ status: DEFAULT_TASK_VIEW.status }));
+    onViewChange.mockClear();
+    act(() =>
+      q(host, "tasks.clearFiltersBuilder")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    expect(onViewChange).toHaveBeenCalledWith(DEFAULT_TASK_VIEW);
+    cleanup();
+  });
+
+  it("lists an active filter as a removable chip under the search", () => {
+    const onViewChange = vi.fn();
+    const { host, cleanup } = render(
+      panel({ onViewChange, view: view({ status: "all", priority: "high" }) }),
+    );
+    expect(q(host, "tasks.applied.status")).not.toBeNull();
+    expect(q(host, "tasks.applied.priority")).not.toBeNull();
+    expect(q(host, "tasks.filtersCount")?.textContent).toBe("2");
+    act(() =>
+      q(host, "tasks.applied.status")!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    expect(onViewChange).toHaveBeenCalledWith(
+      expect.objectContaining({ status: DEFAULT_TASK_VIEW.status }),
+    );
+    cleanup();
+  });
+
+  it("minimal mode (the note-scoped panel) is search only", () => {
+    const { host, cleanup } = render(panel({ minimal: true }));
+    expect(q(host, "tasks.search")).not.toBeNull();
+    expect(q(host, "tasks.filtersButton")).toBeNull();
     cleanup();
   });
 });

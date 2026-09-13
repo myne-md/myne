@@ -30,6 +30,7 @@ import {
 } from "./decorations/task-chip";
 import { canSkipOccurrence, skipOccurrence } from "./decorations/task-recurrence";
 import { canRecur } from "@myne/dialect/taskRecurrence";
+import { taskChipIcon } from "@myne/editor/host/notes/taskChipIcon";
 import i18n from "@myne/editor/i18n";
 
 /** Menu order — the same stable order the writer serializes in. */
@@ -220,11 +221,16 @@ export function openTaskFieldMenu(opts: {
     row.setAttribute("role", "menuitem");
     row.setAttribute("data-testid", `editor.task-field-menu-${kind}`);
     const title = i18n.t(`editor.taskField.title.${kind}`);
+    // Leading icon, so the menu reads at a glance (myne-md/myne#656 review).
+    const main = document.createElement("span");
+    main.className = "cm-task-field-menu-main";
+    main.appendChild(taskChipIcon(kind, kind === "priority" ? "high" : ""));
     const label = document.createElement("span");
     label.textContent = present.has(kind)
       ? i18n.t("editor.taskField.menuEdit", { field: title })
       : title;
-    row.appendChild(label);
+    main.appendChild(label);
+    row.appendChild(main);
     if (kind === "repeat" && repeatNeedsAnchor) {
       const note = document.createElement("span");
       note.className = "cm-task-field-menu-note";

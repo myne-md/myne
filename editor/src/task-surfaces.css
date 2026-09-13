@@ -589,6 +589,21 @@
 
 /* A row that carries a note stacks label over note instead of centring one
    line — see `.cm-task-field-menu-note`. */
+/* Icon + label stay on one line even when the row also carries the "needs a
+   date" note (which makes the row a column). */
+.cm-task-field-menu-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.cm-task-field-menu-main .cm-task-chip-icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  color: var(--fg-3, #78766e);
+}
+
 .cm-task-field-menu-row:has(.cm-task-field-menu-note) {
   flex-direction: column;
   align-items: flex-start;

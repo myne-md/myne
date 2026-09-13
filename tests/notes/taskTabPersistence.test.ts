@@ -70,8 +70,8 @@ describe("omit-when-default", () => {
   });
 
   it("an empty tag list is omitted, not persisted as []", () => {
-    const s = setTaskViewState(withTasksTab(), "p1", view({ folder: "Projects", tags: [] }));
-    expect(tab(s).taskView).toEqual({ folder: "Projects" });
+    const s = setTaskViewState(withTasksTab(), "p1", view({ folders: ["Projects"], tags: [] }));
+    expect(tab(s).taskView).toEqual({ folders: ["Projects"] });
   });
 });
 
@@ -83,7 +83,7 @@ describe("state survives a restart", () => {
       view({
         status: "all",
         due: "upcoming",
-        folder: "Projects",
+        folders: ["Projects"],
         noteId: "n7",
         priority: "high",
         sort: "note",
@@ -92,7 +92,7 @@ describe("state survives a restart", () => {
     expect(taskViewOf(tab(roundTrip(s)) as unknown as WorkspaceItem)).toEqual({
       status: "all",
       due: "upcoming",
-      folder: "Projects",
+      folders: ["Projects"],
       noteId: "n7",
       tags: [],
       priority: "high",
@@ -141,11 +141,11 @@ describe("an unknown persisted value degrades to the default", () => {
 
   it("keeps the good half of a half-junk view", () => {
     const parsed = deserializeWorkspace(
-      blob({ folder: "Projects", tags: [1, "work", null], sort: "bogus" }),
+      blob({ folders: ["Projects"], tags: [1, "work", null], sort: "bogus" }),
     );
     expect(taskViewOf(tab(parsed!) as unknown as WorkspaceItem)).toEqual({
       ...DEFAULT_TASK_VIEW,
-      folder: "Projects",
+      folders: ["Projects"],
       tags: ["work"],
     });
   });
@@ -157,7 +157,7 @@ describe("an unknown persisted value degrades to the default", () => {
     expect(taskViewOf(tab(parsed!) as unknown as WorkspaceItem)).toEqual({
       ...DEFAULT_TASK_VIEW,
       due: "upcoming",
-      folder: "Projects",
+      folders: ["Projects"],
       tags: ["work"],
     });
   });
