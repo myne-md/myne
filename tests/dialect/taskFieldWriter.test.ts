@@ -222,3 +222,104 @@ describe("clearing the last field leaves a line the parser still reads as a task
     );
   });
 });
+
+describe("a user's own whitespace survives a write (myne-md/myne#657)", () => {
+  const EMPTY = { preserved: [], malformed: [] };
+
+  it("keeps a trailing space that is not adjacent to the removed field", () => {
+    // The reported defect: the strip ran a blanket right-trim over the whole
+    // line, so a space the user typed at the end vanished from the file even
+    // when the field being cleared sat earlier on the line.
+    expect(applyPlan("- [ ] call [due:: 2026-08-01] the plumber ", EMPTY)).toBe(
+      "- [ ] call the plumber ",
+    );
+  });
+
+  it("keeps a double space inside the description instead of folding it", () => {
+    // The same blanket pass collapsed every run of 2+ spaces, not only the ones
+    // a removed span left behind, mutating text no removal had touched.
+    expect(applyPlan("- [ ] a  b [due:: 2026-08-01]", EMPTY)).toBe("- [ ] a  b");
+  });
+
+  it("still collapses the separator a removed field leaves between two words", () => {
+    // The repair is scoped, not deleted. Removing a field from between two
+    // words must leave exactly one space.
+    expect(applyPlan("- [ ] call [due:: 2026-08-01] the plumber", EMPTY)).toBe(
+      "- [ ] call the plumber",
+    );
+  });
+
+  it("keeps the separator at EVERY junction, not only the last one", () => {
+    // Two fields with text around them: the join after the FIRST removal needs
+    // its own space. Dropping it there merged the words (`callthe plumber`),
+    // which is the regression this case pins.
+    expect(
+      applyPlan("- [ ] call [due:: 2026-08-01] the plumber [priority:: high]", EMPTY),
+    ).toBe("- [ ] call the plumber");
+  });
+
+  it("handles a field glued to the checkbox without losing the next word", () => {
+    // The field is straight after `[ ]` and a second field sits at the end, so
+    // the result must still read as a task with its separator (myne-md/myne#593
+    // is the shape where it does not).
+    expect(applyPlan("- [ ] [due:: 2026-08-01] call [priority:: high]", EMPTY)).toBe(
+      "- [ ] call",
+    );
+  });
+
+  it("keeps text apart when two removed fields sit back to back", () => {
+    expect(
+      applyPlan("- [ ] alpha [due:: 2026-08-01] [priority:: high] beta", EMPTY),
+    ).toBe("- [ ] alpha beta");
+  });
+
+  it("carries the separator across two adjacent removed fields", () => {
+    // The separator sat before the field cluster while the next word was glued
+    // to the closing `]`. Dropping the pending separator merged them (`ab`).
+    expect(applyPlan("- [ ] a [due:: 1] [priority:: 2]b", EMPTY)).toBe("- [ ] a b");
+  });
+
+  it("is a fixed point on a marker-only line that already has its separator", () => {
+    // The marker match consumes the trailing run, so a length check mistook
+    // `- [ ] ` for a line missing its separator and appended a second space on
+    // every write. Either form must be a no-op.
+    expect(planTaskFieldWrite("- [ ] ", EMPTY)).toBeNull();
+    expect(planTaskFieldWrite("- [ ]  ", EMPTY)).toBeNull();
+  });
+
+  it("collapses a longer trailing run to one separator when a field is written", () => {
+    // The emitted line has to be the fixed point of any later write, so the
+    // boundary is exactly one space however many the user typed.
+    expect(applyPlan("- [ ] task  ", { due: { date: "2026-08-01" }, ...EMPTY })).toBe(
+      "- [ ] task [due:: 2026-08-01]",
+    );
+  });
+
+  it("keeps the leading indent of an indented task", () => {
+    // The indent is a list level; a write must not move a sub-task up one.
+    expect(applyPlan("  - [ ] subtask", { due: { date: "2026-08-01" }, ...EMPTY })).toBe(
+      "  - [ ] subtask [due:: 2026-08-01]",
+    );
+  });
+
+  it("does not double the separator when the description ends in a space", () => {
+    // A description that already ends with a user-typed space supplies the
+    // separator itself; a second one would make two.
+    expect(
+      applyPlan("- [ ] call [due:: 2026-08-01] the plumber ", {
+        due: { date: "2026-09-01" },
+        ...EMPTY,
+      }),
+    ).toBe("- [ ] call the plumber [due:: 2026-09-01]");
+  });
+
+  it("removes a field on an indented line without touching the indent", () => {
+    expect(applyPlan("  - [ ] call [due:: 2026-08-01]", EMPTY)).toBe("  - [ ] call");
+  });
+
+  it("leaves a glued field with no space, matching the source", () => {
+    // No whitespace touched the span, so none is invented: the description is
+    // byte-preserved apart from the field itself.
+    expect(applyPlan("- [ ] a[due:: 2026-08-01]b", EMPTY)).toBe("- [ ] ab");
+  });
+});
