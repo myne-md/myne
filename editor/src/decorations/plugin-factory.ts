@@ -42,10 +42,11 @@ export const treeChanged = (update: ViewUpdate): boolean =>
  * Both are read at BUILD time by the decoration that needs them, which is the
  * right place for them, and neither changes the document, the viewport, the
  * selection or the focus. So without this effect the default gate below never
- * fires and the label keeps whatever it was built with. `callout.ts` records
- * exactly that outcome and accepts it: "a switched language re-labels on the
- * next rebuild (any edit, scroll or selection move). It isn't wired." This is
- * the wiring, and it is deliberately in the SHARED gate rather than in one
+ * fires and the label keeps whatever it was built with. `callout.ts` used to
+ * record that outcome and accept it ("a switched language re-labels on the next
+ * rebuild"); myne-md/myne#644 later found that the rebuild it assumed was not
+ * rendering the rebuilt widget, and fixed that boundary separately. This is the
+ * wiring, and it is deliberately in the SHARED gate rather than in one
  * decoration's own, because at least three families read ambient state (task
  * chips, recurrence labels, callout titles) and a per-decoration channel would
  * have to be remembered by the fourth.

@@ -117,16 +117,11 @@ interface CalloutType {
    *  the display settings or the app language change, so an ambient change now
    *  rebuilds this layer instead of waiting for an incidental edit.
    *
-   *  **What is NOT established is the language outcome**, and this comment
-   *  claimed it until a reviewer checked. `tests/editor/callout-render.test.ts`
-   *  covers the display half and explicitly declines the language half, because
-   *  the measurement it records is that switching the i18n bundle makes the
-   *  header widget VANISH on the next rebuild. That is a separate defect on this
-   *  layer's language path, measured and not yet understood, and it is named
-   *  here rather than left in a test file a reader of this line will not open.
-   *
-   *  Recorded rather than deleted, because the sentence it replaces was cited
-   *  from two other files. */
+   *  The language OUTCOME the channel assumed was broken until myne-md/myne#644:
+   *  the rebuild ran, but the header widget was never rendered, so a switch left
+   *  an empty header until the next edit. The replacement below carries the
+   *  boundary explanation and the fix (`inclusive: true`).
+   *  `tests/editor/callout-render.test.ts` covers both halves now. */
   readonly labelKey: string;
 }
 
@@ -261,8 +256,25 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
           const markerStart = firstLine.from + m[1].length; // after `> `
           const title = m[4].trim() !== "" ? m[4].trim() : i18n.t(type.labelKey);
           decorations.push(
+            // `inclusive: true` is LOAD-BEARING, not cosmetic (myne-md/myne#644).
+            //
+            // The `> ` marker is hidden by `blockquote.ts` with an adjacent
+            // replace that ends exactly where this one begins. With the default
+            // (non-inclusive) sides both points are `NonIncStart`, and when a
+            // rebuild's changed range starts on that shared boundary
+            // CodeMirror's `RangeSet.spans` reports the blockquote point as a
+            // zero-length `openStart: 1` at the same offset. The header widget
+            // is then read as a CONTINUATION of that phantom widget
+            // (`TileBuilder.continueWidget`) and never rendered: the raw
+            // source stays hidden and nothing replaces it, which is the empty
+            // header a language switch produced. An inclusive replace has a
+            // negative `startSide`, so spans opens it fresh (`openStart: 0`) and
+            // the widget is built. The same boundary also split the replacement
+            // before (`[!type]` became `!type]` plus a stray zero-width point),
+            // so this fixes the rendered span too.
             Decoration.replace({
               widget: new CalloutHeaderWidget(type, title),
+              inclusive: true,
             }).range(markerStart, firstLine.to),
           );
         }
