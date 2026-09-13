@@ -1,9 +1,9 @@
-// `workspace-persist` — IPC bindings + (de)serialization for the encrypted
+// `workspace-persist` - IPC bindings + (de)serialization for the encrypted
 // editor workspace descriptor (MYND-166, Task 13).
 //
 // The descriptor is the `WorkspaceState` pane tree serialized to JSON. It is
-// persisted ONLY on graceful exit (lock / auto-lock grace / quit) — never on
-// tab switch — so the `vault.workspace` blob's mtime never becomes an editor-
+// persisted ONLY on graceful exit (lock / auto-lock grace / quit) - never on
+// tab switch - so the `vault.workspace` blob's mtime never becomes an editor-
 // activity log (design grill 2026-06-01 Q1). The Rust side seals it opaque
 // under `session_state_key` (`MYW1`, protocol.md § 9.7).
 
@@ -41,7 +41,7 @@ export async function workspaceWrite(descriptor: string): Promise<void> {
 
 /**
  * Stage the descriptor in the backend's in-RAM slot (no file write). Flushed
- * to `vault.workspace` only on app exit — this is the persist path for app
+ * to `vault.workspace` only on app exit - this is the persist path for app
  * QUIT (Cmd+Q / app-menu Quit), which fires the Rust `ExitRequested` event
  * but NOT the window's `onCloseRequested`. Cheap; safe to call per layout
  * change (it never touches the blob's mtime).
@@ -56,7 +56,7 @@ export async function workspaceStage(descriptor: string): Promise<void> {
  * fields, plus the reading-source-modes (MYND-299) per-tab `viewMode`, are all
  * **omit-when-default**: the pure model never stores `pinned: false`,
  * `stacked: false`, or `viewMode: "live"` (the un-set transitions DROP the key),
- * and `JSON.stringify` omits `undefined` keys — so a workspace with no pins, no
+ * and `JSON.stringify` omits `undefined` keys - so a workspace with no pins, no
  * stacked panes, and all-default view modes serializes BYTE-IDENTICAL to a
  * pre-feature descriptor. The single-descriptor form stays engine-opaque
  * (§9.7.2, SYNC-4); the container form ({@link serializeWorkspaces}) rides the
@@ -68,7 +68,7 @@ export function serializeWorkspace(state: WorkspaceState): string {
 /**
  * Parse + structurally validate a descriptor into a `WorkspaceState`.
  * Returns `null` on any malformation (the caller falls back to a fresh
- * single empty pane) — defense against a tampered-but-AEAD-OK blob and
+ * single empty pane) - defense against a tampered-but-AEAD-OK blob and
  * against schema drift across versions.
  */
 export function deserializeWorkspace(json: string): WorkspaceState | null {
@@ -83,7 +83,7 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
   const focusedPaneId = obj.focusedPaneId;
   if (typeof focusedPaneId !== "string") return null;
   // Normalize (not just validate): migrate legacy bare-string tabs to note
-  // items, and DROP well-formed unknown-kind tabs (forward-compat) — a junk tab
+  // items, and DROP well-formed unknown-kind tabs (forward-compat) - a junk tab
   // still rejects the whole blob (the original strictness for corruption).
   const root = normalizeNode(obj.root);
   if (root === null) return null;
@@ -110,7 +110,7 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
 // ordinary single descriptor handled by the functions above (so per-tab
 // `viewMode` omit-when-default is preserved per slot automatically). Migration-
 // on-read wraps a stray LEGACY single-descriptor payload (the 0x01 shape) as a
-// single "Default" slot — defensive even though the Rust envelope now rejects
+// single "Default" slot - defensive even though the Rust envelope now rejects
 // 0x01.
 // ============================================================
 
@@ -121,7 +121,7 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
 export function serializeWorkspaces(container: NamedWorkspaces): string {
   // graph-connection-ux-polish task 5: the graph pane's device-local settings,
   // omit-when-default per field (see `graphSettings.ts`). Same discipline as
-  // `expandedFolders` below — no format bump, an old reader tolerates the
+  // `expandedFolders` below - no format bump, an old reader tolerates the
   // unknown field, a reader on a default-only vault sees no key at all.
   const encodedGraphSettings = container.graphSettings
     ? encodeGraphSettings(container.graphSettings)
@@ -138,7 +138,7 @@ export function serializeWorkspaces(container: NamedWorkspaces): string {
       state: { root: s.state.root, focusedPaneId: s.state.focusedPaneId },
     })),
     activeId: container.activeId,
-    // MYND-455: sidebar folder-expand set, omit-when-empty (no format bump —
+    // MYND-455: sidebar folder-expand set, omit-when-empty (no format bump -
     // the named-workspaces omit-when-default discipline). A pre-455 reader
     // tolerates the unknown field; a post-455 reader tolerates its absence.
     ...(container.expandedFolders && container.expandedFolders.length > 0
@@ -237,8 +237,8 @@ function parseDetachedEntries(raw: unknown): DetachedEntry[] {
 /**
  * Parse + structurally validate a MYW1 descriptor into a `NamedWorkspaces`
  * container. Accepts BOTH shapes:
- *  - the container shape (`{slots, activeId}`) — the 0x02 form;
- *  - a LEGACY single descriptor (`{root, focusedPaneId}` with no `slots`) —
+ *  - the container shape (`{slots, activeId}`) - the 0x02 form;
+ *  - a LEGACY single descriptor (`{root, focusedPaneId}` with no `slots`) -
  *    migrated-on-read by wrapping it as a single "Default" slot.
  * Returns `null` on any malformation (the caller falls back to a fresh single
  * empty slot). `newId` mints the migration slot id (defaults to
@@ -283,12 +283,12 @@ export function deserializeWorkspaces(
   }
 
   // activeId must name an existing slot; otherwise reject (the consistency
-  // fallback lives in `resolveActiveSlot`, applied against the MYP1 pointer —
+  // fallback lives in `resolveActiveSlot`, applied against the MYP1 pointer -
   // a self-inconsistent blob is corruption and rejects here).
   if (!slotIds.has(obj.activeId)) return null;
 
   // MYND-455: sidebar folder-expand set (optional, forward/backward compatible).
-  // A malformed field is tolerated as absent (a stray value is not corruption —
+  // A malformed field is tolerated as absent (a stray value is not corruption -
   // worst case the sidebar opens collapsed), keeping it strictly additive.
   const expandedFolders =
     Array.isArray(obj.expandedFolders) && obj.expandedFolders.every((k) => typeof k === "string")
@@ -296,7 +296,7 @@ export function deserializeWorkspaces(
       : undefined;
 
   // graph-connection-ux-polish task 5: decode field-by-field (a malformed
-  // value degrades to its default, never rejects the whole blob — see
+  // value degrades to its default, never rejects the whole blob - see
   // `decodeGraphSettings`), then drop the key entirely when the result is
   // all-default (the same omit-when-default check `encodeGraphSettings` uses
   // on write, kept as the single source of truth for "is this default").
@@ -407,13 +407,13 @@ function parseItem(t: unknown): ParsedItem {
   const o = t as Record<string, unknown>;
   if (typeof o.id !== "string") return "invalid";
   // tab-modes (MYND-320): a per-tab `pinned` flag. Read-when-present, omit-
-  // when-absent (an old descriptor — or any unpinned tab — has no key, which is
+  // when-absent (an old descriptor - or any unpinned tab - has no key, which is
   // the unpinned default). Only a literal `true` pins; anything else (false /
   // absent / junk) is treated as unpinned, so the key never round-trips as
   // `false` and a non-pinned tab stays byte-identical to pre-feature.
   const pinned = o.pinned === true ? { pinned: true as const } : {};
   // reading-source-modes (MYND-299): a per-tab `viewMode`. Read-when-present,
-  // omit-when-default — only an explicit `"reading"` / `"source"` round-trips;
+  // omit-when-default - only an explicit `"reading"` / `"source"` round-trips;
   // anything else (absent / `"live"` / junk) is the `"live"` default, so the key
   // never persists for a default-mode tab and stays byte-identical to pre-feature.
   const viewMode: { viewMode?: ViewMode } =
@@ -430,7 +430,7 @@ function parseItem(t: unknown): ParsedItem {
   if (o.kind === "graph") {
     return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned, ...viewMode } };
   }
-  // The vault-wide task list (MYND-616) — a singleton like the graph, plus two
+  // The vault-wide task list (MYND-616) - a singleton like the graph, plus two
   // pieces of per-tab session state. Both are read-when-present and
   // **degrade to the default rather than erroring**: an unknown filter name from
   // a future build, or junk in `taskScope`, must not reject the whole workspace
@@ -482,12 +482,12 @@ function normalizeNode(n: unknown): WorkspaceNode | null {
         activeTab = parsed.item;
       } else {
         // A well-formed activeTab absent from the surviving tabs is corruption
-        // — reject the whole blob (the original strictness).
+        // - reject the whole blob (the original strictness).
         return null;
       }
     }
     // tab-modes (MYND-319): a per-leaf `stacked` layout flag. Read-when-present,
-    // omit-when-absent — only a literal `true` stacks; anything else (false /
+    // omit-when-absent - only a literal `true` stacks; anything else (false /
     // absent / junk) is the not-stacked default, so the key never round-trips as
     // `false` and a non-stacked pane stays byte-identical to pre-feature.
     const leaf: LeafPane = { kind: "leaf", id: node.id, tabs, activeTab };

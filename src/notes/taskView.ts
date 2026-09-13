@@ -3,7 +3,7 @@
 // The panel used to expose four fixed date tabs (Today / Upcoming / Overdue /
 // All) and one sort. That is a reduced copy of a filter vocabulary the repo
 // already ships for task-query blocks (`taskQueryRun.ts` / `task-query-builder.ts`)
-// — status, due window, path, tag, priority, sort — and the four tabs cannot
+// - status, due window, path, tag, priority, sort - and the four tabs cannot
 // express "by file" or "newest", which is what a vault with thousands of tasks
 // needs. This module is the ONE place that turns a `TaskView` into the rows a
 // surface shows, so the panel and the query engine cannot drift on predicate
@@ -202,7 +202,7 @@ function sortDone(tasks: readonly VaultTask[]): VaultTask[] {
 }
 
 /**
- * Filter, partition and sort in one step — what the panel actually calls.
+ * Filter, partition and sort in one step - what the panel actually calls.
  *
  * Scope uses the shared `folderInScope`/`tagsInScope` predicates (folders OR'd
  * with each other, tags OR'd with each other) and the remaining axes go through
@@ -245,14 +245,14 @@ export function partitionTasks(
   return out;
 }
 
-/** Distinct folders present in the set, sorted — the scope control's options. */
+/** Distinct folders present in the set, sorted - the scope control's options. */
 export function distinctFolders(tasks: readonly VaultTask[]): string[] {
   const out = new Set<string>();
   for (const task of tasks) if (task.noteFolder !== null) out.add(task.noteFolder);
   return [...out].sort((a, b) => a.localeCompare(b));
 }
 
-/** Distinct tags present in the set, sorted — the tag control's options. */
+/** Distinct tags present in the set, sorted - the tag control's options. */
 export function distinctTags(
   tasks: readonly VaultTask[],
   tagsOf: (noteId: string) => readonly string[],

@@ -12,7 +12,7 @@ import type { VaultTask } from "./taskIndex";
 import type { TaskSection, TaskSectionKey } from "./taskView";
 import { taskRowKey } from "./taskWriteCore";
 
-/** Fixed item heights — the whole virtual list depends on these being constant. */
+/** Fixed item heights - the whole virtual list depends on these being constant. */
 export const TASK_ROW_HEIGHT = 32;
 export const TASK_HEADER_HEIGHT = 30;
 
@@ -58,10 +58,6 @@ export type TaskWindow = {
   /** Spacer heights that keep the scrollbar honest around the slice. */
   readonly topPad: number;
   readonly bottomPad: number;
-  /** Index of the header that should stick, or -1. */
-  readonly stickyIndex: number;
-  /** True when that header has scrolled off (so the pinned overlay is needed). */
-  readonly stickyPinned: boolean;
 };
 
 const EMPTY_WINDOW: TaskWindow = {
@@ -69,8 +65,6 @@ const EMPTY_WINDOW: TaskWindow = {
   end: 0,
   topPad: 0,
   bottomPad: 0,
-  stickyIndex: -1,
-  stickyPinned: false,
 };
 
 /**
@@ -111,22 +105,10 @@ export function computeTaskWindow(
   const start = Math.max(0, first - TASK_OVERSCAN);
   const endWithOverscan = Math.min(n, end + TASK_OVERSCAN);
 
-  let stickyIndex = -1;
-  for (let i = first; i >= 0; i -= 1) {
-    if (items[i]!.kind === "header") {
-      stickyIndex = i;
-      break;
-    }
-  }
-
   return {
     start,
     end: endWithOverscan,
     topPad: offsets[start]!,
     bottomPad: total - offsets[endWithOverscan]!,
-    stickyIndex,
-    // Pinned once the governing header's top has scrolled above the viewport
-    // (at rest it is the first item and must not be duplicated by the overlay).
-    stickyPinned: stickyIndex !== -1 && offsets[stickyIndex]! < top,
   };
 }

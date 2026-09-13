@@ -20,9 +20,9 @@ import { todayLocal } from "@myne/task-filters";
 import { setTaskCompleted, useVaultTasks, type VaultTask } from "../lib/tasks";
 
 export type TaskSurfaceScope =
-  /** Every task in the vault — the bottom-bar destination and its sidebar tab. */
+  /** Every task in the vault - the bottom-bar destination and its sidebar tab. */
   | { kind: "vault" }
-  /** Only the open note's tasks — the editor sheet and its sidebar tab. */
+  /** Only the open note's tasks - the editor sheet and its sidebar tab. */
   | { kind: "note"; noteId: string };
 
 export type TaskSurfaceProps = {
@@ -50,7 +50,7 @@ export function TaskSurface({
   const { tasks } = useVaultTasks();
 
   // The note-scoped surface narrows the SAME vault-wide fetch rather than asking
-  // the backend for one note's tasks — `vault_indices_tasks` is deliberately
+  // the backend for one note's tasks - `vault_indices_tasks` is deliberately
   // unparameterized, so every surface filters the one list.
   const visible = useMemo(
     () => (scope.kind === "note" ? tasks.filter((t) => t.noteId === scope.noteId) : tasks),
@@ -67,7 +67,7 @@ export function TaskSurface({
       rowScope={scope.kind === "note" ? "note" : "vault"}
       {...(tagsOf === undefined ? {} : { tagsOf })}
       onViewChange={setView}
-      // The write goes through the SHARED sequence with mobile IO — including
+      // The write goes through the SHARED sequence with mobile IO - including
       // the content-hash guard, without which a sync pull-apply racing a
       // checkbox flip would be clobbered.
       onToggle={(task) => void setTaskCompleted(task, !task.completed).catch(() => {})}

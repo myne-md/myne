@@ -70,8 +70,6 @@ describe("computeTaskWindow", () => {
       end: 0,
       topPad: 0,
       bottomPad: 0,
-      stickyIndex: -1,
-      stickyPinned: false,
     });
   });
 
@@ -112,21 +110,19 @@ describe("computeTaskWindow", () => {
     expect(w.bottomPad).toBe(0);
   });
 
-  it("points sticky at the section header governing the first visible row", () => {
+  it("includes the first visible row in the slice, not just the overscan run", () => {
     const items = flattenTaskList(
-      [
-        { key: "overdue", tasks: Array.from({ length: 20 }, (_, i) => task(`o${i}`, i)) },
-        { key: "today", tasks: [task("t", 0)] },
-      ],
+      [{ key: "none", tasks: Array.from({ length: 200 }, (_, i) => task(`n${i}`, i)) }],
       new Map(),
     );
-    const nearTop = computeTaskWindow(items, 0, 100);
-    expect(items[nearTop.stickyIndex]).toMatchObject({ kind: "header", section: "overdue" });
-    expect(nearTop.stickyPinned).toBe(false);
-    // Into the second section's rows, the second header sticks.
-    const intoToday = computeTaskWindow(items, TASK_HEADER_HEIGHT + 20 * TASK_ROW_HEIGHT + 4, 100);
-    expect(items[intoToday.stickyIndex]).toMatchObject({ kind: "header", section: "today" });
-    expect(intoToday.stickyPinned).toBe(true);
+    // scrollTop lands 5 rows into the list (header + 4 rows are above).
+    const scrollTop = TASK_HEADER_HEIGHT + 4 * TASK_ROW_HEIGHT;
+    const w = computeTaskWindow(items, scrollTop, 5 * TASK_ROW_HEIGHT);
+    const visible = items.slice(w.start, w.end);
+    // The row under the viewport top must be rendered, and the slice must not be
+    // empty (an off-by-one that clamps `end` to `start` passes every loose check).
+    expect(visible.some((i) => i.kind === "row" && i.task.noteId === "n4")).toBe(true);
+    expect(w.end).toBeGreaterThan(w.start);
   });
 
   it("falls back to a viewport when the region has not been measured", () => {

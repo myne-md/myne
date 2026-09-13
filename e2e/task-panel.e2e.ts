@@ -6,8 +6,8 @@
 // bytes, filters switching, and the empty-state copy.
 //
 // The empty-state copy is asserted **explicitly**, not incidentally. The tone
-// rule — no celebration, no green check, an empty week is stated rather than
-// congratulated — is a real product constraint, and copy drift is exactly what a
+// rule - no celebration, no green check, an empty week is stated rather than
+// congratulated - is a real product constraint, and copy drift is exactly what a
 // test catches and a review does not.
 //
 // The precedent followed is the graph-view and tag-browser scenarios, which ship
@@ -103,7 +103,7 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
         );
         await pickBuilderValue(s, "tasks", "due", "any");
 
-        // 3. Search narrows the list client-side over the live array — item 6 —
+        // 3. Search narrows the list client-side over the live array - item 6 -
         //    and a query that matches nothing says so about the QUERY rather
         //    than presenting an empty vault (myne-md/myne#656).
         await s.waitForElement(testIdSelector("tasks.row.checkbox"));
@@ -124,7 +124,7 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
         );
 
         // 4. Ticking from the list writes to the CORRECT note. With the list
-        //    restored, tick the rent task and verify Bills changed — the
+        //    restored, tick the rent task and verify Bills changed - the
         //    property the single writer exists to guarantee.
         const boxes = await s.byTestIdAll("tasks.row.checkbox");
         const texts = await rowTexts(s);
@@ -167,7 +167,7 @@ describeE2E("tp2 the note-scoped panel shows only this note's tasks (MYND-616)",
 
         // Open the right panel's Tasks tab.
         // The strip's tabs share one test id and are discriminated by
-        // `data-panel-tab-id` — the existing convention.
+        // `data-panel-tab-id` - the existing convention.
         await (
           await s.waitForElement(
             testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "tasks" }),
@@ -186,7 +186,7 @@ describeE2E("tp2 the note-scoped panel shows only this note's tasks (MYND-616)",
           { label: "only the open note's task is listed" },
         );
 
-        // The source note is hidden in note scope — you are looking at it.
+        // The source note is hidden in note scope - you are looking at it.
         await s.waitUntil(
           async () => ((await s.byTestIdAll("notePanel.tasks.row.note")).length === 0 ? true : null),
           { label: "no source-note control in note scope" },

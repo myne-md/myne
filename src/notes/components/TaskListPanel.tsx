@@ -626,7 +626,7 @@ function TaskFilterBuilder({
     }
   };
 
-  /** Whether a value row reads as checked — membership for multi axes. */
+  /** Whether a value row reads as checked - membership for multi axes. */
   const isActive = (s: BuilderSection, value: string): boolean => {
     if (s === "folder") return value === "" ? view.folders.length === 0 : view.folders.includes(value);
     if (s === "tag") return value === "" ? view.tags.length === 0 : view.tags.includes(value);

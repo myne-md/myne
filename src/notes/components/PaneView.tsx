@@ -1,4 +1,4 @@
-// `<PaneView>` — one leaf pane of the editor workspace (MYND-166, Task 4).
+// `<PaneView>` - one leaf pane of the editor workspace (MYND-166, Task 4).
 //
 // Each visible pane owns its OWN content state + `useAutosave` loop for its
 // active tab's note, so two panes can show two different notes side by
@@ -31,7 +31,7 @@ import type { EditorState } from "@codemirror/state";
 import { resolveDefaultViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
 
-/** Stable no-op onChange for the read-only preview companion (MYND-299) — a fresh
+/** Stable no-op onChange for the read-only preview companion (MYND-299) - a fresh
  *  arrow each render would rebuild nothing here, but a module const keeps it tidy. */
 const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
@@ -111,7 +111,7 @@ export type PaneReadout = {
 // ── Drag-to-split drop zones (MYND-166 behavioral pass) ──────────────
 //
 // Dropping a tab (or a sidebar note) onto a pane body splits along the
-// edge the cursor lands on, or — in the center band — adds it as a tab.
+// edge the cursor lands on, or - in the center band - adds it as a tab.
 // Geometry only: which quadrant/edge is nearest, with a 25% edge band; a
 // drop further than that from every edge is "center".
 
@@ -172,7 +172,7 @@ function zoneHighlightStyle(zone: DropZone): CSSProperties {
 type OutlineTrackView = Parameters<NonNullable<CMEditorProps["onReady"]>>[0];
 
 /** A heading counts as the current one once its block reaches within this many
- *  px of the viewport top (outline-scroll-tracking) — a small lead so the
+ *  px of the viewport top (outline-scroll-tracking) - a small lead so the
  *  highlight flips as the heading arrives at the top rather than after. */
 const OUTLINE_ACTIVE_OFFSET_PX = 8;
 
@@ -304,11 +304,11 @@ export function PaneView({
   const activeViewId: string | null =
     leaf.activeTab?.kind === "view" ? leaf.activeTab.id : null;
   // reading-source-modes (MYND-299): the effective view mode for this pane's
-  // note tab — the tab's own per-tab mode if set, else the global
+  // note tab - the tab's own per-tab mode if set, else the global
   // `editor_default_view_mode` pref, else `live`. Drives the CMEditor below
   // (re-mount-free reconfigure on change).
   // vim-keyboard-mode (MYND-313): with vim on and no explicit stored choice,
-  // notes open in source view — live preview hides the markdown characters
+  // notes open in source view - live preview hides the markdown characters
   // vim's motions still count. An explicit pref wins in either direction.
   const defaultViewMode: ViewMode = resolveDefaultViewMode(
     prefs.editor_default_view_mode,
@@ -319,16 +319,16 @@ export function PaneView({
       ? leaf.activeTab.viewMode
       : defaultViewMode;
   // A graph-kind active tab renders the whole-vault graph pane (MYND-198) in
-  // place of the note editor — a first-class tab, no longer a modal carve-out.
+  // place of the note editor - a first-class tab, no longer a modal carve-out.
   const isGraph = leaf.activeTab?.kind === "graph";
   // A tasks-kind active tab renders the vault-wide task list (MYND-616) in place
-  // of the note editor — the same first-class-tab pattern the graph established.
+  // of the note editor - the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
-  // every SYNC-5 index-change nonce — so a note created/renamed/loaded elsewhere
+  // every SYNC-5 index-change nonce - so a note created/renamed/loaded elsewhere
   // re-resolves the chips live, including through the async post-unlock index
-  // populate the cache reference alone can miss — but hands back a fresh
+  // populate the cache reference alone can miss - but hands back a fresh
   // reference only when the set actually changed, so an unrelated bump no longer
   // reconfigures this pane's editor (myne#217).
   const notes = useLiveResolverNotes();
@@ -336,7 +336,7 @@ export function PaneView({
   // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
   // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
   // open note is not in an `ai_excluded_folders` folder. This flows to CMEditor's
-  // `aiEnabled` prop, which reconfigures the live AI compartment — so toggling
+  // `aiEnabled` prop, which reconfigures the live AI compartment - so toggling
   // the pref, excluding the folder, or switching notes takes effect immediately
   // (no remount / reopen needed).
   // The open note's canonical folder (`""` = vault root, and also the value for
@@ -378,7 +378,7 @@ export function PaneView({
       },
       renameDrawing: async (id, newTitle) => {
         // Route through the transactional rename so the `![[oldTitle]]` embed(s)
-        // are rewritten to `![[newTitle]]` — a bare title write would orphan them.
+        // are rewritten to `![[newTitle]]` - a bare title write would orphan them.
         const body = await noteRead(id as NoteId);
         await drawingIoCtxRef.current.commitRename(id as NoteId, body, newTitle);
       },
@@ -391,12 +391,12 @@ export function PaneView({
   }, [prefs.ai_enabled, prefs.ai_excluded_folders, activeNoteFolder]);
   // MYND-305: the vault-wide heading set the `[[##` autocomplete searches (built
   // lazily by reading note bodies; rebuilt on the index nonce). Empty until the
-  // first async build settles — `[[##` simply finds nothing until then.
+  // first async build settles - `[[##` simply finds nothing until then.
   const vaultHeadings = useVaultHeadings();
   // MYND-382: the vault-wide imported-block-anchor set the `[[^^` enumerate-only
   // autocomplete searches (read from the persisted vault-indices index via one
   // IPC query; refetched on the index nonce). Empty until the first query
-  // settles — `[[^^` simply finds nothing until then.
+  // settles - `[[^^` simply finds nothing until then.
   const vaultBlockAnchors = useVaultBlockAnchors();
   // Click-to-navigate target for a resolved wikilink chip → open the note, and
   // (MYND-305) carry the GENERIC deep-link anchor so the editor scrolls to the
@@ -424,13 +424,13 @@ export function PaneView({
     if (req.noteId !== activeId) return;
     setRevealLine({ noteId: req.noteId, line: req.line, text: req.text, nonce: req.nonce });
   }, [revealTaskNonce, activeId]);
-  // reading-source-modes (MYND-299): side-by-side preview companion — a PaneView-
+  // reading-source-modes (MYND-299): side-by-side preview companion - a PaneView-
   // local, read-only Reading mirror of the SAME `content` buffer. It is NOT a
   // workspace item (the global duplicate-forbid `(kind,id)` invariant is
   // untouched) and writes nothing (this PaneView stays the single autosave owner).
   // The side-by-side preview companion (MYND-299) is ephemeral per-pane state in
   // the workspace context (shared with the bottom-bar "Preview" toggle). Only
-  // meaningful in SOURCE mode — live renders inline, reading IS the rendered view,
+  // meaningful in SOURCE mode - live renders inline, reading IS the rendered view,
   // so a companion left open auto-hides when you leave source.
   const companionOpen = ws.isCompanionOpen(leaf.id);
   const companionVisible = companionOpen && effectiveViewMode === "source";
@@ -441,7 +441,7 @@ export function PaneView({
         pendingAnchorTargetRef.current = noteUuid as NoteId;
         // MYND-305 × MYND-534: an anchored open that switches to a DIFFERENT note
         // must land at the anchor (or note-top if not found), NOT the target's
-        // restored cached scroll — flag it for the body-load effect. A same-note
+        // restored cached scroll - flag it for the body-load effect. A same-note
         // re-click keeps the flag clear (CMEditor's scroll effect handles it) so
         // no stale flag leaks into a later plain tab-switch.
         if (noteUuid !== activeIdRef.current) {
@@ -501,11 +501,11 @@ export function PaneView({
       : null;
 
   // The pane's buffer. `text` is the note body; `base` is the doc text `text`
-  // was DERIVED from, and it is set by exactly ONE producer — the autosave
+  // was DERIVED from, and it is set by exactly ONE producer - the autosave
   // `updated:` patch echo (`handleSaveEcho` below). Every other producer is
   // authoritative (disk load, swap restore, out-of-band reload, keep-both
   // adopt, drawing scene write, the editor's own `onChange`) and leaves it
-  // undefined, which the `setContent` wrapper guarantees BY CONSTRUCTION —
+  // undefined, which the `setContent` wrapper guarantees BY CONSTRUCTION -
   // forgetting to clear a stale baseline is not possible, because the only way
   // to set one is the dedicated setter. `base` flows to `<CMEditor valueBase>`,
   // which refuses an echo the buffer has already moved past (myne#167).
@@ -523,7 +523,7 @@ export function PaneView({
   );
   // The save echo, as a compare-and-swap: `useAutosave` hands down an updater
   // that returns `prev` unchanged when the buffer has moved on, so an adoption
-  // is exactly the case where `prev` IS the text the patch was derived from —
+  // is exactly the case where `prev` IS the text the patch was derived from -
   // which makes it the correct `valueBase` to hand the editor.
   const handleSaveEcho = useCallback((applyPatch: SavedBodyPatch) => {
     setBuffer((prev) => {
@@ -537,8 +537,8 @@ export function PaneView({
   // markdown→markdown note switch we cache the outgoing note's EditorState (undo +
   // selection) + outer-scroller scrollTop and swap the incoming note's in via the
   // CMEditor swap API, instead of tearing the view down. `swapApiRef` is handed up
-  // by the primary CMEditor's `onSwapReady` (null while unmounted — e.g. a drawing
-  // tab — in which case we fall back to the plain content-mirror path).
+  // by the primary CMEditor's `onSwapReady` (null while unmounted - e.g. a drawing
+  // tab - in which case we fall back to the plain content-mirror path).
   const swapApiRef = useRef<EditorSwapApi | null>(null);
   const stateCacheRef = useRef<Map<NoteId, EditorState>>(new Map());
   const prevActiveIdRef = useRef<NoteId | null>(null);
@@ -561,7 +561,7 @@ export function PaneView({
 
   // MYND-534: evict cached EditorStates for notes no longer open in this pane (a
   // closed tab), so the cache is bounded by the pane's open-tab count and a
-  // reopen starts fresh (grill Q3 — tab-switch-only lifetime).
+  // reopen starts fresh (grill Q3 - tab-switch-only lifetime).
   const openNoteTabKey = leaf.tabs
     .filter((t) => t.kind === "note")
     .map((t) => t.id)
@@ -590,7 +590,7 @@ export function PaneView({
   const headingFroms = useMemo(() => headingSections(content).map((h) => h.from), [content]);
   const headingFromsRef = useRef<number[]>(headingFroms);
   const outlineViewRef = useRef<OutlineTrackView>(null);
-  // The same view as `outlineViewRef`, in state — see `handleEditorReady`.
+  // The same view as `outlineViewRef`, in state - see `handleEditorReady`.
   const [editorView, setEditorView] = useState<OutlineTrackView>(null);
   const outlineScrollerRef = useRef<HTMLDivElement | null>(null);
   const activeIdRef = useRef(activeId);
@@ -605,8 +605,8 @@ export function PaneView({
   // Resolve the heading currently at the top of the viewport: the last heading
   // whose block sits at or above the viewport top. The editor GROWS to fit its
   // content inside an OUTER scroller (`view.scrollDOM` / `.cm-scroller` does not
-  // scroll here), so measure in window coords — the content-top rect plus each
-  // heading's always-available height-map offset — against the scroller's top.
+  // scroll here), so measure in window coords - the content-top rect plus each
+  // heading's always-available height-map offset - against the scroller's top.
   // Only the focused pane publishes, so the outline follows the note in view.
   const recomputeActiveHeading = useCallback(() => {
     const view = outlineViewRef.current;
@@ -622,7 +622,7 @@ export function PaneView({
     // Bottom-of-scroll clamp (#186): once the outer scroller is bottomed out, a
     // heading in the final viewport can never rise to the fixed cutoff below, so
     // the loop would leave the highlight stuck on an earlier heading. When we are
-    // at (within 1px of) max scroll, the LAST heading is the active one — this
+    // at (within 1px of) max scroll, the LAST heading is the active one - this
     // fixes both clicking a bottom heading and manually scrolling to the bottom.
     if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) {
       setActiveHeading({ noteId, from: froms[froms.length - 1]! });
@@ -739,7 +739,7 @@ export function PaneView({
   }, []);
 
   // Watch the pane's real scroll container with a rAF-throttled listener. Stable
-  // across note switches — the view handle is read live via the ref, so a
+  // across note switches - the view handle is read live via the ref, so a
   // not-yet-ready view simply no-ops until `onReady` fires.
   useEffect(() => {
     const scroller = outlineScrollerRef.current;
@@ -863,7 +863,7 @@ export function PaneView({
   );
 
   // MYND-651: the inline tag-suggestion band for this pane's note. Gated on BOTH
-  // AI switches and on the host actually having local AI — the Rust side refuses
+  // AI switches and on the host actually having local AI - the Rust side refuses
   // regardless (task 4), but an off feature should not be arming idle timers or
   // building prompts that carry note text.
   const { suggestions: tagSuggestions, dismiss: dismissTagSuggestion } = useTagSuggestions({
@@ -878,8 +878,8 @@ export function PaneView({
   });
 
   // A chip click → the ONE accept path (task 6). `false` means nothing was
-  // written — the note already carries the tag, or its frontmatter is a shape
-  // the writer refuses to touch — and in both cases the user's intent is already
+  // written - the note already carries the tag, or its frontmatter is a shape
+  // the writer refuses to touch - and in both cases the user's intent is already
   // satisfied or unreachable, so the chip goes away either way and no error is
   // surfaced.
   const handleAcceptTagSuggestion = useCallback(
@@ -913,7 +913,7 @@ export function PaneView({
     // Snapshot the outgoing markdown note (the view still holds it here) so a
     // later return restores its undo history + scroll. Best-effort: a stale /
     // mid-update / destroyed view (common right after a pane split/move) must
-    // NEVER break the switch — on failure we drop the swap API and reload.
+    // NEVER break the switch - on failure we drop the swap API and reload.
     if (api !== null && prevId !== null && prevId !== activeId) {
       try {
         cache.set(prevId, api.captureState());
@@ -946,7 +946,7 @@ export function PaneView({
 
     // MYND-305 × MYND-534: is THIS open driven by a deep-link (a wikilink chip
     // carrying an anchor that switched to this note)? If so the anchor owns the
-    // scroll — restoring the note's cached scrollTop would clobber both the
+    // scroll - restoring the note's cached scrollTop would clobber both the
     // anchor's `scrollIntoView` AND the §5.6 not-found fallback, which relies on
     // the note opening at the TOP (a not-found anchor scrolls nowhere). Consumed
     // once here so a later plain tab-switch restores the note's own cached scroll.
@@ -955,7 +955,7 @@ export function PaneView({
 
     // Cached + swap API live → try an instant restore (no disk read, no loading
     // gate). ANY failure degrades to the disk-reload path below, which always
-    // clears `loading` — so a bad swap can never strand the pane in a loading
+    // clears `loading` - so a bad swap can never strand the pane in a loading
     // state (the MYND-534 pane-op regression).
     const cached = api !== null ? cache.get(activeId) : undefined;
     if (api !== null && cached !== undefined) {
@@ -969,13 +969,13 @@ export function PaneView({
       if (swapped) {
         const doc = cached.doc.toString();
         setContent(doc);
-        // myne#288 — flush the OUTGOING note before baselining the incoming one.
+        // myne#288 - flush the OUTGOING note before baselining the incoming one.
         //
         // This effect is registered before `useAutosave`'s own note-change
         // effect, so it runs first: `acceptReloadedBody` used to clear `dirtyRef`
         // and re-baseline `savedBodyRef` while the hook still believed it was
         // editing the previous note. By the time the hook noticed the switch
-        // there was nothing left to flush, and up to ~10 s of typing was gone —
+        // there was nothing left to flush, and up to ~10 s of typing was gone -
         // silently, because the cached EditorState put the text back on screen
         // and the status read `clean`.
         //
@@ -1039,11 +1039,11 @@ export function PaneView({
   }, [activeId]);
 
   // While the body is still loading, autosave sees NO note (`null`): a pane
-  // that MOUNTS with an active note (a split/remount — the initial single pane
+  // that MOUNTS with an active note (a split/remount - the initial single pane
   // mounts with no selection) otherwise burns useAutosave's "first body change
   // is loaded content" token on the transient empty body, so the real body's
   // arrival registered as a user edit and γ1 silently REWROTE the note ~1s
-  // later — a no-op body with a fresh nonce + fresh `updated:`, which the sync
+  // later - a no-op body with a fresh nonce + fresh `updated:`, which the sync
   // engine can only read as a local edit (false-conflict fodder; caught by the
   // unfocused-split-pane E2E). The id flip to `null` resets the token; the
   // loaded body then lands in the same commit as the id flip back, so it is
@@ -1051,10 +1051,10 @@ export function PaneView({
   // workspace flush registry), so the transient `null` never drops real edits.
   // §11.3 BaseMismatch keep-both handler: a save rejected because a sync
   // pull-apply re-based the note underneath the editor. Order is load-bearing
-  // (copy FIRST — a copy failure leaves the buffer untouched, zero keystroke
+  // (copy FIRST - a copy failure leaves the buffer untouched, zero keystroke
   // loss); the orchestration lives in `baseMismatch.ts` (unit-tested). Read
   // The handler resolves the note the REJECTED SAVE was for, which the autosave
-  // now names explicitly (myne#335) — not `activeId`, the pane's current note.
+  // now names explicitly (myne#335) - not `activeId`, the pane's current note.
   // Those differ whenever a rejection lands after a note switch, and attributing
   // the copy to the current note produced a spurious duplicate while losing the
   // keystrokes the handler exists to preserve.
@@ -1076,7 +1076,7 @@ export function PaneView({
     [activeId],
   );
   // §11.3 expected-base guard only makes sense while a sync endpoint is
-  // enrolled — a remote pull-apply is the sole writer it defends against. With
+  // enrolled - a remote pull-apply is the sole writer it defends against. With
   // sync off the guard can only misfire on the editor's own local base churn
   // (a create→rename hop the autosave loop never saw, an out-of-band reload
   // racing a keystroke), turning a routine edit into a false conflict, so gate
@@ -1102,7 +1102,7 @@ export function PaneView({
   // cache); a note WITHOUT the canonical marker is unaffected (guard is exact).
   const isDrawing = useMemo(() => isDrawingBody(content), [content]);
   // Latest autosave handle for the reload effect, which keys only on the reload
-  // nonce (so it must NOT take `autosave` as a dep — its identity changes every
+  // nonce (so it must NOT take `autosave` as a dep - its identity changes every
   // render). Read through the ref at fire time.
   const autosaveRef = useRef(autosave);
   autosaveRef.current = autosave;
@@ -1114,7 +1114,7 @@ export function PaneView({
   const contentRef = useRef(content);
   contentRef.current = content;
 
-  // Re-sync this pane's body when the open note's `.myn` changed out of band —
+  // Re-sync this pane's body when the open note's `.myn` changed out of band -
   // a rename (MYND-140), a snapshot restore, OR a sync pull (`sync://changed` →
   // `reloadOpenNote`). EVERY pane with an open note re-reads, not just the
   // selected one: a sync pull can rewrite a note held by an UNFOCUSED pane, and
@@ -1133,7 +1133,7 @@ export function PaneView({
     // MYND-534: an out-of-band change (sync pull / external edit) may have
     // rewritten ANY note, including ones cached in the background. Clear the
     // whole per-note EditorState cache so the next swap-in rebuilds fresh from
-    // disk (content correctness over background-note undo — grill Q5). The active
+    // disk (content correctness over background-note undo - grill Q5). The active
     // note's own re-read happens just below.
     stateCacheRef.current.clear();
     if (activeId === null) return;
@@ -1144,7 +1144,7 @@ export function PaneView({
     //
     // `hasPendingWork()` and NOT `status` (myne#167): `status` is React state
     // written from a passive effect, so it still reads `saved`/`clean` for a
-    // whole scheduler slice after the user has typed — long enough for this
+    // whole scheduler slice after the user has typed - long enough for this
     // reload to resolve inside it and overwrite those keystrokes with disk
     // bytes. The predicate reads refs only.
     if (autosaveRef.current.hasPendingWork()) return;
@@ -1157,7 +1157,7 @@ export function PaneView({
         // The pane must still be showing the note this read was FOR (myne#334).
         //
         // `cancelled` only covers a re-run of THIS effect, which keys on the
-        // reload nonce — a plain note switch does not re-run it, so a read
+        // reload nonce - a plain note switch does not re-run it, so a read
         // started for note A could resolve after the pane had moved to B. Both
         // guards below then passed, and `acceptReloadedBody(bodyA)` re-baselined
         // B's autosave to A's body while the buffer still held B's: the CAS
@@ -1167,7 +1167,7 @@ export function PaneView({
         // From there `hasPendingWork()` reported true forever, so the pane
         // silently ignored every later out-of-band reload; and the next keystroke
         // in B fired a save whose expected-base was `sha256(bodyA)`, which the
-        // host rejects against B's own disk bytes — minting a keep-both conflict
+        // host rejects against B's own disk bytes - minting a keep-both conflict
         // copy for a note nothing ever conflicted on and relocating the user's
         // in-progress edit into it.
         if (activeIdRef.current !== activeId) return;
@@ -1274,7 +1274,7 @@ export function PaneView({
   const status = autosave.status;
   useEffect(() => {
     if (!focused) return;
-    // A drawing note is an Excalidraw scene stored as fenced JSON — a word/char
+    // A drawing note is an Excalidraw scene stored as fenced JSON - a word/char
     // count over that body counts the JSON, a meaningless, confusing metric. Emit
     // null so the bottom-bar readout hides for drawings (it renders nothing when
     // stats are null).
@@ -1292,10 +1292,10 @@ export function PaneView({
   }, [autosave]);
 
   // "+ new tab" / empty-pane chooser (MYND-166). The "+" no longer force-
-  // creates a note — it opens an empty "New tab" whose body lets the user
+  // creates a note - it opens an empty "New tab" whose body lets the user
   // search/pick an existing note or create a fresh one. A tabless pane shows
   // the same chooser. Pending state lives in the WORKSPACE (`ws.beginNewTab`)
-  // — not PaneView-local — so a sidebar click (routed through
+  // - not PaneView-local - so a sidebar click (routed through
   // `ws.openInFocused`) appends into the new tab instead of replacing the
   // previously-active one.
   const pendingNewTab = ws.pendingNewTabPaneId === leaf.id;
@@ -1308,7 +1308,7 @@ export function PaneView({
     [ws],
   );
 
-  // Mint a note via `mint` (createNote / createDrawing — NOT
+  // Mint a note via `mint` (createNote / createDrawing - NOT
   // `ctx.createAndStartRename`, which auto-selects into the focused pane's ACTIVE
   // slot via Editor.tsx's bridge A and defeats the new-tab intent), open it
   // explicitly into a NEW tab, then inline-rename. Shared by the note + drawing
@@ -1408,9 +1408,9 @@ export function PaneView({
 
   // The "new tab" state: an empty pane (no active tab) OR an explicit "+ new
   // tab" both show the tab bar's New-tab chip + the chooser body. The tab bar
-  // is ALWAYS displayed (MYND-166) — an empty/not-yet-focused pane just shows
+  // is ALWAYS displayed (MYND-166) - an empty/not-yet-focused pane just shows
   // it in its New-tab state.
-  // Empty/chooser only when there is NO active tab at all — a view-active tab
+  // Empty/chooser only when there is NO active tab at all - a view-active tab
   // is NOT a new-tab state (it renders the view host below).
   const inNewTabState = pendingNewTab || leaf.activeTab === null;
 
@@ -1491,13 +1491,13 @@ export function PaneView({
       // properties (`--editor-text-size` / `--editor-line-spacing` /
       // `--editor-font-family`) come from `typographyStyle(prefs)`. The vars
       // inherit into the child `.cm-editor`, which reads them via
-      // `var(--editor-*)` in `theme.ts` — so a preset change re-renders this
+      // `var(--editor-*)` in `theme.ts` - so a preset change re-renders this
       // wrapper and updates the editor live (no CodeMirror remount).
       <div
         data-testid="editor.content-frame"
         // THE WRITING PANE IS A SURFACE (myne#394 task 11).
         //
-        // It is the element `texture` and `ruled` were designed for — the
+        // It is the element `texture` and `ruled` were designed for - the
         // stylesheet's dotted rule says "the dots land where the writing does,
         // and they grow when the text does", and the whole opacity ceiling
         // exists because these primitives render behind body text. The role was
@@ -1551,7 +1551,7 @@ export function PaneView({
             // MYND-651: the inline tag-suggestion band. Empty (the default, and
             // the state of every note while auto-tag is off) renders no band at
             // all, so an idle note is not shifted by a strip of chrome. Only the
-            // editable primary editor gets it — the reading companion below is
+            // editable primary editor gets it - the reading companion below is
             // a mirror, and a second band offering the same accept would write
             // through this same document twice.
             tagSuggestions={tagSuggestions}
@@ -1572,7 +1572,7 @@ export function PaneView({
             // (SYNC-14). The reading-view instance below leaves it default-false.
             aiEnabled={aiSlashEnabled}
             // MYND-592: an independent, opt-OUT switch. Not ANDed with the
-            // excluded-folder rule above — that rule is about ambient AI
+            // excluded-folder rule above - that rule is about ambient AI
             // reading of note content, while transcribing is a per-file action
             // the user explicitly asks for.
             transcriptionEnabled={prefs.transcription_enabled}
@@ -1583,16 +1583,16 @@ export function PaneView({
             // vim-keyboard-mode (MYND-313): default OFF (modal editing is opt-in).
             // The open editor reconfigures its vim compartment live when the pref
             // flips (no remount), and the engine is only downloaded on the first
-            // enable — a user who never turns vim on never pays for it.
+            // enable - a user who never turns vim on never pays for it.
             // Reading view is read-only and never holds a text cursor, so modal
-            // editing is meaningless there — and an indicator would be actively
+            // editing is meaningless there - and an indicator would be actively
             // misleading. Vim is mounted only for the editable modes.
             vimMode={prefs.editor_vim_mode === true && effectiveViewMode !== "reading"}
             // #184: the user keymap overrides (vault.prefs.keymap). The editor
             // reconfigures its rebindable-keymap compartment live when a Hotkeys
             // rebind of an editor command lands (no remount).
             keymapOverrides={prefs.keymap}
-            // MYND-634: inline `![[Drawing]]` embeds — read/save the referenced
+            // MYND-634: inline `![[Drawing]]` embeds - read/save the referenced
             // drawing note's scene + create a sibling drawing for /drawing.
             drawingIo={drawingIo}
             // reading-source-modes (MYND-299): per-tab live/reading/source. The
@@ -1632,8 +1632,8 @@ export function PaneView({
               onTaskQueryToggle={handleTaskQueryToggle}
               onTaskQueryOpen={handleTaskQueryOpen}
               // MYND-634: render inline drawing thumbnails in the reading mirror
-              // too (reading mode never opens the edit-in-place canvas — it stays a
-              // static thumbnail — but it still needs the seam to read the scene).
+              // too (reading mode never opens the edit-in-place canvas - it stays a
+              // static thumbnail - but it still needs the seam to read the scene).
               drawingIo={drawingIo}
               readOnly
               viewMode="reading"
@@ -1813,7 +1813,7 @@ export function PaneView({
         </div>
       </div>
       {dragActive && (
-        // Capture overlay — only mounted during a tab/note drag, covering the
+        // Capture overlay - only mounted during a tab/note drag, covering the
         // pane BODY (not the tab strip) so the drop lands here instead of
         // inside CodeMirror, while the strip stays free to receive reorder /
         // move drops on its own. The inner div is the live region highlight.
@@ -1872,10 +1872,10 @@ function PaneLoading() {
  * Host for an open saved-view tab (MYND-275, Saved Views #5). Resolves the
  * `viewId` to its `SavedView` def via prefs, runs the query engine over the
  * sidebar caches (`useViewResult`), and renders via the viewType dispatch
- * (`ViewRenderHost` → cards / table / list). No autosave / flush — views are
+ * (`ViewRenderHost` → cards / table / list). No autosave / flush - views are
  * read-only projections, not editable buffers. Keeps the `editor.view-host`
  * testid wrapper (E2E #4 contract). While the result is loading (or the view id
- * is stale) the wrapper holds a calm, quiet body — no spinner churn.
+ * is stale) the wrapper holds a calm, quiet body - no spinner churn.
  */
 function ViewHost({ viewId }: { viewId: string }) {
   const { t } = useTranslation();
@@ -1887,7 +1887,7 @@ function ViewHost({ viewId }: { viewId: string }) {
     x: number;
     y: number;
   } | null>(null);
-  // Card navigation reuses the workspace open seam — the same matrix NoteList
+  // Card navigation reuses the workspace open seam - the same matrix NoteList
   // wires for a sidebar row (toSide → split, newTab → new tab, else focused).
   const onOpenNote = useCallback(
     (noteId: string, intent: { newTab: boolean; toSide: boolean }) => {
@@ -1985,7 +1985,7 @@ function ViewHost({ viewId }: { viewId: string }) {
     },
     [coverNoteId, coverPropertyKey, def, sidebar],
   );
-  // The non-mutating card context menu (task 8) — the CLOSED four-item set
+  // The non-mutating card context menu (task 8) - the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
   // link. NO delete / move / trash / rename (a saved view is a read-only
   // projection; deletion stays at the note's own location, the sidebar).

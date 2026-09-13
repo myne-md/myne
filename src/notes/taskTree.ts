@@ -3,7 +3,7 @@
 // `VaultTask` deliberately carries no depth or parent (the index is a flat
 // list), so the authored structure lives in exactly one place: the leading
 // whitespace on `rawLine`. `taskFieldWriter` already reads it with `/^[ \t]*/`,
-// and ordering within a note comes from `lineIndex` — no wire change is needed.
+// and ordering within a note comes from `lineIndex` - no wire change is needed.
 //
 // The panel renders a FLAT, date-sorted list, so "depth" here is not a tree
 // index; it is how far a row should be indented relative to the rows actually
@@ -27,7 +27,7 @@ const TAB_WIDTH = 4;
 /**
  * The visual column width of a line's leading whitespace. Tabs advance to the
  * next tab stop rather than counting as one, so `\t- [ ]` and `    - [ ]` sit at
- * the same depth — which is what the parser sees and what a reader sees.
+ * the same depth - which is what the parser sees and what a reader sees.
  */
 export function taskIndentWidth(rawLine: string): number {
   const lead = /^[ \t]*/.exec(rawLine)?.[0] ?? "";
@@ -57,7 +57,7 @@ function byNoteInLineOrder(tasks: readonly VaultTask[]): VaultTask[][] {
 /**
  * The key of each task's authored parent, from a per-note indent stack. A task
  * whose indent is not greater than the previous task's has no parent at that
- * level — the stack pops back to a shallower line. Note-tasks (no line, no
+ * level - the stack pops back to a shallower line. Note-tasks (no line, no
  * indent) are always roots and never become parents.
  */
 function authoredParents(tasks: readonly VaultTask[]): Map<string, string> {

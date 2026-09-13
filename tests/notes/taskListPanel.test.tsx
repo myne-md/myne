@@ -8,8 +8,8 @@
 // panel could not express: attention-first sections, an independent completion
 // axis, a search box, nesting, and a windowed render.
 //
-// The empty states get attention because the **tone is a constraint** — no
-// celebration, no green check — and because the rebuilding state being distinct
+// The empty states get attention because the **tone is a constraint** - no
+// celebration, no green check - and because the rebuilding state being distinct
 // from a genuinely empty one is the difference between "still reading" and
 // "your tasks are gone".
 
@@ -282,7 +282,7 @@ describe("one component, two surfaces", () => {
 });
 
 describe("the four empty states", () => {
-  it("no tasks in the vault at all — and it says how to make one", () => {
+  it("no tasks in the vault at all - and it says how to make one", () => {
     const { host, cleanup } = render(panel({ tasks: [] }));
     const empty = q(host, "tasks.empty.vault");
     expect(empty).not.toBeNull();

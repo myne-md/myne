@@ -2,7 +2,7 @@
 //
 // The mobile editor's task-field chip wire (MYND-614).
 //
-// The point is not that chip editing works — the desktop proves the shared
+// The point is not that chip editing works - the desktop proves the shared
 // mechanism end to end against a real editor (`tests/editor/taskChipWiring.test.ts`
 // in the main repo, which exercises the very `installTaskChipEditor` the mobile
 // `EditorFlow` now calls). The point is that **the mobile client can consume that
@@ -16,7 +16,7 @@
 // `installTaskChipEditor` installs and tears down its window listener. A real
 // `EditorView` is deliberately NOT mounted here: mobile's dependency graph
 // carries a second `@lezer/markdown` copy, so feeding the dialect parser to
-// `markdown()` hits the dual-package `instanceof` guard — an environment quirk,
+// `markdown()` hits the dual-package `instanceof` guard - an environment quirk,
 // not a wiring fact, and the wiring fact is already covered upstream.
 
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -30,7 +30,7 @@ import { TASK_CHIP_EVENT } from "@myne/editor/decorations/task-chip";
 // Mobile vitest has no global editor-host setup (the app's `src/editor-host.ts`
 // imports Tauri, so it cannot load in a node/jsdom test). Install a minimal host:
 // the field editor only reaches the host for `t`, and none of the assertions
-// below depend on the label TEXT — the recurrence values come from the dialect's
+// below depend on the label TEXT - the recurrence values come from the dialect's
 // `formatRecurrenceSpec`, not from i18n. A key-returning `t` is therefore enough.
 beforeAll(() => {
   setEditorHost({
@@ -117,7 +117,7 @@ describe("installTaskChipEditor manages its window listener", () => {
   it("registers a listener and returns a working unsubscribe", () => {
     const uninstall = installTaskChipEditor();
     // A chip event with no resolvable editor view is a safe no-op (findFromDOM
-    // returns null) — it must not throw, and it must open nothing.
+    // returns null) - it must not throw, and it must open nothing.
     const anchor = anchorEl();
     anchor.dispatchEvent(
       new CustomEvent(TASK_CHIP_EVENT, {

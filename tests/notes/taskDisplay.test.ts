@@ -2,7 +2,7 @@
 //
 // The security-relevant property is here on purpose: the stored value is a
 // closed enum that SELECTS a token, and this suite proves a tampered descriptor
-// cannot land an arbitrary string in a style position — it decodes to the
+// cannot land an arbitrary string in a style position - it decodes to the
 // default and the field is dropped on the next write.
 
 import { describe, expect, it } from "vitest";

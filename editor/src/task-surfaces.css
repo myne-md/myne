@@ -2,11 +2,11 @@
  *
  * Imported as a side effect by `task-field-editor.ts` and `task-query-builder.ts`.
  * Both surfaces mount to `document.body` through `openModal`, OUTSIDE `.cm-editor`,
- * so the CodeMirror `baseTheme` in `theme.ts` cannot reach them — they need a real
+ * so the CodeMirror `baseTheme` in `theme.ts` cannot reach them - they need a real
  * stylesheet or they render as unstyled boxes (the defect this file closes).
  *
- * Tokens carry literal light-mode fallbacks — the same pattern `theme.ts` uses for
- * the rendered task-query block — so a surface still reads if a token is undefined
+ * Tokens carry literal light-mode fallbacks - the same pattern `theme.ts` uses for
+ * the rendered task-query block - so a surface still reads if a token is undefined
  * (a bare test DOM). Both the desktop and mobile clients define the full semantic
  * family AND flip it for dark / amoled, so those themes come for free: nothing here
  * hard-codes a colour that would survive the flip.
@@ -360,7 +360,7 @@
   width: 64px;
 }
 
-/* Weekday toggles — a wrapping row of pressable pills. */
+/* Weekday toggles - a wrapping row of pressable pills. */
 .cm-recurrence-weekdays {
   display: flex;
   flex-wrap: wrap;
@@ -492,7 +492,7 @@
   min-width: 0;
 }
 
-/* The live canonical-text preview — teaches the roster by showing what it wrote. */
+/* The live canonical-text preview - teaches the roster by showing what it wrote. */
 .cm-task-query-builder-preview {
   margin: var(--space-1) 0 0;
   padding: var(--space-2) 10px;
@@ -772,7 +772,7 @@
 }
 
 /* A row that carries a note stacks label over note instead of centring one
-   line — see `.cm-task-field-menu-note`. */
+   line - see `.cm-task-field-menu-note`. */
 /* Icon + label stay on one line even when the row also carries the "needs a
    date" note (which makes the row a column). */
 .cm-task-field-menu-main {
@@ -796,7 +796,7 @@
 
 /* myne#276: "Repeat needs a date to repeat from" said on the row, before the
    user commits to a rule that would be inert. Quieter than the label, and it
-   must NOT take the row's hover colour — it is an explanation, not a second
+   must NOT take the row's hover colour - it is an explanation, not a second
    action. */
 .cm-task-field-menu-note {
   font-size: var(--text-xs);
@@ -816,7 +816,7 @@
   outline-offset: -1px;
 }
 
-/* Divides the value-editing rows from the skip ACTION below them — the two are
+/* Divides the value-editing rows from the skip ACTION below them - the two are
    categorically different and a flat list would read as four of the same kind.
    Negative inline margin so the rule spans the surface's padding. */
 .cm-task-field-menu-sep {

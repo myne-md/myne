@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The task panel's "today" follows the day — myne-md/myne#557, the `tasks.panel`
+// The task panel's "today" follows the day - myne-md/myne#557, the `tasks.panel`
 // bullet.
 //
 // The bullet named a defect rather than a check: `TasksPane` resolved the
@@ -9,7 +9,7 @@
 // across midnight therefore kept yesterday's date: the Today filter listed
 // yesterday's tasks, Overdue stayed one short, and nothing on screen said so.
 //
-// It is the shape of bug a once-a-release hand-walk structurally cannot find —
+// It is the shape of bug a once-a-release hand-walk structurally cannot find -
 // the reviewer opens the app and checks the buckets within a minute of opening
 // it, so the stale-date window never opens. Fake timers reach it in
 // milliseconds.
@@ -42,11 +42,11 @@ describe("msUntilNextLocalMidnight", () => {
   it("answers in the DISPLAY zone, not the machine's", () => {
     // 12:00 UTC is 21:00 in Tokyo and 04:00 in Los Angeles. A single instant
     // must therefore be three hours from midnight in one zone and twenty in
-    // the other — the whole reason the zone is a parameter.
+    // the other - the whole reason the zone is a parameter.
     const at = new Date(Date.UTC(2026, 2, 10, 12, 0, 0, 0));
     expect(msUntilNextLocalMidnight(at, "Asia/Tokyo")).toBe(3 * 3_600_000 + 1_000);
     // Los Angeles is on PDT by 2026-03-10 (US DST began on the 8th), so 12:00
-    // UTC is 05:00 there — nineteen hours, not twenty. Pinning the DST-correct
+    // UTC is 05:00 there - nineteen hours, not twenty. Pinning the DST-correct
     // number rather than the naive winter offset is the point: an arithmetic
     // shortcut that ignored the transition would answer twenty.
     expect(msUntilNextLocalMidnight(at, "America/Los_Angeles")).toBe(
@@ -101,7 +101,7 @@ describe("useLocalToday", () => {
     });
     expect(
       result.current,
-      "the panel kept yesterday's date across midnight — the Today filter " +
+      "the panel kept yesterday's date across midnight - the Today filter " +
         "would list yesterday's tasks and Overdue would stay one short",
     ).toBe("2026-03-11");
   });

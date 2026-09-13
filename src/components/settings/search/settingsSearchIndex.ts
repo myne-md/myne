@@ -1,13 +1,13 @@
 // Settings search-index registry (MYND-536). The single declarative source of
 // truth for what the Settings search can find. Matching runs against THIS static
-// array, never the rendered DOM — panels run IPC on mount (prefsRead / usePrefs),
+// array, never the rendered DOM - panels run IPC on mount (prefsRead / usePrefs),
 // so mounting all ten to scan their text is rejected as heavy + fragile.
 //
 // Each entry names an i18n key for its title (+ optional description + optional
 // translatable keyword/synonym string) and the `panelId` that owns it. The `id`
 // doubles as the `data-setting-anchor="<id>"` scroll target; where a setting
 // already exposes a stable `data-testid` the entry records it as `testid` and the
-// shell's scroll/flash resolver falls back to it — so most settings need no panel
+// shell's scroll/flash resolver falls back to it - so most settings need no panel
 // edit. Titles/descriptions reference the SAME keys the panels already render, so
 // search text can't drift from the UI; a few settings whose live label is an
 // inline string (or lives outside the `settings.*` namespace) get dedicated
@@ -23,7 +23,7 @@ import { has, type Capability } from "../../../platform/capabilities";
 export interface SettingsIndexEntry {
   /** Unique, stable id. Also the `data-setting-anchor` value (Task 4). */
   id: string;
-  /** Owning rail panel — the navigation target + results grouping key. */
+  /** Owning rail panel - the navigation target + results grouping key. */
   panelId: PanelId;
   /** Existing `data-testid` on this setting's control, used as the scroll/flash
    *  fallback target when no `data-setting-anchor` is present (optional). */
@@ -38,7 +38,7 @@ export interface SettingsIndexEntry {
   /**
    * The capability this setting's control needs (phase3-web-client task 96).
    *
-   * Matching runs against THIS static array rather than the rendered DOM —
+   * Matching runs against THIS static array rather than the rendered DOM -
    * panels are not mounted, which is the whole reason the registry exists. That
    * makes an ungated index actively harmful on a client with absent
    * capabilities: the search happily finds a setting, navigates to its panel and
@@ -47,14 +47,14 @@ export interface SettingsIndexEntry {
    *
    * Absent ⇒ the setting is unconditional. Present ⇒ the entry is filtered out
    * where `platform/capabilities.has()` says no, which is the same rule the rail
-   * and the panels already use — one descriptor, three consumers, no third
+   * and the panels already use - one descriptor, three consumers, no third
    * source of truth.
    */
   capability?: Capability;
   /**
    * Whether this entry additionally requires the `developer_mode` preference
    * to be on (developer-mode feature, MYND-593). **Deliberately separate from
-   * `capability`** — the capability set is a static per-build descriptor the
+   * `capability`** - the capability set is a static per-build descriptor the
    * platform seam-contract tests rest on, while Developer mode is a runtime
    * user toggle; folding the two together would make a static invariant
    * dynamic. Settings search resolves straight to a panel id, so without this
@@ -180,7 +180,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
   // omitted where the capability is absent, so an ungated entry would navigate
   // to an anchor that was never rendered. All three ALSO carry
-  // `developerGated` (#181) — PrivacyPanel now renders the block only while
+  // `developerGated` (#181) - PrivacyPanel now renders the block only while
   // Developer mode is on, and the two gates are independent, so the entry
   // needs both to stay in step with its control. The first developer-gated
   // entries in a `core` panel: the flag has never meant "lives in the
@@ -292,7 +292,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     // Developer-gated (#181), like the CLI trio above and for the same
     // reason: EditorPanel renders the toggle only while Developer mode is on.
-    // No `capability` — vim ships on every client, so this entry's gate is
+    // No `capability` - vim ships on every client, so this entry's gate is
     // the runtime one alone.
     id: "editor.vim-mode",
     developerGated: true,
@@ -561,7 +561,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     // A pointer row, not a control (MYND-604): the graph's own settings live in
-    // the graph pane. Indexed anyway — "where do I change how the graph looks?"
+    // the graph pane. Indexed anyway - "where do I change how the graph looks?"
     // is exactly the question Settings search is asked, and the row it lands on
     // answers it.
     id: "appearance.graph-settings",
@@ -672,7 +672,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     // The remote-provider block (myne#415). `developerGated` AND `capability`
     // both apply: they are independent gates and neither implies the other
-    // (`src/CLAUDE.md`) — the whole AI panel is behind Developer mode, and it
+    // (`src/CLAUDE.md`) - the whole AI panel is behind Developer mode, and it
     // is absent entirely where the platform has no local-AI capability.
     id: "ai.provider",
     capability: "localAi",
@@ -686,7 +686,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // Scrolls to the provider BLOCK, via the testid fallback, rather than to
     // the chooser itself: the chooser only renders once a provider is named,
     // so its own anchor would be missing exactly when someone searches for it
-    // — the "navigates to a panel and scrolls to nothing" failure the
+    // - the "navigates to a panel and scrolls to nothing" failure the
     // capability gating above exists to prevent, in its runtime form.
     id: "ai.provider-model",
     capability: "localAi",
@@ -779,10 +779,10 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
  * The entries this client can actually navigate to right now.
  *
  * Every search path goes through here rather than through
- * {@link SETTINGS_SEARCH_INDEX} directly — the raw array stays exported because
+ * {@link SETTINGS_SEARCH_INDEX} directly - the raw array stays exported because
  * the drift test needs to see ALL of it, including the entries this platform
  * hides. `developerModeEnabled` is the live `vault.prefs.developer_mode` value
- * (developer-mode feature, MYND-593) — a runtime toggle, unlike `capability`,
+ * (developer-mode feature, MYND-593) - a runtime toggle, unlike `capability`,
  * so it's threaded in as a parameter rather than read from a module-level
  * static the way the capability set is.
  */

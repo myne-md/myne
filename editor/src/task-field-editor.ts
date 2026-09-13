@@ -1,6 +1,6 @@
 // The editor that opens from a task chip (MYND-614 task 6).
 //
-// Assembled entirely from what already exists — **zero new dependencies**, since
+// Assembled entirely from what already exists - **zero new dependencies**, since
 // a date-picker package would be a security decision needing a dependency-ledger
 // row and its own decision entry:
 //
@@ -18,16 +18,16 @@
 //     (`@myne/dialect/recurrence`): the rule is **assembled from controls and
 //     serialized to canonical English**, never typed. That is `markdown-dialect.md`
 //     §3.8.7's normative requirement ("a rule is chosen from a control, never
-//     typed"), and it is what keeps a closed vocabulary honest — the free-text box
+//     typed"), and it is what keeps a closed vocabulary honest - the free-text box
 //     this replaced could produce bytes the parser refuses.
 //
 // **This is the only way to edit these values in live mode.** Chips never open
 // on caret entry (task 5), so it must be complete and fully keyboard-reachable
-// from day one — not a follow-up. Every control here is focusable, the trap
+// from day one - not a follow-up. Every control here is focusable, the trap
 // cycles them, Enter commits, and Escape dismisses without changing anything.
 //
 // The surfaces mount to `document.body`, OUTSIDE `.cm-editor`, so the CodeMirror
-// `baseTheme` cannot reach them — their chrome lives in `task-surfaces.css`,
+// `baseTheme` cannot reach them - their chrome lives in `task-surfaces.css`,
 // imported here as a side effect.
 
 import "./task-surfaces.css";
@@ -55,7 +55,7 @@ export const PRIORITY_VALUES = ["highest", "high", "medium", "low", "lowest"] as
 export type TaskFieldEditorOptions = {
   /**
    * What the editor is anchored to. A chip / `+` button (an element) or a bare
-   * viewport rectangle — the slash commands have no element to point at, only a
+   * viewport rectangle - the slash commands have no element to point at, only a
    * caret coordinate from `view.coordsAtPos`. Positioning reads only the rect,
    * so both are equivalent here.
    */
@@ -69,7 +69,7 @@ export type TaskFieldEditorOptions = {
   onCancel?: () => void;
   /**
    * Optional label overrides. Left in for callers that want them, but the
-   * defaults now come from the shared catalogue rather than hard-coded English —
+   * defaults now come from the shared catalogue rather than hard-coded English -
    * the desktop caller passes none, so without this the Save/Cancel buttons
    * shipped untranslated.
    */
@@ -107,7 +107,7 @@ type RecurrenceFamily = "interval" | "weekdays" | "dayOfMonth" | "ordinal";
  * The hand-rolled controls (myne-md/myne#656).
  *
  * A native `<select>` and `<input type="number">` render the platform's own
- * chrome, which no custom theme can repaint — the same failure
+ * chrome, which no custom theme can repaint - the same failure
  * `src/components/primitives/Select.tsx` closed everywhere else. These are the
  * vanilla equivalents: a combobox trigger with a listbox popup, a spinbutton and
  * a switch, built from buttons / inputs so the token layer reaches them and every
@@ -485,7 +485,7 @@ function buildRecurrenceControl(value: string, popup: FieldPopupHost): FieldBody
   const root = document.createElement("div");
   root.className = "cm-recurrence";
 
-  // Family selector — the surface's primary input, so it carries the shared
+  // Family selector - the surface's primary input, so it carries the shared
   // testid the harness and the unit suite look for.
   const familyOptions: ReadonlyArray<{ value: RecurrenceFamily; label: string }> = [
     { value: "interval", label: i18n.t("recurrence.builder.familyInterval") },
@@ -623,7 +623,7 @@ function buildRecurrenceControl(value: string, popup: FieldPopupHost): FieldBody
   // rows are the surface that proved the attribute alone is not enough: an
   // inline declaration cannot be outvoted by any stylesheet, so the control
   // stays correct even in a host that never loads the reset. It is also the only
-  // form the fast test lane can see — jsdom applies no CSS, so an assertion on
+  // form the fast test lane can see - jsdom applies no CSS, so an assertion on
   // `hidden` passes whether or not the row is actually visible.
   //
   // The visible state clears the inline value rather than restating `flex`, so
@@ -775,7 +775,7 @@ export function openTaskFieldEditor(
   const modal = host === undefined ? openModal({
     backdropStyle: {
       // A full-screen but transparent backdrop: this is an anchored popover, not
-      // a blocking dialog, so it must not dim — but it does need to span the
+      // a blocking dialog, so it must not dim - but it does need to span the
       // viewport so a click anywhere outside the surface dismisses it (the
       // backdrop-click path in openModal fires only for clicks ON the backdrop).
       position: "fixed",
@@ -902,7 +902,7 @@ export function openTaskFieldEditor(
 
     // Trap on the surface, not the backdrop, so a backdrop click still dismisses.
     // Initial focus is the body's primary control: the whole surface is reachable
-    // by keyboard alone from here — Tab cycles the controls and wraps.
+    // by keyboard alone from here - Tab cycles the controls and wraps.
     modal!.installTrap(surface, body.focusTarget);
   }
 

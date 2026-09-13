@@ -1,4 +1,4 @@
-// `<CMEditor>` — minimal React wrapper around CodeMirror 6's `EditorView`.
+// `<CMEditor>` - minimal React wrapper around CodeMirror 6's `EditorView`.
 //
 // Per `editor-mvp-baseline` PRD (agent-tooling/features/editor-mvp-baseline/prd.md)
 // + grill `agent-tooling/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md`:
@@ -70,7 +70,7 @@ export type ScrollAnchorRequest = { anchor: WikilinkAnchor; nonce: number } | nu
 /**
  * Persistent-view swap API (MYND-534). Handed to a host via `onSwapReady` so it
  * can reuse ONE long-lived `EditorView` across note switches instead of
- * remounting per note — preserving per-note undo history + selection. The host
+ * remounting per note - preserving per-note undo history + selection. The host
  * (desktop `PaneView`) owns the per-note `EditorState` cache and drives:
  *
  *   1. before leaving note A: `captureState()` → cache it (with A's scroll).
@@ -79,7 +79,7 @@ export type ScrollAnchorRequest = { anchor: WikilinkAnchor; nonce: number } | nu
  *
  * `applyState` does `view.setState(...)` (which resets ALL compartments to their
  * seeded defaults) then re-applies the CURRENT compartment config (view-mode,
- * line-numbers, note-set, vault-headings/anchors, AI) — so a config change made
+ * line-numbers, note-set, vault-headings/anchors, AI) - so a config change made
  * while a note was backgrounded is reflected on return. Scroll lives on the host's
  * OUTER scroller (the CM view grows to fit), so scroll capture/restore is the
  * host's job, not this API's.
@@ -108,14 +108,14 @@ export type CMEditorProps = {
    *  either an authoritative external replacement (note switch, sync pull,
    *  §11.3 keep-both adopt) or a stale echo of a snapshot the buffer has
    *  already moved past (the autosave `updated:` patch). Content equality
-   *  cannot tell those apart — so the HOST, the only party that knows what it
+   *  cannot tell those apart - so the HOST, the only party that knows what it
    *  computed `value` from, states the baseline, and this component verifies it
    *  against the live doc, the one thing it owns.
    *
    *  SET → the mirror applies `value` only while the buffer is still exactly
    *  `valueBase`; otherwise the value is REJECTED and the live text is
-   *  re-asserted upward through `onChange`, so the host's copy — and its
-   *  autosave dirty bit — re-converge on the buffer instead of on a save that
+   *  re-asserted upward through `onChange`, so the host's copy - and its
+   *  autosave dirty bit - re-converge on the buffer instead of on a save that
    *  never covered these keystrokes.
    *
    *  UNSET → "authoritative, apply unconditionally": the behaviour every host
@@ -127,7 +127,7 @@ export type CMEditorProps = {
   /** Selection observer (MYND-339): the concatenated non-empty selection
    *  ranges (joined by `\n`), or `""` when nothing is selected. Fired on every
    *  selection or document change so selection-scoped document statistics stay
-   *  live. Ref-backed like `onChange` — no view rebuild. */
+   *  live. Ref-backed like `onChange` - no view rebuild. */
   onSelectionChange?: (selectedText: string) => void;
   /** Composed alongside `myneExtensions`. v0 baseline does not use this. */
   extensions?: readonly Extension[];
@@ -148,11 +148,11 @@ export type CMEditorProps = {
   recentNotes?: RecentNotesSource;
   /** MYND-305: the vault-wide heading set the `[[##` autocomplete searches.
    *  Pushed into the editor's vault-headings compartment (re-mount-free) like
-   *  `noteSet`. Optional — when absent, `[[##` simply finds nothing. */
+   *  `noteSet`. Optional - when absent, `[[##` simply finds nothing. */
   vaultHeadings?: readonly VaultHeading[];
   /** MYND-382: the vault-wide imported-block-anchor set the `[[^^` enumerate-only
    *  autocomplete searches. Pushed into the vault-block-anchors compartment
-   *  (re-mount-free) like `vaultHeadings`. Optional — when absent, `[[^^` finds
+   *  (re-mount-free) like `vaultHeadings`. Optional - when absent, `[[^^` finds
    *  nothing. */
   vaultBlockAnchors?: readonly VaultBlockAnchor[];
   /** MYND-617: results for the task-query blocks in THIS document, keyed by the
@@ -164,13 +164,13 @@ export type CMEditorProps = {
    *  task list is a host IPC surface. This package supplies the block list
    *  (`taskQueryBlocks`) and renders what it is handed, and nothing more.
    *
-   *  Optional, and its absence is NOT an empty result — a block with no entry
+   *  Optional, and its absence is NOT an empty result - a block with no entry
    *  renders as LOADING, because an empty list would be a wrong answer presented
    *  as a finished one. */
   taskQueryResults?: ReadonlyMap<string, TaskQueryRender>;
   /** MYND-617: a task-query row's checkbox was activated. The widget emits a
    *  bubbling `myne-task-query-toggle`; this relays it. The host performs the
-   *  write — this package never writes bytes. */
+   *  write - this package never writes bytes. */
   onTaskQueryToggle?: (detail: TaskQueryRowEventDetail) => void;
   /** MYND-617: a task-query row's source note was activated. Relayed from
    *  `myne-task-query-open` so the workspace can open that note. */
@@ -178,15 +178,15 @@ export type CMEditorProps = {
   /** MYND-651: the tag-suggestion band's chips for the open note, pushed into
    *  the band's state field (re-mount-free) like `taskQueryResults`.
    *
-   *  The host owns everything about these — the model call, the excluded-folder
-   *  gate, the vocabulary fold, the idle debounce — and this package renders
+   *  The host owns everything about these - the model call, the excluded-folder
+   *  gate, the vocabulary fold, the idle debounce - and this package renders
    *  them and nothing more. Absent or empty means NO BAND at all (not an empty
    *  one): a suggestion surface that is off by default must not reserve a strip
    *  of every note. */
   tagSuggestions?: readonly TagSuggestionChip[];
   /** MYND-651: a suggestion chip was activated. Relayed from
    *  `myne-tag-suggestion-accept`; the host performs the frontmatter write
-   *  (`acceptTagIntoView`) — this package never writes bytes. */
+   *  (`acceptTagIntoView`) - this package never writes bytes. */
   onAcceptTagSuggestion?: (detail: TagSuggestionEventDetail) => void;
   /** MYND-651: a suggestion chip's × was activated. Relayed from
    *  `myne-tag-suggestion-dismiss`; the host drops it for this note. */
@@ -202,7 +202,7 @@ export type CMEditorProps = {
    *  body settles (`value` change) so the click→scroll never races the async
    *  note load. */
   scrollAnchor?: ScrollAnchorRequest;
-  /** Scroll to a task line and focus the editor — the task lists'
+  /** Scroll to a task line and focus the editor - the task lists'
    *  click-through (myne-md/myne#656 review). Resolves by matching `text`
    *  (the task's raw line) so a shifted line or a not-yet-loaded body still
    *  lands; re-fires when `nonce` changes and retries as the body settles. */
@@ -237,12 +237,12 @@ export type CMEditorProps = {
    *  buffer (§6 C1). */
   viewMode?: ViewMode;
   readOnly?: boolean;
-  /** Surface the AI slash commands (`/devam`, `/başlık`) in the menu — the
+  /** Surface the AI slash commands (`/devam`, `/başlık`) in the menu - the
    *  `ai_enabled` pref (MYP1). Default false; read at mount (writing-assistant
    *  task 6). Never set on the reading-view instance (inert in Reading view). */
   aiEnabled?: boolean;
   /** Whether speech-to-text is offered on audio attachments (MYND-592).
-   *  Default TRUE — an opt-OUT independent of `aiEnabled`. */
+   *  Default TRUE - an opt-OUT independent of `aiEnabled`. */
   transcriptionEnabled?: boolean;
   /** myne-md/myne#520: which note this view is holding. The cover banner and
    *  the promoted title row's Add cover read it, so their calls into the host
@@ -256,11 +256,11 @@ export type CMEditorProps = {
    *  would say so. Required, `tsc` names it. */
   noteId: string | null;
   /** Mount the floating selection toolbar that appears over a text selection
-   *  (MYND-559). Default TRUE — desktop's formatting surface, unchanged. A host
+   *  (MYND-559). Default TRUE - desktop's formatting surface, unchanged. A host
    *  that renders its own bar via {@link onReady} passes `false` so the two don't
    *  stack: mobile's above-keyboard `FormatBar` offers the same commands, so the
    *  floating toolbar was pure duplication there. Read at MOUNT (a host's choice
-   *  is a platform constant, not a live pref) — unlike `viewMode` / `aiEnabled`,
+   *  is a platform constant, not a live pref) - unlike `viewMode` / `aiEnabled`,
    *  it has no reconfigure compartment. */
   selectionToolbar?: boolean;
   style?: CSSProperties;
@@ -270,14 +270,14 @@ export type CMEditorProps = {
    *
    *  Independent of `selectionToolbar`, NOT coupled to it: desktop sets this (for
    *  outline scroll-tracking in `PaneView`) while keeping the floating toolbar.
-   *  The pairing worth knowing is the other direction — a host that sets this in
+   *  The pairing worth knowing is the other direction - a host that sets this in
    *  order to render its OWN formatting surface is the one that also wants
    *  `selectionToolbar: false`, so it does not end up with two (mobile, MYND-559). */
   onReady?: (view: EditorView | null) => void;
   /** MYND-534: hand a host the persistent-view swap API after mount (`null` on
    *  unmount). When set, the host drives note switches via `captureState` /
    *  `buildState` / `applyState` on ONE long-lived view instead of remounting per
-   *  note, preserving per-note undo + selection. Opt-in — leaving it unset keeps
+   *  note, preserving per-note undo + selection. Opt-in - leaving it unset keeps
    *  the plain controlled-`value` behaviour (mobile, reading companion). */
   onSwapReady?: (api: EditorSwapApi | null) => void;
 };
@@ -359,7 +359,7 @@ export function CMEditor(props: CMEditorProps) {
 
     // Shared extension pieces + a single `makeState` closure, so the mount state
     // AND every note state built later via the swap API (`buildState`) come from
-    // ONE source — no drift (MYND-534). Both listeners close over refs, so a
+    // ONE source - no drift (MYND-534). Both listeners close over refs, so a
     // cached state built earlier never carries a stale callback after a swap.
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -391,7 +391,7 @@ export function CMEditor(props: CMEditorProps) {
             recentNotes,
             // Mount-read, ref-free on purpose (MYND-559): a host's formatting
             // surface is a platform constant, so every state this view ever
-            // builds — mount or post-swap — carries the SAME choice.
+            // builds - mount or post-swap - carries the SAME choice.
             selectionToolbar,
           }),
           ...(extensionsRef.current ?? []),
@@ -466,20 +466,20 @@ export function CMEditor(props: CMEditorProps) {
       }
       // MYND-651: same `setState`-resets-the-field problem as the line above.
       // Without it, switching back to a note the swap cache holds drops its band
-      // until the next idle pass — which is up to a debounce interval of a
+      // until the next idle pass - which is up to a debounce interval of a
       // feature looking broken.
       if (tagSuggestionsRef.current !== undefined) {
         v.dispatch({ effects: setTagSuggestions.of(tagSuggestionsRef.current) });
       }
       // MYND-534 × MYND-313: the vim layer is a compartment too, and it is seeded
       // OFF (`vimExtension()` → `vimCompartment.of([])`), so a `setState` swap
-      // silently drops it — and the `[vimMode]` effect will NOT re-fire, because
+      // silently drops it - and the `[vimMode]` effect will NOT re-fire, because
       // the prop never changed. Without this line, turning vim on and then
       // switching notes leaves the user back in plain insert mode. Async by
       // nature (the engine is dynamically imported); `reconfigureVim` carries its
       // own last-call-wins generation guard, so firing it here is safe.
       //
-      // `.catch()`, not `void` — see the effect below for why the distinction is
+      // `.catch()`, not `void` - see the effect below for why the distinction is
       // load-bearing rather than stylistic.
       reconfigureVim(v, vimModeRef.current).catch(ignoreVimLoadFailure);
     };
@@ -518,7 +518,7 @@ export function CMEditor(props: CMEditorProps) {
       view.destroy();
       viewRef.current = null;
     };
-    // Intentionally empty deps — the view is mounted once. Prop changes
+    // Intentionally empty deps - the view is mounted once. Prop changes
     // flow through the controlled-component mirror effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -534,7 +534,7 @@ export function CMEditor(props: CMEditorProps) {
   // doesn't infer how to map cursor across an indiscriminate replace.
   //
   // CAUSALITY, NOT CONTENT (myne#167). Autosave snapshots the doc, writes it,
-  // and the parent echoes the saved text back as `value` — but the user may
+  // and the parent echoes the saved text back as `value` - but the user may
   // have typed during that round trip, so the echo can describe a document the
   // buffer has already moved past. A diff between "doc with the new keystrokes"
   // and "value without them" describes deleting those keystrokes, and
@@ -547,7 +547,7 @@ export function CMEditor(props: CMEditorProps) {
   // previous prop re-synced to the live doc on every committed keystroke and
   // the check was unsatisfiable exactly when it was needed. (Worse, the only
   // orderings that could reach it left the baseline pointing at the text it had
-  // just dropped, so the NEXT value — possibly an authoritative sync pull —
+  // just dropped, so the NEXT value - possibly an authoritative sync pull -
   // was swallowed too.)
   //
   // `valueBase` is the host's statement of what THIS value was computed from.
@@ -557,7 +557,7 @@ export function CMEditor(props: CMEditorProps) {
   // prefix/suffix scan collapses them into ONE replacement spanning the user's
   // text, so "apply it carefully" has no correct formulation.
   //
-  // Rejecting SILENTLY is not enough either — the host would keep a body the
+  // Rejecting SILENTLY is not enough either - the host would keep a body the
   // buffer never adopted and an autosave that believes it is clean, so the
   // surviving keystrokes would never reach disk. Re-assert the live text
   // upward instead. That terminates in one extra render (the next `value`
@@ -640,7 +640,7 @@ export function CMEditor(props: CMEditorProps) {
 
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref
-  // changes (re-mount-free reconfigure — cursor / scroll / undo preserved). The
+  // changes (re-mount-free reconfigure - cursor / scroll / undo preserved). The
   // compartment is seeded OFF at mount, so this runs once on mount to honor an
   // already-on pref, then on every subsequent toggle.
   useEffect(() => {
@@ -651,7 +651,7 @@ export function CMEditor(props: CMEditorProps) {
   }, [lineNumbers]);
 
   // #184: push the user keymap overrides into the editor keymap Compartment
-  // whenever `vault.prefs.keymap` changes — re-mount-free, so a rebind of an
+  // whenever `vault.prefs.keymap` changes - re-mount-free, so a rebind of an
   // editor command (bold, undo, indent, fold, …) takes effect on the open note
   // live (cursor / scroll / undo preserved). Seeded at mount, so this runs once
   // to honour an already-customised keymap, then on every subsequent rebind.
@@ -663,7 +663,7 @@ export function CMEditor(props: CMEditorProps) {
   }, [keymapOverrides]);
 
   // MYND-634: push the drawing-embed IO seam into its facet whenever it changes
-  // (a note switch re-closes `createSibling` over the new folder) — re-mount-free,
+  // (a note switch re-closes `createSibling` over the new folder) - re-mount-free,
   // so inline drawing thumbnails / edit-in-place keep working across note swaps.
   // Seeded at mount, so this runs once to honour the initial seam.
   useEffect(() => {
@@ -674,7 +674,7 @@ export function CMEditor(props: CMEditorProps) {
   }, [drawingIo]);
 
   // reading-source-modes (MYND-299): push the per-tab view mode into the
-  // view-mode compartments whenever it (or readOnly) changes — re-mount-free, so
+  // view-mode compartments whenever it (or readOnly) changes - re-mount-free, so
   // switching live/reading/source preserves cursor / scroll / undo and never
   // mutates the buffer. Seeded at mount, so this runs once then on every switch.
   useEffect(() => {
@@ -687,7 +687,7 @@ export function CMEditor(props: CMEditorProps) {
 
   // vim-keyboard-mode (MYND-313): push the live `editor_vim_mode` pref into the
   // vim compartment whenever it changes. Unlike the compartments above this is
-  // ASYNC — the engine is dynamically imported on first enable — so the helper
+  // ASYNC - the engine is dynamically imported on first enable - so the helper
   // owns its own last-call-wins guard rather than this effect trying to cancel.
   // A failed chunk load must leave the plain editor working, not break the note.
   //
@@ -695,7 +695,7 @@ export function CMEditor(props: CMEditorProps) {
   // promise lint and swallows NOTHING: `reconfigureVim` has a bare
   // `await import("@replit/codemirror-vim")`, so an offline user, a 503 on the
   // chunk, or a blocking extension produces a rejected promise with no handler.
-  // On this client that is not merely a console line — `src/lib/global-failure.ts`
+  // On this client that is not merely a console line - `src/lib/global-failure.ts`
   // listens for `unhandledrejection` and records `unhandled-rejection` as a
   // bounded global failure code, which `FailClosedError`'s diagnostic block can
   // then show. So a chunk that simply did not download read as the app having
@@ -709,7 +709,7 @@ export function CMEditor(props: CMEditorProps) {
   }, [vimMode]);
 
   // local-ai (SYNC-14): push the live `ai_enabled` (ANDed with the not-excluded
-  // gate the host passes) into the AI compartment whenever it changes — so
+  // gate the host passes) into the AI compartment whenever it changes - so
   // turning AI off, or opening a note in an excluded folder, immediately tears
   // down ghost-text + the AI slash commands instead of leaving them live-feeding
   // note content to the model. Seeded at mount, so this runs once then on toggle.
@@ -750,7 +750,7 @@ export function CMEditor(props: CMEditorProps) {
 
   // MYND-305 deep-link scroll (SYNC-5). Keyed on BOTH the request nonce and
   // `value`: the click sets the request, but the target note's body arrives
-  // asynchronously via the `value`-mirror effect above — so the scroll attempt
+  // asynchronously via the `value`-mirror effect above - so the scroll attempt
   // re-runs when the body settles and lands on the heading then. A request whose
   // anchor resolves to no offset (heading renamed/deleted, marker absent) leaves
   // the editor at the top (§5.6 not-found fallback). The applied nonce is
@@ -764,7 +764,7 @@ export function CMEditor(props: CMEditorProps) {
     const body = view.state.doc.toString();
     const range = resolveAnchorRange(body, scrollAnchor.anchor);
     if (range === null) {
-      // Body may not have loaded yet (anchor not present) — wait for the next
+      // Body may not have loaded yet (anchor not present) - wait for the next
       // `value` change to retry. If the note is loaded and the anchor genuinely
       // doesn't exist, the retry stays a no-op and the editor keeps its top
       // position (the §5.6 fallback). Either way, don't mark this nonce applied.
@@ -863,7 +863,7 @@ export function CMEditor(props: CMEditorProps) {
     };
   }, []);
 
-  // MYND-651: relay the tag-suggestion band's chip events. Same shape again —
+  // MYND-651: relay the tag-suggestion band's chip events. Same shape again -
   // the widget owns the DOM, the host owns the write into frontmatter `tags:`.
   useEffect(() => {
     const host = hostRef.current;

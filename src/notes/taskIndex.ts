@@ -1,13 +1,13 @@
 // Whole-vault task list with a single shared fetch (MYND-612, task 6).
 //
 // Rust returns every task record and filters nothing (no dates compared, no
-// sorting, no tag matching) — a parameterized accessor would move the §3.6.4 type
+// sorting, no tag matching) - a parameterized accessor would move the §3.6.4 type
 // authority out of the dialect layer. So the whole list comes over once and every
 // surface filters it locally.
 //
 // The single-fetch discipline is what makes that affordable. The index nonce bumps
 // on every autosave, so without a shared cache three query blocks mounted in one
-// note would each fetch — roughly once a second while the user types. This module
+// note would each fetch - roughly once a second while the user types. This module
 // holds ONE list, fetches it at most once per nonce, and lets every consumer
 // subscribe to the same value.
 
@@ -27,19 +27,19 @@ export type VaultTask = {
   noteTitle: string | null;
   noteFolder: string | null;
   /**
-   * Zero-based line of the task, or **`null` for a note-task** — a whole note
+   * Zero-based line of the task, or **`null` for a note-task** - a whole note
    * declared a unit of work (`kind: task`), which has no line to locate.
    *
    * The locator IS the discriminator, deliberately: locator present means a
    * write is line surgery, absent means it is a frontmatter patch. Keeping both
    * kinds in one vector concentrates that branch in the single writer instead of
-   * making every reader surface remember to union two sources — where forgetting
+   * making every reader surface remember to union two sources - where forgetting
    * is silent.
    */
   lineIndex: number | null;
   rawLine: string;
   completed: boolean;
-  /** Set when the raw line exceeded the cap and is therefore truncated —
+  /** Set when the raw line exceeded the cap and is therefore truncated -
    *  the record is readable but NOT writable (MYND-612 task 5). */
   oversized: boolean;
   due?: string;
@@ -105,11 +105,11 @@ function sameTasks(a: readonly VaultTask[], b: readonly VaultTask[]): boolean {
 /**
  * Fetch the vault's tasks unless the cache already covers `nonce` or a fetch for
  * it is already running. Failures leave the previous list in place rather than
- * emptying it — a transient IPC error should not make every task surface blank.
+ * emptying it - a transient IPC error should not make every task surface blank.
  *
  * **Silent when nothing changed.** The index nonce bumps on EVERY note autosave,
- * so a vault-wide list refetched and rebuilt its whole array — a new identity,
- * which invalidates every downstream memo and re-renders every row — roughly once
+ * so a vault-wide list refetched and rebuilt its whole array - a new identity,
+ * which invalidates every downstream memo and re-renders every row - roughly once
  * a second while the user typed in an unrelated note. Comparing the decoded set
  * and keeping the OLD array (no `emit()`) means a no-task edit no longer churns
  * the panel at all. `cachedNonce` still advances, so the un-changed fetch is not
@@ -138,7 +138,7 @@ async function ensureFetched(nonce: number): Promise<void> {
 /**
  * Force the next read to re-fetch.
  *
- * Called from `lockVault()` — the frontend lock choke point — because the
+ * Called from `lockVault()` - the frontend lock choke point - because the
  * backend wipes `VaultIndicesState` on lock and `cachedNonce` is module state
  * that survives the editor unmount. Also used by tests.
  */
@@ -149,7 +149,7 @@ export function resetTaskIndexCache(): void {
   emit();
 }
 
-/** The current shared list without subscribing — for non-React callers. */
+/** The current shared list without subscribing - for non-React callers. */
 export function peekVaultTasks(): readonly VaultTask[] {
   return cache;
 }
@@ -161,16 +161,16 @@ export async function fetchVaultTasks(nonce: number): Promise<readonly VaultTask
 }
 
 /**
- * Note ids carrying a task-list item — the `task:` search operator's leaf
+ * Note ids carrying a task-list item - the `task:` search operator's leaf
  * resolver (MYND-303). With `query`, only tasks whose raw text contains it
- * (case-insensitive substring — a Slice-A approximation; the engine intersects
+ * (case-insensitive substring - a Slice-A approximation; the engine intersects
  * the result with the live set, so trash/template/archive exclusion is not this
  * function's job). A fresh index read per call, mirroring the `byTag` resolver.
  */
 export async function noteIdsWithTask(
   query: string | undefined,
 ): Promise<string[]> {
-  // The raw wire shape (`VaultTaskWire`) — but this reads only `noteId` +
+  // The raw wire shape (`VaultTaskWire`) - but this reads only `noteId` +
   // `rawLine`, both required strings on both shapes, so no `fromWire` needed.
   const rows = await invoke<VaultTaskWire[]>("plugin:vault-indices|vault_indices_tasks");
   const q = query?.trim().toLowerCase();
@@ -187,7 +187,7 @@ export async function noteIdsWithTask(
  * SYNC-5 index-changed nonce; N mounted consumers cause one fetch per change, not
  * N.
  *
- * **Ungated** — this is the raw index read. Task surfaces must use
+ * **Ungated** - this is the raw index read. Task surfaces must use
  * {@link useLiveVaultTasks} instead, so trash/template/archive/conflict exclusion
  * happens in exactly one place.
  */
@@ -203,7 +203,7 @@ function useAllVaultTasks(): readonly VaultTask[] {
  * Note-task rows for every live note carrying the class marker (MYND-612 task 4).
  *
  * **The predicate is the marker alone.** A note that merely carries a due date is
- * an ordinary note — otherwise every meeting note with a date would silently
+ * an ordinary note - otherwise every meeting note with a date would silently
  * become a task. And it is value-strict: a user's own `kind: Task` or
  * `kind: "task"` does not qualify, exactly as the reader that produced
  * `TitleRecord.kind` decided.
@@ -234,13 +234,13 @@ export function noteTasksFromCache(
 /**
  * Keep only tasks whose note is in the working set (MYND-612, task 5→7).
  *
- * The Rust index is deliberately trash-blind — it indexes everything and
+ * The Rust index is deliberately trash-blind - it indexes everything and
  * exclusion happens at *query* time, which is how every other index consumer
  * works (backlinks, graph, tag browser, saved views). Filtering at index time
  * would need a re-index on every trash/archive toggle.
  *
  * `liveCache` is the existing single gate and already covers all four states the
- * task asks for — trashed, template, archived, conflict — plus soft-deleted and
+ * task asks for - trashed, template, archived, conflict - plus soft-deleted and
  * folder-archived notes. Reusing it rather than re-listing the predicates is the
  * point: a fifth exclusion added there must not need a second edit here.
  *
@@ -248,7 +248,7 @@ export function noteTasksFromCache(
  * design (an archived note still resolves as a backlink target), and an archived
  * note's tasks should not appear in a task list.
  *
- * Drawing notes are excluded at extraction time, not here — see
+ * Drawing notes are excluded at extraction time, not here - see
  * `dialect/src/visitors/lineTasks.ts`. Duplicating that would be a second site.
  */
 export function filterTasksToLiveSet(

@@ -127,7 +127,7 @@ describe("partitionTasks", () => {
     expect(byDueDesc.tasks.map((t) => t.noteId)).toEqual(["b", "a"]);
   });
 
-  it("filters by note id — the 'separate by file' the tabs could not express", () => {
+  it("filters by note id - the 'separate by file' the tabs could not express", () => {
     const tasks = [task({ noteId: "a" }), task({ noteId: "b" })];
     const sections = partitionTasks(tasks, view({ noteId: "a" }), TODAY, noTags);
     expect(sections.flatMap((s) => s.tasks).map((t) => t.noteId)).toEqual(["a"]);
