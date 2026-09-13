@@ -193,28 +193,6 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
   valueLabel.setAttribute("data-testid", "editor.task-date-value");
   dateSection.appendChild(valueLabel);
 
-  // Quick picks (myne-md/myne#656 review): the common answers in one click, so
-  // the calendar below is for the rest.
-  const quickRow = document.createElement("div");
-  quickRow.className = "cm-date-quick";
-  for (const [key, offset] of [["today", 0], ["tomorrow", 1]] as const) {
-    const quick = button(
-      `cm-date-quick-${key}`,
-      `editor.task-date-quick-${key}`,
-      i18n.t(`editor.taskField.${key}`),
-    );
-    quick.addEventListener("click", () => {
-      const iso = shiftDays(today, offset);
-      selected = iso;
-      cursor = iso;
-      viewIso = iso;
-      focusDay = true;
-      renderDate();
-    });
-    quickRow.appendChild(quick);
-  }
-  dateSection.appendChild(quickRow);
-
   const start = FIRST_WEEKDAY;
 
   const grid = document.createElement("div");
@@ -236,6 +214,28 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
   }
   grid.appendChild(headerRow);
   dateSection.appendChild(grid);
+
+  // Quick picks (myne-md/myne#656 review): the common answers in one click,
+  // below the grid so the grid keeps the surface's initial focus.
+  const quickRow = document.createElement("div");
+  quickRow.className = "cm-date-quick";
+  for (const [key, offset] of [["today", 0], ["tomorrow", 1]] as const) {
+    const quick = button(
+      `cm-date-quick-${key}`,
+      `editor.task-date-quick-${key}`,
+      i18n.t(`editor.taskField.${key}`),
+    );
+    quick.addEventListener("click", () => {
+      const iso = shiftDays(today, offset);
+      selected = iso;
+      cursor = iso;
+      viewIso = iso;
+      focusDay = true;
+      renderDate();
+    });
+    quickRow.appendChild(quick);
+  }
+  dateSection.appendChild(quickRow);
 
   const clear = button(
     "cm-task-field-clear",
