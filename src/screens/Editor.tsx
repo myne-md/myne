@@ -2359,7 +2359,10 @@ function EditorChrome({
           (`pendingNewTab || activeTab === null`) for the FOCUSED pane, so an open
           "+ New tab" over existing tabs still hides it. */}
       {centerView !== "attachments" &&
-        ws.focusedLeaf.activeTab !== null &&
+        // Backlinks / outline are about the OPEN NOTE, so the toggle is hidden
+        // on a non-note tab (the Tasks tab, the graph, a saved view): there is
+        // no note for a right sidebar to describe (myne-md/myne#656 review).
+        ws.focusedLeaf.activeTab?.kind === "note" &&
         ws.pendingNewTabPaneId !== ws.focusedPaneId && (
         <div
           style={{
