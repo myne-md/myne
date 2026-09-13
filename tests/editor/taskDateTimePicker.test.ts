@@ -67,6 +67,20 @@ describe("date picker", () => {
     byTestId(control.root, "editor.task-field-clear").click();
     expect(control.getValue()).toBe("");
   });
+
+  it("offers Today and Tomorrow quick picks (myne-md/myne#656 review)", () => {
+    const control = buildTaskDateTimeControl("2020-01-01");
+    const today = byTestId(control.root, "editor.task-date-quick-today");
+    const tomorrow = byTestId(control.root, "editor.task-date-quick-tomorrow");
+    expect(today).not.toBeNull();
+    expect(tomorrow).not.toBeNull();
+    tomorrow.click();
+    // Clock-independent: a valid civil date that left the stored one.
+    expect(control.getValue()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(control.getValue()).not.toBe("2020-01-01");
+    today.click();
+    expect(control.getValue()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
 });
 
 describe("time picker", () => {

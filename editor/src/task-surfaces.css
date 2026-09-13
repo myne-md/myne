@@ -69,6 +69,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Quick picks (Today / Tomorrow): the common answers one click away, above the
+   calendar grid. */
+.cm-date-quick {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.cm-date-quick button {
+  flex: 1 1 0;
+  padding: 4px 8px;
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  background: transparent;
+  color: var(--fg-2, #4a4943);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.cm-date-quick button:hover,
+.cm-date-quick button:focus-visible {
+  background: var(--paper-2, #eceae4);
+  color: var(--fg-1, #23221e);
+}
+
 .cm-date-weekdays,
 .cm-date-week {
   display: grid;
