@@ -1321,6 +1321,8 @@
       "dateGrid": "Choose a date",
       "dateNext": "Next month",
       "datePrev": "Previous month",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
