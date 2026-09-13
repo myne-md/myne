@@ -88,6 +88,371 @@ type FieldBody = {
 type RecurrenceFamily = "interval" | "weekdays" | "dayOfMonth" | "ordinal";
 
 /**
+ * The hand-rolled controls (myne-md/myne#656).
+ *
+ * A native `<select>` and `<input type="number">` render the platform's own
+ * chrome, which no custom theme can repaint — the same failure
+ * `src/components/primitives/Select.tsx` closed everywhere else. These are the
+ * vanilla equivalents: a combobox trigger with a listbox popup, a spinbutton and
+ * a switch, built from buttons / inputs so the token layer reaches them and every
+ * state is keyboard-operable. Zero new dependency (`computePosition` is already
+ * here).
+ */
+
+/** One choice in a hand-rolled listbox. */
+type SelectOption = { readonly value: string; readonly label: string };
+
+/**
+ * How a select tells the editor that a popup opened or closed.
+ *
+ * Escape and Enter are captured at the document by `openModal`, BEFORE anything
+ * inside the surface sees them, so the editor has to route both to an open popup
+ * itself: Escape closes the listbox, Enter lets the focused option choose instead
+ * of committing the whole field. `id` is the control's identity, so an
+ * overlapping popup cannot unregister the wrong one.
+ */
+type FieldPopupHost = {
+  readonly opened: (id: object, close: () => void) => void;
+  readonly closed: (id: object) => void;
+};
+
+/** A hand-rolled select: its wrapper, its trigger button and its value. */
+type SelectControl = {
+  readonly root: HTMLElement;
+  readonly el: HTMLButtonElement;
+  readonly getValue: () => string;
+  readonly setValue: (value: string) => void;
+};
+
+/**
+ * Build a listbox-backed combobox, mirroring `Select.tsx`'s ARIA and keys.
+ *
+ * The listbox is mounted INSIDE the surface (not a body portal) so the field
+ * editor's focus trap owns it. Options carry `tabindex="-1"` so they never join
+ * the trap's Tab ring; they take programmatic focus, which is how the arrow keys
+ * move.
+ */
+function buildSelectControl(config: {
+  testId: string;
+  ariaLabel: string;
+  className?: string;
+  options: ReadonlyArray<SelectOption>;
+  value: string;
+  onChange?: (value: string) => void;
+  popup?: FieldPopupHost;
+}): SelectControl {
+  const resolved = config.options.some((o) => o.value === config.value)
+    ? config.value
+    : (config.options[0]?.value ?? "");
+  let current = resolved;
+  let open = false;
+  let listbox: HTMLElement | null = null;
+  let activeIndex = Math.max(0, config.options.findIndex((o) => o.value === current));
+  const self = {};
+
+  const wrapper = document.createElement("span");
+  wrapper.className = "cm-select";
+  if (config.className !== undefined) wrapper.classList.add(config.className);
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "cm-select-trigger";
+  trigger.setAttribute("role", "combobox");
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-label", config.ariaLabel);
+  trigger.setAttribute("data-testid", config.testId);
+  trigger.setAttribute("data-value", current);
+
+  const valueLabel = document.createElement("span");
+  valueLabel.className = "cm-select-value";
+  const chevron = document.createElement("span");
+  chevron.className = "cm-select-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  trigger.appendChild(valueLabel);
+  trigger.appendChild(chevron);
+  wrapper.appendChild(trigger);
+
+  const labelFor = (value: string): string =>
+    config.options.find((o) => o.value === value)?.label ?? value;
+  const syncTrigger = (): void => {
+    valueLabel.textContent = labelFor(current);
+    trigger.setAttribute("data-value", current);
+  };
+
+  const optionNodes = (): HTMLElement[] =>
+    listbox === null ? [] : Array.from(listbox.querySelectorAll<HTMLElement>(".cm-select-option"));
+
+  const setActive = (index: number): void => {
+    const nodes = optionNodes();
+    if (nodes.length === 0) return;
+    activeIndex = Math.max(0, Math.min(nodes.length - 1, index));
+    nodes.forEach((node, i) =>
+      node.setAttribute("data-active", i === activeIndex ? "true" : "false"),
+    );
+    nodes[activeIndex]?.focus();
+  };
+
+  const closePopup = (refocus: boolean): void => {
+    if (!open) return;
+    open = false;
+    trigger.setAttribute("aria-expanded", "false");
+    listbox?.remove();
+    listbox = null;
+    config.popup?.closed(self);
+    if (refocus) trigger.focus();
+  };
+
+  const choose = (index: number): void => {
+    const option = config.options[index];
+    if (option !== undefined && option.value !== current) {
+      current = option.value;
+      syncTrigger();
+      config.onChange?.(current);
+    }
+    closePopup(true);
+  };
+
+  const openPopup = (): void => {
+    if (open) return;
+    open = true;
+    trigger.setAttribute("aria-expanded", "true");
+    activeIndex = Math.max(0, config.options.findIndex((o) => o.value === current));
+    const menu = document.createElement("div");
+    menu.className = "cm-select-listbox";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", config.ariaLabel);
+    menu.style.position = "fixed";
+    menu.style.visibility = "hidden";
+    config.options.forEach((option, index) => {
+      const node = document.createElement("div");
+      node.className = "cm-select-option";
+      node.setAttribute("role", "option");
+      node.setAttribute("aria-selected", option.value === current ? "true" : "false");
+      node.setAttribute("data-testid", `${config.testId}-option`);
+      node.setAttribute("data-value", option.value);
+      node.setAttribute("data-active", index === activeIndex ? "true" : "false");
+      node.tabIndex = -1;
+      node.textContent = option.label;
+      // Keep focus on the option through the press without starting a text
+      // selection; the click handler still selects.
+      node.addEventListener("mousedown", (e) => e.preventDefault());
+      node.addEventListener("click", () => choose(index));
+      node.addEventListener("mouseenter", () => setActive(index));
+      menu.appendChild(node);
+    });
+    wrapper.appendChild(menu);
+    listbox = menu;
+    config.popup?.opened(self, () => closePopup(true));
+    // Mount first so the popup has measurable dimensions, then let the shared
+    // positioner clamp it and flip it above when there is no room below.
+    const rect = trigger.getBoundingClientRect();
+    const placed = computePosition({
+      anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      surfaceWidth: menu.offsetWidth || 160,
+      surfaceHeight: menu.offsetHeight || 160,
+      preferredPlacement: "below",
+    });
+    menu.style.left = `${placed.left}px`;
+    menu.style.top = `${placed.top}px`;
+    menu.style.visibility = "";
+    setActive(activeIndex);
+  };
+
+  trigger.addEventListener("keydown", (e) => {
+    if (open) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      openPopup();
+    }
+  });
+
+  // One delegated listener on the wrapper: the focused option is the event
+  // target, so the container catches every key without per-option wiring. The
+  // `contains` guard keeps the trigger's own keys from double-stepping.
+  wrapper.addEventListener("keydown", (e) => {
+    if (!open || listbox === null || !listbox.contains(e.target as Node)) return;
+    const nodes = optionNodes();
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActive(activeIndex + 1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActive(activeIndex - 1);
+        break;
+      case "Home":
+        e.preventDefault();
+        setActive(0);
+        break;
+      case "End":
+        e.preventDefault();
+        setActive(nodes.length - 1);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        choose(activeIndex);
+        break;
+      case "Escape":
+        e.preventDefault();
+        closePopup(true);
+        break;
+      case "Tab":
+        // Let focus move on; the popup closes with the selection unchanged.
+        closePopup(false);
+        break;
+    }
+  });
+
+  trigger.addEventListener("click", () => {
+    if (open) closePopup(true);
+    else openPopup();
+  });
+
+  syncTrigger();
+  return {
+    root: wrapper,
+    el: trigger,
+    getValue: () => current,
+    setValue: (value: string) => {
+      if (!config.options.some((o) => o.value === value)) return;
+      current = value;
+      syncTrigger();
+    },
+  };
+}
+
+/** A hand-rolled numeric spinbutton: a text input that accepts digits only. */
+type NumberControl = {
+  readonly el: HTMLInputElement;
+  readonly getValue: () => number;
+  readonly setValue: (value: number) => void;
+};
+
+function buildNumberControl(config: {
+  testId: string;
+  ariaLabel: string;
+  className?: string;
+  value: number;
+  min: number;
+  max: number;
+}): NumberControl {
+  const el = document.createElement("input");
+  el.type = "text";
+  el.inputMode = "numeric";
+  el.autocomplete = "off";
+  el.className =
+    config.className === undefined ? "cm-stepper" : `cm-stepper ${config.className}`;
+  el.setAttribute("role", "spinbutton");
+  el.setAttribute("aria-valuemin", String(config.min));
+  el.setAttribute("aria-valuemax", String(config.max));
+  el.setAttribute("aria-label", config.ariaLabel);
+  el.setAttribute("data-testid", config.testId);
+
+  const clamp = (value: number): number => {
+    const whole = Number.isFinite(value) ? Math.floor(value) : config.min;
+    return Math.min(config.max, Math.max(config.min, whole));
+  };
+  const syncValueNow = (): void => {
+    el.setAttribute("aria-valuenow", String(clamp(Number(el.value))));
+  };
+  el.value = String(clamp(config.value));
+  syncValueNow();
+
+  el.addEventListener("input", () => {
+    const digits = el.value.replace(/[^\d]/g, "");
+    if (digits !== el.value) el.value = digits;
+    syncValueNow();
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const step = e.key === "ArrowUp" ? 1 : -1;
+      el.value = String(clamp((Number(el.value) || config.min) + step));
+      syncValueNow();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      el.value = String(config.min);
+      syncValueNow();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      el.value = String(config.max);
+      syncValueNow();
+    }
+  });
+  // Clamp on the way out: a typed `0` or `1000` commits as a real bound rather
+  // than the number the user happened to leave in the box.
+  el.addEventListener("blur", () => {
+    el.value = String(clamp(Number(el.value)));
+    syncValueNow();
+  });
+
+  return {
+    el,
+    getValue: () => clamp(Number(el.value)),
+    setValue: (value: number) => {
+      el.value = String(clamp(value));
+      syncValueNow();
+    },
+  };
+}
+
+/** A hand-rolled completion switch (`role="switch"`), replacing the checkbox. */
+type ToggleControl = {
+  readonly root: HTMLElement;
+  readonly isChecked: () => boolean;
+  readonly setChecked: (checked: boolean) => void;
+};
+
+function buildToggleControl(config: {
+  testId: string;
+  label: string;
+  checked: boolean;
+}): ToggleControl {
+  let checked = config.checked;
+  const root = document.createElement("div");
+  root.className = "cm-recurrence-mode";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cm-switch";
+  button.setAttribute("role", "switch");
+  button.setAttribute("aria-label", config.label);
+  button.setAttribute("data-testid", config.testId);
+  const track = document.createElement("span");
+  track.className = "cm-switch-track";
+  track.setAttribute("aria-hidden", "true");
+  const knob = document.createElement("span");
+  knob.className = "cm-switch-knob";
+  track.appendChild(knob);
+  button.appendChild(track);
+  const label = document.createElement("span");
+  label.className = "cm-switch-label";
+  label.textContent = config.label;
+  root.appendChild(button);
+  root.appendChild(label);
+
+  const sync = (): void => button.setAttribute("aria-checked", checked ? "true" : "false");
+  const toggle = (): void => {
+    checked = !checked;
+    sync();
+  };
+  button.addEventListener("click", toggle);
+  // The visible label is part of the hit target, the way a native <label> is.
+  label.addEventListener("click", toggle);
+  sync();
+  return {
+    root,
+    isChecked: () => checked,
+    setChecked: (value: boolean) => {
+      checked = value;
+      sync();
+    },
+  };
+}
+
+/**
  * Build the repeat field's control.
  *
  * Every rule is **assembled and serialized**, never typed: the family selector
@@ -97,7 +462,7 @@ type RecurrenceFamily = "interval" | "weekdays" | "dayOfMonth" | "ordinal";
  * opened the editor to change it, and cancelling leaves the original bytes
  * untouched).
  */
-function buildRecurrenceControl(value: string): FieldBody {
+function buildRecurrenceControl(value: string, popup: FieldPopupHost): FieldBody {
   const parsed = parseRecurrenceSpec(value);
   const seed = parsed.ok ? parsed.spec : null;
 
@@ -106,46 +471,46 @@ function buildRecurrenceControl(value: string): FieldBody {
 
   // Family selector — the surface's primary input, so it carries the shared
   // testid the harness and the unit suite look for.
-  const family = document.createElement("select");
-  family.className = "cm-recurrence-family";
-  family.setAttribute("data-testid", "editor.task-field-input");
-  family.setAttribute("aria-label", i18n.t("recurrence.builder.family"));
   const familyOptions: ReadonlyArray<{ value: RecurrenceFamily; label: string }> = [
     { value: "interval", label: i18n.t("recurrence.builder.familyInterval") },
     { value: "weekdays", label: i18n.t("recurrence.builder.familyWeekdays") },
     { value: "dayOfMonth", label: i18n.t("recurrence.builder.familyDayOfMonth") },
     { value: "ordinal", label: i18n.t("recurrence.builder.familyOrdinal") },
   ];
-  for (const option of familyOptions) {
-    const node = document.createElement("option");
-    node.value = option.value;
-    node.textContent = option.label;
-    family.appendChild(node);
-  }
-  root.appendChild(family);
+  const family = buildSelectControl({
+    testId: "editor.task-field-input",
+    ariaLabel: i18n.t("recurrence.builder.family"),
+    className: "cm-recurrence-family",
+    options: familyOptions,
+    value: "interval",
+    onChange: () => syncRows(),
+    popup,
+  });
+  root.appendChild(family.root);
 
   // interval: `every N unit`
   const intervalRow = document.createElement("div");
   intervalRow.className = "cm-recurrence-row";
-  const count = document.createElement("input");
-  count.type = "number";
-  count.min = "1";
-  count.max = "999";
-  count.value = "1";
-  count.className = "cm-recurrence-count";
-  count.setAttribute("data-testid", "editor.recurrence-count");
-  count.setAttribute("aria-label", i18n.t("recurrence.builder.count"));
-  const unit = document.createElement("select");
-  unit.setAttribute("data-testid", "editor.recurrence-unit");
-  unit.setAttribute("aria-label", i18n.t("recurrence.builder.unitLabel"));
-  for (const intervalUnit of INTERVAL_UNITS) {
-    const node = document.createElement("option");
-    node.value = intervalUnit;
-    node.textContent = i18n.t(`recurrence.builder.units.${intervalUnit}`);
-    unit.appendChild(node);
-  }
-  intervalRow.appendChild(count);
-  intervalRow.appendChild(unit);
+  const count = buildNumberControl({
+    testId: "editor.recurrence-count",
+    ariaLabel: i18n.t("recurrence.builder.count"),
+    className: "cm-recurrence-count",
+    value: 1,
+    min: 1,
+    max: 999,
+  });
+  const unit = buildSelectControl({
+    testId: "editor.recurrence-unit",
+    ariaLabel: i18n.t("recurrence.builder.unitLabel"),
+    options: INTERVAL_UNITS.map((intervalUnit) => ({
+      value: intervalUnit,
+      label: i18n.t(`recurrence.builder.units.${intervalUnit}`),
+    })),
+    value: "week",
+    popup,
+  });
+  intervalRow.appendChild(count.el);
+  intervalRow.appendChild(unit.root);
   root.appendChild(intervalRow);
 
   // weekdays: a wrapping row of pressable pills, at least one always selected
@@ -180,58 +545,56 @@ function buildRecurrenceControl(value: string): FieldBody {
   // dayOfMonth: 1..31 plus "last day"
   const domRow = document.createElement("div");
   domRow.className = "cm-recurrence-row";
-  const dayOfMonth = document.createElement("select");
-  dayOfMonth.setAttribute("data-testid", "editor.recurrence-dayofmonth");
-  dayOfMonth.setAttribute("aria-label", i18n.t("recurrence.builder.familyDayOfMonth"));
-  for (let day = 1; day <= 31; day += 1) {
-    const node = document.createElement("option");
-    node.value = String(day);
-    node.textContent = String(day);
-    dayOfMonth.appendChild(node);
-  }
-  const lastDayOption = document.createElement("option");
-  lastDayOption.value = "last";
-  lastDayOption.textContent = i18n.t("recurrence.builder.lastDay");
-  dayOfMonth.appendChild(lastDayOption);
-  domRow.appendChild(dayOfMonth);
+  const dayOfMonth = buildSelectControl({
+    testId: "editor.recurrence-dayofmonth",
+    ariaLabel: i18n.t("recurrence.builder.familyDayOfMonth"),
+    options: [
+      ...Array.from({ length: 31 }, (_, index) => ({
+        value: String(index + 1),
+        label: String(index + 1),
+      })),
+      { value: "last", label: i18n.t("recurrence.builder.lastDay") },
+    ],
+    value: "1",
+    popup,
+  });
+  domRow.appendChild(dayOfMonth.root);
   root.appendChild(domRow);
 
   // ordinal: `<ordinal> <weekday> of every month`
   const ordinalRow = document.createElement("div");
   ordinalRow.className = "cm-recurrence-row";
-  const ordinal = document.createElement("select");
-  ordinal.setAttribute("data-testid", "editor.recurrence-ordinal");
-  ordinal.setAttribute("aria-label", i18n.t("recurrence.builder.ordinal"));
-  for (const ordinalValue of ORDINALS) {
-    const node = document.createElement("option");
-    node.value = ordinalValue;
-    node.textContent = i18n.t(`recurrence.ordinal.${ordinalValue}`);
-    ordinal.appendChild(node);
-  }
-  const ordinalWeekday = document.createElement("select");
-  ordinalWeekday.setAttribute("data-testid", "editor.recurrence-ordinal-weekday");
-  ordinalWeekday.setAttribute("aria-label", i18n.t("recurrence.builder.weekday"));
-  for (const day of WEEKDAYS) {
-    const node = document.createElement("option");
-    node.value = day;
-    node.textContent = i18n.t(`recurrence.weekday.${day}`);
-    ordinalWeekday.appendChild(node);
-  }
-  ordinalRow.appendChild(ordinal);
-  ordinalRow.appendChild(ordinalWeekday);
+  const ordinal = buildSelectControl({
+    testId: "editor.recurrence-ordinal",
+    ariaLabel: i18n.t("recurrence.builder.ordinal"),
+    options: ORDINALS.map((ordinalValue) => ({
+      value: ordinalValue,
+      label: i18n.t(`recurrence.ordinal.${ordinalValue}`),
+    })),
+    value: "first",
+    popup,
+  });
+  const ordinalWeekday = buildSelectControl({
+    testId: "editor.recurrence-ordinal-weekday",
+    ariaLabel: i18n.t("recurrence.builder.weekday"),
+    options: WEEKDAYS.map((day) => ({
+      value: day,
+      label: i18n.t(`recurrence.weekday.${day}`),
+    })),
+    value: "monday",
+    popup,
+  });
+  ordinalRow.appendChild(ordinal.root);
+  ordinalRow.appendChild(ordinalWeekday.root);
   root.appendChild(ordinalRow);
 
   // Completion-anchoring: the ` when done` opt-in, carried in the rule itself.
-  const modeLabel = document.createElement("label");
-  modeLabel.className = "cm-recurrence-mode";
-  const mode = document.createElement("input");
-  mode.type = "checkbox";
-  mode.setAttribute("data-testid", "editor.recurrence-when-done");
-  const modeText = document.createElement("span");
-  modeText.textContent = i18n.t("recurrence.builder.whenDone");
-  modeLabel.appendChild(mode);
-  modeLabel.appendChild(modeText);
-  root.appendChild(modeLabel);
+  const mode = buildToggleControl({
+    testId: "editor.recurrence-when-done",
+    label: i18n.t("recurrence.builder.whenDone"),
+    checked: false,
+  });
+  root.appendChild(mode.root);
 
   const rows: Record<RecurrenceFamily, HTMLElement> = {
     interval: intervalRow,
@@ -251,40 +614,39 @@ function buildRecurrenceControl(value: string): FieldBody {
   // the stylesheet keeps owning what "shown" looks like.
   function syncRows(): void {
     for (const key of Object.keys(rows) as RecurrenceFamily[]) {
-      const hide = key !== (family.value as RecurrenceFamily);
+      const hide = key !== (family.getValue() as RecurrenceFamily);
       rows[key].hidden = hide;
       rows[key].style.display = hide ? "none" : "";
     }
   }
-  family.addEventListener("change", syncRows);
 
   // Seed from the existing value, or a plain weekly default.
   if (seed !== null) {
     const rule = seed.rule;
     switch (rule.kind) {
       case "interval":
-        family.value = "interval";
-        count.value = String(rule.count);
-        unit.value = rule.unit;
+        family.setValue("interval");
+        count.setValue(rule.count);
+        unit.setValue(rule.unit);
         break;
       case "weekdays":
-        family.value = "weekdays";
+        family.setValue("weekdays");
         for (const day of rule.days) dayButtons.get(day)?.setAttribute("aria-pressed", "true");
         break;
       case "dayOfMonth":
-        family.value = "dayOfMonth";
-        dayOfMonth.value = rule.day === "last" ? "last" : String(rule.day);
+        family.setValue("dayOfMonth");
+        dayOfMonth.setValue(rule.day === "last" ? "last" : String(rule.day));
         break;
       case "ordinal":
-        family.value = "ordinal";
-        ordinal.value = rule.ordinal;
-        ordinalWeekday.value = rule.weekday;
+        family.setValue("ordinal");
+        ordinal.setValue(rule.ordinal);
+        ordinalWeekday.setValue(rule.weekday);
         break;
     }
-    if (seed.mode === "completion") mode.checked = true;
+    if (seed.mode === "completion") mode.setChecked(true);
   } else {
-    family.value = "interval";
-    unit.value = "week";
+    family.setValue("interval");
+    unit.setValue("week");
   }
   // Guarantee the weekday family is never empty, even when seeded elsewhere.
   if (selectedDays().length === 0) {
@@ -293,12 +655,12 @@ function buildRecurrenceControl(value: string): FieldBody {
   syncRows();
 
   const getValue = (): string => {
-    const active = family.value as RecurrenceFamily;
+    const active = family.getValue() as RecurrenceFamily;
     let rule: RecurrenceRule;
     switch (active) {
       case "interval": {
-        const n = Math.min(999, Math.max(1, Math.floor(Number(count.value) || 1)));
-        rule = { kind: "interval", unit: unit.value as IntervalUnit, count: n };
+        const n = count.getValue();
+        rule = { kind: "interval", unit: unit.getValue() as IntervalUnit, count: n };
         break;
       }
       case "weekdays": {
@@ -307,13 +669,16 @@ function buildRecurrenceControl(value: string): FieldBody {
         break;
       }
       case "dayOfMonth":
-        rule = { kind: "dayOfMonth", day: dayOfMonth.value === "last" ? "last" : Number(dayOfMonth.value) };
+        rule = {
+          kind: "dayOfMonth",
+          day: dayOfMonth.getValue() === "last" ? "last" : Number(dayOfMonth.getValue()),
+        };
         break;
       case "ordinal":
         rule = {
           kind: "ordinal",
-          ordinal: ordinal.value as Ordinal,
-          weekday: ordinalWeekday.value as Weekday,
+          ordinal: ordinal.getValue() as Ordinal,
+          weekday: ordinalWeekday.getValue() as Weekday,
         };
         break;
       default: {
@@ -322,28 +687,26 @@ function buildRecurrenceControl(value: string): FieldBody {
         return exhaustive;
       }
     }
-    const anchoring: RecurrenceMode = mode.checked ? "completion" : "due";
+    const anchoring: RecurrenceMode = mode.isChecked() ? "completion" : "due";
     return formatRecurrenceSpec({ rule, mode: anchoring });
   };
 
-  return { root, getValue, focusTarget: family };
+  return { root, getValue, focusTarget: family.el };
 }
 
 /** The body the surface edits, built per field kind. */
-function buildBody(kind: TaskFieldKind, value: string): FieldBody {
-  if (kind === "repeat") return buildRecurrenceControl(value);
+function buildBody(kind: TaskFieldKind, value: string, popup: FieldPopupHost): FieldBody {
+  if (kind === "repeat") return buildRecurrenceControl(value, popup);
 
   if (kind === "priority") {
-    const select = document.createElement("select");
-    for (const level of PRIORITY_VALUES) {
-      const option = document.createElement("option");
-      option.value = level;
-      option.textContent = level;
-      select.appendChild(option);
-    }
-    select.value = PRIORITY_VALUES.includes(value as never) ? value : "medium";
-    select.setAttribute("data-testid", "editor.task-field-input");
-    return { root: select, getValue: () => select.value, focusTarget: select };
+    const select = buildSelectControl({
+      testId: "editor.task-field-input",
+      ariaLabel: i18n.t("editor.taskField.title.priority"),
+      options: PRIORITY_VALUES.map((level) => ({ value: level, label: level })),
+      value: PRIORITY_VALUES.includes(value as never) ? value : "medium",
+      popup,
+    });
+    return { root: select.root, getValue: () => select.getValue(), focusTarget: select.el };
   }
 
   // `due` and `remind` — the native date control (task 1's measurement) PLUS an
@@ -401,6 +764,28 @@ export function openTaskFieldEditor(
 
   let committed = false;
 
+  // An open select popup sits on top of the surface, and `openModal` captures
+  // Escape and Enter at the document before the popup can see either. Route
+  // both through here: Escape closes the listbox (not the whole editor), and
+  // Enter is left to the focused option rather than committing the field.
+  let activePopup: { id: object; close: () => void } | null = null;
+  const popupHost: FieldPopupHost = {
+    opened: (id, close) => {
+      const previous = activePopup;
+      activePopup = { id, close };
+      if (previous !== null && previous.id !== id) previous.close();
+    },
+    closed: (id) => {
+      if (activePopup !== null && activePopup.id === id) activePopup = null;
+    },
+  };
+  const closeActivePopup = (): boolean => {
+    const current = activePopup;
+    if (current === null) return false;
+    current.close();
+    return true;
+  };
+
   const modal = openModal({
     backdropStyle: {
       // A full-screen but transparent backdrop: this is an anchored popover, not
@@ -413,11 +798,19 @@ export function openTaskFieldEditor(
       zIndex: "2147483000",
     },
     onDismiss: () => {
+      if (closeActivePopup()) return;
       modal.close();
       if (!committed) onCancel?.();
     },
     onEnter: (e) => {
       e.preventDefault();
+      if (activePopup !== null) return;
+      // A combobox trigger owns Enter (it opens the listbox); committing here
+      // would close the editor the user was only trying to open.
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.classList.contains("cm-select-trigger")) {
+        return;
+      }
       commit();
     },
   });
@@ -432,7 +825,7 @@ export function openTaskFieldEditor(
   // bare test DOM never applies the imported CSS.
   surface.style.position = "fixed";
 
-  const body = buildBody(kind, value);
+  const body = buildBody(kind, value, popupHost);
   surface.appendChild(body.root);
 
   const actions = document.createElement("div");

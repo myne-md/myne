@@ -35,8 +35,16 @@ import { ViewsSettings } from "./ViewsSettings";
 import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
+import { SettingRow } from "./SettingRow";
+import { Segmented } from "../primitives/Segmented";
 import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useWorkspace } from "../../notes/workspaceContext";
+import {
+  TASK_CHIP_COLORS,
+  TASK_CHIP_INK,
+  type TaskChipColor,
+} from "../../notes/taskDisplay";
 
 // Two-column layout: the controls scroll on the left, a live preview sticks on
 // the right. Only the Editor tab carries a preview — it is the one tab whose
@@ -272,6 +280,63 @@ export interface EditorPanelProps {
   onShowToast?: (message: string) => void;
 }
 
+const CHIP_SETTING_CONTROL_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+const CHIP_SAMPLE_STYLE: CSSProperties = {
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-pill)",
+  padding: "2px 8px",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-medium)",
+  whiteSpace: "nowrap",
+};
+
+/**
+ * Settings -> Editor -> Tasks: the task chip's ink colour (myne-md/myne#656
+ * item 4). Device-local and window-global, carried on the workspace container
+ * (not a vault pref). The stored value is a closed enum that SELECTS a token,
+ * so a tampered descriptor can never land a string in a style position.
+ */
+function TaskChipInkSetting(): ReactNode {
+  const { t } = useTranslation();
+  const ws = useWorkspace();
+  const value = ws.taskDisplay.chipColor;
+  return (
+    <SettingRow
+      label={t("settings.editor.taskChipColor.label")}
+      helper={t("settings.editor.taskChipColor.help")}
+      testId="settings.editor.taskChipColor"
+      anchorId="settings.editor.taskChipColor"
+      control={(helperId) => (
+        <div style={CHIP_SETTING_CONTROL_STYLE}>
+          <span
+            style={{ ...CHIP_SAMPLE_STYLE, color: TASK_CHIP_INK[value] }}
+            aria-hidden="true"
+          >
+            {t("settings.editor.taskChipColor.sample")}
+          </span>
+          <Segmented
+            options={TASK_CHIP_COLORS.map((c) => ({
+              value: c,
+              label: t(`settings.editor.taskChipColor.${c}`),
+            }))}
+            value={value}
+            onChange={(v) => ws.setTaskDisplay({ chipColor: v as TaskChipColor })}
+            ariaLabel={t("settings.editor.taskChipColor.label")}
+            ariaDescribedBy={helperId}
+            testId="settings.editor.taskChipColor.control"
+          />
+        </div>
+      )}
+    />
+  );
+}
+
 export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
   const { t } = useTranslation();
   // Task reminders (MYND-618) read their pref here and echo the toggle locally:
@@ -358,6 +423,14 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
           horizonDays={prefs.reminder_horizon_days}
           onChange={(days) => void setReminderHorizon(days)}
         />
+      </SettingsSection>
+
+      <SettingsSection
+        title={t("settings.editor.sections.tasks")}
+        testId="settings.section.editor-tasks"
+      >
+        {/* Task chip ink colour (myne-md/myne#656 item 4) — device-local. */}
+        <TaskChipInkSetting />
       </SettingsSection>
 
       {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /

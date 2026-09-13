@@ -75,18 +75,55 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/** Whether two decoded task lists are byte-for-byte the same record set. */
+function sameTasks(a: readonly VaultTask[], b: readonly VaultTask[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (
+      x.noteId !== y.noteId ||
+      x.noteTitle !== y.noteTitle ||
+      x.noteFolder !== y.noteFolder ||
+      x.lineIndex !== y.lineIndex ||
+      x.rawLine !== y.rawLine ||
+      x.completed !== y.completed ||
+      x.oversized !== y.oversized ||
+      x.due !== y.due ||
+      x.repeat !== y.repeat ||
+      x.done !== y.done ||
+      x.priority !== y.priority ||
+      x.remind !== y.remind
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Fetch the vault's tasks unless the cache already covers `nonce` or a fetch for
  * it is already running. Failures leave the previous list in place rather than
  * emptying it — a transient IPC error should not make every task surface blank.
+ *
+ * **Silent when nothing changed.** The index nonce bumps on EVERY note autosave,
+ * so a vault-wide list refetched and rebuilt its whole array — a new identity,
+ * which invalidates every downstream memo and re-renders every row — roughly once
+ * a second while the user typed in an unrelated note. Comparing the decoded set
+ * and keeping the OLD array (no `emit()`) means a no-task edit no longer churns
+ * the panel at all. `cachedNonce` still advances, so the un-changed fetch is not
+ * retried.
  */
 async function ensureFetched(nonce: number): Promise<void> {
   if (cachedNonce === nonce || inflight !== null) return;
   inflight = (async () => {
     try {
       const rows = await invoke<VaultTaskWire[]>("plugin:vault-indices|vault_indices_tasks");
-      cache = Object.freeze(rows.map(fromWire));
+      const next = rows.map(fromWire);
       cachedNonce = nonce;
+      if (sameTasks(cache, next)) return;
+      cache = Object.freeze(next);
       emit();
     } catch {
       // Leave `cache` and `cachedNonce` alone: a failed fetch retries on the

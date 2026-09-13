@@ -26,6 +26,11 @@ import {
   type ReactNode,
 } from "react";
 import { DEFAULT_GRAPH_SETTINGS, encodeGraphSettings, type GraphSettings } from "./graphSettings";
+import {
+  DEFAULT_TASK_DISPLAY,
+  encodeTaskDisplay,
+  type TaskDisplaySettings,
+} from "./taskDisplay";
 import type { NoteId } from "./sidebarState";
 import { openDetachedWindow } from "../lib/detachedWindow";
 import {
@@ -52,7 +57,7 @@ import {
   setFocusedPane,
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
-  setTaskTabState as setTaskTabStateOp,
+  setTaskViewState as setTaskViewStateOp,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
   switchToSlot as switchToSlotOp,
@@ -71,6 +76,7 @@ import {
   type WorkspaceSlot,
   type WorkspaceState,
 } from "./workspaceState";
+import type { TaskView } from "./taskView";
 import {
   clearRenameFlushHooks,
   registerRenameFlushHooks,
@@ -219,6 +225,13 @@ export type WorkspaceApi = {
    *  against the live value without reading it first. */
   setGraphSettings: (next: GraphSettings | ((prev: GraphSettings) => GraphSettings)) => void;
 
+  // ── task-surface display (myne-md/myne#656 item 4) — container-level, window-global ──
+  /** The task chip's device-local display settings (defaults resolved). */
+  taskDisplay: TaskDisplaySettings;
+  /** Persist the task display settings (staged into the workspace blob on the
+   *  next graceful-exit / coalesced flush; all-default clears the field). */
+  setTaskDisplay: (next: TaskDisplaySettings) => void;
+
   // ── back/forward history (focused pane; ephemeral, never persisted) ──
   /** Step the focused pane back to the previously viewed note (no-op when
    *  there is no history in that direction). */
@@ -281,12 +294,9 @@ export type WorkspaceApi = {
   /** Open (or reveal) the vault-wide task list — a singleton tab, like the
    *  graph, so calling twice reveals rather than duplicating (MYND-616). */
   openTasks: () => void;
-  /** Persist the task tab's filter / scope WITH the tab (MYND-616 task 9).
+  /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
-  setTaskTabState: (
-    paneId: PaneId,
-    next: { filter?: string; folder?: string | null; tags?: readonly string[] },
-  ) => void;
+  setTaskViewState: (paneId: PaneId, next: TaskView) => void;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -497,6 +507,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+  const setTaskDisplay = useCallback((next: TaskDisplaySettings) => {
+    setContainer((c) => ({
+      ...c,
+      taskDisplay: encodeTaskDisplay(next) ? next : undefined,
+    }));
+  }, []);
   // Ref-backed live container so a persistence caller reading it never sees a
   // stale snapshot (mirrors `stateRef` below; the graceful-exit + coalesced-flush
   // paths in Editor.tsx call this from captured closures).
@@ -613,9 +629,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         : openInFocusedTab(s, tasksItem()),
     );
   }, [setPending]);
-  const setTaskTabState = useCallback(
-    (paneId: PaneId, next: { filter?: string; folder?: string | null; tags?: readonly string[] }) => {
-      setState((s) => setTaskTabStateOp(s, paneId, next));
+  const setTaskViewState = useCallback(
+    (paneId: PaneId, next: TaskView) => {
+      setState((s) => setTaskViewStateOp(s, paneId, next));
     },
     [],
   );
@@ -832,6 +848,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setExpandedFolders,
       graphSettings: container.graphSettings ?? DEFAULT_GRAPH_SETTINGS,
       setGraphSettings,
+      taskDisplay: container.taskDisplay ?? DEFAULT_TASK_DISPLAY,
+      setTaskDisplay,
       restoreContainer,
       saveWorkspaceAs,
       switchWorkspace,
@@ -857,7 +875,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
-      setTaskTabState,
+      setTaskViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,
@@ -892,6 +910,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspacesSnapshot,
       setExpandedFolders,
       setGraphSettings,
+      setTaskDisplay,
       goBack,
       goForward,
       canGoBack,
@@ -911,7 +930,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
-      setTaskTabState,
+      setTaskViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,

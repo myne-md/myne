@@ -89,9 +89,9 @@ describe("clicking a chip opens its editor", () => {
     const { host } = mount();
     chip(host, "priority").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    const el = fieldInput() as HTMLSelectElement;
-    expect(el.tagName).toBe("SELECT");
-    expect(el.value).toBe("high");
+    const el = fieldInput();
+    expect(el.getAttribute("role")).toBe("combobox");
+    expect(el.getAttribute("data-value")).toBe("high");
   });
 
   it("opens from the keyboard too — the chip is the only route in live mode", () => {

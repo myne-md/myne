@@ -137,7 +137,7 @@ describe("the chip token is reused, not restated", () => {
     const chip = byTestId(host, "task-row.due")!;
     const token = taskChipStyle();
     expect(chip.style.borderRadius).toBe(String(token.borderRadius));
-    expect(chip.style.fontSize).toBe(`${TASK_CHIP_TOKEN.fontSize}px`);
+    expect(chip.style.fontSize).toBe(String(TASK_CHIP_TOKEN.fontSize));
     expect(chip.style.background).toContain("--paper-2");
     cleanup();
   });

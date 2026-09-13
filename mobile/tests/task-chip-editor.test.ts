@@ -90,10 +90,15 @@ describe("the shared field editor loads through mobile's module graph", () => {
     const onCommit = vi.fn();
     openTaskFieldEditor({ anchor, kind: "repeat", value: "every month", onCommit });
 
-    // The primary control is a family SELECT; there is no free-text input.
+    // The primary control is a hand-rolled combobox; there is no free-text rule
+    // box (the only text input is the numeric spinbutton).
     const family = document.querySelector('[data-testid="editor.task-field-input"]') as HTMLElement;
-    expect(family.tagName).toBe("SELECT");
-    expect([...surface()!.querySelectorAll("input")].filter((i) => i.type === "text").length).toBe(0);
+    expect(family.getAttribute("role")).toBe("combobox");
+    expect(
+      [...surface()!.querySelectorAll("input")].filter(
+        (i) => i.type === "text" && i.getAttribute("role") !== "spinbutton",
+      ).length,
+    ).toBe(0);
 
     // Bump the interval count → canonical `every 3 months`.
     (document.querySelector('[data-testid="editor.recurrence-count"]') as HTMLInputElement).value =

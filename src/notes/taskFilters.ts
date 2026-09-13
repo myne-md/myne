@@ -123,7 +123,7 @@ const PRIORITY_RANK: ReadonlyMap<string, number> = new Map([
   ["lowest", 4],
 ]);
 
-function priorityRank(task: VaultTask): number {
+export function priorityRank(task: VaultTask): number {
   return PRIORITY_RANK.get(task.priority ?? "") ?? 5;
 }
 

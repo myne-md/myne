@@ -198,7 +198,7 @@ vi.mock("../../src/notes/taskIndex", () => ({
 }));
 vi.mock("../../src/notes/workspaceContext", () => ({
   useWorkspace: () => ({
-    setTaskTabState: vi.fn(),
+    setTaskViewState: vi.fn(),
     flushAll: vi.fn(),
     openInFocused: vi.fn(),
   }),
@@ -243,21 +243,22 @@ describe("TasksPane's Today bucket follows the day", () => {
     render(
       <TasksPane
         paneId={"p1" as never}
-        item={{ kind: "tasks", taskFilter: "today" } as never}
+        // Narrowed to the due-today window; the section model applies on top.
+        item={{ kind: "tasks", taskView: { due: "today" } } as never}
       />,
     );
 
-    // Due today: the row is listed under the Today filter.
+    // Due today: the row is listed.
     expect(screen.queryByText("ship the thing")).not.toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(3 * 60_000);
     });
 
-    // Past midnight it is no longer due today, so the Today filter drops it.
+    // Past midnight it is no longer due today, so the due-today view drops it.
     expect(
       screen.queryByText("ship the thing"),
-      "the Today filter still lists yesterday's task after midnight",
+      "the due-today view still lists yesterday's task after midnight",
     ).toBeNull();
   });
 });

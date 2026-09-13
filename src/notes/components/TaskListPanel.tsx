@@ -1,78 +1,89 @@
-// The task list body (MYND-616, tasks 4–7).
+// The task list body (MYND-616, redesigned for myne-md/myne#656).
 //
 // ONE body for both surfaces. The vault-wide tab and the note-scoped right-panel
 // tab differ by the `scope` prop and by which task list they are handed —
-// nothing else. That is what makes them "literally one component with a scope
-// parameter" rather than two components that happen to look alike.
+// nothing else.
 //
-// It carries: the four filters (with the overdue **count** on its own tab —
-// task 6), the scope selector (task 4/5), the shared `TaskRow`, and the four
-// distinct empty states (task 7).
+// **The design, as decided in the #656 grill:**
+//   - section headers (Overdue / Today / Upcoming / Later / No date, then a flat
+//     Done section) REPLACE the old four date tabs; section order is fixed and
+//     attention-first, and each header carries its own count;
+//   - a curated filter row replaces the tabs: status (undone/all/done), due
+//     window, folder, note, tag, priority, and a within-section sort;
+//   - the list is hand-rolled WINDOWED (a vault can hold thousands of tasks),
+//     with fixed-height rows and a sticky section header;
+//   - the search box filters the live array client-side.
 //
-// EMPTY-STATE TONE IS A CONSTRAINT, not a preference. The canon forbids a green
-// check and the product voice is honest rather than congratulatory: an empty
-// week is **stated, not celebrated**. No confetti, no "all done!", no tick. The
-// copy lives in the catalogue and the E2E asserts it, because copy drift is
-// exactly what a test catches and a review does not.
-//
-// The **rebuilding** state is distinct from a genuinely empty result. Showing
-// "no tasks" while the index is still being built is a wrong answer presented as
-// a finished one — the user concludes their tasks are gone.
+// EMPTY-STATE TONE IS A CONSTRAINT. The canon forbids a green check and the
+// product voice is honest rather than congratulatory: an empty week is stated,
+// not celebrated. No confetti, no tick.
 
-import { useMemo, type CSSProperties, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { TaskRow, type TaskRowData, type TaskRowScope } from "@myne/editor/host/notes/TaskRow";
+import { Select } from "../../components/primitives/Select";
+import { Segmented } from "../../components/primitives/Segmented";
 import { taskDescription } from "../../dialect/taskFieldWriter";
 import {
-  filterAndSortTasks,
-  overdueCount,
-  TASK_FILTERS,
-  type TaskFilter,
-} from "../taskFilters";
-import { filterTasksByScope, isScopeEmpty, type TaskScope } from "../taskScope";
+  DEFAULT_TASK_VIEW,
+  distinctFolders,
+  distinctTags,
+  partitionTasks,
+  type TaskDueFilter,
+  type TaskPriorityFilter,
+  type TaskSectionKey,
+  type TaskSort,
+  type TaskStatusFilter,
+  type TaskView,
+} from "../taskView";
+import { visibleDepths } from "../taskTree";
 import { taskRowKey } from "../taskWriteCore";
+import {
+  TASK_ROW_HEIGHT,
+  computeTaskWindow,
+  flattenTaskList,
+  type TaskListItem,
+} from "../taskWindowing";
 import type { VaultTask } from "../taskIndex";
 
 export type TaskListPanelProps = {
   tasks: readonly VaultTask[];
-  scope: TaskScope;
-  filter: TaskFilter;
+  /** The persisted view (filters + sort). */
+  view: TaskView;
   today: string;
   /** Which surface this is — passed straight through to every row. */
   rowScope: TaskRowScope;
   /** Per-note tags, for the scope selector's tag half. */
   tagsOf?: (noteId: string) => readonly string[];
-  /** True while the index is still being built. A wrong empty list is worse
-   *  than a loading state, so this is rendered distinctly. */
+  /** True while the index is still being built. */
   rebuilding?: boolean;
-  onFilterChange: (filter: TaskFilter) => void;
+  onViewChange: (next: TaskView) => void;
   onToggle?: (task: VaultTask) => void;
   onOpen?: (task: VaultTask) => void;
   testIdPrefix?: string;
-  /** Two-line rows (MYND-620 task 6). Passed straight to every row; the panel
-   *  does not decide the width, its caller does. */
-  twoLine?: boolean;
 };
 
 const NO_TAGS: readonly string[] = [];
 
 /**
- * Project an index record into what a row needs.
- *
- * The optional strings are spread on `== null`, not `=== undefined`: this is the
- * projection boundary, `TaskRowData` promises optional-or-absent, and a client
- * whose fetch skipped the `taskWire.ts` decoder hands a wire `null` down here.
- * `=== undefined` would copy it into the row verbatim, which is the crash the
- * row's own guard then has to survive. `lineIndex` keeps `=== null` deliberately
- * — there it is the note-task discriminator, not an absent value.
+ * Project an index record into what a row needs. `depth` is the visible-relative
+ * indent the tree helper computed.
  */
-function toRowData(task: VaultTask): TaskRowData {
+function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
     key: taskRowKey(task),
-    // A note-task has no line; its title is the task.
     text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
+    ...(depth > 0 ? { depth } : {}),
     ...(task.due == null ? {} : { due: task.due }),
     ...(task.remind == null ? {} : { remind: task.remind }),
     ...(task.repeat == null ? {} : { repeat: task.repeat }),
@@ -81,41 +92,79 @@ function toRowData(task: VaultTask): TaskRowData {
   };
 }
 
-const STRIP_STYLE: CSSProperties = {
+const PANEL_STYLE: CSSProperties = {
   display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  minHeight: 0,
+};
+
+const FILTER_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: "var(--space-1)",
   padding: "6px 8px",
   borderBottom: "1px solid var(--line-1)",
-  flexWrap: "wrap",
 };
 
-function tabStyle(active: boolean): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    padding: "3px 9px",
-    borderRadius: "var(--radius-pill)",
-    // Selection is the ONE thing a fill may carry here; it is not state about
-    // the tasks, it is where the user is.
-    background: active ? "var(--paper-3)" : "transparent",
-    color: active ? "var(--fg-1)" : "var(--fg-2)",
-    border: "1px solid transparent",
-    fontFamily: "var(--font-sans)",
-    fontSize: 12,
-    fontWeight: active ? 600 : 500,
-    cursor: "pointer",
-  };
-}
+const SEARCH_STYLE: CSSProperties = {
+  flex: "1 1 120px",
+  minWidth: 90,
+  boxSizing: "border-box",
+  padding: "var(--space-1) var(--space-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  color: "var(--fg-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+};
 
-const COUNT_STYLE: CSSProperties = {
-  // A plain muted numeral. NOT a badge, NOT alarm-coloured — the canon's state
-  // rules forbid a pill that reads as a status, and an alarm colour would make
-  // the backlog shout every time the panel opens.
+const SCROLL_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minHeight: 0,
+  height: "100%",
+  overflowY: "auto",
+  position: "relative",
+};
+
+const HEADER_BASE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  boxSizing: "border-box",
+  height: TASK_ROW_HEIGHT - 2,
+  padding: "0 8px",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  color: "var(--fg-2)",
+  background: "var(--paper)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const HEADER_COUNT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   fontVariantNumeric: "tabular-nums",
-  fontSize: "var(--text-xs)",
+  fontWeight: 500,
+};
+
+const STICKY_STYLE: CSSProperties = {
+  ...HEADER_BASE,
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 2,
+  borderBottom: "1px solid var(--line-1)",
+};
+
+const ROW_WRAP_STYLE: CSSProperties = {
+  height: TASK_ROW_HEIGHT,
+  boxSizing: "border-box",
+  overflow: "hidden",
 };
 
 const EMPTY_STYLE: CSSProperties = {
@@ -127,95 +176,247 @@ const EMPTY_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+/** A section header: label + count, used both in flow and pinned. */
+function SectionHeader({
+  section,
+  count,
+  testIdPrefix,
+}: {
+  section: TaskSectionKey;
+  count: number;
+  testIdPrefix: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  return (
+    <div style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${section}`}>
+      <span>{t(`tasks.section.${section}`)}</span>
+      <span style={HEADER_COUNT_STYLE}>{count}</span>
+    </div>
+  );
+}
+
 export function TaskListPanel({
   tasks,
-  scope,
-  filter,
+  view,
   today,
   rowScope,
-  twoLine,
   tagsOf,
   rebuilding = false,
-  onFilterChange,
+  onViewChange,
   onToggle,
   onOpen,
   testIdPrefix = "tasks",
 }: TaskListPanelProps): ReactElement {
   const { t } = useTranslation();
+  const [search, setSearch] = useState("");
 
-  const scoped = useMemo(
-    () => filterTasksByScope(tasks, scope, tagsOf ?? (() => NO_TAGS)),
-    [tasks, scope, tagsOf],
+  const sections = useMemo(
+    () => partitionTasks(tasks, view, today, tagsOf ?? (() => NO_TAGS), search),
+    [tasks, view, today, tagsOf, search],
   );
-  const visible = useMemo(
-    () => filterAndSortTasks(scoped, filter, today),
-    [scoped, filter, today],
-  );
-  // Counted over the SCOPED set, not the visible one: the badge must answer
-  // "how much is behind" while the user is looking at Today.
-  const overdue = useMemo(() => overdueCount(scoped, today), [scoped, today]);
 
-  /**
-   * Which empty state applies. Four distinct answers, and the order matters:
-   * rebuilding first (a wrong empty list presented as a finished one is the
-   * worst of the four), then "no tasks at all", then scope, then filter.
-   */
-  const emptyKind = ((): "rebuilding" | "vault" | "scope" | "filter" | null => {
+  // Nesting resolved against the FULL live set, so a parent filtered out still
+  // promotes its child to depth 0 rather than hiding it.
+  const depths = useMemo(() => {
+    const visible = new Set<string>();
+    for (const section of sections) for (const task of section.tasks) visible.add(taskRowKey(task));
+    return visibleDepths(tasks, visible);
+  }, [tasks, sections]);
+
+  const items = useMemo(() => flattenTaskList(sections, depths), [sections, depths]);
+
+  // ── Windowing ──────────────────────────────────────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewport, setViewport] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    const measure = (): void => setViewport(el.clientHeight);
+    measure();
+    const onScroll = (): void => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, []);
+
+  // A new filter/search means a new list; keeping the old scroll offset would
+  // strand the user mid-way down rows that no longer exist.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    el.scrollTop = 0;
+    setScrollTop(0);
+  }, [view, search]);
+
+  const window_ = computeTaskWindow(items, scrollTop, viewport);
+  const slice = items.slice(window_.start, window_.end);
+  const sticky =
+    window_.stickyPinned && window_.stickyIndex >= 0
+      ? (items[window_.stickyIndex] as Extract<TaskListItem, { kind: "header" }>)
+      : null;
+
+  // ── Filter options, derived from the live set (no separate data source) ─────
+  const folderOptions = useMemo(() => distinctFolders(tasks), [tasks]);
+  const tagOptions = useMemo(() => distinctTags(tasks, tagsOf ?? (() => NO_TAGS)), [tasks, tagsOf]);
+  const noteOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const task of tasks) if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("tasks.view.untitled"));
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [tasks, t]);
+
+  const setView = useCallback(
+    (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch }),
+    [onViewChange, view],
+  );
+
+  const emptyKind = ((): "rebuilding" | "search" | "vault" | "filter" | null => {
     if (rebuilding) return "rebuilding";
-    if (visible.length > 0) return null;
+    if (items.length > 0) return null;
+    if (search.trim() !== "") return "search";
     if (tasks.length === 0) return "vault";
-    if (!isScopeEmpty(scope) && scoped.length === 0) return "scope";
     return "filter";
   })();
 
+  const statusOptions = useMemo(
+    () => [
+      { value: "undone", label: t("tasks.status.undone") },
+      { value: "all", label: t("tasks.status.all") },
+      { value: "done", label: t("tasks.status.done") },
+    ],
+    [t],
+  );
+
   return (
-    <div
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
-      data-testid={`${testIdPrefix}.panel`}
-    >
-      <div style={STRIP_STYLE} role="tablist" data-testid={`${testIdPrefix}.filters`}>
-        {TASK_FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            role="tab"
-            aria-selected={f === filter}
-            style={tabStyle(f === filter)}
-            data-testid={`${testIdPrefix}.filter.${f}`}
-            onClick={() => onFilterChange(f)}
-          >
-            {t(`tasks.filter.${f}`)}
-            {/* Absent rather than zero: a "0" is a statement about the backlog
-                that the user did not ask for. */}
-            {f === "overdue" && overdue > 0 ? (
-              <span style={COUNT_STYLE} data-testid={`${testIdPrefix}.overdueCount`}>
-                {overdue}
-              </span>
-            ) : null}
-          </button>
-        ))}
+    <div style={PANEL_STYLE} data-testid={`${testIdPrefix}.panel`}>
+      <div style={FILTER_ROW_STYLE} data-testid={`${testIdPrefix}.filters`}>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("tasks.search.placeholder")}
+          aria-label={t("tasks.search.label")}
+          style={SEARCH_STYLE}
+          data-testid={`${testIdPrefix}.search`}
+        />
+        <Segmented
+          options={statusOptions}
+          value={view.status}
+          onChange={(v) => setView({ status: v as TaskStatusFilter })}
+          ariaLabel={t("tasks.view.statusLabel")}
+          testId={`${testIdPrefix}.status`}
+        />
+        <Select
+          value={view.due}
+          options={[
+            { value: "any", label: t("tasks.due.any") },
+            { value: "overdue", label: t("tasks.due.overdue") },
+            { value: "today", label: t("tasks.due.today") },
+            { value: "upcoming", label: t("tasks.due.upcoming") },
+            { value: "later", label: t("tasks.due.later") },
+            { value: "none", label: t("tasks.due.none") },
+          ]}
+          onChange={(v) => setView({ due: v as TaskDueFilter })}
+          aria-label={t("tasks.view.dueLabel")}
+          testId={`${testIdPrefix}.dueFilter`}
+        />
+        <Select
+          value={view.folder ?? ""}
+          options={[{ value: "", label: t("tasks.view.allFolders") }, ...folderOptions.map((f) => ({ value: f, label: f }))]}
+          onChange={(v) => setView({ folder: v === "" ? null : v })}
+          aria-label={t("tasks.view.folderLabel")}
+          testId={`${testIdPrefix}.folderFilter`}
+        />
+        <Select
+          value={view.noteId ?? ""}
+          options={[{ value: "", label: t("tasks.view.allNotes") }, ...noteOptions.map(([id, title]) => ({ value: id, label: title }))]}
+          onChange={(v) => setView({ noteId: v === "" ? null : v })}
+          aria-label={t("tasks.view.noteLabel")}
+          testId={`${testIdPrefix}.noteFilter`}
+        />
+        <Select
+          value={view.tags[0] ?? ""}
+          options={[{ value: "", label: t("tasks.view.anyTag") }, ...tagOptions.map((tag) => ({ value: tag, label: tag }))]}
+          onChange={(v) => setView({ tags: v === "" ? [] : [v] })}
+          aria-label={t("tasks.view.tagLabel")}
+          testId={`${testIdPrefix}.tagFilter`}
+        />
+        <Select
+          value={view.priority}
+          options={[
+            { value: "any", label: t("tasks.view.anyPriority") },
+            ...(["highest", "high", "medium", "low", "lowest"] as const).map((p) => ({ value: p, label: t(`tasks.priority.${p}`) })),
+          ]}
+          onChange={(v) => setView({ priority: v as TaskPriorityFilter })}
+          aria-label={t("tasks.view.priorityLabel")}
+          testId={`${testIdPrefix}.priorityFilter`}
+        />
+        <Select
+          value={view.sort}
+          options={[
+            { value: "due", label: t("tasks.sort.due") },
+            { value: "dueDesc", label: t("tasks.sort.dueDesc") },
+            { value: "priority", label: t("tasks.sort.priority") },
+            { value: "note", label: t("tasks.sort.note") },
+          ]}
+          onChange={(v) => setView({ sort: v as TaskSort })}
+          aria-label={t("tasks.view.sortLabel")}
+          testId={`${testIdPrefix}.sort`}
+        />
       </div>
 
-      <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "4px 0" }}>
-        {emptyKind !== null ? (
-          <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
-            {t(`tasks.empty.${emptyKind}`)}
+      <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0 }}>
+        <div ref={scrollRef} style={SCROLL_STYLE} data-testid={`${testIdPrefix}.scroll`}>
+          {emptyKind !== null ? (
+            <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
+              {t(`tasks.empty.${emptyKind}`, { query: search.trim() })}
+            </div>
+          ) : (
+            <>
+              <div style={{ height: window_.topPad }} aria-hidden="true" />
+              {slice.map((item) =>
+                item.kind === "header" ? (
+                  <SectionHeader
+                    key={item.id}
+                    section={item.section}
+                    count={item.count}
+                    testIdPrefix={testIdPrefix}
+                  />
+                ) : (
+                  <div key={item.id} style={ROW_WRAP_STYLE}>
+                    <TaskRow
+                      task={toRowData(item.task, item.depth)}
+                      scope={rowScope}
+                      today={today}
+                      testIdPrefix={`${testIdPrefix}.row`}
+                      {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
+                      {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+                    />
+                  </div>
+                ),
+              )}
+              <div style={{ height: window_.bottomPad }} aria-hidden="true" />
+            </>
+          )}
+        </div>
+        {sticky !== null && emptyKind === null ? (
+          <div style={STICKY_STYLE} data-testid={`${testIdPrefix}.stickyHeader`}>
+            <span>{t(`tasks.section.${sticky.section}`)}</span>
+            <span style={HEADER_COUNT_STYLE}>{sticky.count}</span>
           </div>
-        ) : (
-          visible.map((task) => (
-            <TaskRow
-              key={taskRowKey(task)}
-              task={toRowData(task)}
-              scope={rowScope}
-              {...(twoLine === undefined ? {} : { twoLine })}
-              today={today}
-              testIdPrefix={`${testIdPrefix}.row`}
-              {...(onToggle === undefined ? {} : { onToggle: () => onToggle(task) })}
-              {...(onOpen === undefined ? {} : { onOpen: () => onOpen(task) })}
-            />
-          ))
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
+
+/** The default every caller starts from; re-exported so callers import one module. */
+export { DEFAULT_TASK_VIEW };

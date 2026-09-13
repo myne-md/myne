@@ -3369,7 +3369,8 @@
         "text": "Text & display",
         "editing": "Editing",
         "writing": "Writing",
-        "features": "Features"
+        "features": "Features",
+        "tasks": "Tasks"
       },
       "preview": {
         "heading": "The quick brown fox",
@@ -3381,7 +3382,16 @@
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",
-      "enableArchiving": "Enable archiving"
+      "enableArchiving": "Enable archiving",
+      "taskChipColor": {
+        "accent": "Accent",
+        "danger": "Red",
+        "help": "The colour of a task chip's icon and label, on every task surface on this device.",
+        "label": "Task chip colour",
+        "muted": "Muted",
+        "sample": "Aug 1",
+        "theme": "Theme"
+      }
     },
     "search": {
       "placeholder": "Search settings…",
@@ -3840,7 +3850,16 @@
       "filter": "Nothing here right now. Try another filter.",
       "rebuilding": "Reading your notes…",
       "scope": "No tasks in this folder or tag. Try widening the scope.",
+      "search": "No tasks match “{{query}}”.",
       "vault": "No tasks yet. Write “- [ ]” on a line in any note to make one."
+    },
+    "due": {
+      "any": "Any date",
+      "later": "Later",
+      "none": "No date",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
     },
     "filter": {
       "all": "All",
@@ -3849,6 +3868,46 @@
       "upcoming": "Upcoming"
     },
     "noteTitle": "Tasks in this note",
+    "priority": {
+      "high": "High",
+      "highest": "Highest",
+      "low": "Low",
+      "lowest": "Lowest",
+      "medium": "Medium"
+    },
+    "section": {
+      "done": "Done",
+      "later": "Later",
+      "none": "No date",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
+    },
+    "sort": {
+      "due": "Due date",
+      "dueDesc": "Due date, latest first",
+      "note": "Note",
+      "priority": "Priority"
+    },
+    "status": {
+      "all": "All",
+      "done": "Done",
+      "undone": "Open"
+    },
+    "view": {
+      "allFolders": "All folders",
+      "allNotes": "All notes",
+      "anyPriority": "Any priority",
+      "anyTag": "Any tag",
+      "dueLabel": "Filter by due date",
+      "folderLabel": "Filter by folder",
+      "noteLabel": "Filter by note",
+      "priorityLabel": "Filter by priority",
+      "sortLabel": "Sort within sections",
+      "statusLabel": "Filter by completion",
+      "tagLabel": "Filter by tag",
+      "untitled": "Untitled"
+    },
     "query": {
       "dropped_one": "{{count}} clause Myne could not read",
       "dropped_other": "{{count}} clauses Myne could not read",
@@ -3870,6 +3929,10 @@
     "scope": {
       "allFolders": "All folders",
       "label": "Narrow by"
+    },
+    "search": {
+      "label": "Search tasks",
+      "placeholder": "Search tasks…"
     },
     "title": "Tasks"
   },

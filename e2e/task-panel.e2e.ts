@@ -31,11 +31,26 @@ import { testIdSelector, type Session } from "./support/webdriver";
 async function openTaskTab(s: Session): Promise<void> {
   await runPaletteAction(s, "tasks.show", "tasks");
   await s.waitForElement(testIdSelector("tasks.panel"));
+  // The windowed scroll container is what holds the rows (myne-md/myne#656).
+  await s.waitForElement(testIdSelector("tasks.scroll"));
 }
 
 async function rowTexts(s: Session): Promise<string[]> {
   const rows = await s.byTestIdAll("tasks.row.text");
   return Promise.all(rows.map((r) => r.text()));
+}
+
+/** Pick an option from a panel `Select` by its visible label. */
+async function pickSelect(s: Session, testId: string, label: string): Promise<void> {
+  await (await s.byTestId(testId)).click();
+  const options = await s.byTestIdAll(`${testId}-option`);
+  for (const option of options) {
+    if ((await option.text()).trim() === label) {
+      await option.click();
+      return;
+    }
+  }
+  throw new Error(`option "${label}" not found in ${testId}`);
 }
 
 describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", () => {
@@ -63,8 +78,10 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
 
         await openTaskTab(s);
 
-        // 1. `All` shows both notes' tasks — the vault-wide claim.
-        await (await s.byTestId("tasks.filter.all")).click();
+        // 1. Sections: both notes' tasks appear, and the section model puts the
+        //    past-due one under Overdue and the 2030 one under Later.
+        await s.waitForElement(testIdSelector("tasks.section.overdue"));
+        await s.waitForElement(testIdSelector("tasks.section.later"));
         await s.waitUntil(
           async () => {
             const texts = await rowTexts(s);
@@ -73,22 +90,41 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
               ? true
               : null;
           },
-          { label: "both notes' tasks listed" },
+          { label: "both notes' tasks listed across sections" },
         );
 
-        // 2. Filters narrow. `Upcoming` is a rolling seven days, so a task due
-        //    in 2030 cannot be in it.
-        await (await s.byTestId("tasks.filter.upcoming")).click();
+        // 2. The due filter narrows. `Upcoming` is a rolling seven days, so
+        //    neither an overdue task nor a 2030 one can be in it.
+        await pickSelect(s, "tasks.dueFilter", "Upcoming");
         await s.waitUntil(
-          async () => ((await rowTexts(s)).every((t) => !t.includes("buy milk")) ? true : null),
-          { label: "the far-future task left the upcoming filter" },
+          async () => ((await rowTexts(s)).length === 0 ? true : null),
+          { label: "neither task is in the upcoming window" },
+        );
+        await pickSelect(s, "tasks.dueFilter", "Any date");
+
+        // 3. Search narrows the list client-side over the live array — item 6 —
+        //    and a query that matches nothing says so about the QUERY rather
+        //    than presenting an empty vault (myne-md/myne#656).
+        await s.waitForElement(testIdSelector("tasks.row.checkbox"));
+        await (await s.byTestId("tasks.search")).replaceText("milk");
+        await s.waitUntil(
+          async () => {
+            const rows = await rowTexts(s);
+            return rows.length === 1 && rows[0]!.includes("buy milk") ? true : null;
+          },
+          { label: "search narrowed the list to the matching task" },
+        );
+        await (await s.byTestId("tasks.search")).replaceText("zzz-no-match");
+        await s.waitForElement(testIdSelector("tasks.empty.search"));
+        await (await s.byTestId("tasks.search")).replaceText("");
+        await s.waitUntil(
+          async () => ((await rowTexts(s)).length === 2 ? true : null),
+          { label: "clearing the search restored both tasks" },
         );
 
-        // 3. Ticking from the list writes to the CORRECT note. Back on `All`,
-        //    tick the rent task and verify Bills changed — the property the
-        //    single writer exists to guarantee.
-        await (await s.byTestId("tasks.filter.all")).click();
-        await s.waitForElement(testIdSelector("tasks.row.checkbox"));
+        // 4. Ticking from the list writes to the CORRECT note. With the list
+        //    restored, tick the rent task and verify Bills changed — the
+        //    property the single writer exists to guarantee.
         const boxes = await s.byTestIdAll("tasks.row.checkbox");
         const texts = await rowTexts(s);
         const rentIndex = texts.findIndex((t) => t.includes("pay the rent"));
@@ -216,9 +252,9 @@ describeE2E("tp4 the task tab body fills the pane (myne-md/myne#534)", () => {
         await typeIntoEditor(s, "- [ ] tp4taskalfa9x3k7m2q");
         await waitForSaved(s);
         await openTaskTab(s);
-        // The tab opens on `today` and this task carries no due date, so it is
-        // legitimately absent until the filter widens. tp1 does the same.
-        await (await s.byTestId("tasks.filter.all")).click();
+        // The undated task sits in its own "No date" section under the default
+        // view, so it is present without touching a filter.
+        await s.waitForElement(testIdSelector("tasks.section.none"));
         await s.waitForElement(testIdSelector("tasks.row.text"));
 
         const geometry = await settleOn(

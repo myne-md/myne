@@ -107,6 +107,90 @@
   color: var(--accent-on, #ffffff);
 }
 
+/* ── Hand-rolled controls in the task-field editor (myne-md/myne#656) ───────── */
+
+/* A select-like combobox. The trigger carries the input skin (its own rule, so
+   it outranks the generic button skin) and the listbox is a fixed anchored
+   popup. The listbox is a DOM CHILD of the surface, so the field editor's focus
+   trap owns it; its options are `tabindex="-1"` so they never join the Tab ring. */
+.cm-select {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.cm-task-field-editor .cm-select-trigger {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-1, #fbfaf7);
+  color: var(--fg-1, #23221e);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cm-select-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A pure-CSS chevron: no glyph to translate and no icon font to load. */
+.cm-select-chevron {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--fg-3, #78766e);
+  border-bottom: 1.5px solid var(--fg-3, #78766e);
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.cm-select-listbox {
+  position: fixed;
+  z-index: 2147483001;
+  box-sizing: border-box;
+  min-width: 140px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--bg-1, #fbfaf7);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 16px rgba(11, 11, 9, 0.12));
+}
+
+.cm-select-option {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-1, 4px);
+  color: var(--fg-1, #23221e);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.cm-select-option[data-active="true"] {
+  background: var(--accent-soft, #e8edf5);
+  color: var(--accent, #2c4a7a);
+}
+
+.cm-select-option[aria-selected="true"] {
+  font-weight: var(--weight-semibold);
+}
+
 /* ── The recurrence control (repeat field) ─────────────────────────────────── */
 
 .cm-recurrence {
@@ -166,11 +250,50 @@
   cursor: pointer;
 }
 
-.cm-recurrence-mode input {
+/* A hand-rolled switch (myne-md/myne#656): the native checkbox renders the
+   platform's chrome, which no custom theme can repaint. The trigger is a
+   `role="switch"` button, so Space/Enter toggle it for free and the accent is a
+   token. */
+.cm-recurrence-mode .cm-switch {
+  flex: 0 0 auto;
   min-height: 0;
-  width: auto;
   padding: 0;
-  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.cm-recurrence-mode .cm-switch-track {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 32px;
+  height: 18px;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: var(--line-2, #c8c7c1);
+  transition: background var(--duration-fast, 0.1s) ease;
+}
+
+.cm-recurrence-mode .cm-switch-knob {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-1, #fbfaf7);
+  box-shadow: var(--shadow-1, 0 1px 2px rgba(11, 11, 9, 0.2));
+  transition: transform var(--duration-fast, 0.1s) ease;
+}
+
+.cm-recurrence-mode .cm-switch[aria-checked="true"] .cm-switch-track {
+  background: var(--accent, #2c4a7a);
+}
+
+.cm-recurrence-mode .cm-switch[aria-checked="true"] .cm-switch-knob {
+  transform: translateX(14px);
+}
+
+.cm-switch-label {
+  font-size: var(--text-sm);
 }
 
 /* ── The task-query builder (a centered dialog) ────────────────────────────── */
