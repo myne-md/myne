@@ -407,7 +407,12 @@ export function PaneView({
   // re-fires the scroll.
   const [scrollAnchor, setScrollAnchor] = useState<ScrollAnchorRequest>(null);
   // Task-list click-through (myne-md/myne#656 review): scroll to a task's line.
-  const [revealLine, setRevealLine] = useState<{ line: number; nonce: number } | null>(null);
+  const [revealLine, setRevealLine] = useState<{
+    noteId: string;
+    line: number;
+    text: string;
+    nonce: number;
+  } | null>(null);
   const revealTaskNonce = useRevealTaskNonce();
   useEffect(() => {
     const req = peekRevealTask();
@@ -417,7 +422,7 @@ export function PaneView({
     // click scroll (myne-md/myne#656 review). A note is open in one pane only
     // (global duplicate-forbid), so `activeId` matching is unambiguous.
     if (req.noteId !== activeId) return;
-    setRevealLine({ line: req.line, nonce: req.nonce });
+    setRevealLine({ noteId: req.noteId, line: req.line, text: req.text, nonce: req.nonce });
   }, [revealTaskNonce, activeId]);
   // reading-source-modes (MYND-299): side-by-side preview companion — a PaneView-
   // local, read-only Reading mirror of the SAME `content` buffer. It is NOT a

@@ -2306,7 +2306,12 @@ function EditorChrome({
             rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
-        {centerView !== "attachments" && (
+        {centerView !== "attachments" &&
+          // Same condition as the right toggle: a non-note tab has no note for
+          // the backlinks/outline sidebar to describe, so it is not shown — and
+          // the sidebar can never be left open with its toggle gone
+          // (myne-md/myne#656 review).
+          ws.focusedLeaf.activeTab?.kind === "note" && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}

@@ -202,10 +202,11 @@ export type CMEditorProps = {
    *  body settles (`value` change) so the click→scroll never races the async
    *  note load. */
   scrollAnchor?: ScrollAnchorRequest;
-  /** Scroll to a line (0-based) and focus the editor — the task lists'
-   *  click-through (myne-md/myne#656 review). Re-fires when `nonce` changes and
-   *  retries as the body settles, exactly like `scrollAnchor`. */
-  revealLine?: { line: number; nonce: number } | null;
+  /** Scroll to a task line and focus the editor — the task lists'
+   *  click-through (myne-md/myne#656 review). Resolves by matching `text`
+   *  (the task's raw line) so a shifted line or a not-yet-loaded body still
+   *  lands; re-fires when `nonce` changes and retries as the body settles. */
+  revealLine?: { noteId: string; line: number; text: string; nonce: number } | null;
   /** editor-line-numbers (MYND-314): show the line-number gutter. Pushed into
    *  the editor's line-number compartment (re-mount-free) whenever it changes,
    *  so toggling the `editor_line_numbers` pref updates the open note live while
@@ -787,17 +788,40 @@ export function CMEditor(props: CMEditorProps) {
   useEffect(() => {
     const view = viewRef.current;
     if (view === null || revealLine === null) return;
+    // Only act on the note this editor actually shows: a tab becomes active
+    // BEFORE its body loads, so applying the line number to the previous note's
+    // body scrolled to the wrong place (myne-md/myne#656 review).
+    if (revealLine.noteId !== noteId) return;
     if (appliedRevealLineNonceRef.current === revealLine.nonce) return;
     const doc = view.state.doc;
-    const lineNo = Math.max(1, Math.min(revealLine.line + 1, doc.lines));
-    const pos = doc.line(lineNo).from;
+    const target = revealLine.text.trim();
+    let found: number | null = null;
+    if (target !== "") {
+      // Search outward from the index-provided line so a shifted line still
+      // resolves, and a duplicate line elsewhere on the note cannot win.
+      const guess = Math.max(1, Math.min(revealLine.line + 1, doc.lines));
+      for (let d = 0; d < doc.lines && found === null; d += 1) {
+        const n = d % 2 === 0 ? guess + d / 2 : guess - (d + 1) / 2;
+        if (n < 1 || n > doc.lines) continue;
+        if (doc.line(n).text.trim() === target) found = n;
+      }
+    }
+    if (found === null) {
+      // Give up only once the doc looks loaded (longer than the target line);
+      // otherwise wait for the body and retry on the next `value`.
+      if (doc.lines > revealLine.line + 1) {
+        appliedRevealLineNonceRef.current = revealLine.nonce;
+      }
+      return;
+    }
     appliedRevealLineNonceRef.current = revealLine.nonce;
+    const pos = doc.line(found).from;
     view.dispatch({
       selection: { anchor: pos },
       effects: EditorView.scrollIntoView(pos, { y: "center" }),
     });
     view.focus();
-  }, [revealLine, value]);
+  }, [revealLine, value, noteId]);
 
   // Relay the chip click-to-navigate event (dispatched on the editor DOM by the
   // wikilink chip extension) to the `onOpenWikilink` callback.
