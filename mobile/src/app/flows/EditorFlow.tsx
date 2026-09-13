@@ -138,7 +138,6 @@ import { defaultGrantFor } from "@myne/agent-protocol";
 
 import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
-import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
 import { takeReminderLanding } from "../../lib/reminderLanding";
 import { vaultTasks } from "../../lib/tasks";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
@@ -645,10 +644,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [sortMode, setSortMode] = useState<"none" | "az" | "za">("none");
   // Which slice of the notes tab is shown: live notes / archive / trash.
   const [listView, setListView] = useState<"notes" | "archive" | "trash">("notes");
-  // MYND-620 task 3: the Tasks destination's folder/tag narrowing. Owned here so
-  // it survives leaving and re-entering the destination — a scope that silently
-  // reset on every visit would be a control that does not hold.
-  const [taskScope, setTaskScope] = useState<TaskScope>(EMPTY_SCOPE);
 
   // MYND-620 task 7: a reminder tapped while locked lands here, once, after
   // unlock. The editor mounts on every unlock path, which is the same seam the
@@ -3103,8 +3098,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "tasks" && (
           <TaskSurface
             scope={{ kind: "vault" }}
-            taskScope={taskScope}
-            onScopeChange={setTaskScope}
             tagsOf={tagsOfNote}
             onOpen={(task) => {
               setTab("notes");

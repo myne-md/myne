@@ -56,6 +56,7 @@ export default defineConfig({
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
+      { find: /^@myne\/task-view$/, replacement: sib("../src/notes/taskView.ts") },
       { find: /^@myne\/task-write$/, replacement: sib("../src/notes/taskWriteCore.ts") },
       { find: /^@myne\/note-completion$/, replacement: sib("../src/notes/completeNoteCore.ts") },
       // The agent's wire types and its RAM-only run store (myne-md/myne#456).

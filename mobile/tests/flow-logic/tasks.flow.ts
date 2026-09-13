@@ -1,5 +1,5 @@
-// Flow-logic: the mobile task surfaces (MYND-620 tasks 3, 4, 8).
-// Headless Chromium + mock IPC — NOT end-to-end.
+// Flow-logic: the mobile task surfaces (MYND-620 tasks 3, 4, 8; panel redesigned
+// for myne-md/myne#656). Headless Chromium + mock IPC — NOT end-to-end.
 //
 // What this tier is for here is stated in the task itself: **a navigation change
 // must not be able to silently remove these surfaces.** So the assertions are
@@ -84,9 +84,10 @@ async function openTasksDestination(page: Page): Promise<void> {
   await page.getByTestId("workspace.tab-tasks").click();
 }
 
-/** Show every task regardless of date — the destination opens on "Today". */
-async function showAll(page: Page): Promise<void> {
-  await page.getByText("All", { exact: true }).first().click();
+/** Pick a folder from the filter row's Select (a portal listbox). */
+async function pickFolder(page: Page, prefix: string, name: string): Promise<void> {
+  await page.getByTestId(`${prefix}.folderFilter`).click();
+  await page.getByRole("option", { name }).click();
 }
 
 test.describe("mobile task surfaces", () => {
@@ -102,7 +103,6 @@ test.describe("mobile task surfaces", () => {
     await expect(destination).toBeVisible();
 
     await destination.click();
-    await showAll(page);
 
     // Across notes: a vault-wide list whose rows all came from one note would
     // not be a vault-wide list.
@@ -119,54 +119,43 @@ test.describe("mobile task surfaces", () => {
     // shared panel, the shared row. The desktop cannot reproduce this at all —
     // it decodes at its own boundary — so if this surface is going to regress,
     // it regresses here or nowhere (myne-md/myne-mobile#36).
-    //
-    // "All" is not an incidental choice: it is the only filter that shows an
-    // undated task, because every other one drops it before a row is built. So
-    // it is the only filter that ever handed the row a null to slice.
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
     await openTasksDestination(page);
-    await showAll(page);
 
-    // Present, not merely un-crashed: the whole point of All is that undated
-    // work appears somewhere.
+    // Present, not merely un-crashed: the undated rows sit in their own section,
+    // so a fix that dropped every null-bearing row would not pass.
     await expect(page.getByText("buy bread")).toBeVisible();
     await expect(page.getByText("chase the reply")).toBeVisible();
-    // …and the dated rows still render alongside them, so a fix that dropped
-    // every null-bearing row would not pass either.
     await expect(page.getByText("buy milk")).toBeVisible();
   });
 
-  test("the four filters are there, with the overdue count on its own", async ({ page }) => {
+  test("the sections and the filter row are there", async ({ page }) => {
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
     await openTasksDestination(page);
 
-    for (const key of ["today", "upcoming", "overdue", "all"]) {
-      await expect(page.getByTestId(`tasks.vault.filter.${key}`)).toBeVisible();
-    }
-
-    // "on its own" is the point of the assertion, and an exact-text match on
-    // the chip could never see it: the count is a sibling node INSIDE the
-    // button, so the button reads "Overdue2" and `getByText("Overdue",
-    // { exact: true })` matches nothing. That is what this spec used to do —
-    // it named the count in its title and then checked only the four labels.
-    await expect(page.getByTestId("tasks.vault.overdueCount")).toBeVisible();
+    // The dated buckets (both due 2026-08 are in the past against the real
+    // clock) and the undated bucket each get a labelled section.
+    await expect(page.getByTestId("tasks.vault.section.overdue")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.section.none")).toBeVisible();
+    // The filter row replaced the old four tabs.
+    await expect(page.getByTestId("tasks.vault.status")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.folderFilter")).toBeVisible();
+    await expect(page.getByTestId("tasks.vault.search")).toBeVisible();
   });
 
-  test("the scope strip narrows by folder", async ({ page }) => {
+  test("the folder filter narrows (AND)", async ({ page }) => {
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
     await openTasksDestination(page);
-    await showAll(page);
 
-    await page.getByTestId("tasks.scope-folder-Office").click();
+    await pickFolder(page, "tasks.vault", "Office");
 
-    // Folder narrows (AND) — the shared semantics, not a mobile invention.
     await expect(page.getByText("send the invoice")).toBeVisible();
     await expect(page.getByText("buy milk")).toHaveCount(0);
 
-    await page.getByTestId("tasks.scope-all").click();
+    await pickFolder(page, "tasks.vault", "All folders");
     await expect(page.getByText("buy milk")).toBeVisible();
   });
 
@@ -177,7 +166,6 @@ test.describe("mobile task surfaces", () => {
     await page.getByTestId("notes.row").first().click();
     await page.getByTestId("editor.more").click();
     await page.getByTestId("editor.note-menu-tasks").click();
-    await showAll(page);
 
     // Scoped to the PANEL: the note's body is open in the editor behind the
     // sheet, so an unscoped text match resolves to the editor line, the tab
@@ -192,7 +180,6 @@ test.describe("mobile task surfaces", () => {
     await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
     await page.goto("/");
     await openTasksDestination(page);
-    await showAll(page);
 
     // Tick a task belonging to note-b while nothing is open. The write must
     // land in note-b — a list that wrote to "the current note" would corrupt a

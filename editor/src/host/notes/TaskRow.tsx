@@ -17,9 +17,12 @@
 //
 // Canon rules that are constraints, not preferences:
 //   - **no green check, anywhere**. A completed row is expressed by a filled
-//     neutral box and struck-through muted text;
-//   - **state is never carried by a fill.** Overdue is coloured *text* on the
-//     date chip, never a red pill;
+//     box and struck-through text, never a tick glyph;
+//   - **completion is the one ruled exception to state-never-by-fill** in this
+//     panel: the box and the strike are ACCENT (`docs/design/README.md`
+//     "Task completion", `docs/decisions/ui/0586`). Everywhere else — the date
+//     chip's overdue ink, the editor's inline affordances — state stays text,
+//     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
 import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
@@ -44,6 +47,12 @@ export type TaskRowData = {
   /** The task's text — marker and fields already stripped (`taskDescription`). */
   text: string;
   completed: boolean;
+  /**
+   * How far to indent this row, relative to the rows on screen (myne-md/myne#656
+   * item 7). `0`/absent is a top-level row. The panel computes it and promotes a
+   * task whose parent is filtered out back to `0`; the row only renders it.
+   */
+  depth?: number;
   /** Source note title, or null for an untitled note. */
   noteTitle: string | null;
   due?: string;
@@ -122,9 +131,11 @@ function isOverdue(task: TaskRowData, today: string): boolean {
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   gap: "var(--space-2)",
-  padding: "6px 8px",
+  height: "100%",
+  boxSizing: "border-box",
+  padding: "0 8px",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
@@ -136,7 +147,6 @@ const BOX_BASE: CSSProperties = {
   flex: "0 0 auto",
   width: 14,
   height: 14,
-  marginTop: 3,
   borderRadius: "var(--radius-1)",
   border: "1px solid var(--line-2, var(--line-1))",
   background: "transparent",
@@ -147,12 +157,28 @@ const BOX_BASE: CSSProperties = {
 function boxStyle(completed: boolean, disabled: boolean): CSSProperties {
   return {
     ...BOX_BASE,
-    // A completed box is FILLED, not ticked. The canon forbids a green check,
-    // and a neutral fill says "done" without congratulating anyone.
-    background: completed ? "var(--fg-3)" : "transparent",
-    borderColor: completed ? "var(--fg-3)" : "var(--line-2, var(--line-1))",
+    // A completed box is FILLED, not ticked — the canon forbids a green check.
+    // The fill is the ACCENT (myne-md/myne#656, decided in the panel grill),
+    // which is the one place completion is allowed to read as state; the editor
+    // keeps its neutral inline treatment.
+    background: completed ? "var(--accent)" : "transparent",
+    borderColor: completed ? "var(--accent)" : "var(--line-2, var(--line-1))",
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
+  };
+}
+
+/**
+ * The row's box, indented by nesting depth. The base padding lives in
+ * `ROW_STYLE`; this only overrides the leading edge, so depth 0 is byte-identical
+ * to the flat row and only nested rows move. The step is a spacing token, so a
+ * theme that re-scales the scale re-scales the tree with it.
+ */
+function rowStyle(depth: number): CSSProperties {
+  if (depth <= 0) return ROW_STYLE;
+  return {
+    ...ROW_STYLE,
+    paddingInlineStart: `calc(var(--space-2) + var(--space-4) * ${depth})`,
   };
 }
 
@@ -160,9 +186,14 @@ function textStyle(completed: boolean): CSSProperties {
   return {
     flex: "1 1 auto",
     minWidth: 0,
+    // One line, ellipsis: the windowed list has a FIXED row height, so wrapping
+    // would break the offset maths. The full text is on the `title` attr.
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
     textDecoration: completed ? "line-through" : "none",
-    color: completed ? "var(--fg-3)" : "var(--fg-1)",
-    overflowWrap: "anywhere",
+    // Completion is the one state this panel renders in accent (myne-md/myne#656).
+    color: completed ? "var(--accent)" : "var(--fg-1)",
   };
 }
 
@@ -227,6 +258,7 @@ export function TaskRow({
   const display = useDateTimeDisplay();
   const raw = rowDate(task);
   const date = raw === undefined ? undefined : formatStoredValue(raw, display);
+  const depth = task.depth ?? 0;
   const disabled = task.oversized === true || onToggle === undefined;
 
   const toggle = (): void => {
@@ -252,7 +284,7 @@ export function TaskRow({
             // the reason this chip's background stays neutral while overdue.
             // On the two-line layout this is also where the overdue indicator
             // lives, which is what the second line is for.
-            color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.fg,
+            color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.ink,
           }}
           data-testid={`${testIdPrefix}.due`}
           data-overdue={overdue ? "true" : undefined}
@@ -277,7 +309,12 @@ export function TaskRow({
   );
 
   return (
-    <div style={ROW_STYLE} data-testid={`${testIdPrefix}.row`} data-task-scope={scope}>
+    <div
+      style={rowStyle(depth)}
+      data-testid={`${testIdPrefix}.row`}
+      data-task-scope={scope}
+      {...(depth > 0 ? { "data-depth": String(depth) } : {})}
+    >
       <span
         role="checkbox"
         aria-checked={task.completed}
@@ -304,8 +341,18 @@ export function TaskRow({
       {twoLine ? (
         <span style={STACK_STYLE} data-testid={`${testIdPrefix}.stack`}>
           <span
-            style={{ ...textStyle(task.completed), flex: "0 1 auto" }}
+            style={{
+              ...textStyle(task.completed),
+              flex: "0 1 auto",
+              // The two-line layout exists to WRAP rather than truncate; the
+              // single-line one is the fixed-height windowed row.
+              whiteSpace: "normal",
+              overflow: "visible",
+              textOverflow: "clip",
+              overflowWrap: "anywhere",
+            }}
             data-testid={`${testIdPrefix}.text`}
+            title={task.text === "" ? undefined : task.text}
           >
             {task.text === "" ? i18n.t("tasks.row.untitled") : task.text}
           </span>
@@ -315,7 +362,11 @@ export function TaskRow({
         </span>
       ) : (
         <>
-          <span style={textStyle(task.completed)} data-testid={`${testIdPrefix}.text`}>
+          <span
+            style={textStyle(task.completed)}
+            data-testid={`${testIdPrefix}.text`}
+            title={task.text === "" ? undefined : task.text}
+          >
             {task.text === "" ? i18n.t("tasks.row.untitled") : task.text}
           </span>
           <span style={META_STYLE} data-testid={`${testIdPrefix}.meta`}>

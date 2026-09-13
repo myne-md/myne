@@ -231,6 +231,7 @@ import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
 import { createInAppNotifier } from "../lib/reminderNotifier";
 import { useLiveVaultTasks } from "../notes/taskIndex";
+import { TASK_CHIP_INK } from "../notes/taskDisplay";
 import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
 import { effectiveAutoLockSecs } from "@myne/client-core";
@@ -772,6 +773,18 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // Task-chip ink is a device-local display choice (myne-md/myne#656 item 4).
+  // Published as a CSS variable at the document root so BOTH the panel rows and
+  // the editor's inline chips follow it by construction — no per-surface
+  // plumbing, no CodeMirror theme recompilation. `chipColor` is a closed enum,
+  // so only a token this app owns ever reaches the style.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--task-chip-ink", TASK_CHIP_INK[ws.taskDisplay.chipColor]);
+    return () => {
+      root.style.removeProperty("--task-chip-ink");
+    };
+  }, [ws.taskDisplay.chipColor]);
   // myne#681 task 2 (SYNC-11): in a detached (pop-out) window, set when the note
   // this window holds is deleted from ANOTHER surface (a `notes://deleted` event
   // whose payload matches `detachedNoteId`). The window then shows a terminal

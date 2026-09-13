@@ -51,6 +51,7 @@ export function openTaskFieldAdd(
   lineFrom: number,
   kind: TaskFieldKind,
   anchor: HTMLElement | Rect,
+  opts?: { handle?: TaskFieldEditHandle; onEditorClose?: () => void },
 ): void {
   const line = view.state.doc.lineAt(lineFrom);
   // Prefill from the existing field, if any, so choosing a present kind edits it
@@ -60,18 +61,32 @@ export function openTaskFieldAdd(
   const existing = chipRangesIn(view.state, line.from, line.to).find(
     (span) => span.kind === kind,
   );
-  const edit = beginTaskFieldEdit(view, { from: line.from, to: line.to, kind });
+  // The menu opens this editor while a tracked span is ALREADY live, so the
+  // editor BORROWS that handle rather than minting a second one: exactly one
+  // span is mapped through document changes for as long as either surface is
+  // open. A borrowed handle is never ended here — the menu owns its lifetime.
+  const borrowed = opts?.handle;
+  const edit = borrowed ?? beginTaskFieldEdit(view, { from: line.from, to: line.to, kind });
   openTaskFieldEditor({
     anchor,
     kind,
     value: existing?.value ?? "",
     onCommit: (next) => {
       const span = edit.current();
-      edit.end();
+      if (borrowed === undefined) edit.end();
       // Null means the line was deleted while the editor was open — declining is
       // the only correct answer (mirrors the chip listener).
-      if (span === null) return;
-      if (!applyTaskFieldEdit(view, span, next)) return;
+      if (span === null) {
+        opts?.onEditorClose?.();
+        return;
+      }
+      // A borrowed handle was created with kind `repeat` (the menu tracks the
+      // whole line, not one field), so the field actually being written
+      // overrides it.
+      if (!applyTaskFieldEdit(view, borrowed === undefined ? span : { ...span, kind }, next)) {
+        opts?.onEditorClose?.();
+        return;
+      }
       // myne#276: a `repeat` with nothing to repeat FROM is inert by
       // construction, and the menu let you mint one with no warning of any
       // kind. Rather than refuse the write — the rule the user typed is
@@ -79,17 +94,29 @@ export function openTaskFieldAdd(
       // in the same surface, immediately. Declining leaves the rule on the line
       // with its inline explanation (`task-chip.ts`), so nothing is lost either
       // way.
-      if (kind !== "repeat" || next === "") return;
+      if (kind !== "repeat" || next === "") {
+        opts?.onEditorClose?.();
+        return;
+      }
       // Re-read the line from the post-write document. Clamped, because a
       // document that shrank under a concurrent change must not throw here —
       // an offer of a due date is not worth an exception on the save path.
       const written = view.state.doc.lineAt(
         Math.min(span.from, view.state.doc.length),
       );
-      if (canRecur(written.text)) return;
-      openTaskFieldAdd(view, written.from, "due", anchor);
+      if (canRecur(written.text)) {
+        opts?.onEditorClose?.();
+        return;
+      }
+      // The chained due editor borrows the SAME handle, so its own close is what
+      // finally reports the editor as closed — not this repeat one, which has
+      // already handed off.
+      openTaskFieldAdd(view, written.from, "due", anchor, opts);
     },
-    onCancel: () => edit.end(),
+    onCancel: () => {
+      if (borrowed === undefined) edit.end();
+      opts?.onEditorClose?.();
+    },
   });
 }
 
@@ -139,12 +166,21 @@ export function openTaskFieldMenu(opts: {
   //
   // Tracking has to begin HERE rather than on click: by click time the offsets
   // have already moved. Ended on every exit, so an abandoned menu leaves no
-  // tracking behind.
+  // tracking behind — EXCEPT while a field editor borrows it: the row handler
+  // below hands this handle to the editor and deliberately does not end it, so
+  // exactly one tracked span stays live across both surfaces (myne-md/myne#656).
   const tracked: TaskFieldEditHandle = beginTaskFieldEdit(view, {
     from: line.from,
     to: line.to,
     kind: "repeat",
   });
+
+  // True between a row opening the field editor and that editor closing (commit
+  // or cancel). While it holds, the menu's own dismiss must do NOTHING: the
+  // editor is the innermost trap, its Escape is the one that means "close the
+  // editor", and tearing the menu (and therefore the borrowed span) down behind
+  // it would end the very handle the editor is still writing through.
+  let editorOpen = false;
 
   const modal = openModal({
     backdropStyle: {
@@ -154,6 +190,7 @@ export function openTaskFieldMenu(opts: {
       zIndex: "2147483000",
     },
     onDismiss: () => {
+      if (editorOpen) return;
       tracked.end();
       modal.close();
     },
@@ -196,18 +233,30 @@ export function openTaskFieldMenu(opts: {
       row.appendChild(note);
     }
     row.addEventListener("click", () => {
-      // Capture the row's rect BEFORE close() removes it from the DOM — the
-      // field editor anchors to where the row was.
+      // Capture the row's live rect — the field editor anchors to where the row
+      // is, and the menu stays mounted so the row is still here.
       const rect = row.getBoundingClientRect();
       // The line as it stands NOW, not as it stood when the menu opened
       // (myne#326). Null means the line was deleted while the menu was open, and
       // declining is the only correct answer — the same rule the skip row and
       // the field editor already follow.
       const span = tracked.current();
-      tracked.end();
-      modal.close();
-      if (span === null) return;
-      openTaskFieldAdd(view, span.from, kind, rect);
+      if (span === null) {
+        tracked.end();
+        modal.close();
+        return;
+      }
+      // Hand the menu's ONE tracked handle to the editor and keep it live: the
+      // editor borrows it instead of minting a second, so the span keeps mapping
+      // through document changes on both sides of the handoff. The editor's
+      // close flips `editorOpen` back so the next Escape reaches the menu.
+      editorOpen = true;
+      openTaskFieldAdd(view, span.from, kind, rect, {
+        handle: tracked,
+        onEditorClose: () => {
+          editorOpen = false;
+        },
+      });
     });
     if (firstRow === null) firstRow = row;
     surface.appendChild(row);

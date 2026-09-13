@@ -32,6 +32,16 @@ vi.mock("../../src/hooks/usePrefs", () => ({
   }),
 }));
 
+// The Editor panel gained a device-local task-chip-colour row (myne-md/myne#656),
+// which reads the workspace container. Stub it here; this file is about the
+// reminder wire, not the task display.
+vi.mock("../../src/notes/workspaceContext", () => ({
+  useWorkspace: () => ({
+    taskDisplay: { chipColor: "theme" },
+    setTaskDisplay: vi.fn(),
+  }),
+}));
+
 const stub = (id: string) => () => <div data-testid={id} />;
 vi.mock("../../src/components/settings/TypographySettings", () => ({
   TypographySettings: stub("stub.typography"),

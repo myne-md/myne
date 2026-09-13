@@ -180,7 +180,10 @@ describe("nothing about tasks is implemented twice", () => {
     const source = surface();
     expect(source).toContain('from "@myne/task-panel"');
     expect(source).toContain('from "@myne/task-filters"');
-    expect(source).toContain('from "@myne/task-scope"');
+    // The view model (filters + sort) is shared too; the mobile-only
+    // `TaskScopeStrip` was retired when folder/tag narrowing became one of the
+    // shared filter row's axes (myne-md/myne#656).
+    expect(source).toContain('from "@myne/task-view"');
     // No local predicate, comparator or date axis anywhere in the mobile tree.
     for (const forbidden of ["matchesFilter", "sortTasks", "overdueCount", "?? task.remind"]) {
       expect(source, `mobile must not restate ${forbidden}`).not.toContain(forbidden);

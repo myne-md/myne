@@ -60,6 +60,29 @@ describe("the shared fetch", () => {
     expect(invoke).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the SAME array identity across an unchanged re-fetch (no churn)", async () => {
+    // The index nonce bumps on every autosave. Without this, a task list refetched
+    // ~1/s while the user typed in an unrelated note, and each fetch produced a
+    // new array — invalidating every memo and re-rendering every row.
+    invoke.mockResolvedValue([ROW]);
+    await fetchVaultTasks(1);
+    const before = peekVaultTasks();
+    const after = await fetchVaultTasks(2);
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(after).toBe(before);
+    expect(peekVaultTasks()).toBe(before);
+  });
+
+  it("replaces the list when the set actually changed", async () => {
+    invoke.mockResolvedValueOnce([ROW]);
+    await fetchVaultTasks(1);
+    const before = peekVaultTasks();
+    invoke.mockResolvedValueOnce([{ ...ROW, completed: true }]);
+    const after = await fetchVaultTasks(2);
+    expect(after).not.toBe(before);
+    expect(after[0]!.completed).toBe(true);
+  });
+
   it("collapses concurrent callers into one in-flight fetch", async () => {
     // Three consumers mounting in the same tick is the real shape of this: a
     // note with three query blocks. They must produce one IPC call between them.

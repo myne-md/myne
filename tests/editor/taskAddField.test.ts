@@ -51,7 +51,7 @@ function menuRow(kind: string): HTMLElement {
   return el as HTMLElement;
 }
 
-function fieldInput(): HTMLInputElement | HTMLSelectElement {
+function fieldInput(): HTMLElement {
   return document.querySelector('[data-testid="editor.task-field-input"]')!;
 }
 
@@ -127,7 +127,7 @@ describe("the + menu adds an absent field and edits a present one", () => {
     expect(menuRow("due")).not.toBeNull();
     menuRow("repeat").click();
     // Prefilled with the SOURCE value, so opening it does not clobber the rule.
-    expect((fieldInput() as HTMLSelectElement).value).toBe("interval");
+    expect(fieldInput().getAttribute("data-value")).toBe("interval");
   });
 });
 
@@ -221,8 +221,8 @@ describe("/due /repeat /priority slash commands", () => {
     const from = m.view.state.doc.toString().indexOf("/repeat");
     cmd("repeat").apply(m.view, from, from + "/repeat".length);
     const input = fieldInput();
-    expect(input.tagName).toBe("SELECT");
-    expect(input.classList.contains("cm-recurrence-family")).toBe(true);
+    expect(input.getAttribute("role")).toBe("combobox");
+    expect(input.closest(".cm-select")?.classList.contains("cm-recurrence-family")).toBe(true);
   });
 });
 
@@ -257,8 +257,6 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
   it("offers the due date in the same surface after an anchorless repeat commits", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
 
     // The rule the user chose is written — it is correct, and refusing it would
@@ -268,7 +266,7 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
     const chained = document.querySelector('[data-testid="editor.task-field-editor"]');
     expect(chained).not.toBeNull();
     // It is the DUE editor, not the repeat one that just closed: the repeat
-    // surface leads with a family `<select>`, the due surface with a text input.
+    // surface leads with a combobox, the due surface with a date input.
     expect(chained!.getAttribute("aria-label")).toBe("Due date");
     expect(fieldInput().tagName).toBe("INPUT");
   });
@@ -276,8 +274,6 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
   it("does not chain into the due editor when the line already has an anchor", () => {
     openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
     expect(document.querySelector('[data-testid="editor.task-field-editor"]')).toBeNull();
   });
@@ -357,5 +353,68 @@ describe("the + menu survives a document shift (myne#326)", () => {
 
     expect(() => menuRow("due").click()).not.toThrow();
     expect(m.view.state.doc.toString()).toBe("x");
+  });
+});
+
+// ── myne-md/myne#656: the menu stays mounted behind the field editor ─────────
+//
+// The menu used to end its tracking handle and close BEFORE opening the field
+// editor, so only one tracked span ever existed. The editor now BORROWS the
+// menu's handle — one live handle, mapped through document changes for as long
+// as either surface is open — which only works if the menu stays mounted and
+// its dismiss handler does not tear the handle down while the editor is up.
+describe("the + menu stays open behind the field editor (myne-md/myne#656)", () => {
+  function editor(): HTMLElement | null {
+    return document.querySelector('[data-testid="editor.task-field-editor"]');
+  }
+  function menu(): HTMLElement | null {
+    return document.querySelector('[data-testid="editor.task-field-menu"]');
+  }
+
+  it("keeps the menu mounted while the editor is open", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+    expect(editor()).not.toBeNull();
+    // The regression: the old handler called modal.close() on the menu here.
+    expect(menu()).not.toBeNull();
+  });
+
+  it("Escape closes the editor first and the menu second", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(editor()).toBeNull();
+    expect(menu()).not.toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(menu()).toBeNull();
+  });
+
+  it("a commit keeps the menu open for a second field", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    commit();
+    expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
+    expect(menu()).not.toBeNull();
+  });
+
+  it("writes the REAL kind, not the menu handle's placeholder `repeat`", () => {
+    // The menu's tracked handle is created with kind `repeat` (the menu tracks
+    // the whole line, not one field). If the editor applies through that handle
+    // without overriding the kind, a priority edit lands as `[repeat:: high]`.
+    openMenu("- [ ] pay the rent\n");
+    menuRow("priority").click();
+    fieldInput().click();
+    const option = document.querySelector(
+      '[data-testid="editor.task-field-input-option"][data-value="high"]',
+    ) as HTMLElement | null;
+    option!.click();
+    commit();
+
+    const text = m!.view.state.doc.toString();
+    expect(text).toContain("[priority:: high]");
+    expect(text).not.toContain("[repeat::");
   });
 });

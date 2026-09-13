@@ -31,7 +31,16 @@
 
 import i18n from "../i18n";
 import type { GraphSettings } from "./graphSettings";
+import type { TaskDisplaySettings } from "./taskDisplay";
 import type { NoteId } from "./sidebarState";
+import {
+  DEFAULT_TASK_VIEW,
+  type TaskDueFilter,
+  type TaskPriorityFilter,
+  type TaskSort,
+  type TaskStatusFilter,
+  type TaskView,
+} from "./taskView";
 import type { DetachedEntry } from "./detachedRestore";
 
 /** Opaque identifier for a pane (leaf or split node). */
@@ -79,25 +88,37 @@ export type WorkspaceItem =
   | { kind: "view"; id: ViewId; pinned?: boolean; viewMode?: ViewMode }
   | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean; viewMode?: ViewMode }
   /**
-   * The vault-wide task list (MYND-616). `taskFilter` and `taskScope` are
-   * **per-tab session state**, not preferences: "which filter am I looking at"
-   * is where you are, and preferences are for stated choices like theme and
-   * auto-lock. Carrying them here also avoids the roughly thirteen-site
-   * preference registration surface — of which the specification roster is the
-   * one nothing verifies.
+   * The vault-wide task list (MYND-616; the view fields redesigned for
+   * myne-md/myne#656). `taskView` is **per-tab session state**, not a
+   * preference: "which filter am I looking at" is where you are, and
+   * preferences are for stated choices like theme and auto-lock. Carrying it
+   * here also avoids the roughly thirteen-site preference registration surface.
    *
-   * Both are **omit-when-default**, exactly like `pinned` and `viewMode`, so a
-   * tab left on its defaults stays byte-identical to a pre-feature descriptor.
-   * The descriptor is opaque to the storage codec, so this is no format change.
+   * **Omit-when-default**, exactly like `pinned` and `viewMode`, so a tab left
+   * on its defaults stays byte-identical to a pre-feature descriptor. The
+   * descriptor is opaque to the storage codec — no format change.
    */
   | {
       kind: "tasks";
       id: typeof TASKS_TAB_ID;
       pinned?: boolean;
       viewMode?: ViewMode;
-      taskFilter?: string;
-      taskScope?: { folder?: string; tags?: readonly string[] };
+      taskView?: PersistedTaskView;
     };
+
+/**
+ * The persisted delta of a `TaskView`. Every key is omit-when-default, so the
+ * object is absent entirely when the tab is on defaults.
+ */
+export type PersistedTaskView = {
+  status?: TaskStatusFilter;
+  due?: TaskDueFilter;
+  noteId?: string;
+  folder?: string;
+  tags?: readonly string[];
+  priority?: TaskPriorityFilter;
+  sort?: TaskSort;
+};
 
 /** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
@@ -713,27 +734,24 @@ export function setItemViewMode(
  * keys, so a task tab left alone serializes byte-identical to one written before
  * this existed.
  */
-export function setTaskTabState(
+export function setTaskViewState(
   state: WorkspaceState,
   paneId: PaneId,
-  next: { filter?: string; folder?: string | null; tags?: readonly string[] },
+  view: TaskView,
 ): WorkspaceState {
   const apply = (t: WorkspaceItem): WorkspaceItem => {
     if (t.kind !== "tasks") return t;
     const rest: Record<string, unknown> = { ...t };
-    delete rest.taskFilter;
-    delete rest.taskScope;
-
-    const filter = next.filter ?? t.taskFilter;
-    if (filter !== undefined && filter !== "today") rest.taskFilter = filter;
-
-    const folder = next.folder !== undefined ? next.folder : (t.taskScope?.folder ?? null);
-    const tags = next.tags ?? t.taskScope?.tags ?? [];
-    const scope: Record<string, unknown> = {};
-    if (folder !== null && folder !== "") scope.folder = folder;
-    if (tags.length > 0) scope.tags = [...tags];
-    if (Object.keys(scope).length > 0) rest.taskScope = scope;
-
+    delete rest.taskView;
+    const v: PersistedTaskView = {};
+    if (view.status !== DEFAULT_TASK_VIEW.status) v.status = view.status;
+    if (view.due !== "any") v.due = view.due;
+    if (view.noteId !== null) v.noteId = view.noteId;
+    if (view.folder !== null && view.folder !== "") v.folder = view.folder;
+    if (view.tags.length > 0) v.tags = [...view.tags];
+    if (view.priority !== "any") v.priority = view.priority;
+    if (view.sort !== "due") v.sort = view.sort;
+    if (Object.keys(v).length > 0) rest.taskView = v;
     return rest as WorkspaceItem;
   };
   return {
@@ -743,6 +761,21 @@ export function setTaskTabState(
       tabs: leaf.tabs.map(apply),
       activeTab: leaf.activeTab === null ? null : apply(leaf.activeTab),
     })),
+  };
+}
+
+/** Read a task tab's persisted view back as a full `TaskView`. */
+export function taskViewOf(item: WorkspaceItem): TaskView {
+  if (item.kind !== "tasks") return DEFAULT_TASK_VIEW;
+  const p = item.taskView ?? {};
+  return {
+    status: p.status ?? DEFAULT_TASK_VIEW.status,
+    due: p.due ?? "any",
+    noteId: p.noteId ?? null,
+    folder: p.folder ?? null,
+    tags: p.tags ?? [],
+    priority: p.priority ?? "any",
+    sort: p.sort ?? "due",
   };
 }
 
@@ -982,6 +1015,10 @@ export type NamedWorkspaces = {
    *  field, a fresh container has none). Restored clamped onto a currently-
    *  connected display (`planDetachedRestore`). */
   detached?: readonly DetachedEntry[];
+  /** Task-surface display (myne-md/myne#656 item 4) — device-local, window-
+   *  global (one chip-colour choice across every task surface) like
+   *  `graphSettings`. Omit-when-default (see `taskDisplay.ts`). */
+  taskDisplay?: TaskDisplaySettings;
 };
 
 /** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */
