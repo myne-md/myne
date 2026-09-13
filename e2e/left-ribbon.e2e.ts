@@ -74,8 +74,12 @@ describeE2E("lr-ribbon left ribbon pin/run/reorder/unpin (#699)", () => {
         const pin = await byCommandId(s, "palette.pin", "app.open-settings");
         expect(pin, "the palette offers a pin for app.open-settings").not.toBeNull();
         await pin!.click();
+        // Close the palette with a REAL bubbling Escape on its input: React
+        // delegates at the root, so a non-bubbling synthetic event never
+        // reaches the palette's onKeyDown and the modal would stay up over the
+        // rail, making the next click time out as "not interactable".
         await s.execute(
-          "document.querySelector('[data-testid=\"palette.dialog\"]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));",
+          "const el=document.querySelector('[data-testid=\"palette.input\"]'); if (el) el.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));",
         );
         await s.waitUntil(
           async () =>
