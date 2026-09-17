@@ -115,6 +115,12 @@ fn main() {
                     // generate_handler, and permissions/prefs/default.toml — a
                     // command absent from any of the three fails CLOSED.
                     "set_transcription_enabled",
+                    // Left ribbon (myne-md/myne#699): the rail's pinned command
+                    // ids + visibility flag. Shared core setters; same
+                    // three-site lockstep (this list, the permission file, the
+                    // invoke_handler).
+                    "set_ribbon_items",
+                    "set_ribbon_visible",
                 ]),
             )
             .plugin(

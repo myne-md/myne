@@ -86,6 +86,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_item_order,
             commands::set_hidden_bar_items,
             commands::set_bar_items_order,
+            // Left ribbon (myne-md/myne#699). Shared `myne-core` bodies; mobile
+            // only registers them so a synced `ribbon_items` / `ribbon_visible`
+            // the desktop wrote is writable here too. Each needs a matching
+            // `allow-` entry in permissions/prefs/default.toml or the ACL
+            // resolver fails closed.
+            commands::set_ribbon_items,
+            commands::set_ribbon_visible,
             commands::set_favorites,
             commands::set_editor_layout,
             commands::set_theme,

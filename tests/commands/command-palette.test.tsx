@@ -63,6 +63,15 @@ vi.mock("../../src/notes/views/useRunViewContext", () => {
 
 const mockedSearch = vi.mocked(searchNotes);
 
+// The palette's ribbon pin toggle writes through `src/lib/prefs`. Mocked at
+// the lib boundary so the tests assert the call rather than the IPC.
+const setRibbonItems = vi.fn();
+vi.mock("../../src/lib/prefs", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/lib/prefs")>();
+  return { ...actual, setRibbonItems: (...a: unknown[]) => setRibbonItems(...a) };
+});
+
 function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
@@ -89,6 +98,7 @@ describe("CommandPalette UI", () => {
     // the debounced search from throwing on the default vi.fn() return.
     mockedSearch.mockReset();
     mockedSearch.mockResolvedValue([]);
+    setRibbonItems.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
     cleanup();
@@ -257,5 +267,55 @@ describe("CommandPalette UI", () => {
     await Promise.resolve();
     // The action is disabled — palette stays open, no onClose.
     expect(screen.queryByRole("dialog")).toBeTruthy();
+  });
+
+  // Ribbon pin toggle (myne-md/myne#699): the pin button is mouse-first
+  // (onMouseDown, pre-blur) but must also answer keyboard activation, which
+  // arrives as a click with detail 0. A real mouse click (detail 1) must NOT
+  // toggle twice.
+  function renderPaletteWithEmptyRail() {
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        ctx={buildCtx({
+          stageName: "editor",
+          selectedNoteId: "note-1",
+          prefs: { ribbon_items: [] as string[] } as CommandContext["prefs"],
+        })}
+      />,
+    );
+    const input = screen.getByRole("dialog").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "lock" } });
+    const pins = screen.getAllByTestId("palette.pin");
+    const pin = pins.find(
+      (el) => el.getAttribute("data-command-id") === "vault.lock",
+    )!;
+    expect(pin).toBeTruthy();
+    return pin;
+  }
+
+  it("keyboard activation (click with detail 0) pins the command", () => {
+    const pin = renderPaletteWithEmptyRail();
+    fireEvent.click(pin);
+    expect(setRibbonItems).toHaveBeenCalledTimes(1);
+    expect(setRibbonItems).toHaveBeenCalledWith(["vault.lock"]);
+  });
+
+  it("a mouse click after mousedown does not toggle twice", () => {
+    const pin = renderPaletteWithEmptyRail();
+    fireEvent.mouseDown(pin);
+    expect(setRibbonItems).toHaveBeenCalledTimes(1);
+    // The click the browser fires after that mousedown carries detail 1.
+    fireEvent.click(pin, { detail: 1 });
+    expect(setRibbonItems).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed pin write surfaces an error instead of failing silently", async () => {
+    setRibbonItems.mockRejectedValueOnce(new Error("locked"));
+    const pin = renderPaletteWithEmptyRail();
+    fireEvent.click(pin);
+    expect(await screen.findByTestId("palette.pin-error")).toBeTruthy();
+    expect(screen.getByText("Could not pin the command.")).toBeTruthy();
   });
 });

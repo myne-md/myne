@@ -4031,6 +4031,145 @@ pub(crate) async fn set_daily_template_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `ribbon_items` rail order
+/// (myne-md/myne#699): the left ribbon's pinned command ids. Read-modify-write
+/// under the per-plugin write mutex; no native side-effect; disk-first.
+/// **Device-local** (the `bar_items_order` class), so it is never clock-stamped.
+/// The caller passes the full desired sequence; the codec preserves element
+/// order VERBATIM. Writing always marks the rail CONFIGURED (`Some(...)`), so a
+/// deliberately emptied rail (`Some([])`) stays empty rather than re-seeding the
+/// client's curated default. Logs the COUNT only.
+pub async fn set_ribbon_items_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_ribbon_items_with_dir(&dir, state, hooks, items, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ribbon_items<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    set_ribbon_items_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        items,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_ribbon_items`].
+pub(crate) async fn set_ribbon_items_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    // A caller passes registry command ids (`note.new`, `daily.open-today`:
+    // short dotted tokens, the longest in the registry under 40 bytes). The
+    // caps are generous enough that no honest rail meets either and small
+    // enough that a compromised WebView cannot park storage in the blob: 128
+    // ids of 200 bytes each stay far under the 64 KiB `MYP1` envelope, which
+    // is the backstop, not the validation.
+    const MAX_RIBBON_ITEMS: usize = 128;
+    const MAX_RIBBON_ITEM_LEN: usize = 200;
+    if items.len() > MAX_RIBBON_ITEMS || items.iter().any(|id| id.len() > MAX_RIBBON_ITEM_LEN) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let count = items.len();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ribbon_items = Some(items);
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "ribbon_items", count);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `ribbon_visible` flag
+/// (myne-md/myne#699): whether THIS DEVICE shows the left ribbon. Default
+/// `true`; the codec omits the field unless it is `false`. Read-modify-write
+/// under the write mutex; no native side-effect; disk-first. **Device-local**,
+/// so it is never clock-stamped. Non-load-bearing.
+pub async fn set_ribbon_visible_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    visible: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_ribbon_visible_with_dir(&dir, state, hooks, visible, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_ribbon_visible<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    visible: bool,
+) -> Result<(), PrefsWriteError> {
+    set_ribbon_visible_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        visible,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_ribbon_visible`].
+pub(crate) async fn set_ribbon_visible_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    visible: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ribbon_visible = visible;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "ribbon_visible", visible);
+    Ok(())
+}
+
 /// The three settings a period carries, mirroring what `daily_folder` /
 /// `daily_date_format` / `daily_template` carry for the daily period. The key
 /// written into `periodic_notes` is `<period>.<setting>` (myne#177).
@@ -6581,6 +6720,8 @@ mod tests {
                 &PrefsView {
                     attachment_compression_enabled: true,
                     developer_mode: false,
+                    ribbon_items: None,
+                    ribbon_visible: true,
                     attachment_ocr_enabled: true,
                     time_format: None,
                     timezone: None,
@@ -8113,6 +8254,143 @@ mod tests {
                 .await
                 .expect("read");
             assert!(cleared.bar_items_order.is_empty());
+        });
+    }
+
+    // ---- ribbon setters (myne-md/myne#699) ----------------------------
+
+    #[test]
+    fn set_ribbon_items_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-ribbon-items-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["note.new"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_ribbon_items_writes_some_so_emptied_stays_emptied() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4a).await;
+            // Sequence semantics: order is the payload, preserved verbatim.
+            set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["note.new", "daily.open-today"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set items");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(
+                view.ribbon_items,
+                Some(alloc_vec(["note.new", "daily.open-today"]))
+            );
+
+            // Emptying writes `Some([])`, NOT `None`: a deliberately emptied
+            // rail must not decode back to "never configured" and re-seed.
+            set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear items");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(cleared.ribbon_items, Some(Vec::new()));
+        });
+    }
+
+    #[test]
+    fn set_ribbon_items_rejects_over_cap_count_and_length() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4c).await;
+            // 129 ids: one past MAX_RIBBON_ITEMS.
+            let too_many: Vec<String> = (0..129).map(|i| format!("cmd.{i}")).collect();
+            let result = set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                too_many,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::InvalidValue)));
+            // One id past MAX_RIBBON_ITEM_LEN.
+            let too_long: Vec<String> = vec!["x".repeat(201)];
+            let result = set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                too_long,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::InvalidValue)));
+            // Neither refusal wrote: the rail is still unconfigured.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.ribbon_items, None);
+        });
+    }
+
+    #[test]
+    fn set_ribbon_visible_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-ribbon-visible-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_ribbon_visible_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_ribbon_visible_round_trips() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
+            set_ribbon_visible_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("hide ribbon");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(!view.ribbon_visible);
         });
     }
 

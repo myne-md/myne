@@ -186,6 +186,18 @@ export interface PrefsView {
    *  PRIVACY bound before a resource one — pending times sit in OS-owned
    *  plaintext, so a shorter horizon exposes less. */
   reminder_horizon_days: number | null;
+  /**
+   * The left ribbon's pinned command ids (myne-md/myne#699), in display order.
+   * `null` means never configured (render the curated default set); `[]` is a
+   * deliberately emptied rail and stays empty. Device-local, like
+   * `bar_items_order`; unknown ids are the caller's to drop.
+   */
+  ribbon_items: string[] | null;
+  /**
+   * Whether THIS DEVICE shows the left ribbon (myne-md/myne#699). Defaults
+   * `true`; persisted only when `false`. Device-local.
+   */
+  ribbon_visible: boolean;
   show_task_marker: boolean;
   /**
    * Whether speech-to-text may run on this vault's audio attachments
@@ -1497,6 +1509,25 @@ export async function setDailyFolder(folder: string): Promise<void> {
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
   await writePref("plugin:prefs|set_daily_template", { templateId });
+}
+
+/**
+ * Set the left ribbon's pinned command ids (myne-md/myne#699), in display order.
+ * Writing marks the rail configured, so an emptied list (`[]`) stays empty
+ * rather than re-seeding the curated default. Device-local; disk-first, no
+ * native side-effect. Bumps the prefs nonce on success so the open rail (which
+ * reads prefs through its OWN `usePrefs`) re-renders without a reload.
+ */
+export async function setRibbonItems(items: string[]): Promise<void> {
+  await writePref("plugin:prefs|set_ribbon_items", { items });
+}
+
+/**
+ * Show or hide the left ribbon on THIS device (myne-md/myne#699). Device-local;
+ * disk-first, no native side-effect.
+ */
+export async function setRibbonVisible(visible: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_ribbon_visible", { visible });
 }
 
 /**
