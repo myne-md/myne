@@ -21,6 +21,7 @@
 //   - **completion is the one ruled exception to state-never-by-fill** in this
 //     panel: the box and the strike are ACCENT (`docs/design/README.md`
 //     "Task completion", `design-notes/ui/0587`). Everywhere else — the date
+//     chip's overdue ink, the editor's inline affordances — state stays text,
 //     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
@@ -318,6 +319,9 @@ export function TaskRow({
   const onBoxKey = (e: KeyboardEvent<HTMLElement>): void => {
     if (e.key !== " " && e.key !== "Enter") return;
     e.preventDefault();
+    // The row itself opens on Enter/Space: without this, a keyboard toggle
+    // would bubble up and fire onOpen as well (myne-md/myne#656 review).
+    e.stopPropagation();
     toggle();
   };
 
@@ -361,6 +365,12 @@ export function TaskRow({
             e.stopPropagation();
             onOpen?.(task);
           }}
+          // A keyboard activation clicks the button AND bubbles its keydown to
+          // the row, which would fire onOpen a second time (myne-md/myne#656
+          // review). The click already opens; the bubble must not.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
           title={task.noteTitle}
         >
           {task.noteTitle}
@@ -395,6 +405,10 @@ export function TaskRow({
             onClick: () => onOpen(task),
             onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
               if (e.key === "Enter" || e.key === " ") {
+                // Inner controls (checkbox, note button) stop their own
+                // keydowns; this guard is the second half, for any control
+                // that does not (myne-md/myne#656 review).
+                if (e.target !== e.currentTarget) return;
                 e.preventDefault();
                 onOpen(task);
               }

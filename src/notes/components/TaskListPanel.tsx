@@ -575,10 +575,16 @@ function BuilderValueRow({
  * The two-pane filter builder. It opens with only the axis list; clicking an
  * axis reveals its values on the right. The header carries `Clear all`, and each
  * applied axis has its own reset beside it.
+ *
+ * Keyboard contract (myne-md/myne#656 review): the panel takes focus on open,
+ * Escape closes it, and focus returns to the Filters button that opened it.
+ * It is an inline non-modal builder (no focus trap): Tab may leave it, and
+ * Escape is the keyboard close.
  */
 function TaskFilterBuilder({
   view,
   onViewChange,
+  onClose,
   folderOptions,
   noteOptions,
   tagOptions,
@@ -586,6 +592,7 @@ function TaskFilterBuilder({
 }: {
   view: TaskView;
   onViewChange: (next: TaskView) => void;
+  onClose: () => void;
   folderOptions: readonly string[];
   noteOptions: readonly (readonly [string, string])[];
   tagOptions: readonly string[];
@@ -594,6 +601,24 @@ function TaskFilterBuilder({
   const { t } = useTranslation();
   // Starts CLOSED: no axis is chosen until the user clicks one.
   const [section, setSection] = useState<BuilderSection | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Focus into the panel on open, and close on Escape (myne-md/myne#656
+  // review). The caller returns focus to the Filters button.
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el === null) return;
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    el.addEventListener("keydown", onKey);
+    return () => el.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const [clearHover, clearHandlers] = useHover();
   const setView = (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch });
 
@@ -770,6 +795,8 @@ function TaskFilterBuilder({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       style={BUILDER_STYLE}
       role="dialog"
       aria-label={t("tasks.filters.title")}
@@ -845,6 +872,14 @@ export function TaskListPanel({
   const [builderOpen, setBuilderOpen] = useState(false);
   const [filtersHover, filtersHandlers] = useHover();
   const [clearHover, clearHandlers] = useHover();
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+  // Escape close returns focus to the button that opened the builder
+  // (myne-md/myne#656 review); the backdrop path is a mouse close and moves
+  // no focus.
+  const closeBuilder = useCallback(() => {
+    setBuilderOpen(false);
+    filtersButtonRef.current?.focus();
+  }, []);
 
   const sections = useMemo(
     () => partitionTasks(tasks, view, today, tagsOf ?? (() => NO_TAGS), search),
@@ -977,6 +1012,7 @@ export function TaskListPanel({
           {minimal ? null : (
             <button
               type="button"
+              ref={filtersButtonRef}
               style={filtersHover ? FILTERS_BUTTON_HOVER_STYLE : FILTERS_BUTTON_STYLE}
               {...filtersHandlers}
               aria-expanded={builderOpen}
@@ -1001,6 +1037,7 @@ export function TaskListPanel({
             <TaskFilterBuilder
               view={view}
               onViewChange={onViewChange}
+              onClose={closeBuilder}
               folderOptions={folderOptions}
               noteOptions={noteOptions}
               tagOptions={tagOptions}

@@ -138,6 +138,7 @@ import { defaultGrantFor } from "@myne/agent-protocol";
 
 import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
+import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { takeReminderLanding } from "../../lib/reminderLanding";
 import { vaultTasks } from "../../lib/tasks";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
@@ -367,6 +368,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const vaultId = stageVaultId ?? resolved;
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<WorkspaceTab>("notes");
+  // Task-view state lives HERE rather than in TaskSurface: every mount below
+  // is conditional, so component-local state would reset each time the user
+  // leaves and re-enters the destination. One state per scope family, matching
+  // desktop's per-tab persistence semantics (myne-md/myne#656 review).
+  const [vaultTaskView, setVaultTaskView] = useState<TaskView>(DEFAULT_TASK_VIEW);
+  const [noteTaskView, setNoteTaskView] = useState<TaskView>(DEFAULT_TASK_VIEW);
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
   // editor swap; medium/expanded ("regular") = persistent multi-pane split.
   // `view` stays the compact navigation intent; `editing` drives the detail
@@ -3099,6 +3106,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           <TaskSurface
             scope={{ kind: "vault" }}
             tagsOf={tagsOfNote}
+            view={vaultTaskView}
+            onViewChange={setVaultTaskView}
             onOpen={(task) => {
               setTab("notes");
               void openNote(task.noteId);
@@ -3112,6 +3121,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "note-tasks" && editing?.id && (
           <TaskSurface
             scope={{ kind: "note", noteId: editing.id }}
+            view={noteTaskView}
+            onViewChange={setNoteTaskView}
             testIdPrefix="tasks.note-tab"
           />
         )}
@@ -3737,6 +3748,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           {() => (
             <TaskSurface
               scope={{ kind: "note", noteId: editing.id as string }}
+              view={noteTaskView}
+              onViewChange={setNoteTaskView}
               onOpen={() => setNoteTasksOpen(false)}
               testIdPrefix="tasks.note"
             />

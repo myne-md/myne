@@ -1809,6 +1809,12 @@ function EditorChrome({
     // `graphSettings` (graph-connection-ux-polish task 5) is the same shape of
     // dep for the same reason: a graph-panel toggle only changes that one
     // field on the spread container.
+    // `taskDisplay` (chip colour / icon-only) and the container `taskView`
+    // (the Tasks tab's persisted filters) are the same shape again: both are
+    // set through a container spread, so a chip-colour toggle would otherwise
+    // never re-fire staging and a quit flush would lose the setting
+    // (myne-md/myne#656 review). Device-local state only; the lock path is
+    // unaffected.
   }, [
     restoreSettled,
     ws.slots,
@@ -1817,6 +1823,8 @@ function EditorChrome({
     ws.focusedPaneId,
     ws.expandedFolders,
     ws.graphSettings,
+    ws.taskDisplay,
+    ws.taskView,
   ]);
 
   // MYND-308 (SYNC-6, mtime-defense) - coalesced background flush. The

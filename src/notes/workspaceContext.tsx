@@ -841,6 +841,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
+  // Stable identity for the staging-effect dep in Editor.tsx: resolveTaskView
+  // builds a fresh object per call, so exposing its result directly would
+  // re-fire staging on every render (myne-md/myne#656 review). Keyed on the
+  // persisted container field, whose identity moves only when the view does.
+  const resolvedTaskView = useMemo(
+    () => resolveTaskView(container.taskView),
+    [container.taskView],
+  );
   const api = useMemo<WorkspaceApi>(
     () => ({
       root: state.root,
@@ -862,7 +870,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setGraphSettings,
       taskDisplay: container.taskDisplay ?? DEFAULT_TASK_DISPLAY,
       setTaskDisplay,
-      taskView: resolveTaskView(container.taskView),
+      taskView: resolvedTaskView,
       taskViewIsSet: container.taskView !== undefined,
       restoreContainer,
       saveWorkspaceAs,
@@ -909,6 +917,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       container,
       leaves,
       focused,
+      resolvedTaskView,
       openInFocused,
       openNewTabInFocused,
       openToSide,
