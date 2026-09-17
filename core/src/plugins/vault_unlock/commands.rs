@@ -319,6 +319,15 @@ pub(crate) async fn run_post_unlock_pipeline(
     // marker is the durable WAL), so it never blocks unlock.
     recover_pending_rename_on_unlock(host, io, state).await;
 
+    // ---- myne-md/myne#698: finish an interrupted B2B member-removal rekey ----
+    //
+    // The rekey commits through a device-local `.rekey-journal` at the vault
+    // root (stage every blob, journal, meta, publish). A present journal rolls
+    // the committed batch forward; an absent one deletes orphan `.tmp`. It must
+    // run before any note read so an unlock never observes a half-rekeyed vault.
+    // Idempotent and best-effort, exactly like the rename recovery above.
+    recover_pending_rekey_on_unlock(host, io, state).await;
+
     // ---- MYND-171: reclaim catalog-less stray attachment blobs ----------
     //
     // Finish any "clean unused attachments" sweep that crashed between its
@@ -717,6 +726,69 @@ pub(crate) async fn recover_pending_rename_in_dir(
                 "pending rename recovery failed; left for next-unlock retry",
             );
         }
+    }
+}
+
+/// Roll an interrupted B2B member-removal rekey forward (or its orphan temps
+/// back). Resolves the active vault root through the IO seam and delegates to
+/// [`crate::plugins::sync::member_removal::recover_pending_rekey`].
+///
+/// Best-effort: a root-resolution failure is logged with a bounded io-failure
+/// kind and skipped (no path never logged). The `.rekey-journal` is the
+/// durable WAL, so a missed recovery is retried idempotently on the next unlock
+/// and never blocks this one.
+pub(crate) async fn recover_pending_rekey_on_unlock(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) {
+    let base = match host.app_data_dir() {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    let vault_root =
+        crate::paths::active_vault_root_from_base(&base, state.active_vault_id().await);
+    match crate::plugins::sync::member_removal::recover_pending_rekey(io, &vault_root).await {
+        // A roll-forward rewrote `vault.meta` to the NEW itemsKey AFTER this
+        // session derived its own from the old meta. Re-derive and swap it, or
+        // the running session holds the retired key against new-key blobs and
+        // every note read fails (and its stale anchor force-relocks the next
+        // password change).
+        Ok(Some(new_meta)) => {
+            let Some((root_key, old_hash)) = state.peek_unlocked_root_key_and_hash_clone().await
+            else {
+                return;
+            };
+            let Ok(meta) = protocol::parse_vault_meta_any(&new_meta) else {
+                return;
+            };
+            let Some(id) = state.active_vault_id().await else {
+                return;
+            };
+            let version =
+                protocol::meta_version_of(&new_meta).unwrap_or(protocol::MetaVersion::V0_1);
+            let derived = if version == protocol::MetaVersion::V0_2 {
+                derive_items_key_v0_2(&root_key, &meta)
+            } else {
+                derive_items_key(&root_key, &meta)
+            };
+            let Ok(items_key) = derived else {
+                tracing::warn!(event = "rekey_recovery_key_derive_failed");
+                return;
+            };
+            state.replace_items_key(id, items_key).await;
+            // Refresh the CAS anchor to the bytes recovery wrote, so the next
+            // change-password does not read our own recovery as external
+            // tampering.
+            use sha2::Digest as _;
+            let new_hash: [u8; 32] = sha2::Sha256::digest(&new_meta).into();
+            state.refresh_meta_hash_if(id, old_hash, new_hash).await;
+        }
+        Ok(None) => {}
+        Err(()) => tracing::warn!(
+            event = "rekey_recovery_failed",
+            "left for next-unlock retry"
+        ),
     }
 }
 
@@ -1249,6 +1321,13 @@ pub async fn lock_from_host(
     // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
+
+    // myne-md/myne#698: drop the backend-held B2B person identity on the same
+    // lock path. It holds the person's PQ-hybrid private seeds in RAM, so it is
+    // as sensitive as `root_key`; leaving it resident after a lock is the A6
+    // guarantee being false for a keypair the user never saw a lock button for.
+    // `take_person_identity` moves the pair out, zeroizing it on drop.
+    let _ = state.take_person_identity().await;
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //

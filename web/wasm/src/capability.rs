@@ -641,6 +641,20 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
 /// ten (myne-md/myne#535), which is the failure mode of every hand-maintained
 /// tally sitting next to the thing it counts.
 const PER_COMMAND: &[(&str, Class)] = &[
+    // The B2B member surface (myne-md/myne#698). A browser cannot hold the
+    // person identity: it has no OS keychain (the phrase-derived sealed file
+    // also lives in `<app_config_dir>`, outside OPFS), and the phrase is
+    // deliberately not an enrolment credential in served code
+    // (`decisions.md` 2026-07-26, entry 0514). Member removal additionally
+    // walks the whole `notes/` and `attachments/` trees to re-wrap every
+    // blob, a directory walk this client does not do. `Class::Unsupported`
+    // rather than `Pending`: none of it becomes reachable by porting more,
+    // the carrier itself is the blocker.
+    ("plugin:sync|sync_person_unlock", Class::Unsupported),
+    ("plugin:sync|sync_person_lock", Class::Unsupported),
+    ("plugin:sync|sync_invite_member", Class::Unsupported),
+    ("plugin:sync|sync_list_roster", Class::Unsupported),
+    ("plugin:sync|sync_remove_member", Class::Unsupported),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
     // rule for display and entry alike. They are listed in `DISPATCHED` rather

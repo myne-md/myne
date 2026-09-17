@@ -5594,6 +5594,9 @@ export const ROSTER = Object.freeze([
       "src/components/sync/DeviceJoinQr.tsx",
       "src/components/sync/FingerprintConfirm.tsx",
       "src/components/sync/DeviceManagementPanel.tsx",
+      "src/components/sync/MemberRosterPanel.tsx",
+      "src/hooks/useRoster.ts",
+      "src/lib/invite.ts",
       "src/components/sync/EnrollDeviceForm.tsx",
       "src/components/sync/EnrollPhraseCredential.tsx",
       "src/components/sync/phrase-credential.ts",
@@ -5623,6 +5626,7 @@ export const ROSTER = Object.freeze([
       "e2e/unsynced-marker.e2e.ts",
       "e2e/multi-device-harness.e2e.ts",
       "e2e/sync-usage.e2e.ts",
+      "e2e/member-roster.e2e.ts",
     ],
     manual: [
       {

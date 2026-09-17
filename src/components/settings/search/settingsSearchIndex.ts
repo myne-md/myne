@@ -228,6 +228,18 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.syncDevices",
   },
   {
+    id: "sync.members",
+    panelId: "sync",
+    titleKey: "sync.memberRoster.title",
+    descriptionKey: "sync.memberRoster.hint",
+    keywordsKey: "settings.search.keywords.syncMembers",
+    // The control is gated on `memberSharing` (SyncPanel renders the panel only
+    // under `hasCapability("memberSharing")`), so the search
+    // entry must carry the same gate or it navigates to an anchor that never
+    // renders on a client where the capability is absent.
+    capability: "memberSharing",
+  },
+  {
     id: "sync.add-device",
     panelId: "sync",
     titleKey: "sync.panel.addDevice.label",

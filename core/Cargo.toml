@@ -122,6 +122,11 @@ async-trait = "0.1"
 # and ~6 net-new crates land, all pure-Rust (`flate2 → miniz_oxide`, no C/FFI).
 # MIT. `dependency-policy.md` row + `decisions.md` note owed (this feature, task 5).
 automerge = "0.10"
+# `rand_core 0.10`: the `CryptoRng` bound the B2B person-keypair surfaces take
+# (myne-md/myne#698); the same major `protocol` already declares, so this adds no
+# new major to the lock. `default-features = false` keeps `getrandom` off, so the
+# entropy source stays the caller's explicit `crate::rng::OsRng`.
+rand_core = { version = "0.10.1", default-features = false }
 
 # ── Target split for the Phase 3 web client (phase3-web-client task 78) ──────
 #

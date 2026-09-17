@@ -86,6 +86,25 @@ pub const MEMBERSHIP_CIPHERTEXT_LEN: usize = 48;
 /// Total length of the membership field: 24-byte nonce + 48-byte ciphertext.
 pub const MEMBERSHIP_FIELD_LEN: usize = AEAD_NONCE_LEN + MEMBERSHIP_CIPHERTEXT_LEN;
 
+/// The B2B roster extension's nonce length (same 192-bit AEAD nonce).
+pub const MEMBERSHIP_ROSTER_NONCE_LEN: usize = AEAD_NONCE_LEN;
+/// Cap on the sealed B2B roster extension ciphertext (64 KiB). A member
+/// row carries the member's full public halves (ML-KEM ek 1184 B + Ed25519
+/// 32 B + ML-DSA vk 1952 B, hex-encoded ≈ 6.5 KiB) so ANY device holding
+/// the roster can re-wrap a rotated `itemsKey` without a key round-trip :
+/// the operation member removal depends on. The cap therefore bounds team
+/// size (single-digit members at 64 KiB) rather than dozens; raising it is
+/// a deliberate trade against the `vault.meta` size signal the server
+/// already sees (A13, accepted). A fixed cap keeps the meta layout
+/// length-bounded rather than attacker-inflatable.
+pub const MEMBERSHIP_ROSTER_CT_CAP: usize = 65536;
+/// Total cap on the extended (roster) membership field:
+/// nonce + u32-BE length + ciphertext. The read-side parser and the backup
+/// container's member cap both bound by this, so the writer, the reader and
+/// the export agree on one number.
+pub const MEMBERSHIP_ROSTER_FIELD_CAP: usize =
+    MEMBERSHIP_ROSTER_NONCE_LEN + 4 + MEMBERSHIP_ROSTER_CT_CAP;
+
 /// Total `vault.meta` length when the membership field is present (NTV5 only):
 /// 345 base bytes + 72 membership bytes.
 pub const VAULT_META_V0_2_WITH_MEMBERSHIP_LEN: usize = VAULT_META_LEN + MEMBERSHIP_FIELD_LEN;
@@ -104,6 +123,32 @@ pub struct Membership {
     pub nonce: [u8; AEAD_NONCE_LEN],
     /// 48-byte blob: 16-byte account id ciphertext + 32-byte CTX tag.
     pub enc: [u8; MEMBERSHIP_CIPHERTEXT_LEN],
+    /// The B2B **roster extension** (b2b-identity-substrate, myne-md/myne#698
+    /// task 3), `None` when the vault carries only the single-account field.
+    /// AEAD-sealed under the SAME `membership_key` with a NEW AAD role
+    /// (`membership-roster-blob`, aead.rs), carrying the member roster,
+    /// per-member `enc_items_key` wraps and `previousKeySet` entries as its
+    /// engine-opaque plaintext. `None` means "un-extended", never an error,
+    /// and a pre-B2B reader that predates this field reads the vault
+    /// normally with the account id alone (the 0580 back-compat rule).
+    pub roster: Option<MembershipRoster>,
+}
+
+/// The B2B roster extension carried inside `vault.meta` (NTV5 `reserved`
+/// byte `0x02`): one AEAD envelope over the roster plaintext.
+///
+/// The inner plaintext is ENGINE-OPAQUE to this envelope (the codec pins
+/// framing, not the roster schema; the roster's member-list + per-member
+/// wrap content is the sync-merge layer's shape, B2 union-merge +
+/// tombstones). Cap: [`MEMBERSHIP_ROSTER_CT_CAP`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MembershipRoster {
+    /// 192-bit nonce for the roster AEAD seal.
+    pub nonce: [u8; MEMBERSHIP_ROSTER_NONCE_LEN],
+    /// Sealed roster ciphertext, 32-byte CTX tag included. Capped at
+    /// [`MEMBERSHIP_ROSTER_CT_CAP`]; the parser enforces the cap so the
+    /// extension cannot inflate `vault.meta` past a bounded length.
+    pub enc: alloc::vec::Vec<u8>,
 }
 
 /// In-memory representation of `vault.meta` per spec § 9.3.

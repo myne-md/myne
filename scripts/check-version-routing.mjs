@@ -261,6 +261,7 @@ const ALLOWED = new Map([
   ["core/src/plugins/vault_change_password/commands.rs#aadwrap", [2, "the v0.1 arm of an explicit `version == V0_2` branch"]],
   ["core/src/plugins/sync/enroll.rs#pwkdf", [2, "the v0.1 arms of the enrol path's explicit `version == V0_2` branch (password + recovery)"]],
   ["core/src/plugins/sync/enroll.rs#aadwrap", [2, "the v0.1 arms of the same branch"]],
+  ["core/src/plugins/sync/member_removal.rs#aadwrap", [1, "the v0.1 arm of an explicit `version == V0_2` branch (the rekey re-seals enc_items_key under the vault's own generation)"]],
   ["core/src/plugins/vault_recover/commands.rs#pwkdf", [1, "the v0.1 arm of an explicit `version == V0_2` branch"]],
   ["core/src/plugins/vault_recover/commands.rs#aadwrap", [2, "the v0.1 arm of an explicit `version == V0_2` branch"]],
   ["core/src/plugins/sync/orchestrator.rs#metaw", [1, "the v0.1 arm of the meta merge's explicit generation match (a cross-generation merge is refused outright)"]],

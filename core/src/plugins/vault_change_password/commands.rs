@@ -101,6 +101,9 @@ pub async fn change_password_from_host(
         // stops being true. `close_all` rather than a keyed drop: whichever
         // vault just went away, an import across it cannot continue.
         crate::plugins::vault_unlock::import_source::close_all(state).await;
+        // myne-md/myne#698: the backend-held person identity dies with the slot
+        // on this force-relock too (AS21 "every lock path").
+        let _ = state.take_person_identity().await;
         hooks.zeroize_search_index();
         // MYND-262/266: wipe the spell engine + personal/ignore sets (each add
         // already persisted, so nothing to flush — only RAM to zeroize).

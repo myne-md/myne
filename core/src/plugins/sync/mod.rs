@@ -65,6 +65,8 @@ pub mod enroll;
 pub mod fork_audit;
 pub mod http_transport;
 pub mod integrity;
+pub mod invite;
+pub mod member_removal;
 // Ungated as of phase3-web-client task 84 — but only half of it compiles for a
 // browser. `loop_control`'s decision state machine (`SyncScheduler`, the retry
 // ladder, the constants) is pure and target-independent; its runtime glue
@@ -106,6 +108,7 @@ pub mod proxy;
 pub mod qr_join;
 pub mod reconcile;
 pub mod reconcile_policy;
+pub mod roster;
 // Raw-TLS transport, host-only. `rustls 0.23` with the `ring` provider has no
 // wasm32 backend, and a browser has no raw TCP socket to put TLS on regardless
 // — its transport is `fetch` + `EventSource` (phase3-web-client task 84). The

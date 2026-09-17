@@ -186,6 +186,17 @@ pub struct VaultRuntimeState {
     /// strictly *stricter* (the user does one password unlock before
     /// quick-unlock works) — never weaker — so it needs no wiring there.
     full_unlock_this_session: AtomicBool,
+
+    /// Backend-held person identity (B2B, myne-md/myne#698): the owner's
+    /// [`protocol::PersonKeyPair`] for this process, populated ONCE by
+    /// `sync_person_unlock` from the person's recovery phrase and dropped
+    /// by `sync_person_lock`. Vault-independent (one person, many vaults)
+    /// and deliberately OUTSIDE the per-vault slot map: relocking a vault
+    /// does not revoke personhood, and inviting needs an unlocked vault
+    /// PLUS this identity. Held behind its own lock; `None` means "no
+    /// person unlocked this process". The pair zeroizes on drop
+    /// (`ZeroizeOnDrop`), and `take` moves it out so no clone lingers.
+    person_identity: RwLock<Option<protocol::PersonKeyPair>>,
 }
 
 impl Default for VaultRuntimeState {
@@ -199,6 +210,7 @@ impl Default for VaultRuntimeState {
             label_cache: RwLock::new(HashMap::new()),
             icon_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
+            person_identity: RwLock::new(None),
         }
     }
 }
@@ -219,6 +231,41 @@ impl VaultRuntimeState {
     /// this in their command's critical-section guard.
     pub fn auth_permits(&self) -> &Semaphore {
         &self.auth_permits
+    }
+
+    /// Store the backend-held person identity (B2B unlock). Overwrites
+    /// any previous identity: one person per process, and a second
+    /// unlock is a switch, never an accumulation.
+    pub async fn set_person_identity(&self, pair: protocol::PersonKeyPair) {
+        *self.person_identity.write().await = Some(pair);
+    }
+
+    /// Drop the held person identity, zeroizing it. Returns whether one
+    /// was held.
+    pub async fn take_person_identity(&self) -> Option<protocol::PersonKeyPair> {
+        self.person_identity.write().await.take()
+    }
+
+    /// Clone the held person identity for a command core. The clone lives
+    /// only for the call: command cores must not retain it past the
+    /// operation (no caching outside this lock).
+    pub async fn clone_person_identity(&self) -> Option<protocol::PersonKeyPair> {
+        self.person_identity.read().await.clone()
+    }
+
+    /// Swap the unlocked slot's `itemsKey` for a freshly rotated one
+    /// (member removal, myne-md/myne#698). `root_key` is untouched: the
+    /// rekey rotates the content-encryption key only. A no-op when the
+    /// vault is not the unlocked one.
+    pub async fn replace_items_key(
+        &self,
+        id: VaultId,
+        new_items_key: zeroize::Zeroizing<[u8; protocol::AEAD_KEY_LEN]>,
+    ) {
+        let mut slots = self.slots.write().await;
+        if let Some(Slot::Unlocked(uv)) = slots.get_mut(&id) {
+            uv.items_key = new_items_key;
+        }
     }
 
     // Backup is desktop-only — the web capability set excludes backup

@@ -177,6 +177,13 @@ describe("capability descriptor", () => {
       // there is nothing a later port could deliver. The pop-out affordance is
       // gated on this and omitted where it is absent.
       "detachedWindows",
+      // myne-md/myne#698, the B2B member-sharing substrate. The person keypair
+      // is held backend-side in a sealed file outside browser storage, and the
+      // panel's recovery-phrase prompt is substituted out of the served bundle
+      // (not merely gated). Both the invite and the removal rekey need it to
+      // wrap or rotate the vault `itemsKey`, so the roster commands are refused
+      // and the panel is gated behind this absent capability.
+      "memberSharing",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

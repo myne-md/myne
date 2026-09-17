@@ -202,6 +202,21 @@ const CAPABILITY_BACKING = {
   // myne#678 (epic #173): the pop-out spawn plugin. Desktop-only; a browser page
   // cannot open a second OS window.
   detachedWindows: ["detached-window"],
+  // myne-md/myne#698: the B2B member-sharing surface (person keypairs, the
+  // roster, the invite and the removal rekey). Named per command, NOT as the
+  // whole `sync` plugin, which ships on web and dispatches most of its surface.
+  // The five are refused because the person identity's carrier is a
+  // device-local sealed file outside the browser's storage and the panel asks
+  // for the recovery phrase to unlock it, which `docs/vision.md` keeps out of
+  // served code by build-time substitution. The invite/removal path needs that
+  // identity to wrap or rotate the `itemsKey`.
+  memberSharing: [
+    "plugin:sync|sync_person_unlock",
+    "plugin:sync|sync_person_lock",
+    "plugin:sync|sync_invite_member",
+    "plugin:sync|sync_list_roster",
+    "plugin:sync|sync_remove_member",
+  ],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

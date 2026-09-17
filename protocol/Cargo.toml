@@ -41,6 +41,47 @@ unicode-normalization = { version = "0.1.25", default-features = false }
 thiserror = { version = "2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 tracing = { version = "0.1", default-features = false }
+# ML-KEM (FIPS 203), the PQ KEM for the B2B person-keypair per-recipient wrap
+# (myne-md/myne#698, b2b-identity-substrate task 2). RustCrypto KEMs team
+# (tarcieri + `github:rustcrypto:kems`), same closed-stack discipline as the
+# rows above. `default-features = false` + explicit features: `alloc` (the
+# 0.3.x default), `zeroize` for key-material hygiene matching the rows above.
+# The `getrandom` feature stays OFF: the crate takes `rand_core::CryptoRngCore`
+# from the caller, so the wasm32 graph stays getrandom-free and the entropy
+# source remains the explicit boundary decision it is today (the `custom`
+# getrandom backend + `wasm-csprng-check.sh`). `pkcs8`/`pem`/`hazmat` stay off:
+# no serialization or hazmat surface is used. `rand_core 0.10` is a new major
+# in the shared lock - arrives transitively, reviewed in the dep-policy ledger.
+# No independent audit exists for any Rust ML-KEM (README states it); the
+# compensating control is NIST KAT vectors + property tests (task 2) per the
+# same paragraph-6 posture that admits the rest of the stack. Ledger row:
+# docs/dependency-policy.md (this change).
+ml-kem = { version = "0.3.2", default-features = false, features = ["alloc", "zeroize"] }
+# ML-DSA (FIPS 204), the PQ signature half of the person-keypair hybrid
+# (Ed25519 + ML-DSA-65 per the roadmap commitment; myne-md/myne#698 task 2).
+# RustCrypto signatures team, `signature` 3.0 trait, `MlDsa65` param set.
+# `getrandom` stays OFF (a 32-byte seed is supplied from the existing CSPRNG
+# path) and `pkcs8` off. `rand_core` is ON only so `sign_randomized` can accept
+# the caller's `CryptoRng`; it draws nothing itself, the entropy source stays
+# `crate::rng::OsRng`. 0.1.x semver, API churn risk documented in the ledger row.
+# The hybrid combiner itself is Myne-side (protocol/src/person_key.rs, task 2)
+# following IETF draft-ietf-lamps-pq-composite-sigs-19; composite ML-DSA is
+# EUF-CMA only, so the Myne usage records that bound explicitly.
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "zeroize", "rand_core"] }
+# Ed25519, the classical signature half of the person-keypair hybrid.
+# RustCrypto/dalek (curve25519-dalek org, multi-maintainer); promoted from a
+# transitive edge (tor-sidecar) to a direct one because this crate now names
+# its types. `fast` (precomputed tables) + `zeroize` from the default set;
+# `std` stays OFF (no_std crate) with `alloc` on for the surfaces used.
+# `rand_core` stays off like every other crate in this file: seeds come from
+# the caller.
+ed25519-dalek = { version = "2.2.0", default-features = false, features = ["fast", "zeroize", "alloc"] }
+# rand_core 0.10: direct edge for the CryptoRng bound the person-keypair
+# wrap functions take. The version unifies with ml-kem's transitive
+# requirement; getrandom stays out of this crate's graph.
+rand_core = { version = "0.10", default-features = false }
+curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "zeroize"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
 
 # wasm32 (Phase 3 web client). getrandom 0.2 refuses to build for
 # `wasm*-unknown-unknown` unless a backend is chosen, and the two choices are

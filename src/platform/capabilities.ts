@@ -308,6 +308,8 @@ export type Capability =
    * that reject.
    */
   | "accountGrouping"
+  /** B2B member sharing: person identity, invite, roster, removal. */
+  | "memberSharing"
   /**
    * Desktop pop-out: open a note in its own OS-level window (second monitor;
    * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
@@ -360,6 +362,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   lockedVaultNames: true,
   torRouting: true,
   accountGrouping: true,
+  memberSharing: true,
   detachedWindows: true,
 });
 
