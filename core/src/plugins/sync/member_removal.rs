@@ -370,8 +370,19 @@ pub async fn remove_member_from_host(
     // rotated key instead of adopting the server's stale copy, and refresh the
     // slot's CAS anchor so the next change-password does not read our own
     // out-of-band write as external tampering.
-    if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, &vault_root).await {
-        tracing::debug!(stage = "member_removal", error = ?e, "meta-dirty marker write failed");
+    //
+    // Best-effort with one immediate retry: the marker write is idempotent,
+    // so a second attempt is cheap and needs no signature change. A persistent
+    // failure still converges rather than stranding the removal: the meta
+    // phase pushes on baseline divergence too (`meta_baseline_hex` still
+    // holds the pre-removal hash while `vault.meta` already carries the
+    // rotated key), so the marker only accelerates the baseline-lost corner
+    // instead of gating the push.
+    if let Err(first) = crate::plugins::sync::state::mark_vault_meta_dirty(io, &vault_root).await {
+        // One immediate retry before giving up (see the guarantee above).
+        if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, &vault_root).await {
+            tracing::warn!(stage = "member_removal", first_error = ?first, error = ?e, "meta-dirty marker write failed twice");
+        }
     }
     let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
     sha2::Digest::update(&mut hasher, &new_meta_bytes);

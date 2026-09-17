@@ -3296,6 +3296,16 @@ fn merge_roster_extension(
     account_number_hash: [u8; 16],
 ) {
     let Some(root_key) = root_key else {
+        // No key, no merge (an unenrolled edge or a keyless test caller).
+        // Warn rather than stay silent: a keyed production cycle that lands
+        // here leaves a diverged roster standing inside a Merged/Pushed
+        // outcome, and nothing else names it.
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "no_root_key",
+            "roster extension merge skipped: no root key, transplanted membership stands as-is"
+        );
         return;
     };
     // A roster on either side; the single-account half of the transplanted
@@ -3319,8 +3329,22 @@ fn merge_roster_extension(
     let (Some(local_roster), Some(remote_roster)) = (local_roster, remote_roster) else {
         // An unreadable envelope is not a merge input: leave the transplanted
         // field alone rather than merging against a guessed empty roster.
+        // Warn: the cycle still reports Merged/Pushed/Adopted while the roster
+        // did not converge, and this line is the only place that says so.
+        // (Counts only; roster bytes never enter a log line.)
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "unreadable_envelope",
+            local_had_roster = local.and_then(|m| m.roster.as_ref()).is_some(),
+            remote_had_roster = remote.and_then(|m| m.roster.as_ref()).is_some(),
+            "roster extension merge skipped: a roster envelope failed to unseal or parse"
+        );
         return;
     };
+    // Nothing to write when neither side carried a roster extension. This is
+    // the ordinary single-user cycle, so it stays silent by design: a warn
+    // here would fire on every sync of every vault that never had a roster.
     // Nothing to write when neither side carried a roster extension.
     let had_any = local.and_then(|m| m.roster.as_ref()).is_some()
         || remote.and_then(|m| m.roster.as_ref()).is_some();
@@ -3331,11 +3355,24 @@ fn merge_roster_extension(
     let plaintext = super::roster::encode_roster(&union);
     let mut nonce = [0u8; protocol::MEMBERSHIP_ROSTER_NONCE_LEN];
     if getrandom::getrandom(&mut nonce).is_err() {
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "csprng",
+            "roster extension merge skipped: nonce randomness unavailable, union not sealed"
+        );
         return;
     }
     let Ok(env) =
         protocol::seal_membership_roster_raw(root_key, &plaintext, &account_number_hash, &nonce)
     else {
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "seal",
+            union_members = union.len(),
+            "roster extension merge skipped: reseal of the merged union failed"
+        );
         return;
     };
     // The roster rides INSIDE an existing membership field. When the merged meta

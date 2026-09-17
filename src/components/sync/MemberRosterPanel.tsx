@@ -111,6 +111,7 @@ export function MemberRosterPanel({
             type="password"
             autoComplete="off"
             spellCheck={false}
+            aria-label={t("sync.memberRoster.personHint")}
             value={phrase}
             onChange={(e) => setPhrase(e.target.value)}
             style={INPUT_STYLE}
