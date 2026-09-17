@@ -153,6 +153,10 @@ const DEFAULT_PREFS: PrefsView = {
   spell_languages: [],
   saved_views: [],
   view_order: [],
+  // myne-md/myne#699. `null` ribbon_items means never configured: the rail
+  // renders its curated default set client-side.
+  ribbon_items: null,
+  ribbon_visible: true,
 };
 
 interface UsePrefsResult {

@@ -376,6 +376,9 @@
     "matchedInAttachmentTitle": "The query matched inside a file embedded in this note",
     "matchedInBody": "↳ matched in body",
     "noMatches": "No matches",
+    "pin": "Pin to left ribbon",
+    "unpin": "Unpin from left ribbon",
+    "pinError": "Could not pin the command.",
     "operatorHint": "Tab to complete",
     "operators": {
       "tag": "Notes with a tag",
@@ -751,6 +754,12 @@
     "title": "This browser was removed from your account"
   },
   "editor": {
+    "ribbon": {
+      "customize": "Customize ribbon…",
+      "label": "Left ribbon",
+      "unpin": "Unpin from ribbon",
+      "runFailed": "Could not run the ribbon command."
+    },
     "attachment": {
       "actions": {
         "exported": "Exported {{filename}}.",
@@ -3019,6 +3028,19 @@
       "searchPlaceholder": "Search shortcuts…",
       "warnAlreadyUsed": "Already used by {{commands}}. Added anyway."
     },
+    "ribbonCustomize": {
+      "add": "Add",
+      "empty": "No commands on the ribbon yet. Use Add to pin one.",
+      "errorSave": "Could not save the ribbon setting.",
+      "helper": "The commands on the left ribbon, in order. Drag to reorder, add more from the command list, or remove with the ×. The rail hides commands unavailable in the current state.",
+      "label": "Left ribbon",
+      "remove": "Remove {{name}} from the ribbon",
+      "position": "{{name}}, {{index}} of {{total}}",
+      "searchEmpty": "No matching commands.",
+      "searchPlaceholder": "Search commands…",
+      "showHelper": "Show the left ribbon on this device.",
+      "showLabel": "Show left ribbon"
+    },
     "language": {
       "helper": "Choose the display language for the app.",
       "label": "Language"
@@ -3455,6 +3477,7 @@
         "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
+        "ribbon": "left ribbon rail pin pins command commands customize reorder unpin toolbar shortcuts",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "screenCaptureOverride": "screen capture override allow disable magnifier remote desktop accessibility unlock screen black",
         "showEditTimes": "show edit times timestamps modified dates notes",

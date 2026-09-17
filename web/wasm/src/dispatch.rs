@@ -3405,6 +3405,64 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        "plugin:prefs|set_ribbon_items" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                items: Vec<String>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_ribbon_items_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.items,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:prefs|set_ribbon_visible" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                visible: bool,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_ribbon_visible_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.visible,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:prefs|set_new_note_location" => {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]

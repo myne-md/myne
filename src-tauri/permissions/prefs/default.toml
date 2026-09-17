@@ -32,6 +32,8 @@ permissions = [
   "allow-set-daily-folder",
   "allow-set-daily-template",
   "allow-set-periodic-note-setting",
+  "allow-set-ribbon-items",
+  "allow-set-ribbon-visible",
   "allow-set-new-note-location",
   "allow-set-startup-open",
   "allow-set-editor-text-size",
@@ -208,6 +210,18 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+# myne-md/myne#699: left-ribbon layout + visibility. DeviceLocal; atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing.
+[[permission]]
+identifier = "allow-set-ribbon-items"
+description = "Allow invoking prefs:set_ribbon_items (Slot::Unlocked-gated setter for the ribbon_items sequence: the left ribbon's pinned command ids; writing marks the rail configured so an emptied list stays empty; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ribbon_items"]
+
+[[permission]]
+identifier = "allow-set-ribbon-visible"
+description = "Allow invoking prefs:set_ribbon_visible (Slot::Unlocked-gated setter for the ribbon_visible flag: whether this device shows the left ribbon; default true, omitted unless false; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ribbon_visible"]
 
 [[permission]]
 identifier = "allow-set-periodic-note-setting"

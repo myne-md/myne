@@ -139,6 +139,10 @@ const V = {
     "adapted",
     "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
   ],
+  "src/components/settings/RibbonCustomizeSettings.tsx": [
+    "ported",
+    "Prefs-backed (myne-md/myne#699). The rail itself renders from the same shared src/ tree on web, and the commands it pins carry their own per-state guards, so the customization roster behaves identically here.",
+  ],
   "src/components/settings/SettingsSection.tsx": [
     "ported",
     "The settings-panel section wrapper (MYND-624). Presentational — a heading plus its children, no host call and no capability of its own, so it carries whatever its contents already carry.",
