@@ -19,8 +19,13 @@ import {
 
 const OVERLAY_STYLE: CSSProperties = {
   position: "absolute",
-  top: "100%",
+  // The popover mounts at the BOTTOM of the tab column (after the composer),
+  // so opening downward (top: 100%) lands past the viewport edge and the
+  // Close row stops being hit-testable (myne-md/myne#697, mem1 0/12). Open
+  // upward from the anchor instead, capped against the viewport.
+  bottom: "100%",
   right: 0,
+  marginBottom: "var(--space-1)",
   zIndex: 30,
   width: 300,
   // The right panel narrows below 300px on small viewports: without this cap
@@ -28,8 +33,10 @@ const OVERLAY_STYLE: CSSProperties = {
   // being hit-testable (myne-md/myne#697 review). The cap keeps every control
   // inside the clickable area.
   maxWidth: "calc(100vw - 24px)",
-  maxHeight: 320,
-  overflowY: "auto",
+  // Viewport-capped: a short window still fits the whole overlay, and the
+  // roster scrolls inside while the Close row stays pinned (see SCROLL_STYLE
+  // / FOOTER_STYLE below).
+  maxHeight: "min(320px, calc(100vh - 96px))",
   background: "var(--paper)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
@@ -38,6 +45,21 @@ const OVERLAY_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-1)",
+};
+
+const SCROLL_STYLE: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+
+const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  gap: "var(--space-2)",
+  flexShrink: 0,
 };
 
 const ROW_STYLE: CSSProperties = {
@@ -144,68 +166,70 @@ export function MemoryPopover(props: {
         style={{ ...OVERLAY_STYLE }}
         data-testid="ai.memory-popover"
       >
-        <div
-          style={{
-            fontSize: "var(--text-xs)",
-            fontWeight: "var(--weight-medium)",
-            color: "var(--fg-3)",
-          }}
-        >
-          {t("editor.chrome.rightPanel.aiChat.memoryPopoverTitle")}
-        </div>
-        {loadFailed ? (
-          <div>
-            <p data-testid="ai.memory-popover-load-failed" style={TEXT_STYLE}>
-              {t("editor.chrome.rightPanel.aiChat.memoryPopoverLoadFailed")}
-            </p>
-            <button
-              type="button"
-              data-testid="ai.memory-popover-retry"
-              style={SMALL_BUTTON_STYLE}
-              onClick={() => void reload()}
-            >
-              {t("editor.chrome.rightPanel.aiChat.memoryPopoverRetry")}
-            </button>
+        <div style={SCROLL_STYLE}>
+          <div
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--weight-medium)",
+              color: "var(--fg-3)",
+            }}
+          >
+            {t("editor.chrome.rightPanel.aiChat.memoryPopoverTitle")}
           </div>
-        ) : rows === null ? null : rows.length === 0 ? (
-          <p data-testid="ai.memory-popover-empty" style={TEXT_STYLE}>
-            {t("editor.chrome.rightPanel.aiChat.memoryPopoverEmpty")}
-          </p>
-        ) : (
-          rows.slice(0, 8).map((row) => (
-            <div key={row.id} style={ROW_STYLE} data-testid="ai.memory-popover-row">
-              {failedIds.has(row.id) ? (
-                <p style={TEXT_STYLE} data-testid="ai.memory-popover-row-unreadable">
-                  {t("editor.chrome.rightPanel.aiChat.memoryPopoverEntryFailed")}
-                </p>
-              ) : (
-                <p style={TEXT_STYLE}>{texts[row.id] ?? ""}</p>
-              )}
+          {loadFailed ? (
+            <div>
+              <p data-testid="ai.memory-popover-load-failed" style={TEXT_STYLE}>
+                {t("editor.chrome.rightPanel.aiChat.memoryPopoverLoadFailed")}
+              </p>
               <button
                 type="button"
-                data-testid="ai.memory-popover-delete"
-                onClick={() => {
-                  void memoryDelete(row.id)
-                    .then(() => {
-                      props.onShowToast(
-                        t("editor.chrome.rightPanel.aiChat.memoryPopoverDeleted"),
-                      );
-                      void reload();
-                    })
-                    .catch(() => {
-                      props.onShowToast(
-                        t("editor.chrome.rightPanel.aiChat.memoryPopoverDeleteFailed"),
-                      );
-                    });
-                }}
+                data-testid="ai.memory-popover-retry"
                 style={SMALL_BUTTON_STYLE}
+                onClick={() => void reload()}
               >
-                {t("editor.chrome.rightPanel.aiChat.memoryPopoverDelete")}
+                {t("editor.chrome.rightPanel.aiChat.memoryPopoverRetry")}
               </button>
             </div>
-          ))
-        )}
-        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          ) : rows === null ? null : rows.length === 0 ? (
+            <p data-testid="ai.memory-popover-empty" style={TEXT_STYLE}>
+              {t("editor.chrome.rightPanel.aiChat.memoryPopoverEmpty")}
+            </p>
+          ) : (
+            rows.slice(0, 8).map((row) => (
+              <div key={row.id} style={ROW_STYLE} data-testid="ai.memory-popover-row">
+                {failedIds.has(row.id) ? (
+                  <p style={TEXT_STYLE} data-testid="ai.memory-popover-row-unreadable">
+                    {t("editor.chrome.rightPanel.aiChat.memoryPopoverEntryFailed")}
+                  </p>
+                ) : (
+                  <p style={TEXT_STYLE}>{texts[row.id] ?? ""}</p>
+                )}
+                <button
+                  type="button"
+                  data-testid="ai.memory-popover-delete"
+                  onClick={() => {
+                    void memoryDelete(row.id)
+                      .then(() => {
+                        props.onShowToast(
+                          t("editor.chrome.rightPanel.aiChat.memoryPopoverDeleted"),
+                        );
+                        void reload();
+                      })
+                      .catch(() => {
+                        props.onShowToast(
+                          t("editor.chrome.rightPanel.aiChat.memoryPopoverDeleteFailed"),
+                        );
+                      });
+                  }}
+                  style={SMALL_BUTTON_STYLE}
+                >
+                  {t("editor.chrome.rightPanel.aiChat.memoryPopoverDelete")}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+        <div style={FOOTER_STYLE}>
           <button
             type="button"
             data-testid="ai.memory-popover-settings"
