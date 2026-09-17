@@ -1004,6 +1004,9 @@ mod tests {
             MemberFamily::AttachmentBlob => "attachment-blob",
             MemberFamily::ChatsCatalog => "chats-catalog",
             MemberFamily::ConversationFile => "conversation-file",
+            MemberFamily::MemoryCatalog => "memory-catalog",
+            MemberFamily::MemoryEntry => "memory-entry",
+            MemberFamily::Personality => "personality",
         }
     }
 

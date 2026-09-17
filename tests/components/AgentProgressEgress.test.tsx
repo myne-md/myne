@@ -76,7 +76,7 @@ function awaitingScope() {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  }, currentRunEpoch());
+  memoryUpdated: 0,}, currentRunEpoch());
 }
 
 const REPORT = {

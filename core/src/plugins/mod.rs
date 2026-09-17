@@ -44,6 +44,7 @@ pub mod chats;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod export;
 pub mod graph_layout;
+pub mod memory;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;

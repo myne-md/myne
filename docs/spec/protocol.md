@@ -244,6 +244,11 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 chats-catalog-key"` | KEK for the `vault.chats` conversations catalog singleton (§9.23) | Active when `vault.chats` is written (myne-md/myne#675). `root_key`-derived (itemsKey-independent), like prefs/search/themes. |
 | `"myne.v0.1 chats-catalog-sync-id"` | Reserved sync blob-id for `vault.chats` (Phase 2 sync; `sync-protocol.md` §4.2). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the conversations catalog (myne-md/myne#675). Like prefs/themes, the catalog is a synced singleton outside the head manifest, so it needs a deterministic, device-independent 16-byte identifier: `chats_catalog_sync_id = DeriveSubkey(root_key, "chats-catalog-sync-id")[0..16]`. This derives an *identifier*, not key material: the catalog's KEK remains `chats-catalog-key`. The per-conversation files of §9.24 need no sync-id role of their own: their sync blob-id is the conversation id's own 16 bytes, the attachment-id pattern (id-generic server). |
 | `"myne.v0.1 chats-key"` | KEK for the per-conversation AI chat blobs (`chats/<id>`, §9.24, `MYJ1`) | Active when a conversation file is written (myne-md/myne#675). `root_key`-derived (itemsKey-independent), like prefs/search/attachment-text. One KEK for the whole family; per-conversation separation comes from the `conversation_id` AAD binding (§9.24.3), the `MYE1` archetype. |
+| `"myne.v0.1 agent-memory-catalog-key"` | KEK for the agent-memory catalog singleton (`vault.agent-memory`, §9.25) | Active when the agent-memory catalog is written (`decisions.md` 2026-09-10, myne-md/myne#697). `root_key`-derived (itemsKey-independent), like prefs/search/chats-catalog. Written only while the runtime beta opt-in `ai_enabled` is on: a vault that never enabled AI carries no memory at all, exactly as §9.17 treats `vault.embeddings`. |
+| `"myne.v0.1 agent-memory-catalog-sync-id"` | Reserved sync blob-id for `vault.agent-memory` (Phase 2 sync; `sync-protocol.md` §10.2.6). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the agent-memory catalog (myne-md/myne#697). Like the chats/themes catalogs, it is a synced singleton outside the head manifest, so it needs a deterministic, device-independent 16-byte identifier: `agent_memory_catalog_sync_id = DeriveSubkey(root_key, "agent-memory-catalog-sync-id")[0..16]`. This derives an *identifier*, not key material: the catalog's KEK remains `agent-memory-catalog-key`. The per-entry files of §9.26 need no sync-id role of their own: their sync blob-id is the entry id's own 16 bytes, the attachment-id pattern (id-generic server). |
+| `"myne.v0.1 agent-memory-key"` | KEK for the per-entry agent-memory blobs (`memories/<id>`, §9.26, `MYX1`) | Active when a memory-entry file is written (`decisions.md` 2026-09-10, myne-md/myne#697). `root_key`-derived (itemsKey-independent), like prefs/search/attachment-text. One KEK for the whole family; per-entry separation comes from the `memory_entry_id` AAD binding (§9.26.3), the `MYE1` archetype. |
+| `"myne.v0.1 agent-personality-key"` | KEK for the agent-personality singleton (`vault.personality`, §9.27, `MYZ1`) | Active when the personality blob is written (`decisions.md` 2026-09-10, myne-md/myne#697). `root_key`-derived (itemsKey-independent), like prefs/search/themes. Written only while `ai_enabled` is on; user-edited only (the agent never writes personality, `decisions.md` 2026-09-10). |
+| `"myne.v0.1 agent-personality-sync-id"` | Reserved sync blob-id for `vault.personality` (Phase 2 sync; `sync-protocol.md` §10.2.7). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the personality singleton (`decisions.md` 2026-09-10, myne-md/myne#697). Like the chats/themes catalogs, it is a synced singleton outside the head manifest, so it needs a deterministic, device-independent 16-byte identifier: `agent_personality_sync_id = DeriveSubkey(root_key, "agent-personality-sync-id")[0..16]`. This derives an *identifier*, not key material: the singleton's KEK remains `agent-personality-key`. |
 | `"myne.v0.2 membership-key"` | KEK for the sealed vault membership field (`vault.meta` §9.3.1) | Active when the membership field is written (the account/vault split, `decisions.md` 2026-09-07). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. So a vault's account membership survives a later epoch-rotation `itemsKey` evolution. Derived under the **v0.2** context prefix because the field is `NTV5`-only. Distinct from the AAD role string `"membership-blob"` (§5.2). |
 | (future next-major contexts) | reserved | not derived in v0.1. |
 
@@ -416,6 +421,15 @@ AAD_attachments_catalog =
 AAD_ai_embeddings_blob =
   AAD_prefix || protocol_version (1 B) || "ai-embeddings-blob" || account_number_hash (16 B)
 
+AAD_agent_memory_catalog =
+  AAD_prefix || protocol_version (1 B) || "agent-memory-catalog" || account_number_hash (16 B)
+
+AAD_agent_memory_blob =
+  AAD_prefix || protocol_version (1 B) || "agent-memory-blob" || memory_entry_id (16 B) || account_number_hash (16 B)
+
+AAD_agent_personality_blob =
+  AAD_prefix || protocol_version (1 B) || "personality-blob" || account_number_hash (16 B)
+
 AAD_membership_blob =
   AAD_prefix || protocol_version (1 B) || "membership-blob" || account_number_hash (16 B)
 ```
@@ -447,6 +461,12 @@ AAD_membership_blob =
 `AAD_chats_catalog` is the AAD bound into the AEAD wrap of `vault.chats` (`MYM1`, §9.23), the encrypted AI conversations catalog. It mirrors `AAD_prefs_blob` exactly, with the role string `"chats-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 13 ASCII bytes, total 15 bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the catalog to its specific vault. Total AAD length: `10 + 1 + 15 + 16 = 42 bytes`. As with prefs/search/themes, `items_key_id` is **not** bound: the catalog KEK derives directly from `root_key` via `"myne.v0.1 chats-catalog-key"` (§3.4), independent of the `itemsKey` lineage.
 
 `AAD_chats_blob` is the AAD bound into the AEAD seal of a per-conversation AI chat file (`chats/<conversation-id-hex>`, `MYJ1`, §9.24). It follows the `AAD_attachment_text` per-entry pattern with the conversation id in the per-entry position: the role string `"chats-blob"` (length-prefixed UTF-8: 2-B big-endian length + 10 ASCII bytes, total 12 bytes), then the 16-byte `conversation_id` (also the on-disk filename, hex), then the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 12 + 16 + 16 = 55 bytes`. Binding both ids prevents substituting one conversation's blob for another within the same vault and porting a blob across vaults at the AEAD layer. As with the whole `root_key`-derived family, `items_key_id` is **not** bound: `chats_key` derives via `"myne.v0.1 chats-key"` (§3.4), one KEK for the family with per-conversation separation from this AAD, the `MYE1` archetype.
+
+`AAD_agent_memory_catalog` is the AAD bound into the AEAD wrap of the agent-memory catalog (`vault.agent-memory`, `MYN1`, §9.25). It mirrors `AAD_chats_catalog` exactly, with the role string `"agent-memory-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes, total 22 bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the catalog to its specific vault. Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. As with the whole `root_key`-derived singleton family, `items_key_id` is **not** bound: the catalog KEK derives directly from `root_key` via `"myne.v0.1 agent-memory-catalog-key"` (§3.4), independent of the `itemsKey` lineage.
+
+`AAD_agent_memory_blob` is the AAD bound into the AEAD seal of a per-entry agent-memory file (`memories/<memory-id-hex>`, `MYX1`, §9.26). It follows the `AAD_chats_blob` per-entry pattern with the memory-entry id in the per-entry position: the role string `"agent-memory-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes), then the 16-byte `memory_entry_id` (also the on-disk filename, hex), then the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 19 + 16 + 16 = 62 bytes`. Binding both ids prevents substituting one entry's blob for another within the same vault and porting a blob across vaults at the AEAD layer. As with the whole `root_key`-derived family, `items_key_id` is **not** bound: `agent_memory_key` derives via `"myne.v0.1 agent-memory-key"` (§3.4), one KEK for the family with per-entry separation from this AAD, the `MYE1` archetype.
+
+`AAD_agent_personality_blob` is the AAD bound into the AEAD wrap of the agent-personality singleton (`vault.personality`, `MYZ1`, §9.27). It mirrors `AAD_prefs_blob` exactly, with the role string `"personality-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes, total 18 bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the blob to its specific vault. Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. As with the whole `root_key`-derived singleton family, `items_key_id` is **not** bound: the personality KEK derives directly from `root_key` via `"myne.v0.1 agent-personality-key"` (§3.4), independent of the `itemsKey` lineage.
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
@@ -725,6 +745,8 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── vault.graph           ← encrypted graph-layout cache (MYG1, §9.19)
 ├── vault.themes          ← encrypted custom-theme palettes (MYT1, §9.21)
 ├── vault.chats           ← encrypted AI conversations catalog (MYM1, §9.23)
+├── vault.agent-memory    ← encrypted agent-memory catalog (MYN1, §9.25)
+├── vault.personality     ← encrypted agent-personality singleton (MYZ1, §9.27)
 ├── notes/
 │   ├── 0184a2b3-...myn   ← one encrypted note per file
 │   ├── 0184a2b4-...myn
@@ -739,6 +761,9 @@ A Myne vault is a directory on the user's filesystem containing:
     chats/                ← encrypted AI conversation turn lists (MYJ1, §9.24),
                              one per <conversation-id-hex>; catalog is vault.chats
                              (MYM1, §9.23)
+    memories/             ← encrypted per-entry agent-memory blobs (MYX1, §9.26),
+                             one per <memory-id-hex>; catalog is vault.agent-memory
+                             (MYN1, §9.25)
 ```
 
 - **Only `vault.meta` and `notes/` are required.** Every other entry is created lazily, the first time the feature that owns it writes; the tree above is an index, and each `vault.*` singleton's own §9.x section is normative for its envelope, KEK, AAD, size cap, and backup/sync class. A vault missing any of them is well-formed — the reader falls back per §9.x (rebuild for a cache, empty/default for a preference blob), never a parse failure.
@@ -1531,6 +1556,9 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.themes` | IN if present | Custom themes are authoritative user data (§9.21) — hand-authored palettes, a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
 | `vault.chats` | IN if present | The AI conversations catalog is authoritative user content (§9.23, myne-md/myne#675): a Class-1 sync member, so `sync ⊆ backup` requires it here. Carrying the tombstones is load-bearing: a restore must not resurrect a conversation deleted before the backup |
 | `chats/` (per-conversation files) | IN if present | One `MYJ1` file per catalog entry (§9.24). A conversation whose catalog row is a tombstone is absent by construction (delete removes the file first), so the pair restores coherently |
+| `vault.agent-memory` | IN if present | The agent-memory catalog is authoritative user content (§9.25, myne-md/myne#697): a Class-1 sync member behind the `ai_enabled` gate, so `sync ⊆ backup` requires it here. Carrying the tombstones is load-bearing for the same reason the chats row states |
+| `memories/` (per-entry files) | IN if present | One `MYX1` file per catalog entry (§9.26). An entry whose catalog row is a tombstone is absent by construction, so the pair restores coherently |
+| `vault.personality` | IN if present | The agent-personality singleton is authoritative user content (§9.27, myne-md/myne#697): a Class-1 sync member behind the `ai_enabled` gate, so `sync ⊆ backup` requires it here |
 | `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
 | `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
@@ -2640,6 +2668,133 @@ Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: a conversat
 
 **Deletion** follows the attachments-catalog tombstone discipline: deleting a conversation writes the tombstone into its `vault.chats` record (§9.23) and removes the `chats/<id>` file; the tombstone is what syncs (remove-wins over a concurrent append, the §11.4 catalogue rule), so a delete propagates to every device rather than resurrecting from a peer's copy.
 
+### 9.25 Agent-memory catalog (`vault.agent-memory`, `MYN1`)
+
+`vault.agent-memory` is a vault-level singleton artifact carrying the **memory roster** for the personal-agent layer (`decisions.md` 2026-09-10, myne-md/myne#697): one entry per persisted memory, holding its id, created/updated timestamps, causal `version`, and deletion tombstone. The entry text itself lives in the per-entry files of §9.26; this catalog is the enumerable index over them, the same pair shape as `vault.chats` (§9.23) over `chats/` (§9.24) and `vault.attachments` (§9.10) over `attachments/` (§9.9). It is **Class-1 Authoritative data** (`sync-protocol.md` §9): synced, backed up (§9.11.3), addressed by the reserved blob-id `agent_memory_catalog_sync_id` (§3.4).
+
+The plaintext inside is **canonical JSON** of an object whose keys are memory-entry ids (32-char lowercase-hex strings) and whose values are memory-record objects. Per-record keys, emitted in lexicographic order: `created_at` (epoch-ms integer), `deleted_at` (epoch-ms integer, present only on a tombstone), `quarantined` (boolean, present only when true; absent ≡ false, a row held for user review: listed but never injected, `decisions/ai/0591`), `updated_at` (epoch-ms integer), `version` (monotonic causal counter, non-negative integer; absent ≡ 0, the §11.4 discipline). Floats are FORBIDDEN, as everywhere in this section. The object is omitted-when-empty at the file level: a vault with no memories has no `vault.agent-memory` file at all, and the first memory write creates it.
+
+**The `ai_enabled` gate is load-bearing here.** Both agent-memory families and the personality singleton exist only when the runtime beta opt-in `ai_enabled` is on (§9.5.2, MYND-406): a vault that never enabled AI carries no `vault.agent-memory`, no `memories/` entry, and no `vault.personality` at all, so its at-rest fingerprint stays exactly the pre-feature one. The whole surface (writes, reads, the sync phase, backup inclusion, injection into the agent system turn) exists only behind that gate; turning AI off does not delete existing memory, it just stops the feature from writing or reading until it is turned back on (the `vault.embeddings` contrast is deliberate there: that family is a rebuildable cache and turning AI on again rebuilds it; memory is authoritative content and persists).
+
+#### 9.25.1 Outer envelope layout
+
+The header is 34 bytes, identical in shape to `vault.chats` (§9.23.1) / `vault.prefs` (§9.5.1):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 B | magic, ASCII `MYN1` on a v0.1 vault, `MYN5` on a v0.2 vault (§10.3; one magic per generation, the themes-family convention) |
+| 4 | 1 B | `protocol_version` = `0x01` always (the envelope version, not the vault generation; the generation travels in the magic + AAD, exactly as the shared `encode_blob_envelope` path writes it for every singleton family) |
+| 5 | 1 B | `memory_catalog_format_version` = `0x01` (inner schema, evolves independently) |
+| 6 | 24 B | `nonce` (random, §5.3 policy inherited) |
+| 30 | 4 B | `ciphertext_len` (u32 BE) |
+
+Then the CTX-committed XChaCha20-Poly1305 ciphertext of the canonical JSON. Strict-trailing (§10.3.1): total length MUST be exactly `34 + ciphertext_len`.
+
+The KEK is `agent_memory_catalog_key = DeriveSubkey(root_key, "agent-memory-catalog-key")` (§3.2 + §3.4), `root_key`-derived and `itemsKey`-independent like prefs/search/chats-catalog, so the roster survives a later epoch-rotation. No public key-id field appears.
+
+#### 9.25.2 AAD construction
+
+`AAD_agent_memory_catalog` mirrors `AAD_prefs_blob` exactly, with the role string `"agent-memory-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes, total 22 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the catalog to its specific vault. Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. As with prefs/search/chats-catalog, `items_key_id` is **not** bound.
+
+#### 9.25.3 Size cap and read semantics
+
+Implementations MUST reject `ciphertext_len > 1048576 + 32` (1 MiB plaintext cap + 32-byte CTX tag) before allocating (the §9.5.4 / §9.21.4 DoS-allocation discipline; tighter than the chats catalog because a memory roster is bounded by design, the client layer's 100-live-entry roster bound below sits below this). An over-cap catalog is refused at write time rather than truncated.
+
+Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: memory is load-bearing user content (the agent's distilled picture of the user), so an unreadable catalog read as empty would, on the next write, persist that emptiness over real memory records. A read failure surfaces as an error naming the artifact; the client MUST NOT offer memory writes as a repair path that writes over the unreadable blob without an explicit user acknowledgement of the loss.
+
+### 9.26 Agent-memory entry blob (`memories/<memory-id>`, `MYX1`)
+
+Each memory entry's text is one file under `<vault-root>/memories/<memory-id-hex>`, the structural sibling of `chats/<conversation-id-hex>` (§9.24) and `attachments/<attachment-id-hex>` (§9.9): a per-entry file family enumerated by its catalog (§9.25), one KEK for the whole family with per-entry separation from the AAD (the `MYE1` archetype). An entry file holds **load-bearing user content** (AS1/AS2-class distilled text), encrypted at rest, synced, backed up.
+
+#### 9.26.1 Outer envelope layout
+
+The header is 34 bytes, identical in shape to `vault.agent-memory` (§9.25.1) with two field changes:
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 B | magic, ASCII `MYX1` on a v0.1 vault, `MYX5` on a v0.2 vault (§10.3; one magic per generation) |
+| 4 | 1 B | `protocol_version` (`0x01` v0.1 / `0x02` v0.2, travelling with the magic) |
+| 5 | 1 B | `memory_blob_format_version` = `0x01` (inner entry schema) |
+| 6 | 24 B | `nonce` (random, §5.3) |
+| 30 | 4 B | `ciphertext_len` (u32 BE) |
+
+Strict-trailing (§10.3.1): total length MUST be exactly `34 + ciphertext_len`.
+
+The KEK is `agent_memory_key = DeriveSubkey(root_key, "agent-memory-key")` (§3.4), `root_key`-derived, `itemsKey`-independent, **one KEK for the whole family**; per-entry separation comes from the AAD binding below, exactly as one `chats_key` serves every `MYJ1` blob (§9.24).
+
+#### 9.26.2 Inner plaintext (the entry)
+
+A JSON object with two keys (key order is NOT significant; writers emit `text` first and parsers accept either order):
+
+- `text` (string, NFC-normalized, at most 2000 Unicode scalar values after the host's write-time cap): the distilled memory text the model wrote and the user can see and edit. **The host schema enforces the cap and a closed field set at write time** (`decisions.md` 2026-09-10): this codec treats the plaintext as opaque bytes exactly as the chats codec does, and the enforcement is the memory plugin's, so the at-rest bound is the §9.26.4 size cap below.
+- `source_conversation` (string, optional): the writing run's id (dash-stripped UUIDv7, 32 hex) the entry was written during, present only when the entry was model-written (the `remember` verb, `decisions.md` 2026-09-10). A user-authored entry (Settings panel, popover edit) carries no `source_conversation`. Informational: the client renders the originating conversation link from it; readers that do not render it ignore it. Load-bearing since the 2026-09-17 hardening (myne-md/myne#709, `decisions/ai/0591`): the authorship gate reads this link back on every overwrite, and a model write naming a row without one is refused, so model rows must never overwrite user-authored rows.
+
+**Write gates beyond cadence (myne-md/myne#709, `decisions/ai/0591`).** The write re-reads the live `ai_excluded_folders` set against the folders of every note the run read and refuses (`ExcludedSource`) on any match, so exclusion binds the learning surface as well as the read surface. A model create whose text trips the injection scan persists with the catalog row's `quarantined` marker set: listed for user review in the Memory panel, never injected into any run, until a user edit (clean text) clears it. Dirty updates and dirty user creates refuse outright, so clean text is never clobbered by dirty text.
+
+Entries are **mutable whole values, never append-merged**: unlike a conversation's turn list, an entry is one text the agent rewrites or the user edits. The `version` counter that sync races on lives in the catalog record (§9.25), not in this file: an entry file is content-addressed by its id and pushed whenever its bytes change, while causal ordering is the catalog's job. A concurrent same-version write of the SAME entry id is reconciled by the catalog merge's total-order tie-break (the §9.25/§10.2.6 discipline); the per-entry file has no merge of its own, and a pull adopts whichever side the catalog winner points at (the conversation-file cadence: content-addressed by id, catalog owns ordering).
+
+**Write cadence is bounded by the run loop**: at most ONE memory write per agent run (the `remember` verb's own counter in the loop, `decisions.md` 2026-09-10), plus unbounded user-initiated edits through the memory UI. This bounds sync traffic (a memory write rides the same Class-1 blob plane as every other vault content) and bounds how much a single run can change the agent's picture of the user.
+
+**Roster size is bounded by the client layer**: at most 100 live entries (§9.25.3). Writes that would grow the roster past the bound refuse (`EntryLimitReached`); overwriting an existing entry is not growth and stays allowed. Injection carries at most the same 100 rows, newest first, so a roster that grew by sync cannot ride a run without limit either.
+
+#### 9.26.3 AAD construction
+
+`AAD_agent_memory_blob` follows the `MYE1` per-entry pattern with the memory-entry id in the per-entry position:
+
+```
+AAD_agent_memory_blob =
+  AAD_prefix || protocol_version (1 B) || "agent-memory-blob" || memory_entry_id (16 B) || account_number_hash (16 B)
+```
+
+`"agent-memory-blob"` is length-prefixed UTF-8 (2-B big-endian length + 17 ASCII bytes, total 19 bytes); `memory_entry_id` is the 16-byte entry UUIDv7 (also the on-disk filename, hex); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 19 + 16 + 16 = 62 bytes`. Binding both ids prevents substituting one entry's blob for another within the same vault and porting a blob across vaults at the AEAD layer. As with the whole `root_key`-derived family, `items_key_id` is **not** bound.
+
+#### 9.26.4 Size cap, write cadence, and read semantics
+
+Implementations MUST reject `ciphertext_len > 262144 + 32` (256 KiB plaintext cap + 32-byte CTX tag) before allocating (a per-entry blob holds one bounded entry, so this is generous ~100x over the 2000-character text cap and still refuses allocation at the §9.5.4 DoS discipline). An over-cap entry is refused at write time rather than truncated.
+
+Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: an entry file that fails any check (absent from under a live catalog entry, magic/version mismatch, AEAD failure, over-cap, unparseable JSON) surfaces as an error naming the entry. The catalog row MUST NOT be silently dropped in response.
+
+**Deletion** follows the attachments-catalog tombstone discipline: deleting an entry writes the tombstone into its `vault.agent-memory` record (§9.25) and removes the `memories/<id>` file; the tombstone is what syncs (remove-wins over a concurrent edit, the §11.4 catalogue rule), so a delete propagates to every device rather than resurrecting from a peer's copy.
+
+### 9.27 Agent-personality singleton (`vault.personality`, `MYZ1`)
+
+`vault.personality` is a vault-level singleton artifact carrying the **agent-personality block** (`decisions.md` 2026-09-10, myne-md/myne#697): the user's standing voice directives for the AI (tone, length, language preferences, formatting habits). It is Class-1 Authoritative data (`sync-protocol.md` §9): synced, backed up (§9.11.3), addressed by the reserved blob-id `agent_personality_sync_id` (§3.4). It exists **only** when `ai_enabled` is on (§9.25's gate, verbatim).
+
+It is **user-authored only**: the personality blob is written by the Settings surface (and the mobile twin) and never by the agent (no verb writes it; `decisions.md` 2026-09-10). The write path is a whole-value replace, the prefs/themes singleton shape, and its inner plaintext is canonical JSON of one object whose keys are emitted in lexicographic order:
+
+- `directives` (array of objects, at most 32): the ordered voice directives. Per-element keys, lexicographic: `text` (string, NFC-normalized, at most 2000 Unicode scalar values (the same cap the memory entries carry)), `updated_at` (epoch-ms integer). Array order is directive precedence, preserved verbatim (never sorted by any id: there is no id): the agent reads them in order and first-match-wins is the natural reading of an ordered rule list.
+- `personality_format_version` is NOT a plaintext key: it is the header byte at offset 5 (0x01), the singleton-family convention (`chats_catalog_format_version`, §9.23.1).
+
+The object is omitted-when-empty at the file level: a vault whose user never set a personality has no `vault.personality` file at all. A user clearing every directive removes the file.
+
+#### 9.27.1 Outer envelope layout
+
+The header is 34 bytes, identical in shape to `vault.prefs` (§9.5.1) / `vault.themes` (§9.21.1):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 B | magic, ASCII `MYZ1` on a v0.1 vault, `MYZ5` on a v0.2 vault (§10.3; one magic per generation) |
+| 4 | 1 B | `protocol_version` = `0x01` always (the singleton-family envelope convention) |
+| 5 | 1 B | `personality_format_version` = `0x01` (inner schema) |
+| 6 | 24 B | `nonce` (random, §5.3 policy inherited) |
+| 30 | 4 B | `ciphertext_len` (u32 BE) |
+
+Then the CTX-committed XChaCha20-Poly1305 ciphertext of the canonical JSON. Strict-trailing (§10.3.1): total length MUST be exactly `34 + ciphertext_len`.
+
+The KEK is `agent_personality_key = DeriveSubkey(root_key, "agent-personality-key")` (§3.4), `root_key`-derived and `itemsKey`-independent like prefs/search/themes.
+
+#### 9.27.2 AAD construction
+
+`AAD_agent_personality_blob` mirrors `AAD_prefs_blob` exactly, with the role string `"personality-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes, total 18 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the blob to its specific vault. Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. As with prefs/search/themes, `items_key_id` is **not** bound.
+
+#### 9.27.3 Size cap, merge, and read semantics
+
+Implementations MUST reject `ciphertext_len > 262144 + 32` (256 KiB plaintext cap + 32-byte CTX tag) before allocating (the §9.21.4 themes-cap discipline). An over-cap blob is refused at write time rather than truncated.
+
+**Sync merge is whole-value LWW on the canonical encoding** (`sync-protocol.md` §10.2.7): the personality is one coherent voice, so two devices that concurrently edit reconcile by the greater `updated_at` over the WHOLE blob (the themes-palette rule verbatim: never merged directive-by-directive, which would yield an incoherent voice). There is no per-directive clock and no tombstone row: clearing every directive removes the file, and a cleared vault that re-seeds on enrollment adopts the peer's whole blob.
+
+Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: the personality is the standing instruction set the agent's system turn is built from, and an unreadable blob read as absent would, on the next write, persist that absence over a real one. A read failure surfaces as an error naming the artifact.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -2699,9 +2854,12 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Sealed label store (`vault.label`) | `MYL1` | `MYL5` | §9.22 | myne-md/myne#411 |
 | AI conversations catalog (`vault.chats`) | `MYM1` | `MYM5` (allocated, v0.2) | §9.23 | myne-md/myne#675 |
 | AI conversation blob (`chats/<id>`) | `MYJ1` | `MYJ5` (allocated, v0.2) | §9.24 | myne-md/myne#675 |
+| Agent-memory catalog (`vault.agent-memory`) | `MYN1` | `MYN5` (allocated, v0.2) | §9.25 | myne-md/myne#697 |
+| Agent-memory entry blob (`memories/<id>`) | `MYX1` | `MYX5` (allocated, v0.2) | §9.26 | myne-md/myne#697 |
+| Agent-personality singleton (`vault.personality`) | `MYZ1` | `MYZ5` (allocated, v0.2) | §9.27 | myne-md/myne#697 |
 | CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5` and `MYJ5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5`, `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5` and `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic**: it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only**: it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09, the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family). The three agent-layer rows (`MYN1`/`MYN5`, `MYX1`/`MYX5`, `MYZ1`/`MYZ5`) landed with `decisions.md` 2026-09-10 (myne-md/myne#697): `N` = *nMemory* is wrong to claim: `N` names nothing and is a free §10.3 letter, implementer-allocated like every family magic (the §9.20 `MYF1` precedent), as are `X` and `Z`; all three are **v0.1 families** (a v0.1 vault's agent-layer files carry `MYN1`/`MYX1`/`MYZ1`), so their `MY?5` rows are allocated in the same class as `MYM5`/`MYJ5`, and a v0.1→v0.2 migration re-seals them exactly as §10.4.1 re-seals the chats pair. Letters chosen from the free pool at allocation time (`M`-pool leftovers `N`/`X`/`Z` were all free; a later letter change would be a mechanical rename, not a format change, the §9.22 note).
 
 **One row's next-major reservation means something different from every other row's: the sealed label store.** `vault.label` is **generation-independent** (§9.22): it stays `MYL1` inside a v0.2 vault, beside that vault's `NTV5` and `MY?5` neighbours, so `MYL5` is **not** the magic a version cut moves this family to. It is reserved against a future revision of **this family's own** layout, and against nothing else. What lets it be that is the key: the file is sealed under an OS-keychain `wrap_key` rather than any `root_key` product (§9.22.2), so no KDF, KEK context or AAD prefix inherited from the vault ties its bytes to a generation. §10.4.1 point 2 records the migration's matching behaviour, which is that the file is left alone.
 
@@ -2762,7 +2920,7 @@ The migration tool is itself part of the next-major-version client — there is 
 
 1. **The recovery phrase is REQUIRED, not "password or phrase" (closes the §10.4 step-3/step-6 gap).** Step 6 wraps the new v0.2 `root_key` under **both** credentials (password and recovery phrase), and the phrase-derived wrap needs `recovery_wrap_key`, which is derivable **only** from the 24-word phrase (§3.1). A password-only migration would therefore produce a v0.2 vault whose recovery wrap no phrase can open — permanently stranding recovery, in direct violation of the standing commitment that **the recovery phrase is the only recovery path and it is unrevocable/permanent** (§7, `threat-model.md`). A compliant client MUST require the user to enter a **valid** recovery phrase before writing any v0.2 blob, and MUST refuse the migration otherwise with a typed error (the implementation's `RecoveryPhraseRequired`). This is a **backend gate**, not merely a UI affordance — a UI bug must not be able to strand recovery.
 
-2. **Eager / whole-vault, not lazy.** For this cut the client MUST re-encrypt **every note** (→ `NC05` via the §10.7 encode) and re-seal **every synced/persistent singleton** (prefs `MYP5`, themes `MYT5`, dictionary `MYD5`, attachments catalog `MYC5` + blobs `MYA5`) under the new keys with its `MY?5` magic, emitting per-blob progress. The **rebuildable, never-synced caches** (`vault.search`/`.workspace`/`.indices`/`.graph`/`.embeddings`) are **dropped, not re-sealed** — they rebuild on next unlock under the new `root_key` (their KEKs re-derive through the v0.1 `derive_subkey` context on the v0.2 root, which is self-consistent by construction since a cache never crosses a generation boundary — it is written and read only on the migrated vault). §10.4 step 5's "MAY lazy (per-note on first access)" is **not** exercised for the v0.1 → v0.2 cut: the pre-beta fleet is small and controlled (2 founders, 3–5 devices), so a coordinated whole-vault cutover is free and avoids a long-lived mixed-format vault. The transient mixed state exists only *within* the single migration operation, never as a resting state the user lives in.
+2. **Eager / whole-vault, not lazy.** For this cut the client MUST re-encrypt **every note** (→ `NC05` via the §10.7 encode) and re-seal **every synced/persistent singleton** (prefs `MYP5`, themes `MYT5`, dictionary `MYD5`, attachments catalog `MYC5` + blobs `MYA5`, the conversations catalog `MYM5` + per-conversation files `MYJ5`, and, behind the `ai_enabled` gate (present on the vault only when the feature is on), the agent-memory catalog `MYN5` + per-entry files `MYX5` and the personality singleton `MYZ5`, the §9.25 to §9.27 families; an `ai_enabled`-off vault carries none of them and the migration writes none, exactly as it drops the caches that do not exist) under the new keys with its `MY?5` magic, emitting per-blob progress. The **rebuildable, never-synced caches** (`vault.search`/`.workspace`/`.indices`/`.graph`/`.embeddings`) are **dropped, not re-sealed**: they rebuild on next unlock under the new `root_key` (their KEKs re-derive through the v0.1 `derive_subkey` context on the v0.2 root, which is self-consistent by construction since a cache never crosses a generation boundary: it is written and read only on the migrated vault). §10.4 step 5's "MAY lazy (per-note on first access)" is **not** exercised for the v0.1 → v0.2 cut: the pre-beta fleet is small and controlled (2 founders, 3 to 5 devices), so a coordinated whole-vault cutover is free and avoids a long-lived mixed-format vault. The transient mixed state exists only *within* the single migration operation, never as a resting state the user lives in.
 
    **`vault.label` (`MYL1`, §9.22) is neither re-sealed nor dropped: the migration leaves it exactly as it is, and it stays `MYL1` on the migrated vault.** It is device-local and never synced like the caches above, but it is neither rebuildable from the notes nor sealed under anything the re-key touches: its `wrap_key` is an OS-keychain item rather than a `DeriveSubkey(root_key, …)` product (§9.22.2), so the migration has nothing to re-derive and no reason to invalidate it, and the name it holds is unchanged by the cut. This is the same generation-independence a vault **born** v0.2 has (§10.3.1), stated here so the enumeration above is exhaustive: every family in the vault is re-sealed, dropped, or named in this point, and `vault.label` is the one that is left alone.
 

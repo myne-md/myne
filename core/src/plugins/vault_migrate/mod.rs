@@ -33,10 +33,14 @@ use protocol::aead::{ROLE_STR_CUSTOM_THEMES_BLOB, ROLE_STR_PERSONAL_DICT_BLOB};
 use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
-    reseal_attachment_v0_2, reseal_chats_blob_v0_2, reseal_kek_envelope_v0_2, KdfParams,
-    MetaVersion, SubkeyRole, CHATS_CATALOG_BLOB_AAD_ROLE, CHATS_CATALOG_BLOB_MAGIC,
-    CHATS_CATALOG_BLOB_V0_2_MAGIC, DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_V0_2_MAGIC,
-    THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
+    reseal_agent_memory_blob_v0_2, reseal_attachment_v0_2, reseal_chats_blob_v0_2,
+    reseal_kek_envelope_v0_2, KdfParams, MetaVersion, SubkeyRole,
+    AGENT_MEMORY_CATALOG_BLOB_AAD_ROLE, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
+    AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_BLOB_AAD_ROLE,
+    AGENT_PERSONALITY_BLOB_MAGIC, AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CHATS_CATALOG_BLOB_AAD_ROLE,
+    CHATS_CATALOG_BLOB_MAGIC, CHATS_CATALOG_BLOB_V0_2_MAGIC, DICTIONARY_BLOB_MAGIC,
+    DICTIONARY_BLOB_V0_2_MAGIC, MAX_AGENT_MEMORY_CATALOG_PLAINTEXT_LEN,
+    MAX_AGENT_PERSONALITY_PLAINTEXT_LEN, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
 };
 use std::path::Path;
 use zeroize::Zeroizing;
@@ -94,6 +98,31 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         aad_role: CHATS_CATALOG_BLOB_AAD_ROLE,
         kek_role: SubkeyRole::ChatsCatalogKey,
         cap: 4 * 1024 * 1024,
+    },
+    // Agent-memory catalog (MYN1 → MYN5, myne-md/myne#697): same
+    // KEK-envelope re-seal as the other singletons. The per-entry files
+    // (`memories/<id>`) re-seal separately below (they need their entry id
+    // for the AAD, which this table's shape cannot carry).
+    KekSingleton {
+        filename: "vault.agent-memory",
+        old_magic: &AGENT_MEMORY_CATALOG_BLOB_MAGIC,
+        new_magic: &AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC,
+        format_version: 0x01,
+        aad_role: AGENT_MEMORY_CATALOG_BLOB_AAD_ROLE,
+        kek_role: SubkeyRole::AgentMemoryCatalogKey,
+        // The codec's own cap, not a copy of it: a drift between the re-seal
+        // cap and the reader cap strands or truncates (myne-md/myne#697).
+        cap: MAX_AGENT_MEMORY_CATALOG_PLAINTEXT_LEN,
+    },
+    // Agent personality (MYZ1 → MYZ5, myne-md/myne#697): same re-seal.
+    KekSingleton {
+        filename: "vault.personality",
+        old_magic: &AGENT_PERSONALITY_BLOB_MAGIC,
+        new_magic: &AGENT_PERSONALITY_BLOB_V0_2_MAGIC,
+        format_version: 0x01,
+        aad_role: AGENT_PERSONALITY_BLOB_AAD_ROLE,
+        kek_role: SubkeyRole::AgentPersonalityKey,
+        cap: MAX_AGENT_PERSONALITY_PLAINTEXT_LEN,
     },
 ];
 /// A note re-encrypted from `MY01` to `NC05` by the migration.
@@ -505,6 +534,9 @@ const LEGACY_RESTORE_FILES: &[&str] = &[
     "vault.dictionary",
     "vault.prefs",
     "vault.attachments",
+    "vault.chats",
+    "vault.agent-memory",
+    "vault.personality",
 ];
 
 /// Singletons sealed under a `root_key` that is being replaced, by name.
@@ -603,6 +635,13 @@ pub async fn vault_migrate_abort_from_host(
         &vault_root.join("attachments"),
     )
     .await?;
+    // The per-file families the migration re-seals entry by entry (5b chats,
+    // 5b2 memories, myne-md/myne#675 + myne-md/myne#697): without these two
+    // lines an abort restores the catalogs but leaves the live entry files
+    // as undecryptable v0.2 bytes, then deletes the only surviving v0.1
+    // copies with `legacy/`. Absent source dir = no-op by construction.
+    restore_tree(io, &legacy.join("chats"), &vault_root.join("chats")).await?;
+    restore_tree(io, &legacy.join("memories"), &vault_root.join("memories")).await?;
     for name in LEGACY_RESTORE_FILES.iter().filter(|n| **n != "vault.meta") {
         if let Ok(bytes) = io.read(&legacy.join(name)).await {
             io.write(&vault_root.join(name), &bytes, WriteOpts::default())
@@ -1303,6 +1342,52 @@ pub async fn migrate_vault_notes_on_disk(
         }
     }
 
+    // (5b2) Re-seal the agent-memory entry files (`memories/<id-hex>`)
+    //       present on disk: `MYX1` → `MYX5` under the v0.2 memory KEK
+    //       (myne-md/myne#697). The chats (5b) shape verbatim: stage-first,
+    //       skip-dead, sync-ids unchanged (entry ids are client-minted, so no
+    //       stranded-sync-id tombstone is owed).
+    {
+        let memories_dir = vault_root.join("memories");
+        let legacy_memories = legacy.join("memories");
+        let old_memory_key = derive_subkey(old_root_key, SubkeyRole::AgentMemoryKey);
+        let new_memory_key = derive_subkey_v0_2(&out.new_root_key, SubkeyRole::AgentMemoryKey);
+        if let Ok(entries) = io.read_dir(&memories_dir).await {
+            for entry in entries {
+                if entry.is_dir {
+                    continue;
+                }
+                let Some(entry_id) = hex_decode_16_conversation(&entry.name) else {
+                    continue; // stray file: leave it, do not abort
+                };
+                let blob_path = memories_dir.join(&entry.name);
+                let Ok(old_blob) = io.read(&blob_path).await else {
+                    continue;
+                };
+                io.create_dir_all(&legacy_memories).await.map_err(|_| Io)?;
+                io.write(
+                    &legacy_memories.join(&entry.name),
+                    &old_blob,
+                    WriteOpts::default(),
+                )
+                .await
+                .map_err(|_| Io)?;
+                let Ok(resealed) = reseal_agent_memory_blob_v0_2(
+                    &old_blob,
+                    &old_memory_key,
+                    &new_memory_key,
+                    account_number_hash,
+                    &entry_id,
+                ) else {
+                    continue;
+                };
+                io.write(&blob_path, &resealed, WriteOpts::default())
+                    .await
+                    .map_err(|_| Io)?;
+            }
+        }
+    }
+
     // (5c) Drop the rebuildable / device-local caches and the quick-unlock
     //      credential. Each is either reconstructable from the notes (search,
     //      indices, graph, embeddings), device-local editor state (workspace), or
@@ -1384,7 +1469,8 @@ async fn rebase_sync_plane_after_rekey(
     new_root_key: &[u8; 32],
 ) {
     use crate::plugins::sync::orchestrator::{
-        catalog_sync_id, chats_catalog_sync_id, prefs_sync_id, themes_sync_id,
+        agent_memory_catalog_sync_id, agent_personality_sync_id, catalog_sync_id,
+        chats_catalog_sync_id, prefs_sync_id, themes_sync_id,
     };
     use crate::plugins::sync::state::{mark_vault_meta_dirty, read_sync_state, write_sync_state};
 
@@ -1409,6 +1495,12 @@ async fn rebase_sync_plane_after_rekey(
         // the client-minted conversation ids, not root_key derivations, so a
         // re-key does not strand them.
         chats_catalog_sync_id(old_root_key),
+        // The agent-memory catalog + personality (myne-md/myne#697): same
+        // root_key-derived sync-id shape, so the same orphan tombstone. The
+        // per-entry files do NOT appear here: their sync blob-ids are the
+        // client-minted entry ids, not root_key derivations.
+        agent_memory_catalog_sync_id(old_root_key),
+        agent_personality_sync_id(old_root_key),
     ] {
         let hex = crate::plugins::sync::to_hex(&id);
         // Queue the tombstone BEFORE dropping the baseline (#443): the removal
@@ -2187,6 +2279,27 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            // Agent-memory + personality seed (myne-md/myne#697): the abort
+            // must restore these families byte-identical, or the live MYN5 /
+            // MYX5 / MYZ5 files strand under the restored v0.1 meta and the
+            // only surviving v0.1 copies die with legacy/.
+            let seeded = seed_v0_1_singletons(&io, &vault_root).await;
+            let original_memory_catalog = io
+                .read(&vault_root.join("vault.agent-memory"))
+                .await
+                .unwrap();
+            let original_memory_entry = io
+                .read(
+                    &vault_root
+                        .join("memories")
+                        .join(&seeded.memory_entry_id_hex),
+                )
+                .await
+                .unwrap();
+            let original_personality = io
+                .read(&vault_root.join("vault.personality"))
+                .await
+                .unwrap();
             vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
                 .await
                 .expect("migration succeeds");
@@ -2222,6 +2335,31 @@ mod tests {
                 io.read(&snapshots.join(snap_name)).await.unwrap(),
                 original_note,
                 "the snapshot must come back too"
+            );
+            assert_eq!(
+                io.read(&vault_root.join("vault.agent-memory"))
+                    .await
+                    .unwrap(),
+                original_memory_catalog,
+                "the memory catalog must come back as the original MYN1 bytes"
+            );
+            assert_eq!(
+                io.read(
+                    &vault_root
+                        .join("memories")
+                        .join(&seeded.memory_entry_id_hex)
+                )
+                .await
+                .unwrap(),
+                original_memory_entry,
+                "the memory entry must come back as the original MYX1 bytes"
+            );
+            assert_eq!(
+                io.read(&vault_root.join("vault.personality"))
+                    .await
+                    .unwrap(),
+                original_personality,
+                "the personality must come back as the original MYZ1 bytes"
             );
             assert!(
                 io.read(&vault_root.join("legacy/vault.meta"))
@@ -2370,6 +2508,16 @@ mod tests {
         chats_conv_id_hex: String,
         /// The exact turn-list payload the `MYJ1` file wrapped.
         chats_turns_payload: Vec<u8>,
+        /// The `MYN1` memory catalog: one live row (myne-md/myne#697).
+        memory_catalog_plaintext: Vec<u8>,
+        /// The live memory entry's client-minted id (stable across the re-key).
+        memory_entry_id: [u8; 16],
+        /// …and its lowercase-hex form, which is the `memories/` filename.
+        memory_entry_id_hex: String,
+        /// The exact entry plaintext the `MYX1` file wrapped.
+        memory_entry_plaintext: Vec<u8>,
+        /// The exact directives JSON the `MYZ1` file wrapped.
+        personality_plaintext: Vec<u8>,
     }
 
     /// Seed the v0.1 shape of every family the note pass does not touch:
@@ -2547,6 +2695,66 @@ mod tests {
         .await
         .unwrap();
 
+        // vault.agent-memory (MYN1) under the OLD AgentMemoryCatalogKey: one
+        // live row. memories/<id-hex> (MYX1) under the OLD AgentMemoryKey:
+        // its distilled text. vault.personality (MYZ1) under the OLD
+        // AgentPersonalityKey (myne-md/myne#697).
+        let memory_entry_id = [0xD0u8; 16];
+        let memory_entry_id_hex = hex_encode(&memory_entry_id[..]);
+        let memory_catalog_plaintext =
+            br#"{"0184a2b3c4d5e6f708192a3b4c5d6e7f":{"created_at":1725417600000,"updated_at":1725417600000,"version":3}}"#
+                .to_vec();
+        let old_memory_catalog_kek = derive_subkey(&OLD_ROOT, SubkeyRole::AgentMemoryCatalogKey);
+        let memory_catalog_blob = protocol::encode_agent_memory_catalog_blob(
+            &old_memory_catalog_kek,
+            &ACCT,
+            &memory_catalog_plaintext,
+        )
+        .expect("seed MYN1");
+        io.write(
+            &vault_root.join("vault.agent-memory"),
+            &memory_catalog_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+        let memory_entry_plaintext = br#"{"text":"The user prefers concise answers."}"#.to_vec();
+        let old_memory_key = derive_subkey(&OLD_ROOT, SubkeyRole::AgentMemoryKey);
+        let memory_file_blob = protocol::encode_agent_memory_blob(
+            &old_memory_key,
+            &ACCT,
+            &memory_entry_id,
+            &memory_entry_plaintext,
+        )
+        .expect("seed MYX1");
+        io.create_dir_all(&vault_root.join("memories"))
+            .await
+            .unwrap();
+        io.write(
+            &vault_root.join("memories").join(&memory_entry_id_hex),
+            &memory_file_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+        let personality_plaintext =
+            br#"{"directives":[{"text":"Keep answers short.","updated_at":1725417600000}]}"#
+                .to_vec();
+        let old_personality_kek = derive_subkey(&OLD_ROOT, SubkeyRole::AgentPersonalityKey);
+        let personality_blob = protocol::encode_agent_personality_blob(
+            &old_personality_kek,
+            &ACCT,
+            &personality_plaintext,
+        )
+        .expect("seed MYZ1");
+        io.write(
+            &vault_root.join("vault.personality"),
+            &personality_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
         SeededV0_1 {
             themes_plaintext,
             prefs,
@@ -2559,6 +2767,11 @@ mod tests {
             chats_conv_id,
             chats_conv_id_hex,
             chats_turns_payload,
+            memory_catalog_plaintext,
+            memory_entry_id,
+            memory_entry_id_hex,
+            memory_entry_plaintext,
+            personality_plaintext,
         }
     }
 
@@ -2637,8 +2850,8 @@ mod tests {
             // A dropped leg shows up here before any of the per-family
             // assertions below.
             assert_eq!(
-                summary.singletons_migrated, 5,
-                "themes + dictionary + chats-catalog + prefs + attachments-catalog"
+                summary.singletons_migrated, 7,
+                "themes + dictionary + chats-catalog + memory-catalog + personality + prefs + attachments-catalog"
             );
 
             let (new_root, new_items, new_items_key_id) =
@@ -2739,6 +2952,106 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(&legacy_conv[0..4], b"MYJ1");
+
+            // ── vault.agent-memory: MYN5 under derive_subkey_v0_2(new_root,
+            // AgentMemoryCatalogKey) (myne-md/myne#697). The roster passes
+            // through opaquely; the causal version survives.
+            let new_memory_catalog_kek =
+                derive_subkey_v0_2(&new_root, SubkeyRole::AgentMemoryCatalogKey);
+            let memory_catalog = io
+                .read(&vault_root.join("vault.agent-memory"))
+                .await
+                .unwrap();
+            assert_eq!(
+                &memory_catalog[0..4],
+                b"MYN5",
+                "memory catalog must land in the v0.2 family"
+            );
+            let memory_roster_plaintext = protocol::decode_agent_memory_catalog_blob_versioned(
+                protocol::MetaVersion::V0_2,
+                &new_memory_catalog_kek,
+                &ACCT,
+                &memory_catalog,
+            )
+            .expect("MYN5 decodes under the v0.2 memory-catalog KEK");
+            assert_eq!(
+                memory_roster_plaintext.as_slice(),
+                seeded.memory_catalog_plaintext.as_slice(),
+                "the memory roster survived the re-key byte-exact"
+            );
+            let legacy_memory_catalog = io
+                .read(&vault_root.join("legacy/vault.agent-memory"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_memory_catalog[0..4], b"MYN1");
+
+            // ── memories/<id>: MYX5 under derive_subkey_v0_2(new_root,
+            // AgentMemoryKey). Stage-first, skip-dead; the distilled text
+            // passes through opaquely.
+            let new_memory_key = derive_subkey_v0_2(&new_root, SubkeyRole::AgentMemoryKey);
+            let mem_path = vault_root
+                .join("memories")
+                .join(&seeded.memory_entry_id_hex);
+            let mem_blob = io.read(&mem_path).await.unwrap();
+            assert_eq!(
+                &mem_blob[0..4],
+                b"MYX5",
+                "memory entry must land in the v0.2 family"
+            );
+            let mem_plaintext = protocol::decode_agent_memory_blob_versioned(
+                protocol::MetaVersion::V0_2,
+                &new_memory_key,
+                &ACCT,
+                &seeded.memory_entry_id,
+                &mem_blob,
+            )
+            .expect("MYX5 decodes under the v0.2 memory KEK");
+            assert_eq!(
+                mem_plaintext.as_slice(),
+                seeded.memory_entry_plaintext.as_slice(),
+                "the entry text survived the re-key byte-exact"
+            );
+            let legacy_mem = io
+                .read(
+                    &vault_root
+                        .join("legacy/memories")
+                        .join(&seeded.memory_entry_id_hex),
+                )
+                .await
+                .unwrap();
+            assert_eq!(&legacy_mem[0..4], b"MYX1");
+
+            // ── vault.personality: MYZ5 under derive_subkey_v0_2(new_root,
+            // AgentPersonalityKey). Whole-value singleton; the directives pass
+            // through opaquely.
+            let new_personality_kek =
+                derive_subkey_v0_2(&new_root, SubkeyRole::AgentPersonalityKey);
+            let personality = io
+                .read(&vault_root.join("vault.personality"))
+                .await
+                .unwrap();
+            assert_eq!(
+                &personality[0..4],
+                b"MYZ5",
+                "personality must land in the v0.2 family"
+            );
+            let personality_plaintext = protocol::decode_agent_personality_blob_versioned(
+                protocol::MetaVersion::V0_2,
+                &new_personality_kek,
+                &ACCT,
+                &personality,
+            )
+            .expect("MYZ5 decodes under the v0.2 personality KEK");
+            assert_eq!(
+                personality_plaintext.as_slice(),
+                seeded.personality_plaintext.as_slice(),
+                "the directives survived the re-key byte-exact"
+            );
+            let legacy_personality = io
+                .read(&vault_root.join("legacy/vault.personality"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_personality[0..4], b"MYZ1");
 
             // ── vault.prefs: MYP5 under derive_subkey_v0_2(new_root, PrefsKey)
             let old_prefs_kek = derive_subkey(&OLD_ROOT, SubkeyRole::PrefsKey);
@@ -3039,9 +3352,9 @@ mod tests {
             .await
             .expect("a corrupt catalog must not abort the whole migration");
 
-            // themes + dictionary + prefs + chats-catalog re-sealed; the
-            // attachments catalog did not.
-            assert_eq!(summary.singletons_migrated, 4);
+            // themes + dictionary + prefs + chats-catalog + memory-catalog +
+            // personality re-sealed; the attachments catalog did not.
+            assert_eq!(summary.singletons_migrated, 6);
 
             // Both blobs — the live one AND the tombstoned leftover — are in
             // legacy/, byte-identical, because without the catalog neither can be
@@ -3125,9 +3438,9 @@ mod tests {
             .await
             .expect("an undecodable prefs blob must not abort the migration");
 
-            // themes + dictionary + catalog + chats-catalog re-sealed;
-            // prefs did not.
-            assert_eq!(summary.singletons_migrated, 4);
+            // themes + dictionary + catalog + chats-catalog + memory-catalog +
+            // personality re-sealed; prefs did not.
+            assert_eq!(summary.singletons_migrated, 6);
 
             // The old bytes are staged AND left in place, unreadable under v0.2.
             assert_eq!(

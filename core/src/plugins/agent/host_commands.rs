@@ -539,6 +539,10 @@ pub struct AgentStepResult {
     /// How many notes the `ai_excluded_folders` clamp removed from the grant
     /// that produced this step. Shown on the approval screen.
     pub excluded_count: usize,
+    /// How many memory entries this step wrote (0 or 1). Feeds the turn-end
+    /// marker the chat renders (myne-md/myne#697): a run that wrote memory
+    /// says so on its turn.
+    pub memory_updated: usize,
 }
 
 /// Refuse unless AI is switched on, read from the vault's own prefs.
@@ -660,6 +664,12 @@ pub async fn step<R: Runtime>(
     // what let this whole function move here rather than be copied.
     engine: &dyn AgentEngine,
     searcher: &dyn ScopeSearcher,
+    // **The third seam a client supplies for itself** (myne-md/myne#697):
+    // the run's memory store. `None` when the surface is unavailable (no
+    // `ai_enabled` on this device): the verb then answers with a
+    // model-readable refusal instead of failing the run. Taken as a trait
+    // object like the engine and the searcher above.
+    memory: Option<&dyn crate::plugins::agent::memory::MemoryStore>,
     _cancel: Arc<AtomicBool>,
     excluded_count: usize,
     on_progress: Channel<RunProgress>,
@@ -745,6 +755,7 @@ pub async fn step<R: Runtime>(
         searcher,
         records: &records,
         exclusions: &exclusions,
+        memory,
         language: language.as_deref(),
         history: &history,
         on_progress: &report,
@@ -853,6 +864,7 @@ pub async fn step<R: Runtime>(
         notes_read: outcome.notes_read,
         chars_off_device: outcome.chars_off_device,
         excluded_count,
+        memory_updated: outcome.memory_writes,
     })
 }
 

@@ -2367,7 +2367,10 @@ function EditorChrome({
             onToggleCollapse={layout.toggleRightCollapsed}
             resizeLabel={t("editor.chrome.resizeBacklinksSidebar")}
           >
-            <RightSidebar />
+            <RightSidebar
+              onOpenSettings={() => setSettingsOpen(true)}
+              onShowToast={(message) => showToastMessage(message)}
+            />
           </SidebarPane>
         )}
       </div>
@@ -4435,7 +4438,13 @@ function WorkspaceHotkeys({
  *  memo miss does not hand the composer a fresh array identity per render. */
 const EMPTY_FOLDERS: readonly string[] = [];
 
-function RightSidebar() {
+function RightSidebar({
+  onOpenSettings,
+  onShowToast,
+}: {
+  onOpenSettings?: () => void;
+  onShowToast?: (message: string) => void;
+}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const notes = useResolverNotes();
@@ -4668,6 +4677,8 @@ function RightSidebar() {
           <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
+            onOpenSettings={onOpenSettings}
+            onShowToast={onShowToast}
             // The automatic-apply path writes out of band of any pane's own
             // autosave loop, exactly as the manual one does, so it owes the
             // same reload (myne-md/myne#551).

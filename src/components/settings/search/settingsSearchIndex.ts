@@ -766,6 +766,24 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.ai.excludedHelper",
     keywordsKey: "settings.search.keywords.aiExcluded",
   },
+  {
+    id: "ai.memory",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.memory.heading",
+    descriptionKey: "settings.memory.helper",
+    keywordsKey: "settings.search.keywords.aiMemory",
+  },
+  {
+    id: "ai.personality",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.memory.personalityLabel",
+    descriptionKey: "settings.memory.personalityPlaceholder",
+    keywordsKey: "settings.search.keywords.aiMemory",
+  },
 
   // ── Network (Developer group, MYND-650) ────────────────────────────────────
   {

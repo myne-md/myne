@@ -33,9 +33,12 @@ use protocol::{
     compute_manifest_hash, derive_subkey, derive_subkey_versioned,
     encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
     AttachmentsCatalog, ManifestEntry, MetaVersion, SubkeyRole, VaultHead, VvEntry,
-    CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC, CHATS_BLOB_MAGIC, CHATS_BLOB_V0_2_MAGIC,
-    CHATS_CATALOG_BLOB_MAGIC, CHATS_CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC,
-    PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
+    AGENT_MEMORY_BLOB_MAGIC, AGENT_MEMORY_BLOB_V0_2_MAGIC, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
+    AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_BLOB_MAGIC,
+    AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC,
+    CHATS_BLOB_MAGIC, CHATS_BLOB_V0_2_MAGIC, CHATS_CATALOG_BLOB_MAGIC,
+    CHATS_CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC,
+    THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -101,6 +104,18 @@ pub struct SyncSummary {
     /// a peer. Reported for the same reason as `themes_applied_remote` (the
     /// WebView re-reads the roster over IPC on demand).
     pub chats_applied_remote: bool,
+    /// Memory entry files downloaded + written to `memories/` this cycle
+    /// (myne-md/myne#697, the `attachments_pulled` shape for the memory plane).
+    pub memory_entries_pulled: usize,
+    /// A remote memory-catalog change was merged onto the on-disk roster this
+    /// cycle (myne-md/myne#697). Reported for the same reason as
+    /// `chats_applied_remote` (the WebView re-reads the roster over IPC).
+    pub memory_applied_remote: bool,
+    /// A remote personality change was merged onto the on-disk singleton this
+    /// cycle (myne-md/myne#697). Reported for the same reason: the settings
+    /// surface re-reads it over IPC, and a silent peer-applied voice change
+    /// is otherwise invisible.
+    pub personality_applied_remote: bool,
 
     /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
     /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
@@ -870,6 +885,114 @@ fn chats_catalog_file_path(vault_root: &Path) -> std::path::PathBuf {
 /// `<vault>/chats`: the MYJ1 per-conversation files directory.
 fn chats_dir(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("chats")
+}
+
+/// `vault.agent-memory`'s reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "agent-memory-catalog-sync-id")[0..16]`
+/// (`protocol.md` § 3.4, myne-md/myne#697): the `chats_catalog_sync_id`
+/// twin.
+pub fn agent_memory_catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::AgentMemoryCatalogSyncId)
+}
+
+/// The agent-memory-catalog blob's sync discriminator
+/// (`read_singleton_nonce` over MYN1/MYN5 (both generations, the § 10.4.1
+/// envelope convention: the nonce sits at the same offset in both, so one
+/// reader covers the family. Accepting only v0.1 would make every reader
+/// `None` on a migrated vault (myne-md/myne#638).
+fn read_agent_memory_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(
+        bytes,
+        &AGENT_MEMORY_CATALOG_BLOB_MAGIC,
+        &[&AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC],
+    )
+}
+
+/// A memory-entry file's sync discriminator (`read_singleton_nonce` over
+/// MYX1/MYX5, both generations, same envelope, same offset). The nonce
+/// carries the per-entry change, and an unchanged outer nonce proves the
+/// file untouched since the last sync (no decrypt needed).
+fn read_agent_memory_blob_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(
+        bytes,
+        &AGENT_MEMORY_BLOB_MAGIC,
+        &[&AGENT_MEMORY_BLOB_V0_2_MAGIC],
+    )
+}
+
+/// `vault.personality`'s reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "agent-personality-sync-id")[0..16]`
+/// (`protocol.md` § 3.4, myne-md/myne#697): the `themes_sync_id` twin.
+pub fn agent_personality_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::AgentPersonalitySyncId)
+}
+
+/// The personality blob's sync discriminator (`read_singleton_nonce` over
+/// MYZ1/MYZ5, both generations, the same envelope convention).
+fn read_personality_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(
+        bytes,
+        &AGENT_PERSONALITY_BLOB_MAGIC,
+        &[&AGENT_PERSONALITY_BLOB_V0_2_MAGIC],
+    )
+}
+
+/// Greatest `updated_at` over a DECODED personality plaintext
+/// (`{"directives":[{text, updated_at}, …]}`), the whole-value LWW key
+/// (§10.2.7). Unparseable input reads as 0: the merge only calls this on
+/// bytes that already decrypted, so 0 means "empty voice", never "skip".
+fn personality_max_updated_at(plaintext: &[u8]) -> u64 {
+    serde_json::from_slice::<serde_json::Value>(plaintext)
+        .ok()
+        .and_then(|v| {
+            v.get("directives")?
+                .as_array()?
+                .iter()
+                .filter_map(|d| d.get("updated_at")?.as_u64())
+                .max()
+        })
+        .unwrap_or(0)
+}
+
+/// `<vault>/vault.agent-memory`: the MYN1 agent-memory catalog singleton.
+fn agent_memory_catalog_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.agent-memory")
+}
+
+/// `<vault>/memories`: the MYX1 per-entry memory files directory.
+fn memories_dir(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("memories")
+}
+
+/// `<vault>/vault.personality`: the MYZ1 personality singleton.
+fn personality_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.personality")
+}
+
+/// The per-device `ai_enabled` gate for the memory plane (sync-protocol.md
+/// §10.2.6/§10.2.7): a device with the opt-in off runs no memory phase and
+/// pushes/pulls nothing for these ids. Read off the live `vault.prefs` at
+/// scan time (the prefs phase may rewrite it later in the cycle, but the opt-in
+/// is device-local and never merged, so the scan-time read cannot go stale
+/// within a cycle). §9.5.5 read semantic: any decode failure falls back to
+/// defaults, whose `ai_enabled` is off. An unreadable prefs file gates the
+/// plane closed, never open.
+async fn memory_sync_enabled(
+    io: &dyn crate::vault_io::VaultIo,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    version: MetaVersion,
+) -> bool {
+    let prefs_key = derive_subkey_versioned(version, root_key, SubkeyRole::PrefsKey);
+    io.read(&vault_root.join("vault.prefs"))
+        .await
+        .ok()
+        .and_then(|b| {
+            protocol::decode_prefs_blob_versioned(version, &prefs_key, account_number_hash, &b).ok()
+        })
+        .map(|view| view.ai_enabled)
+        .unwrap_or(false)
 }
 
 // NOTE: conversation deletions reclaim their server copy through the
@@ -2034,6 +2157,636 @@ async fn sync_chats_phase(
     })
 }
 
+// ---------------------------------------------------------------------------
+// agent-memory catalog phase (myne-md/myne#697, sync-protocol.md §10.2.6)
+// ---------------------------------------------------------------------------
+
+/// The memory phase's outcome (the `ChatsPhase` twin, minus the fall-back arm).
+struct MemoryPhase {
+    /// The post-merge catalog (== the on-disk catalog when this returns).
+    merged: crate::plugins::memory::commands::MemoryCatalogMap,
+    /// The catalog needs a push (local-only change, or a merge that differed
+    /// from the server's plaintext).
+    dirty: bool,
+    /// A remote change was merged onto the on-disk catalog this cycle.
+    applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty`:
+    /// the myne#436 single-derivation discipline (the push site never
+    /// re-derives the KEK).
+    push_bytes: Option<Vec<u8>>,
+    /// The memory plane was refused this cycle (unreadable local catalog, or
+    /// a verified remote record that failed schema parse): no reconciliation
+    /// ran, nothing is dirty, nothing pushes. Scoped here rather than
+    /// aborting the whole cycle, exactly like the chats refusal.
+    skipped: bool,
+    /// The pre-merge local row versions (id-hex → version, absent = no local
+    /// row): the entry loop's both-changed arbiter. The merged row whose
+    /// version differs from the local one is the remote winner (adopt its
+    /// file); a merged row at the local version is the local winner (push our
+    /// file). Deterministic on both sides because both compute the same merge
+    /// and each compares against its own pre-merge row.
+    local_versions: BTreeMap<String, u64>,
+}
+
+/// The one refused outcome every `sync_memory_phase` refusal arm returns.
+fn skipped_memory_phase() -> MemoryPhase {
+    MemoryPhase {
+        merged: crate::plugins::memory::commands::MemoryCatalogMap::default(),
+        dirty: false,
+        applied_remote: false,
+        push_bytes: None,
+        skipped: true,
+        local_versions: BTreeMap::new(),
+    }
+}
+
+/// Pull-side `vault.agent-memory` reconciliation (myne-md/myne#697). The
+/// `sync_chats_phase` twin, minus the fall-back-to-empty arm: memory is
+/// load-bearing user content, so the read semantic is report-don't-empty
+/// (§ 9.25.3) and the catalog phase MUST behave accordingly. Behind the
+/// per-device `ai_enabled` gate: a device with the opt-in off runs no memory
+/// phase at all (the caller checks before invoking; this function assumes the
+/// gate passed).
+///
+/// `merged == remote_map` comparison is on the DECODED maps (not bytes): the
+/// local re-encode of an identical map is byte-identical under the canonical
+/// JSON, so no spurious dirty.
+///
+/// Holds the memory plugin's write mutex across the read-merge-write: the
+/// CALLER takes it before invoking this phase and holds it through the entry
+/// loop that follows (ONE critical section, taken at the call site because a
+/// tokio Mutex is not reentrant; shared with the plugin commands).
+#[allow(clippy::too_many_arguments)]
+async fn sync_memory_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    memory_catalog_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
+) -> Result<MemoryPhase, SyncCycleError> {
+    use crate::plugins::memory::commands::MemoryCatalogMap;
+    use protocol::{
+        decode_agent_memory_catalog_blob_versioned, encode_agent_memory_catalog_blob_versioned,
+    };
+
+    let memory_catalog_key =
+        derive_subkey_versioned(version, root_key, SubkeyRole::AgentMemoryCatalogKey);
+
+    // Read + decode the local catalog. A refusal (unreadable store) degrades
+    // to a skipped phase: no reconciliation this cycle, nothing pushed, the
+    // rest of sync proceeds. Never-merge-over-unreadable holds by
+    // construction.
+    let path = agent_memory_catalog_file_path(vault_root);
+    let local_bytes: Option<Vec<u8>> = match crate::singleton::open_newest_and_sweep(
+        io,
+        &path,
+        |bytes| {
+            decode_agent_memory_catalog_blob_versioned(
+                version,
+                &memory_catalog_key,
+                account_number_hash,
+                bytes,
+            )
+            .map(|_| ())
+        },
+    )
+    .await
+    {
+        Ok(()) => match io.read(&path).await {
+            Ok(bytes) => Some(bytes),
+            Err(kind) => {
+                tracing::warn!(
+                    stage = "memory-catalog",
+                    io_failure_kind = ?kind,
+                    "local agent-memory catalog re-read failed after a successful sweep; skipping the memory plane this cycle"
+                );
+                return Ok(skipped_memory_phase());
+            }
+        },
+        Err(crate::singleton::OpenOutcome::Absent) => None,
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => {
+            tracing::warn!(
+                stage = "memory-catalog",
+                "local agent-memory catalog is unreadable; skipping the memory plane this cycle"
+            );
+            return Ok(skipped_memory_phase());
+        }
+        Err(crate::singleton::OpenOutcome::Io(kind)) => {
+            tracing::warn!(
+                stage = "memory-catalog",
+                io_failure_kind = ?kind,
+                "local agent-memory catalog read failed; skipping the memory plane this cycle"
+            );
+            return Ok(skipped_memory_phase());
+        }
+    };
+    let decode_map = |bytes: Option<&[u8]>| -> Result<MemoryCatalogMap, ()> {
+        match bytes {
+            None => Ok(MemoryCatalogMap::default()),
+            Some(b) => {
+                let plaintext = decode_agent_memory_catalog_blob_versioned(
+                    version,
+                    &memory_catalog_key,
+                    account_number_hash,
+                    b,
+                )
+                .map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ())
+            }
+        }
+    };
+    let local_map = match decode_map(local_bytes.as_deref()) {
+        Ok(map) => map,
+        Err(()) => {
+            tracing::warn!(
+                stage = "memory-catalog",
+                "local agent-memory catalog does not parse; skipping the memory plane this cycle"
+            );
+            return Ok(skipped_memory_phase());
+        }
+    };
+    let local_nonce = local_bytes
+        .as_deref()
+        .and_then(read_agent_memory_catalog_nonce);
+    let local_versions: BTreeMap<String, u64> = local_map
+        .iter()
+        .map(|(k, row)| (k.clone(), row.version))
+        .collect();
+
+    let id_hex = hex(memory_catalog_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+
+    // §11.3 gate: an unverified remote adoption MUST NOT write over the live
+    // catalog.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_agent_memory_catalog_nonce,
+        "memory-catalog",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        let remote_map: MemoryCatalogMap = match decode_agent_memory_catalog_blob_versioned(
+            version,
+            &memory_catalog_key,
+            account_number_hash,
+            &remote_bytes,
+        ) {
+            Ok(plaintext) => match serde_json::from_slice(&plaintext) {
+                Ok(map) => map,
+                Err(_) => {
+                    tracing::warn!(
+                        stage = "memory-catalog",
+                        "verified remote agent-memory catalog does not parse;                          skipping the memory plane this cycle"
+                    );
+                    return Ok(skipped_memory_phase());
+                }
+            },
+            Err(_) => {
+                tracing::warn!(
+                    stage = "memory-catalog",
+                    "verified remote agent-memory catalog does not decrypt;                      skipping the memory plane this cycle"
+                );
+                return Ok(skipped_memory_phase());
+            }
+        };
+        let merged = crate::plugins::sync::conflict::merge_memory_catalog(&local_map, &remote_map);
+        let applied_remote = merged != local_map;
+
+        let (bytes, dirty) = if merged == remote_map {
+            // Adopt the server bytes VERBATIM: byte-identical store +
+            // baseline == server (version, nonce); nothing to push.
+            (remote_bytes, false)
+        } else {
+            let plaintext = serde_json::to_vec(&merged).map_err(|_| SyncCycleError::Io)?;
+            let sealed = encode_agent_memory_catalog_blob_versioned(
+                version,
+                &memory_catalog_key,
+                account_number_hash,
+                &plaintext,
+            )
+            .map_err(|_| SyncCycleError::Io)?;
+            (sealed, true)
+        };
+        io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        record_blob_baseline(state, &id_hex, &rec);
+        return Ok(MemoryPhase {
+            merged,
+            dirty,
+            applied_remote,
+            push_bytes: dirty.then_some(bytes),
+            skipped: false,
+            local_versions,
+        });
+    }
+
+    // No (changed) remote catalog: dirty iff the local file drifted from the
+    // synced baseline. A virgin no-memories vault (no file, no baseline) is
+    // deliberately NOT pushed: memory-silent by default.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    let dirty = local_bytes.is_some()
+        && local_nonce_hex != baseline_nonce_hex
+        && !(baseline_nonce_hex.is_none() && local_map.is_empty());
+    Ok(MemoryPhase {
+        merged: local_map,
+        dirty,
+        applied_remote: false,
+        push_bytes: if dirty { local_bytes } else { None },
+        skipped: false,
+        local_versions,
+    })
+}
+
+/// The outcome of one entry-file reconcile: what the cycle must push (if
+/// anything) and the remote record this merge reconciled, if any (its version
+/// is the CAS base; its nonce is the baseline either way).
+#[derive(Debug)]
+struct MemoryEntryPhase {
+    /// The merged store was written this cycle and differs from the server's
+    /// plaintext: push these exact bytes (myne#436 single-derivation: the
+    /// push site never re-derives the KEK).
+    push_bytes: Option<Vec<u8>>,
+    /// The remote record this merge reconciled, if any.
+    remote: Option<ChangedBlob>,
+}
+
+/// Pull-side reconcile of ONE per-entry file (`memories/<id-hex>`, `MYX1`,
+/// § 9.26 + `sync-protocol.md` § 10.2.6). Called for every live catalog row
+/// (after the catalog phase merged) under the memory plugin's write mutex.
+/// Adopt-by-catalog-winner: the catalog merge already decided per-id which
+/// side's row won, so bodies are never content-merged (unlike conversation
+/// turns):
+///
+/// - No remote change: the file is verified-nonce-clean or left alone.
+/// - Remote change, local clean: verified download → adopt verbatim.
+/// - Local dirty, remote unchanged: push the local bytes.
+/// - Both changed: the catalog winner decides (`remote_wins`, computed by the
+///   caller from the merged row version against the pre-merge local one).
+///   A tie (both bumped to the same version) reads as a local win on both
+///   sides; both push, one 409s, the loser adopts next cycle, one extra
+///   round-trip, still convergent on a last-writer-wins server.
+///
+/// Absent and unreadable are different answers: a file that exists but cannot
+/// be read refuses this reconcile for the cycle, never merges as empty (which
+/// would adopt the remote bytes over an entry that never reached the server).
+#[allow(clippy::too_many_arguments)]
+async fn sync_memory_entry_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    entry_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    remote_wins: bool,
+    version: MetaVersion,
+) -> Result<MemoryEntryPhase, SyncCycleError> {
+    use protocol::decode_agent_memory_blob_versioned;
+
+    let memory_key = derive_subkey_versioned(version, root_key, SubkeyRole::AgentMemoryKey);
+
+    let id_hex = hex(entry_id);
+    let path = memories_dir(vault_root).join(&id_hex);
+
+    let local_bytes: Option<Vec<u8>> = match io.read(&path).await {
+        Ok(bytes) => Some(bytes),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => None,
+        Err(_) => return Err(SyncCycleError::Io),
+    };
+    let local_nonce = local_bytes
+        .as_deref()
+        .and_then(read_agent_memory_blob_nonce);
+
+    let baseline_nonce_hex = state_baseline_nonce(state, &id_hex);
+    let local_dirty = local_bytes.is_some()
+        && baseline_nonce_hex.is_some()
+        && local_nonce.map(|n| hex(&n)) != baseline_nonce_hex;
+
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_agent_memory_blob_nonce,
+        "memory-entry",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        // The remote bytes verified against the record: they must still
+        // decode as an entry file (a verified-but-undecodable payload is a
+        // refusal, never an adoption).
+        if decode_agent_memory_blob_versioned(
+            version,
+            &memory_key,
+            account_number_hash,
+            entry_id,
+            &remote_bytes,
+        )
+        .is_err()
+        {
+            tracing::warn!(
+                stage = "memory-entry",
+                "verified remote memory entry does not decrypt; skipping it for this cycle"
+            );
+            return Err(SyncCycleError::Io);
+        }
+        let take_remote = !local_dirty || remote_wins;
+        if take_remote {
+            io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
+            return Ok(MemoryEntryPhase {
+                push_bytes: None,
+                remote: Some(rec),
+            });
+        }
+        // Local winner: keep our file; the push arm carries it below.
+        return Ok(MemoryEntryPhase {
+            push_bytes: local_bytes,
+            remote: Some(rec),
+        });
+    }
+
+    // No (changed) remote entry: push iff locally dirty.
+    Ok(MemoryEntryPhase {
+        push_bytes: if local_dirty { local_bytes } else { None },
+        remote: None,
+    })
+}
+
+/// The synced-baseline nonce for one blob-plane id, as an owned hex string
+/// (the entry phase's dirty rule needs it by value; the call sites that hold
+/// `state` borrows keep their own shape).
+fn state_baseline_nonce(state: &SyncState, id_hex: &str) -> Option<String> {
+    state.blobs.get(id_hex).map(|b| b.content_nonce_hex.clone())
+}
+
+// ---------------------------------------------------------------------------
+// personality singleton phase (myne-md/myne#697, sync-protocol.md §10.2.7)
+// ---------------------------------------------------------------------------
+
+/// The personality phase's outcome (the themes-shape singleton phase).
+struct PersonalityPhase {
+    /// The post-merge blob (== the on-disk blob when this returns).
+    merged: Option<Vec<u8>>,
+    /// The personality needs a push (local-only change, or a merge that
+    /// differed from the server's bytes).
+    dirty: bool,
+    /// A remote change was merged onto the on-disk blob this cycle.
+    applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty`.
+    push_bytes: Option<Vec<u8>>,
+    /// Refused this cycle: no reconciliation ran, nothing pushes.
+    skipped: bool,
+}
+
+fn skipped_personality_phase() -> PersonalityPhase {
+    PersonalityPhase {
+        merged: None,
+        dirty: false,
+        applied_remote: false,
+        push_bytes: None,
+        skipped: true,
+    }
+}
+
+/// Pull-side `vault.personality` reconciliation (myne-md/myne#697): whole-value
+/// LWW on the canonical encoding (the themes-palette rule verbatim: never
+/// directive-by-directive). Behind the per-device `ai_enabled` gate like the
+/// memory phase.
+#[allow(clippy::too_many_arguments)]
+async fn sync_personality_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    personality_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
+) -> Result<PersonalityPhase, SyncCycleError> {
+    use protocol::decode_agent_personality_blob_versioned;
+
+    // The memory plane's write mutex (the themes discipline): a user edit
+    // landing between this phase's read and its write would otherwise be
+    // silently overwritten (myne-md/myne#697). The memory pair holds the
+    // same mutex at its call sites; the phase holds it for the whole
+    // reconcile so read and write are one critical section.
+    let _guard = crate::plugins::memory::commands::write_mutex()
+        .lock_owned()
+        .await;
+    let personality_key =
+        derive_subkey_versioned(version, root_key, SubkeyRole::AgentPersonalityKey);
+
+    let path = personality_file_path(vault_root);
+    let local_bytes: Option<Vec<u8>> = match crate::singleton::open_newest_and_sweep(
+        io,
+        &path,
+        |bytes| {
+            decode_agent_personality_blob_versioned(
+                version,
+                &personality_key,
+                account_number_hash,
+                bytes,
+            )
+            .map(|_| ())
+        },
+    )
+    .await
+    {
+        Ok(()) => match io.read(&path).await {
+            Ok(bytes) => Some(bytes),
+            Err(kind) => {
+                tracing::warn!(
+                    stage = "personality",
+                    io_failure_kind = ?kind,
+                    "local personality re-read failed after a successful sweep; skipping the personality plane this cycle"
+                );
+                return Ok(skipped_personality_phase());
+            }
+        },
+        Err(crate::singleton::OpenOutcome::Absent) => None,
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => {
+            tracing::warn!(
+                stage = "personality",
+                "local personality blob is unreadable; skipping the personality plane this cycle"
+            );
+            return Ok(skipped_personality_phase());
+        }
+        Err(crate::singleton::OpenOutcome::Io(kind)) => {
+            tracing::warn!(
+                stage = "personality",
+                io_failure_kind = ?kind,
+                "local personality read failed; skipping the personality plane this cycle"
+            );
+            return Ok(skipped_personality_phase());
+        }
+    };
+    let local_nonce = local_bytes.as_deref().and_then(read_personality_nonce);
+
+    let id_hex = hex(personality_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // Changed-against-baseline, not changed-against-each-other: a local
+    // CLEAR (file removed, `local_bytes` None) must read as a local change
+    // whenever a baseline exists, or sync silently resurrects the server's
+    // old blob over the user's delete (myne-md/myne#697). Comparing the
+    // remote against the baseline (rather than the local) is what keeps a
+    // genuinely new server write winning over the clear in the both-changed
+    // arm below.
+    let remote_changed = remote_record
+        .map(|r| Some(hex(&r.content_nonce)) != baseline_nonce_hex)
+        .unwrap_or(false);
+
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_personality_nonce,
+        "personality",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        // Decode both sides for the whole-value comparison. An unverifiable
+        // remote payload is a refusal, local store untouched.
+        let local_ok = match &local_bytes {
+            None => true,
+            Some(b) => decode_agent_personality_blob_versioned(
+                version,
+                &personality_key,
+                account_number_hash,
+                b,
+            )
+            .is_ok(),
+        };
+        if !local_ok {
+            tracing::warn!(
+                stage = "personality",
+                "local personality blob does not decrypt; skipping the personality plane this cycle"
+            );
+            return Ok(skipped_personality_phase());
+        }
+        let remote_ok = decode_agent_personality_blob_versioned(
+            version,
+            &personality_key,
+            account_number_hash,
+            &remote_bytes,
+        )
+        .is_ok();
+        if !remote_ok {
+            tracing::warn!(
+                stage = "personality",
+                "verified remote personality blob does not decrypt; skipping the personality plane this cycle"
+            );
+            return Ok(skipped_personality_phase());
+        }
+        // Whole-value LWW: the merge picks one side's bytes. A personality is
+        // one coherent voice, so the rule is "the changed side wins; a change
+        // on both sides resolves to the fresher whole value" (§10.2.7): the
+        // greater max `updated_at` over the blob wins, ties go remote
+        // (deterministic on both sides, since both see the same two blobs).
+        // The nonce comparison below decides which side changed, exactly as
+        // the dirty rule does.
+        let local_nonce_hex = local_nonce.map(|n| hex(&n));
+        let local_changed = local_nonce_hex != baseline_nonce_hex;
+        let (bytes, dirty, applied_remote) = if remote_changed && !local_changed {
+            (remote_bytes, false, true)
+        } else if local_changed && !remote_changed {
+            (local_bytes.clone().unwrap(), true, false)
+        } else if remote_changed && local_changed {
+            // Concurrent edit on both sides: fresher wins, ties go remote.
+            // Decode failures cannot reach here (both sides verified above),
+            // so an unparseable max reads as 0 rather than skipping the plane.
+            let decode = |b: &[u8]| {
+                decode_agent_personality_blob_versioned(
+                    version,
+                    &personality_key,
+                    account_number_hash,
+                    b,
+                )
+                .ok()
+            };
+            let local_max = local_bytes
+                .as_deref()
+                .and_then(decode)
+                .map(|pt| personality_max_updated_at(&pt))
+                .unwrap_or(0);
+            let remote_max = decode(&remote_bytes)
+                .map(|pt| personality_max_updated_at(&pt))
+                .unwrap_or(0);
+            if remote_max >= local_max {
+                (remote_bytes, false, true)
+            } else {
+                (local_bytes.clone().unwrap(), true, false)
+            }
+        } else {
+            (local_bytes.clone().unwrap_or_default(), false, false)
+        };
+        if !bytes.is_empty() {
+            io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
+        }
+        record_blob_baseline(state, &id_hex, &rec);
+        return Ok(PersonalityPhase {
+            merged: Some(bytes.clone()),
+            dirty,
+            applied_remote,
+            push_bytes: dirty.then_some(bytes),
+            skipped: false,
+        });
+    }
+
+    // No (changed) remote blob: dirty iff the local file drifted from the
+    // synced baseline. A virgin vault (no file, no baseline) is NOT pushed:
+    // personality-silent by default. A clear (no file, baseline present) IS
+    // pushed, as a tombstone down in the push block.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    let dirty = local_nonce_hex != baseline_nonce_hex;
+    // A clear yields Some(empty) rather than None: the push block gates on
+    // `push_bytes.take()` and only an empty vec reaches the tombstone arm.
+    // None here would skip the tombstone silently while reporting dirty.
+    let push_bytes = if dirty {
+        Some(local_bytes.clone().unwrap_or_default())
+    } else {
+        None
+    };
+    Ok(PersonalityPhase {
+        merged: local_bytes.clone(),
+        dirty,
+        applied_remote: false,
+        push_bytes,
+        skipped: false,
+    })
+}
+
 /// A decoded conversation payload: turn ids in file order, the turn objects,
 /// and the `title_derived_from` snapshot when the file carries one.
 type DecodedConversationTurns = (Vec<String>, Vec<serde_json::Value>, Option<String>);
@@ -2274,10 +3027,10 @@ async fn sync_chats_conversation_phase(
 /// Pull-side `vault.themes` reconciliation (MYND-486). The `sync_catalog_phase`
 /// twin: `vault.themes` carries **no device-local subset** (every theme is
 /// shared vault content), so the push gate is the blob nonce vs the synced
-/// baseline — no shared-subset hash, which is the one twist `sync_prefs_phase`
+/// baseline (no shared-subset hash), which is the one twist `sync_prefs_phase`
 /// needs and this phase does not. Downloads a changed remote themes blob, runs
 /// the per-theme-name [`merge_custom_themes`] post-decrypt, and either **adopts
-/// the server bytes verbatim** (merge equal to the remote — re-encrypting would
+/// the server bytes verbatim** (merge equal to the remote: re-encrypting would
 /// nonce-churn an endless push loop) or writes the merged store freshly (dirty
 /// → pushed this cycle with the server's version as CAS base). Holds the themes
 /// plugin's write mutex across the read-merge-write.
@@ -2298,13 +3051,13 @@ async fn sync_themes_phase(
 ) -> Result<ThemesPhase, SyncCycleError> {
     use crate::plugins::themes::commands::{decode_themes_map_or_empty, encode_themes_map};
 
-    // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
+    // See `apply_pulled_note_blob`: `blocking_lock` panics inside a runtime.
     let _guard = crate::plugins::themes::commands::write_mutex().lock().await;
 
     let path = themes_file_path(vault_root);
     // The newest copy that DECRYPTS, not merely the newest that parses a header
     // (myne#301). A torn slot on the web client otherwise supplied both the
-    // local nonce and, further down, the bytes pushed to the server — where
+    // local nonce and, further down, the bytes pushed to the server, where
     // every peer decodes them to empty.
     let themes_key_for_read =
         derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
@@ -2320,7 +3073,7 @@ async fn sync_themes_phase(
     // Decrypting the local store costs an HKDF + a full AEAD open + a whole-map
     // JSON parse, so it happens ONLY on the two paths that read the plaintext:
     // the remote-reconcile branch (which merges) and the virgin-store check
-    // below. The steady state — no remote change, local nonce == baseline —
+    // below. The steady state (no remote change, local nonce == baseline)
     // proves byte-cleanliness from the nonce alone and never decrypts. (The
     // `sync_catalog_phase` twin decodes eagerly for a reason this phase lacks:
     // it RETURNS the merged catalog to the downstream attachment loop, while
@@ -2346,7 +3099,7 @@ async fn sync_themes_phase(
 
     // §11.3 gate. This family needs it most: the `io.write` below is shared by
     // both arms, and the local store falls back to EMPTY when it cannot be
-    // decoded — so for unverified junk `merged == remote_map` holds and the
+    // decoded, so for unverified junk `merged == remote_map` holds and the
     // live `vault.themes` is replaced by that junk.
     let verified = verified_singleton_download(
         transport,
@@ -2398,7 +3151,7 @@ async fn sync_themes_phase(
     // the synced baseline. Every themes write re-encrypts under a fresh nonce,
     // so a local blob whose outer nonce still equals the baseline's is provably
     // byte-untouched since the last sync. A virgin empty store (no themes, no
-    // baseline) is deliberately NOT pushed — a theme-less vault stays
+    // baseline) is deliberately NOT pushed: a theme-less vault stays
     // themes-silent, exactly as an attachment-less vault stays catalog-silent.
     let local_nonce_hex = local_nonce.map(|n| hex(&n));
     // The virgin-store conjunct is ordered baseline-first so the cheap `is_none`
@@ -2412,7 +3165,7 @@ async fn sync_themes_phase(
         dirty,
         applied_remote: false,
         // `dirty` already implies `local_bytes.is_some()`, and these are the
-        // VERIFIED bytes (myne#301) — the same ones the push must carry.
+        // VERIFIED bytes (myne#301): the same ones the push must carry.
         push_bytes: if dirty { local_bytes } else { None },
     })
 }
@@ -3075,6 +3828,33 @@ async fn sync_cycle_attempt(
             }
         }
     }
+    // The memory plane is behind the per-device `ai_enabled` gate
+    // (sync-protocol.md §10.2.6/§10.2.7): an opted-out device derives no ids,
+    // scans nothing, and inserts no baselines. It pushes/pulls nothing for
+    // these ids, exactly as a vault with no conversations stays chats-silent.
+    let memory_on =
+        memory_sync_enabled(io, root_key, &account_number_hash, vault_root, version).await;
+    let memory_catalog_id = memory_on.then(|| agent_memory_catalog_sync_id(root_key));
+    let personality_id = memory_on.then(|| agent_personality_sync_id(root_key));
+    // In-memory union of the per-entry files (entry id → on-disk nonce),
+    // maintained by the pull loop like `chats_scan`.
+    let mut memories_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
+    if memory_on {
+        if let Ok(entries) = io.read_dir(&memories_dir(vault_root)).await {
+            for entry in entries {
+                if let Some(id) = from_hex16(&entry.name) {
+                    if let Ok(header) = io
+                        .read_prefix(&memories_dir(vault_root).join(&entry.name), 34)
+                        .await
+                    {
+                        if let Some(nonce) = read_agent_memory_blob_nonce(&header) {
+                            memories_scan.insert(id, nonce);
+                        }
+                    }
+                }
+            }
+        }
+    }
     let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
         scan_attachments_manifest(io, &attachments_dir(vault_root)).await
     } else {
@@ -3115,6 +3895,31 @@ async fn sync_cycle_attempt(
         .and_then(read_chats_catalog_nonce)
     {
         local.insert(chats_catalog_id, n);
+    }
+    if let Some(mid) = memory_catalog_id {
+        if let Some(n) = io
+            .read(&agent_memory_catalog_file_path(vault_root))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(read_agent_memory_catalog_nonce)
+        {
+            local.insert(mid, n);
+        }
+    }
+    if let Some(pid) = personality_id {
+        if let Some(n) = io
+            .read(&personality_file_path(vault_root))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(read_personality_nonce)
+        {
+            local.insert(pid, n);
+        }
+    }
+    for (cid, n) in &memories_scan {
+        local.insert(*cid, *n);
     }
     for (cid, n) in &chats_scan {
         local.insert(*cid, *n);
@@ -3352,6 +4157,149 @@ async fn sync_cycle_attempt(
         }
     }
     drop(chats_write_guard);
+
+    // --- memory phase (myne-md/myne#697): gated, every cycle when on ---
+    // Behind the per-device `ai_enabled` gate: `memory_catalog_id` is `None`
+    // when the opt-in is off and the whole plane stands down (no pull, no
+    // push, no tombstone drain). When on, the memory catalog rides the push
+    // batch below like the chats catalog (never head-committed; CAS/409
+    // covers it). ONE critical section: the memory plugin's write mutex is
+    // taken HERE and held through the entry loop below, same shape as chats.
+    let mut memory_phase: Option<MemoryPhase> = None;
+    let mut personality_phase: Option<PersonalityPhase> = None;
+    let mut entries_pulled: usize = 0;
+    if let Some(mid) = memory_catalog_id {
+        let remote_mem_cat_rec = page
+            .all_metas
+            .iter()
+            .find(|m| m.id == mid && m.attachment_id.is_none());
+        let memory_write_mutex = crate::plugins::memory::commands::write_mutex();
+        let memory_write_guard = memory_write_mutex.lock().await;
+        let phase = sync_memory_phase(
+            io,
+            transport,
+            token,
+            root_key,
+            &account_number_hash,
+            vault_root,
+            state,
+            &mid,
+            remote_mem_cat_rec,
+            version,
+        )
+        .await?;
+
+        // --- entry pull loop (catalog-guarded, adopt-by-catalog-winner) ---
+        // For every LIVE catalog row, reconcile the per-entry file. A row
+        // whose record is a tombstone erases the local file instead (deletion
+        // propagation); an id with no catalog row is never downloaded blind.
+        // A locally-dirty file is skipped: our on-disk copy diverges from the
+        // synced baseline and downloading the server's copy would clobber it.
+        // The whole loop stands down when the catalog phase was refused
+        // (`skipped`): with no merged roster there is nothing to reconcile
+        // against.
+        if !phase.skipped {
+            for (entry_hex, row) in phase.merged.iter() {
+                let Some(entry_id) = from_hex16(entry_hex) else {
+                    continue;
+                };
+                if !row.is_live() {
+                    let path = memories_dir(vault_root).join(entry_hex);
+                    match io.remove_file(&path).await {
+                        Ok(()) => {
+                            memories_scan.remove(&entry_id);
+                            state.blobs.remove(entry_hex);
+                        }
+                        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+                            state.blobs.remove(entry_hex);
+                        }
+                        Err(_) => {}
+                    }
+                    continue;
+                }
+                // Locally-dirty skip (the conversation loop's cheap filter).
+                let baseline_nonce_hex = state.blobs.get(entry_hex).map(|b| &b.content_nonce_hex);
+                let local_nonce_hex = memories_scan.get(&entry_id).map(|n| hex(&n[..]));
+                if baseline_nonce_hex.is_some() && baseline_nonce_hex != local_nonce_hex.as_ref() {
+                    continue;
+                }
+                // Both-changed arbiter: the merged row at a version past the
+                // pre-merge local one is the remote winner (adopt its file);
+                // at the local version it is the local winner (push ours).
+                let remote_wins = phase
+                    .local_versions
+                    .get(entry_hex)
+                    .map(|v| row.version != *v)
+                    .unwrap_or(true);
+                let remote_rec = page
+                    .all_metas
+                    .iter()
+                    .find(|m| m.id == entry_id && m.attachment_id.is_none());
+                let entry_phase = match sync_memory_entry_phase(
+                    io,
+                    transport,
+                    token,
+                    root_key,
+                    &account_number_hash,
+                    vault_root,
+                    state,
+                    &entry_id,
+                    remote_rec,
+                    remote_wins,
+                    version,
+                )
+                .await
+                {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::warn!(
+                            stage = "memory-entry",
+                            error = ?e,
+                            "a memory entry failed to reconcile; skipping it for this cycle"
+                        );
+                        continue;
+                    }
+                };
+                if let Some(rec) = entry_phase.remote {
+                    record_blob_baseline(state, entry_hex, &rec);
+                    entries_pulled += 1;
+                    if let Ok(bytes) = io.read(&memories_dir(vault_root).join(entry_hex)).await {
+                        if let Some(n) = read_agent_memory_blob_nonce(&bytes) {
+                            memories_scan.insert(entry_id, n);
+                        }
+                    }
+                }
+            }
+        }
+        drop(memory_write_guard);
+        memory_phase = Some(phase);
+
+        // --- personality phase: the singleton half of the plane ---
+        // Whole-value LWW, themes-shape. The phase holds the memory plane's
+        // write mutex for the whole reconcile (myne-md/myne#697), so a user
+        // edit landing between its read and its write cannot be silently
+        // overwritten.
+        let pid = personality_id.expect("personality id set whenever the gate passed");
+        let remote_pers_rec = page
+            .all_metas
+            .iter()
+            .find(|m| m.id == pid && m.attachment_id.is_none());
+        personality_phase = Some(
+            sync_personality_phase(
+                io,
+                transport,
+                token,
+                root_key,
+                &account_number_hash,
+                vault_root,
+                state,
+                &pid,
+                remote_pers_rec,
+                version,
+            )
+            .await?,
+        );
+    }
 
     // --- catalog phase (MUST precede any attachment record — §11.4 rule 5) ---
     // The merged catalog is the resurrection guard: a tombstoned id is erased
@@ -4199,6 +5147,7 @@ async fn sync_cycle_attempt(
     let mut attachments_pushed = 0usize;
     let mut pushed_att_tombstones: HashSet<[u8; 32]> = HashSet::new();
     let mut pushed_chats_tombstones: Vec<[u8; 16]> = Vec::new();
+    let mut pushed_memory_tombstones: Vec<[u8; 16]> = Vec::new();
     if gate.allows_content() {
         if let Some(_keys) = attachment_keys {
             let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
@@ -4478,6 +5427,166 @@ async fn sync_cycle_attempt(
             )
             .await;
         }
+
+        // --- memory plane push (myne-md/myne#697) ---
+        // Gated with the pull half: `memory_phase` is `None` when the opt-in
+        // is off and nothing for these ids rides the batch. Otherwise the
+        // dirty catalog, the dirty personality singleton, and the changed
+        // entry files ride the same batch as inline blobs (the chats shape:
+        // conversation-id sync blob-id, content_nonce from the on-disk
+        // header, base_version from the recorded CAS base). An entry whose
+        // catalog row is a tombstone is NEVER pushed here (the delete
+        // propagates through the catalog tombstone; pushing the file would
+        // resurrect content against its own tombstone). A SKIPPED phase
+        // (refused store, myne-md/myne#697) pushes nothing: with `merged`
+        // empty every queued id reads "not live again" and a re-created
+        // entry's server copy would be tombstoned.
+        if let Some(memory_phase) = memory_phase.as_mut().filter(|p| !p.skipped) {
+            let mid = memory_catalog_id.expect("catalog id set whenever the phase ran");
+            if memory_phase.dirty {
+                if let Some(bytes) = memory_phase.push_bytes.take() {
+                    if let Some(nonce) = read_agent_memory_catalog_nonce(&bytes) {
+                        let base = state.blobs.get(&hex(&mid)).map(|b| b.version).unwrap_or(0);
+                        to_push.push(PushBlob {
+                            id: mid,
+                            base_version: base,
+                            content_nonce: nonce,
+                            ciphertext: bytes,
+                            tombstone: false,
+                            attachment_id: None,
+                        });
+                    }
+                }
+            }
+            if let Some(personality_phase) = personality_phase.as_mut() {
+                let pid = personality_id.expect("personality id set whenever the phase ran");
+                if personality_phase.dirty {
+                    if let Some(bytes) = personality_phase.push_bytes.take() {
+                        if bytes.is_empty() {
+                            // Local clear of a previously-synced personality:
+                            // the delete rides the batch as a tombstone against
+                            // the last synced nonce, or peers keep the old blob
+                            // and the next pull resurrects it (myne-md/myne#697).
+                            let base = state.blobs.get(&hex(&pid)).map(|b| b.version).unwrap_or(0);
+                            let nonce = state
+                                .blobs
+                                .get(&hex(&pid))
+                                .and_then(|b| hex_to_arr::<24>(&b.content_nonce_hex));
+                            if let Some(content_nonce) = nonce {
+                                to_push.push(PushBlob {
+                                    id: pid,
+                                    base_version: base,
+                                    content_nonce,
+                                    ciphertext: Vec::new(),
+                                    tombstone: true,
+                                    attachment_id: None,
+                                });
+                            }
+                        } else if let Some(nonce) = read_personality_nonce(&bytes) {
+                            let base = state.blobs.get(&hex(&pid)).map(|b| b.version).unwrap_or(0);
+                            to_push.push(PushBlob {
+                                id: pid,
+                                base_version: base,
+                                content_nonce: nonce,
+                                ciphertext: bytes,
+                                tombstone: false,
+                                attachment_id: None,
+                            });
+                        }
+                    }
+                }
+            }
+            if gate.allows_content() {
+                for (entry_hex, _) in memory_phase.merged.iter().filter(|(_, e)| e.is_live()) {
+                    let Some(entry_id) = from_hex16(entry_hex) else {
+                        continue;
+                    };
+                    let synced = state.blobs.get(entry_hex).cloned();
+                    // The skip decision reads the CURRENT on-disk file, never
+                    // the pre-guard `memories_scan` snapshot (the conversation
+                    // loop's hole, same fix).
+                    let Ok(bytes) = io.read(&memories_dir(vault_root).join(entry_hex)).await else {
+                        continue;
+                    };
+                    let Some(file_nonce) = read_agent_memory_blob_nonce(&bytes) else {
+                        continue;
+                    };
+                    if synced.as_ref().map(|b| b.content_nonce_hex.as_str())
+                        == Some(hex(&file_nonce).as_str())
+                    {
+                        continue; // already in sync
+                    }
+                    let base_version = if let Some(b) = &synced {
+                        if let Some((server_version, _)) = server_meta.get(&entry_id) {
+                            if *server_version > b.version {
+                                *server_version
+                            } else {
+                                b.version
+                            }
+                        } else {
+                            b.version
+                        }
+                    } else {
+                        0
+                    };
+                    to_push.push(PushBlob {
+                        id: entry_id,
+                        base_version,
+                        content_nonce: file_nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+
+                // Queued entry deletions → blob-plane tombstone records. A
+                // queued id whose catalog row is live again is a STALE
+                // tombstone (re-created after delete): dropped, never pushed.
+                // An id with no synced baseline has no server-side record to
+                // reclaim (the migration rule): dropped. Otherwise the
+                // empty-ciphertext record marks the server copy deleted so
+                // horizon-GC reclaims it.
+                let mut stale_memories: Vec<[u8; 16]> = Vec::new();
+                // A corrupt or unreadable queue fails the cycle rather than
+                // draining half a reclaim set: the reader refuses instead of
+                // truncating, so there is no partial-drain shape to handle.
+                let queued = crate::plugins::memory::commands::read_pending_memory_tombstones(
+                    io, vault_root,
+                )
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
+                for q in queued {
+                    let live_again = memory_phase
+                        .merged
+                        .get(&hex(&q.entry_id))
+                        .map(|e| e.is_live())
+                        .unwrap_or(false);
+                    let Some(baseline) = state.blobs.get(&hex(&q.entry_id)) else {
+                        stale_memories.push(q.entry_id);
+                        continue;
+                    };
+                    if live_again {
+                        stale_memories.push(q.entry_id);
+                        continue;
+                    }
+                    to_push.push(PushBlob {
+                        id: q.entry_id,
+                        base_version: baseline.version,
+                        content_nonce: q.content_nonce,
+                        ciphertext: Vec::new(),
+                        tombstone: true,
+                        attachment_id: None,
+                    });
+                    pushed_memory_tombstones.push(q.entry_id);
+                }
+                let _ = crate::plugins::memory::commands::clear_pending_memory_tombstones(
+                    io,
+                    vault_root,
+                    &stale_memories,
+                )
+                .await;
+            }
+        }
     }
 
     let mut pushed = 0;
@@ -4693,6 +5802,14 @@ async fn sync_cycle_attempt(
             &pushed_chats_tombstones,
         )
         .await;
+        // Same for the entry-tombstone queue: records that rode the content
+        // push are dropped so they are not re-flagged every cycle.
+        let _ = crate::plugins::memory::commands::clear_pending_memory_tombstones(
+            io,
+            vault_root,
+            &pushed_memory_tombstones,
+        )
+        .await;
         // The blobs a re-key stranded (#443). Deliberately AFTER the content
         // push and in a request of its own — see `drain_orphan_tombstones` for
         // why mixing them in could wedge every future push cycle.
@@ -4776,6 +5893,15 @@ async fn sync_cycle_attempt(
         prefs_applied_remote: prefs_phase.applied_remote,
         themes_applied_remote: themes_phase.applied_remote,
         chats_applied_remote: chats_phase.applied_remote,
+        memory_entries_pulled: entries_pulled,
+        memory_applied_remote: memory_phase
+            .as_ref()
+            .map(|p| p.applied_remote)
+            .unwrap_or(false),
+        personality_applied_remote: personality_phase
+            .as_ref()
+            .map(|p| p.applied_remote)
+            .unwrap_or(false),
         pull_skipped,
         dropped,
         pulled_note_ids,
@@ -9749,7 +10875,7 @@ mod tests {
             };
 
             // Local: a SHARED field with the newer clock, so the merge beats the
-            // server and the phase must take its write-a-fresh-blob branch — plus
+            // server and the phase must take its write-a-fresh-blob branch, plus
             // a device-local one to prove the whole view survives, not just the
             // field under contention. Without the shared win the phase adopts the
             // server's bytes and never re-encodes, which makes the encoder half of
@@ -9851,7 +10977,7 @@ mod tests {
         }
 
         // A server that has never held a prefs blob receives this device's
-        // unconditionally — the §10.2.1 initial publish (even a default view).
+        // unconditionally: the §10.2.1 initial publish (even a default view).
         #[test]
         fn initial_publish_when_server_never_held_prefs() {
             let dir = scratch("initpub");
@@ -9898,7 +11024,7 @@ mod tests {
                     doc_heads_hex: Vec::new(),
                 },
             );
-            // The synced baseline was the default view — whose SHARED subset
+            // The synced baseline was the default view, whose SHARED subset
             // equals the themed view's (theme is device-local).
             set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
             let t = FakeTransport::new();
@@ -9961,7 +11087,7 @@ mod tests {
         }
 
         // A remote rename lands: merged into the on-disk view (device-local
-        // theme preserved), applied_remote=true, and NO re-push — the server
+        // theme preserved), applied_remote=true, and NO re-push: the server
         // already carries the merged shared subset (the anti-ping-pong rule).
         #[test]
         fn remote_rename_merges_applies_and_does_not_repush() {
@@ -10028,13 +11154,13 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // Enrollment wholesale seed: a VIRGIN vault (no vault.prefs on disk —
+        // Enrollment wholesale seed: a VIRGIN vault (no vault.prefs on disk,
         // the just-joined state) adopts the server blob VERBATIM, device-local
         // fields included as starting defaults (Q3/Q7), and never re-seeds.
         #[test]
         fn virgin_vault_seeds_wholesale_from_server() {
             let dir = scratch("seed");
-            // NO local vault.prefs — the just-joined-device state.
+            // NO local vault.prefs: the just-joined-device state.
             let mut st = SyncState::default();
             let pid = prefs_sync_id(&ROOT);
             let t = FakeTransport::new();
@@ -10085,7 +11211,7 @@ mod tests {
 
         /// §11.3 on the enrollment seed. `decode_prefs_blob` succeeding is NOT
         /// the check: these bytes ARE a valid `MYP1` for this vault, they are
-        /// simply not the revision the record advertised — which is exactly
+        /// simply not the revision the record advertised, which is exactly
         /// what a server replaying a genuine older blob under a newer record
         /// produces. Seeding them would write the wrong revision to a virgin
         /// vault AND record a baseline the client does not hold.
@@ -10181,7 +11307,7 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // A virgin vault against an EMPTY server proceeds on defaults — no
+        // A virgin vault against an EMPTY server proceeds on defaults: no
         // crash, no seed, and the initial-publish intent registers as dirty.
         #[test]
         fn virgin_vault_with_empty_server_proceeds_on_defaults() {
@@ -10215,7 +11341,7 @@ mod tests {
         // Poisoned-gate regression (re-review I7): an UNSYNCED shared edit +
         // app restart (RAM baseline lost) + an unchanged server record must
         // still push. The self-heal may only adopt the gate baseline when the
-        // local blob is provably the server's bytes — healing from the edited
+        // local blob is provably the server's bytes: healing from the edited
         // view would silently withhold the rename from the fleet forever.
         #[test]
         fn unsynced_shared_edit_survives_a_restart() {
@@ -10326,7 +11452,7 @@ mod tests {
         // (`gc2`); this is the OTHER device. What makes a `FakeTransport`
         // faithful here rather than a stand-in: `run_sync_cycle`'s
         // `prefs_phase.dirty` arm uploads `io.read(vault_root/"vault.prefs")`
-        // VERBATIM — the pushed ciphertext IS the author's on-disk blob — and
+        // VERBATIM: the pushed ciphertext IS the author's on-disk blob, and
         // the server is a zero-knowledge relay that cannot read or alter it.
         // So serving device A's actual file bytes as B's server record models
         // the wire payload exactly; only the socket is faked, and the response
@@ -10360,7 +11486,7 @@ mod tests {
         }
 
         /// Two ordered rules exercising both v1 filter leaves, one of them
-        /// DISABLED — a disabled rule is retained, so it must cross the wire
+        /// DISABLED: a disabled rule is retained, so it must cross the wire
         /// too or re-enabling it on the peer loses the authoring work.
         fn authored_rules() -> Vec<protocol::ColorGroup> {
             use protocol::{ColorGroup, FilterNode};
@@ -10386,7 +11512,7 @@ mod tests {
 
         // Device A authors color groups; device B receives them. A's push
         // registers as dirty, and B's phase lands A's EXACT blob bytes: same
-        // rules, same precedence order, same disabled flag, same filter ASTs —
+        // rules, same precedence order, same disabled flag, same filter ASTs;
         // while B's own device-local tuning survives untouched.
         #[test]
         fn color_groups_authored_on_device_a_land_on_device_b() {
@@ -10461,7 +11587,7 @@ mod tests {
                 "B adopted a shared subset it already agrees with ⇒ no ping-pong re-push"
             );
 
-            // B's DISK is the assertion — the peer reads its rules back from
+            // B's DISK is the assertion: the peer reads its rules back from
             // the blob it persisted, not from the merge's return value.
             let on_b = read_local(&dir_b);
             assert_eq!(
@@ -10490,7 +11616,7 @@ mod tests {
         }
 
         // …and back the other way: B edits the list it just received and A
-        // converges on B's version. The reverse leg is a separate claim —
+        // converges on B's version. The reverse leg is a separate claim:
         // `color_groups` is `Shared(WholeValueLww)`, so the peer that edits
         // second must WIN on the author, not merge into a hybrid list.
         #[test]
@@ -10508,7 +11634,7 @@ mod tests {
             write_local(&dir_a, &a);
 
             // B edits it: reorders (precedence change), renames the first rule
-            // and re-enables the second — under a newer clock.
+            // and re-enables the second, under a newer clock.
             let mut edited = authored_rules();
             edited.swap(0, 1);
             edited[0].enabled = true;
@@ -10997,6 +12123,481 @@ mod tests {
                 std::fs::read(dir.join("chats").join(hex(&CONV))).unwrap(),
                 remote_bytes,
                 "adoption is byte-verbatim"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+    }
+
+    // ---- myne-md/myne#697: agent-memory plane (sync_memory_phase) ----------
+
+    mod memory_phase {
+        // The parent module's seam shims (task 86).
+        use super::{blocking, IO};
+
+        use super::super::*;
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use crate::vault_io::VaultIo;
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+
+        const ROOT: [u8; 32] = [0x42; 32];
+        const HASH: [u8; 16] = [0x33; 16];
+        const ENTRY: [u8; 16] = [0xBB; 16];
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-memoryphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn memory_catalog_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey_versioned(MetaVersion::V0_1, &ROOT, SubkeyRole::AgentMemoryCatalogKey)
+        }
+
+        fn memory_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey_versioned(MetaVersion::V0_1, &ROOT, SubkeyRole::AgentMemoryKey)
+        }
+
+        fn personality_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey_versioned(MetaVersion::V0_1, &ROOT, SubkeyRole::AgentPersonalityKey)
+        }
+
+        fn row(version: u64) -> serde_json::Value {
+            serde_json::json!({"created_at": 1, "updated_at": 1, "version": version})
+        }
+
+        fn seal_catalog(map: &serde_json::Value) -> Vec<u8> {
+            protocol::encode_agent_memory_catalog_blob_versioned(
+                MetaVersion::V0_1,
+                &memory_catalog_key(),
+                &HASH,
+                &serde_json::to_vec(map).unwrap(),
+            )
+            .unwrap()
+        }
+
+        fn seal_entry(id: &[u8; 16], text: &str) -> Vec<u8> {
+            let plaintext = serde_json::json!({"text": text}).to_string().into_bytes();
+            protocol::encode_agent_memory_blob_versioned(
+                MetaVersion::V0_1,
+                &memory_key(),
+                &HASH,
+                id,
+                &plaintext,
+            )
+            .unwrap()
+        }
+
+        fn seal_personality(directives: &str) -> Vec<u8> {
+            let plaintext = serde_json::json!({"directives": directives})
+                .to_string()
+                .into_bytes();
+            protocol::encode_agent_personality_blob_versioned(
+                MetaVersion::V0_1,
+                &personality_key(),
+                &HASH,
+                &plaintext,
+            )
+            .unwrap()
+        }
+
+        fn seal_personality_at(text: &str, updated_at: u64) -> Vec<u8> {
+            let plaintext =
+                serde_json::json!({"directives": [{"text": text, "updated_at": updated_at}]})
+                    .to_string()
+                    .into_bytes();
+            protocol::encode_agent_personality_blob_versioned(
+                MetaVersion::V0_1,
+                &personality_key(),
+                &HASH,
+                &plaintext,
+            )
+            .unwrap()
+        }
+
+        /// Register bytes under `/sync/blob?id=…` and return the record.
+        fn serve(t: &FakeTransport, id: &[u8; 16], bytes: &[u8], version: u64) -> ChangedBlob {
+            let nonce = read_agent_memory_blob_nonce(bytes)
+                .or_else(|| read_agent_memory_catalog_nonce(bytes))
+                .or_else(|| read_personality_nonce(bytes))
+                .unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(id)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *id,
+                content_nonce: nonce,
+                version,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        fn run_catalog_phase(
+            io: &dyn VaultIo,
+            t: &FakeTransport,
+            dir: &Path,
+            st: &mut SyncState,
+            rec: Option<&ChangedBlob>,
+        ) -> Result<MemoryPhase, SyncCycleError> {
+            let catid = agent_memory_catalog_sync_id(&ROOT);
+            blocking(sync_memory_phase(
+                io,
+                t,
+                "tok",
+                &ROOT,
+                &HASH,
+                dir,
+                st,
+                &catid,
+                rec,
+                MetaVersion::V0_1,
+            ))
+        }
+
+        fn run_entry_phase(
+            io: &dyn VaultIo,
+            t: &FakeTransport,
+            dir: &Path,
+            st: &mut SyncState,
+            rec: Option<&ChangedBlob>,
+            remote_wins: bool,
+        ) -> Result<MemoryEntryPhase, SyncCycleError> {
+            blocking(sync_memory_entry_phase(
+                io,
+                t,
+                "tok",
+                &ROOT,
+                &HASH,
+                dir,
+                st,
+                &ENTRY,
+                rec,
+                remote_wins,
+                MetaVersion::V0_1,
+            ))
+        }
+
+        fn run_personality_phase(
+            io: &dyn VaultIo,
+            t: &FakeTransport,
+            dir: &Path,
+            st: &mut SyncState,
+            rec: Option<&ChangedBlob>,
+        ) -> Result<PersonalityPhase, SyncCycleError> {
+            let pid = agent_personality_sync_id(&ROOT);
+            blocking(sync_personality_phase(
+                io,
+                t,
+                "tok",
+                &ROOT,
+                &HASH,
+                dir,
+                st,
+                &pid,
+                rec,
+                MetaVersion::V0_1,
+            ))
+        }
+
+        fn seed_baseline(st: &mut SyncState, id_hex: &str, nonce_hex: String) {
+            st.blobs.insert(
+                id_hex.to_string(),
+                BlobSyncState {
+                    version: 1,
+                    content_nonce_hex: nonce_hex,
+                    doc_heads_hex: Vec::new(),
+                },
+            );
+        }
+
+        #[test]
+        fn skipped_outcome_holds_its_invariants() {
+            let phase = skipped_memory_phase();
+            assert!(phase.skipped);
+            assert!(!phase.dirty);
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert!(phase.merged.is_empty());
+            let phase = skipped_personality_phase();
+            assert!(phase.skipped);
+            assert!(!phase.dirty);
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+        }
+
+        // A virgin no-memories vault stays memory-silent: no file, no
+        // record, nothing to push.
+        #[test]
+        fn virgin_vault_stays_memory_silent() {
+            let dir = scratch("virgin");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, None).unwrap();
+            assert!(!phase.dirty);
+            assert!(!phase.skipped);
+            assert!(phase.push_bytes.is_none());
+            let phase = run_personality_phase(&IO, &t, &dir, &mut st, None).unwrap();
+            assert!(!phase.dirty);
+            assert!(!phase.skipped);
+            assert!(phase.push_bytes.is_none());
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // An unreadable local catalog refuses the plane even against a live
+        // remote record: the garbage on disk is untouched.
+        #[test]
+        fn unreadable_local_catalog_skips_the_plane() {
+            let dir = scratch("unreadable");
+            std::fs::write(dir.join("vault.agent-memory"), b"torn-bytes").unwrap();
+            let catid = agent_memory_catalog_sync_id(&ROOT);
+            let remote_bytes = seal_catalog(&serde_json::json!({}));
+            let t = FakeTransport::new();
+            let rec = serve(&t, &catid, &remote_bytes, 3);
+            let mut st = SyncState::default();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(phase.skipped, "an unreadable store refuses, never merges");
+            assert!(!phase.dirty);
+            assert_eq!(
+                std::fs::read(dir.join("vault.agent-memory")).unwrap(),
+                b"torn-bytes",
+                "the refused store is never written"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Absent local catalog + a verified remote record: adopted verbatim.
+        #[test]
+        fn absent_catalog_adopts_verified_remote() {
+            let dir = scratch("absent-cat");
+            let catid = agent_memory_catalog_sync_id(&ROOT);
+            let remote_bytes = seal_catalog(&serde_json::json!({hex(&ENTRY): row(1)}));
+            let t = FakeTransport::new();
+            let rec = serve(&t, &catid, &remote_bytes, 2);
+            let mut st = SyncState::default();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(!phase.skipped);
+            assert!(
+                phase.push_bytes.is_none(),
+                "verbatim adoption pushes nothing"
+            );
+            assert!(phase.applied_remote);
+            assert_eq!(
+                std::fs::read(dir.join("vault.agent-memory")).unwrap(),
+                remote_bytes,
+                "adoption is byte-verbatim"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Local-only change: dirty with the exact local bytes to push.
+        #[test]
+        fn local_only_catalog_change_pushes() {
+            let dir = scratch("local-dirty");
+            let local_bytes = seal_catalog(&serde_json::json!({hex(&ENTRY): row(1)}));
+            std::fs::write(dir.join("vault.agent-memory"), &local_bytes).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, None).unwrap();
+            assert!(!phase.skipped);
+            assert!(phase.dirty);
+            assert_eq!(phase.push_bytes.unwrap(), local_bytes);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A merge that beats the server pushes the merged bytes (local row A
+        // + remote row B converge to {A, B}, which equals neither side).
+        #[test]
+        fn merge_that_beats_the_server_pushes() {
+            let dir = scratch("merge-wins");
+            let other = [0xCC; 16];
+            let local_bytes = seal_catalog(&serde_json::json!({hex(&ENTRY): row(1)}));
+            std::fs::write(dir.join("vault.agent-memory"), &local_bytes).unwrap();
+            let remote_bytes = seal_catalog(&serde_json::json!({hex(&other): row(1)}));
+            let catid = agent_memory_catalog_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let rec = serve(&t, &catid, &remote_bytes, 2);
+            let mut st = SyncState::default();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(!phase.skipped);
+            assert!(phase.dirty, "the merge differs from the server store");
+            assert!(phase.applied_remote);
+            assert_eq!(phase.merged.len(), 2, "both rows survive the join");
+            assert!(phase.push_bytes.is_some());
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Enrollment seed order (task 8): a catalog adopted wholesale keeps
+        // its tombstones, so an entry deleted before this device enrolled does
+        // not resurrect here. The tombstoned row survives verbatim; no entry
+        // file is fetched for it.
+        #[test]
+        fn enrollment_seed_keeps_tombstones_verbatim() {
+            let dir = scratch("enroll-tomb");
+            let dead = [0xDD; 16];
+            let remote_bytes = seal_catalog(&serde_json::json!({
+                hex(&ENTRY): row(1),
+                hex(&dead): {"created_at": 1, "updated_at": 5, "version": 4, "deleted_at": 5},
+            }));
+            let catid = agent_memory_catalog_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let rec = serve(&t, &catid, &remote_bytes, 2);
+            let mut st = SyncState::default();
+            let phase = run_catalog_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(!phase.skipped);
+            assert!(phase.applied_remote);
+            let tomb = &phase.merged[&hex(&dead)];
+            assert!(
+                tomb.deleted_at.is_some(),
+                "the pre-enrollment delete must survive the wholesale seed"
+            );
+            assert_eq!(phase.merged.len(), 2);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Absent entry file + verified remote: adopted verbatim.
+        #[test]
+        fn absent_entry_adopts_verified_remote() {
+            let dir = scratch("absent-entry");
+            std::fs::create_dir_all(dir.join("memories")).unwrap();
+            let remote_bytes = seal_entry(&ENTRY, "likes tea");
+            let t = FakeTransport::new();
+            let rec = serve(&t, &ENTRY, &remote_bytes, 2);
+            let mut st = SyncState::default();
+            let phase = run_entry_phase(&IO, &t, &dir, &mut st, Some(&rec), true).unwrap();
+            assert!(phase.push_bytes.is_none());
+            assert!(phase.remote.is_some());
+            assert_eq!(
+                std::fs::read(dir.join("memories").join(hex(&ENTRY))).unwrap(),
+                remote_bytes,
+                "adoption is byte-verbatim"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Locally dirty entry, no remote change: the local bytes push.
+        #[test]
+        fn dirty_entry_without_remote_change_pushes() {
+            let dir = scratch("dirty-entry");
+            let local_bytes = seal_entry(&ENTRY, "local text");
+            std::fs::create_dir_all(dir.join("memories")).unwrap();
+            std::fs::write(dir.join("memories").join(hex(&ENTRY)), &local_bytes).unwrap();
+            let mut st = SyncState::default();
+            seed_baseline(&mut st, &hex(&ENTRY), hex(&[0x00; 24]));
+            let t = FakeTransport::new();
+            let phase = run_entry_phase(&IO, &t, &dir, &mut st, None, false).unwrap();
+            assert_eq!(phase.push_bytes.unwrap(), local_bytes);
+            assert!(phase.remote.is_none());
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Both sides changed: the catalog winner decides. Remote winner →
+        // adopt; local winner → push ours.
+        #[test]
+        fn both_changed_entry_defers_to_the_catalog_winner() {
+            for (remote_wins, tag) in [(true, "remote"), (false, "local")] {
+                let dir = scratch(&format!("both-changed-{tag}"));
+                let local_bytes = seal_entry(&ENTRY, "local text");
+                std::fs::create_dir_all(dir.join("memories")).unwrap();
+                std::fs::write(dir.join("memories").join(hex(&ENTRY)), &local_bytes).unwrap();
+                let remote_bytes = seal_entry(&ENTRY, "remote text");
+                let t = FakeTransport::new();
+                let rec = serve(&t, &ENTRY, &remote_bytes, 4);
+                let mut st = SyncState::default();
+                seed_baseline(&mut st, &hex(&ENTRY), hex(&[0x00; 24]));
+                let phase =
+                    run_entry_phase(&IO, &t, &dir, &mut st, Some(&rec), remote_wins).unwrap();
+                if remote_wins {
+                    assert!(phase.push_bytes.is_none());
+                    assert_eq!(
+                        std::fs::read(dir.join("memories").join(hex(&ENTRY))).unwrap(),
+                        remote_bytes,
+                        "the catalog winner's file is adopted"
+                    );
+                } else {
+                    assert_eq!(
+                        phase.push_bytes.unwrap(),
+                        local_bytes,
+                        "the local winner's file pushes"
+                    );
+                }
+                std::fs::remove_dir_all(&dir).ok();
+            }
+        }
+
+        // Personality: remote-only adopts (applied, nothing to push);
+        // local-only pushes; both-changed resolves to the remote write.
+        #[test]
+        fn personality_singleton_reconciles_whole_value() {
+            let pid = agent_personality_sync_id(&ROOT);
+            // Remote-only.
+            let dir = scratch("pers-remote");
+            let remote_bytes = seal_personality("be terse");
+            let t = FakeTransport::new();
+            let rec = serve(&t, &pid, &remote_bytes, 2);
+            let mut st = SyncState::default();
+            let phase = run_personality_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(!phase.skipped);
+            assert!(phase.applied_remote);
+            assert!(!phase.dirty);
+            assert_eq!(
+                std::fs::read(dir.join("vault.personality")).unwrap(),
+                remote_bytes
+            );
+            std::fs::remove_dir_all(&dir).ok();
+            // Local-only.
+            let dir = scratch("pers-local");
+            let local_bytes = seal_personality("be warm");
+            std::fs::write(dir.join("vault.personality"), &local_bytes).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let phase = run_personality_phase(&IO, &t, &dir, &mut st, None).unwrap();
+            assert!(phase.dirty);
+            assert_eq!(phase.push_bytes.unwrap(), local_bytes);
+            std::fs::remove_dir_all(&dir).ok();
+            // Both changed: the remote write wins.
+            let dir = scratch("pers-both");
+            let local_bytes = seal_personality("be warm");
+            std::fs::write(dir.join("vault.personality"), &local_bytes).unwrap();
+            let remote_bytes = seal_personality("be terse");
+            let t = FakeTransport::new();
+            let rec = serve(&t, &pid, &remote_bytes, 3);
+            let mut st = SyncState::default();
+            seed_baseline(&mut st, &hex(&pid), hex(&[0x00; 24]));
+            let phase = run_personality_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(!phase.dirty, "whole-value LWW resolves to one side");
+            assert!(phase.applied_remote);
+            assert_eq!(
+                std::fs::read(dir.join("vault.personality")).unwrap(),
+                remote_bytes,
+                "the remote write wins a concurrent edit"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+            // Both changed, local fresher: the greater updated_at wins (§10.2.7).
+            let dir = scratch("pers-fresh-local");
+            let local_bytes = seal_personality_at("be warm", 3_000);
+            std::fs::write(dir.join("vault.personality"), &local_bytes).unwrap();
+            let remote_bytes = seal_personality_at("be terse", 2_000);
+            let t = FakeTransport::new();
+            let rec = serve(&t, &pid, &remote_bytes, 3);
+            let mut st = SyncState::default();
+            seed_baseline(&mut st, &hex(&pid), hex(&[0x00; 24]));
+            let phase = run_personality_phase(&IO, &t, &dir, &mut st, Some(&rec)).unwrap();
+            assert!(phase.dirty, "the fresher local write must push");
+            assert!(!phase.applied_remote);
+            assert_eq!(
+                std::fs::read(dir.join("vault.personality")).unwrap(),
+                local_bytes,
+                "the fresher side wins a concurrent edit"
             );
             std::fs::remove_dir_all(&dir).ok();
         }

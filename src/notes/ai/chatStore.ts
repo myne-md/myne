@@ -99,6 +99,9 @@ export interface AgentTurnSummary {
    *  "remote but nothing was sent" are different statements. */
   charsOffDevice: number | null;
   end: AgentTurnEnd;
+  /** Memory entries this run wrote (0 or 1, summed across resumes). Feeds the
+   *  turn-end marker (myne-md/myne#697). */
+  memoryUpdated?: number;
   /** The frozen proposal, present when the settled run proposed anything.
    *  A verbatim plain-data copy (`Pick` of the live `Proposal`), so later
    *  mutations of the live run cannot rewrite history. */

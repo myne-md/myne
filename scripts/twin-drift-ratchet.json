@@ -11,7 +11,16 @@
     "",
     "The denominator has its own floor, and it is NOT in this file:",
     "`EXAMINED_FLOOR` in scripts/check-twin-drift-ratchet.mjs. Shrinking the twin",
-    "roster would shrink this set too, and read as progress."
+    "roster would shrink this set too, and read as progress.",
+    "",
+    "Two entries below are hand-added, not `--record` output, and this paragraph",
+    "is their stated reason (myne-md/myne#697):",
+    "`src/components/settings/MemorySection.tsx::mobile/src/app/flows/MemorySection.tsx`",
+    "and `src/notes/components/MemoryPopover.tsx::mobile/src/app/flows/MemorySheet.tsx`.",
+    "Both are new twin pairs with recorded per-client posture (desktop Settings",
+    "section and popover against mobile flow and bottom sheet); the divergence is",
+    "legitimate growth, not a regression cover. `--record` still refuses any further",
+    "growth, and the set itself is unchanged by this paragraph."
   ],
   "semanticallyDifferent": [
     "core/src/inference/engine.rs::mobile/src-tauri/src/plugins/local_inference/engine.rs",
@@ -46,6 +55,7 @@
     "src-tauri/src/plugins/workspace/mod.rs::mobile/src-tauri/src/plugins/workspace/mod.rs",
     "src/App.tsx::mobile/src/App.tsx",
     "src/App.tsx::mobile/src/app/AppShell.tsx",
+    "src/components/settings/MemorySection.tsx::mobile/src/app/flows/MemorySection.tsx",
     "src/dialect/welcomeNote.ts::mobile/src/lib/welcomeNote.ts",
     "src/editor-host.ts::mobile/src/editor-host.ts",
     "src/hooks/useDateTimeDisplaySync.ts::mobile/src/lib/useDateTimeDisplaySync.ts",
@@ -70,6 +80,7 @@
     "src/lib/workspace-persist.ts::mobile/src/lib/workspace-persist.ts",
     "src/main.tsx::mobile/src/main.tsx",
     "src/notes/attachmentRef.ts::mobile/src/lib/attachmentRef.ts",
+    "src/notes/components/MemoryPopover.tsx::mobile/src/app/flows/MemorySheet.tsx",
     "src/notes/dailyNote.ts::mobile/src/lib/daily.ts",
     "src/notes/folderBackfill.ts::mobile/src/lib/folderBackfill.ts",
     "src/notes/localDateTime.ts::mobile/src/lib/localDateTime.ts",

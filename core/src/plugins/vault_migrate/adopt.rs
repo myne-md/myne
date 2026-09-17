@@ -104,6 +104,8 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
             "vault.attachments",
             "vault.themes",
             "vault.chats",
+            "vault.agent-memory",
+            "vault.personality",
         ],
     )
     .await;
@@ -117,6 +119,13 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
     // these files in place instead (it holds both keys for one moment), so
     // the shared drop helper must not touch the subtree.
     let _ = io.remove_dir_all(&vault_root.join("chats")).await;
+
+    // `memories/` (`MYX1` per-entry files, myne-md/myne#697) is the per-file
+    // twin of the catalog drop above: sealed under the old `AgentMemoryKey`,
+    // so the whole subtree goes with it. Same recovery story as `chats/`
+    // (files come back from the server under the new generation; entry ids
+    // are generation-independent).
+    let _ = io.remove_dir_all(&vault_root.join("memories")).await;
 
     // The personal dictionary (`MYD1`) is dropped with them and is NOT
     // recoverable: it is sealed under the old root and is not synced, and the

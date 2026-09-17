@@ -245,6 +245,26 @@ const TYPE_SHIM_REASON =
 
 const CURATED_TWINS = [
   {
+    a: "src/components/settings/MemorySection.tsx",
+    b: "mobile/src/app/flows/MemorySection.tsx",
+    what: "the agent-memory management surface: list, edit, delete, clear-all-with-confirm, and the personality editor (myne-md/myne#697)",
+    why:
+      "The two files answer the same product question at different paths, so " +
+      "the path sweep cannot pair them. The phone side is recut for touch " +
+      "(stacked confirms with the safe answer last, inline two-tap delete) " +
+      "while the desktop side uses the settings primitives; the commands, " +
+      "testids and the ai_enabled gate are the shared answer both must keep.",
+  },
+  {
+    a: "src/notes/components/MemoryPopover.tsx",
+    b: "mobile/src/app/flows/MemorySheet.tsx",
+    what: "the in-chat memory surface: the live roster beside the conversation, with delete (myne-md/myne#697)",
+    why:
+      "A popover has no phone posture, so the mobile twin is a bottom sheet " +
+      "opened from the AI flow's memory button. Same roster, same delete " +
+      "path, same report-don't-empty read; editing lives in Settings on both.",
+  },
+  {
     a: "src/notes/dailyNote.ts",
     b: "mobile/src/lib/daily.ts",
     what: "hand-mirrors the whole period resolver: isoWeek, formatDailyDate, zonedNow, PERIODS, PERIOD_DEFAULTS, periodRange, periodSettings, resolvePeriodNote",
@@ -552,6 +572,22 @@ const ROSTER = [
   // Rust source actually lives, and one of these (vault-repair-error) turns out
   // NOT to be in core/ at all.
   {
+    a: "src/components/settings/MemorySection.tsx",
+    b: "mobile/src/app/flows/MemorySection.tsx",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Same surface, different client posture (myne-md/myne#697). Desktop uses the settings primitives; mobile owns its styles with stacked confirms and inline two-tap delete. Commands, testids and the ai_enabled gate are the shared answer; presentation is per-client by design.",
+  },
+  {
+    a: "src/notes/components/MemoryPopover.tsx",
+    b: "mobile/src/app/flows/MemorySheet.tsx",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "Same surface, different client posture (myne-md/myne#697): a popover has no phone form, so the mobile twin is a bottom sheet. Roster, delete path and the report-don't-empty read are shared; the container is per-client by design.",
+  },
+  {
     a: "src/App.tsx",
     b: "mobile/src/App.tsx",
     verdict: "screen",
@@ -630,6 +666,14 @@ const ROSTER = [
     destination: "undecided",
     reason:
       "IPC wrapper and DTO mirror over the shared chats core, the attachments-twin shape: six commands plus the two error-kind unions plus ConversationEntry. Both sides register the full subset the shared ACL grants, so unlike attachments there is no per-command absence question here: the wrapper shape is one answer. Its error taxonomy overlaps myne-md/myne#475.",
+  },
+  {
+    a: "src/lib/memory.ts",
+    b: "mobile/src/lib/memory.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "IPC wrapper and DTO mirror over the shared memory core, the chats-twin shape: six commands plus the two error-kind unions plus MemoryEntryRow/MemoryListRow/PersonalityView. Both sides register the full subset the shared ACL grants, so unlike attachments there is no per-command absence question here: the wrapper shape is one answer (myne-md/myne#697).",
   },
   {
     a: "src/lib/device-name.ts",
@@ -1144,6 +1188,14 @@ const ROSTER = [
       SHIM_REASON,
   },
   {
+    a: "src-tauri/src/plugins/memory/mod.rs",
+    b: "mobile/src-tauri/src/plugins/memory/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      SHIM_REASON,
+  },
+  {
     a: "src-tauri/src/plugins/export/mod.rs",
     b: "mobile/src-tauri/src/plugins/export/mod.rs",
     verdict: "delegated",
@@ -1341,7 +1393,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2203 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2263 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1405,7 +1457,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "The `#[tauri::command]` layer, 541 lines against 367, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own. The `agent_start` argument disagreement this reason used to record (desktop declared `language` and `history`, mobile did not, desktop read neither) is closed by myne-md/myne#648: both sides declare and seed both now.",
+      "The `#[tauri::command]` layer, 567 lines against 390, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own. The `agent_start` argument disagreement this reason used to record (desktop declared `language` and `history`, mobile did not, desktop read neither) is closed by myne-md/myne#648: both sides declare and seed both now.",
   },
   {
     a: "src-tauri/src/plugins/agent/adapters.rs",

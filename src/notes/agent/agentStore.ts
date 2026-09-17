@@ -44,6 +44,8 @@ export interface AgentState {
   charsOffDevice: number | null;
   /** Notes the excluded-folder clamp removed from the most recent grant. */
   excludedCount: number;
+  /** Memory entries this run wrote (0 or 1 per step, summed across resumes). */
+  memoryUpdated: number;
   /** Indices into `proposal.edits` the user has rejected. Rejection is tracked
    *  rather than approval so a newly arrived edit defaults to shown-and-kept,
    *  which is what a reviewer expects after a resume. */
@@ -135,6 +137,7 @@ const INITIAL: AgentState = {
   notesRead: 0,
   charsOffDevice: null,
   excludedCount: 0,
+  memoryUpdated: 0,
   rejected: new Set(),
   rejectedNewNotes: new Set(),
   appliedEdits: new Set(),
@@ -343,6 +346,7 @@ export function settleStep(
     notesRead: number;
     charsOffDevice: number | null;
     excludedCount: number;
+    memoryUpdated: number;
   },
   epoch: number,
 ): boolean {
@@ -375,6 +379,7 @@ export function settleStep(
     notesRead: legBase.notesRead,
     charsOffDevice: legBase.charsOffDevice,
     excludedCount: result.excludedCount,
+    memoryUpdated: (getAgent().memoryUpdated ?? 0) + (result.memoryUpdated ?? 0),
     running: false,
   });
   return true;

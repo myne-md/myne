@@ -198,6 +198,11 @@ pub fn run() {
         // stay in lockstep with build.rs + permissions/chats/default.toml or
         // the ACL resolver fails closed.
         .plugin(plugins::chats::init())
+        // Agent memory (MYN1 catalog + MYX1 files + MYZ1 personality,
+        // myne-md/myne#697): the six storage commands, shared from
+        // `myne-core`. Commands must stay in lockstep with build.rs +
+        // permissions/memory/default.toml or the ACL resolver fails closed.
+        .plugin(plugins::memory::init())
         // Workspace state (MYW1, §9.7): read/write of the encrypted
         // vault.workspace descriptor, which on mobile carries the sidebar
         // folder-expand set (MYND-561). Mobile-LOCAL, not a `myne-core`

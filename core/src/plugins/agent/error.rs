@@ -171,6 +171,27 @@ pub enum AgentError {
     /// excluded, or the folder holds none.
     #[error("grant resolved to no usable notes")]
     EmptyGrant,
+    /// A `remember` action failed the memory plugin's write-time gate
+    /// (schema + 2000-character cap + injection scan, `decisions/ai/0590`).
+    /// Refused at the write: a refused update or user write is never
+    /// persisted; a refused MODEL create persists as `quarantined` (held for
+    /// user review, never injected) instead of being dropped silently
+    /// (myne-md/myne#709, `decisions/ai/0591`). Carries no detail: the scan's
+    /// classes are closed and the memory UI renders the entry as rejected or
+    /// held.
+    #[error("the memory write failed the injection scan or the schema gate")]
+    MemoryScanRejected,
+    /// A `remember` action named a user-authored entry (myne-md/myne#709, the
+    /// authorship gate). The model never overwrites user rows; the correction
+    /// stays a user act in the Memory panel. A refusal the loop reports, not
+    /// a run failure.
+    #[error("the agent may not overwrite a user-authored memory entry")]
+    MemoryAuthorshipRefused,
+    /// A `remember` action distilled notes the run read from a folder the user
+    /// has since excluded (myne-md/myne#709, write-time exclusion). A refusal
+    /// the loop reports, not a run failure.
+    #[error("the memory was learned from a note in an excluded folder")]
+    MemoryExcludedSource,
     /// A grant named a folder that canonicalizes to the vault root, which would
     /// grant the whole vault in one step and defeat the point of a grant.
     #[error("a grant may not name the vault root")]
@@ -281,6 +302,9 @@ impl AgentError {
             Self::OutOfScope { .. } => "out_of_scope",
             Self::ExcludedNow => "excluded_now",
             Self::EmptyGrant => "empty_grant",
+            Self::MemoryScanRejected => "memory_scan_rejected",
+            Self::MemoryAuthorshipRefused => "memory_authorship_refused",
+            Self::MemoryExcludedSource => "memory_excluded_source",
             Self::RootGrant => "root_grant",
             Self::RestorePointFailed => "restore_point_failed",
             Self::WriteFailed => "write_failed",

@@ -52,6 +52,9 @@ pub const MAX_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
 pub mod account_number;
 pub mod aead;
+pub mod agent_memory_catalog_blob;
+pub mod agent_memory_entry_blob;
+pub mod agent_personality_blob;
 pub mod attachment_blob;
 pub mod attachment_text_blob;
 pub mod attachments_catalog;
@@ -103,14 +106,43 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob, aad_chats_blob_v0_2,
-    aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob, aad_membership_blob,
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
-    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-    aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
-    aad_vault_indices_blob, aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2,
-    aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+    aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
+    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob,
+    aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob,
+    aad_membership_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+    aad_password_wrap_v0_2, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
+    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
+    aad_singleton_blob_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
+    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+};
+pub use agent_memory_catalog_blob::{
+    decode_agent_memory_catalog_blob, decode_agent_memory_catalog_blob_versioned,
+    encode_agent_memory_catalog_blob, encode_agent_memory_catalog_blob_raw,
+    encode_agent_memory_catalog_blob_versioned, AgentMemoryCatalogError,
+    AGENT_MEMORY_CATALOG_ACCOUNT_HASH_LEN, AGENT_MEMORY_CATALOG_BLOB_AAD_ROLE,
+    AGENT_MEMORY_CATALOG_BLOB_MAGIC, AGENT_MEMORY_CATALOG_BLOB_PROTOCOL_VERSION,
+    AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_MEMORY_CATALOG_FORMAT_VERSION,
+    AGENT_MEMORY_CATALOG_HEADER_LEN, MAX_AGENT_MEMORY_CATALOG_PLAINTEXT_LEN,
+};
+pub use agent_memory_entry_blob::{
+    decode_agent_memory_blob, decode_agent_memory_blob_v0_2, decode_agent_memory_blob_versioned,
+    encode_agent_memory_blob, encode_agent_memory_blob_raw, encode_agent_memory_blob_v0_2,
+    encode_agent_memory_blob_v0_2_raw, encode_agent_memory_blob_versioned,
+    reseal_agent_memory_blob_v0_2, AgentMemoryBlobError, AGENT_MEMORY_BLOB_AAD_ROLE,
+    AGENT_MEMORY_BLOB_ACCOUNT_HASH_LEN, AGENT_MEMORY_BLOB_FORMAT_VERSION,
+    AGENT_MEMORY_BLOB_HEADER_LEN, AGENT_MEMORY_BLOB_MAGIC, AGENT_MEMORY_BLOB_PROTOCOL_VERSION_V0_1,
+    AGENT_MEMORY_BLOB_PROTOCOL_VERSION_V0_2, AGENT_MEMORY_BLOB_V0_2_MAGIC,
+    MAX_AGENT_MEMORY_PLAINTEXT_LEN, MEMORY_ENTRY_ID_LEN,
+};
+pub use agent_personality_blob::{
+    decode_agent_personality_blob, decode_agent_personality_blob_versioned,
+    encode_agent_personality_blob, encode_agent_personality_blob_raw,
+    encode_agent_personality_blob_versioned, AgentPersonalityBlobError,
+    AGENT_PERSONALITY_ACCOUNT_HASH_LEN, AGENT_PERSONALITY_BLOB_AAD_ROLE,
+    AGENT_PERSONALITY_BLOB_MAGIC, AGENT_PERSONALITY_BLOB_PROTOCOL_VERSION,
+    AGENT_PERSONALITY_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_FORMAT_VERSION,
+    AGENT_PERSONALITY_HEADER_LEN, MAX_AGENT_PERSONALITY_PLAINTEXT_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_encrypt_attachment_v0_2, aad_wrap_attachment_key,

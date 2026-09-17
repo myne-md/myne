@@ -204,9 +204,14 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
  *  says of that roster: "Naming it here because the sentence above says nothing
  *  else and a bulk enumeration of notes the model has not read is not covered by
  *  it." This is the sentence it meant, and it did not say so until
- *  myne-md/myne#531 review round six. */
+ *  myne-md/myne#531 review round six.
+ *
+ *  **Memory rides along and is named for the same reason.** Every agent run
+ *  also carries what it remembers about you: distilled facts from earlier
+ *  runs (at most 100 entries) and your voice preferences, each entry with a
+ *  stable identifier (myne-md/myne#697). */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them.";
+  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier.";
 
 /** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
  *
