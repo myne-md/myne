@@ -385,3 +385,139 @@ proptest! {
         prop_assert_ne!(head_fingerprint(&a), head_fingerprint(&b));
     }
 }
+
+// ── Person-keypair PQ hybrid (myne-md/myne#698) ────────────────────────────
+//
+// The compensating control for shipping unaudited ML-KEM/ML-DSA is that the
+// wrap/sign laws are exercised as universal properties, not only by example
+// round-trips. A wrong implementation fails these; a self-consistent one that
+// is wrong in the same way twice does not, which is what the cross-impl
+// `person-identity` vectors cover in the other direction.
+
+use protocol::person_key::{
+    PersonKeyPair, PersonPublicHalf, PERSON_DK_SEED_LEN, PERSON_ED25519_SEED_LEN,
+    PERSON_MLDSA_SEED_LEN,
+};
+
+struct PropRng(u64);
+impl rand_core::TryRng for PropRng {
+    type Error = core::convert::Infallible;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(0)
+    }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(0)
+    }
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        let ctr = self.0.wrapping_add(1);
+        self.0 = ctr;
+        let mut x = ctr;
+        for b in dst.iter_mut() {
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            *b = (x >> 33) as u8;
+        }
+        Ok(())
+    }
+}
+impl rand_core::TryCryptoRng for PropRng {}
+
+fn pair_from(material: &[u8]) -> PersonKeyPair {
+    let mut kem = [0u8; PERSON_DK_SEED_LEN];
+    let mut ed = [0u8; PERSON_ED25519_SEED_LEN];
+    let mut ml = [0u8; PERSON_MLDSA_SEED_LEN];
+    for (i, b) in material.iter().enumerate() {
+        kem[i % PERSON_DK_SEED_LEN] ^= b;
+        ed[i % PERSON_ED25519_SEED_LEN] ^= b.rotate_left(1);
+        ml[i % PERSON_MLDSA_SEED_LEN] ^= b.rotate_left(2);
+    }
+    PersonKeyPair::generate_raw(&kem, &ed, &ml)
+}
+
+proptest! {
+    /// The fingerprint is a deterministic function of the three public halves:
+    /// the same seeds always fingerprint identically, and any change to a seed
+    /// changes it.
+    #[test]
+    fn prop_person_fingerprint_deterministic_and_sensitive(
+        a in pvec(any::<u8>(), 8),
+        b in pvec(any::<u8>(), 8),
+    ) {
+        let ka = pair_from(&a);
+        let kb = pair_from(&a);
+        prop_assert_eq!(ka.fingerprint(), kb.fingerprint());
+        prop_assume!(a != b);
+        let fa = pair_from(&a);
+        let fb = pair_from(&b);
+        prop_assert_ne!(fa.fingerprint(), fb.fingerprint());
+    }
+
+    /// The PQ-hybrid wrap round-trips: a key wrapped to a member's public half
+    /// opens under that member's private half, and a DIFFERENT member cannot
+    /// open it.
+    #[test]
+    fn prop_person_wrap_round_trips_and_excludes_others(
+        owner in pvec(any::<u8>(), 8),
+        member in pvec(any::<u8>(), 8),
+        other in pvec(any::<u8>(), 8),
+        key in uniform32(any::<u8>()),
+        acct in uniform16(any::<u8>()),
+    ) {
+        prop_assume!(member != other);
+        let member_pair = pair_from(&member);
+        let other_pair = pair_from(&other);
+        let _ = owner;
+        let mut rng = PropRng(0);
+        let wrapped = member_pair
+            .public_half()
+            .wrap_key(&key, &acct, &mut rng)
+            .expect("wrap to a valid half");
+        let opened = member_pair.unwrap_key(&wrapped, &acct).expect("member opens");
+        prop_assert_eq!(*opened, key);
+        // The wrong member, and the wrong vault hash, both fail closed.
+        prop_assert!(other_pair.unwrap_key(&wrapped, &acct).is_err());
+        let mut wrong_acct = acct;
+        wrong_acct[0] ^= 0x01;
+        prop_assert!(member_pair.unwrap_key(&wrapped, &wrong_acct).is_err());
+    }
+
+    /// Both signature halves verify over the signed message, and a tampered
+    /// message (or signature) fails. `verify` requires BOTH halves, so the
+    /// hybrid is SUF-CMA by independence rather than by a composite.
+    #[test]
+    fn prop_person_sign_verifies_and_rejects_tamper(
+        who in pvec(any::<u8>(), 8),
+        msg in pvec(any::<u8>(), 32),
+    ) {
+        let pair = pair_from(&who);
+        let mut rng = PropRng(7);
+        let signed = pair.sign(&msg, &mut rng).expect("sign");
+        pair.public_half().verify(&msg, &signed).expect("valid signature verifies");
+
+        if !msg.is_empty() {
+            let mut tampered = msg.clone();
+            tampered[0] ^= 0x01;
+            prop_assert!(pair.public_half().verify(&tampered, &signed).is_err());
+        }
+        let mut bad = signed.clone();
+        bad.ed25519_sig[0] ^= 0x01;
+        prop_assert!(pair.public_half().verify(&msg, &bad).is_err());
+    }
+
+    /// A public half rebuilt from its hex parts fingerprints identically, so
+    /// the SAS value a roster pins and the value an invite computes agree.
+    #[test]
+    fn prop_person_public_half_hex_round_trips(material in pvec(any::<u8>(), 8)) {
+        let pair = pair_from(&material);
+        let half: &PersonPublicHalf = &pair.public_half();
+        let hex = |b: &[u8]| b.iter().map(|x| format!("{x:02x}")).collect::<String>();
+        let rebuilt = PersonPublicHalf::from_parts_hex(
+            &hex(half.kem_ek()),
+            &hex(half.ed_pk()),
+            &hex(half.mldsa_vk()),
+        )
+        .expect("valid hex round-trips");
+        prop_assert_eq!(rebuilt.fingerprint(), half.fingerprint());
+    }
+}

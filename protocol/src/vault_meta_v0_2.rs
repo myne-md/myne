@@ -29,8 +29,9 @@
 //! [`encode_vault_meta_v0_2`].
 
 use crate::aead::{
-    aad_membership_blob, aad_password_wrap_v0_2, aad_recovery_wrap_v0_2,
-    aad_vault_items_key_wrap_v0_2, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    aad_membership_blob, aad_membership_roster_blob, aad_password_wrap_v0_2,
+    aad_recovery_wrap_v0_2, aad_vault_items_key_wrap_v0_2, aead_open_ctx, aead_seal_ctx,
+    AEAD_KEY_LEN, AEAD_NONCE_LEN,
 };
 use crate::error::ProtocolError;
 use crate::kdf::{
@@ -39,10 +40,12 @@ use crate::kdf::{
 use crate::subkey::{derive_subkey_v0_2, SubkeyRole};
 use crate::types::{KdfParams, MetaVersion};
 use crate::vault_meta::{
-    parse_vault_meta, serialize_vault_meta, Membership, VaultMeta, MEMBERSHIP_ACCOUNT_ID_LEN,
-    MEMBERSHIP_CIPHERTEXT_LEN, MEMBERSHIP_FIELD_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
-    VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION, VAULT_META_V0_2_WITH_MEMBERSHIP_LEN,
-    VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+    parse_vault_meta, serialize_vault_meta, Membership, MembershipRoster, VaultMeta,
+    MEMBERSHIP_ACCOUNT_ID_LEN, MEMBERSHIP_CIPHERTEXT_LEN, MEMBERSHIP_FIELD_LEN,
+    MEMBERSHIP_ROSTER_CT_CAP, MEMBERSHIP_ROSTER_NONCE_LEN, VAULT_META_ITEMS_KEY_ID_LEN,
+    VAULT_META_LEN, VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION,
+    VAULT_META_V0_2_WITH_MEMBERSHIP_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN,
+    VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 use alloc::vec::Vec;
 use zeroize::Zeroizing;
@@ -69,9 +72,25 @@ pub fn serialize_vault_meta_v0_2(meta: &VaultMeta) -> Vec<u8> {
     out[0..4].copy_from_slice(&VAULT_META_V0_2_MAGIC);
     out[4] = VAULT_META_V0_2_PROTOCOL_VERSION;
     if let Some(membership) = &meta.membership {
-        out[5] = 0x01;
-        out.extend_from_slice(&membership.nonce);
-        out.extend_from_slice(&membership.enc);
+        match &membership.roster {
+            None => {
+                // The 0580 single-account shape: reserved 0x01, 417 bytes.
+                out[5] = 0x01;
+                out.extend_from_slice(&membership.nonce);
+                out.extend_from_slice(&membership.enc);
+            }
+            Some(roster) => {
+                // The B2B shape (b2b-identity-substrate task 3): reserved
+                // 0x02, then the single-account field, then the roster
+                // envelope (nonce + capped ciphertext).
+                out[5] = 0x02;
+                out.extend_from_slice(&membership.nonce);
+                out.extend_from_slice(&membership.enc);
+                out.extend_from_slice(&roster.nonce);
+                out.extend_from_slice(&(roster.enc.len() as u32).to_be_bytes());
+                out.extend_from_slice(&roster.enc);
+            }
+        }
     }
     out
 }
@@ -90,7 +109,7 @@ pub fn serialize_vault_meta_v0_2(meta: &VaultMeta) -> Vec<u8> {
 /// read from the trailing 72 bytes and carried as `membership: Some(..)`; it is
 /// NOT AEAD-opened here (that needs `root_key`, which the parser does not hold).
 pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
-    if bytes.len() != VAULT_META_LEN && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
+    if bytes.len() != VAULT_META_LEN && bytes.len() < VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
         return Err(ProtocolError::InvalidVaultMeta);
     }
     if bytes[0..4] != VAULT_META_V0_2_MAGIC {
@@ -100,16 +119,58 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         return Err(ProtocolError::InvalidVaultMeta);
     }
     let reserved = bytes[5];
-    if reserved != 0x00 && reserved != 0x01 {
+    if reserved > 0x02 {
         return Err(ProtocolError::InvalidVaultMeta);
     }
-    let has_membership = reserved == 0x01;
-    if has_membership && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
+    let has_membership = reserved >= 0x01;
+    let has_roster = reserved == 0x02;
+    if has_membership && bytes.len() < VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
         return Err(ProtocolError::InvalidVaultMeta);
     }
     if !has_membership && bytes.len() != VAULT_META_LEN {
         return Err(ProtocolError::InvalidVaultMeta);
     }
+
+    // Roster envelope (reserved 0x02 only): 24-byte nonce + u32 BE ciphertext
+    // length + ciphertext, directly after the single-account field.
+    let roster = if has_roster {
+        let base = VAULT_META_V0_2_WITH_MEMBERSHIP_LEN;
+        // Envelope order (the serializer's): roster nonce (24) || u32 BE ct
+        // length || ciphertext. The length field sits AFTER the nonce.
+        let nonce_start = base;
+        let len_start = base + MEMBERSHIP_ROSTER_NONCE_LEN;
+        if bytes.len() < len_start + 4 {
+            return Err(ProtocolError::InvalidVaultMeta);
+        }
+        let ct_len = u32::from_be_bytes([
+            bytes[len_start],
+            bytes[len_start + 1],
+            bytes[len_start + 2],
+            bytes[len_start + 3],
+        ]) as usize;
+        if ct_len == 0 || ct_len > MEMBERSHIP_ROSTER_CT_CAP {
+            return Err(ProtocolError::InvalidVaultMeta);
+        }
+        let ct_start = len_start + 4;
+        let expected = ct_start + ct_len;
+        if bytes.len() != expected {
+            return Err(ProtocolError::InvalidVaultMeta);
+        }
+        let mut roster_nonce = [0u8; MEMBERSHIP_ROSTER_NONCE_LEN];
+        roster_nonce
+            .copy_from_slice(&bytes[nonce_start..nonce_start + MEMBERSHIP_ROSTER_NONCE_LEN]);
+        let mut enc = alloc::vec::Vec::with_capacity(ct_len);
+        enc.extend_from_slice(&bytes[ct_start..expected]);
+        Some(MembershipRoster {
+            nonce: roster_nonce,
+            enc,
+        })
+    } else {
+        if has_membership && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
+            return Err(ProtocolError::InvalidVaultMeta);
+        }
+        None
+    };
 
     let mut as_v0_1 = [0u8; VAULT_META_LEN];
     as_v0_1.copy_from_slice(&bytes[..VAULT_META_LEN]);
@@ -125,7 +186,7 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         enc.copy_from_slice(
             &bytes[VAULT_META_LEN + AEAD_NONCE_LEN..VAULT_META_LEN + MEMBERSHIP_FIELD_LEN],
         );
-        meta.membership = Some(Membership { nonce, enc });
+        meta.membership = Some(Membership { nonce, enc, roster });
     }
 
     Ok(meta)
@@ -453,7 +514,50 @@ pub fn seal_membership_raw(
     debug_assert_eq!(sealed.len(), MEMBERSHIP_CIPHERTEXT_LEN);
     let mut enc = [0u8; MEMBERSHIP_CIPHERTEXT_LEN];
     enc.copy_from_slice(&sealed);
-    Ok(Membership { nonce: *nonce, enc })
+    Ok(Membership {
+        nonce: *nonce,
+        enc,
+        roster: None,
+    })
+}
+
+/// Seal a B2B roster envelope (b2b-identity-substrate, myne-md/myne#698 task
+/// 3) under the SAME `membership_key` as the single-account field, with the
+/// roster AAD role (`aad_membership_roster_blob`): the vault binding comes
+/// from the same `account_number_hash`, so a roster from another vault
+/// fails AEAD. `plaintext` is the ENGINE-OPAQUE roster bytes (the merge
+/// layer's canonical encoding); the cap is enforced here so the write path
+/// and the parser agree on [`MEMBERSHIP_ROSTER_CT_CAP`].
+///
+/// Returns [`ProtocolError::AeadFailure`] when the sealed plaintext would
+/// exceed the cap (write-side refusal; read-side the parser rejects the
+/// length before decrypting).
+pub fn seal_membership_roster_raw(
+    root_key: &[u8; AEAD_KEY_LEN],
+    plaintext: &[u8],
+    account_number_hash: &[u8; 16],
+    nonce: &[u8; MEMBERSHIP_ROSTER_NONCE_LEN],
+) -> Result<MembershipRoster, ProtocolError> {
+    if plaintext.is_empty() || plaintext.len() + 32 > MEMBERSHIP_ROSTER_CT_CAP {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_membership_roster_blob(account_number_hash);
+    let enc = aead_seal_ctx(&membership_key, nonce, plaintext, &aad)?;
+    Ok(MembershipRoster { nonce: *nonce, enc })
+}
+
+/// Unseal the B2B roster envelope. Same binding as
+/// [`unseal_membership`]: a tampered envelope or a wrong `root_key`
+/// answers [`ProtocolError::AeadFailure`] (non-distinguishing, §7.3).
+pub fn unseal_membership_roster(
+    root_key: &[u8; AEAD_KEY_LEN],
+    roster: &MembershipRoster,
+    account_number_hash: &[u8; 16],
+) -> Result<Zeroizing<Vec<u8>>, ProtocolError> {
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_membership_roster_blob(account_number_hash);
+    aead_open_ctx(&membership_key, &roster.nonce, &roster.enc, &aad)
 }
 
 /// Unseal the account id from a [`Membership`] field. Returns
@@ -497,6 +601,24 @@ mod tests {
             p: 1,
             argon2_version: 0x13,
         }
+    }
+
+    /// A minimal v0.2 meta carrying a fixture roster extension. Built from
+    /// the REAL encoded base (`encode()`, fast params), so the base-345
+    /// parse inside the roster parser is exercised for real; the roster
+    /// ciphertext bytes are fixture filler (framing only; the AEAD tests
+    /// use real seals).
+    fn roster_meta_fixture() -> VaultMeta {
+        let mut meta = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        meta.membership = Some(Membership {
+            nonce: [0x11; AEAD_NONCE_LEN],
+            enc: [0x22; MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: Some(MembershipRoster {
+                nonce: [0x33; MEMBERSHIP_ROSTER_NONCE_LEN],
+                enc: alloc::vec![0x55; 64],
+            }),
+        });
+        meta
     }
 
     fn encode() -> [u8; VAULT_META_LEN] {
@@ -715,9 +837,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_rejects_reserved_byte_other_than_zero_or_one() {
+    fn parse_rejects_reserved_byte_above_the_allocated_range() {
+        // 0x00/0x01/0x02 are allocated (base / single-account / roster); 0x03 is
+        // the first unallocated value the newer-reads-older rule must reject.
+        // This used 0x02 until the roster extension allocated it, at which point
+        // the test passed only because the 345-byte fixture is shorter than the
+        // roster-present length and the LENGTH check rejected it, not the
+        // reserved-byte check the name described.
         let mut blob = encode().to_vec();
-        blob[5] = 0x02;
+        blob[5] = 0x03;
         assert!(matches!(
             parse_vault_meta_v0_2(&blob),
             Err(ProtocolError::InvalidVaultMeta)
@@ -947,6 +1075,216 @@ mod tests {
         std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
         std::println!("    \"tamper_offset\": 369,");
         std::println!("    \"expected_error\": \"aead_failure\"");
+        std::println!("  }}");
+        std::println!("]");
+    }
+    #[test]
+    fn b2b_roster_round_trip() {
+        let mut meta = roster_meta_fixture();
+        meta.membership = Some(Membership {
+            nonce: [0x11; AEAD_NONCE_LEN],
+            enc: [0x22; MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: Some(MembershipRoster {
+                nonce: [0x33; MEMBERSHIP_ROSTER_NONCE_LEN],
+                enc: alloc::vec![0x55; 64],
+            }),
+        });
+        let bytes = serialize_vault_meta_v0_2(&meta);
+        assert_eq!(bytes[5], 0x02, "roster shape is reserved byte 0x02");
+        // 345 + 72 (single-account field) + 24 (roster nonce) + 4 (len) + 64 (ct) = 509
+        assert_eq!(
+            bytes.len(),
+            VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + MEMBERSHIP_ROSTER_NONCE_LEN + 4 + 64
+        );
+        let parsed = parse_vault_meta_v0_2(&bytes).expect("roster meta parses");
+        let membership = parsed.membership.expect("membership present");
+        let roster = membership.roster.expect("roster present");
+        assert_eq!(roster.nonce, [0x33; MEMBERSHIP_ROSTER_NONCE_LEN]);
+        assert_eq!(roster.enc, alloc::vec![0x55; 64]);
+    }
+
+    #[test]
+    fn b2b_roster_parser_rejects_over_cap_and_zero_len() {
+        // Build a valid 0x02 blob, then tamper the u32 length field past the cap.
+        let mut meta = roster_meta_fixture();
+        meta.membership = Some(Membership {
+            nonce: [0x11; AEAD_NONCE_LEN],
+            enc: [0x22; MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: Some(MembershipRoster {
+                nonce: [0x33; MEMBERSHIP_ROSTER_NONCE_LEN],
+                enc: alloc::vec![0x55; 64],
+            }),
+        });
+        let mut bytes = serialize_vault_meta_v0_2(&meta);
+        let len_start = VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + MEMBERSHIP_ROSTER_NONCE_LEN;
+        // Over-cap length: the parser must reject BEFORE reading ciphertext.
+        bytes[len_start] = 0xFF;
+        bytes[len_start + 1] = 0xFF;
+        bytes[len_start + 2] = 0xFF;
+        bytes[len_start + 3] = 0xFF;
+        assert_eq!(
+            parse_vault_meta_v0_2(&bytes).unwrap_err(),
+            ProtocolError::InvalidVaultMeta
+        );
+    }
+
+    #[test]
+    fn b2b_roster_parser_rejects_length_mismatch_closed() {
+        let mut meta = roster_meta_fixture();
+        meta.membership = Some(Membership {
+            nonce: [0x11; AEAD_NONCE_LEN],
+            enc: [0x22; MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: Some(MembershipRoster {
+                nonce: [0x33; MEMBERSHIP_ROSTER_NONCE_LEN],
+                enc: alloc::vec![0x55; 64],
+            }),
+        });
+        let mut bytes = serialize_vault_meta_v0_2(&meta);
+        // Drop one ciphertext byte: declared length no longer matches.
+        bytes.pop();
+        assert_eq!(
+            parse_vault_meta_v0_2(&bytes).unwrap_err(),
+            ProtocolError::InvalidVaultMeta
+        );
+    }
+
+    #[test]
+    fn b2b_roster_seal_unseal_round_trip_and_vault_binding() {
+        let plaintext = alloc::vec![0xAB; 128];
+        let nonce = [0x44; MEMBERSHIP_ROSTER_NONCE_LEN];
+        let roster =
+            seal_membership_roster_raw(&ROOT, &plaintext, &ACCT, &nonce).expect("roster seal");
+        let opened = unseal_membership_roster(&ROOT, &roster, &ACCT).expect("roster unseal");
+        assert_eq!(plaintext.as_slice(), &opened[..]);
+
+        // The vault binding: the SAME roster under a DIFFERENT account hash
+        // must fail AEAD (a roster copied across vaults cannot regroup).
+        let other_hash = [0x77u8; 16];
+        let result = unseal_membership_roster(&ROOT, &roster, &other_hash);
+        assert_eq!(result.unwrap_err(), ProtocolError::AeadFailure);
+    }
+
+    #[test]
+    fn b2b_roster_cap_refuses_over_cap_plaintext() {
+        let nonce = [0x44; MEMBERSHIP_ROSTER_NONCE_LEN];
+        let over_cap = alloc::vec![0u8; MEMBERSHIP_ROSTER_CT_CAP];
+        let result = seal_membership_roster_raw(&ROOT, &over_cap, &ACCT, &nonce);
+        // plaintext.len() + 32 > cap: the +32 tag would push past the cap.
+        assert_eq!(result.unwrap_err(), ProtocolError::InvalidVaultMeta);
+    }
+
+    /// The B2B **roster extension** vector emitter (myne-md/myne#698 task
+    /// 11): pins the NTV5 `reserved` byte `0x02` layout. the roster
+    /// envelope (nonce || u32 BE len || ct) after the 72 single-account
+    /// bytes. for the same fixture roots as the membership family. Six
+    /// cases: absent, present (round-trip + unseal), tampered (fail
+    /// closed), cap-refused (over-cap length rejected by the parser
+    /// BEFORE reading ciphertext), and a seal/unseal pair with a known
+    /// plaintext under a known wrap key.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act. Run
+    /// with: `cargo test -p protocol --lib emit_roster_vectors_for_paste -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn emit_roster_vectors_for_paste() {
+        extern crate std;
+        fn hex(b: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(b.len() * 2);
+            for x in b {
+                s.push_str(&alloc::format!("{x:02x}"));
+            }
+            s
+        }
+        let base = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        // Present-with-roster: the single-account field + a real roster
+        // seal. The roster plaintext is a canonical fixture the merge
+        // layer's schema pins (owner row, version 1).
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let mem_nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &mem_nonce).expect("seal");
+        let roster_plaintext = b"{\"member_fp\":\"aa\"}".to_vec();
+        let roster_nonce = [0xEE; MEMBERSHIP_ROSTER_NONCE_LEN];
+        let roster = seal_membership_roster_raw(&ROOT, &roster_plaintext, &ACCT, &roster_nonce)
+            .expect("roster seal");
+        let mut roster_meta = base.clone();
+        roster_meta.membership = Some(Membership {
+            nonce: membership.nonce,
+            enc: membership.enc,
+            roster: Some(roster.clone()),
+        });
+        let roster_blob = serialize_vault_meta_v0_2(&roster_meta);
+        assert_eq!(roster_blob[5], 0x02);
+        assert_eq!(
+            roster_blob.len(),
+            VAULT_META_V0_2_WITH_MEMBERSHIP_LEN
+                + MEMBERSHIP_ROSTER_NONCE_LEN
+                + 4
+                + roster.enc.len()
+        );
+        // Parsed back: the roster envelope round-trips.
+        let parsed = parse_vault_meta_v0_2(&roster_blob).expect("roster meta parses");
+        let parsed_roster = parsed
+            .membership
+            .as_ref()
+            .and_then(|m| m.roster.as_ref())
+            .expect("roster present");
+        assert_eq!(parsed_roster.nonce, roster.nonce);
+        assert_eq!(parsed_roster.enc, roster.enc);
+        // Over-cap: the length field pushed past the cap rejects.
+        let mut over_cap = roster_blob.clone();
+        let len_start = VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + MEMBERSHIP_ROSTER_NONCE_LEN;
+        over_cap[len_start] = 0xFF;
+        over_cap[len_start + 1] = 0xFF;
+        over_cap[len_start + 2] = 0xFF;
+        over_cap[len_start + 3] = 0xFF;
+        assert!(parse_vault_meta_v0_2(&over_cap).is_err());
+        // Tampered roster ct: unseal fails closed.
+        let mut tampered_roster = roster.clone();
+        let mid = tampered_roster.enc.len() / 2;
+        tampered_roster.enc[mid] ^= 0x01;
+        assert!(unseal_membership_roster(&ROOT, &tampered_roster, &ACCT).is_err());
+        let mut tampered_meta = base.clone();
+        tampered_meta.membership = Some(Membership {
+            nonce: membership.nonce,
+            enc: membership.enc,
+            roster: Some(tampered_roster),
+        });
+        let tampered_blob = serialize_vault_meta_v0_2(&tampered_meta);
+        std::println!("[");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/roster-present\",");
+        std::println!("    \"description\": \"An NTV5 vault.meta with the B2B roster extension: reserved byte 0x02, 417 + 24 + 4 + N bytes, the roster envelope (nonce 0xEE.., u32 BE length, ciphertext) after the 72 single-account bytes, sealed under membership_key with the roster AAD. parse_vault_meta_v0_2 must accept it and unseal_membership_roster must recover the roster plaintext under root_key = 0x11.., account_number_hash = 0x44..\",");
+        std::println!("    \"case_kind\": \"roster_present\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&roster_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!(
+            "    \"input_roster_nonce_hex\": \"{}\",",
+            hex(&roster.nonce)
+        );
+        std::println!(
+            "    \"expected_roster_plaintext_utf8\": \"{{\\\"member_fp\\\":\\\"aa\\\"}}\","
+        );
+        std::println!("    \"tamper_offset\": {}", mid);
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/roster-tampered\",");
+        std::println!("    \"description\": \"The roster-present blob with the middle roster ciphertext byte flipped. unseal_membership_roster must fail closed (AeadFailure), never a partial read.\",");
+        std::println!("    \"case_kind\": \"roster_tampered\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&tampered_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"expected_error\": \"aead_failure\"");
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/roster-over-cap\",");
+        std::println!("    \"description\": \"The roster-present blob with the u32 BE ciphertext-length field pushed past the 64 KiB cap. parse_vault_meta_v0_2 must reject the length BEFORE reading any ciphertext (InvalidVaultMeta), so the cap is enforced at the frame layer.\",");
+        std::println!("    \"case_kind\": \"roster_over_cap\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&over_cap));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"tamper_offset\": {},", len_start);
+        std::println!("    \"expected_error\": \"invalid_vault_meta\"");
         std::println!("  }}");
         std::println!("]");
     }

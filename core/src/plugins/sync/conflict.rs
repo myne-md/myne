@@ -283,7 +283,7 @@ pub fn merge_custom_themes(local: &ThemesMap, remote: &ThemesMap) -> ThemesMap {
 /// is consulted ONLY on an equal `version` and MUST be a total order (returning
 /// `Equal` only for byte-identical entries) with remove-wins tombstone-ness
 /// folded in.
-fn join_by_version<T: Clone>(
+pub(crate) fn join_by_version<T: Clone>(
     a: &T,
     b: &T,
     version: impl Fn(&T) -> u64,
@@ -535,6 +535,16 @@ pub fn merge_vault_meta(
     // regardless of which side won the password-side. Grouping is a per-device
     // organisational choice, so a divergent grouping across devices must never
     // converge and never produce a conflict surface (`sync-protocol.md` §10.3).
+    //
+    // The B2B **roster extension** is the one deliberate reversal
+    // (b2b-identity-substrate task 4, myne-md/myne#698): the member list is a
+    // SHARED fact. Its merge lives in `super::roster` (`merge_rosters`, the
+    // attachments-catalog §11.4 pattern) and runs at the CALLER, which
+    // holds the unlocked `root_key` the roster envelopes need to be opened
+    // with: this function sees only opaque ciphertext and merges nothing
+    // behind it. The single-account half stays device-local exactly as 0580
+    // classified it, so the LOCAL envelope (single-account + whatever roster
+    // the caller re-sealed into it) always wins here.
     merged.membership = local.membership.clone();
     Ok(merged)
 }
@@ -1519,11 +1529,13 @@ mod tests {
         local.membership = Some(protocol::Membership {
             nonce: [0x11; protocol::AEAD_NONCE_LEN],
             enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: None,
         });
         let mut remote = meta(0xBB, 0x55);
         remote.membership = Some(protocol::Membership {
             nonce: [0x33; protocol::AEAD_NONCE_LEN],
             enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: None,
         });
 
         // Remote wins the password-side, but the membership stays local.
@@ -1545,11 +1557,13 @@ mod tests {
         local.membership = Some(protocol::Membership {
             nonce: [0x11; protocol::AEAD_NONCE_LEN],
             enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: None,
         });
         let mut remote = meta(0xBB, 0x55);
         remote.membership = Some(protocol::Membership {
             nonce: [0x33; protocol::AEAD_NONCE_LEN],
             enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: None,
         });
 
         let merged = merge_vault_meta(&local, &remote, MetaWinner::Remote).unwrap();

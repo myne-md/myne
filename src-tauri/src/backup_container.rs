@@ -745,11 +745,17 @@ mod tests {
 
     #[test]
     fn family_member_cap_is_enforced_by_verifier() {
-        // A vault.meta member larger than the §9.3 fixed length must reject
-        // at the table-parse layer (allocation-bound discipline).
+        // A vault.meta member larger than the member cap must reject at the
+        // table-parse layer (allocation-bound discipline). The cap now includes
+        // the NTV5 membership roster extension (myne-md/myne#698), so the
+        // overflowing fixture is one byte past THAT bound, not past the base
+        // 345-byte v0.1 length.
         let dir = ScopedTempDir::new("bc-cap").unwrap();
+        let cap = myne_format::backup_container::family_member_cap(
+            myne_format::backup_container::MemberFamily::VaultMeta,
+        ) as usize;
         let big_meta = dir.path().join("vault.meta");
-        fs::write(&big_meta, vec![0xAB; 5000]).unwrap();
+        fs::write(&big_meta, vec![0xAB; cap + 1]).unwrap();
         let dest = dir.path().join("out");
         assert!(matches!(
             write_container(&dest, &[("vault.meta".into(), big_meta)]),
@@ -1201,15 +1207,19 @@ mod tests {
         let mut misorder_table = rec_prefs_empty.clone();
         misorder_table.extend_from_slice(&rec_meta_empty);
         let vf_order = raw_container(2, 0, misorder_table.len() as u32, &misorder_table, &[]);
-        // vault.meta declared + carried at 346 bytes: the equations hold,
+        // vault.meta declared + carried one byte over the family cap: the equations hold,
         // the §9.3-derived family cap (<= 345) fires at table parse.
-        let rec_meta_346 = raw_record("vault.meta", 346, &zero_sha);
+        let meta_overflow_len = myne_format::backup_container::family_member_cap(
+            myne_format::backup_container::MemberFamily::VaultMeta,
+        ) as usize
+            + 1;
+        let rec_meta_346 = raw_record("vault.meta", meta_overflow_len as u64, &zero_sha);
         let vf_len_overflow = raw_container(
             1,
-            346,
+            meta_overflow_len as u64,
             rec_meta_346.len() as u32,
             &rec_meta_346,
-            &vec![0xAB; 346],
+            &vec![0xAB; meta_overflow_len],
         );
         let vf_lengths = minimal_bytes[..minimal_bytes.len() - 1].to_vec();
         let mut vf_hash = minimal_bytes.clone();
@@ -1285,7 +1295,7 @@ mod tests {
             ),
             (
                 "verify-fail-member-len-overflow",
-                "vault.meta member declared AND carried at 346 bytes — one over the §9.3-derived family cap (<= 345 at the container layer; the exact-345 structural check is the restore engine's stage 5). The length equations hold, so only the family-cap check (stage 3) can reject.",
+                "vault.meta member declared AND carried one byte over the family cap (which now includes the NTV5 membership roster extension, myne-md/myne#698; the base-345 structural check is the restore engine's stage 5). The length equations hold, so only the family-cap check (stage 3) can reject.",
                 &vf_len_overflow,
                 BackupContainerError::MemberLenOverflow,
             ),

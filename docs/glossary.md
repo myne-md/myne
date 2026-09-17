@@ -398,6 +398,25 @@ A content-light `.myn` note created by the [browser clipper](#browser-clipper) h
 
 Used in: `browser-extension` epic, MYND-447
 
+### **B2B rekey** &nbsp; 🗝️ *Key/identifier*
+
+The `itemsKey` rotation a member removal triggers (`myne-md/myne#698`,
+`docs/decisions/protocol/0592`). `root_key` is untouched: every per-note
+`item_key` and every attachment `attachment_key` sits under the singleton
+`itemsKey`, so minting a fresh one re-keys all content in one step, the
+Bitwarden content-encryption-key pattern. Per blob the content ciphertext is
+**byte-identical** (re-encrypting it would author an edit into every note's
+Automerge change-graph and churn every attachment), the `enc_item_key` wrap is
+rewritten under the new key, and `items_key_id` **stays** because the content
+AAD binds it. The new `itemsKey` is then wrapped to every remaining member
+([per-recipient wrap](#per-recipient-wrap)) and the removed member's row is
+tombstoned (see [vault roster](#vault-roster)). A removed member keeps what
+they synced before the rotation; anything pushed after it is closed to them.
+Distinct from the whole-vault **format migration** (`spec/protocol.md` §10.4),
+which re-keys `root_key` and re-encrypts every blob.
+
+Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
+
 ### **BIP-39** &nbsp; 🏗️ *Construction* (deep entry, *Myne-divergent*)
 
 *(Aliases: mnemonic phrase encoding. Myne-divergent: yes — encoding only.)*
@@ -1142,7 +1161,7 @@ Reference: RFC 5869.
 
 ### **HNDL (Harvest Now, Decrypt Later)** &nbsp; ⚠️ *Threat*
 
-A class of attack where an adversary captures encrypted traffic or storage today, expecting future cryptographic advances (notably quantum computing) to enable decryption later. Myne v0.1 does not provide post-quantum protection; a later major version's roadmap introduces hybrid X25519 + ML-KEM-768 wrap to address HNDL for sync-server scenarios.
+A class of attack where an adversary captures encrypted traffic or storage today, expecting future cryptographic advances (notably quantum computing) to enable decryption later. Myne v0.1 does not provide post-quantum protection vault-wide; the B2B person path ships a hybrid ML-KEM-768 + Ed25519 wrap and ML-DSA-65 + Ed25519 signatures now (`decisions/protocol/0592`), and a later major version extends hybrid X25519 + ML-KEM-768 to sync-server scenarios.
 
 Used in: `threat-model.md` §1 (A10 discussion)
 
@@ -1181,6 +1200,7 @@ Used in: `spec/markdown-dialect.md` §3.2, §5
 A 5-color highlight palette — yellow (default), green, blue, pink, purple — usable within a single note (decisions.md 2026-06-15). Because `==text==` carries no color, a non-yellow highlight is stored as the portable [embedded HTML](#embedded-html-rendering) form `<mark class="hl-green|hl-blue|hl-pink|hl-purple">text</mark>` (the toolbar's color swatches emit it; yellow keeps emitting `==text==`). The `hl-*` class set is **closed** and enforced at the DOMPurify boundary (`ALLOWED_ATTR` widened to `[title, class]`, then an `uponSanitizeAttribute` hook keeps `class` only as one allowlisted token on a `<mark>`); an unknown/multi-class value is stripped and falls back to the default-yellow `<mark>` render, with note bytes preserved verbatim (§6 C1). Not Pandoc attribute syntax (§7 still excludes that) — a fixed closed vocabulary, not general `.class` parsing. The per-color washes are the `--highlight-{green,blue,pink,purple}` tokens.
 
 Used in: `spec/markdown-dialect.md` §3.2, §5, §7, §8
+
 
 ### **hosted sync** &nbsp; 📦 *Product*
 
@@ -1387,7 +1407,7 @@ Used in: `spec/protocol.md` §3
 
 ### **KEM (Key Encapsulation Mechanism)** &nbsp; 🏗️ *Construction*
 
-The asymmetric building block of a hybrid encryption scheme. Generates a random symmetric key and an "encapsulation" of it that only the recipient's private key can decapsulate. Myne does not use KEMs in v0.1; ML-KEM-768 (the post-quantum KEM standardized as FIPS 203) is canonical in a later major version.
+The asymmetric building block of a hybrid encryption scheme. Generates a random symmetric key and an "encapsulation" of it that only the recipient's private key can decapsulate. Myne does not use KEMs in v0.1; ML-KEM-768 (the post-quantum KEM standardized as FIPS 203) is canonical in the B2B person path now (ML-KEM-768) and slated for a later major version vault-wide.
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
@@ -1599,6 +1619,20 @@ Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs
 The user's primary authentication credential. Held in user memory only. Fed to Argon2id with `salt_password` to derive `password_wrap_key`, which encrypts a copy of `root_key`. Myne recommends ≥12 characters and zxcvbn score ≥3 at signup; users with weaker passwords are protected primarily by their recovery phrase.
 
 Used in: `spec/protocol.md` §3.1, §4.1
+
+### **membership roster extension** &nbsp; 📦 *Product*
+
+The `vault.meta` membership field's third shape: NTV5 `reserved` byte
+`0x02` (0x00 = base, 0x01 = the 0580 single-account field), carrying one
+AEAD envelope (nonce + u32-BE-length + ciphertext, capped at 64 KiB) sealed
+under the SAME `membership_key` with the NEW AAD role
+`"membership-roster-blob"` and the same `account_number_hash` vault
+binding. The inner plaintext is the [vault roster](#vault-roster)'s
+canonical JSON. Back-compat: 0x00/0x01 shapes parse unchanged; a reader
+handed 0x02 that predates it REJECTS the blob (the §10.2 newer-reads-older
+rule stops at an unknown minor revision).
+
+Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
 ### **memory entry** &nbsp; 📦 *Product*
 
@@ -1880,6 +1914,51 @@ Used in: `scripts/check-desktop-payload-budget.mjs`, `CLAUDE.md` (guard table)
 
 ---
 
+### **per-recipient wrap** &nbsp; 🏗️ *Construction*
+
+The PQ-hybrid envelope that delivers the vault `itemsKey` to one member:
+ML-KEM-768 encapsulate to the member's public key (a 32-byte PQ shared
+secret + a 1088-byte ciphertext) COMBINED with a classical X25519-style
+static DH against the member's Ed25519 public key's Montgomery form
+(the RFC 8032 expanded scalar, SHA-512(seed)[..32], clamped), the wrap key
+`HKDF-SHA-256-Extract("myne.person-wrap-ss v1|", classical || pq)`. both halves
+required, PQ last, so a classical break of either alone opens nothing.
+The wrap AEAD is the crate's XChaCha20-Poly1305 + CTX composition under
+the v0.2 AAD prefix, role `"person-wrap-items-key"`, binding the
+recipient fingerprint. The same construction re-wraps the rotated
+`itemsKey` to every remaining member on a removal
+Member removal drops the removed member's wrap and
+regenerates the rest, the Bitwarden content-encryption-key pattern, where
+rotating an upstream key never requires re-uploading the content.
+
+Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
+
+
+
+### **person keypair** &nbsp; 🗝️ *Key/identifier*
+
+The B2B identity substrate's per-member cryptographic identity
+(`myne-md/myne#698`): one ML-KEM-768 KEM keypair (wraps the vault
+`itemsKey` per recipient) plus an Ed25519 + ML-DSA-65 double-signature
+pair (side by side, NOT a composite: the composite draft is EUF-CMA only,
+two independent signatures preserve SUF-CMA), both carried by ONE person
+sealed under the person's OWN recovery phrase via the salt domain
+`"myne.v0.2 argon2id-person-keypair|"` (with the phrase-derived
+`person_id_hash` from the `"myne.person-id|"` domain in the salt slot). The
+keypair material itself is generated from the OS CSPRNG and sealed under that
+phrase-derived wrap key in a device-local file (`person_keypair.sealed`); it is
+NOT deterministically derived from the phrase, so a phrase on a NEW device mints
+a new identity unless the sealed file is present. Vault-independent (NOT
+`root_key`-derived; `SubkeyRole::ALL` untouched), so one identity spans many
+vaults. The canonical fingerprint (SHA-256 over the domain-prefixed
+`"myne.person-fingerprint v1|"` public halves) is the [SAS](#bootstrap-fingerprint)
+value the invite flow compares. Distinct from a [device_id](#device_id-vv-actor):
+a person is who they are regardless of which devices they hold.
+
+Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
+
+
+
 ### **Personal dictionary** &nbsp; 📦 *Product*
 
 The user's own set of words the spell checker treats as correctly spelled
@@ -1891,6 +1970,7 @@ exact NFC. Distinct from the **Ignore list** (which suppresses without asserting
 correctness) and from the bundled read-only language dictionaries.
 
 Used in: `spec/protocol.md` §9.13; MYND-266.
+
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
@@ -1966,7 +2046,7 @@ Used in: `threat-model.md` §7
 
 ### **post-quantum cryptography** &nbsp; 🔐 *Primitive*
 
-Cryptographic primitives believed secure against quantum-computing attacks. Myne v0.1 is not post-quantum. A later major version's roadmap introduces hybrid X25519 + ML-KEM-768 (FIPS 203) for KEM operations and Ed25519 + ML-DSA-65 (FIPS 204) for signatures.
+Cryptographic primitives believed secure against quantum-computing attacks. Myne v0.1 is not post-quantum. The B2B person path ships hybrid ML-KEM-768 (FIPS 203) for KEM operations and Ed25519 + ML-DSA-65 (FIPS 204) for signatures now (`decisions/protocol/0592`); extending PQ protection to the sync-server vault-wide path stays a later major version.
 
 Used in: `spec/protocol.md` §11
 
@@ -1975,6 +2055,18 @@ Used in: `spec/protocol.md` §11
 Signal's post-quantum-augmented X3DH key-agreement protocol, with hybrid X25519 + ML-KEM-768. Reference design pattern for Myne's later-major-version user-to-user key agreement (sharing).
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+
+### **previousKeySet** &nbsp; 🗝️ *Key/identifier*
+
+The rotation-history chain a [person keypair](#person-keypair) row is designed to
+carry when its identity is re-rolled: `previous_fingerprint_hex` records the
+fingerprint the row superseded, so a peer viewing the roster can tell that a
+member's identity changed rather than that a new member appeared. ROADMAP: nothing
+writes the field in the current change (`threat-model.md` AS22), so this
+rotation-visibility property is not shipped yet. The field rides the
+[vault roster](#vault-roster) inside the AEAD envelope (`myne-md/myne#698`).
+
+Used in: `docs/decisions/protocol/0592`; `core/src/plugins/sync/roster.rs`.
 
 ### **prefs chokepoint** &nbsp; 🛠️ *Tooling*
 
@@ -2252,7 +2344,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **RustCrypto** &nbsp; 🛠️ *Tooling*
 
-A collection of pure-Rust cryptographic crates (`hkdf`, `chacha20poly1305`, `argon2`, `ml-kem`, `ml-dsa`, etc.). **The primary — and only — primitive provider on Myne's Rust side** (`decisions.md` 2026-04-28, which supersedes the earlier libsodium-bindings clause; `spec/protocol.md` §2 "Library"). `protocol/Cargo.toml` declares **no cryptographic primitive provider outside RustCrypto**: every KDF, AEAD, hash and MAC the protocol specifies comes from `hkdf`, `argon2`, `chacha20poly1305`, `chacha20`, `poly1305`, `sha2` and `pbkdf2` (the RFC 5802/7677 SCRAM KDF), alongside `subtle`, `zeroize` and `getrandom`. The manifest's other entries are not primitive providers and are not claimed to be — `base64` (SCRAM `AuthMessage` serialization), `bip39` (the BIP-39 wordlist and its own internal checksum; the phrase is fed **directly** to RustCrypto's `argon2`, never through BIP-39's PBKDF2 seed step), `unicode-normalization` (NFKD before Argon2id), `thiserror`, `serde`, `tracing`. The same crate is what the desktop, mobile and — compiled to `wasm32-unknown-unknown` — web clients run, so there is no fallback path and no second Rust implementation to keep in agreement. [libsodium](#libsodium) is not linked anywhere; it remains the **byte-level interoperability reference** the primitive choices are stated against, machine-checked by `myne-test-vectors/`. The `ml-kem` and `ml-dsa` crates are the likely Rust path for a later version's post-quantum primitives.
+A collection of pure-Rust cryptographic crates (`hkdf`, `chacha20poly1305`, `argon2`, `ml-kem`, `ml-dsa`, etc.). **The primary (and only) primitive provider on Myne's Rust side** (`decisions.md` 2026-04-28, which supersedes the earlier libsodium-bindings clause; `spec/protocol.md` §2 "Library"). `protocol/Cargo.toml` declares **no cryptographic primitive provider outside RustCrypto**: every KDF, AEAD, hash and MAC the protocol specifies comes from `hkdf`, `argon2`, `chacha20poly1305`, `chacha20`, `poly1305`, `sha2` and `pbkdf2` (the RFC 5802/7677 SCRAM KDF), alongside `subtle`, `zeroize` and `getrandom`. The manifest's other entries are not primitive providers and are not claimed to be: `base64` (SCRAM `AuthMessage` serialization), `bip39` (the BIP-39 wordlist and its own internal checksum; the phrase is fed **directly** to RustCrypto's `argon2`, never through BIP-39's PBKDF2 seed step), and `unicode-normalization` (NFKD before Argon2id), `thiserror`, `serde`, `tracing`. The same crate is what the desktop, mobile and, compiled to `wasm32-unknown-unknown`) web clients run, so there is no fallback path and no second Rust implementation to keep in agreement. [libsodium](#libsodium) is not linked anywhere; it remains the **byte-level interoperability reference** the primitive choices are stated against, machine-checked by `myne-test-vectors/`. The `ml-kem` and `ml-dsa` crates are the RustCrypto path the B2B person primitives use today (myne-md/myne#698) and the intended one for the later vault-wide post-quantum work.
 
 Used in: `spec/protocol.md` §2.2
 
@@ -3090,6 +3182,7 @@ The backend-resident state held between the `begin` and `commit` IPC calls of th
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
 
+
 ### **vault head** &nbsp; 📋 *Protocol* (deep entry)
 
 The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.16). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
@@ -3101,6 +3194,28 @@ Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.16, §10.3; `thr
 The `uuid → content_nonce` map of a vault's **content blobs only** (notes + attachments; synced singletons like [vault.prefs](#vaultprefs) / [vault.meta](#vaultmeta) are excluded — their rollback is the already-accepted "local prefs replay" of `threat-model.md` §7). A [vault head](#vault-head) commits a flat `SHA-256` of this map's canonical encoding (uuid-sorted, fixed-width), not the map itself, keeping the head O(1). Binding [content_nonce](#content_type) (fresh-random per save, §6.3) rather than a bare counter gives **two-layer** rollback detection: a server serving an old version mismatches the manifest *before* decryption, and the AEAD nonce-binding makes a header/content splice fail *on* decrypt. The manifest object's own canonical encoding is the sync wire protocol's concern (MYND-414); the head only anchors its hash. Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head)
+
+### **vault invite** &nbsp; 📦 *Product*
+
+The B2B member invitation (`myne-md/myne#698`, `docs/decisions/protocol/0592`):
+one message an owner sends a prospective member. It carries the vault
+`itemsKey` wrapped to that member ([per-recipient wrap](#per-recipient-wrap))
+plus the owner's identity public halves and a double signature (Ed25519 +
+ML-DSA-65, side by side), and the canonical payload is itself AEAD-sealed to
+the member under a fresh hybrid frame. Nothing the recipient acts on is
+signed-plaintext: the payload frame is encrypted, and every carried byte is
+signature-bound with the `"myne.vault-invite v1|"` message-class prefix. The
+recipient verifies both signature halves, checks the carried owner material
+against the claimed fingerprint, and unwraps the `itemsKey` as proof of
+receipt. The invite-time SAS is the owner and member comparing fingerprints
+out of band (the [bootstrap-fingerprint](#bootstrap-fingerprint) pattern); a
+key change after the invite would be surfaced by
+[previousKeySet](#previouskeyset) once that identity-re-roll feature lands, and
+continuous Key Transparency stays on the roadmap. The transport route is not
+specified here (the sync wire contract is a follow-on); the envelope is opaque
+to the server except its public-key bytes.
+
+Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
 ### **vault label** &nbsp; 📦 *Product*
 
@@ -3119,6 +3234,20 @@ Written eagerly at vault creation and lazily on each natural unlock, never gatin
 device-local half is the **account record**.
 
 Used in: `spec/protocol.md` §9.3.1
+
+### **vault roster** &nbsp; 📦 *Product*
+
+The member list of a B2B-shared vault: one row per person, keyed by their
+[person fingerprint](#person-keypair), carrying the display name, the member's
+public halves (so any device can re-wrap a rotated `itemsKey` to them without a
+round-trip), their per-recipient `itemsKey` wrap, a causal `version`, a
+tombstone flag, an optional [previousKeySet](#previouskeyset) and the join time.
+Encoded as canonical JSON and sealed inside the
+[membership roster extension](#membership-roster-extension). Union-merged across
+devices with a remove-wins tie (a tombstone outranks a stale live row), so a
+removal cannot be resurrected.
+
+Used in: `docs/decisions/protocol/0592`; `core/src/plugins/sync/roster.rs`.
 
 ### **vault picker** &nbsp; 📦 *Product*
 

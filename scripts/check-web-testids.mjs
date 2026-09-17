@@ -61,6 +61,12 @@ const RENDERS_NOTHING = new Set([
   // the one thing this substitution must not do, since the real module takes a
   // 24-word recovery phrase.
   join("web", "src", "notes", "import", "MyneVaultSetup.tsx"),
+  // The B2B member-roster panel (myne-md/myne#698). It renders `null` by
+  // design: the real panel prompts for the recovery phrase, and `docs/vision.md`
+  // keeps that out of served code by build-time substitution. A testid would be
+  // a lie (there is no reachable surface) and returning markup would defeat the
+  // substitution. See `web/vite.config.ts` SUBSTITUTED_MODULES.
+  join("web", "src", "components", "sync", "MemberRosterPanel.tsx"),
   join("web", "src", "main.tsx"), // the entry point; mounts, renders no markup of its own
 ]);
 

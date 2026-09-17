@@ -751,7 +751,7 @@ pub fn aad_chats_blob_v0_2(account_number_hash: &[u8; 16], conversation_id: &[u8
     aad.extend_from_slice(account_number_hash);
     aad
 }
-
+pub fn aad_membership_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// Build the AAD bound into the AEAD encryption of the agent-memory catalog
 /// singleton (`vault.agent-memory`, `MYN1`, myne-md/myne#697; `protocol.md`
 /// § 9.25.2). Mirrors [`aad_chats_catalog`] exactly, with the role string
@@ -871,6 +871,43 @@ pub fn aad_agent_personality_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad.extend_from_slice(account_number_hash);
     aad
 }
+/// Build the AAD bound into the AEAD seal of the vault membership field
+/// (`vault.meta` §9.3.1, the account/vault split). The field is `NTV5`-only, so
+/// this AAD is stamped with the **v0.2** prefix + version, mirroring
+/// [`aad_prefs_blob`] in shape but under the v0.2 domain.
+/// Build the AAD bound into the AEAD seal of the B2B **roster extension**
+/// (b2b-identity-substrate, myne-md/myne#698 task 3; `vault.meta` §9.3.1
+/// extension, NTV5 `reserved` byte `0x02`). Mirrors
+/// [`aad_membership_blob`] with the role string `"membership-roster-blob"`
+/// and the same 16-byte `account_number_hash` binding: the field stays
+/// bound to its vault, so a roster copied from another vault fails AEAD
+/// instead of silently regrouping. DISTINCT from `"membership-blob"` and
+/// from `"person-keypair-blob"` (`person_key.rs`).
+///
+/// Layout (51 bytes):
+///
+/// ```text
+/// "myne.v0.2|"                    10 bytes  (v0.2 AAD prefix, § 10.5)
+/// 0x02                             1 byte   (protocol_version, § 9.3)
+/// u16_be(22) || "membership-roster-blob"  24 bytes  (length-prefixed role, § 5.2)
+/// account_number_hash             16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+pub fn aad_membership_roster_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_MEMBERSHIP_ROSTER_BLOB: &[u8] = b"membership-roster-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_MEMBERSHIP_ROSTER_BLOB.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_MEMBERSHIP_ROSTER_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD seal of the vault membership field
 /// (`vault.meta` §9.3.1, the account/vault split). The field is `NTV5`-only, so
 /// this AAD is stamped with the **v0.2** prefix + version, mirroring
@@ -3291,9 +3328,89 @@ mod tests {
                 ("account_number_hash", 16),
             ],
             &role_and_hash_json("membership-blob"),
+            true,
+        );
+        // myne-md/myne#698 (B2B identity substrate): the roster envelope and
+        // the two person-envelope builders. The roster envelope is
+        // vault-scoped (role + account_number_hash, the membership shape); the
+        // person wrap and keypair envelopes carry no account hash.
+        let aad_roster = aad_membership_roster_blob(&account_number_hash);
+        emit_case(
+            &mut dump,
+            "aad_membership_roster_blob",
+            "aad_membership_roster_blob",
+            "AAD bound into the AEAD seal of the membership field's B2B roster extension (NTV5 reserved byte 0x02, myne-md/myne#698). Mirrors aad_membership_blob with role 'membership-roster-blob' + account_number_hash, sealed under the SAME membership_key, so a roster copied from another vault fails AEAD instead of silently regrouping.",
+            &aad_roster,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 22),
+                ("account_number_hash", 16),
+            ],
+            &role_and_hash_json("membership-roster-blob"),
+            true,
+        );
+        // The two person-envelope builders (myne-md/myne#698). `aad_person_wrap`
+        // is vault-scoped (role + recipient fingerprint + account_number_hash);
+        // `aad_person_keypair` is role-only by construction (the fingerprint is
+        // derived from the sealed material itself, so no caller could supply it
+        // before opening).
+        let aad_person_wrap_case =
+            crate::person_key::aad_person_wrap(&[0x5A; 32], &account_number_hash);
+        emit_case(
+            &mut dump,
+            "aad_person_wrap",
+            "aad_person_wrap",
+            "AAD bound into the AEAD seal of a per-recipient itemsKey wrap (myne-md/myne#698). Role 'person-wrap-items-key' + the 32-byte recipient fingerprint + the 16-byte account_number_hash, the vault binding every vault-scoped AAD follows.",
+            &aad_person_wrap_case,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 21),
+                ("recipient_fingerprint", 32),
+                ("account_number_hash", 16),
+            ],
+            &alloc::format!(
+                "      \"input_role_label\": \"person-wrap-items-key\",\n      \"input_recipient_fingerprint_hex\": \"{}\",\n{}",
+                hex_lower(&[0x5A; 32]),
+                account_hash_json
+            ),
+            true,
+        );
+        let aad_person_keypair_case = crate::person_key::aad_person_keypair();
+        emit_case(
+            &mut dump,
+            "aad_person_keypair",
+            "aad_person_keypair",
+            "AAD bound into the AEAD seal of a person keypair envelope (myne-md/myne#698). Role 'person-keypair-blob' only: a fingerprint cannot be bound here because it is derived from the sealed material itself.",
+            &aad_person_keypair_case,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 19),
+            ],
+            "      \"input_role_label\": \"person-keypair-blob\",\n",
+            true,
+        );
+        let aad_vault_invite_case = crate::person_invite::aad_vault_invite();
+        emit_case(
+            &mut dump,
+            "aad_vault_invite",
+            "aad_vault_invite",
+            "AAD bound into the AEAD seal of an invite payload envelope (myne-md/myne#698). Role 'vault-invite-blob' only: the envelope is sync-wire-only and binds nothing else, because the vault binding the member needs arrives on the inner wrapped itemsKey whose own AAD carries account_number_hash.",
+            &aad_vault_invite_case,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 17),
+            ],
+            "      \"input_role_label\": \"vault-invite-blob\",\n",
             false,
         );
-
         dump.push_str("  ]\n");
         dump.push_str("}\n");
 

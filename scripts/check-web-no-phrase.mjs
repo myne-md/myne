@@ -78,6 +78,16 @@ const DIST = join("web", "dist");
  */
 const MARKERS = [
   {
+    needle: "member-roster.phrase-input",
+    meaning:
+      "the B2B member-identity phrase prompt (myne-md/myne#698). Unlocking a " +
+      "member identity to send an invite is neither a recovery nor creation, so " +
+      "it is the fifth phrase path and the one that must never reach served " +
+      "code. It is substituted out of the bundle at build time " +
+      "(`web/vite.config.ts`), the same mechanism as the enrolment and import " +
+      "grids; this needle is what makes that absence a checked property",
+  },
+  {
     needle: "sync.enroll.phrase-cell",
     meaning:
       "the device-enrolment phrase credential — the third phrase path, and the " +

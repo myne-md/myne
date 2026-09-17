@@ -3,12 +3,12 @@
 # `build.rs` declares this as an `InlinedPlugin`. Capability files reference these
 # as `sync:default` (or `sync:allow-sync-get-endpoint` /
 # `sync:allow-sync-set-endpoint`). Ported from the desktop
-# `src-tauri/permissions/sync/default.toml` — the same 19 desktop commands
+# `src-tauri/permissions/sync/default.toml`: the same desktop commands
 # (MYND-459 T12 added `sync_head_fingerprint`, the SY-05 SAS eye-compare
 # substrate) PLUS the mobile-only lifecycle pair (`sync_lifecycle_suspend` /
 # `sync_lifecycle_resume` — in-RAM scheduler flag flips driven by the WebView's
 # visibilitychange; desktop never manages the signal so it does not register
-# them). 21 commands total (the recovered-notes quarantine quartet —
+# them). 30 commands total (the recovered-notes quarantine quartet:
 # `sync_list_quarantine` / `sync_read_quarantine` / `sync_restore_quarantine` /
 # `sync_delete_quarantine` — is registered for parity even though the mobile UI
 # does not surface it yet).
@@ -29,6 +29,11 @@ permissions = [
     "allow-sync-set-endpoint",
     "allow-sync-status",
     "allow-sync-now",
+    "allow-sync-person-unlock",
+    "allow-sync-person-lock",
+    "allow-sync-invite-member",
+    "allow-sync-list-roster",
+    "allow-sync-remove-member",
     "allow-sync-list-devices",
     "allow-sync-account-status",
     "allow-sync-approve-device",
@@ -71,6 +76,31 @@ commands.allow = ["sync_status"]
 identifier = "allow-sync-now"
 description = "Allow invoking sync:sync_now (request an immediate sync; returns the resulting status). No new vault access beyond the engine's authed session."
 commands.allow = ["sync_now"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock"
+description = "Allow invoking sync:sync_person_unlock (B2B: derive-or-open the person keypair from the recovery phrase and hold it backend-side)."
+commands.allow = ["sync_person_unlock"]
+
+[[permission]]
+identifier = "allow-sync-person-lock"
+description = "Allow invoking sync:sync_person_lock (B2B: drop the backend-held person identity)."
+commands.allow = ["sync_person_lock"]
+
+[[permission]]
+identifier = "allow-sync-invite-member"
+description = "Allow invoking sync:sync_invite_member (B2B invite: wrap the unlocked vault's itemsKey to the member's person public half and sign with the held owner identity)."
+commands.allow = ["sync_invite_member"]
+
+[[permission]]
+identifier = "allow-sync-list-roster"
+description = "Allow invoking sync:sync_list_roster (B2B: unseal the membership roster extension and return the non-tombstoned member rows)."
+commands.allow = ["sync_list_roster"]
+
+[[permission]]
+identifier = "allow-sync-remove-member"
+description = "Allow invoking sync:sync_remove_member (B2B: rotate the vault itemsKey, re-wrap every note and attachment, tombstone the removed member, re-seal vault.meta)."
+commands.allow = ["sync_remove_member"]
 
 [[permission]]
 identifier = "allow-sync-list-devices"

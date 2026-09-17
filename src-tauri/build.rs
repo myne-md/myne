@@ -598,6 +598,17 @@ fn main() {
                 // cannot move under them.
                 "sync_verify_hold_begin",
                 "sync_verify_hold_end",
+                // myne-md/myne#698 (B2B identity substrate): the member
+                // surface. `sync_person_unlock`/`sync_person_lock` hold the
+                // person identity backend-side; `sync_invite_member` reads
+                // it; `sync_list_roster`/`sync_remove_member` own the roster.
+                // Lock-stepped with `permissions/sync/default.toml` or the
+                // ACL resolver never authorizes these invokes.
+                "sync_person_unlock",
+                "sync_person_lock",
+                "sync_invite_member",
+                "sync_list_roster",
+                "sync_remove_member",
             ]),
         )
         .plugin(

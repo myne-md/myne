@@ -23,4 +23,5 @@
 pub mod commands;
 pub mod error;
 pub mod key;
+pub mod person_identity;
 pub mod store;

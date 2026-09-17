@@ -51,6 +51,11 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
       return { can_abort: false, ...migration };
     }
     if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
+    // The B2B member roster (myne-md/myne#698). The panel renders whenever the
+    // `memberSharing` capability is present, so every SyncPanel mount reaches
+    // this command; an unanswered one resolves `undefined` and crashes the
+    // panel's `.length` read.
+    if (cmd === "plugin:sync|sync_list_roster") return [];
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
