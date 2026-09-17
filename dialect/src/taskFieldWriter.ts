@@ -263,6 +263,17 @@ export function planTaskFieldWrite(
 
   // The field block follows exactly ONE separator. A description that already
   // ends in whitespace supplies it, and a longer run collapses to one.
+  //
+  // Deliberate exception to the byte-for-byte rule, recorded rather than
+  // removed (myne-md/myne#657): when a field block is APPENDED, a trailing
+  // whitespace run on the description collapses into that single separator
+  // instead of surviving after the field. Fields are always last on the line,
+  // so preserving it would emit a doubled separator (`task  [due:: …]`) or a
+  // new trailing run after the field, neither of which is the user's space
+  // anymore. Clearing fields preserves trailing whitespace untouched; only
+  // the append boundary normalizes. Pinned by "collapses a longer trailing
+  // run to one separator when a field is written" and "does not double the
+  // separator when the description ends in a space" below.
   const rewritten = restoreTaskSeparator(
     serialized === "" || description === ""
       ? `${description}${serialized}`
