@@ -883,12 +883,19 @@ impl RosterMemberView {
 }
 
 /// **Remove a member from the unlocked vault** (B2B, myne-md/myne#698
-/// tasks 4 and 7). Rotates the vault `itemsKey`, re-wraps every note and
-/// attachment blob's per-entry key under it (content ciphertext
-/// byte-identical), tombstones the removed member's roster row, re-wraps
-/// the new `itemsKey` to every remaining member's carried public half,
-/// re-seals the roster into `vault.meta`, and re-derives the slot's
-/// `itemsKey` so the running session keeps working.
+/// tasks 4 and 7).
+///
+/// PARKED until the roster wire ships: refuses immediately with
+/// [`SyncDeviceError::RemovalUnavailable`]. The rotation this would run is
+/// local-only (no peer propagation, no tombstone convergence), so the entry
+/// point stays refused rather than stranding peers on a retired key. When the
+/// wire lands, this delegates to `member_removal::remove_member_from_host`,
+/// which rotates the vault `itemsKey`, re-wraps every note and attachment
+/// blob's per-entry key under it (content ciphertext byte-identical),
+/// tombstones the removed member's roster row, re-wraps the new `itemsKey`
+/// to every remaining member's carried public half, re-seals the roster into
+/// `vault.meta`, and re-derives the slot's `itemsKey` so the running session
+/// keeps working.
 #[tauri::command]
 pub async fn sync_remove_member<R: Runtime>(
     app: AppHandle<R>,
@@ -909,6 +916,7 @@ pub async fn sync_remove_member<R: Runtime>(
         // one makes a failed call indistinguishable from a retryable one.
         use super::member_removal::MemberRemovalError as E;
         match e {
+            E::RemovalUnavailable => SyncDeviceError::RemovalUnavailable,
             E::VaultLocked | E::NoRoster => SyncDeviceError::NotEnrolled,
             E::MemberNotFound => SyncDeviceError::DeviceNotFound,
             // A contended auth permit is transient: the frontend retries rather

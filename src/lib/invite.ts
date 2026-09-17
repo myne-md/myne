@@ -71,7 +71,9 @@ export async function listRoster(): Promise<RosterMemberView[]> {
   return invoke<RosterMemberView[]>("plugin:sync|sync_list_roster");
 }
 
-/** Remove a member (rotates the vault itemsKey and re-wraps every blob). */
+/** Remove a member. PARKED until the roster wire ships: the backend refuses
+ *  with `RemovalUnavailable` before touching the vault, and the roster panel
+ *  offers no Remove affordance. Kept wired so the binding stays covered. */
 export async function removeMember(memberFingerprintHex: string): Promise<void> {
   return invoke("plugin:sync|sync_remove_member", { memberFingerprintHex });
 }

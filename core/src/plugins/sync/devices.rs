@@ -507,6 +507,14 @@ pub enum SyncDeviceError {
     /// The device is registered and still awaiting approval (server 403
     /// `pending_approval`, #268) — not a credential problem either.
     AwaitingApproval,
+    /// Member removal is parked until the roster wire ships (B2B,
+    /// myne-md/myne#698). The rotation the removal would run is local-only
+    /// with no peer propagation and no tombstone convergence, so the entry
+    /// point refuses rather than stranding peers on a retired key. Carries
+    /// the reason in words on the Rust side
+    /// (`member_removal::MemberRemovalError::unavailable_message`):
+    /// "Member removal is disabled until the roster wire ships."
+    RemovalUnavailable,
     /// Internal (task join, IO).
     Internal,
 }
