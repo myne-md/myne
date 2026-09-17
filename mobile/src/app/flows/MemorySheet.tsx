@@ -195,7 +195,34 @@ export function MemorySheet({
         if (e.target === e.currentTarget) onClose();
       }}
       onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
+        if (e.key === "Escape") {
+          onClose();
+          return;
+        }
+        // Tab-cycle trap: the sheet claims `aria-modal="true"`, so focus
+        // must not leave it while open. Wraps last-to-first (and
+        // first-to-last on Shift+Tab); a focus outside the card (the mount
+        // focus lands on the card itself, `tabIndex={-1}`) is pulled back in.
+        if (e.key !== "Tab") return;
+        const root = cardRef.current;
+        if (root === null) return;
+        const focusables = root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusables.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusables[0]!;
+        const last = focusables[focusables.length - 1]!;
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey && (active === first || !root.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !root.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        }
       }}
     >
       <div ref={cardRef} tabIndex={-1} style={CARD}>
