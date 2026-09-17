@@ -190,6 +190,11 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // picker grouping UI is omitted rather than rendered against commands that
   // reject.
   "accountGrouping",
+  // The B2B member surface: the person identity's sealed file lives outside
+  // browser storage, and the panel's recovery-phrase prompt is substituted out
+  // of the served bundle. The
+  // phrase is not an enrolment credential in served code.
+  "memberSharing",
   // myne#173. A pop-out is a second host-spawned OS window. A browser page has
   // one tab context and cannot open an OS window a viewer would read as another
   // window of the app; the single-tab OPFS lock is the whole model. Absent by

@@ -15,6 +15,7 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
+import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
@@ -418,6 +419,21 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
         <DeviceManagementPanel hook={devicesHook} />
       </div>
+
+      {/* The B2B member roster (myne-md/myne#698): the membership extension's
+          member rows for the unlocked shared vault. Omitted on a client without
+          the capability (web has no person-identity carrier), per the
+          absent-not-disabled rule; the empty arm covers a single-account vault.
+          NOT gated on `enrolledHere`: the roster is a property of the unlocked
+          VAULT (read from `vault.meta` under `root_key`), not of this device's
+          account enrollment, so a vault can carry members before this device
+          joins the account roster. */}
+      {hasCapability("memberSharing") ? (
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.members" data-setting-row="true">
+          <span style={SECTION_TITLE_STYLE}>{t("sync.memberRoster.title")}</span>
+          <MemberRosterPanel onDialogOpenChange={onDialogOpenChange} />
+        </div>
+      ) : null}
 
       {/* An enrolled device can invite another by showing a QR (MYND-466). */}
       {enrolledHere && (

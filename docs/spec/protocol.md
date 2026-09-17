@@ -136,6 +136,37 @@ Both `random_salt_password_16` and `random_salt_recovery_16` are generated once 
 
 The Argon2id parameter values themselves live in `vault.meta` (§9.3) and are bound into both wrap AADs (§4.3), so any tampering with the stored parameters invalidates the AEAD tag.
 
+**Person-keypair path** (the B2B identity substrate, `decisions/protocol/0592`; deriving the person's keypair wrap key). This credential is **vault-independent** by design: one person holds many vaults, so the salt domain deliberately omits `account_number_hash` and instead binds a phrase-derived person id.
+
+```
+person_id_hash    = SHA-256("myne.person-id|" || phrase_normalized)[:16]
+
+salt_person       = SHA-256("myne.v0.2 argon2id-person-keypair|"
+                            || person_id_hash
+                            || random_salt_person_16)[:16]
+
+person_wrap_key   = Argon2id(password = phrase_normalized (UTF-8 bytes),
+                             salt    = salt_person,
+                             m, t, p as recorded in the sealed frame,
+                             out     = 32 bytes)
+```
+
+`random_salt_person_16` and the KDF params are generated once at person enrolment and stored, with the KDF params in the 11-byte canonical form (§4.3) **inside** the sealed person-keypair frame, so a later baseline bump does not strand the credential. The domain prefix is `"myne.v0.2 argon2id-person-keypair|"`; it is distinct from the vault password/recovery prefixes so a phrase used for both cannot derive a shared key.
+
+**Person fingerprint and hybrid-wrap combiner** (the other two person-path byte constructions, both cross-implementation and pinned by the `person-identity` vectors). The fingerprint is the SAS value the invite compare uses; the combiner produces the per-recipient wrap key.
+
+```
+fingerprint       = SHA-256("myne.person-fingerprint v1|"
+                            || kem_ek || ed25519_pk || mldsa_vk)          (32 B)
+
+hybrid_wrap_key   = HKDF-SHA-256-Extract(
+                        salt = "myne.person-wrap-ss v1|",
+                        ikm  = classical_ss (32 B) || pq_ss (32 B))      (32 B)
+```
+
+The three domain strings (`"myne.person-id|"`, `"myne.person-fingerprint v1|"`, `"myne.person-wrap-ss v1|"`) and the invite signature class `"myne.vault-invite v1|"` (`person_invite.rs`) are load-bearing: a change to any of them re-derives every fingerprint, wrap key or signature class. Each is domain-separated from the vault AAD/HKDF registries and from the others.
+
+
 ### 3.2 Subkey derivation (HKDF-SHA-256 with registered context strings)
 
 The concrete primitive is **HKDF-SHA-256** (RFC 5869). Myne's own clients reach it through the RustCrypto `hkdf` crate (§2); an independent implementation may use any RFC 5869 implementation — libsodium's `crypto_kdf_hkdf_sha256_*` API among them — and MUST produce the same bytes. For each subkey role:
@@ -449,6 +480,14 @@ AAD_membership_blob =
 `AAD_ai_embeddings_blob` is the AAD bound into the AEAD wrap of `vault.embeddings` (`MYR1`, §9.17), the encrypted AI embedding index. It mirrors `AAD_search_index_blob` exactly, with the role string `"ai-embeddings-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes, total 20 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs and search, `items_key_id` is **not** bound: the embeddings KEK derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage. The model-identity tuple that invalidates the cache on a model / dimension / chunker change is carried **inside** the engine-opaque payload (§9.17.2), not in this AAD — matching the `vault.search` `extractor_version` precedent.
 
 `AAD_membership_blob` is the AAD bound into the AEAD seal of the vault membership field (`vault.meta` §9.3.1). It mirrors `AAD_prefs_blob` exactly, with the role string `"membership-blob"` (length-prefixed UTF-8: 2-B big-endian length + 15 ASCII bytes, total 17 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the field to its specific vault. As with prefs/search/workspace, `items_key_id` is **not** bound: the membership KEK derives directly from `root_key` via `"myne.v0.2 membership-key"` (§3.4), independent of the `itemsKey` lineage. Total AAD length: `10 + 1 + 17 + 16 = 44 bytes`.
+
+`AAD_membership_roster_blob` is the AAD bound into the AEAD seal of the membership field's **roster extension** (`vault.meta` §9.3.1, NTV5 `reserved` byte `0x02`; the B2B identity substrate, `decisions/protocol/0592`). It mirrors `AAD_membership_blob` with the role string `"membership-roster-blob"` (2-B BE length + 22 ASCII bytes) and the same 16-byte `account_number_hash` vault binding, sealed under the SAME `membership_key`. A roster copied from another vault fails AEAD instead of silently regrouping. Total AAD length: `10 + 1 + 24 + 16 = 51 bytes`.
+
+`AAD_person_wrap` is the AAD bound into the AEAD seal of a **per-recipient `itemsKey` wrap** (the PQ-hybrid envelope a vault owner produces for one member; `decisions/protocol/0592`). Role string `"person-wrap-items-key"` (2-B BE + 21 ASCII bytes) followed by the 32-byte canonical **recipient fingerprint** (the SAS value, `person_key.rs`) and the 16-byte `account_number_hash`. It follows the §5.2 convention every vault-scoped AAD follows (cf. `AAD_membership_blob`): without the vault binding a wrap ports across vaults at the AAD layer. Total AAD length: `10 + 1 + 23 + 32 + 16 = 82 bytes`.
+
+`AAD_person_keypair` is the AAD bound into the AEAD seal of a **person keypair envelope** (the sealed key carrier; `person_key.rs`). Role string `"person-keypair-blob"` (2-B BE + 19 ASCII bytes), stamped with the v0.2 prefix + version. It binds the role and **neither** a fingerprint **nor** `account_number_hash`: the fingerprint is a hash of the sealed material itself, so binding it would be circular, and the keypair is vault-independent by construction (one person, many vaults). Total AAD length: `10 + 1 + 21 = 32 bytes`.
+
+`AAD_vault_invite` is the AAD bound into the AEAD seal of an **invite payload envelope** (`person_invite.rs`). Role string `"vault-invite-blob"` (2-B BE + 17 ASCII bytes). Total AAD length: `10 + 1 + 2 + 17 = 30 bytes`. The invite envelope is sync-wire-only (no §10.3 family; the frame rides the existing sync plane), so this role carries no magic and the envelope binds nothing else: the owner's public material and the wrapped key pieces live in the payload itself, and the vault binding arrives on the inner per-recipient `itemsKey` wrap whose own AAD carries `account_number_hash`. The role is deliberately **distinct** from `"person-wrap-items-key"` so the invite payload class and the `itemsKey`-wrap class never share an AEAD domain.
 
 `AAD_pending_capture_blob` is the AAD bound into the AEAD seal of a pending-capture queue entry (`captures/<capture-id>`, `MYK1`, §9.18). It is the one blob AAD that binds **neither** `account_number_hash` **nor** `items_key_id`: the queue is written while the vault is locked and is vault-agnostic (§9.18), so it instead binds the per-entry `capture_id` (16 bytes, also the queue filename) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes). Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. There is no `DeriveSubkey` role — the KEK is a device-local key held in the OS keychain, not `root_key`-derived (§9.18.2).
 
@@ -916,6 +955,14 @@ ciphertext byte) fails the AEAD tag and rejects the parse, never a partial read.
 while the `MYV1` serializer does not. The `reserved` byte at offset 5 is the minor-revision flag for
 `NTV5` (the §9.4 "anchor for future flags" role); a reader that predates this field and sees `0x01`
 rejects the blob per §10.3.1 strict-trailing (the fleet-event shape §10.3.1 point 2 already names).
+**The B2B roster extension** (`decisions/protocol/0592`) is the byte's second allocated value:
+`0x02` signals the single-account field PLUS the roster envelope (the [vault roster](../glossary.md)
+member rows inside one AEAD envelope under the same `membership_key`, AAD role
+`"membership-roster-blob"`, 24-byte nonce + u32-BE length + ciphertext, 64 KiB cap, immediately
+after the 72 single-account bytes). A reader that predates `0x02` rejects the blob the same way
+(the newer-reads-older rule stops at an unknown minor revision, §10.1); 0580's `0x00`/`0x01`
+shapes parse unchanged. The extension's merge class is SHARED (union-merge + tombstone,
+`sync-protocol.md` §10.2), reversing the device-local classification for the extension only.
 One device's lazy stamp is a fleet event: the sync meta phase pushes the stamped bytes, so until
 every device updates, an older build rejects the stamped vault until it is updated. That window
 loses no data (the pre-stamp bytes remain valid to the older reader's rule; updating heals), but
@@ -1573,6 +1620,8 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.head-state` | OUT | Device-local sync baseline (`MYH1`, §9.16); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
 | `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
+| `.rekey-journal` (vault root) | OUT | Commit marker (the new `vault.meta` bytes) for the B2B member-removal rekey (myne-md/myne#698): stage every blob, write this journal, publish the blobs, write `vault.meta` last. A present journal rolls the committed batch forward at unlock; an absent one deletes orphan temps. Transient WAL sentinel, never synced or backed up |
+| `*.rekeytmp` (notes/attachments/snapshots/conflicts/quarantine) | OUT | Staged rekey blobs, the `.tmp` half of the above. A DISTINCT suffix from `*.tmp` on purpose, so `note_txn`'s rename recovery never deletes a committed rekey batch's staging |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
 | `vault.workspace` (§9.7) | OUT | Device-local editor layout (`MYW1`, Class-4 device-local, `sync-protocol.md` §9); rebuilt/reset per device, not carried across a restore |
 | `vault.indices` (§9.8) | OUT | Pure rebuildable cache (`MYI1`, Class-3, `sync-protocol.md` §9); re-derived locally from the notes on the first unlock after restore (§9.8.4), same class as `vault.search` |

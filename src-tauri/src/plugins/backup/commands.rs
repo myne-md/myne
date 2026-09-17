@@ -604,7 +604,10 @@ mod tests {
         // mid-stream; neither the temp nor the destination may remain.
         let dir = ScopedTempDir::new("be-fail").unwrap();
         let vault = fixture_vault(&dir);
-        fs::write(vault.join("vault.meta"), vec![0xAB; 5000]).unwrap();
+        let cap = myne_format::backup_container::family_member_cap(
+            myne_format::backup_container::MemberFamily::VaultMeta,
+        ) as usize;
+        fs::write(vault.join("vault.meta"), vec![0xAB; cap + 1]).unwrap();
         let dest = dir.path().join("out.myne-backup");
         assert!(matches!(
             export_backup_with_dir(&vault, &dest),

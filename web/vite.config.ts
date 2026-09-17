@@ -225,6 +225,19 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "screens",
     "EnrollPhraseCredential",
   ),
+  // The B2B member-roster panel prompts for the recovery phrase to unlock a
+  // member identity (myne-md/myne#698). `docs/vision.md` commits that a phrase
+  // prompt is kept out of the served artefact by BUILD-TIME SUBSTITUTION, not
+  // by a runtime capability gate, which hides the render while the phrase
+  // field and its strings still ship. This entry makes the absence real.
+  [path.join(repoRoot, "src", "components", "sync", "MemberRosterPanel")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "MemberRosterPanel",
+  ),
 };
 
 function platformSeamSubstitution(): Plugin {
