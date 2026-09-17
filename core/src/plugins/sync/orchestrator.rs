@@ -3269,6 +3269,121 @@ pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     hex(&Sha256::digest(bytes))
 }
 
+/// The vault's `account_number_hash`, the AAD binding both membership envelopes
+/// use. Taken from the local meta because the account hash is a validated
+/// invariant of `merge_vault_meta`, so the two inputs agree.
+fn account_number_hash_of(meta: &protocol::VaultMeta) -> [u8; 16] {
+    meta.account_number_hash
+}
+
+/// Union-merge the B2B roster extension across local and remote membership
+/// fields, then re-seal it into the merged meta (myne-md/myne#698).
+///
+/// The single-account half of the membership field keeps its device-local rule;
+/// only the 0x02 roster extension is shared. The merge itself lives in
+/// `super::roster` (`merge_rosters`, the attachments-catalog §11.4 pattern); this
+/// is the caller that comment named, and it runs HERE because only this site
+/// holds the unlocked `root_key` the envelopes need.
+///
+/// No-op when the caller has no `root_key` (an unenrolled edge, most unit
+/// tests), when neither side carries a roster, or on any envelope/seal failure.
+/// The roster is a best-effort convergence and must never fail a meta cycle.
+fn merge_roster_extension(
+    root_key: Option<&[u8; 32]>,
+    merged: &mut protocol::VaultMeta,
+    local: Option<&protocol::Membership>,
+    remote: Option<&protocol::Membership>,
+    account_number_hash: [u8; 16],
+) {
+    let Some(root_key) = root_key else {
+        // No key, no merge (an unenrolled edge or a keyless test caller).
+        // Warn rather than stay silent: a keyed production cycle that lands
+        // here leaves a diverged roster standing inside a Merged/Pushed
+        // outcome, and nothing else names it.
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "no_root_key",
+            "roster extension merge skipped: no root key, transplanted membership stands as-is"
+        );
+        return;
+    };
+    // A roster on either side; the single-account half of the transplanted
+    // local membership stays as `merge_vault_meta` left it.
+    let local_roster = match local
+        .and_then(|m| m.roster.as_ref())
+        .map(|r| protocol::unseal_membership_roster(root_key, r, &account_number_hash))
+    {
+        Some(Ok(bytes)) => super::roster::parse_roster(&bytes),
+        Some(Err(_)) => None,
+        None => Some(super::roster::RosterMap::new()),
+    };
+    let remote_roster = match remote
+        .and_then(|m| m.roster.as_ref())
+        .map(|r| protocol::unseal_membership_roster(root_key, r, &account_number_hash))
+    {
+        Some(Ok(bytes)) => super::roster::parse_roster(&bytes),
+        Some(Err(_)) => None,
+        None => Some(super::roster::RosterMap::new()),
+    };
+    let (Some(local_roster), Some(remote_roster)) = (local_roster, remote_roster) else {
+        // An unreadable envelope is not a merge input: leave the transplanted
+        // field alone rather than merging against a guessed empty roster.
+        // Warn: the cycle still reports Merged/Pushed/Adopted while the roster
+        // did not converge, and this line is the only place that says so.
+        // (Counts only; roster bytes never enter a log line.)
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "unreadable_envelope",
+            local_had_roster = local.and_then(|m| m.roster.as_ref()).is_some(),
+            remote_had_roster = remote.and_then(|m| m.roster.as_ref()).is_some(),
+            "roster extension merge skipped: a roster envelope failed to unseal or parse"
+        );
+        return;
+    };
+    // Nothing to write when neither side carried a roster extension. This is
+    // the ordinary single-user cycle, so it stays silent by design: a warn
+    // here would fire on every sync of every vault that never had a roster.
+    // Nothing to write when neither side carried a roster extension.
+    let had_any = local.and_then(|m| m.roster.as_ref()).is_some()
+        || remote.and_then(|m| m.roster.as_ref()).is_some();
+    if !had_any {
+        return;
+    }
+    let union = super::roster::merge_rosters(&local_roster, &remote_roster);
+    let plaintext = super::roster::encode_roster(&union);
+    let mut nonce = [0u8; protocol::MEMBERSHIP_ROSTER_NONCE_LEN];
+    if getrandom::getrandom(&mut nonce).is_err() {
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "csprng",
+            "roster extension merge skipped: nonce randomness unavailable, union not sealed"
+        );
+        return;
+    }
+    let Ok(env) =
+        protocol::seal_membership_roster_raw(root_key, &plaintext, &account_number_hash, &nonce)
+    else {
+        tracing::warn!(
+            stage = "meta_phase",
+            event = "roster_merge_skipped",
+            reason = "seal",
+            union_members = union.len(),
+            "roster extension merge skipped: reseal of the merged union failed"
+        );
+        return;
+    };
+    // The roster rides INSIDE an existing membership field. When the merged meta
+    // has none, there is no single-account half to attach it to (that half is
+    // the local account id, which this site cannot fabricate), so the roster is
+    // left for the unlock stamp to install rather than written against zeroes.
+    if let Some(m) = merged.membership.as_mut() {
+        m.roster = Some(env);
+    }
+}
+
 /// What the `vault.meta` reconcile did this cycle (F1 Faz B). Returned for tests
 /// and logging; the caller treats every arm as success (the phase is best-effort).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3332,6 +3447,12 @@ pub(crate) async fn sync_meta_phase(
     vault_root: &Path,
     state: &mut SyncState,
     allow_push: bool,
+    // The unlocked vault's `root_key`, threaded from `run_sync_cycle`, so the
+    // B2B roster extension can be opened + union-merged across devices. `None`
+    // on a caller that has no key (an unenrolled edge, and most unit tests):
+    // the roster merge is then a no-op and the single-account membership field
+    // keeps the device-local transplant rule unchanged.
+    root_key: Option<&[u8; 32]>,
 ) -> MetaPhaseOutcome {
     let meta_path = vault_root.join("vault.meta");
     let Ok(local_bytes) = io.read(&meta_path).await else {
@@ -3452,10 +3573,21 @@ pub(crate) async fn sync_meta_phase(
         // MYV1 server blob has no field slot, and dropping the local field
         // there heals on next unlock (absent re-stamps), so that path stays
         // verbatim rather than version-upgrading the file on adopt.
+        //
+        // The 0x02 ROSTER extension is the one shared exception
+        // (myne-md/myne#698): its member rows are a vault fact, so they are
+        // union-merged with the server's rather than transplanted local-wins.
         let adopted_bytes =
             if protocol::meta_version_of(&server_bytes) == Some(protocol::MetaVersion::V0_2) {
                 let mut adopted_meta = server_meta.clone();
                 adopted_meta.membership = local_meta.membership.clone();
+                merge_roster_extension(
+                    root_key,
+                    &mut adopted_meta,
+                    local_meta.membership.as_ref(),
+                    server_meta.membership.as_ref(),
+                    account_number_hash_of(&local_meta),
+                );
                 protocol::serialize_vault_meta_v0_2(&adopted_meta)
             } else {
                 server_bytes.clone()
@@ -3510,9 +3642,19 @@ pub(crate) async fn sync_meta_phase(
         return MetaPhaseOutcome::Skipped; // never merge across generations
     }
     let winner = meta_password_side_winner(&local_meta, &server_meta);
-    let Ok(merged) = merge_vault_meta(&local_meta, &server_meta, winner) else {
+    let Ok(mut merged) = merge_vault_meta(&local_meta, &server_meta, winner) else {
         return MetaPhaseOutcome::Skipped; // incompatible invariant → leave local alone
     };
+    // The roster extension is shared: union-merge both sides' member rows so a
+    // peer's invite (or a removal tombstone) converges instead of being
+    // transplanted local-wins by `merge_vault_meta`.
+    merge_roster_extension(
+        root_key,
+        &mut merged,
+        local_meta.membership.as_ref(),
+        server_meta.membership.as_ref(),
+        account_number_hash_of(&local_meta),
+    );
     let merged_bytes = match local_gen {
         Some(protocol::MetaVersion::V0_2) => protocol::serialize_vault_meta_v0_2(&merged),
         _ => serialize_vault_meta(&merged).to_vec(),
@@ -3727,6 +3869,7 @@ pub async fn run_sync_cycle(
                     vault_root,
                     &mut state,
                     gate.allows_content(),
+                    Some(root_key),
                 )
                 .await;
                 summary.credential_ambiguous =
@@ -5911,7 +6054,6 @@ async fn sync_cycle_attempt(
 
 #[cfg(test)]
 mod tests {
-
     /// The enrollment seed withholds the consent and the AI switch, and nothing
     /// else.
     ///
@@ -13319,7 +13461,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
 
             assert_eq!(out, MetaPhaseOutcome::CredentialAmbiguous);
             assert_eq!(
@@ -13354,7 +13496,7 @@ mod tests {
             // the guard is not reached for an unchanged credential.
             t.on(HttpMethod::Get, "/vault.meta", 200, local.clone());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
             std::fs::remove_dir_all(&dir).ok();
@@ -13377,7 +13519,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::Adopted);
             assert_eq!(
                 std::fs::read(dir.join("vault.meta")).unwrap(),
@@ -13406,7 +13548,7 @@ mod tests {
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::Pushed);
             let puts = put_recorded(&t);
             assert_eq!(puts.len(), 1);
@@ -13449,7 +13591,7 @@ mod tests {
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false, None));
             assert_eq!(out, MetaPhaseOutcome::Pushed);
             assert_eq!(
                 put_recorded(&t),
@@ -13481,7 +13623,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false, None));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert!(put_recorded(&t).is_empty(), "a poll cycle pushes nothing");
             std::fs::remove_dir_all(&dir).ok();
@@ -13508,7 +13650,9 @@ mod tests {
             let ta = FakeTransport::new();
             ta.on(HttpMethod::Get, "/vault.meta", 200, b_pw.clone());
             ta.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
-            let out_a = blocking(sync_meta_phase(&IO, &ta, "tok", &dir_a, &mut st_a, true));
+            let out_a = blocking(sync_meta_phase(
+                &IO, &ta, "tok", &dir_a, &mut st_a, true, None,
+            ));
             assert_eq!(out_a, MetaPhaseOutcome::Merged);
             assert_eq!(
                 std::fs::read(dir_a.join("vault.meta")).unwrap(),
@@ -13527,7 +13671,9 @@ mod tests {
             let tb = FakeTransport::new();
             tb.on(HttpMethod::Get, "/vault.meta", 200, a_pw.clone());
             tb.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
-            let out_b = blocking(sync_meta_phase(&IO, &tb, "tok", &dir_b, &mut st_b, true));
+            let out_b = blocking(sync_meta_phase(
+                &IO, &tb, "tok", &dir_b, &mut st_b, true, None,
+            ));
             assert_eq!(out_b, MetaPhaseOutcome::Merged);
             assert_eq!(
                 std::fs::read(dir_b.join("vault.meta")).unwrap(),
@@ -13586,7 +13732,7 @@ mod tests {
             t.on(HttpMethod::Get, "/vault.meta", 200, b_pw.clone());
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::Merged);
             let merged = std::fs::read(dir.join("vault.meta")).unwrap();
             assert_eq!(
@@ -13629,7 +13775,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, server);
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::Skipped);
             assert_eq!(
                 std::fs::read(dir.join("vault.meta")).unwrap(),
@@ -13651,7 +13797,7 @@ mod tests {
             t.on(HttpMethod::Get, "/vault.meta", 404, Vec::new());
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::Pushed);
             assert_eq!(put_recorded(&t), vec![local.clone()]);
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
@@ -13670,7 +13816,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, m.clone());
 
-            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true, None));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert!(put_recorded(&t).is_empty());
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&m)));

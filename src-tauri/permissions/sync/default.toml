@@ -30,6 +30,11 @@ permissions = [
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
+    "allow-sync-invite-member",
+    "allow-sync-list-roster",
+    "allow-sync-person-unlock",
+    "allow-sync-person-lock",
+    "allow-sync-remove-member",
     "allow-sync-list-devices",
     "allow-sync-account-status",
     "allow-sync-approve-device",
@@ -98,6 +103,31 @@ commands.allow = ["sync_materialisation_progress"]
 identifier = "allow-sync-now"
 description = "Allow invoking sync:sync_now (request an immediate sync; returns the resulting status). No new vault access beyond the engine's authed session."
 commands.allow = ["sync_now"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock"
+description = "Allow invoking sync:sync_person_unlock (B2B: derive-or-open the person keypair from the user's recovery phrase and hold it backend-side in VaultRuntimeState. The phrase crosses IPC once, at this unlock-equivalent moment; no private seed ever crosses again)."
+commands.allow = ["sync_person_unlock"]
+
+[[permission]]
+identifier = "allow-sync-person-lock"
+description = "Allow invoking sync:sync_person_lock (B2B: drop the backend-held person identity; it zeroizes on drop)."
+commands.allow = ["sync_person_lock"]
+
+[[permission]]
+identifier = "allow-sync-invite-member"
+description = "Allow invoking sync:sync_invite_member (B2B invite: wraps the unlocked vault's itemsKey to the member's full person public half + signs the sealed envelope with the HELD owner identity; randomness from the OS CSPRNG). Requires an unlocked active vault and a held person identity."
+commands.allow = ["sync_invite_member"]
+
+[[permission]]
+identifier = "allow-sync-list-roster"
+description = "Allow invoking sync:sync_list_roster (B2B: unseal the membership roster extension of the unlocked vault and return the non-tombstoned member rows)."
+commands.allow = ["sync_list_roster"]
+
+[[permission]]
+identifier = "allow-sync-remove-member"
+description = "Allow invoking sync:sync_remove_member (B2B: rotate the vault itemsKey, re-wrap every note and attachment per-entry key, tombstone the removed member, re-wrap to remaining members, re-seal vault.meta). Requires an unlocked active vault with a roster."
+commands.allow = ["sync_remove_member"]
 
 [[permission]]
 identifier = "allow-sync-list-devices"

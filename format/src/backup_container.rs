@@ -132,9 +132,16 @@ pub enum MemberFamily {
 /// pre-hash work).
 pub fn family_member_cap(family: MemberFamily) -> u64 {
     match family {
-        // §9.3: fixed-length serialization; anything longer is not a
-        // v0.1 vault.meta.
-        MemberFamily::VaultMeta => protocol::vault_meta::VAULT_META_LEN as u64,
+        // §9.3: fixed-length serialization, EXCEPT the NTV5 membership
+        // extension (myne-md/myne#698): a shared vault's `vault.meta` carries
+        // the roster envelope after the single-account field, up to the
+        // parser's own bound. Capping at the base 345 would refuse to export
+        // ANY B2B vault, removing the only mitigation against device loss for
+        // exactly the feature that made the blob grow.
+        MemberFamily::VaultMeta => {
+            (protocol::VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + protocol::MEMBERSHIP_ROSTER_FIELD_CAP)
+                as u64
+        }
         // §9.2: 16 MiB plaintext cap + envelope overhead, rounded up.
         MemberFamily::Note | MemberFamily::Snapshot => 17 * 1024 * 1024,
         // §9.5.4: 64 KiB plaintext cap + 34-byte header + 32-byte CTX tag

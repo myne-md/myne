@@ -80,6 +80,16 @@ const SALT_PREFIX_PASSWORD_V0_2: &[u8] = b"myne.v0.2 argon2id-password|";
 /// (`spec/protocol.md` §10.4.1). The next-major mirror of [`SALT_PREFIX_RECOVERY`].
 const SALT_PREFIX_RECOVERY_V0_2: &[u8] = b"myne.v0.2 argon2id-recovery|";
 
+/// Salt prefix for the **person keypair** wrap key (b2b-identity-substrate,
+/// myne-md/myne#698 task 2). The person's own recovery phrase derives a
+/// wrap key for THEIR keypair under this domain, NOT under any vault's
+/// credential domains: a person keypair is vault-independent (one person,
+/// many vaults) and a vault credential must never be able to unwrap it
+/// (and vice versa). Distinct from every other prefix by its
+/// `argon2id-person-keypair` segment; v0.2-prefixed because the feature
+/// ships post-v0.2-birth-format.
+const SALT_PREFIX_PERSON_KEYPAIR_V0_2: &[u8] = b"myne.v0.2 argon2id-person-keypair|";
+
 /// Argon2id salt length: 16 bytes (truncated SHA-256 output).
 pub const ARGON2_SALT_LEN: usize = 16;
 
@@ -248,6 +258,61 @@ pub fn derive_recovery_wrap_key_from_normalized_v0_2(
 ) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
     let salt = build_salt(SALT_PREFIX_RECOVERY_V0_2, account_number_hash, salt_random);
     argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// Derive the 32-byte AEAD wrap key for the **person keypair** (B2B
+/// identity substrate, myne-md/myne#698 task 2) from the person's own
+/// normalized recovery phrase.
+///
+/// NOT a vault credential path: the salt domain
+/// `"myne.v0.2 argon2id-person-keypair|"` is distinct from every vault
+/// credential prefix, and `account_number_hash` is NOT bound into the salt
+/// (a person keypair outlives and outranks any one vault account). The
+/// `salt_random` is a per-person random value generated once at enrolment and
+/// stored, with the KDF params, inside the sealed `person_keypair.sealed`
+/// frame; the caller passes a fresh CSPRNG salt on first derivation.
+///
+/// `person_id_hash` is the phrase-derived person id
+/// (`SHA-256("myne.person-id|" || phrase)[:16]`). It occupies the
+/// `account_number_hash` salt slot because the person path is VAULT-independent
+/// and binds to the person, not to any vault. It keeps the person-path salt
+/// domain distinct from the vault credential domains; it does NOT separate two
+/// people who hold the same phrase (the id is a pure function of the phrase,
+/// so they derive the same wrap key).
+///
+/// Returns [`ProtocolError::KdfFailure`] on Argon2id error (same
+/// discipline as every other path in this module).
+pub fn derive_person_keypair_wrap_key_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    person_id_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(SALT_PREFIX_PERSON_KEYPAIR_V0_2, person_id_hash, salt_random);
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// The person-id hash: `SHA-256("myne.person-id|" || phrase_normalized)[:16]`.
+///
+/// It occupies the `account_number_hash` salt slot in
+/// [`derive_person_keypair_wrap_key_from_normalized`]: the person path is
+/// vault-independent, so the binding is to the PERSON, not to any vault. Two
+/// people holding the SAME phrase derive the SAME id and the SAME key: this
+/// hash is a pure function of the phrase, so separation between two people
+/// comes from the phrase itself plus the per-person `salt_random`, with this
+/// id as a defense-in-depth binding, not as a separator. A domain-separation
+/// constant with no registry of its own, so it is pinned here (and by the
+/// `person-keypair` vectors) as well as in the root identifier table.
+pub const PERSON_ID_PREFIX: &[u8] = b"myne.person-id|";
+
+pub fn person_id_hash(phrase_normalized: &str) -> [u8; 16] {
+    let mut h = Sha256::new();
+    h.update(PERSON_ID_PREFIX);
+    h.update(phrase_normalized.as_bytes());
+    let out = h.finalize();
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&out[..16]);
+    id
 }
 
 /// `salt = SHA-256(prefix || account_number_hash || salt_random)[:16]`
@@ -789,7 +854,6 @@ mod tests {
             &canonical_params,
         )
         .expect("derive quickunlock pin");
-
         let salt_hex = hex_lower(&salt_random);
         let acct_hex = hex_lower(&account_number_hash);
 
@@ -918,6 +982,134 @@ mod tests {
 
         std::fs::write("/tmp/myne_argon2id_vectors.json", dump.as_bytes())
             .expect("write argon2id vectors dump");
+    }
+
+    /// Vector generator for the `person-keypair` v0.2 Argon2id path (the B2B
+    /// identity substrate, myne-md/myne#698). `#[ignore]`-gated, emits
+    /// ready-to-copy JSON to `/tmp/myne_person_keypair_vectors.json`.
+    ///
+    /// Pins [`derive_person_keypair_wrap_key_from_normalized`] under the
+    /// `"myne.v0.2 argon2id-person-keypair|"` salt domain: the person's own
+    /// recovery phrase → wrap key, with the phrase-derived `person_id_hash` in
+    /// the `account_number_hash` salt slot (this path is vault-independent, so
+    /// no vault account hash is involved). Two cases with different person ids
+    /// show the person-level domain separation: the same phrase and salt derive
+    /// DIFFERENT keys for two people. ~3s per case at canonical params.
+    #[test]
+    #[ignore = "vector generator; run explicitly to refresh person-keypair cases.json"]
+    fn emit_person_keypair_vectors_for_paste() {
+        extern crate std;
+        use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+
+        let params = DEFAULT_V0_1_KDF_PARAMS;
+        let salt_random: [u8; 16] = [0xEF; 16];
+        let phrase = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_vec();
+        let phrase_str = core::str::from_utf8(&phrase).unwrap();
+        // The REAL phrase-derived person id, so the vector pins the actual
+        // construction (`person_id_hash`) and not a fabricated constant. Case B
+        // uses a different phrase, which changes both the person id and the
+        // Argon2id password, so it is domain separation in the strong sense.
+        let person_a: [u8; 16] = person_id_hash(phrase_str);
+        let phrase_b = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon".to_vec();
+        let phrase_b_str = core::str::from_utf8(&phrase_b).unwrap();
+        let person_b: [u8; 16] = person_id_hash(phrase_b_str);
+
+        let key_a = derive_person_keypair_wrap_key_from_normalized(
+            phrase_str,
+            &salt_random,
+            &person_a,
+            &params,
+        )
+        .expect("derive person keypair A");
+        let key_b = derive_person_keypair_wrap_key_from_normalized(
+            phrase_b_str,
+            &salt_random,
+            &person_b,
+            &params,
+        )
+        .expect("derive person keypair B");
+        // Domain separation assertion at mint: two people (different phrase,
+        // hence different person id), same salt, MUST derive different keys.
+        assert_ne!(&*key_a, &*key_b, "person id must domain-separate the key");
+
+        let salt_hex = hex_lower(&salt_random);
+        let phrase_a_hex = hex_lower(&phrase);
+        let phrase_b_hex = hex_lower(&phrase_b);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"person-keypair\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3.1\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_person_keypair_wrap_key_from_normalized + protocol::person_id_hash under the v0.2 salt domain 'myne.v0.2 argon2id-person-keypair|'. Two cases, different normalized phrases (hence different person_id_hash values), same salt, so person-level domain separation is pinned: different phrases derive different wrap keys under the same salt. Vault-independent: the account_number_hash salt slot carries the phrase-derived person_id_hash, not any vault's account hash. EXPECTED RUNTIME: ~6s total. Default-on in `cargo test`; only the regenerator is #[ignore]-gated. Generated by `cargo test -p protocol --lib emit_person_keypair_vectors_for_paste -- --ignored`.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let emit_case = |dump: &mut alloc::string::String,
+                         slug: &str,
+                         description: &str,
+                         phrase_hex: &str,
+                         person_id: &[u8; 16],
+                         wrap_key: &[u8; 32],
+                         trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"person-keypair/v0.2/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_phrase_utf8_hex\": \"{}\",\n",
+                phrase_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_salt_random_hex\": \"{}\",\n",
+                salt_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_person_id_hash_hex\": \"{}\",\n",
+                hex_lower(person_id)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_kdf_params\": {{\n        \"m_kib\": {},\n        \"t\": {},\n        \"p\": {},\n        \"argon2_version_hex\": \"{:02x}\"\n      }},\n",
+                params.m_kib, params.t, params.p, params.argon2_version
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_wrap_key_hex\": \"{}\"\n",
+                hex_lower(wrap_key)
+            ));
+            dump.push_str(if trailing_comma {
+                "    },\n"
+            } else {
+                "    }\n"
+            });
+        };
+
+        emit_case(
+            &mut dump,
+            "person-keypair-a",
+            "Person-keypair wrap key for the 12-word 'abandon … about' phrase. Its person_id_hash is SHA-256('myne.person-id|' || phrase)[:16], pinned here so the derivation the salt binds is cross-implementation. The phrase is fed raw (already NFKD-normalizable ASCII; the caller normalizes before this call per §3.4).",
+            &phrase_a_hex,
+            &person_a,
+            &key_a,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "person-keypair-b",
+            "A DIFFERENT normalized phrase, same salt. Both the Argon2id password and the person_id_hash change, so the wrap key differs from case A: two people never share a wrap key for one salt.",
+            &phrase_b_hex,
+            &person_b,
+            &key_b,
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+        std::fs::write("/tmp/myne_person_keypair_vectors.json", dump.as_bytes())
+            .expect("write person-keypair vectors dump");
     }
 
     /// Vector generator for the `bip39-recovery` companion category.

@@ -442,6 +442,14 @@ const V = {
   ],
   "src/hooks/useConflictMaterializer.ts": ["ported", "Keep-both conflict drain; the sync engine is shared."],
   "src/hooks/useDevices.ts": ["ported", "Device roster; the commands are dispatched (task 69)."],
+  "src/hooks/useRoster.ts": [
+    "typed-unsupported",
+    "The B2B member commands are `Class::Unsupported` on web (`memberSharing` absent), and the only module that imports this hook is `MemberRosterPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
+  ],
+  "src/lib/invite.ts": [
+    "typed-unsupported",
+    "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
+  ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],
   "src/hooks/useIdleAutoLock.ts": ["adapted", "Same signal difference as useActivityHeartbeat."],

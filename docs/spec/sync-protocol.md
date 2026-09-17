@@ -604,6 +604,16 @@ divergent grouping across devices merges silently, with each device preserving i
 conflict UX is reachable from this field, and the merged blob stays well-formed for both generations
 (the field is an `NTV5`-only extension, `vault.meta` §9.3.1; an `MYV1` blob never carries it).
 
+**The one exception: the 0x02 roster extension is SHARED** (b2b-identity-substrate,
+`decisions/protocol/0592`). The membership field's `reserved` byte `0x02` shape (`vault.meta` §9.3.1)
+carries the vault roster, which is a **shared** fact, not a per-device organisational choice, so it
+is union-merged with the attachments-catalog §11.4 causal-join pattern (greater `version` wins,
+equal-version tie remove-wins) exactly as §10.2 classifies a shared member. The split is inside the
+single membership field: the 0x00/0x01 single-account half keeps the device-local rule above, and
+only the 0x02 roster extension converges. The roster merge runs at the **caller** that holds the
+unlocked `root_key`; the merge function itself sees only opaque ciphertext, so it cannot open the
+envelopes and is handed the already-decrypted rosters.
+
 ---
 
 ## 11. Deletion & tombstone horizon-GC

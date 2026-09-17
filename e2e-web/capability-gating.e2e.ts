@@ -47,6 +47,7 @@ const MUST_BE_ABSENT: readonly [string, string][] = [
   // What stays is the phrase path this client still refuses, and it is asserted
   // on the enrolment screen where it would actually appear.
   ["sync.enroll.phrase-cell", "the phrase as a DEVICE-ENROLMENT credential — the one phrase path this client still refuses (decisions.md 2026-08-15)"],
+  ["member-roster", "the B2B member surface: `memberSharing` is absent (web has no keychain-style carrier and the panel's phrase prompt is substituted out of the bundle, not merely gated)"],
   ["create.ready-backup-now", "the encrypted-backup export; `backup` and `nativeSaveAs` are both absent here"],
   ["create.ready-show-folder", "revealing a vault directory in an OS file manager; OPFS has no path to reveal"],
 ];

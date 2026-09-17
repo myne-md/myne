@@ -11,6 +11,7 @@
 
 use super::config::{validate_endpoint_url, SyncConfigError};
 use crate::host::HostCtx;
+use crate::vault_io::VaultIo as _;
 use std::path::PathBuf;
 // The rest of this module is still Tauri-shaped (task 79 step 9); only the two
 // entry points the auth cluster calls have host arms so far.
@@ -478,6 +479,452 @@ pub async fn sync_list_devices<R: Runtime>(
         state.inner(),
     )
     .await
+}
+
+/// **Unlock the backend-held person identity** (B2B identity substrate,
+/// myne-md/myne#698). One call per process: derive (or first-enroll) the
+/// person keypair from the person's own recovery phrase and hold it in
+/// [`VaultRuntimeState`], never in the WebView. Every later invite reads
+/// it from there, so no private seed ever crosses IPC.
+///
+/// The phrase crosses the bridge exactly once, at this unlock-equivalent
+/// moment, mirroring the master-password-at-unlock precedent.
+#[tauri::command]
+pub async fn sync_person_unlock<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    phrase: String,
+) -> Result<PersonIdentityView, SyncDeviceError> {
+    let phrase = zeroize::Zeroizing::new(phrase);
+    // `normalize_user_phrase` is infallible by signature: it canonicalizes
+    // whatever it is handed, and a phrase that does not decode as BIP-39
+    // simply derives a different (unusable) identity rather than erroring.
+    let normalized = protocol::normalize_user_phrase(&phrase);
+    let pair = crate::account::person_identity::unlock_person_identity(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        normalized.as_str(),
+    )
+    .await
+    .map_err(|e| {
+        // Map by cause: a transient IO or CSPRNG failure is not a "bad phrase",
+        // and telling the user to retype a correct phrase sends them in a loop.
+        use crate::account::person_identity::PersonIdentityError as E;
+        match e {
+            E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
+            E::Io | E::Csprng => SyncDeviceError::Transport,
+        }
+    })?;
+    let view = PersonIdentityView {
+        fingerprint_hex: crate::account::person_identity::hex_lower(pair.fingerprint()),
+    };
+    state.inner().set_person_identity(pair).await;
+    Ok(view)
+}
+
+/// **Drop the backend-held person identity** (lock-equivalent). The pair
+/// zeroizes as it drops.
+///
+/// `forget: true` additionally ERASES the device-local sealed file, which is
+/// person off-boarding from this device rather than a session lock: the next
+/// unlock with the same phrase re-enrols a fresh keypair and a new fingerprint.
+/// The flag exists so the erase path has a production caller instead of being a
+/// dead function, and so a plain lock never destroys an enrollment the user did
+/// not mean to drop.
+#[tauri::command]
+pub async fn sync_person_lock<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    forget: Option<bool>,
+) -> Result<(), SyncDeviceError> {
+    let _ = state.inner().take_person_identity().await;
+    if forget.unwrap_or(false) {
+        let host = crate::host::tauri_host::TauriHost::new(app.clone());
+        crate::account::person_identity::delete_sealed_file(&host, &crate::vault_io::StdVaultIo)
+            .await
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+    }
+    Ok(())
+}
+
+/// The person identity's public view (fingerprint only, no key material).
+#[derive(Debug, serde::Serialize)]
+pub struct PersonIdentityView {
+    /// Canonical fingerprint (the SAS value), lowercase hex.
+    pub fingerprint_hex: String,
+}
+
+/// **Invite a member to the unlocked vault** (B2B identity substrate,
+/// myne-md/myne#698 task 5-6 command core).
+///
+/// Wraps the vault's `itemsKey` to the member's full person public half
+/// (ML-KEM ek + Ed25519 pk + ML-DSA vk, all lowercase hex, fetched from
+/// the member's SCRAM account), seals the payload to the member under a
+/// fresh PQ-hybrid frame, and signs it with the HELD owner identity.
+/// Randomness comes from the OS CSPRNG; the held identity comes from
+/// `sync_person_unlock`; the vault hash binds the wrap to this vault.
+///
+/// The wire ROUTE is Grill 4's (B10): this core returns the invite frame;
+/// the caller relays it once the route exists.
+#[tauri::command]
+pub async fn sync_invite_member<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    member_kem_ek_hex: String,
+    member_ed_pk_hex: String,
+    member_mldsa_vk_hex: String,
+    vault_label: String,
+    created_at_secs: u64,
+) -> Result<InviteCommandView, SyncDeviceError> {
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    // Peek the slot, then DROP the guard before any await: holding a
+    // `slots.read()` across `active_vault_id()`'s own `slots.read()` is the
+    // tokio RwLock deadlock shape (a queued writer blocks the second acquire
+    // while the first stays held).
+    let (root_key, items_key) = {
+        let slot = state.inner().slot_read_active().await;
+        match &*slot {
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => (
+                zeroize::Zeroizing::new(*uv.root_key),
+                zeroize::Zeroizing::new(*uv.items_key),
+            ),
+            _ => return Err(SyncDeviceError::NotEnrolled),
+        }
+    };
+    let owner = state
+        .inner()
+        .clone_person_identity()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+
+    let member_public = protocol::person_key::PersonPublicHalf::from_parts_hex(
+        &member_kem_ek_hex,
+        &member_ed_pk_hex,
+        &member_mldsa_vk_hex,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    // Serialize the whole-blob `vault.meta` read-modify-write against every
+    // other lifecycle mutation BEFORE reading: the permit must be held across
+    // the read below and the write in `write_roster_row`, or a concurrent
+    // `change_password` landing between them is silently reverted by the
+    // invite write (both blobs stay AEAD-valid, so nothing detects it).
+    // `member_removal` takes the permit first for the same reason.
+    let _permit = state
+        .inner()
+        .auth_permits()
+        .try_acquire()
+        .map_err(|_| SyncDeviceError::Transport)?;
+
+    // Read `vault.meta` ONCE: its account hash binds the wrap and its roster is
+    // the store the invited member's row is written into.
+    let root = crate::paths::active_vault_root_from_base(
+        &host
+            .app_data_dir()
+            .map_err(|_| SyncDeviceError::Transport)?,
+        state.inner().active_vault_id().await,
+    );
+    let meta_path = root.join("vault.meta");
+    let meta_bytes = io
+        .read(&meta_path)
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    let version = protocol::meta_version_of(&meta_bytes).unwrap_or(protocol::MetaVersion::V0_1);
+    let mut meta =
+        protocol::parse_vault_meta_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let account_number_hash = meta.account_number_hash;
+
+    // Panics on an OS CSPRNG failure (the `CryptoRng` bound the person
+    // surfaces take needs an infallible source; `rng.rs` documents that
+    // posture). Not a recoverable state on a supported platform.
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let invite = super::invite::invite_create(
+        &owner,
+        &member_public,
+        &items_key,
+        &account_number_hash,
+        &vault_label,
+        created_at_secs,
+        &mut rng,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    // Write the invited member's roster row. This is what CREATES the roster
+    // extension: without it no roster is ever written, `sync_list_roster` stays
+    // empty, and `sync_remove_member` is unreachable.
+    let wrapped = protocol::person_rekey::wrap_items_key_to_member(
+        &items_key,
+        &member_public,
+        &account_number_hash,
+        &mut rng,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+    let row = super::invite::invited_member_row(
+        &member_public,
+        super::invite::wrapped_hex(&wrapped),
+        &vault_label,
+        created_at_secs,
+    );
+    if let Err(e) = write_roster_row(
+        state.inner(),
+        &_permit,
+        &io,
+        &root,
+        &meta_path,
+        version,
+        &mut meta,
+        &root_key,
+        &account_number_hash,
+        row,
+    )
+    .await
+    {
+        tracing::debug!(stage = "invite", error = ?e, "roster row write failed");
+        return Err(e);
+    }
+
+    let invite_wire = protocol::person_invite::vault_invite_to_wire(&invite);
+    Ok(InviteCommandView {
+        owner_fingerprint_hex: invite.owner_fingerprint_hex,
+        member_fingerprint_hex: invite.member_fingerprint_hex,
+        owner_ed25519_pk_hex: invite.owner_ed25519_pk_hex.clone(),
+        owner_mldsa_vk_hex: invite.owner_mldsa_vk_hex.clone(),
+        // The relayable frame. The wire ROUTE is Grill 4's, but the frame itself
+        // is what the member needs to accept, so the command hands it back
+        // instead of dropping it: without this the invite cannot leave the
+        // device and the feature is inert in one direction.
+        invite_wire,
+    })
+}
+
+/// Unseal the roster (or start empty), upsert one member row, re-seal it into
+/// `vault.meta`, and write the meta back. Runs under the caller's auth permit
+/// (held across the `vault.meta` read in `sync_invite_member` and this write),
+/// so the write cannot interleave a concurrent `change_password`; marks the
+/// meta dirty so the row reaches peers, and refreshes the slot anchor so the
+/// next change-password does not read the write as external tampering.
+#[allow(clippy::too_many_arguments)]
+async fn write_roster_row(
+    state: &VaultRuntimeState,
+    _permit: &tokio::sync::SemaphorePermit<'_>,
+    io: &dyn crate::vault_io::VaultIo,
+    root: &std::path::Path,
+    meta_path: &std::path::Path,
+    version: protocol::MetaVersion,
+    meta: &mut protocol::VaultMeta,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    row: super::roster::RosterMemberEntry,
+) -> Result<(), SyncDeviceError> {
+    // The auth permit arrives held from `sync_invite_member` (acquired before
+    // its `vault.meta` read); it is only borrowed here to keep the
+    // read-modify-write under one hold. Taking it here instead would leave the
+    // outer read outside the serialization.
+    let current = match meta.membership.as_ref().and_then(|m| m.roster.as_ref()) {
+        Some(env) => {
+            let plaintext = protocol::unseal_membership_roster(root_key, env, account_number_hash)
+                .map_err(|_| SyncDeviceError::BadRequest)?;
+            super::roster::parse_roster(&plaintext).ok_or(SyncDeviceError::BadRequest)?
+        }
+        None => super::roster::RosterMap::new(),
+    };
+    // Refuse to re-invite a tombstoned member rather than writing the unchanged
+    // roster and handing back a live invite frame: `upsert_member` leaves a
+    // tombstone alone (remove-wins), so the member would accept an invite that
+    // the roster never records and no later rotation re-wraps.
+    if current
+        .get(&row.fingerprint_hex)
+        .is_some_and(|existing| existing.deleted)
+    {
+        return Err(SyncDeviceError::BadRequest);
+    }
+    let updated = super::roster::upsert_member(&current, row);
+    let plaintext = super::roster::encode_roster(&updated);
+    let mut nonce = [0u8; protocol::MEMBERSHIP_ROSTER_NONCE_LEN];
+    getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Transport)?;
+    let env =
+        protocol::seal_membership_roster_raw(root_key, &plaintext, account_number_hash, &nonce)
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+    match meta.membership.as_mut() {
+        Some(m) => m.roster = Some(env),
+        None => return Err(SyncDeviceError::BadRequest),
+    }
+    let old_hash = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .map(|(_, h)| h);
+    let new_bytes = protocol::serialize_vault_meta_versioned(version, meta);
+    io.write(meta_path, &new_bytes, crate::vault_io::WriteOpts::default())
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    // The dirty marker opens the meta phase's push window for this device's
+    // roster write. Best-effort with one immediate retry: a transient IO
+    // failure is the common case and the marker write is idempotent, so a
+    // second attempt is cheap and needs no signature change. A persistent
+    // failure still converges rather than stranding the invite: the meta
+    // phase pushes on baseline divergence too (`meta_baseline_hex` still
+    // holds the pre-invite hash while `vault.meta` already carries the new
+    // roster), so the marker only accelerates the baseline-lost corner
+    // instead of gating the push.
+    if let Err(first) = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await {
+        // One immediate retry before giving up (see the guarantee above).
+        if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await {
+            tracing::warn!(stage = "invite", first_error = ?first, error = ?e, "meta-dirty marker write failed twice");
+        }
+    }
+    // Refresh the CAS anchor to the bytes written, or the next change-password
+    // compares against the pre-invite hash and force-relocks with
+    // `VaultMetaChangedExternally`.
+    if let (Some(old), Some(id)) = (old_hash, state.active_vault_id().await) {
+        use sha2::Digest as _;
+        let new_hash: [u8; 32] = sha2::Sha256::digest(&new_bytes).into();
+        state.refresh_meta_hash_if(id, old, new_hash).await;
+    }
+    Ok(())
+}
+
+/// The invite command's serializable result.
+#[derive(Debug, serde::Serialize)]
+pub struct InviteCommandView {
+    pub owner_fingerprint_hex: String,
+    pub member_fingerprint_hex: String,
+    pub owner_ed25519_pk_hex: String,
+    pub owner_mldsa_vk_hex: String,
+    /// The whole sealed invite frame, hex-JSON encoded
+    /// (`protocol::person_invite::vault_invite_to_wire`), for the caller to
+    /// relay to the member. Accept is a later task; this is the frame it needs.
+    pub invite_wire: String,
+}
+
+/// **List the unlocked vault's B2B roster** (myne-md/myne#698 task 9).
+///
+/// Unseals the membership field's roster extension (when present) with the
+/// slot's `root_key`, parses the canonical member rows, and returns the
+/// non-tombstoned ones. A vault without the extension answers an empty
+/// list (the 0580 single-account shape, no roster to show).
+#[tauri::command]
+pub async fn sync_list_roster<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<RosterMemberView>, SyncDeviceError> {
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    let slot = state.inner().slot_read_active().await;
+    let root_key = match &*slot {
+        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => uv.root_key.clone(),
+        _ => return Err(SyncDeviceError::NotEnrolled),
+    };
+    drop(slot);
+
+    let root = crate::paths::active_vault_root_from_base(
+        &host
+            .app_data_dir()
+            .map_err(|_| SyncDeviceError::Transport)?,
+        state.inner().active_vault_id().await,
+    );
+    // Read + parse `vault.meta` ONCE: the account hash and the roster both come
+    // from it, and a second read could observe a file that changed between them.
+    let bytes = io
+        .read(&root.join("vault.meta"))
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    let meta = protocol::parse_vault_meta_any(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let hash = meta.account_number_hash;
+    let roster = match meta.membership.as_ref().and_then(|m| m.roster.as_ref()) {
+        Some(roster) => {
+            let plaintext = protocol::unseal_membership_roster(&root_key, roster, &hash)
+                .map_err(|_| SyncDeviceError::BadRequest)?;
+            // The roster is AEAD-verified by now, so a parse failure means the
+            // writer is broken. Error rather than substitute an empty map:
+            // answering "no members" for a corrupt roster would let the caller
+            // (and the next write) persist that emptiness over real rows.
+            super::roster::parse_roster(&plaintext).ok_or(SyncDeviceError::BadRequest)?
+        }
+        None => super::roster::RosterMap::new(),
+    };
+
+    Ok(roster
+        .into_values()
+        .filter(|m| !m.deleted)
+        .map(RosterMemberView::from_entry)
+        .collect())
+}
+
+/// One roster row as the UI consumes it.
+#[derive(Debug, serde::Serialize)]
+pub struct RosterMemberView {
+    pub fingerprint_hex: String,
+    pub display_name: String,
+    pub version: u64,
+    pub previous_fingerprint_hex: Option<String>,
+    pub joined_at: u64,
+    /// The member's Ed25519 public key (lowercase hex).
+    pub member_ed_pk_hex: String,
+    /// The member's ML-KEM encapsulation key (lowercase hex).
+    pub member_kem_ek_hex: String,
+    /// The member's ML-DSA verifying key (lowercase hex).
+    pub member_mldsa_vk_hex: String,
+}
+
+impl RosterMemberView {
+    fn from_entry(e: super::roster::RosterMemberEntry) -> Self {
+        Self {
+            fingerprint_hex: e.fingerprint_hex,
+            display_name: e.display_name,
+            version: e.version,
+            previous_fingerprint_hex: e.previous_fingerprint_hex,
+            joined_at: e.joined_at,
+            member_ed_pk_hex: e.member_ed_pk_hex,
+            member_kem_ek_hex: e.member_kem_ek_hex,
+            member_mldsa_vk_hex: e.member_mldsa_vk_hex,
+        }
+    }
+}
+
+/// **Remove a member from the unlocked vault** (B2B, myne-md/myne#698
+/// tasks 4 and 7).
+///
+/// PARKED until the roster wire ships: refuses immediately with
+/// [`SyncDeviceError::RemovalUnavailable`]. The rotation this would run is
+/// local-only (no peer propagation, no tombstone convergence), so the entry
+/// point stays refused rather than stranding peers on a retired key. When the
+/// wire lands, this delegates to `member_removal::remove_member_from_host`,
+/// which rotates the vault `itemsKey`, re-wraps every note and attachment
+/// blob's per-entry key under it (content ciphertext byte-identical),
+/// tombstones the removed member's roster row, re-wraps the new `itemsKey`
+/// to every remaining member's carried public half, re-seals the roster into
+/// `vault.meta`, and re-derives the slot's `itemsKey` so the running session
+/// keeps working.
+#[tauri::command]
+pub async fn sync_remove_member<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    member_fingerprint_hex: String,
+) -> Result<(), SyncDeviceError> {
+    super::member_removal::remove_member_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &member_fingerprint_hex,
+    )
+    .await
+    .map_err(|e| {
+        // Map the closed enum by cause rather than collapsing every failure to
+        // `Transport`: a removed member that does not exist and a corrupt
+        // `vault.meta` are not transient network faults, and reporting them as
+        // one makes a failed call indistinguishable from a retryable one.
+        use super::member_removal::MemberRemovalError as E;
+        match e {
+            E::RemovalUnavailable => SyncDeviceError::RemovalUnavailable,
+            E::VaultLocked | E::NoRoster => SyncDeviceError::NotEnrolled,
+            E::MemberNotFound => SyncDeviceError::DeviceNotFound,
+            // A contended auth permit is transient: the frontend retries rather
+            // than re-enrolling, so it maps to `Transport`, not `NotEnrolled`.
+            E::Busy => SyncDeviceError::Transport,
+            E::CannotDecrypt | E::InvalidVaultMeta | E::Io => SyncDeviceError::BadRequest,
+        }
+    })
 }
 
 /// Approve a pending device (the existing unlocked device authorizes it).

@@ -368,6 +368,11 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
         // sit for the remainder of the 30-minute TTL on a device the user is
         // looking at as locked.
         myne_core::plugins::vault_unlock::import_source::close_all(state).await;
+        // The backend-held B2B person identity is a Critical-class keypair and
+        // must die with the same idle lock that drops the slot (myne-md/myne#698;
+        // `threat-model.md` AS21 says "every lock path"). It lives OUTSIDE the
+        // slot map, so nothing else on this path reaches it.
+        let _ = state.take_person_identity().await;
         // Canonical teardown order (decisions 2026-05-30, leg-split): hide
         // (2a, BEFORE zeroize — renderer-independent cover) → zeroize (leg 1)
         // → reapply screen-capture → reload (2b, AFTER zeroize). The window

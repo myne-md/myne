@@ -198,7 +198,7 @@ fn cases_json_v0_2(category: &str) -> Option<String> {
 /// absent file is a compile error: without the gate, every contributor who has
 /// not cloned the companion would lose the ability to build this crate's tests.
 ///
-/// Keeping this list complete is enforced rather than remembered —
+/// Keeping this list complete is enforced rather than remembered :
 /// [`cases_json`] panics on a category that is missing here, and
 /// `the_browser_lane_carries_every_category` asserts the table and the runners
 /// name the same set.
@@ -254,6 +254,16 @@ mod embedded {
             "argon2id",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/argon2id/v0.1/cases.json"),
+        ),
+        (
+            "person-keypair",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-keypair/v0.2/cases.json"),
+        ),
+        (
+            "person-identity",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-identity/v0.2/cases.json"),
         ),
         (
             "attachment-blob",
@@ -2520,6 +2530,188 @@ fn argon2id_wrap_vectors() {
     }
 }
 
+/// `person-keypair` v0.2: the B2B person-keypair wrap-key derivation under the
+/// `"myne.v0.2 argon2id-person-keypair|"` salt domain (`decisions/protocol/0592`).
+///
+/// A protocol-touching KDF domain with no case is a port that derives the wrap
+/// key differently and is caught by nothing; the two cases pin the bytes AND the
+/// person-level domain separation (same phrase + salt, different `person_id_hash`
+/// must derive different keys).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_keypair_vectors() {
+    use protocol::derive_person_keypair_wrap_key_from_normalized;
+
+    let Some(raw) = cases_json_v0_2("person-keypair") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-keypair/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-keypair");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 2,
+        "person-keypair must carry at least 2 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("person-keypair/v0.2", cases);
+
+    let mut seen_keys = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let phrase = hex_decode(
+            case["input_phrase_utf8_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_phrase_utf8_hex")),
+        );
+        let phrase = core::str::from_utf8(&phrase)
+            .unwrap_or_else(|e| panic!("[{id}] phrase not valid UTF-8: {e}"));
+        let salt: [u8; 16] = hex_decode_array(
+            case["input_salt_random_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_salt_random_hex")),
+        );
+        let person_id: [u8; 16] = hex_decode_array(
+            case["input_person_id_hash_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_person_id_hash_hex")),
+        );
+        let params = parse_kdf_params(case, id);
+        let expected: [u8; 32] = hex_decode_array(
+            case["expected_wrap_key_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing expected_wrap_key_hex")),
+        );
+        let actual =
+            derive_person_keypair_wrap_key_from_normalized(phrase, &salt, &person_id, &params)
+                .unwrap_or_else(|e| {
+                    panic!("[{id}] derive_person_keypair_wrap_key_from_normalized failed: {e:?}")
+                });
+        assert_eq!(
+            actual.as_slice(),
+            expected.as_slice(),
+            "[{id}] person-keypair wrap-key mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+            hex_encode(&expected),
+            hex_encode(&*actual),
+        );
+        seen_keys.insert(hex_encode(&*actual));
+    }
+    // Domain separation: the cases differ only in person id, so their keys MUST
+    // differ, a runner that pinned two identical keys would be asserting
+    // nothing about the person-level binding.
+    assert_eq!(
+        seen_keys.len(),
+        cases.len(),
+        "person-keypair cases must derive distinct keys per person id"
+    );
+}
+
+/// `person-identity` v0.2: the canonical fingerprint and the hybrid-wrap
+/// combiner, the two deterministic byte surfaces a second implementation must
+/// reproduce byte-for-byte (myne-md/myne#698).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_identity_vectors() {
+    use protocol::{compute_fingerprint, hybrid_wrap_key};
+
+    let Some(raw) = cases_json_v0_2("person-identity") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-identity/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-identity");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    for case in cases {
+        let kind = case["case_kind"]
+            .as_str()
+            .expect("case_kind must be a string");
+        seen_kinds.insert(kind.to_string());
+        match kind {
+            "fingerprint" => {
+                let kem_ek: [u8; protocol::PERSON_EK_LEN] = hex_decode_array(
+                    case["input_kem_ek_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_kem_ek_hex")),
+                );
+                let ed_pk: [u8; protocol::PERSON_ED25519_PK_LEN] = hex_decode_array(
+                    case["input_ed_pk_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_ed_pk_hex")),
+                );
+                let mldsa_vk: [u8; protocol::PERSON_MLDSA_VK_LEN] = hex_decode_array(
+                    case["input_mldsa_vk_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_mldsa_vk_hex")),
+                );
+                let expected: [u8; protocol::PERSON_FINGERPRINT_LEN] = hex_decode_array(
+                    case["expected_fingerprint_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_fingerprint_hex")),
+                );
+                let actual = compute_fingerprint(&kem_ek, &ed_pk, &mldsa_vk);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[fingerprint] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+                // The domain prefix is load-bearing: the bare SHA-256 of the
+                // concatenation must NOT equal the expected fingerprint.
+                use sha2::{Digest, Sha256};
+                let mut bare = Sha256::new();
+                bare.update(kem_ek);
+                bare.update(ed_pk);
+                bare.update(mldsa_vk);
+                assert_ne!(
+                    bare.finalize().as_slice(),
+                    expected.as_slice(),
+                    "[fingerprint] the domain prefix must change the digest"
+                );
+            }
+            "hybrid-wrap-key" => {
+                let classical: [u8; 32] = hex_decode_array(
+                    case["input_classical_ss_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_classical_ss_hex")),
+                );
+                let pq: [u8; 32] = hex_decode_array(
+                    case["input_pq_ss_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_pq_ss_hex")),
+                );
+                let expected: [u8; 32] = hex_decode_array(
+                    case["expected_hybrid_wrap_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_hybrid_wrap_key_hex")),
+                );
+                let actual = hybrid_wrap_key(&classical, &pq);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[hybrid-wrap-key] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&*actual),
+                );
+            }
+            other => panic!("[{other}] unknown case_kind for person-identity"),
+        }
+    }
+    for required in ["fingerprint", "hybrid-wrap-key"] {
+        assert!(
+            seen_kinds.contains(required),
+            "person-identity must cover the '{required}' case kind"
+        );
+    }
+}
+
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn bip39_recovery_vectors() {
@@ -2842,8 +3034,9 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_agent_memory_blob_v0_2, aad_membership_blob, aad_password_wrap_v0_2,
-        aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
+        aad_agent_memory_blob_v0_2, aad_membership_blob, aad_membership_roster_blob,
+        aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
+        aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -2916,6 +3109,17 @@ fn aad_construction_v0_2_vectors() {
                 aad_singleton_blob_v0_2(role.as_bytes(), &account_number_hash())
             }
             "aad_membership_blob" => aad_membership_blob(&account_number_hash()),
+            "aad_membership_roster_blob" => aad_membership_roster_blob(&account_number_hash()),
+            "aad_person_wrap" => {
+                let fingerprint: [u8; 32] = hex_decode_array(
+                    case["input_recipient_fingerprint_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_recipient_fingerprint_hex")),
+                );
+                protocol::person_key::aad_person_wrap(&fingerprint, &account_number_hash())
+            }
+            "aad_person_keypair" => protocol::person_key::aad_person_keypair(),
+            "aad_vault_invite" => protocol::person_invite::aad_vault_invite(),
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
             ),
@@ -2977,13 +3181,17 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 6] = [
+    let required: [&str; 10] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
         "aad_singleton_blob_v0_2",
         "aad_agent_memory_blob_v0_2",
         "aad_membership_blob",
+        "aad_membership_roster_blob",
+        "aad_person_wrap",
+        "aad_person_keypair",
+        "aad_vault_invite",
     ];
     for builder in required {
         assert!(
@@ -5689,6 +5897,63 @@ fn vault_meta_v0_2_vectors() {
                     "[{id}] a tampered membership field must fail closed"
                 );
             }
+            "roster_present" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] roster meta must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let roster = membership
+                    .roster
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] roster must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let plaintext =
+                    protocol::unseal_membership_roster(&root_key, roster, &account_number_hash)
+                        .unwrap_or_else(|e| panic!("[{id}] roster unseal: {e:?}"));
+                assert_eq!(
+                    String::from_utf8_lossy(&plaintext),
+                    field(case, id, "expected_roster_plaintext_utf8"),
+                    "[{id}] roster plaintext"
+                );
+                assert_eq!(
+                    hex_encode(&roster.nonce),
+                    field(case, id, "input_roster_nonce_hex"),
+                    "[{id}] roster nonce"
+                );
+            }
+            "roster_tampered" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] tampered roster must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let roster = membership
+                    .roster
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] roster must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                assert!(
+                    protocol::unseal_membership_roster(&root_key, roster, &account_number_hash)
+                        .is_err(),
+                    "[{id}] a tampered roster envelope must fail closed"
+                );
+            }
+            "roster_over_cap" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert!(
+                    parse_vault_meta_v0_2(&blob).is_err(),
+                    "[{id}] the length field past the 64 KiB cap must reject BEFORE any ciphertext read"
+                );
+            }
             other => panic!("[{id}] unknown case_kind {other}"),
         }
     }
@@ -5705,6 +5970,12 @@ fn vault_meta_v0_2_vectors() {
         assert!(
             seen.contains(k),
             "vault-meta/v0.2 must cover membership case_kind {k}"
+        );
+    }
+    for k in ["roster_present", "roster_tampered", "roster_over_cap"] {
+        assert!(
+            seen.contains(k),
+            "vault-meta/v0.2 must cover roster case_kind {k}"
         );
     }
 }
