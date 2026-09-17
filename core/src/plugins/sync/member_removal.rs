@@ -64,6 +64,11 @@ pub const REKEY_JOURNAL: &str = ".rekey-journal";
 /// Member-removal errors. Closed enum; no path or secret ever crosses IPC.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemberRemovalError {
+    /// Member removal is parked until the roster wire ships. Every removal
+    /// entry point refuses with this before touching the vault, so the
+    /// non-converging half (local rotation without peer propagation or
+    /// tombstone convergence) cannot run.
+    RemovalUnavailable,
     /// No vault is unlocked.
     VaultLocked,
     /// The vault carries no roster extension (a 0580 single-account vault).
@@ -83,13 +88,41 @@ pub enum MemberRemovalError {
     Busy,
 }
 
+impl MemberRemovalError {
+    /// The reason carried by [`MemberRemovalError::RemovalUnavailable`]. The
+    /// only variant that carries a message: every other failure is rendered
+    /// from its kind by the caller, while a parked entry point owes the
+    /// caller the reason in words.
+    pub fn unavailable_message(&self) -> Option<&'static str> {
+        match self {
+            MemberRemovalError::RemovalUnavailable => {
+                Some("Member removal is disabled until the roster wire ships.")
+            }
+            _ => None,
+        }
+    }
+}
+
 /// The testable core: remove `member_fingerprint_hex` from the active vault.
+///
+/// PARKED until the roster wire ships: refuses with
+/// [`MemberRemovalError::RemovalUnavailable`] before touching the vault (no
+/// permit taken, no slot read, no IO). The rotation below is local-only with
+/// no peer propagation and no tombstone convergence, so running it would
+/// strand peers on the retired key. The body stays compiled behind the
+/// refusal (unreachable code is still type-checked), so lifting the gate is
+/// deleting the refusal plus the `allow`, not reconstructing the pipeline.
+#[allow(unreachable_code)]
 pub async fn remove_member_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     member_fingerprint_hex: &str,
 ) -> Result<(), MemberRemovalError> {
+    // While parked the parameters go unused: name them for the live pipeline
+    // so lifting the gate is deleting these two lines, not renaming the API.
+    let _ = (host, io, state, member_fingerprint_hex);
+    return Err(MemberRemovalError::RemovalUnavailable);
     // Serialize against every other `vault.meta`-lifecycle mutation. A rekey is
     // a whole-blob read-modify-write of `vault.meta`; a `change_password`
     // running concurrently writes its new password-side while this holds the
@@ -683,6 +716,42 @@ fn hex_val(b: u8) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PARKED: the removal entry point refuses before touching the vault, with
+    /// the named error carrying the reason. The vault is untouched — no permit
+    /// taken, no slot read, no IO — so this runs against a default (locked,
+    /// empty) state on a nonexistent base dir.
+    #[test]
+    fn removal_is_refused_until_the_roster_wire_ships() {
+        use crate::host::test_host::TestHost;
+        use crate::test_support::block_on;
+        use crate::vault_io::StdVaultIo;
+
+        let host = TestHost::new("/nonexistent-base");
+        let state = VaultRuntimeState::default();
+        let err = block_on(remove_member_from_host(
+            &host,
+            &StdVaultIo,
+            &state,
+            &"ab".repeat(32),
+        ))
+        .expect_err("removal must refuse while parked");
+        assert_eq!(err, MemberRemovalError::RemovalUnavailable);
+        assert_eq!(
+            err.unavailable_message(),
+            Some("Member removal is disabled until the roster wire ships.")
+        );
+    }
+
+    /// Only `RemovalUnavailable` carries a message; every other failure is
+    /// rendered from its kind by the caller.
+    #[test]
+    fn only_the_parked_refusal_carries_a_message() {
+        assert!(MemberRemovalError::VaultLocked
+            .unavailable_message()
+            .is_none());
+        assert!(MemberRemovalError::Busy.unavailable_message().is_none());
+    }
 
     #[test]
     fn parse_uuid_accepts_canonical_hyphenated_and_rejects_junk() {

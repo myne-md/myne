@@ -64,21 +64,20 @@ export function MemberRosterPanel({
     loading,
     error,
     inviting,
-    removing,
     lastInvite,
     invite,
     unlockPerson,
     lockPerson,
-    remove,
   } = useRoster();
   const [personReady, setPersonReady] = useState(false);
   const [personError, setPersonError] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const childDialogOpen = inviteOpen || pendingRemoval !== null;
+  // Removal is parked until the roster wire ships, so there is no removal
+  // dialog: the only child dialog is the invite form.
+  const childDialogOpen = inviteOpen;
   useEffect(() => {
     onDialogOpenChange?.(childDialogOpen);
     return () => onDialogOpenChange?.(false);
@@ -155,54 +154,37 @@ export function MemberRosterPanel({
         </div>
       )}
 
-      {/* Step 2: the roster. */}
+      {/* Step 2: the roster. Removal is parked until the roster wire ships:
+          no per-row Remove button renders, and the notice below states the
+          disabled state instead of promising a flow that cannot run. */}
       {members.length === 0 ? (
         <p data-testid="member-roster.empty" style={STATUS_STYLE}>
           {t("sync.memberRoster.empty")}
         </p>
       ) : (
-        <ul data-testid="member-roster.list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {members.map((m) => (
-            <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex} style={ROW_STYLE}>
-              <span data-testid="member-roster.name" style={NAME_STYLE}>
-                {m.display_name}
-              </span>
-              <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
-                {m.fingerprint_hex.slice(0, 16)}
-              </span>
-              {m.previous_fingerprint_hex ? (
-                <span data-testid="member-roster.rotated" style={CODE_STYLE}>
-                  {t("sync.memberRoster.rotated")}
+        <>
+          <ul data-testid="member-roster.list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {members.map((m) => (
+              <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex} style={ROW_STYLE}>
+                <span data-testid="member-roster.name" style={NAME_STYLE}>
+                  {m.display_name}
                 </span>
-              ) : null}
-              <Button
-                type="button"
-                variant="danger"
-                data-testid="member-roster.remove-button"
-                disabled={removing}
-                onClick={() => setPendingRemoval(m.fingerprint_hex)}
-              >
-                {t("sync.memberRoster.remove")}
-              </Button>
-            </li>
-          ))}
-        </ul>
+                <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
+                  {m.fingerprint_hex.slice(0, 16)}
+                </span>
+                {m.previous_fingerprint_hex ? (
+                  <span data-testid="member-roster.rotated" style={CODE_STYLE}>
+                    {t("sync.memberRoster.rotated")}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <p data-testid="member-roster.remove-disabled" style={STATUS_STYLE}>
+            {t("sync.memberRoster.removeConfirm")}
+          </p>
+        </>
       )}
-
-      {pendingRemoval ? (
-        <ConfirmRemove
-          busy={removing}
-          onCancel={() => setPendingRemoval(null)}
-          onConfirm={async () => {
-            try {
-              await remove(pendingRemoval);
-              setPendingRemoval(null);
-            } catch {
-              setActionError(t("sync.memberRoster.removeFailed"));
-            }
-          }}
-        />
-      ) : null}
 
       {/* Step 3: invite. */}
       <Button
@@ -254,8 +236,8 @@ export function MemberRosterPanel({
   );
 }
 
-/** The removal confirmation: a removal re-keys the vault, so the dialog
- *  states what it does before the user commits. */
+/** Escape closes the topmost child dialog (the invite form, while removal
+ *  is parked). */
 function useEscapeToClose(onClose: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -264,45 +246,6 @@ function useEscapeToClose(onClose: () => void) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-}
-
-function ConfirmRemove({
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(ref, { enabled: true });
-  useEscapeToClose(onCancel);
-  return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("sync.memberRoster.removeConfirm")}
-      data-testid="member-roster.remove-confirm"
-      style={STATUS_STYLE}
-    >
-      <p>{t("sync.memberRoster.removeConfirm")}</p>
-      <Button type="button" data-testid="member-roster.remove-cancel" onClick={onCancel}>
-        {t("common.cancel")}
-      </Button>
-      <Button
-        type="button"
-        variant="danger"
-        data-testid="member-roster.remove-confirm-button"
-        disabled={busy}
-        onClick={onConfirm}
-      >
-        {t("sync.memberRoster.remove")}
-      </Button>
-    </div>
-  );
 }
 
 /** The invite form. The invitee's public material is pasted; fetching it

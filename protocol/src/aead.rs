@@ -751,7 +751,7 @@ pub fn aad_chats_blob_v0_2(account_number_hash: &[u8; 16], conversation_id: &[u8
     aad.extend_from_slice(account_number_hash);
     aad
 }
-pub fn aad_membership_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+
 /// Build the AAD bound into the AEAD encryption of the agent-memory catalog
 /// singleton (`vault.agent-memory`, `MYN1`, myne-md/myne#697; `protocol.md`
 /// § 9.25.2). Mirrors [`aad_chats_catalog`] exactly, with the role string
