@@ -1155,10 +1155,11 @@ describe("a settings change repaints an open note (myne#609)", () => {
 
   it("re-labels an OPEN note's recurrence chip on a language change", async () => {
     // The date half rides `locale`; this is the other half, an `i18n.t` label
-    // read at build time. It is the case `callout.ts:109-114` documents and
-    // accepts today ("a switched language re-labels on the next rebuild (any
-    // edit, scroll or selection move). It isn't wired."), and the callout title
-    // is the same mechanism one decoration over, so wiring it here retires both.
+    // read at build time. It used to be the case `callout.ts` documented and
+    // accepted ("a switched language re-labels on the next rebuild"), and the
+    // callout title is the same mechanism one decoration over. myne-md/myne#644
+    // later fixed the callout half of that (its rebuild was not rendering the
+    // rebuilt widget); this test covers the recurrence chip.
     //
     // The language change is paired with a store publish because that is what
     // production does: the host adapter carries the active language in
