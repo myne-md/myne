@@ -68,7 +68,7 @@ function settleWith(edits: ProposedEdit[]) {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  }, currentRunEpoch());
+  memoryUpdated: 0,}, currentRunEpoch());
 }
 
 function mount() {

@@ -751,6 +751,126 @@ pub fn aad_chats_blob_v0_2(account_number_hash: &[u8; 16], conversation_id: &[u8
     aad.extend_from_slice(account_number_hash);
     aad
 }
+
+/// Build the AAD bound into the AEAD encryption of the agent-memory catalog
+/// singleton (`vault.agent-memory`, `MYN1`, myne-md/myne#697; `protocol.md`
+/// § 9.25.2). Mirrors [`aad_chats_catalog`] exactly, with the role string
+/// `"agent-memory-catalog"` (20 ASCII bytes, length-prefixed: 2-B BE length
+/// plus the 20 role bytes, 22 total) and the 16-byte `account_number_hash`
+/// binding the catalog to its specific vault. Total AAD length is 49 bytes
+/// (`10 + 1 + 22 + 16`). As with the whole `root_key`-derived singleton
+/// family, `items_key_id` is **not** bound: the catalog KEK derives directly
+/// from `root_key` via `"myne.v0.1 agent-memory-catalog-key"` (§ 3.4),
+/// independent of the `itemsKey` lineage. DISTINCT from the subkey roles
+/// `"agent-memory-catalog-key"` / `"agent-memory-catalog-sync-id"` and from
+/// the per-entry role `"agent-memory-blob"`.
+pub fn aad_agent_memory_catalog(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_AGENT_MEMORY_CATALOG: &[u8] = b"agent-memory-catalog";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_AGENT_MEMORY_CATALOG.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_AGENT_MEMORY_CATALOG);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Build the AAD bound into the AEAD seal of a per-entry agent-memory file
+/// (`memories/<memory-id-hex>`, `MYX1`, myne-md/myne#697; `protocol.md`
+/// § 9.26.3). Follows the [`aad_chats_blob`] per-entry pattern with the
+/// 16-byte memory-entry id in the per-entry position.
+///
+/// Layout (62 bytes for the v0.1 stamp):
+///
+/// ```text
+/// "myne.v0.1|"                        10 bytes  (AAD prefix, § 5.2)
+/// protocol_version                     1 byte   (caller's vault generation)
+/// u16_be(17) || "agent-memory-blob"   19 bytes  (length-prefixed role)
+/// memory_entry_id                     16 bytes  (the entry UUIDv7, § 9.26)
+/// account_number_hash                 16 bytes  (vault identity, § 9.3 offset 6)
+/// ```
+///
+/// Binding both ids prevents substituting one entry's blob for another
+/// within the same vault (the per-blob-safety property that lets ONE KEK
+/// serve every entry file, the `MYE1` archetype) and porting a blob across
+/// vaults at the AEAD layer. `account_number_hash` (NOT `items_key_id`)
+/// binds vault identity: `agent_memory_key` derives via
+/// `"myne.v0.1 agent-memory-key"`, independent of the `items_key` lineage.
+/// DISTINCT from the subkey role `"agent-memory-key"` and from the singleton
+/// role `"agent-memory-catalog"`.
+pub fn aad_agent_memory_blob(
+    account_number_hash: &[u8; 16],
+    memory_entry_id: &[u8; 16],
+) -> Vec<u8> {
+    const ROLE_STR_AGENT_MEMORY_BLOB: &[u8] = b"agent-memory-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_AGENT_MEMORY_BLOB.len()
+            + memory_entry_id.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_AGENT_MEMORY_BLOB);
+    aad.extend_from_slice(memory_entry_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Generic **v0.2** memory-entry AAD, the next-major mirror of
+/// [`aad_agent_memory_blob`], stamped with the v0.2 prefix + version. The
+/// migration re-seals a memory-entry file by decoding under
+/// `aad_agent_memory_blob` and re-encoding under this (§10.4.1).
+pub fn aad_agent_memory_blob_v0_2(
+    account_number_hash: &[u8; 16],
+    memory_entry_id: &[u8; 16],
+) -> Vec<u8> {
+    const ROLE_STR_AGENT_MEMORY_BLOB: &[u8] = b"agent-memory-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_AGENT_MEMORY_BLOB.len()
+            + memory_entry_id.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_AGENT_MEMORY_BLOB);
+    aad.extend_from_slice(memory_entry_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Build the AAD bound into the AEAD encryption of the agent-personality
+/// singleton (`vault.personality`, `MYZ1`, myne-md/myne#697; `protocol.md`
+/// § 9.27.2). Mirrors [`aad_prefs_blob`] exactly, with the role string
+/// `"personality-blob"` (16 ASCII bytes, length-prefixed: 2-B BE length +
+/// 16 = 18 bytes) and the 16-byte `account_number_hash` binding the blob to
+/// its specific vault. Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. As
+/// with the whole `root_key`-derived singleton family, `items_key_id` is
+/// **not** bound: the personality KEK derives directly from `root_key` via
+/// `"myne.v0.1 agent-personality-key"` (§ 3.4), independent of the
+/// `itemsKey` lineage. DISTINCT from the subkey roles
+/// `"agent-personality-key"` / `"agent-personality-sync-id"`.
+pub fn aad_agent_personality_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PERSONALITY_BLOB: &[u8] = b"personality-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_PERSONALITY_BLOB.len() + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSONALITY_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
 /// Build the AAD bound into the AEAD seal of the vault membership field
 /// (`vault.meta` §9.3.1, the account/vault split). The field is `NTV5`-only, so
 /// this AAD is stamped with the **v0.2** prefix + version, mirroring
@@ -2951,6 +3071,8 @@ mod tests {
         let aad_vik = aad_vault_items_key_wrap_v0_2(&items_key_id);
         let aad_prefs = aad_singleton_blob_v0_2(b"prefs-blob", &account_number_hash);
         let aad_themes = aad_singleton_blob_v0_2(b"custom-themes-blob", &account_number_hash);
+        let memory_entry_id: [u8; 16] = [0xC7; 16];
+        let aad_mem_blob = aad_agent_memory_blob_v0_2(&account_number_hash, &memory_entry_id);
         let aad_membership = aad_membership_blob(&account_number_hash);
 
         // The property that makes the v0.2 prefix worth a vector at all: the same
@@ -2978,6 +3100,12 @@ mod tests {
             "      \"input_account_number_hash_hex\": \"{}\",\n",
             hex_lower(&account_number_hash)
         );
+        let entry_id_json = alloc::format!(
+            "      \"input_memory_entry_id_hex\": \"{}\",\n",
+            hex_lower(&memory_entry_id)
+        );
+        let mut mem_blob_inputs_json = account_hash_json.clone();
+        mem_blob_inputs_json.push_str(&entry_id_json);
         let role_and_hash_json = |role: &str| -> String {
             alloc::format!("      \"input_role_label\": \"{role}\",\n{account_hash_json}")
         };
@@ -2987,7 +3115,7 @@ mod tests {
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §10.4.1 + §10.5 + §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs). These are the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 6 cases: the password/recovery wraps, the itemsKey wrap, the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders. The migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name), and the membership-field builder (aad_membership_blob, §9.3.1). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block. What they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs). These are the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 7 cases: the password/recovery wraps, the itemsKey wrap, the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders. The migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name), the per-entry memory AAD (aad_agent_memory_blob_v0_2, myne-md/myne#697), and the membership-field builder (aad_membership_blob, §9.3.1). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block. What they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // `case_slug` and `builder_name` are separate on purpose: the generic
@@ -3130,6 +3258,23 @@ mod tests {
                 ("account_number_hash", 16),
             ],
             &role_and_hash_json("custom-themes-blob"),
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_agent_memory_blob_v0_2",
+            "aad_agent_memory_blob_v0_2",
+            "The v0.2 per-entry memory AAD (myne-md/myne#697): prefix + 0x02 + length-prefixed role 'agent-memory-blob' + 16-byte entry id + account hash. The entry id sits between the role and the hash, which is what makes a cross-entry substitution fail the AEAD tag. The §10.4.1 migration re-seals every memories/<id> file under exactly these bytes.",
+            &aad_mem_blob,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 17),
+                ("memory_entry_id", 16),
+                ("account_number_hash", 16),
+            ],
+            &mem_blob_inputs_json,
             true,
         );
         emit_case(

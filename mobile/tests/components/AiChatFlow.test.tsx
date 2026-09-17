@@ -458,6 +458,41 @@ describe("AiChatFlow: conversation history (myne-md/myne#675)", () => {
     expect(screen.getByTestId("ai.chat").textContent).toContain("previous answer");
   });
 
+  it("renders the turn-end memory marker for a turn that wrote memory (myne-md/myne#697)", async () => {
+    // The transparency half of the automatic-write model: a run that wrote
+    // says so on its own turn. Seeded through history (the marker reads
+    // turn.agentSummary.memoryUpdated), not through a live run.
+    mockChatsList.mockResolvedValue(ROWS);
+    mockChatsRead.mockResolvedValue(
+      JSON.stringify({
+        title_derived_from: "Newer",
+        turns: [
+          { id: "h1", kind: "text", role: "user", text: "remember this" },
+          {
+            id: "h2",
+            kind: "text",
+            role: "assistant",
+            text: "done",
+            agentSummary: {
+              runId: "run-9",
+              summary: "done",
+              edits: 0,
+              newNotes: 0,
+              notesRead: 1,
+              iterations: 2,
+              charsOffDevice: 120,
+              memoryUpdated: 1,
+              end: "finished",
+            },
+          },
+        ],
+      }),
+    );
+    mount();
+
+    await waitFor(() => expect(screen.getByTestId("ai.memory-updated")).toBeTruthy());
+  });
+
   it("appends the settled pair to the open conversation", async () => {
     mockChatsList.mockResolvedValue([]);
     agentStart.mockResolvedValue(finished("settled answer"));

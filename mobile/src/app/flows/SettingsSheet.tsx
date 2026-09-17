@@ -10,6 +10,7 @@ import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } fr
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
+import { MemorySection } from "./MemorySection";
 import { applyTheme } from "../../formfactor/theme";
 import type { ThemeName } from "../../formfactor/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -948,6 +949,7 @@ function AiPanel({
   onModel,
   onLoadModels,
   onRevoke,
+  onToast,
 }: {
   prefs: PrefsView;
   hasKey: boolean;
@@ -959,6 +961,7 @@ function AiPanel({
   onModel: (model: string) => void;
   onLoadModels: () => void;
   onRevoke: () => void;
+  onToast: (message: string) => void;
 }) {
   const { t } = useTranslation();
   const [keyDraft, setKeyDraft] = useState("");
@@ -1136,6 +1139,12 @@ function AiPanel({
               <PanelHint>{t("settings.ai.mobileRevokeHelper")}</PanelHint>
             </>
           )}
+
+          {/* Agent memory + personality (myne-md/myne#697): the desktop
+              MemorySection twin. Gated on the opt-in only. Memory is
+              written by local runs too, so hiding it behind a provider
+              selection would make an enabled device's memory invisible. */}
+          <MemorySection onToast={onToast} />
         </>
       )}
     </div>
@@ -2578,6 +2587,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             onModel={(m) => writeDraftPref("ai_provider_model", m, () => setAiProviderModel(m))}
             onLoadModels={loadAiModels}
             onRevoke={revokeAiProvider}
+            onToast={(message) => setToast(message)}
           />
         )}
 

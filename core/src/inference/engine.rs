@@ -842,6 +842,28 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         .map(|m| m.content.as_str())
         .unwrap_or("");
 
+    // A memory write, asked once (myne-md/myne#697, `memory.e2e.ts`). Keyed
+    // off the task text like the task-keyed branches below, so the scenario
+    // asks for what it needs in the sentence a user would type. Fires on the
+    // FIRST turn only (no `remember` in the transcript yet): the loop's
+    // one-write-per-run counter would refuse a second, and re-emitting it
+    // would turn the scenario's settle wait into a refusal transcript. The
+    // `finish` rides the same reply because a remember-only run proposes no
+    // edits: without it the run would idle for another provider round-trip
+    // before settling, and the marker wait would measure patience rather
+    // than the write.
+    if task.contains("remember this")
+        && !messages
+            .iter()
+            .any(|m| m.content.contains("\"action\":\"remember\""))
+    {
+        return Some(
+            "{\"action\":\"remember\",\"text\":\"The user prefers terse answers.\"}\n\
+             {\"action\":\"finish\",\"summary\":\"stub remember run\"}}"
+                .to_string(),
+        );
+    }
+
     // **What the model has in hand, from EITHER frame the host uses.**
     //
     // The branches below used to key on `last_assistant` naming a `read_note`,
@@ -1852,6 +1874,44 @@ mod agent_script_tests {
             }
             other => panic!("expected a scope request, got {other:?}"),
         }
+    }
+
+    /// The `remember this` branch `memory.e2e.ts` depends on, asserted here
+    /// so a failure names the branch rather than arriving as a container
+    /// timeout forty minutes later.
+    #[test]
+    fn a_task_asking_to_remember_writes_memory_then_finishes() {
+        let reply = ask(&[turn(ChatRole::User, "please remember this for later")]);
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 2, "got {actions:?}");
+        match &actions[0] {
+            AgentAction::Remember { text, .. } => {
+                assert!(!text.is_empty());
+            }
+            other => panic!("expected a remember, got {other:?}"),
+        }
+        assert!(
+            matches!(actions[1], AgentAction::Finish { .. }),
+            "got {actions:?}"
+        );
+    }
+
+    /// The one-write-per-run shape: a transcript that already holds a
+    /// `remember` must not get a second one from the stub.
+    #[test]
+    fn a_second_remember_is_not_re_emitted() {
+        let reply = ask(&[
+            turn(ChatRole::User, "please remember this for later"),
+            turn(
+                ChatRole::Assistant,
+                r#"{"action":"remember","text":"The user prefers terse answers."}"#,
+            ),
+            turn(ChatRole::User, "remember saved memory entry [abc123]"),
+        ]);
+        assert!(
+            !reply.contains("\"action\":\"remember\""),
+            "the stub must not re-emit remember, got: {reply}"
+        );
     }
 
     #[test]

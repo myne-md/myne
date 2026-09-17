@@ -84,6 +84,7 @@ import {
 } from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
 import { SettingRow } from "./SettingRow";
+import { MemorySection } from "./MemorySection";
 import {
   BLOCK_STYLE,
   FOLDER_TEXTAREA_STYLE,
@@ -1384,6 +1385,14 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         />
         <p style={HELPER_STYLE}>{t("settings.ai.excludedHelper")}</p>
       </div>
+
+      {/* Agent memory + personality (myne-md/myne#697): the settings half of
+          the memory surface (the chat popover is the other). Absent, not
+          disabled, when off (task 7, the mobile twin's posture): with AI off
+          there is no run to learn from and no reserved gap. */}
+      {aiEnabled ? (
+        <MemorySection onShowToast={onShowToast ?? (() => {})} aiEnabled={aiEnabled} />
+      ) : null}
     </div>
   );
 }

@@ -94,7 +94,7 @@ describe("openRun", () => {
         notesRead: 1,
         charsOffDevice: 120,
         excludedCount: 0,
-      },
+      memoryUpdated: 0,},
       epoch,
     );
 
@@ -124,7 +124,7 @@ describe("resumeRun", () => {
         notesRead: 1,
         charsOffDevice: null,
         excludedCount: 0,
-      },
+      memoryUpdated: 0,},
       epoch,
     );
     expect(getAgent().end?.kind).toBe("awaitingScope");

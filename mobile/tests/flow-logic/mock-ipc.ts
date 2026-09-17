@@ -229,6 +229,18 @@ export interface MockConfig {
     }>;
     payloads?: Record<string, string>;
   };
+  /** Seed + capture for `plugin:memory|*` (myne-md/myne#697). `rows` seeds
+   *  the roster `memory_list` returns (each `{ id, created_at, updated_at,
+   *  version }`); `texts` maps entry id → entry text `memory_read` returns;
+   *  `directives` seeds `personality_read`. Writes through the UI
+   *  (add/edit/delete/clear/personality-save) mutate this store, so a later
+   *  list answers from it. Calls land on `window.__memoryCalls` for specs
+   *  that assert what was written. */
+  memory?: {
+    rows?: Array<{ id: string; created_at: number; updated_at: number; version: number }>;
+    texts?: Record<string, string>;
+    directives?: string[];
+  };
   /** How `plugin:local-inference|transcribe` behaves (MYND-563). `text` →
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
@@ -1057,6 +1069,59 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
             const i = rows.findIndex((r) => r.id === args["conversationIdHex"]);
             if (i >= 0) rows.splice(i, 1);
             delete payloads[args["conversationIdHex"] as string];
+            return null;
+          },
+        };
+      })(),
+      // ── Agent memory + personality (myne-md/myne#697) ──
+      // STATEFUL roster + texts + directives: seeded from `config.memory`,
+      // mutated by the UI's writes. Mutating calls also land on
+      // `window.__memoryCalls` for specs that assert what was written.
+      ...(() => {
+        type Row = { id: string; created_at: number; updated_at: number; version: number };
+        const rows: Row[] = (config.memory?.rows ?? []).map((r) => ({ ...r }));
+        const texts: Record<string, string> = { ...(config.memory?.texts ?? {}) };
+        let directives: string[] = [...(config.memory?.directives ?? [])];
+        const record = (cmd: string, args: Record<string, unknown>) => {
+          const w = window as unknown as { __memoryCalls?: Array<unknown> };
+          (w.__memoryCalls ??= []).push({ cmd, args });
+        };
+        const byUpdatedDesc = () => [...rows].sort((a, b) => b.updated_at - a.updated_at);
+        return {
+          "plugin:memory|memory_list": () => byUpdatedDesc(),
+          "plugin:memory|memory_read": (args: Record<string, unknown>) => {
+            const text = texts[args["memoryIdHex"] as string];
+            if (text === undefined) {
+              throw { kind: "EntryNotFound" };
+            }
+            return text;
+          },
+          "plugin:memory|memory_write": (args: Record<string, unknown>) => {
+            record("memory_write", args);
+            const id = (args["memoryIdHex"] as string | undefined) ?? "e9".repeat(16);
+            texts[id] = args["text"] as string;
+            const row = rows.find((r) => r.id === id);
+            if (row) {
+              row.version += 1;
+              row.updated_at = Date.now();
+            } else {
+              rows.push({ id, created_at: Date.now(), updated_at: Date.now(), version: 1 });
+            }
+            return id;
+          },
+          "plugin:memory|memory_delete": (args: Record<string, unknown>) => {
+            record("memory_delete", args);
+            const i = rows.findIndex((r) => r.id === args["memoryIdHex"]);
+            if (i >= 0) rows.splice(i, 1);
+            delete texts[args["memoryIdHex"] as string];
+            return null;
+          },
+          "plugin:memory|personality_read": () => ({
+            directives: directives.map((text) => ({ text, updated_at: 1 })),
+          }),
+          "plugin:memory|personality_write": (args: Record<string, unknown>) => {
+            record("personality_write", args);
+            directives = (args["directives"] as Array<{ text: string }>).map((d) => d.text);
             return null;
           },
         };

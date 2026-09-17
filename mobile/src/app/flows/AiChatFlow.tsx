@@ -70,6 +70,7 @@ import {
   type ChatTurnJson,
 } from "../../lib/chatHistory";
 import { AiHistorySheet } from "./AiHistorySheet";
+import { MemorySheet } from "./MemorySheet";
 import { usePrefs } from "../../lib/use-prefs";
 import { Button } from "../../components/Button";
 import { ScreenScroll } from "../../components/layout";
@@ -183,6 +184,7 @@ export function AiChatFlow({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openTurns, setOpenTurns] = useState<ChatTurnJson[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [memorySheetOpen, setMemorySheetOpen] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   // Persist health (myne-md/myne#675 review): a failed flush keeps the write
   // staged and raises this until a flush lands, so "shown but unsaved" never
@@ -385,6 +387,9 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         notesRead: a.notesRead,
         iterations: a.iterations,
         charsOffDevice: a.charsOffDevice,
+        // The turn-end memory marker (myne-md/myne#697): the count comes
+        // from the host store, never from a model claim.
+        memoryUpdated: a.memoryUpdated ?? 0,
         end: a.end?.kind ?? "finished",
       proposal: JSON.parse(
         JSON.stringify({ edits: a.proposal.edits, newNotes: a.proposal.newNotes }),
@@ -527,7 +532,14 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
 
   return (
     <>
-      <div style={{ flex: "none", padding: "var(--space-2) var(--space-3) 0" }}>
+      <div
+        style={{
+          flex: "none",
+          display: "flex",
+          gap: "var(--space-2)",
+          padding: "var(--space-2) var(--space-3) 0",
+        }}
+      >
         <Button
           variant="ghost"
           full={false}
@@ -535,6 +547,16 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           onClick={() => setSheetOpen(true)}
         >
           {t("editor.chrome.rightPanel.aiChat.historyTitle")}
+        </Button>
+        {/* The memory entry point (myne-md/myne#697): the desktop popover
+            has no phone posture, so it opens the memory sheet instead. */}
+        <Button
+          variant="ghost"
+          full={false}
+          data-testid="ai.memory-button"
+          onClick={() => setMemorySheetOpen(true)}
+        >
+          {t("editor.chrome.rightPanel.aiChat.memory")}
         </Button>
       </div>
       <ScreenScroll>
@@ -560,6 +582,13 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
                     : turn.text}
                 </p>
               )}
+              {(turn.agentSummary?.memoryUpdated ?? 0) > 0 ? (
+                <p data-testid="ai.memory-updated" style={MUTED}>
+                  {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
+                    count: turn.agentSummary?.memoryUpdated ?? 0,
+                  })}
+                </p>
+              ) : null}
             </div>
           ))}
           {historyError ? (
@@ -820,6 +849,9 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           }}
           onClose={() => setSheetOpen(false)}
         />
+      ) : null}
+      {memorySheetOpen ? (
+        <MemorySheet onDeleted={() => {}} onClose={() => setMemorySheetOpen(false)} />
       ) : null}
     </>
   );

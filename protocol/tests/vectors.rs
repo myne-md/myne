@@ -216,6 +216,36 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/aad-construction/v0.2/cases.json"),
         ),
         (
+            "agent-memory-blob",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/agent-memory-blob/v0.1/cases.json"),
+        ),
+        (
+            "agent-memory-blob",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/agent-memory-blob/v0.2/cases.json"),
+        ),
+        (
+            "agent-memory-catalog",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/agent-memory-catalog/v0.1/cases.json"),
+        ),
+        (
+            "agent-memory-catalog",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/agent-memory-catalog/v0.2/cases.json"),
+        ),
+        (
+            "agent-personality",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/agent-personality/v0.1/cases.json"),
+        ),
+        (
+            "agent-personality",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/agent-personality/v0.2/cases.json"),
+        ),
+        (
             "account-number",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/account-number/v0.1/cases.json"),
@@ -1241,6 +1271,11 @@ fn hkdf_sha256_vectors() {
                 "chats-catalog-key" => SubkeyRole::ChatsCatalogKey,
                 "chats-catalog-sync-id" => SubkeyRole::ChatsCatalogSyncId,
                 "chats-key" => SubkeyRole::ChatsKey,
+                "agent-memory-catalog-key" => SubkeyRole::AgentMemoryCatalogKey,
+                "agent-memory-catalog-sync-id" => SubkeyRole::AgentMemoryCatalogSyncId,
+                "agent-memory-key" => SubkeyRole::AgentMemoryKey,
+                "agent-personality-key" => SubkeyRole::AgentPersonalityKey,
+                "agent-personality-sync-id" => SubkeyRole::AgentPersonalitySyncId,
                 "vault-head-mac" => SubkeyRole::VaultHeadMac,
                 "server-auth" => SubkeyRole::ServerAuth,
                 "graph-layout-key" => SubkeyRole::GraphLayoutKey,
@@ -2574,6 +2609,7 @@ fn bip39_recovery_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_vectors() {
     use protocol::{
+        aad_agent_memory_blob, aad_agent_memory_catalog, aad_agent_personality_blob,
         aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob, aad_chats_catalog,
         aad_custom_themes_blob, aad_graph_layout_blob, aad_note_content_encrypt,
         aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
@@ -2654,6 +2690,13 @@ fn aad_construction_vectors() {
                     .unwrap_or_else(|| panic!("[{id}] missing input_conversation_id_hex")),
             )
         };
+        let memory_entry_id = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_memory_entry_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_memory_entry_id_hex")),
+            )
+        };
         let extractor_version = || -> u8 {
             case["input_extractor_version"]
                 .as_u64()
@@ -2687,6 +2730,11 @@ fn aad_construction_vectors() {
             "aad_chats_blob" => {
                 aad_chats_blob(&account_number_hash(), &conversation_id())
             }
+            "aad_agent_memory_catalog" => aad_agent_memory_catalog(&account_number_hash()),
+            "aad_agent_memory_blob" => {
+                aad_agent_memory_blob(&account_number_hash(), &memory_entry_id())
+            }
+            "aad_agent_personality_blob" => aad_agent_personality_blob(&account_number_hash()),
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
             ),
@@ -2747,7 +2795,7 @@ fn aad_construction_vectors() {
     // outside this family's enumeration. Their canonical bytes are pinned by
     // the aad_*_default_matches_pinned_hex unit tests in aead.rs plus the
     // pending-capture / share-import encrypt cases.
-    let required: [&str; 17] = [
+    let required: [&str; 20] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2765,6 +2813,9 @@ fn aad_construction_vectors() {
         "aad_custom_themes_blob",
         "aad_chats_catalog",
         "aad_chats_blob",
+        "aad_agent_memory_catalog",
+        "aad_agent_memory_blob",
+        "aad_agent_personality_blob",
     ];
     for builder in required {
         assert!(
@@ -2791,8 +2842,8 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_membership_blob, aad_password_wrap_v0_2, aad_recovery_wrap_v0_2,
-        aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
+        aad_agent_memory_blob_v0_2, aad_membership_blob, aad_password_wrap_v0_2,
+        aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -2844,11 +2895,21 @@ fn aad_construction_v0_2_vectors() {
                 .unwrap_or_else(|| panic!("[{id}] missing input_role_label"))
                 .to_string()
         };
+        let memory_entry_id = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_memory_entry_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_memory_entry_id_hex")),
+            )
+        };
 
         let actual = match builder_name {
             "aad_password_wrap_v0_2" => aad_password_wrap_v0_2(&parse_kdf_params(case, id)),
             "aad_recovery_wrap_v0_2" => aad_recovery_wrap_v0_2(&parse_kdf_params(case, id)),
             "aad_vault_items_key_wrap_v0_2" => aad_vault_items_key_wrap_v0_2(&items_key_id()),
+            "aad_agent_memory_blob_v0_2" => {
+                aad_agent_memory_blob_v0_2(&account_number_hash(), &memory_entry_id())
+            }
             "aad_singleton_blob_v0_2" => {
                 let role = role_label();
                 singleton_roles.insert(role.clone());
@@ -2916,11 +2977,12 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 5] = [
+    let required: [&str; 6] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
         "aad_singleton_blob_v0_2",
+        "aad_agent_memory_blob_v0_2",
         "aad_membership_blob",
     ];
     for builder in required {
@@ -6323,6 +6385,815 @@ fn chats_blob_v0_2_vectors() {
     }
     for k in ["encrypt", "decode_fail_v0_1"] {
         assert!(seen.contains(k), "chats-blob/v0.2 must cover case_kind {k}");
+    }
+}
+
+/// `MYN1` agent-memory catalog codec vectors (§9.25, myne-md/myne#697). The
+/// `chats_catalog_vectors` shape: envelope golden bytes, decode round-trips,
+/// the non-distinguishing AEAD failure, and every structural reject the
+/// `AgentMemoryCatalogError` enum carries.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_memory_catalog_vectors() {
+    use protocol::{
+        decode_agent_memory_catalog_blob, derive_subkey, encode_agent_memory_catalog_blob_raw,
+        AgentMemoryCatalogError, SubkeyRole,
+    };
+
+    let Some(raw) = cases_json("agent-memory-catalog") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-memory-catalog] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "agent-memory-catalog");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 13,
+        "agent-memory-catalog must carry at least 13 vectors (3 encrypt + 2 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("agent-memory-catalog", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+
+        match case_kind {
+            "encrypt" => {
+                let plaintext = hex_decode(field(case, id, "input_plaintext_canonical_utf8_hex"));
+                let nonce: [u8; 24] = hex_decode_array(field(case, id, "input_catalog_nonce_hex"));
+                let expected = hex_decode(field(case, id, "expected_catalog_blob_hex"));
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryCatalogKey);
+                if let Some(info_hex) = case
+                    .get("informational_catalog_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        catalog_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_catalog_key_hex disagrees with derive_subkey(root_key, AgentMemoryCatalogKey)",
+                    );
+                }
+
+                let actual = encode_agent_memory_catalog_blob_raw(
+                    &catalog_key,
+                    &account_hash,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] agent-memory-catalog encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_plaintext =
+                    hex_decode(field(case, id, "expected_plaintext_canonical_utf8_hex"));
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryCatalogKey);
+                let decoded = decode_agent_memory_catalog_blob(&catalog_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] agent-memory-catalog decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_kind"),
+                    "aead_fail",
+                    "[{id}] decrypt_aead_fail carries a non-aead expected_kind"
+                );
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryCatalogKey);
+                match decode_agent_memory_catalog_blob(&catalog_key, &account_hash, &blob) {
+                    Err(AgentMemoryCatalogError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AgentMemoryCatalogError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_error = field(case, id, "expected_error");
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => AgentMemoryCatalogError::MagicMismatch,
+                    "protocol_version_mismatch" => AgentMemoryCatalogError::ProtocolVersionMismatch,
+                    "format_unsupported" => AgentMemoryCatalogError::FormatUnsupported,
+                    "header_too_short" => AgentMemoryCatalogError::HeaderTooShort,
+                    "ciphertext_truncated" => AgentMemoryCatalogError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => AgentMemoryCatalogError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_kind '{other}': schema enforces enum, so update this match arm in lockstep with AgentMemoryCatalogError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_agent_memory_catalog_blob(&dummy_key, &dummy_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' (schema enforces enum)"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "agent-memory-catalog missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "agent-memory-catalog missing parse_fail coverage for AgentMemoryCatalogError '{err}': every structural reject must be pinned"
+        );
+    }
+}
+
+/// `MYN5` agent-memory catalog codec vectors (§9.25 + §10.4.1, myne-md/myne#697).
+/// The `chats_catalog_v0_2_vectors` shape: golden `encrypt` (the bytes the
+/// migration writes: v0.2 KEK + v0.2 AAD) + `decode_fail_v0_1` (the §10.5
+/// anti-downgrade pin). Skips without the companion checkout, like every
+/// other runner in this file.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_memory_catalog_v0_2_vectors() {
+    use protocol::{
+        decode_agent_memory_catalog_blob_versioned, derive_subkey_versioned, MetaVersion,
+    };
+
+    let Some(raw) = cases_json_v0_2("agent-memory-catalog") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-memory-catalog/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "agent-memory-catalog");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("agent-memory-catalog/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let kek_v0_1 = derive_subkey_versioned(
+            MetaVersion::V0_1,
+            &root_key,
+            protocol::SubkeyRole::AgentMemoryCatalogKey,
+        );
+        let kek_v0_2 = derive_subkey_versioned(
+            MetaVersion::V0_2,
+            &root_key,
+            protocol::SubkeyRole::AgentMemoryCatalogKey,
+        );
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                assert_eq!(
+                    &expected[0..4],
+                    field(case, id, "expected_magic_ascii").as_bytes(),
+                    "[{id}] magic"
+                );
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] catalog singletons keep 0x01 in v0.2"
+                );
+                let opened = decode_agent_memory_catalog_blob_versioned(
+                    MetaVersion::V0_2,
+                    &kek_v0_2,
+                    &account_hash,
+                    &expected,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_error"),
+                    "magic_mismatch",
+                    "[{id}] the v0.1 expectation refuses a next-major blob at the magic check"
+                );
+                assert!(
+                    decode_agent_memory_catalog_blob_versioned(
+                        MetaVersion::V0_1,
+                        &kek_v0_1,
+                        &account_hash,
+                        &blob
+                    )
+                    .is_err(),
+                    "[{id}] a MYN5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(
+            seen.contains(k),
+            "agent-memory-catalog/v0.2 must cover case_kind {k}"
+        );
+    }
+}
+
+/// `MYX1` per-entry agent-memory blob codec vectors (§9.26, myne-md/myne#697).
+/// Same shape as the catalog runner one above; the cases carry the entry id
+/// the AAD binds, which is what makes a cross-entry substitution fail.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_memory_blob_vectors() {
+    use protocol::{
+        decode_agent_memory_blob, derive_subkey, encode_agent_memory_blob_raw,
+        AgentMemoryBlobError, SubkeyRole,
+    };
+
+    let Some(raw) = cases_json("agent-memory-blob") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-memory-blob] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "agent-memory-blob");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 13,
+        "agent-memory-blob must carry at least 13 vectors (3 encrypt + 1 decrypt_ok + 3 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("agent-memory-blob", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let entry_id: [u8; 16] = hex_decode_array(field(case, id, "input_memory_entry_id_hex"));
+
+        match case_kind {
+            "encrypt" => {
+                let plaintext = hex_decode(field(case, id, "input_plaintext_canonical_utf8_hex"));
+                let nonce: [u8; 24] = hex_decode_array(field(case, id, "input_blob_nonce_hex"));
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+
+                let memory_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryKey);
+                if let Some(info_hex) = case
+                    .get("informational_blob_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        memory_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_blob_key_hex disagrees with derive_subkey(root_key, AgentMemoryKey)",
+                    );
+                }
+
+                let actual = encode_agent_memory_blob_raw(
+                    &memory_key,
+                    &account_hash,
+                    &entry_id,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] agent-memory-blob encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_plaintext =
+                    hex_decode(field(case, id, "expected_plaintext_canonical_utf8_hex"));
+
+                let memory_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryKey);
+                let decoded =
+                    decode_agent_memory_blob(&memory_key, &account_hash, &entry_id, &blob)
+                        .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] agent-memory-blob decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_kind"),
+                    "aead_fail",
+                    "[{id}] decrypt_aead_fail carries a non-aead expected_kind"
+                );
+
+                let memory_key = derive_subkey(&root_key, SubkeyRole::AgentMemoryKey);
+                match decode_agent_memory_blob(&memory_key, &account_hash, &entry_id, &blob) {
+                    Err(AgentMemoryBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AgentMemoryBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_error = field(case, id, "expected_error");
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => AgentMemoryBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => AgentMemoryBlobError::ProtocolVersionMismatch,
+                    "format_unsupported" => AgentMemoryBlobError::FormatUnsupported,
+                    "header_too_short" => AgentMemoryBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => AgentMemoryBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => AgentMemoryBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_kind '{other}': schema enforces enum, so update this match arm in lockstep with AgentMemoryBlobError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_agent_memory_blob(&dummy_key, &dummy_hash, &entry_id, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' (schema enforces enum)"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "agent-memory-blob missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "agent-memory-blob missing parse_fail coverage for AgentMemoryBlobError '{err}': every structural reject must be pinned"
+        );
+    }
+}
+
+/// `MYX5` per-entry agent-memory blob vectors (§9.26 + §10.4.1, myne-md/myne#697).
+/// The `chats_blob_v0_2_vectors` shape: golden `encrypt` (the bytes the
+/// migration's 5b2 leg writes: v0.2 KEK + v0.2 per-entry AAD) +
+/// `decode_fail_v0_1` (the §10.5 anti-downgrade pin). Unlike the singletons,
+/// the per-entry families carry the generation in the header version byte
+/// (0x02), which the runner pins rather than assuming.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_memory_blob_v0_2_vectors() {
+    use protocol::{decode_agent_memory_blob_versioned, derive_subkey_versioned, MetaVersion};
+
+    let Some(raw) = cases_json_v0_2("agent-memory-blob") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-memory-blob/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "agent-memory-blob");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("agent-memory-blob/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let entry_id: [u8; 16] = hex_decode_array(field(case, id, "input_memory_entry_id_hex"));
+        let kek_v0_1 = derive_subkey_versioned(
+            MetaVersion::V0_1,
+            &root_key,
+            protocol::SubkeyRole::AgentMemoryKey,
+        );
+        let kek_v0_2 = derive_subkey_versioned(
+            MetaVersion::V0_2,
+            &root_key,
+            protocol::SubkeyRole::AgentMemoryKey,
+        );
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                assert_eq!(
+                    &expected[0..4],
+                    field(case, id, "expected_magic_ascii").as_bytes(),
+                    "[{id}] magic"
+                );
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] per-entry families carry the generation in the version byte"
+                );
+                let opened = decode_agent_memory_blob_versioned(
+                    MetaVersion::V0_2,
+                    &kek_v0_2,
+                    &account_hash,
+                    &entry_id,
+                    &expected,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_error"),
+                    "magic_mismatch",
+                    "[{id}] the v0.1 expectation refuses a next-major blob at the magic check"
+                );
+                assert!(
+                    decode_agent_memory_blob_versioned(
+                        MetaVersion::V0_1,
+                        &kek_v0_1,
+                        &account_hash,
+                        &entry_id,
+                        &blob
+                    )
+                    .is_err(),
+                    "[{id}] a MYX5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(
+            seen.contains(k),
+            "agent-memory-blob/v0.2 must cover case_kind {k}"
+        );
+    }
+}
+
+/// `MYZ1` personality singleton codec vectors (§9.27, myne-md/myne#697). The
+/// singleton shape (no per-entry id in the AAD).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_personality_vectors() {
+    use protocol::{
+        decode_agent_personality_blob, derive_subkey, encode_agent_personality_blob_raw,
+        AgentPersonalityBlobError, SubkeyRole,
+    };
+
+    let Some(raw) = cases_json("agent-personality") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-personality] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "agent-personality");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 10,
+        "agent-personality must carry at least 10 vectors (1 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("agent-personality", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+
+        match case_kind {
+            "encrypt" => {
+                let plaintext = hex_decode(field(case, id, "input_plaintext_canonical_utf8_hex"));
+                let nonce: [u8; 24] =
+                    hex_decode_array(field(case, id, "input_personality_nonce_hex"));
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+
+                let personality_key = derive_subkey(&root_key, SubkeyRole::AgentPersonalityKey);
+                if let Some(info_hex) = case
+                    .get("informational_personality_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        personality_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_personality_key_hex disagrees with derive_subkey(root_key, AgentPersonalityKey)",
+                    );
+                }
+
+                let actual = encode_agent_personality_blob_raw(
+                    &personality_key,
+                    &account_hash,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] agent-personality encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_plaintext =
+                    hex_decode(field(case, id, "expected_plaintext_canonical_utf8_hex"));
+
+                let personality_key = derive_subkey(&root_key, SubkeyRole::AgentPersonalityKey);
+                let decoded = decode_agent_personality_blob(&personality_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] agent-personality decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_kind"),
+                    "aead_fail",
+                    "[{id}] decrypt_aead_fail carries a non-aead expected_kind"
+                );
+
+                let personality_key = derive_subkey(&root_key, SubkeyRole::AgentPersonalityKey);
+                match decode_agent_personality_blob(&personality_key, &account_hash, &blob) {
+                    Err(AgentPersonalityBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AgentPersonalityBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let expected_error = field(case, id, "expected_error");
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => AgentPersonalityBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => AgentPersonalityBlobError::ProtocolVersionMismatch,
+                    "format_unsupported" => AgentPersonalityBlobError::FormatUnsupported,
+                    "header_too_short" => AgentPersonalityBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => AgentPersonalityBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => AgentPersonalityBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_kind '{other}': schema enforces enum, so update this match arm in lockstep with AgentPersonalityBlobError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_agent_personality_blob(&dummy_key, &dummy_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' (schema enforces enum)"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "agent-personality missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "agent-personality missing parse_fail coverage for AgentPersonalityBlobError '{err}': every structural reject must be pinned"
+        );
+    }
+}
+
+/// `MYZ5` personality singleton vectors (§9.27 + §10.4.1, myne-md/myne#697).
+/// The singleton v0.2 shape (catalog twin one above): golden `encrypt` +
+/// `decode_fail_v0_1`.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn agent_personality_v0_2_vectors() {
+    use protocol::{decode_agent_personality_blob_versioned, derive_subkey_versioned, MetaVersion};
+
+    let Some(raw) = cases_json_v0_2("agent-personality") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[agent-personality/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "agent-personality");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("agent-personality/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let kek_v0_1 = derive_subkey_versioned(
+            MetaVersion::V0_1,
+            &root_key,
+            protocol::SubkeyRole::AgentPersonalityKey,
+        );
+        let kek_v0_2 = derive_subkey_versioned(
+            MetaVersion::V0_2,
+            &root_key,
+            protocol::SubkeyRole::AgentPersonalityKey,
+        );
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                assert_eq!(
+                    &expected[0..4],
+                    field(case, id, "expected_magic_ascii").as_bytes(),
+                    "[{id}] magic"
+                );
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] personality singletons keep 0x01 in v0.2"
+                );
+                let opened = decode_agent_personality_blob_versioned(
+                    MetaVersion::V0_2,
+                    &kek_v0_2,
+                    &account_hash,
+                    &expected,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_error"),
+                    "magic_mismatch",
+                    "[{id}] the v0.1 expectation refuses a next-major blob at the magic check"
+                );
+                assert!(
+                    decode_agent_personality_blob_versioned(
+                        MetaVersion::V0_1,
+                        &kek_v0_1,
+                        &account_hash,
+                        &blob
+                    )
+                    .is_err(),
+                    "[{id}] a MYZ5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(
+            seen.contains(k),
+            "agent-personality/v0.2 must cover case_kind {k}"
+        );
     }
 }
 

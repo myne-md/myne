@@ -110,7 +110,7 @@ beforeEach(() => {
   agentPreviewGrant.mockReset().mockResolvedValue({
     noteCount: 4,
     excludedCount: 0,
-    unknownCount: 0,
+    memoryUpdated: 0,unknownCount: 0,
     newTotal: 5,
   });
   agentApproveScope.mockReset();
@@ -752,7 +752,7 @@ describe("AiChatTab: the live run's controls", () => {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
-    }, currentRunEpoch());
+    memoryUpdated: 0,}, currentRunEpoch());
   }
 
   it("renders the scope-expansion gate through the production mount path", async () => {

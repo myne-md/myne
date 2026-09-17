@@ -24,6 +24,7 @@
     "vault-indices:default",
     "graph-layout:default",
     "chats:default",
+    "memory:default",
     "vault-label:default",
     "account:default",
     "themes:default",

@@ -51,6 +51,10 @@ const V = {
     "adapted",
     "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty. Unchanged by the remote-provider controls (myne#415): they live inside this same panel, so they inherit the same rail filter and reach the browser no more than the rest of it does.",
   ],
+  "src/components/settings/MemorySection.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this section is unreachable. Holds no host call of its own beyond the `memory:` bindings (Unsupported on web), so there is nothing here that would need a web substitution even if it were reachable.",
+  ],
   "src/components/settings/AiProviderConsent.tsx": [
     "adapted",
     "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this screen is unreachable. It holds no host call of its own — accepting calls back to the panel, which writes the consent — so there is nothing here that would need a web substitution even if it were reachable.",
@@ -270,6 +274,10 @@ const V = {
   "src/lib/chats.ts": [
     "ported",
     "The conversations plugin's IPC bindings (create/append/read/list/rename/delete, myne-md/myne#675). All six commands are Dispatched in web/wasm/src/dispatch.rs against the OPFS-backed store, so the history list/open/rename/delete run in the browser exactly as written. That makes it the one AI surface that survives the `agent` plugin's Unsupported classification.",
+  ],
+  "src/lib/memory.ts": [
+    "adapted",
+    "The agent-memory + personality IPC bindings (list/read/write/delete + personality read/write, myne-md/myne#697). Classified `memory: Unsupported` in web/wasm/src/capability.rs: the whole AI surface is absent on web (`localAi`), so no web path ever calls these bindings (unlike `chats.ts`, which the browser runs in full). Unreachable rather than substituted, the same posture as the AI settings panel that imports it.",
   ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],

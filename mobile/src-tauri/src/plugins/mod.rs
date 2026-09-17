@@ -32,6 +32,11 @@ pub mod graph_layout;
 // re-export wrapper over `myne_core::plugins::chats`: the six conversation
 // storage commands, Class-1 synced vault content.
 pub mod chats;
+// Agent memory (MYN1 catalog + MYX1 files + MYZ1 personality,
+// myne-md/myne#697): a thin re-export wrapper over
+// `myne_core::plugins::memory`: the six memory + personality storage
+// commands, Class-1 synced vault content.
+pub mod memory;
 // On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
 // `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
 // wasm-clean, so the whisper subset is copied here). Declared unconditionally;

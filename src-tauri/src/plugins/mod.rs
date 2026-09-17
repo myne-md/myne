@@ -28,10 +28,15 @@ pub mod attachments;
 pub mod backup;
 pub mod chats;
 pub mod clipper_pairing;
+// myne-md/myne#697: the agent-memory + personality store. Like `chats`, the
+// storage plane itself is vault content read/written by the agent loop, so it
+// is NOT gated on `local-inference` (the loop compiles unconditionally); the
+// `ai_enabled` pref is the runtime gate, re-read per command.
 pub mod detached_window;
 pub mod export;
 pub mod graph_layout;
 pub mod importer;
+pub mod memory;
 // local-ai epic (MYND-406): on-device inference plugin, gated behind the
 // default-off `local-inference` cargo feature (SYNC-5). Absent — zero symbols —
 // from the default build.

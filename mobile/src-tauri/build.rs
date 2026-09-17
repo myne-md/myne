@@ -283,6 +283,22 @@ fn main() {
                 ]),
             )
             .plugin(
+                // Agent memory (MYN1 catalog + MYX1 files + MYZ1 personality,
+                // myne-md/myne#697): shared from `myne-core`; the same six
+                // commands the desktop registers. Adding a command here
+                // without a matching entry in
+                // `permissions/memory/default.toml` is a security bug.
+                "memory",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "memory_list",
+                    "memory_read",
+                    "memory_write",
+                    "memory_delete",
+                    "personality_read",
+                    "personality_write",
+                ]),
+            )
+            .plugin(
                 // Sealed label store (MYL1, §9.22): the device-local
                 // hide-vault-names option (myne-md/myne#411): shared from
                 // `myne-core`; the same THREE commands the desktop registers, and

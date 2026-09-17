@@ -45,6 +45,7 @@ use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::history::{
     history_budget, seed_messages, HistoryTurn, SeedControls,
 };
+use myne_core::plugins::agent::host_adapters::MemoryAdapter;
 use myne_core::plugins::prefs::commands::prefs_read_from_host;
 use myne_core::vault_io::StdVaultIo;
 
@@ -74,6 +75,7 @@ pub async fn agent_start<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, LocalInferenceState>,
     vectors: State<'_, LocalInferenceVectorState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
@@ -169,6 +171,13 @@ pub async fn agent_start<R: Runtime>(
     // no way to tell whether the time was the provider's or ours. It was the
     // provider's, and now that is readable rather than inferred.
     let started = std::time::Instant::now();
+    // Built before the call because `step` takes `app` by value.
+    let tauri_host = myne_core::host::tauri_host::TauriHost::new(app.clone());
+    let memory = MemoryAdapter {
+        host: &tauri_host,
+        state: vault.inner(),
+        hooks: hooks.inner().clone(),
+    };
     let outcome = step(
         app,
         run_id,
@@ -187,6 +196,11 @@ pub async fn agent_start<R: Runtime>(
             state: ai.inner(),
             vectors: vectors.inner(),
         },
+        // The run's memory store (myne-md/myne#697): the shared
+        // `MemoryAdapter` over this client's host + slot + hooks, so a
+        // `remember` write lands in the vault (and its sync bump fires)
+        // rather than answering "surface unavailable".
+        Some(&memory),
         cancel,
         resolved.excluded_count,
         on_progress,
@@ -225,6 +239,7 @@ pub async fn agent_approve_scope<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, LocalInferenceState>,
     vectors: State<'_, LocalInferenceVectorState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
@@ -240,6 +255,12 @@ pub async fn agent_approve_scope<R: Runtime>(
     // is a flag nothing else writes to, and Stop and the lock teardown would
     // both be inert for this leg.
     let cancel = runs.cancel_flag(&run_id)?;
+    let tauri_host = myne_core::host::tauri_host::TauriHost::new(app.clone());
+    let memory = MemoryAdapter {
+        host: &tauri_host,
+        state: vault.inner(),
+        hooks: hooks.inner().clone(),
+    };
     step(
         app,
         run_id,
@@ -258,6 +279,11 @@ pub async fn agent_approve_scope<R: Runtime>(
             state: ai.inner(),
             vectors: vectors.inner(),
         },
+        // The run's memory store (myne-md/myne#697): the shared
+        // `MemoryAdapter` over this client's host + slot + hooks, so a
+        // `remember` write lands in the vault (and its sync bump fires)
+        // rather than answering "surface unavailable".
+        Some(&memory),
         cancel,
         resolved.excluded_count,
         on_progress,
