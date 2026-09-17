@@ -182,6 +182,11 @@ function MemoryRow(props: {
 
   return (
     <li style={ROW} data-testid="settings.memory.row">
+      {props.row.quarantined ? (
+        <p style={ROW_META} data-testid="settings.memory.row-held">
+          {t("settings.memory.heldForReview")}
+        </p>
+      ) : null}
       {props.unreadable ? (
         <p style={ROW_TEXT} data-testid="settings.memory.row-unreadable">
           {t("settings.memory.entryUnreadable")}

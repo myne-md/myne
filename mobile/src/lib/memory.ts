@@ -48,12 +48,18 @@ export type MemoryMutateErrorKind =
   | "CatalogUnreadable"
   | "EntryNotFound"
   // The write failed the injection scan or the schema gate (decisions/ai/0590).
-  // Refused at the write, never persisted, never injected.
+  // A refused user write or update is never persisted; a refused model create
+  // persists as quarantined (myne-md/myne#709, decisions/ai/0591).
   | "ScanRejected"
   | "TextTooLong"
   | "PayloadTooLarge"
   // The roster holds MAX_MEMORY_ENTRIES live entries; growth refuses.
   | "EntryLimitReached"
+  // A model write named a user-authored row (myne-md/myne#709, authorship gate).
+  | "ModelOverwriteRefused"
+  // The write was learned from a note in an `ai_excluded_folders` folder
+  // (myne-md/myne#709, write-time exclusion).
+  | "ExcludedSource"
   | "RandomnessUnavailable";
 
 /** Mirror of Rust `MemoryMutateError` (serde `tag = "kind", content = "detail"`). */
@@ -72,6 +78,9 @@ export interface MemoryEntryRow {
   deleted_at?: number;
   updated_at: number;
   version: number;
+  // Held for user review: tripped the injection scan on a model create, listed
+  // but never injected until a user edit clears it (myne-md/myne#709).
+  quarantined: boolean;
 }
 
 /** One roster row as the list command returns it: id + row. */
@@ -81,6 +90,7 @@ export interface MemoryListRow {
   deleted_at?: number;
   updated_at: number;
   version: number;
+  quarantined: boolean;
 }
 
 /** One voice directive (§ 9.27): the standing rule text and its update time. */
@@ -104,16 +114,16 @@ export async function memoryRead(memoryIdHex: string): Promise<string> {
   return await invoke<string>("plugin:memory|memory_read", { memoryIdHex });
 }
 
-/** Add or update one memory entry (the write-time gate runs host-side). */
+/** Add or update one memory entry (the write-time gate runs host-side). Always
+ * user-authored: the host clears the provenance link on this path, so no
+ * payload here can mint a model-authored row. */
 export async function memoryWrite(
   text: string,
   memoryIdHex?: string,
-  sourceConversationHex?: string,
 ): Promise<string> {
   return await invoke<string>("plugin:memory|memory_write", {
     text,
     ...(memoryIdHex !== undefined ? { memoryIdHex } : {}),
-    ...(sourceConversationHex !== undefined ? { sourceConversationHex } : {}),
   });
 }
 

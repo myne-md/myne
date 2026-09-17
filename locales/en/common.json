@@ -3199,6 +3199,7 @@
       "saveFailed": "Could not save the entry.",
       "deleteFailed": "Could not delete the entry.",
       "entryUnreadable": "Couldn't read this entry. It is still stored; delete it here or fix it in Settings.",
+      "heldForReview": "Held for review: this entry tripped the injection scan and is not used by the assistant until you edit or delete it.",
       "savedToast": "Memory updated.",
       "deletedToast": "Entry removed everywhere.",
       "clearedToast": "All memory entries removed.",

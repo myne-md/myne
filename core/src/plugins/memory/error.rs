@@ -95,11 +95,31 @@ pub enum MemoryMutateError {
     /// Carries no id: the caller named it in the request.
     #[error("the memory entry does not exist")]
     EntryNotFound,
+    /// A model write tried to overwrite a user-authored row (myne-md/myne#709,
+    /// the authorship gate, `decisions/ai/0591`). Model rows carry a
+    /// `source_conversation` provenance link; user rows carry none. A model
+    /// write naming a row without one is refused rather than applied, so a
+    /// documented correction loses to the next run no more. User writes
+    /// overwrite anything. Carries no id: the caller named it in the request.
+    #[error("the agent may not overwrite a user-authored memory entry")]
+    ModelOverwriteRefused,
+    /// A `remember` write whose source notes sit under an `ai_excluded_folders`
+    /// folder (myne-md/myne#709, `decisions/ai/0591`). The run loop threads the
+    /// folders of every note it read this run; the write re-reads the live
+    /// exclusion set at the write boundary (the `apply.rs` discipline) and
+    /// refuses on any match, so a folder excluded mid-run stops the learning
+    /// surface too, not just the read surface. Read-side clamping is why this
+    /// rarely fires; this is the backstop for when it moves underneath a run.
+    #[error("the memory was learned from a note in an excluded folder")]
+    ExcludedSource,
     /// The entry text or the personality payload failed the write-time gate:
     /// schema enforcement, the 2000-character cap, or the injection-pattern
-    /// scan (`decisions/ai/0590`). Refused at the write, never persisted,
-    /// never injected. Carries no detail: the scan's classes are closed and
-    /// the memory UI renders the entry as rejected.
+    /// scan (`decisions/ai/0590`). A refused write is never injected. A
+    /// refused USER write or a refused UPDATE is never persisted either; a
+    /// refused MODEL create persists as `quarantined` (held for user review,
+    /// never injected) instead of being dropped silently (myne-md/myne#709,
+    /// `decisions/ai/0591`). Carries no detail: the scan's classes are closed
+    /// and the memory UI renders the entry as rejected or held.
     #[error("the payload failed the injection scan or the schema gate")]
     ScanRejected,
     /// The entry text exceeds the 2000-character cap.

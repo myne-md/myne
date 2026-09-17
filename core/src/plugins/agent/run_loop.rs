@@ -1212,20 +1212,58 @@ async fn drive_inner(
                             // read its id off the memory block). Removal
                             // stays a user act in the memory UI (0590), not a
                             // model verb.
+                            //
+                            // Provenance, threaded not derived (myne-md/myne#709):
+                            // the run's own id becomes the entry's
+                            // `source_conversation` link (dash-stripped UUIDv7
+                            // is 32 hex), and the folders of every note read
+                            // so far ride along for the write-time exclusion
+                            // check. An id the snapshot does not carry reads
+                            // as the root folder, which no exclusion matches:
+                            // the run could only have read it through the
+                            // clamped paths, and the write check covers what
+                            // is known at the write.
+                            let mut source_folders: Vec<String> = Vec::new();
+                            for id in read_ids.iter() {
+                                let folder = deps
+                                    .records
+                                    .get(id)
+                                    .and_then(|r| r.folder.clone())
+                                    .unwrap_or_default();
+                                if !source_folders.contains(&folder) {
+                                    source_folders.push(folder);
+                                }
+                            }
                             let action = super::memory::RememberAction::Upsert {
                                 entry_id: entry_id.clone(),
                                 text: text.clone(),
+                                source_run_hex: run_id.replace('-', ""),
+                                source_folders,
                             };
                             match store.remember(action).await {
-                                Ok(written_id) => {
+                                Ok(outcome) => {
                                     memory_writes += 1;
-                                    transcript.push(tool_result(
+                                    // A held write is reported as held, not as
+                                    // remembered: the entry is listed for user
+                                    // review and rides no run until approved.
+                                    let line = if outcome.quarantined {
                                         format!(
-                                            "remember saved memory entry [{written_id}]. \
-                                             It will be visible in the user's memory list."
-                                        ),
-                                        None,
-                                    ));
+                                            "remember saved memory entry [{}] but it \
+                                             was held for user review (it tripped \
+                                             the injection scan). It will be \
+                                             visible in the user's memory list \
+                                             but will not be used until \
+                                             approved. Finish.",
+                                            outcome.entry_id
+                                        )
+                                    } else {
+                                        format!(
+                                            "remember saved memory entry [{}]. \
+                                             It will be visible in the user's memory list.",
+                                            outcome.entry_id
+                                        )
+                                    };
+                                    transcript.push(tool_result(line, None));
                                 }
                                 Err(super::error::AgentError::MemoryScanRejected) => {
                                     // The gate refused it (schema, cap or scan):
@@ -1238,6 +1276,36 @@ async fn drive_inner(
                                         "remember was refused by the memory gate \
                                          (the text failed the scan or the cap). \
                                          Do not retry the same text; finish."
+                                            .into(),
+                                        None,
+                                    ));
+                                }
+                                Err(super::error::AgentError::MemoryAuthorshipRefused) => {
+                                    // The entry was written by the user: the
+                                    // model cannot overwrite it, and the
+                                    // correction stays a user act in the
+                                    // Memory panel. A refusal the model can
+                                    // act on (write a NEW entry instead), not
+                                    // a run failure.
+                                    transcript.push(tool_result(
+                                        "remember was refused: that entry was \
+                                         written by the user and the agent \
+                                         cannot overwrite it. Write a new \
+                                         entry instead, or finish."
+                                            .into(),
+                                        None,
+                                    ));
+                                }
+                                Err(super::error::AgentError::MemoryExcludedSource) => {
+                                    // The run distilled a note from a folder
+                                    // the user has since excluded: learning it
+                                    // would walk around SYNC-14. Do not retry;
+                                    // finish.
+                                    transcript.push(tool_result(
+                                        "remember was refused: the memory was \
+                                         learned from a note in a folder that \
+                                         is now excluded. Do not retry the \
+                                         same text; finish."
                                             .into(),
                                         None,
                                     ));
@@ -1312,7 +1380,7 @@ async fn drive_inner(
 mod tests {
     use super::*;
     use crate::plugins::agent::engine::{AgentCompletion, AgentRequest, AgentRequestClass};
-    use crate::plugins::agent::memory::{MemoryStore, RememberAction};
+    use crate::plugins::agent::memory::{MemoryStore, RememberAction, RememberOutcome};
     use crate::plugins::agent::tools::SearchHit;
     use crate::plugins::memory::commands::PersonalityView;
     use crate::test_support::block_on;
@@ -1558,11 +1626,19 @@ mod tests {
         async fn personality_for_injection(&self) -> Result<PersonalityView, AgentError> {
             Ok(PersonalityView::default())
         }
-        async fn remember(&self, action: RememberAction) -> Result<String, AgentError> {
-            let RememberAction::Upsert { entry_id, text } = action;
+        async fn remember(&self, action: RememberAction) -> Result<RememberOutcome, AgentError> {
+            let RememberAction::Upsert {
+                entry_id,
+                text,
+                source_run_hex: _,
+                source_folders: _,
+            } = action;
             let id = entry_id.unwrap_or_else(|| "minted1".to_string());
             self.writes.lock().unwrap().push(text);
-            Ok(id)
+            Ok(RememberOutcome {
+                entry_id: id,
+                quarantined: false,
+            })
         }
     }
 
