@@ -82,27 +82,55 @@ function fieldRanges(line: string, tree?: Tree): ByteRange[] {
   return ranges;
 }
 
-/** `line` with every task-field span removed and doubled separators collapsed. */
+/**
+ * `line` with every task-field span removed, the separators around those spans
+ * collapsed to one space, and everything else preserved byte-for-byte.
+ *
+ * The removed spans are the ONLY thing this rewrites. A blanket collapse of
+ * every whitespace run (and a blanket right-trim) used to run here, and both
+ * reached text the removal never touched: a user's own double space inside the
+ * description was folded to one, and a trailing space they typed was deleted
+ * the moment ANY field was written or cleared (myne-md/myne#657). A space in the
+ * document has to be a space on screen and in the source, so the repair is
+ * scoped to the junctions a removal actually creates.
+ *
+ * A removed span becomes a single space only when whitespace touched it, and
+ * nothing when it did not: removing the last field leaves no dangling
+ * separator, a field between two words leaves exactly one space, and a field
+ * glued to its neighbours leaves no space because there was none. Whitespace
+ * inside a segment is never touched, and only trailing whitespace is trimmed,
+ * so a leading indent survives untouched.
+ */
 function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
-  let out = "";
+  // The text before the first field, between fields, and after the last.
+  const segments: string[] = [];
   let cursor = 0;
   for (const r of ranges) {
-    out += line.slice(cursor, r.start);
+    segments.push(line.slice(cursor, r.start));
     cursor = r.end;
   }
-  out += line.slice(cursor);
-  // Collapsing runs of whitespace repairs the doubled separators that removing
-  // a field span leaves behind — but the LEADING run is not a separator, it is
-  // the list indentation, and collapsing it moves a sub-task up a level. Split
-  // it off, collapse the rest.
-  const indent = /^[ \t]*/.exec(out)![0];
-  return (
-    indent +
-    out
-      .slice(indent.length)
-      .replace(/[ \t]{2,}/g, " ")
-      .replace(/[ \t]+$/, "")
-  );
+  segments.push(line.slice(cursor));
+
+  // Join the segments, turning each removed span into a separator only where
+  // content sits on both sides of it. The separator is carried across empty
+  // segments, so `a [f1] [f2]b` still reads `a b` rather than `ab`.
+  let out = segments[0]!;
+  let pendingSeparator = false;
+  for (let i = 1; i < segments.length; i++) {
+    const raw = segments[i]!;
+    const right = raw.replace(/^[ \t]+/, "");
+    // Only TRAILING whitespace is trimmed, so a leading indent is never touched.
+    const left = out.replace(/[ \t]+$/, "");
+    // Whitespace touching the removed span is that span's separator.
+    if (left !== out || right !== raw) pendingSeparator = true;
+    if (right === "") {
+      out = left;
+      continue;
+    }
+    out = left + (pendingSeparator && left !== "" ? " " : "") + right;
+    pendingSeparator = false;
+  }
+  return out;
 }
 
 /**
@@ -174,8 +202,9 @@ export function taskDescription(line: string, tree?: Tree): string {
  * Put back the separator the parser requires after `[ ]`, when stripping left a
  * line that is nothing but its marker.
  *
- * `stripFieldSpans` ends by right-trimming, so clearing the last field from a
- * description-less task takes `- [ ] @due(2026-01-01)` to `- [ ]`. That line has
+ * `stripFieldSpans` drops the separator a removed span leaves when nothing
+ * follows it, so clearing the last field from a description-less task takes
+ * `- [ ] @due(2026-01-01)` to `- [ ]`. That line has
  * no separator, so `@lezer/markdown`'s GFM `TaskList` leaf does not see a task
  * at all and the checkbox disappears.
  *
@@ -193,12 +222,17 @@ export function taskDescription(line: string, tree?: Tree): string {
  * Restoring the space rather than refusing the write is the right half to fix.
  * The user asked for the field to go; the separator is the parser's requirement,
  * not their content.
+ *
+ * A line that already ends in the separator is left alone. The marker match
+ * consumes a trailing whitespace run, so `marker[0]` can be as long as the whole
+ * line; the check is on the last CHARACTER, not on the lengths, or a marker-only
+ * line that already carries its space grows by one on every write.
  */
 function restoreTaskSeparator(rewritten: string): string {
   const marker = TASK_LINE_MARKER_STRIP.exec(rewritten);
   if (marker === null) return rewritten;
   // Already carries the separator, or has a description after it.
-  if (rewritten.length > marker[0].length) return rewritten;
+  if (rewritten.length > marker[0].length || /[ \t]$/.test(rewritten)) return rewritten;
   return `${rewritten} `;
 }
 
@@ -227,8 +261,23 @@ export function planTaskFieldWrite(
   // `taskDescription`, which differs only in also dropping the list marker.
   const description = stripFieldSpans(line, ranges);
 
+  // The field block follows exactly ONE separator. A description that already
+  // ends in whitespace supplies it, and a longer run collapses to one.
+  //
+  // Deliberate exception to the byte-for-byte rule, recorded rather than
+  // removed (myne-md/myne#657): when a field block is APPENDED, a trailing
+  // whitespace run on the description collapses into that single separator
+  // instead of surviving after the field. Fields are always last on the line,
+  // so preserving it would emit a doubled separator (`task  [due:: …]`) or a
+  // new trailing run after the field, neither of which is the user's space
+  // anymore. Clearing fields preserves trailing whitespace untouched; only
+  // the append boundary normalizes. Pinned by "collapses a longer trailing
+  // run to one separator when a field is written" and "does not double the
+  // separator when the description ends in a space" below.
   const rewritten = restoreTaskSeparator(
-    serialized === "" ? description : `${description}${description === "" ? "" : " "}${serialized}`,
+    serialized === "" || description === ""
+      ? `${description}${serialized}`
+      : `${description.replace(/[ \t]+$/, "")} ${serialized}`,
   );
 
   if (rewritten === line) return null;

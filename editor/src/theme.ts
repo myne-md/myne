@@ -48,6 +48,18 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-content": {
     caretColor: "var(--accent, #2c4a7a)",
+    // Lay trailing spaces out instead of hanging them (myne-md/myne#657).
+    //
+    // CodeMirror's base theme sets `.cm-content` to `white-space: pre` and only
+    // reaches `break-spaces` through the `.cm-lineWrapping` class that
+    // `EditorView.lineWrapping` adds. Under `pre-wrap` a trailing space hangs
+    // at end of line (no width, caret does not advance) while the document
+    // keeps the byte, which is exactly the reported live-view/raw asymmetry.
+    // Pin `break-spaces` here explicitly so the layout does not depend on the
+    // base theme's class surviving, and on `.cm-line` below so the line itself
+    // resolves to it. Same value the base theme carries, so nothing visual
+    // changes; this only stops it from drifting.
+    whiteSpace: "break-spaces",
     // Fill the scroller so the empty area below the text is part of the editable
     // surface — clicking there reaches the editor (and lands the caret on the
     // last line, MYND-162 feedback) instead of being dead space.
@@ -69,6 +81,12 @@ export const myneTheme = EditorView.theme({
   },
   "&.cm-focused": {
     outline: "none",
+  },
+  // Line-level twin of the `.cm-content` rule above (myne-md/myne#657): the
+  // base theme sets no `white-space` on `.cm-line` itself, so the line only
+  // resolves to `break-spaces` by inheritance. State it directly.
+  ".cm-line": {
+    whiteSpace: "break-spaces",
   },
   // focus-mode (MYND-348): highlightActiveLine() is mounted only to supply the
   // `.cm-activeLine` class for focus-mode line-dimming (tokens.css). Neutralize
