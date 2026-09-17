@@ -4080,6 +4080,17 @@ pub(crate) async fn set_ribbon_items_with_dir(
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
+    // A caller passes registry command ids (`note.new`, `daily.open-today`:
+    // short dotted tokens, the longest in the registry under 40 bytes). The
+    // caps are generous enough that no honest rail meets either and small
+    // enough that a compromised WebView cannot park storage in the blob: 128
+    // ids of 200 bytes each stay far under the 64 KiB `MYP1` envelope, which
+    // is the backstop, not the validation.
+    const MAX_RIBBON_ITEMS: usize = 128;
+    const MAX_RIBBON_ITEM_LEN: usize = 200;
+    if items.len() > MAX_RIBBON_ITEMS || items.iter().any(|id| id.len() > MAX_RIBBON_ITEM_LEN) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
     let count = items.len();
     update_prefs_with_dir(
         vault_dir,
@@ -8305,6 +8316,42 @@ mod tests {
                 .await
                 .expect("read");
             assert_eq!(cleared.ribbon_items, Some(Vec::new()));
+        });
+    }
+
+    #[test]
+    fn set_ribbon_items_rejects_over_cap_count_and_length() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4c).await;
+            // 129 ids: one past MAX_RIBBON_ITEMS.
+            let too_many: Vec<String> = (0..129).map(|i| format!("cmd.{i}")).collect();
+            let result = set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                too_many,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::InvalidValue)));
+            // One id past MAX_RIBBON_ITEM_LEN.
+            let too_long: Vec<String> = vec!["x".repeat(201)];
+            let result = set_ribbon_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                too_long,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::InvalidValue)));
+            // Neither refusal wrote: the rail is still unconfigured.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.ribbon_items, None);
         });
     }
 

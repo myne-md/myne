@@ -11,7 +11,7 @@
 // resolves to `hidden` drops out of the rail and the others reflow, a `disabled`
 // command stays dimmed with its hint, and `show` is live.
 
-import { useCallback, useMemo, useState, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS } from "../../commands";
 import { Icon } from "../../components/primitives/Icon";
@@ -119,15 +119,34 @@ export function LeftRibbon({ hidden = false }: { hidden?: boolean }) {
 
   const eligible = useMemo(() => ribbonEligibleIds(), []);
   const byId = useMemo(() => new Map(COMMAND_ACTIONS.map((a) => [a.id, a])), []);
-  const items = useMemo(
+  const stored = useMemo(
     () => resolveRibbonItems(prefs.ribbon_items, eligible),
     [prefs.ribbon_items, eligible],
   );
 
+  // Optimistic reorder: the write round-trips through the prefs nonce, so the
+  // rail would otherwise sit on the old order until the re-read lands. A failed
+  // write clears the override, which rolls back to the stored order the failed
+  // write never changed.
+  const [pending, setPending] = useState<string[] | null>(null);
+  const items = pending ?? stored;
+  // Once the stored prefs catch up to an optimistic write, drop the override
+  // so later external changes (a palette pin) flow through again. Compared by
+  // value: the nonce re-read is async, and clearing on write-settle instead
+  // would flash the old order.
+  useEffect(() => {
+    if (
+      pending !== null &&
+      pending.length === stored.length &&
+      pending.every((id, i) => stored[i] === id)
+    ) {
+      setPending(null);
+    }
+  }, [pending, stored]);
+
   const persist = useCallback((next: string[]) => {
-    // Best-effort: the rail has no error surface of its own. A failed write is
-    // surfaced by the Appearance roster, which shows `errorSave` and rolls back.
-    void setRibbonItems(next).catch(() => {});
+    setPending(next);
+    void setRibbonItems(next).catch(() => setPending(null));
   }, []);
 
   if (hidden || !prefs.ribbon_visible) return null;

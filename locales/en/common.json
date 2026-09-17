@@ -378,6 +378,7 @@
     "noMatches": "No matches",
     "pin": "Pin to left ribbon",
     "unpin": "Unpin from left ribbon",
+    "pinError": "Could not pin the command.",
     "operatorHint": "Tab to complete",
     "operators": {
       "tag": "Notes with a tag",
@@ -756,7 +757,8 @@
     "ribbon": {
       "customize": "Customize ribbon…",
       "label": "Left ribbon",
-      "unpin": "Unpin from ribbon"
+      "unpin": "Unpin from ribbon",
+      "runFailed": "Could not run the ribbon command."
     },
     "attachment": {
       "actions": {
@@ -3033,6 +3035,7 @@
       "helper": "The commands on the left ribbon, in order. Drag to reorder, add more from the command list, or remove with the ×. The rail hides commands unavailable in the current state.",
       "label": "Left ribbon",
       "remove": "Remove {{name}} from the ribbon",
+      "position": "{{name}}, {{index}} of {{total}}",
       "searchEmpty": "No matching commands.",
       "searchPlaceholder": "Search commands…",
       "showHelper": "Show the left ribbon on this device.",
