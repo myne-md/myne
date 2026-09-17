@@ -3027,10 +3027,10 @@ async fn sync_chats_conversation_phase(
 /// Pull-side `vault.themes` reconciliation (MYND-486). The `sync_catalog_phase`
 /// twin: `vault.themes` carries **no device-local subset** (every theme is
 /// shared vault content), so the push gate is the blob nonce vs the synced
-/// baseline — no shared-subset hash, which is the one twist `sync_prefs_phase`
+/// baseline (no shared-subset hash), which is the one twist `sync_prefs_phase`
 /// needs and this phase does not. Downloads a changed remote themes blob, runs
 /// the per-theme-name [`merge_custom_themes`] post-decrypt, and either **adopts
-/// the server bytes verbatim** (merge equal to the remote — re-encrypting would
+/// the server bytes verbatim** (merge equal to the remote: re-encrypting would
 /// nonce-churn an endless push loop) or writes the merged store freshly (dirty
 /// → pushed this cycle with the server's version as CAS base). Holds the themes
 /// plugin's write mutex across the read-merge-write.
@@ -3051,13 +3051,13 @@ async fn sync_themes_phase(
 ) -> Result<ThemesPhase, SyncCycleError> {
     use crate::plugins::themes::commands::{decode_themes_map_or_empty, encode_themes_map};
 
-    // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
+    // See `apply_pulled_note_blob`: `blocking_lock` panics inside a runtime.
     let _guard = crate::plugins::themes::commands::write_mutex().lock().await;
 
     let path = themes_file_path(vault_root);
     // The newest copy that DECRYPTS, not merely the newest that parses a header
     // (myne#301). A torn slot on the web client otherwise supplied both the
-    // local nonce and, further down, the bytes pushed to the server — where
+    // local nonce and, further down, the bytes pushed to the server, where
     // every peer decodes them to empty.
     let themes_key_for_read =
         derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
@@ -3073,7 +3073,7 @@ async fn sync_themes_phase(
     // Decrypting the local store costs an HKDF + a full AEAD open + a whole-map
     // JSON parse, so it happens ONLY on the two paths that read the plaintext:
     // the remote-reconcile branch (which merges) and the virgin-store check
-    // below. The steady state — no remote change, local nonce == baseline —
+    // below. The steady state (no remote change, local nonce == baseline)
     // proves byte-cleanliness from the nonce alone and never decrypts. (The
     // `sync_catalog_phase` twin decodes eagerly for a reason this phase lacks:
     // it RETURNS the merged catalog to the downstream attachment loop, while
@@ -3099,7 +3099,7 @@ async fn sync_themes_phase(
 
     // §11.3 gate. This family needs it most: the `io.write` below is shared by
     // both arms, and the local store falls back to EMPTY when it cannot be
-    // decoded — so for unverified junk `merged == remote_map` holds and the
+    // decoded, so for unverified junk `merged == remote_map` holds and the
     // live `vault.themes` is replaced by that junk.
     let verified = verified_singleton_download(
         transport,
@@ -3151,7 +3151,7 @@ async fn sync_themes_phase(
     // the synced baseline. Every themes write re-encrypts under a fresh nonce,
     // so a local blob whose outer nonce still equals the baseline's is provably
     // byte-untouched since the last sync. A virgin empty store (no themes, no
-    // baseline) is deliberately NOT pushed — a theme-less vault stays
+    // baseline) is deliberately NOT pushed: a theme-less vault stays
     // themes-silent, exactly as an attachment-less vault stays catalog-silent.
     let local_nonce_hex = local_nonce.map(|n| hex(&n));
     // The virgin-store conjunct is ordered baseline-first so the cheap `is_none`
@@ -3165,7 +3165,7 @@ async fn sync_themes_phase(
         dirty,
         applied_remote: false,
         // `dirty` already implies `local_bytes.is_some()`, and these are the
-        // VERIFIED bytes (myne#301) — the same ones the push must carry.
+        // VERIFIED bytes (myne#301): the same ones the push must carry.
         push_bytes: if dirty { local_bytes } else { None },
     })
 }
@@ -10875,7 +10875,7 @@ mod tests {
             };
 
             // Local: a SHARED field with the newer clock, so the merge beats the
-            // server and the phase must take its write-a-fresh-blob branch — plus
+            // server and the phase must take its write-a-fresh-blob branch, plus
             // a device-local one to prove the whole view survives, not just the
             // field under contention. Without the shared win the phase adopts the
             // server's bytes and never re-encodes, which makes the encoder half of
@@ -10977,7 +10977,7 @@ mod tests {
         }
 
         // A server that has never held a prefs blob receives this device's
-        // unconditionally — the §10.2.1 initial publish (even a default view).
+        // unconditionally: the §10.2.1 initial publish (even a default view).
         #[test]
         fn initial_publish_when_server_never_held_prefs() {
             let dir = scratch("initpub");
@@ -11024,7 +11024,7 @@ mod tests {
                     doc_heads_hex: Vec::new(),
                 },
             );
-            // The synced baseline was the default view — whose SHARED subset
+            // The synced baseline was the default view, whose SHARED subset
             // equals the themed view's (theme is device-local).
             set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
             let t = FakeTransport::new();
@@ -11087,7 +11087,7 @@ mod tests {
         }
 
         // A remote rename lands: merged into the on-disk view (device-local
-        // theme preserved), applied_remote=true, and NO re-push — the server
+        // theme preserved), applied_remote=true, and NO re-push: the server
         // already carries the merged shared subset (the anti-ping-pong rule).
         #[test]
         fn remote_rename_merges_applies_and_does_not_repush() {
@@ -11154,13 +11154,13 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // Enrollment wholesale seed: a VIRGIN vault (no vault.prefs on disk —
+        // Enrollment wholesale seed: a VIRGIN vault (no vault.prefs on disk,
         // the just-joined state) adopts the server blob VERBATIM, device-local
         // fields included as starting defaults (Q3/Q7), and never re-seeds.
         #[test]
         fn virgin_vault_seeds_wholesale_from_server() {
             let dir = scratch("seed");
-            // NO local vault.prefs — the just-joined-device state.
+            // NO local vault.prefs: the just-joined-device state.
             let mut st = SyncState::default();
             let pid = prefs_sync_id(&ROOT);
             let t = FakeTransport::new();
@@ -11211,7 +11211,7 @@ mod tests {
 
         /// §11.3 on the enrollment seed. `decode_prefs_blob` succeeding is NOT
         /// the check: these bytes ARE a valid `MYP1` for this vault, they are
-        /// simply not the revision the record advertised — which is exactly
+        /// simply not the revision the record advertised, which is exactly
         /// what a server replaying a genuine older blob under a newer record
         /// produces. Seeding them would write the wrong revision to a virgin
         /// vault AND record a baseline the client does not hold.
@@ -11307,7 +11307,7 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // A virgin vault against an EMPTY server proceeds on defaults — no
+        // A virgin vault against an EMPTY server proceeds on defaults: no
         // crash, no seed, and the initial-publish intent registers as dirty.
         #[test]
         fn virgin_vault_with_empty_server_proceeds_on_defaults() {
@@ -11341,7 +11341,7 @@ mod tests {
         // Poisoned-gate regression (re-review I7): an UNSYNCED shared edit +
         // app restart (RAM baseline lost) + an unchanged server record must
         // still push. The self-heal may only adopt the gate baseline when the
-        // local blob is provably the server's bytes — healing from the edited
+        // local blob is provably the server's bytes: healing from the edited
         // view would silently withhold the rename from the fleet forever.
         #[test]
         fn unsynced_shared_edit_survives_a_restart() {
@@ -11452,7 +11452,7 @@ mod tests {
         // (`gc2`); this is the OTHER device. What makes a `FakeTransport`
         // faithful here rather than a stand-in: `run_sync_cycle`'s
         // `prefs_phase.dirty` arm uploads `io.read(vault_root/"vault.prefs")`
-        // VERBATIM — the pushed ciphertext IS the author's on-disk blob — and
+        // VERBATIM: the pushed ciphertext IS the author's on-disk blob, and
         // the server is a zero-knowledge relay that cannot read or alter it.
         // So serving device A's actual file bytes as B's server record models
         // the wire payload exactly; only the socket is faked, and the response
@@ -11486,7 +11486,7 @@ mod tests {
         }
 
         /// Two ordered rules exercising both v1 filter leaves, one of them
-        /// DISABLED — a disabled rule is retained, so it must cross the wire
+        /// DISABLED: a disabled rule is retained, so it must cross the wire
         /// too or re-enabling it on the peer loses the authoring work.
         fn authored_rules() -> Vec<protocol::ColorGroup> {
             use protocol::{ColorGroup, FilterNode};
@@ -11512,7 +11512,7 @@ mod tests {
 
         // Device A authors color groups; device B receives them. A's push
         // registers as dirty, and B's phase lands A's EXACT blob bytes: same
-        // rules, same precedence order, same disabled flag, same filter ASTs —
+        // rules, same precedence order, same disabled flag, same filter ASTs;
         // while B's own device-local tuning survives untouched.
         #[test]
         fn color_groups_authored_on_device_a_land_on_device_b() {
@@ -11587,7 +11587,7 @@ mod tests {
                 "B adopted a shared subset it already agrees with ⇒ no ping-pong re-push"
             );
 
-            // B's DISK is the assertion — the peer reads its rules back from
+            // B's DISK is the assertion: the peer reads its rules back from
             // the blob it persisted, not from the merge's return value.
             let on_b = read_local(&dir_b);
             assert_eq!(
@@ -11616,7 +11616,7 @@ mod tests {
         }
 
         // …and back the other way: B edits the list it just received and A
-        // converges on B's version. The reverse leg is a separate claim —
+        // converges on B's version. The reverse leg is a separate claim:
         // `color_groups` is `Shared(WholeValueLww)`, so the peer that edits
         // second must WIN on the author, not merge into a hybrid list.
         #[test]
@@ -11634,7 +11634,7 @@ mod tests {
             write_local(&dir_a, &a);
 
             // B edits it: reorders (precedence change), renames the first rule
-            // and re-enables the second — under a newer clock.
+            // and re-enables the second, under a newer clock.
             let mut edited = authored_rules();
             edited.swap(0, 1);
             edited[0].enabled = true;
