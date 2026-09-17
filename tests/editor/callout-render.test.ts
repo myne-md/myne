@@ -20,6 +20,7 @@ import {
   setDateTimeDisplay,
   __resetDateTimeDisplayForTest,
 } from "@myne/editor/host/lib/datetimeFormat";
+import i18n from "../../src/i18n";
 
 /** The icon's child tags, in order. Empty means the glyph rendered as nothing —
  *  which is the shape #376 reported and which asserting on `<svg>` alone misses. */
@@ -30,9 +31,13 @@ function iconShapes(m: Mounted): string[] {
 }
 
 let m: Mounted | null = null;
-afterEach(() => {
+afterEach(async () => {
   if (m !== null) teardown(m);
   m = null;
+  // A language switched for one test must not leak into the next. `tr` is a
+  // lazy catalog, so the injected bundle has to come back out as well.
+  if (i18n.language !== "en") await i18n.changeLanguage("en");
+  i18n.removeResourceBundle("tr", "common");
 });
 
 describe("callouts", () => {
@@ -99,22 +104,79 @@ describe("callouts", () => {
   it("rebuilds on an ambient display change without losing its header", () => {
     // myne-md/myne#609 gave the shared rebuild gate a signal for ambient state
     // (the reader's date format and language), which this module's own header
-    // records as deliberately unwired: "a switched language re-labels on the
-    // next rebuild (any edit, scroll or selection move). It isn't wired."
-    //
-    // What is pinned here is the narrow, checkable half: a rebuild driven by
-    // that signal leaves the callout header intact. The wider claim, that a
-    // LANGUAGE switch re-labels an open callout, is deliberately NOT asserted,
-    // and the reason is recorded rather than hidden. Injecting a `tr` bundle
-    // and switching to it makes the header widget vanish on the next rebuild,
-    // and it does so on the PRE-EXISTING edit path too, with no involvement
-    // from the new signal. That is a separate defect in this layer's language
-    // path, measured and not yet understood; asserting around it here would
-    // bury it.
+    // records as deliberately unwired before that. A display-format change does
+    // not alter the callout's own label, so this pins only that the rebuild
+    // leaves the header intact; the label half is the next test.
     m = mount("> [!note]\n> body text\n");
     expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
     setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmy" });
     expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
     __resetDateTimeDisplayForTest();
+  });
+
+  // myne-md/myne#644. The callout header replacement begins exactly where
+  // `blockquote.ts`'s `> ` marker-hide ends. With a non-inclusive replace both
+  // points share the same positive `startSide`, so a rebuild whose changed range
+  // starts on that shared boundary made CodeMirror read the header widget as a
+  // continuation of a zero-length phantom point and never render it: the source
+  // stayed hidden and nothing replaced it. A language switch is what changes the
+  // label, so it is what triggers a rebuild on that boundary; the *next edit* is
+  // the same rebuild path and is the step the issue reports. `inclusive: true`
+  // on the replacement is the fix.
+  it("re-labels on a language switch through the production ambient channel", async () => {
+    m = mount("> [!note]\n> body text\n");
+    expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
+
+    // The rebuild is driven the way production drives it: the host adapter
+    // carries the active language in `DateTimeDisplay.locale` and republishes
+    // when it changes, which fires the shared `ambientLabelsChanged` gate. A
+    // synthetic doc edit would pass through the `docChanged` gate instead and
+    // prove nothing about the ambient path.
+    i18n.addResourceBundle(
+      "tr",
+      "common",
+      { editor: { callout: { label: { note: "NOT-TR" } } } },
+      true,
+      true,
+    );
+    await i18n.changeLanguage("tr");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, locale: "tr" });
+
+    const title = query(m, ".cm-callout-title");
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toContain("NOT-TR");
+    __resetDateTimeDisplayForTest();
+  });
+
+  it("keeps its header through the edit that follows a language switch", async () => {
+    m = mount("> [!note]\n> body text\n");
+    i18n.addResourceBundle(
+      "tr",
+      "common",
+      { editor: { callout: { label: { note: "NOT-TR" } } } },
+      true,
+      true,
+    );
+    await i18n.changeLanguage("tr");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, locale: "tr" });
+    m.view.dispatch({ changes: { from: m.view.state.doc.length, insert: "x" } });
+
+    const title = query(m, ".cm-callout-title");
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toContain("NOT-TR");
+    __resetDateTimeDisplayForTest();
+  });
+
+  it("keeps end-of-line typing visible", () => {
+    // Pins that a keystroke landing exactly on the end of the header line
+    // renders: the header replacement must never absorb it into the hidden
+    // span, or the typed character would vanish with the document unchanged.
+    m = mount("> [!note]\n> body text\n");
+    const end = m.view.state.doc.line(1).to;
+    m.view.dispatch({ changes: { from: end, insert: "!" } });
+
+    expect(m.view.state.doc.toString()).toContain("> [!note]!");
+    expect(query(m, ".cm-callout-title")).not.toBeNull();
+    expect(renderedText(m)).toContain("!");
   });
 });
