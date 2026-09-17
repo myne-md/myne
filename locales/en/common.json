@@ -3918,7 +3918,7 @@
       "rotated": "Key rotated",
       "invite": "Invite member",
       "remove": "Remove",
-      "removeConfirm": "Removing a member re-keys the vault on this device, so what is written here next is unreadable to them. What they already synced, they keep, and other devices pick up the new key only with a later update. This cannot be undone.",
+      "removeConfirm": "Removing a member re-keys the vault on this device only, so what is written here next is unreadable to them. What they already synced, they keep, and other devices do not pick up the change yet: member removal does not propagate to peers until the roster sync follow-on lands. This cannot be undone.",
       "inviteReady": "Invite ready for {{fingerprint}}…",
       "title": "Vault members",
       "personHint": "Unlock your member identity with your recovery phrase. It stays on this device until you lock the vault or close the app.",

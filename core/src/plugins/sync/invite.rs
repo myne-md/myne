@@ -22,6 +22,8 @@ use protocol::person_invite::create_invite;
 use protocol::person_key::{PersonKeyPair, PersonPublicHalf};
 use std::string::String;
 
+use crate::account::person_identity::hex_lower;
+
 /// Invite-flow errors. Separate enum per command (the per-command
 /// closed-enum discipline); no `String` field ever reaches the frontend.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,6 +136,8 @@ pub fn invite_accept(
 /// Lowercase hex of a wrapped-key's pieces in the roster's fixed order
 /// (`ed_ephemeral_pk || ml_kem_ct || nonce || wrapped_key`), the same encoding
 /// `member_removal` writes into `wrapped_items_key_hex`.
+/// (Encoding is [`crate::account::person_identity::hex_lower`]; this wrapper
+/// only fixes the field order.)
 pub fn wrapped_hex(w: &protocol::person_key::PersonWrappedKey) -> String {
     use protocol::person_key::{PERSON_CT_LEN, PERSON_ED25519_PK_LEN};
     let mut bytes =
@@ -143,16 +147,6 @@ pub fn wrapped_hex(w: &protocol::person_key::PersonWrappedKey) -> String {
     bytes.extend_from_slice(&w.nonce);
     bytes.extend_from_slice(&w.wrapped_key);
     hex_lower(&bytes)
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::new();
-    for b in bytes {
-        s.push(HEX[(b >> 4) as usize] as char);
-        s.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    s
 }
 
 #[cfg(test)]

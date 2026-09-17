@@ -758,8 +758,20 @@ async fn write_roster_row(
     io.write(meta_path, &new_bytes, crate::vault_io::WriteOpts::default())
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
-    if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await {
-        tracing::debug!(stage = "invite", error = ?e, "meta-dirty marker write failed");
+    // The dirty marker opens the meta phase's push window for this device's
+    // roster write. Best-effort with one immediate retry: a transient IO
+    // failure is the common case and the marker write is idempotent, so a
+    // second attempt is cheap and needs no signature change. A persistent
+    // failure still converges rather than stranding the invite: the meta
+    // phase pushes on baseline divergence too (`meta_baseline_hex` still
+    // holds the pre-invite hash while `vault.meta` already carries the new
+    // roster), so the marker only accelerates the baseline-lost corner
+    // instead of gating the push.
+    if let Err(first) = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await {
+        // One immediate retry before giving up (see the guarantee above).
+        if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await {
+            tracing::warn!(stage = "invite", first_error = ?first, error = ?e, "meta-dirty marker write failed twice");
+        }
     }
     // Refresh the CAS anchor to the bytes written, or the next change-password
     // compares against the pre-invite hash and force-relocks with
