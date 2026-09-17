@@ -19,7 +19,7 @@
 // "the spaces are still on screen" is directly observable.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { focusAt, mount, type Mounted, teardown } from "./_conformance";
+import { focusAt, mount, roundTripBytes, type Mounted, teardown } from "./_conformance";
 
 let m: Mounted | null = null;
 afterEach(() => {
@@ -67,5 +67,32 @@ describe("a list item keeps its trailing spaces on screen", () => {
     m = mount("paragraph  \nsecond line\n");
     focusAt(m, 3);
     expect(m.view.contentDOM.textContent ?? "").toContain("paragraph  ");
+  });
+});
+
+describe("a single trailing space is on screen, not only in the bytes", () => {
+  // myne-md/myne#657 candidate 1: under `white-space: pre-wrap` a trailing
+  // space HANGS at end of line (occupies no width, caret does not advance),
+  // while `break-spaces` lays it out. The document is untouched either way,
+  // so this half of the issue is purely about what the line resolves to.
+  //
+  // jsdom measures no layout, so "takes width" is asserted one level down:
+  // the rendered text still carries the space (no decoration hid it, the way
+  // the HardBreak guard above used to hide two), the bytes survive a focus
+  // cycle, and the line itself resolves to `break-spaces`.
+  it("keeps the space in the rendered text of a task line", () => {
+    const text = renderedAway("- [ ] label \n\ntail\n");
+    expect(text).toContain("label ");
+  });
+
+  it("leaves the byte in the document across a focus cycle", () => {
+    expect(roundTripBytes("- [ ] label \n\ntail\n")).toBe("- [ ] label \n\ntail\n");
+  });
+
+  it("resolves the task line itself to break-spaces", () => {
+    m = mount("- [ ] label \n\ntail\n");
+    const line = m.view.contentDOM.querySelector(".cm-line");
+    expect(line).not.toBeNull();
+    expect(getComputedStyle(line!).whiteSpace).toBe("break-spaces");
   });
 });
