@@ -628,6 +628,19 @@
     "merged tree alongside ch1, and the merged-tree run in the Phase 2 sweep",
     "is what checks the sum rather than this arithmetic."
   ],
-  "stable": 359,
-  "stable_max_failures": 0
+  "stable": 361,
+  "stable_max_failures": 0,
+  "_comment_359_to_361": [
+    "Raised 359 -> 361 for myne-md/myne#697. `e2e/memory.e2e.ts` is NEW",
+    "relative to develop and carries TWO scenarios (mem1: remember-through-a-run",
+    "plus popover plus settings delete; mem2: personality save plus close/reopen",
+    "persistence), both inside `aiDescribe` and both executing where CI sets",
+    "MYNE_E2E_AI=1.",
+    "",
+    "This is arithmetic on the file's scenario count, not a fresh CI measurement:",
+    "359 was the develop base and the new file executes two scenarios under the",
+    "AI gate. The pre-release E2E run (`.woodpecker/e2e.yml`, manual) is what",
+    "confirms the number; if that run executes a different count, this floor",
+    "moves to what it measured rather than keeping 361."
+  ]
 }

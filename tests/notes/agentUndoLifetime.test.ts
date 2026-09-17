@@ -46,7 +46,7 @@ const STEP = {
   notesRead: 1,
   charsOffDevice: null,
   excludedCount: 0,
-};
+memoryUpdated: 0,};
 
 beforeEach(() => {
   clearAgentForLock();

@@ -54,7 +54,7 @@ function settledLeg(
     notesRead,
     charsOffDevice,
     excludedCount: 0,
-  };
+  memoryUpdated: 0,};
 }
 
 beforeEach(() => clearAgent());

@@ -135,9 +135,25 @@ A simple, modern file-encryption format and library by Filippo Valsorda. Myne do
 Used in: `decisions.md` 2026-04-28 (age/rage cited as the boring-crypto precedent for the RustCrypto stack); `spec/protocol.md` §2
 Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
+### **agent memory** &nbsp; 📦 *Product*
+
+*(Alias: `vault.agent-memory`, `memories/<id>`; the memory roster and its per-entry blobs.)*
+
+What the AI assistant remembers about the user across runs: a small, curated set of distilled claims (preferences, conventions, standing facts) the model wrote itself through the `remember` verb and the user can read, edit or delete in full. Persisted as vault content (`MYN1` catalog + `MYX1` per-entry blobs, `protocol.md` §9.25/§9.26): encrypted, synced Class-1, backed up, existing only while the `ai_enabled` opt-in is on. Writes are automatic (one per run, no approval dialog; `decisions/ai/0591`), and the compensating control is transparency plus scan: every entry is visible in the Settings panel and the chat popover, every model-written entry passed the schema + character-cap + injection scan at write time and again at injection time (a rejected write is refused before it reaches disk, never persisted, never injected; there is no rejected-entries rendering — refused text simply never becomes an entry; `decisions/ai/0590`). Distinct from [conversations](#conversation) (the transcript, append-only) and from a note (never a write target). Cross-device by sync; delete-everywhere via the catalog tombstone.
+
+Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; `threat-model.md` TB12/TB13 (2026-09-10 amendments)
+
+### **agent personality** &nbsp; 📦 *Product*
+
+*(Alias: `vault.personality`.)*
+
+The user's standing voice directives for the AI (tone, length, language, formatting), persisted as one encrypted singleton (`MYZ1`, `protocol.md` §9.27) and injected into the agent's system turn beside the memory. **User-authored only**: written from Settings (and the mobile twin), never by the agent (no verb writes it). Syncs as whole-value LWW (one coherent voice, never merged directive-by-directive, the themes-palette rule), behind the same `ai_enabled` gate as [agent memory](#agent-memory). Distinct from [agent memory](#agent-memory) (model-written, self-updating) by authorship: the personality is what the user says, the memory is what the agent learned.
+
+Used in: `protocol.md` §9.27; `decisions/ai/0590`; `sync-protocol.md` §10.2.7
+
 ### **agent run** &nbsp; 📦 *Product*
 
-One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0583` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run never writes; applying is a separate act behind the user's approval.
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0583` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run writes exactly one thing without approval: a single memory entry through the [remember verb](#remember-verb) (myne-md/myne#697, `decisions/ai/0591`); everything else about a run never writes, and applying is a separate act behind the user's approval.
 
 Used in: `decisions.md` 2026-08-16, 2026-08-19, `decisions/ai/0581`, `decisions/ai/0583`, `threat-model.md` §7
 
@@ -149,7 +165,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529), with exactly one exception: the [remember verb](#remember-verb) writes a memory entry without approval (myne-md/myne#697, `decisions/ai/0591`). Four verbs: edit a note body, append to a note body, create a note (the [append verb](#append-verb) was added by myne-md/myne#616), and remember a fact about the user; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -1584,6 +1600,12 @@ The user's primary authentication credential. Held in user memory only. Fed to A
 
 Used in: `spec/protocol.md` §3.1, §4.1
 
+### **memory entry** &nbsp; 📦 *Product*
+
+One record in [agent memory](#agent-memory): a 16-byte UUIDv7 id (the `memories/<id-hex>` filename), one ≤2000-character distilled text, and a roster row (timestamps + causal `version` + tombstone) in the `vault.agent-memory` catalog. Written by the model through the `remember` verb (one per run) or by the user through the memory UI, rewritten whole rather than append-merged, and removed everywhere by the tombstone. The write path accepts an optional `source_conversation` link, but no producer sets one today, so model rows carry no provenance marker. Sealed as `MYX1` (§9.26) with the entry id + `account_number_hash` bound into the AAD, the `MYE1` archetype.
+
+Used in: `protocol.md` §9.26; `decisions/ai/0590`
+
 ### **merge version** &nbsp; 📋 *Protocol*
 
 The monotonic causal counter carried per entry by the synced tombstone-guarded singletons — the [`vault.themes`](#vaultthemes) per-name map (`spec/protocol.md` §9.21.2) and the [`vault.attachments`](#vaultattachments) catalog (§9.10.2) — and the **primary key of their per-entry merge join** (`spec/sync-protocol.md` §10.2.2 / §11.4). On any local mutation of a key it is bumped to `max(versions this device has observed for that key) + 1`; the greater `version` wins a reconcile, and the wall-clock fields (`created_at`/`updated_at`/`deleted_at`) only break an equal-`version` tie (**remove-wins** on tombstone-ness). Because "pick the maximum under a total order" is associative, this closes the three-device CAS ping-pong the earlier `created_at`-vs-`deleted_at` guard admitted (myne-md/myne#405). An additive optional field (`#[serde(default)]`, absent = 0), introducing no `MYC1`/`MYT1` magic, AAD, or version change. Causal, not a wall-clock — it orders edits, it is not a security property. Phase 2.
@@ -2051,6 +2073,12 @@ Daily keeps its three top-level `vault.prefs` fields; weekly and monthly live in
 
 Used in: `spec/protocol.md` §9.5.2; `spec/sync-protocol.md` §10.2
 
+### **personal-agent layer** &nbsp; 📦 *Product*
+
+The memory plus personality slice of the agent: what the agent distills from working with the user ([agent memory](#agent-memory)) and what the user tells it to sound like ([agent personality](#agent-personality)), persisted as synced vault content (`vault.agent-memory` `MYN1` + `memories/<id>` `MYX1`, `vault.personality` `MYZ1`) and injected into the agent's system turn as an `UntrustedNote` span (myne-md/myne#697). The name covers the storage pair plus the `remember` verb plus the injection, not a separate product surface.
+
+Used in: `spec/protocol.md` §9.25-§9.27; `spec/sync-protocol.md` §10.2.6, §10.2.7; `decisions/ai/0590`
+
 ### **property** &nbsp; 📦 *Product*
 
 A typed `key → value` pair derived from a note's YAML [frontmatter](#frontmatter) body by the Saved Views property-index (MYND-271). Every arbitrary frontmatter key is read and coerced to exactly one Myne type — `string` / `number` / `date` / `list` / `checkbox` — by the canonical value-typing ruleset (`spec/markdown-dialect.md` §3.6.4); the property-index is the **single type authority** for the Saved Views epic (sibling features consume its typing, never redefine it). Tags (`#tag` ∪ frontmatter `tags:`) and the `folder:` value are queryable alongside properties as pseudo-properties. The parse is read-only and non-mutating (the `.myn` file stays source of truth); the typed values live in the derived [vault.indices](#vaultindices) / `MYI1` cache. A [saved view](#saved-view) filters and sorts on properties.
@@ -2160,6 +2188,12 @@ Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
 
 Used in: `spec/markdown-dialect.md` §3.2, §5; `decisions.md` 2026-05-30
+
+### **remember verb** &nbsp; 📦 *Product*
+
+The fourth verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#697): it writes one memory entry, not a note, carrying `entry_id` (absent mints, present overwrites) and `text`. The only model-initiated write that does not end in the review screen (`decisions/ai/0591`): the run loop caps it at one write per run, and the memory plugin's write-time gate (schema, 2000-character cap, injection scan) runs inside. Removal stays a user act in the memory UI; the model has no delete verb. Advertised to the model in the prompt's action list, or the feature is inert.
+
+Used in: `spec/protocol.md` §9.25, §9.26; `decisions/ai/0590`; `decisions/ai/0591`
 
 ### **remind** &nbsp; 📦 *Product*
 

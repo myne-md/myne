@@ -41,6 +41,7 @@
     "workspace:default",
     "graph-layout:default",
     "chats:default",
+    "memory:default",
     "detached-window:default",
     "vault-label:default",
     "account:default",

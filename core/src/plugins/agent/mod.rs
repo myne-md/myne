@@ -66,6 +66,7 @@ pub mod history;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod host_adapters;
 pub mod host_commands;
+pub mod memory;
 pub mod probe;
 pub mod prompt;
 pub mod run;

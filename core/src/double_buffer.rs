@@ -109,6 +109,14 @@ pub const DOUBLE_BUFFERED: &[&str] = &[
     // causal version), so a torn write would cost the whole roster.
     // The rewrite cadence is the same one that puts `vault.attachments` on this list.
     "vault.chats",
+    // Agent-memory catalog + personality singletons (MYN1/MYZ1,
+    // myne-md/myne#697): rewritten on every memory write/delete (catalog
+    // version bump) and every personality save. A torn catalog fails
+    // AEAD/strict-trailing and reads as CatalogUnreadable, which refuses all
+    // local mutations and skips the memory plane every cycle. A wedge
+    // recoverable only by backup restore. Same cadence, same protection.
+    "vault.agent-memory",
+    "vault.personality",
     "vault.graph",
     "vault.embeddings",
     "vault.quickunlock",
@@ -124,6 +132,11 @@ pub const DOUBLE_BUFFERED: &[&str] = &[
     // the same schedule as `pending-tombstones`, and a torn one loses the
     // deletion INTENT, so the server never reclaims the body.
     "pending-attachment-tombstones",
+    // The chats + memory deletion queues (myne-md/myne#675 + myne-md/myne#697):
+    // the same read-modify-write schedule, the same torn-write cost (a lost
+    // deletion intent orphans the server copy permanently).
+    "pending-chats-tombstones",
+    "pending-memory-tombstones",
 ];
 
 /// How a path is stored on a container-backed store.
@@ -204,6 +217,16 @@ pub fn mode_for(path: &str) -> Mode {
     // re-arrives from a peer on the next cycle. Hex-name check (not a bare
     // directory check) so a stray file in `chats/` is not containerized.
     if parent == "chats" && is_32_hex(name) {
+        return Mode::SingleLive;
+    }
+    // Agent-memory entry files (`memories/<32-hex>`, MYX1, myne-md/myne#697):
+    // the chats twin in write shape: small files rewritten in place on every
+    // remember-overwrite, so `SingleLive` buys the torn-write → reads-as-absent
+    // property for one slot's cost. The sync merge treats a read-as-absent
+    // entry under a live catalog row as `EntryUnreadable` (§ 9.26.4
+    // report-don't-empty): the catalog row survives, the file re-arrives from
+    // a peer on the next cycle. Hex-name check, same strictness as above.
+    if parent == "memories" && is_32_hex(name) {
         return Mode::SingleLive;
     }
     Mode::Plain
@@ -1246,15 +1269,22 @@ mod tests {
             "vault.quickunlock",
             "vault.head-state",
             "vault.chats",
+            // Agent-memory catalog + personality (MYN1/MYZ1, myne-md/myne#697):
+            // rewritten on every mutation, so a torn write costs the roster
+            // or the voice. Same rule as vault.chats above.
+            "vault.agent-memory",
+            "vault.personality",
             "vault.meta-dirty",
             "sync-state.json",
             "sync-config.json",
             "pending-tombstones",
             // Task 86 found this one missing. It is the attachment twin of
-            // `pending-tombstones` — read-modify-written on the same schedule —
+            // `pending-tombstones`: read-modify-written on the same schedule,
             // and a torn one loses the deletion INTENT, so the server never
             // reclaims the body (`sync-protocol.md` §11.4).
             "pending-attachment-tombstones",
+            "pending-chats-tombstones",
+            "pending-memory-tombstones",
         ] {
             assert!(
                 mode_for(&format!("/myne/vaults/019f/{name}")) == Mode::Doubled,

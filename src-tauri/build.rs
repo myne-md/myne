@@ -449,6 +449,23 @@ fn main() {
                 .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
+            "memory",
+            // myne-md/myne#697: the agent-memory + personality store
+            // (vault.agent-memory MYN1 + memories/<id> MYX1 +
+            // vault.personality MYZ1). Each of the six commands needs its
+            // matching `commands.allow` entry in
+            // `permissions/memory/default.toml` or the ACL resolver never
+            // authorizes the `plugin:memory|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "memory_list",
+                "memory_read",
+                "memory_write",
+                "memory_delete",
+                "personality_read",
+                "personality_write",
+            ]),
+        )
+        .plugin(
             "chats",
             // myne-md/myne#675: the AI conversations store (vault.chats MYM1
             // catalog + chats/<id-hex> MYJ1 per-conversation files). Each of

@@ -331,6 +331,17 @@ pub async fn clear_device_local_sync(
         Err(IoFailureKind::NotFound) => {}
         Err(kind) => return Err(kind.into()),
     }
+    // The chats + memory deletion queues (myne-md/myne#675 + myne-md/myne#697)
+    // are the same stale intent: a queued id names a server copy under the
+    // OLD enrollment's baseline, so replaying it after re-enroll would
+    // tombstone a live server record.
+    for queue in ["pending-chats-tombstones", "pending-memory-tombstones"] {
+        match io.remove_file(&dir.join(queue)).await {
+            Ok(()) => {}
+            Err(IoFailureKind::NotFound) => {}
+            Err(kind) => return Err(kind.into()),
+        }
+    }
     match io.remove_dir_all(&dir.join("conflicts")).await {
         Ok(()) => {}
         Err(IoFailureKind::NotFound) => {}

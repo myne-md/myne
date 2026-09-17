@@ -290,7 +290,8 @@
     "    suite runs WebKitGTK on Linux and mobile's Playwright tier drives its React",
     "    tree against a mocked Tauri IPC, so neither produces a real prefs write",
     "    arriving over sync, nor observes which side of the prefs merge each field",
-    "    lands on. 10 minutes on ios and android, which is the whole of 9822 -> 9842."
+    "    lands on. 10 minutes on ios and android, which is the whole of 9822 -> 9842.",
+    "CEILING RAISED 10655 -> 10675 by myne-md/myne#697, in the sanctioned direction: a new surface that genuinely needs a human. What added the minutes, named so the raise is an argument: the agent-memory surface (settings Memory section + chat-header popover + turn-end marker) on the two desktop WebViews the automated lane never drives, 10 minutes on desktop-macos and desktop-windows, core. The E2E scenario (task 10) covers the same flow on desktop-linux; the macOS/Windows renderings plus the OS-credential-store unlock path are unexercised anywhere else, the same shape as the #675 conversation-history raise. Both items are core, so gatedMinutes rises by the same 20."
   ],
   "$comment2": [
     "CEILING RAISED 9822 -> 9846 by myne-md/myne#456, in the sanctioned direction.",
@@ -466,6 +467,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10655,
-  "gatedMinutes": 3817
+  "totalMinutesCeiling": 10675,
+  "gatedMinutes": 3837
 }

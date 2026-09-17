@@ -668,8 +668,15 @@ impl RemoteEngine {
         cancelled: &super::cancellable_io::CancelledFn,
         max_output_tokens: Option<u32>,
     ) -> Result<String, EngineError> {
-        self.post_and_parse(system, messages, on_token, cancelled, max_output_tokens)
-            .map(|(text, _truncated)| text)
+        self.post_and_parse(
+            system,
+            messages,
+            on_token,
+            cancelled,
+            max_output_tokens,
+            max_output_tokens.is_some(),
+        )
+        .map(|(text, _truncated)| text)
     }
 
     /// The body of [`Self::chat_with`], returning the truncation flag its
@@ -686,15 +693,20 @@ impl RemoteEngine {
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
         cancelled: &super::cancellable_io::CancelledFn,
         max_output_tokens: Option<u32>,
+        cache_system: bool,
     ) -> Result<(String, bool), EngineError> {
         let model = self.model()?;
         let (provider, key, transport) = self.ready(cancelled)?;
-        // The ceiling and the cache marker travel together because they mark the
-        // same thing: an agent request, whose system message is
-        // `prompt::system_instructions` and carries no note content. Deriving
-        // one from the other rather than taking a second parameter keeps them
-        // from drifting apart into a request that caches note text.
-        let cache_system = max_output_tokens.is_some();
+        // The ceiling and the cache marker NO LONGER travel together, and the
+        // reason is the agent-memory block (myne-md/myne#697): the agent
+        // system message used to be `prompt::system_instructions` and nothing
+        // else, so deriving the marker from the ceiling kept a request that
+        // caches note text unstatable. The system turn now carries
+        // note-derived memory as an `UntrustedNote` span, so the agent arm
+        // passes `false` explicitly below while keeping its ceiling. A marker
+        // derived from the ceiling here would re-ask the provider to retain
+        // that memory: the exact request `design-notes/ai/0555` was
+        // corrected to stop making.
         let body =
             provider.build_chat_body(&model, system, messages, max_output_tokens, cache_system);
         let raw = transport
@@ -833,12 +845,17 @@ impl Engine for RemoteEngine {
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
         cancelled: &super::cancellable_io::CancelledFn,
     ) -> Result<AgentReply, EngineError> {
+        // Ceiling yes, cache marker no: the system turn carries note-derived
+        // memory (myne-md/myne#697), so asking the provider to retain it as a
+        // cache prefix is the request `design-notes/ai/0555` forbids. The
+        // cost is a full-price system turn on every iteration.
         self.post_and_parse(
             system,
             messages,
             on_token,
             cancelled,
             Some(AGENT_MAX_OUTPUT_TOKENS),
+            false,
         )
         .map(|(text, truncated)| AgentReply { text, truncated })
     }
@@ -1353,13 +1370,12 @@ mod tests {
             "You edit the user's notes by proposing changes.",
             &turns(),
             Some(AGENT_MAX_OUTPUT_TOKENS),
-            true,
+            false,
         );
+        let agent_text = core::str::from_utf8(&agent).unwrap();
         assert!(
-            core::str::from_utf8(&agent)
-                .unwrap()
-                .contains("cache_control"),
-            "the agent's own instructions are host-written and are what the marker is for"
+            !agent_text.contains("cache_control"),
+            "the agent system turn carries note-derived memory and must never be marked: {agent_text}",
         );
 
         // Ollama receives no marker whatever the flag says: it serves the model
@@ -1401,9 +1417,9 @@ mod tests {
 
     /// **The wiring, read off the production source**, which is the only way to
     /// pin it without a live transport: `chat_agent_cancellable` is the one
-    /// place that decides an agent request asks for a ceiling AND for a cache
-    /// marker, and both were pinned only at the builder, where flipping either
-    /// argument changes nothing a test can see.
+    /// place that decides an agent request asks for a ceiling and NOT for a
+    /// cache marker, and both were pinned only at the builder, where flipping
+    /// either argument changes nothing a test can see.
     ///
     /// Source-text rather than behaviour, deliberately, and the precedent is
     /// `src-tauri/src/plugins/agent/adapters.rs`, which asserts the agent goes
@@ -1411,7 +1427,7 @@ mod tests {
     /// test has to follow the function if it moves; the alternative is a claim
     /// nothing checks, which this file has already paid for once.
     #[test]
-    fn the_agent_arm_is_wired_to_ask_for_a_ceiling_and_a_cache_marker() {
+    fn the_agent_arm_is_wired_to_ask_for_a_ceiling_and_no_cache_marker() {
         let src = include_str!("provider_registry.rs");
         let start = src
             .find("fn chat_agent_cancellable(")
@@ -1430,17 +1446,28 @@ mod tests {
              indistinguishable from a malformed one: {body}"
         );
 
-        // The cache marker rides on the same value, which is what stops the two
-        // drifting into a request that caches note text. Read at the one place
-        // that derives it.
+        // The ceiling rides on the agent arm, and the cache marker must NOT:
+        // the system turn carries note-derived memory, so a marker would ask
+        // the provider to retain it (myne-md/myne#697, `design-notes/ai/0555`).
+        // Read at the one place that passes both.
         let post = src
             .find("fn post_and_parse(")
             .expect("post_and_parse moved; this test has to follow it");
         let post_body = &src[post..];
         let post_end = post_body.find("\n    }").expect("body end") + 6;
         assert!(
-            post_body[..post_end].contains("let cache_system = max_output_tokens.is_some();"),
-            "the marker must be derived from the ceiling rather than set independently"
+            !post_body[..post_end].contains("let cache_system = max_output_tokens.is_some();"),
+            "the marker must not be derived from the ceiling: the agent has a ceiling and must not be marked"
+        );
+        let agent_fn = src
+            .find("fn chat_agent_cancellable(")
+            .expect("chat_agent_cancellable moved; this test has to follow it");
+        let agent_src = &src[agent_fn..];
+        let agent_end = agent_src.find("\n    }").expect("body end") + 6;
+        let agent_src = &agent_src[..agent_end];
+        assert!(
+            agent_src.contains("Some(AGENT_MAX_OUTPUT_TOKENS),") && agent_src.contains("false,"),
+            "the agent arm must pass its ceiling and an explicit no-cache flag: {agent_src}"
         );
     }
 

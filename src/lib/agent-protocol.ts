@@ -150,6 +150,9 @@ export interface AgentStepResult {
    *  produced this step. Shown on the approval screen with the count, never
    *  dropped silently. */
   excludedCount: number;
+  /** How many memory entries this step wrote (0 or 1). Mirrors the Rust
+   *  `AgentStepResult.memory_updated`; feeds the turn-end marker. */
+  memoryUpdated: number;
 }
 
 /** Why one edit did not land. Mirrors the Rust `EditRejection`. */

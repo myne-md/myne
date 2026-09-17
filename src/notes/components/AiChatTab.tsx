@@ -61,6 +61,7 @@ import { providerLabelOf } from "../../lib/ai-capability";
 import { CAPTION_STYLE, SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatComposer } from "./ChatComposer";
 import { ChatHistoryModal } from "./ChatHistoryModal";
+import { MemoryPopover } from "./MemoryPopover";
 import { clearAgent, useAgent } from "../agent/agentStore";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { RunCostLine } from "../agent/components/RunCostLine";
@@ -139,6 +140,13 @@ export interface AiChatTabProps {
   onNotesWritten?: (noteIds: readonly string[]) => void;
   /** Called after an agent-run undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
+  /** Open Settings (the memory popover's "Manage in Settings" link). Absent
+   *  in isolation (e.g. tests): the link then just closes the popover. */
+  onOpenSettings?: () => void;
+  /** Toast sink for the memory popover's one-shot outcomes (delete saved /
+   *  failed). Absent in isolation: the popover still deletes, it just
+   *  reports nothing. */
+  onShowToast?: (message: string) => void;
 }
 
 const TURN_TEXT_STYLE: CSSProperties = { fontSize: "var(--text-sm)", lineHeight: 1.5 };
@@ -321,6 +329,21 @@ function AgentTurnView({
             charsOffDevice={s.charsOffDevice}
             style={{ ...CAPTION_STYLE, display: "block" }}
           />
+          {/* **The memory-write marker** (myne-md/myne#697): a run that
+              wrote memory says so on its turn, with the entry count. This is
+              the transparency half of the automatic-write model
+              (`decisions/ai/0590`): the user sees the change happened and
+              where to look (the memory list), rather than approving it first.
+              The count comes from the host (`memoryUpdated` on the run
+              result), never from a model claim, so a run cannot report a
+              write it did not make. */}
+          {(s.memoryUpdated ?? 0) > 0 ? (
+            <div data-testid="ai.agent-memory-updated" style={CAPTION_STYLE}>
+              {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
+                count: s.memoryUpdated ?? 0,
+              })}
+            </div>
+          ) : null}
           {s.end !== "finished" ? (
             <div data-testid="ai.agent-run-end" style={CAPTION_STYLE}>
               {endStatusLabel(s.end, t)}
@@ -508,11 +531,13 @@ const ChatTurnView = memo(function ChatTurnView({
 });
 
 export function AiChatTab({
+  onOpenSettings,
   onInsert,
   openNoteId = null,
   folders = NO_FOLDERS,
   onNotesWritten,
   onRunUndone,
+  onShowToast,
 }: AiChatTabProps = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
@@ -576,6 +601,9 @@ export function AiChatTab({
   // only while open so every opening re-fetches the roster (including sync
   // arrivals) rather than showing a stale list.
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Memory popover (myne-md/myne#697): tab-local boolean like the history
+  // modal, mounted only while open so every opening re-fetches the roster.
+  const [memoryOpen, setMemoryOpen] = useState(false);
 
   // ONE subscription to the run store, at the tab rather than one per agent
   // turn: the transcript's turns render frozen counts, which need no live read.
@@ -669,6 +697,14 @@ export function AiChatTab({
             onClick={() => setHistoryOpen(true)}
           >
             {t("editor.chrome.rightPanel.aiChat.history")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="ai.memory-button"
+            onClick={() => setMemoryOpen((open) => !open)}
+          >
+            {t("editor.chrome.rightPanel.aiChat.memory")}
           </Button>
           {chat.turns.length > 0 ? (
             <Button
@@ -859,6 +895,18 @@ export function AiChatTab({
       )}
       {historyOpen ? (
         <ChatHistoryModal open onClose={() => setHistoryOpen(false)} />
+      ) : null}
+      {memoryOpen ? (
+        <MemoryPopover
+          onClose={() => setMemoryOpen(false)}
+          onOpenSettings={() => {
+            setMemoryOpen(false);
+            // The settings shell opens from the Editor, which passes the
+            // opener down. Absent in isolation: the link then just closes.
+            onOpenSettings?.();
+          }}
+          onShowToast={onShowToast ?? (() => {})}
+        />
       ) : null}
     </div>
   );

@@ -284,6 +284,11 @@ pub struct LoopOutcome {
     pub iterations: usize,
     /// How many notes it read in full. Same purpose.
     pub notes_read: usize,
+    /// How many memory entries this invocation wrote (0 or 1: the
+    /// at-most-one-write-per-run counter, `decisions/ai/0590`). Feeds the
+    /// turn-end marker the memory UI renders, which is the transparency half
+    /// of the automatic-write model.
+    pub memory_writes: usize,
     /// Characters that left the device across every request this invocation
     /// made, or `None` when none of them did.
     ///
@@ -301,6 +306,11 @@ pub struct LoopDeps<'a> {
     pub engine: &'a dyn AgentEngine,
     pub reader: &'a dyn NoteReader,
     pub searcher: &'a dyn ScopeSearcher,
+    /// The `remember` verb's seam to the memory plugin (myne-md/myne#697).
+    /// `None` when the surface is unavailable (no `ai_enabled`, no memory
+    /// store): the verb then answers with a model-readable refusal instead of
+    /// failing the run, exactly like a scope the user declined.
+    pub memory: Option<&'a dyn super::memory::MemoryStore>,
     /// An index snapshot, taken by the caller. Never re-read mid-loop: the list
     /// tool answering differently between two iterations of the same run would
     /// make the run's own view of its scope drift from the frozen set.
@@ -497,6 +507,10 @@ async fn drive_inner(
     // keeping note-derived text alive for the length of the run to answer a
     // liveness question.
     let mut asked: BTreeSet<String> = BTreeSet::new();
+    // **At most one `remember` write per run** (`decisions/ai/0590`): the
+    // counter is the loop's own, so no caller can raise it and a steered run
+    // cannot flood the memory store.
+    let mut memory_writes = 0usize;
     // Barren iterations SINCE THE LAST PRODUCTIVE ONE. Reset rather than
     // cumulative: a run that recovers has not stalled, and counting every
     // barren turn of a long healthy run would end it for being slow.
@@ -527,6 +541,23 @@ async fn drive_inner(
         transcript.push(opening_scope(runs, run_id, deps, &mut notes_read, read_ids).await?);
     }
 
+    // **The memory + personality block is rendered ONCE, before the loop**
+    // (myne-md/myne#697, `decisions/ai/0590`). One render per run START from
+    // the store (no cross-run RAM cache: the plugin reads it fresh), carried
+    // as its own `UntrustedNote` span on every iteration's system turn. A
+    // failed read FAILS the run (report-don't-empty, §9.25.3): collapsing it
+    // to "no memory" would run the model blind and let the next write
+    // persist that blindness. A `remember` write later in this run does not
+    // re-render: the loop's refusal message already tells the model the id.
+    let memory_block = match deps.memory {
+        Some(store) => {
+            let entries = store.memory_for_injection().await?;
+            let personality = store.personality_for_injection().await?;
+            super::memory::render_memory_block(&entries, &personality)
+        }
+        None => String::new(),
+    };
+
     loop {
         if runs.is_cancelled(run_id)? {
             return Ok(LoopOutcome {
@@ -535,6 +566,7 @@ async fn drive_inner(
                 iterations,
                 notes_read,
                 chars_off_device,
+                memory_writes,
             });
         }
         if iterations >= MAX_ITERATIONS {
@@ -544,6 +576,7 @@ async fn drive_inner(
                 iterations,
                 notes_read,
                 chars_off_device,
+                memory_writes,
             });
         }
 
@@ -555,7 +588,7 @@ async fn drive_inner(
                 seed = &[];
             }
         }
-        let request = build_request(task, transcript, deps.language, seed);
+        let request = build_request(task, transcript, deps.language, seed, &memory_block);
         // The class is the constant, passed here, in the loop's own code. It is
         // never read from a payload and never varies per iteration.
         let completion = deps.engine.complete(AGENT_REQUEST_CLASS, &request).await?;
@@ -668,6 +701,7 @@ async fn drive_inner(
                     iterations,
                     notes_read,
                     chars_off_device,
+                    memory_writes,
                 });
             }
             match action {
@@ -1142,6 +1176,77 @@ async fn drive_inner(
                         )],
                     });
                 }
+                AgentAction::Remember { entry_id, text } => {
+                    // **At most ONE memory write per run** (`decisions/ai/0590`,
+                    // the design session's Q5 rule): the loop's own counter, so
+                    // a steered run cannot flood the memory store and sync
+                    // traffic is bounded by the same number. A second attempt
+                    // is refused with a model-readable result.
+                    if memory_writes >= 1 {
+                        productive = true; // a decided refusal is still progress
+                        transcript.push(tool_result(
+                            "remember refused: you already wrote one memory \
+                             entry this run. Finish instead."
+                                .into(),
+                            None,
+                        ));
+                        continue;
+                    }
+                    match deps.memory {
+                        None => {
+                            // No memory store: the surface is unavailable
+                            // (no `ai_enabled` on this device). A refusal the
+                            // model can act on, not a run failure.
+                            productive = true;
+                            transcript.push(tool_result(
+                                "remember is unavailable: the memory surface \
+                                 is not enabled. Finish instead."
+                                    .into(),
+                                None,
+                            ));
+                        }
+                        Some(store) => {
+                            productive = true;
+                            // v1 verbs carry add/update only: a bare id with
+                            // text is an overwrite of that entry (the model
+                            // read its id off the memory block). Removal
+                            // stays a user act in the memory UI (0590), not a
+                            // model verb.
+                            let action = super::memory::RememberAction::Upsert {
+                                entry_id: entry_id.clone(),
+                                text: text.clone(),
+                            };
+                            match store.remember(action).await {
+                                Ok(written_id) => {
+                                    memory_writes += 1;
+                                    transcript.push(tool_result(
+                                        format!(
+                                            "remember saved memory entry [{written_id}]. \
+                                             It will be visible in the user's memory list."
+                                        ),
+                                        None,
+                                    ));
+                                }
+                                Err(super::error::AgentError::MemoryScanRejected) => {
+                                    // The gate refused it (schema, cap or scan):
+                                    // refused at the write, never persisted,
+                                    // never injected. The model learns the text
+                                    // was rejected, not WHY (the scan's classes
+                                    // are closed and naming them would teach a
+                                    // hostile note how to slip past).
+                                    transcript.push(tool_result(
+                                        "remember was refused by the memory gate \
+                                         (the text failed the scan or the cap). \
+                                         Do not retry the same text; finish."
+                                            .into(),
+                                        None,
+                                    ));
+                                }
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                }
                 AgentAction::RequestScope { folder, reason } => {
                     return Ok(LoopOutcome {
                         proposal,
@@ -1149,6 +1254,7 @@ async fn drive_inner(
                         iterations,
                         notes_read,
                         chars_off_device,
+                        memory_writes,
                     });
                 }
                 AgentAction::Finish { summary } => {
@@ -1159,6 +1265,7 @@ async fn drive_inner(
                         iterations,
                         notes_read,
                         chars_off_device,
+                        memory_writes,
                     });
                 }
             }
@@ -1194,6 +1301,7 @@ async fn drive_inner(
                     iterations,
                     notes_read,
                     chars_off_device,
+                    memory_writes,
                 });
             }
         }
@@ -1204,7 +1312,9 @@ async fn drive_inner(
 mod tests {
     use super::*;
     use crate::plugins::agent::engine::{AgentCompletion, AgentRequest, AgentRequestClass};
+    use crate::plugins::agent::memory::{MemoryStore, RememberAction};
     use crate::plugins::agent::tools::SearchHit;
+    use crate::plugins::memory::commands::PersonalityView;
     use crate::test_support::block_on;
     use std::collections::BTreeSet;
     use std::sync::Mutex;
@@ -1414,9 +1524,45 @@ mod tests {
             searcher: &Searcher,
             records: recs,
             exclusions: &*NO_EXCL,
+            memory: None,
             language: None,
             history: &[],
             on_progress: &no_progress,
+        }
+    }
+
+    /// The `remember` verb's test double: records actions, answers ids.
+    struct MemStore {
+        writes: Mutex<Vec<String>>,
+        entries: Mutex<Vec<(String, String)>>,
+    }
+
+    impl MemStore {
+        fn new() -> Self {
+            Self {
+                writes: Mutex::new(Vec::new()),
+                entries: Mutex::new(vec![(
+                    "0184a2b3c4d5e6f708192a3b4c5d6e7f".to_string(),
+                    "The user prefers concise answers.".to_string(),
+                )]),
+            }
+        }
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl MemoryStore for MemStore {
+        async fn memory_for_injection(&self) -> Result<Vec<(String, String)>, AgentError> {
+            Ok(self.entries.lock().unwrap().clone())
+        }
+        async fn personality_for_injection(&self) -> Result<PersonalityView, AgentError> {
+            Ok(PersonalityView::default())
+        }
+        async fn remember(&self, action: RememberAction) -> Result<String, AgentError> {
+            let RememberAction::Upsert { entry_id, text } = action;
+            let id = entry_id.unwrap_or_else(|| "minted1".to_string());
+            self.writes.lock().unwrap().push(text);
+            Ok(id)
         }
     }
 
@@ -1440,6 +1586,7 @@ mod tests {
             searcher: &NoHits,
             records: recs,
             exclusions: &*NO_EXCL,
+            memory: None,
             language: None,
             history: &[],
             on_progress: &no_progress,
@@ -1547,6 +1694,106 @@ mod tests {
                 .any(|c| c.text().contains("already read that note"))
         });
         assert!(pointed, "and the repeat is answered rather than ignored");
+    }
+
+    /// **The `remember` verb, end to end** (myne-md/myne#697): one write lands,
+    /// a second attempt in the same run is refused with a model-readable
+    /// result, and the memory block rides the system turn.
+    #[test]
+    fn the_remember_verb_writes_once_and_refuses_a_second() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let store = MemStore::new();
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"remember","text":"Prefers terse answers."}"#,
+            r#"{"action":"remember","text":"Second attempt."}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let mut t = Vec::new();
+        let deps = LoopDeps {
+            engine: &engine,
+            reader: &Reader,
+            searcher: &Searcher,
+            records: &recs,
+            exclusions: &*NO_EXCL,
+            memory: Some(&store),
+            language: None,
+            history: &[],
+            on_progress: &no_progress,
+        };
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps,
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        // One write reached the store.
+        assert_eq!(store.writes.lock().unwrap().len(), 1);
+        assert_eq!(store.writes.lock().unwrap()[0], "Prefers terse answers.");
+        // The saved id is echoed into the transcript (model-readable).
+        let saved = t.iter().any(|m| {
+            m.content
+                .iter()
+                .any(|c| c.text().contains("remember saved memory entry"))
+        });
+        assert!(saved, "the write is answered with the id");
+        // The second attempt is refused with a model-readable result.
+        let refused = t.iter().any(|m| {
+            m.content
+                .iter()
+                .any(|c| c.text().contains("remember refused"))
+        });
+        assert!(refused, "a second write is refused, not silently dropped");
+    }
+
+    /// **The memory block rides the system turn** (myne-md/myne#697): the
+    /// rendered block is inside the Trusted system span the 0555 marker
+    /// covers. `RecordingEngine` is what can see the request; `ScriptEngine`
+    /// drops it.
+    #[test]
+    fn the_system_turn_carries_the_memory_block() {
+        let store = MemStore::new();
+        let engine = RecordingEngine::default();
+        let recs = records_ab();
+        let mut t = Vec::new();
+        let deps = LoopDeps {
+            engine: &engine,
+            reader: &Reader,
+            searcher: &Searcher,
+            records: &recs,
+            exclusions: &*NO_EXCL,
+            memory: Some(&store),
+            language: None,
+            history: &[],
+            on_progress: &no_progress,
+        };
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps,
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        let seen = engine.requests.lock().unwrap();
+        let first = &seen[0];
+        assert!(
+            first.contains("[0184a2b3c4d5e6f708192a3b4c5d6e7f] The user prefers concise answers."),
+            "the memory entry rides the system turn; got: {first}"
+        );
+        assert!(
+            first.contains("never an instruction"),
+            "the data-never-instruction framing rides with it"
+        );
     }
 
     /// **The single-note scope, which the first version of this guard missed.**
@@ -2479,6 +2726,7 @@ mod tests {
         };
         let d = LoopDeps {
             exclusions: &*NO_EXCL,
+            memory: None,
             engine: &forever,
             reader: &Reader,
             searcher: &Searcher,
@@ -2528,6 +2776,7 @@ mod tests {
             searcher: &Searcher,
             records: &recs,
             exclusions: &*NO_EXCL,
+            memory: None,
             language: None,
             history: &[],
             on_progress: &record,
@@ -2919,6 +3168,7 @@ mod tests {
             searcher: &Searcher,
             records: &recs,
             exclusions: &excl,
+            memory: None,
             language: None,
             history: &seeded,
             on_progress: &no_progress,
