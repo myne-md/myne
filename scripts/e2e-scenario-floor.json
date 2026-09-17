@@ -637,10 +637,12 @@
     "persistence), both inside `aiDescribe` and both executing where CI sets",
     "MYNE_E2E_AI=1.",
     "",
-    "This is arithmetic on the file's scenario count, not a fresh CI measurement:",
-    "359 was the develop base and the new file executes two scenarios under the",
-    "AI gate. The pre-release E2E run (`.woodpecker/e2e.yml`, manual) is what",
-    "confirms the number; if that run executes a different count, this floor",
-    "moves to what it measured rather than keeping 361."
+    "This is measured, not arithmetic: mem1+mem2 ran green 3x consecutive",
+    "isolated in one warm container (2026-09-17, tip 10d8b4a6, AI lane with",
+    "MYNE_E2E_AI=1 plus the local-inference-stub build; mem1 was 0/12 red",
+    "before the popover viewport-cap fix and 3/3 green after). Log:",
+    "/Users/omer/mem-697-rerun.log. 359 was the develop base and the new file",
+    "executes two scenarios under the AI gate, so the floor holds 361 on",
+    "measured runs rather than counting."
   ]
 }
