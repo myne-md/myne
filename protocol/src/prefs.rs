@@ -2368,7 +2368,7 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"reminders_enabled\":false,");
     }
 
-    // ribbon_items (canonical key 'ribbon_items' — after reminders_enabled
+    // ribbon_items (canonical key 'ribbon_items': after reminders_enabled
     // ['re' < 'ri'], before ribbon_visible, myne-md/myne#699). `Option` so
     // `Some([])` (a deliberately emptied rail) is EMITTED as `[]` while `None`
     // (never configured) is omitted, which is what lets the client seed its
@@ -2379,7 +2379,7 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // ribbon_visible (canonical key 'ribbon_visible' — after ribbon_items
+    // ribbon_visible (canonical key 'ribbon_visible': after ribbon_items
     // ['ribbon_i' < 'ribbon_v'], before right_panel_active_tab ['rib' < 'rig'],
     // myne-md/myne#699). Default `true`, so only a `false` is written; an
     // untouched vault stays byte-identical.
@@ -3283,7 +3283,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // omit-when-default rule, so a pre-MYND-618 blob parses unchanged.
     let reminders_enabled =
         parse_optional_bool_field(rest, &mut cursor, b"\"reminders_enabled\":")?.unwrap_or(true);
-    // ribbon_items + ribbon_visible (keys 'ribbon' — after reminders_enabled
+    // ribbon_items + ribbon_visible (keys 'ribbon': after reminders_enabled
     // ['re' < 'ri'], before right_panel_* ['rib' < 'rig'], myne-md/myne#699).
     // `ribbon_items` uses the Option-returning array parse so ABSENT (never
     // configured) stays distinguishable from PRESENT-but-EMPTY (deliberately

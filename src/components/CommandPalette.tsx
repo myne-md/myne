@@ -218,6 +218,13 @@ const EMPTY_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+const PIN_ERROR_STYLE: CSSProperties = {
+  padding: "8px 16px",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--danger)",
+};
+
 // One-line match-context snippet under a note-body result (so the user sees
 // WHAT matched, not just "matched in body"). Mono + muted; the matched span
 // lifts to full foreground with a soft highlight.
@@ -596,16 +603,22 @@ export function CommandPalette({
     [ctx.prefs.ribbon_items, ribbonEligible],
   );
   const pinnedSet = useMemo(() => new Set(ribbonPinned), [ribbonPinned]);
+  // A failed pin write changes nothing (the palette reads the same live prefs
+  // as the rail, so only a successful write re-renders), which reads as
+  // "nothing happened" unless it is said out loud. The Appearance roster is
+  // not open to say it, so the palette carries its own one-line error.
+  const [pinError, setPinError] = useState<string | null>(null);
   const togglePin = useCallback(
     (id: string) => {
       const next = pinnedSet.has(id)
         ? ribbonPinned.filter((x) => x !== id)
         : [...ribbonPinned, id];
-      // Best-effort: the palette has no error surface. The Appearance roster is
-      // where a failed prefs write is surfaced and rolled back.
-      void setRibbonItems(next).catch(() => {});
+      void setRibbonItems(next).then(
+        () => setPinError(null),
+        () => setPinError(t("commandPalette.pinError")),
+      );
     },
-    [pinnedSet, ribbonPinned],
+    [pinnedSet, ribbonPinned, t],
   );
 
   // Clamp selected index when row count changes.
@@ -864,6 +877,11 @@ export function CommandPalette({
             })
           )}
         </div>
+        {pinError !== null && (
+          <div style={PIN_ERROR_STYLE} role="alert" data-testid="palette.pin-error">
+            {pinError}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -937,6 +955,13 @@ function renderRow(
                 e.preventDefault();
                 e.stopPropagation();
                 togglePin(row.action.id);
+              }}
+              onClick={(e) => {
+                // Keyboard activation (Enter/Space on the focused toggle)
+                // fires click with detail 0. A mouse click already toggled on
+                // mousedown above, so handling it again here would pin and
+                // immediately unpin.
+                if (e.detail === 0) togglePin(row.action.id);
               }}
               style={{
                 display: "inline-flex",

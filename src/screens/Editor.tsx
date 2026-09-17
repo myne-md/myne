@@ -3724,9 +3724,12 @@ function CommandPaletteHost({
   useEffect(() => {
     ribbonCommands.run = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
-      if (action !== undefined && action.visibility(commandCtx) === "show") {
-        void action.run(commandCtx);
-      }
+      if (action === undefined || action.visibility(commandCtx) !== "show") return;
+      // A rail click that fails must say so: the button already acted pressed.
+      // `run` may be sync or async; normalizing lets one catch cover both.
+      void Promise.resolve(action.run(commandCtx)).catch(() => {
+        setToast({ message: t("editor.ribbon.runFailed"), variant: "error" });
+      });
     };
     ribbonCommands.visibility = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
@@ -3736,7 +3739,7 @@ function CommandPaletteHost({
       ribbonCommands.run = undefined;
       ribbonCommands.visibility = undefined;
     };
-  }, [commandCtx]);
+  }, [commandCtx, setToast, t]);
   // Stable note predicates (fresh identity only when the cache changes): they
   // sit in the palette's snippet-effect deps, and an inline arrow's per-render
   // identity would re-run that effect - re-issuing its `note_read` decrypts -

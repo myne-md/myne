@@ -17,7 +17,7 @@ import { ERROR_STYLE } from "./panel-styles";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { prefsRead, setRibbonItems, setRibbonVisible } from "../../lib/prefs";
 import { resolveRibbonItems, ribbonEligibleIds } from "../../notes/ribbonItems";
-import { reorderByDrop } from "../../notes/barItemsOrder";
+import { reorderByDrop, moveBarItem } from "../../notes/barItemsOrder";
 
 const SECTION_STYLE: CSSProperties = {
   position: "relative",
@@ -151,7 +151,8 @@ export function RibbonCustomizeSettings() {
     };
   }, [eligible]);
 
-  // Click-away closes the dropdown.
+  // Click-away closes the dropdown. Escape closes it too and returns focus
+  // to the Add button that opened it, so keyboard users are not dropped.
   useEffect(() => {
     if (!pickerOpen) return;
     function onDown(e: MouseEvent) {
@@ -159,8 +160,24 @@ export function RibbonCustomizeSettings() {
         setPickerOpen(false);
       }
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setPickerOpen(false);
+        // The Add button is a shared primitive with no ref forwarding; reach
+        // it by its testid, which doubles as the stable selector.
+        sectionRef.current
+          ?.querySelector<HTMLButtonElement>(
+            '[data-testid="settings.ribbon-customize.add"]',
+          )
+          ?.focus();
+      }
+    }
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [pickerOpen]);
 
   function persistOrder(next: string[]) {
@@ -193,6 +210,15 @@ export function RibbonCustomizeSettings() {
     }
     setDragId(null);
     setDropAt(null);
+  }
+
+  function onRowKeyDown(e: React.KeyboardEvent, id: string) {
+    // Keyboard reorder fallback, the rail's own Alt+Arrow contract
+    // (LeftRibbon.tsx): the roster lists the whole order, so the full order
+    // is both sequences moveBarItem takes.
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    persistOrder(moveBarItem(order, order, id, e.key === "ArrowUp" ? -1 : 1));
   }
 
   function persistVisible(next: boolean) {
@@ -271,11 +297,11 @@ export function RibbonCustomizeSettings() {
           </div>
         )}
       </div>
-      <div style={LIST_STYLE} data-testid="settings.ribbon-customize.list">
+      <div style={LIST_STYLE} role="list" data-testid="settings.ribbon-customize.list">
         {orderLoaded && order.length === 0 && (
           <p style={EMPTY_STYLE}>{t("settings.ribbonCustomize.empty")}</p>
         )}
-        {order.map((id) => {
+        {order.map((id, index) => {
           const action = byId.get(id);
           if (action === undefined) return null;
           const dropEdge = dropAt?.id === id ? dropAt.edge : null;
@@ -284,6 +310,14 @@ export function RibbonCustomizeSettings() {
               key={id}
               style={{ ...ROW_STYLE, opacity: dragId === id ? 0.4 : 1 }}
               draggable
+              tabIndex={0}
+              role="listitem"
+              aria-label={t("settings.ribbonCustomize.position", {
+                name: action.label,
+                index: index + 1,
+                total: order.length,
+              })}
+              onKeyDown={(e) => onRowKeyDown(e, id)}
               onDragStart={() => setDragId(id)}
               onDragEnd={() => {
                 setDragId(null);
@@ -291,6 +325,7 @@ export function RibbonCustomizeSettings() {
               }}
               onDragOver={(e) => onDragOver(e, id)}
               onDrop={() => onDrop(id)}
+              data-testid="settings.ribbon-customize.row"
               data-item-id={id}
             >
               {dropEdge === "before" && <span aria-hidden style={{ ...DROP_STYLE, top: -1 }} />}

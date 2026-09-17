@@ -34,6 +34,8 @@ permissions = [
   "allow-set-item-order",
   "allow-set-hidden-bar-items",
   "allow-set-bar-items-order",
+  "allow-set-ribbon-items",
+  "allow-set-ribbon-visible",
   "allow-set-favorites",
   "allow-set-editor-layout",
   "allow-set-theme",
@@ -150,6 +152,22 @@ commands.allow = ["set_hidden_bar_items"]
 identifier = "allow-set-bar-items-order"
 description = "Allow invoking prefs:set_bar_items_order (Slot::Unlocked-gated setter for the bar_items_order sequence — the bottom-bar item display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
 commands.allow = ["set_bar_items_order"]
+
+# Left ribbon (myne-md/myne#699): write setters for the ribbon_items sequence
+# (the pinned command ids) and the ribbon_visible flag. Shared `myne-core`
+# bodies; mobile registers them so a synced rail both clients wrote stays
+# writable here. Inherits the same main-window-only invariant as the other
+# allow-set-* permissions. Atomic-writes vault.prefs with no native
+# side-effect; non-load-bearing.
+[[permission]]
+identifier = "allow-set-ribbon-items"
+description = "Allow invoking prefs:set_ribbon_items (Slot::Unlocked-gated setter for the ribbon_items sequence: the left ribbon's pinned command ids; writing marks the rail configured so an emptied list stays empty; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ribbon_items"]
+
+[[permission]]
+identifier = "allow-set-ribbon-visible"
+description = "Allow invoking prefs:set_ribbon_visible (Slot::Unlocked-gated setter for the ribbon_visible flag: whether this device shows the left ribbon; default true, omitted unless false; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ribbon_visible"]
 
 [[permission]]
 identifier = "allow-set-favorites"
