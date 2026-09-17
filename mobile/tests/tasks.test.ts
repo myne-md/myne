@@ -1,6 +1,6 @@
 // The mobile task data layer and the shared-module consumption (MYND-620 task 2).
 //
-// The point of these tests is not that mobile filters tasks correctly — the
+// The point of these tests is not that mobile filters tasks correctly - the
 // desktop already proves that, and mobile does not have its own copy to prove.
 // The point is that **there is no second copy**: the write sequence, the filter
 // predicates and the panel all come from the shared modules, and the things
@@ -89,7 +89,7 @@ describe("the vault-wide fetch", () => {
     // struct is the on-disk `MYI1` payload). `VaultTask` promises
     // optional-or-absent, every shared consumer writes the check that promise
     // invites, and casting the rows here instead of decoding them is what made
-    // that promise false on this client — the Tasks tab crashed on `.slice` of a
+    // that promise false on this client - the Tasks tab crashed on `.slice` of a
     // null under the All filter (myne-md/myne-mobile#36).
     invoke.mockResolvedValueOnce([
       { ...lineTask(), due: null, remind: null, repeat: null, priority: null, done: null },
@@ -116,7 +116,7 @@ describe("the write goes through the shared sequence, with mobile IO", () => {
     expect(noteId).toBe("n1");
     expect(body).toBe("intro\n- [x] water the plants\noutro");
     // The content-hash guard is what stops a sync pull-apply being clobbered.
-    // It is passed ALWAYS, not optionally — a checkbox flip is not
+    // It is passed ALWAYS, not optionally - a checkbox flip is not
     // idempotent-safe applied to a body the user has since edited.
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -156,7 +156,7 @@ describe("the write goes through the shared sequence, with mobile IO", () => {
     expect(createConflictCopy.mock.calls[0]![0]).toContain("- [x] water the plants");
   });
 
-  // A note-task has no line — the whole note is the task — so it goes through
+  // A note-task has no line - the whole note is the task - so it goes through
   // the frontmatter patcher instead.
   it("routes a note-task through the done: field, not line surgery", async () => {
     noteRead.mockResolvedValueOnce("---\nkind: task\ntitle: Ship it\n---\nbody");
@@ -180,7 +180,10 @@ describe("nothing about tasks is implemented twice", () => {
     const source = surface();
     expect(source).toContain('from "@myne/task-panel"');
     expect(source).toContain('from "@myne/task-filters"');
-    expect(source).toContain('from "@myne/task-scope"');
+    // The view model (filters + sort) is shared too; the mobile-only
+    // `TaskScopeStrip` was retired when folder/tag narrowing became one of the
+    // shared filter row's axes (myne-md/myne#656).
+    expect(source).toContain('from "@myne/task-view"');
     // No local predicate, comparator or date axis anywhere in the mobile tree.
     for (const forbidden of ["matchesFilter", "sortTasks", "overdueCount", "?? task.remind"]) {
       expect(source, `mobile must not restate ${forbidden}`).not.toContain(forbidden);
@@ -192,7 +195,7 @@ describe("nothing about tasks is implemented twice", () => {
     const source = data();
     expect(source).toContain('from "@myne/task-write"');
     expect(source).toContain('from "@myne/note-completion"');
-    // The sequence itself — the raw-line verification, the marker flip — must
+    // The sequence itself - the raw-line verification, the marker flip - must
     // not appear here. A second copy would drift on whichever step a reader
     // thought was incidental.
     for (const forbidden of ["flipMarker", "rawLine", "TaskWriteRefused"]) {
@@ -230,6 +233,7 @@ describe("nothing about tasks is implemented twice", () => {
       "@myne/task-panel",
       "@myne/task-filters",
       "@myne/task-scope",
+      "@myne/task-view",
       "@myne/task-write",
       "@myne/task-wire",
       "@myne/note-completion",

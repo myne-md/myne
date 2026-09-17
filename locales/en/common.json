@@ -254,8 +254,8 @@
       "sort": {
         "createdAsc": "Oldest first",
         "createdDesc": "Newest first",
-        "nameAsc": "Name A–Z",
-        "nameDesc": "Name Z–A"
+        "nameAsc": "Name A-Z",
+        "nameDesc": "Name Z-A"
       },
       "sortAriaLabel": "Sort attachments",
       "supportedFilesFilter": "Supported files",
@@ -1316,22 +1316,34 @@
     },
     "taskField": {
       "addAffordance": "Add task field",
+      "addTime": "Add time",
+      "clear": "Clear",
+      "dateGrid": "Choose a date",
+      "dateNext": "Next month",
+      "datePrev": "Previous month",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
       "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
       "menuEdit": "Edit {{field}}",
+      "selectField": "Select a field to add",
       "menuTitle": "Add field",
+      "noDate": "No date",
       "repeatNoAnchor": "This task has no date to repeat from, so it won't repeat. Add a due date to start it.",
       "repeatNeedsDate": "Needs a due date to repeat from",
+      "removeTime": "Remove time",
       "save": "Save",
       "skipOccurrence": "Skip this occurrence",
+      "timeHour": "Hour",
+      "timeMeridiem": "AM or PM",
+      "timeMinute": "Minute",
       "title": {
         "due": "Due date",
         "repeat": "Repeat",
         "priority": "Priority",
         "remind": "Reminder"
       },
-      "timeLabel": "Time (optional)",
       "invalidRemind": "Myne can't read this date, so it won't remind you."
     },
     "toolbar": {
@@ -3369,7 +3381,8 @@
         "text": "Text & display",
         "editing": "Editing",
         "writing": "Writing",
-        "features": "Features"
+        "features": "Features",
+        "tasks": "Tasks"
       },
       "preview": {
         "heading": "The quick brown fox",
@@ -3381,7 +3394,20 @@
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",
-      "enableArchiving": "Enable archiving"
+      "enableArchiving": "Enable archiving",
+      "taskChipColor": {
+        "accent": "Accent",
+        "danger": "Red",
+        "help": "The colour of a task chip's icon and label, on every task surface on this device.",
+        "label": "Task chip colour",
+        "muted": "Muted",
+        "sample": "Aug 1",
+        "theme": "Theme"
+      },
+      "taskChipIconOnly": {
+        "help": "Show a priority as its icon only, instead of the word.",
+        "label": "Icon-only priority"
+      }
     },
     "search": {
       "placeholder": "Search settings…",
@@ -3665,7 +3691,7 @@
       "echoProgress": "{{count}} of {{total}} characters so far.",
       "echoProgress_one": "{{count}} of {{total}} characters so far.",
       "echoProgress_other": "{{count}} of {{total}} characters so far.",
-      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0–9 or a–f. Colons, spaces and a leading “sha256:” are fine. Anything else is not part of it.",
+      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0-9 or a-f. Colons, spaces and a leading “sha256:” are fine. Anything else is not part of it.",
       "helpToggle": "Where do I find this fingerprint?",
       "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing: whatever could swap the certificate could swap that page too.",
       "helpFromServer": "On the machine running your server: openssl x509 -noout -fingerprint -sha256 -in <your certificate file>",
@@ -3820,6 +3846,15 @@
     }
   },
   "tasks": {
+    "axis": {
+      "due": "Due",
+      "folder": "Folder",
+      "note": "Note",
+      "priority": "Priority",
+      "sort": "Sort",
+      "status": "Status",
+      "tag": "Tag"
+    },
     "builder": {
       "any": "Any",
       "due": "Due",
@@ -3840,7 +3875,16 @@
       "filter": "Nothing here right now. Try another filter.",
       "rebuilding": "Reading your notes…",
       "scope": "No tasks in this folder or tag. Try widening the scope.",
+      "search": "No tasks match “{{query}}”.",
       "vault": "No tasks yet. Write “- [ ]” on a line in any note to make one."
+    },
+    "due": {
+      "any": "Any date",
+      "later": "Later",
+      "none": "No date",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
     },
     "filter": {
       "all": "All",
@@ -3848,7 +3892,53 @@
       "today": "Today",
       "upcoming": "Upcoming"
     },
+    "filters": {
+      "button": "Filters",
+      "clearAll": "Clear all",
+      "selectHint": "Select a filter to apply",
+      "title": "Filters"
+    },
     "noteTitle": "Tasks in this note",
+    "priority": {
+      "high": "High",
+      "highest": "Highest",
+      "low": "Low",
+      "lowest": "Lowest",
+      "medium": "Medium"
+    },
+    "section": {
+      "done": "Done",
+      "later": "Later",
+      "none": "No date",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
+    },
+    "sort": {
+      "due": "Due date",
+      "dueDesc": "Due date, latest first",
+      "note": "Note",
+      "priority": "Priority"
+    },
+    "status": {
+      "all": "All",
+      "done": "Done",
+      "undone": "Open"
+    },
+    "view": {
+      "allFolders": "All folders",
+      "allNotes": "All notes",
+      "anyPriority": "Any priority",
+      "anyTag": "Any tag",
+      "dueLabel": "Filter by due date",
+      "folderLabel": "Filter by folder",
+      "noteLabel": "Filter by note",
+      "priorityLabel": "Filter by priority",
+      "sortLabel": "Sort within sections",
+      "statusLabel": "Filter by completion",
+      "tagLabel": "Filter by tag",
+      "untitled": "Untitled"
+    },
     "query": {
       "dropped_one": "{{count}} clause Myne could not read",
       "dropped_other": "{{count}} clauses Myne could not read",
@@ -3870,6 +3960,10 @@
     "scope": {
       "allFolders": "All folders",
       "label": "Narrow by"
+    },
+    "search": {
+      "label": "Search tasks",
+      "placeholder": "Search tasks…"
     },
     "title": "Tasks"
   },
@@ -4464,7 +4558,7 @@
     "encryptingSubtitle": "Deriving your key with Argon2id. This takes a few seconds and can't be interrupted.",
     "phraseTitle": "Your recovery phrase",
     "phraseIntro": "Twenty-four words, in order. Write them on paper and store them somewhere safe.",
-    "showSecondHalf": "Show words 13–24",
+    "showSecondHalf": "Show words 13-24",
     "saveToFile": "Save to file",
     "writtenThemDown": "I've written them down",
     "typebackTitle": "Confirm your phrase",

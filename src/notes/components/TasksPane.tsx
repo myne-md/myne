@@ -1,76 +1,66 @@
-// The vault-wide task tab (MYND-616, task 4) and the note-scoped panel body
-// (task 5), as two thin wrappers over ONE `TaskListPanel`.
+// The vault-wide task tab (MYND-616, task 4; view redesigned for myne-md/myne#656)
+// and the note-scoped panel body (task 5), as two thin wrappers over ONE
+// `TaskListPanel`.
 //
 // They differ in exactly three things: which task list they hand down, the
-// `scope` they pass to the rows, and where their filter state lives. Everything
-// else — the four filters, the overdue count, the empty states, the row — is the
-// same component instance shape. That is the "literally one component with a
-// scope parameter" claim made concrete rather than asserted.
+// `rowScope` they pass, and where their view state lives. Everything else - the
+// sections, the filter row, the windowing, the rows - is the same component.
 //
-// The vault-wide tab keeps its filter and scope **with the tab** in the
-// workspace descriptor (task 9). The note-scoped panel keeps its filter in
-// component state: the right panel is not a tab strip and has no per-tab
-// descriptor to ride, and a panel filter that survived a restart would be a
-// preference — which this feature deliberately does not add.
+// The vault-wide tab keeps its view (filters + sort) **with the tab** in the
+// workspace descriptor. The note-scoped panel keeps it in component state: the
+// right panel is not a tab strip and has no per-tab descriptor to ride.
 
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { TaskListPanel } from "./TaskListPanel";
 import { toggleTaskSwallowingRefusal } from "../toggleTask";
-import { TASK_FILTERS, type TaskFilter } from "../taskFilters";
 import { useLocalToday } from "../useLocalToday";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
-import { EMPTY_SCOPE, type TaskScope } from "../taskScope";
+import { DEFAULT_TASK_VIEW, type TaskView } from "../taskView";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { useWorkspace } from "../workspaceContext";
 import { useSelectedNote } from "../sidebarState";
+import { requestRevealTask } from "../views/revealTaskSignal";
 import type { WorkspaceItem, PaneId } from "../workspaceState";
-
-/** A persisted filter name back to the closed union, defaulting on anything else. */
-function asFilter(raw: string | undefined): TaskFilter {
-  return (TASK_FILTERS as readonly string[]).includes(raw ?? "")
-    ? (raw as TaskFilter)
-    : "today";
-}
-
-/** The scope a persisted task tab carries, defaulting to the unset scope. */
-function asScope(raw: { folder?: string; tags?: readonly string[] } | undefined): TaskScope {
-  if (raw === undefined) return EMPTY_SCOPE;
-  return { folder: raw.folder ?? null, tags: raw.tags ?? [] };
-}
+import { taskViewOf } from "../workspaceState";
 
 /** The vault-wide task list, mounted as a pane body. */
 export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
   const ws = useWorkspace();
   const tasks = useLiveVaultTasks();
-  // myne#279: "today" follows the display timezone when one is set.
+  // myne#279: "today" follows the display timezone when one is set; myne#557:
+  // it must also tick at midnight, so it is a hook, not a memo on the zone.
   const { timeZone: zone } = useDateTimeDisplay();
-  // Not a `useMemo` on the zone: that re-runs when the ZONE changes and never
-  // when the DAY does, so a window left open across midnight kept yesterday's
-  // buckets (myne-md/myne#557).
   const today = useLocalToday(zone);
 
-  const persisted = item.kind === "tasks" ? item : undefined;
-  const filter = asFilter(persisted?.taskFilter);
-  const scope = asScope(persisted?.taskScope);
-
-  const onFilterChange = useCallback(
-    (next: TaskFilter) => ws.setTaskTabState(paneId, { filter: next }),
+  // Container-level, so closing and reopening the tab restores the filters.
+  // On a vault written before the container field existed, fall back to the
+  // tab's own persisted view instead of silently dropping it (myne-md/myne#656
+  // review).
+  const view = ws.taskViewIsSet ? ws.taskView : taskViewOf(item);
+  const onViewChange = useCallback(
+    (next: TaskView) => ws.setTaskViewState(paneId, next),
     [ws, paneId],
   );
   const onToggle = useCallback(
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
-  const onOpen = useCallback((task: VaultTask) => ws.openInFocused(task.noteId), [ws]);
+  const onOpen = useCallback(
+    (task: VaultTask) => {
+      // Open the note, then ask the focused pane to scroll to the task's line.
+      ws.openInFocused(task.noteId);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex, task.rawLine);
+    },
+    [ws],
+  );
 
   return (
     <TaskListPanel
       tasks={tasks}
-      scope={scope}
-      filter={filter}
+      view={view}
       today={today}
       rowScope="vault"
-      onFilterChange={onFilterChange}
+      onViewChange={onViewChange}
       onToggle={onToggle}
       onOpen={onOpen}
       testIdPrefix="tasks"
@@ -84,14 +74,13 @@ export function NoteTasksPanel(): ReactElement {
   const all = useLiveVaultTasks();
   const { selectedId } = useSelectedNote();
   const { timeZone: zone } = useDateTimeDisplay();
-  // Not a `useMemo` on the zone: that re-runs when the ZONE changes and never
-  // when the DAY does, so a window left open across midnight kept yesterday's
-  // buckets (myne-md/myne#557).
   const today = useLocalToday(zone);
-  const [filter, setFilter] = useState<TaskFilter>("all");
+  // A single-file view: showing completed and open together is the point, so the
+  // default status here is `all`, unlike the vault-wide tab's `undone`.
+  const [view, setView] = useState<TaskView>({ ...DEFAULT_TASK_VIEW, status: "all" });
 
   // Every record already carries its note, so narrowing needs no new query
-  // capability — the point task 5 makes about the two surfaces sharing data.
+  // capability - the point task 5 makes about the two surfaces sharing data.
   const tasks = useMemo(
     () => (selectedId === null ? [] : all.filter((t) => t.noteId === selectedId)),
     [all, selectedId],
@@ -101,17 +90,27 @@ export function NoteTasksPanel(): ReactElement {
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
+  const onOpen = useCallback(
+    (task: VaultTask) => {
+      // Make sure the note is open (it may not be, even when selected), then ask
+      // its pane to scroll to the line.
+      ws.openInFocused(task.noteId);
+      if (task.lineIndex !== null) requestRevealTask(task.noteId, task.lineIndex, task.rawLine);
+    },
+    [ws],
+  );
 
   return (
     <TaskListPanel
       tasks={tasks}
-      scope={EMPTY_SCOPE}
-      filter={filter}
+      view={view}
       today={today}
       rowScope="note"
-      onFilterChange={setFilter}
+      onViewChange={setView}
       onToggle={onToggle}
+      onOpen={onOpen}
       testIdPrefix="notePanel.tasks"
+      minimal
     />
   );
 }

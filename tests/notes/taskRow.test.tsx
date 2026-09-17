@@ -2,8 +2,8 @@
 //
 // The shared task row (MYND-616 task 1).
 //
-// Three of the four acceptance criteria are structural — where the component
-// lives, which tokens it reuses, whether it takes a scope parameter — and the
+// Three of the four acceptance criteria are structural - where the component
+// lives, which tokens it reuses, whether it takes a scope parameter - and the
 // tests that can see those are the ones that assert the *consequences*: the row
 // renders identical chip geometry to the editor's inline chip, and the same
 // component produces two different layouts from `scope` alone.
@@ -24,7 +24,7 @@ import {
 
 // myne#279: the row prints its date through the shared formatter now, so pin an
 // explicit format rather than depending on the runner's locale. That the raw
-// stored string is NO LONGER what lands on screen is the point of the change —
+// stored string is NO LONGER what lands on screen is the point of the change -
 // it used to emit raw ISO and silently drop any time.
 beforeEach(() => setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "iso" }));
 afterEach(() => __resetDateTimeDisplayForTest());
@@ -69,7 +69,7 @@ describe("everything the row must show", () => {
 
   it("files a reminder-only task on its reminder date", () => {
     // Without the fallback a task carrying only a reminder reads as undated and
-    // vanishes from every dated view — the case absolute reminders exist for.
+    // vanishes from every dated view - the case absolute reminders exist for.
     const { host, cleanup } = render(
       <TaskRow
         task={{ ...TASK, due: undefined, remind: "2026-08-05" }}
@@ -89,11 +89,11 @@ describe("everything the row must show", () => {
     cleanup();
   });
 
-  it("treats a wire `null` date as undated — no chip, and no crash", () => {
+  it("treats a wire `null` date as undated - no chip, and no crash", () => {
     // `TaskRowData` promises optional-or-absent, but the `MYI1` row serializes
     // `Option<String>` as `null`, so a client whose fetch skipped the
     // `taskWire.ts` decoder hands one down. `undefined ?? null` is `null`, which
-    // a `=== undefined` guard misses — the row then slices a non-string and
+    // a `=== undefined` guard misses - the row then slices a non-string and
     // takes the whole subtree down (myne-md/myne-mobile#36). Rendering at all is
     // half of what this asserts.
     const { host, cleanup } = render(
@@ -120,7 +120,7 @@ describe("scope decides context, not the caller", () => {
     vaultScoped.cleanup();
   });
 
-  it("query scope behaves as vault scope — three mount points, one component", () => {
+  it("query scope behaves as vault scope - three mount points, one component", () => {
     const { host, cleanup } = render(<TaskRow task={TASK} scope="query" today={TODAY} />);
     expect(byTestId(host, "task-row.note")).not.toBeNull();
     expect(byTestId(host, "task-row.row")?.getAttribute("data-task-scope")).toBe("query");
@@ -137,14 +137,14 @@ describe("the chip token is reused, not restated", () => {
     const chip = byTestId(host, "task-row.due")!;
     const token = taskChipStyle();
     expect(chip.style.borderRadius).toBe(String(token.borderRadius));
-    expect(chip.style.fontSize).toBe(`${TASK_CHIP_TOKEN.fontSize}px`);
+    expect(chip.style.fontSize).toBe(String(TASK_CHIP_TOKEN.fontSize));
     expect(chip.style.background).toContain("--paper-2");
     cleanup();
   });
 });
 
 describe("canon rules are constraints", () => {
-  it("a completed row uses a filled neutral box and struck text — never a green check", () => {
+  it("a completed row uses a filled neutral box and struck text - never a green check", () => {
     const { host, cleanup } = render(
       <TaskRow task={{ ...TASK, completed: true }} scope="vault" today={TODAY} />,
     );
@@ -166,7 +166,7 @@ describe("canon rules are constraints", () => {
     const chip = byTestId(host, "task-row.due")!;
     expect(chip.getAttribute("data-overdue")).toBe("true");
     expect(chip.style.color).toContain("--danger");
-    // The fill stays neutral — the canon forbids state-as-fill.
+    // The fill stays neutral - the canon forbids state-as-fill.
     expect(chip.style.background).toContain("--paper-2");
     expect(chip.style.background).not.toContain("--danger");
     cleanup();
@@ -184,7 +184,7 @@ describe("canon rules are constraints", () => {
     cleanup();
   });
 
-  it("today is not overdue — the boundary, asserted rather than assumed", () => {
+  it("today is not overdue - the boundary, asserted rather than assumed", () => {
     const { host, cleanup } = render(
       <TaskRow task={{ ...TASK, due: TODAY }} scope="vault" today={TODAY} />,
     );
@@ -192,7 +192,7 @@ describe("canon rules are constraints", () => {
     cleanup();
   });
 
-  it("a wire-`null` date is not overdue — the guard answers false, it does not throw", () => {
+  it("a wire-`null` date is not overdue - the guard answers false, it does not throw", () => {
     // The undated rule and the null rule have to agree: a row with no date is
     // not late, and a row whose date arrived as `null` has no date. Asserted on
     // the whole row rather than on the chip, because the chip is absent and an
@@ -247,7 +247,7 @@ describe("toggling", () => {
     cleanup();
   });
 
-  it("renders inert with no toggle handler — a read-only mount", () => {
+  it("renders inert with no toggle handler - a read-only mount", () => {
     const { host, cleanup } = render(<TaskRow task={TASK} scope="query" today={TODAY} />);
     expect(byTestId(host, "task-row.checkbox")?.getAttribute("tabindex")).toBe("-1");
     cleanup();
@@ -262,6 +262,36 @@ describe("toggling", () => {
     expect(note.tagName).toBe("BUTTON");
     act(() => note.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onOpen).toHaveBeenCalledWith(TASK);
+    cleanup();
+  });
+
+  it("a keyboard toggle does not also open the row (myne-md/myne#656 review)", () => {
+    const onToggle = vi.fn();
+    const onOpen = vi.fn();
+    const { host, cleanup } = render(
+      <TaskRow task={TASK} scope="vault" today={TODAY} onToggle={onToggle} onOpen={onOpen} />,
+    );
+    const box = byTestId(host, "task-row.checkbox")!;
+    act(() =>
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })),
+    );
+    expect(onToggle).toHaveBeenCalledWith(TASK);
+    expect(onOpen).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("a keyboard activation on the note button opens exactly once (myne-md/myne#656 review)", () => {
+    const onOpen = vi.fn();
+    const { host, cleanup } = render(
+      <TaskRow task={TASK} scope="vault" today={TODAY} onOpen={onOpen} />,
+    );
+    const note = byTestId(host, "task-row.note")!;
+    act(() =>
+      note.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })),
+    );
+    // No click follows a bare keydown, so the button's own onClick stays
+    // silent and the row must not answer the bubbled key for it either.
+    expect(onOpen).not.toHaveBeenCalled();
     cleanup();
   });
 });
@@ -296,7 +326,7 @@ describe("two-line layout at narrow width", () => {
     const stack = byTestId(host, "task-row.stack");
     expect(stack).not.toBeNull();
     expect(stack!.style.flexDirection).toBe("column");
-    // The metadata is INSIDE the stack — that is what makes it a second line
+    // The metadata is INSIDE the stack - that is what makes it a second line
     // rather than a third column.
     expect(stack!.contains(byTestId(host, "task-row.meta"))).toBe(true);
     cleanup();
@@ -332,7 +362,7 @@ describe("two-line layout at narrow width", () => {
     );
     const chip = byTestId(host, "task-row.due")!;
     expect(chip.dataset.overdue).toBe("true");
-    // Inside the second line, and carried by COLOUR rather than by a fill —
+    // Inside the second line, and carried by COLOUR rather than by a fill -
     // the canon forbids a status pill.
     expect(byTestId(host, "task-row.meta")!.contains(chip)).toBe(true);
     expect(chip.style.background).toBe(taskChipStyle().background);
@@ -365,13 +395,13 @@ describe("touch hit area", () => {
   it("carries the expander class, so the 14 px box is not the tap target", () => {
     const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} />);
     const box = byTestId(host, "task-row.checkbox")!;
-    // The class is what a `::before` expander can hang off — React's `style`
+    // The class is what a `::before` expander can hang off - React's `style`
     // prop cannot reach a pseudo-element, which is why this is not inline.
     expect(box.classList.contains("myne-task-checkbox")).toBe(true);
     cleanup();
   });
 
-  it("keeps its 14 px visual size — the density is the point of the row", () => {
+  it("keeps its 14 px visual size - the density is the point of the row", () => {
     const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} />);
     const box = byTestId(host, "task-row.checkbox") as HTMLElement;
     expect(box.style.width).toBe("14px");

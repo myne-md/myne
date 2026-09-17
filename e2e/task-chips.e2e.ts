@@ -7,7 +7,7 @@
 // handling); this scenario proves the whole path holds end to end.
 //
 // The precedent followed is the table and tag-chip decorations, which ship with
-// test ids and a scenario. The diagram decoration shipped with neither — that is
+// test ids and a scenario. The diagram decoration shipped with neither - that is
 // deliberately NOT the precedent copied here.
 
 import { it } from "vitest";
@@ -67,22 +67,38 @@ describeE2E("tc1 task-field chips render, open, and write (MYND-614)", () => {
           { label: "one priority chip" },
         );
 
-        // 2. Clicking a chip opens the field editor. The `due` editor is a
-        //    native `<input type="date">`, so this proves the OPEN path for the
-        //    one field whose control is a platform widget.
+        // 2. Clicking a chip opens the field editor. The `due` editor is the
+        //    Myne-owned calendar picker now (myne-md/myne#614), whose primary
+        //    control is a day button, so this proves the OPEN path for the field
+        //    whose control is a grid rather than a text box.
         await (await s.byTestId("editor.task-chip-due")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
-        // Escape goes to the FIELD INPUT, which is what holds focus while the
-        // editor is open — `.cm-content` is not focusable then (tc2's pattern).
+        // Escape goes to the FIELD CONTROL, which is what holds focus while the
+        // editor is open - `.cm-content` is not focusable then (tc2's pattern).
         await (await s.byTestId("editor.task-field-input")).sendKeys(ESCAPE_KEY);
         await s.waitForGone(testIdSelector("editor.task-field-editor"));
 
-        // 3. A value change lands in the FILE — the point of the whole path.
+        // 2b. Pick a day on the calendar and commit, so the new control's WRITE
+        //     path is proven end to end, not only its open/close. The stored
+        //     value is 2026-08-01, so the grid opens on August 2026 and the 15th
+        //     is a visible cell with no month navigation.
+        await (await s.byTestId("editor.task-chip-due")).click();
+        await s.waitForElement(testIdSelector("editor.task-field-editor"));
+        await (await s.waitForElement('[data-date="2026-08-15"]')).click();
+        await (await s.byTestId("editor.task-field-commit")).click();
+        await waitForSaved(s);
+        await s.waitUntil(
+          async () =>
+            (await editorSourceText(s)).includes("[due:: 2026-08-15]") ? true : null,
+          { label: "picked date reached the file" },
+        );
+
+        // 3. A value change lands in the FILE - the point of the whole path.
         //    Driven through `repeat`, whose editor is a CONTROL, not a text box
         //    (dialect §3.8.7: a rule is chosen from a control, never typed). The
         //    seed rule `every month` opens the interval family; bumping the
         //    interval count to 3 and committing must serialize canonical
-        //    `every 3 months` into the file — the control → canonical-English →
+        //    `every 3 months` into the file - the control → canonical-English →
         //    write path, end to end. The count is a number input, so it takes
         //    real keystrokes honestly (a native `<select>` would be asserting on
         //    the platform's dropdown, the trap the old text-input note called
@@ -126,7 +142,7 @@ describeE2E("tc2 chip editor dismissal leaves the value alone (MYND-614)", () =>
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
 
         // Escape is U+E00C in the WebDriver key table. Typing a literal "Escape"
-        // would insert the word — the invisible-key trap this suite has hit
+        // would insert the word - the invisible-key trap this suite has hit
         // before.
         await (await s.byTestId("editor.task-field-input")).sendKeys("\uE00C");
 
@@ -158,7 +174,7 @@ describeE2E("tc3 the + affordance adds a task field end to end", () => {
         await createNote(s, "Add Field Note");
 
         // A task line carrying NO fields yet. The caret stays on it after typing,
-        // so the cursor-gated `+` affordance renders — the entry point that lets
+        // so the cursor-gated `+` affordance renders - the entry point that lets
         // a field be added without typing `[repeat:: …]` by hand.
         await typeIntoEditor(s, "- [ ] pay the rent", { landedText: "pay the rent" });
         await waitForSaved(s);
@@ -171,21 +187,21 @@ describeE2E("tc3 the + affordance adds a task field end to end", () => {
         await s.waitForElement(testIdSelector("editor.task-field-menu"));
 
         // 3. Pick "Repeat". Its editor is a CONTROL (the recurrence builder), so
-        //    it drives honestly through a number input — the same reason tc1
+        //    it drives honestly through a number input - the same reason tc1
         //    exercises the write path through `repeat` rather than the native
         //    date widget. On a fieldless line this opens at the default (weekly),
         //    so bumping the interval count to 3 and committing must APPEND a
-        //    canonical `[repeat:: every 3 weeks]` — the add path (no prior field)
+        //    canonical `[repeat:: every 3 weeks]` - the add path (no prior field)
         //    writing through the very seam a chip edit uses, end to end.
         await (await s.byTestId("editor.task-field-menu-repeat")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
 
-        // 3a. Only the ACTIVE family's controls may be on screen — the builder
+        // 3a. Only the ACTIVE family's controls may be on screen - the builder
         //     opens on the interval family, so the weekday-family row must be
         //     collapsed (myne-md/myne#196). This assertion exists HERE and not in
-        //     the unit lane because the defect was a cascade override — the
+        //     the unit lane because the defect was a cascade override - the
         //     author-origin `.cm-recurrence-row { display: flex }` beating the UA
-        //     stylesheet's `[hidden]` rule — and jsdom applies no CSS, so a unit
+        //     stylesheet's `[hidden]` rule - and jsdom applies no CSS, so a unit
         //     test reads the attribute as set whether or not the row is visible.
         //     A zero-area rect is real-CSS proof of collapse rather than of
         //     intent. Shipped broken: all four families rendered at once, so

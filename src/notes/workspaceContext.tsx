@@ -1,4 +1,4 @@
-// `workspaceContext` — React Context wrapping the pure `workspaceState`
+// `workspaceContext` - React Context wrapping the pure `workspaceState`
 // model (MYND-166). Holds the pane tree + focused pane in a `useState`
 // slot and exposes bound operations to the editor chrome, pane views, tab
 // strips, and sidebar.
@@ -26,6 +26,11 @@ import {
   type ReactNode,
 } from "react";
 import { DEFAULT_GRAPH_SETTINGS, encodeGraphSettings, type GraphSettings } from "./graphSettings";
+import {
+  DEFAULT_TASK_DISPLAY,
+  encodeTaskDisplay,
+  type TaskDisplaySettings,
+} from "./taskDisplay";
 import type { NoteId } from "./sidebarState";
 import { openDetachedWindow } from "../lib/detachedWindow";
 import {
@@ -52,7 +57,9 @@ import {
   setFocusedPane,
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
-  setTaskTabState as setTaskTabStateOp,
+  setTaskViewState as setTaskViewStateOp,
+  resolveTaskView,
+  taskViewToPersisted,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
   switchToSlot as switchToSlotOp,
@@ -71,6 +78,7 @@ import {
   type WorkspaceSlot,
   type WorkspaceState,
 } from "./workspaceState";
+import type { TaskView } from "./taskView";
 import {
   clearRenameFlushHooks,
   registerRenameFlushHooks,
@@ -156,7 +164,7 @@ export type WorkspaceApi = {
   focusedLeaf: LeafPane;
 
   // ── selection / open (always into the focused pane) ────────────
-  /** Open in the focused pane's active tab (reuse) — or, if that pane has a
+  /** Open in the focused pane's active tab (reuse) - or, if that pane has a
    *  pending "new tab", append into it; reveal if already open. */
   openInFocused: (id: NoteId) => void;
   /** Open in a NEW tab in the focused pane; reveal if open. */
@@ -175,7 +183,7 @@ export type WorkspaceApi = {
   /** Replace the ACTIVE slot's workspace (used to restore a persisted session). */
   restore: (state: WorkspaceState) => void;
 
-  // ── named workspaces (slots) — N named layouts over one container (MYND-308) ──
+  // ── named workspaces (slots) - N named layouts over one container (MYND-308) ──
   /** All slots in declaration order (drives the switcher list). */
   slots: WorkspaceSlot[];
   /** The active slot's id (the switcher's current selection + the MYP1 pointer). */
@@ -191,13 +199,13 @@ export type WorkspaceApi = {
   renameWorkspace: (id: SlotId, name: string) => void;
   /** Delete slot `id` (deleting the last yields a fresh empty Default). */
   deleteWorkspace: (id: SlotId) => void;
-  /** The CURRENT container — read live (ref-backed) so a persistence caller never
+  /** The CURRENT container - read live (ref-backed) so a persistence caller never
    *  sees a stale snapshot. Mirrors the `stateRef` discipline. */
   workspacesSnapshot: () => NamedWorkspaces;
 
-  // ── sidebar folder-expand set (MYND-455) — container-level, window-global ──
+  // ── sidebar folder-expand set (MYND-455) - container-level, window-global ──
   /** The persisted set of OPEN folder keys (stable reference; empty = collapsed).
-   *  This is the SINGLE owner — the sidebar renders straight off it rather than
+   *  This is the SINGLE owner - the sidebar renders straight off it rather than
    *  mirroring it into local state, so the async restore just replaces it. */
   expandedFolders: readonly string[];
   /** Persist the sidebar folder-expand set (staged into the workspace blob on the
@@ -208,8 +216,8 @@ export type WorkspaceApi = {
     next: ReadonlySet<string> | ((prev: ReadonlySet<string>) => ReadonlySet<string>),
   ) => void;
 
-  // ── graph pane settings (graph-connection-ux-polish task 5) — container-level, window-global ──
-  /** The graph pane's device-local settings (defaults resolved — never
+  // ── graph pane settings (graph-connection-ux-polish task 5) - container-level, window-global ──
+  /** The graph pane's device-local settings (defaults resolved - never
    *  partial). This is the SINGLE owner, like `expandedFolders`: the graph
    *  settings panel renders straight off it. */
   graphSettings: GraphSettings;
@@ -218,6 +226,13 @@ export type WorkspaceApi = {
    *  the field (omit-when-default). Takes an updater so a caller can toggle
    *  against the live value without reading it first. */
   setGraphSettings: (next: GraphSettings | ((prev: GraphSettings) => GraphSettings)) => void;
+
+  // ── task-surface display (myne-md/myne#656 item 4) - container-level, window-global ──
+  /** The task chip's device-local display settings (defaults resolved). */
+  taskDisplay: TaskDisplaySettings;
+  /** Persist the task display settings (staged into the workspace blob on the
+   *  next graceful-exit / coalesced flush; all-default clears the field). */
+  setTaskDisplay: (next: TaskDisplaySettings) => void;
 
   // ── back/forward history (focused pane; ephemeral, never persisted) ──
   /** Step the focused pane back to the previously viewed note (no-op when
@@ -241,7 +256,7 @@ export type WorkspaceApi = {
   // ── per-pane tab ops ───────────────────────────────────────────
   activateInPane: (paneId: PaneId, id: NoteId) => void;
   closeTabInPane: (paneId: PaneId, id: NoteId) => void;
-  /** Close a note's tabs in EVERY pane — used when the note leaves the live tree
+  /** Close a note's tabs in EVERY pane - used when the note leaves the live tree
    *  (trash / archive) so no stale, still-editable buffer is left behind for an
    *  autosave to write back and silently un-trash / un-archive it (#219). */
   closeNoteEverywhere: (id: NoteId) => void;
@@ -278,15 +293,19 @@ export type WorkspaceApi = {
    *  like `openInFocused`). The graph is a singleton, so re-opening it reveals
    *  the existing tab (global duplicate-forbid) instead of making a second. */
   openGraph: () => void;
-  /** Open (or reveal) the vault-wide task list — a singleton tab, like the
+  /** Open (or reveal) the vault-wide task list - a singleton tab, like the
    *  graph, so calling twice reveals rather than duplicating (MYND-616). */
   openTasks: () => void;
-  /** Persist the task tab's filter / scope WITH the tab (MYND-616 task 9).
+  /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
-  setTaskTabState: (
-    paneId: PaneId,
-    next: { filter?: string; folder?: string | null; tags?: readonly string[] },
-  ) => void;
+  setTaskViewState: (paneId: PaneId, next: TaskView) => void;
+  /** The LAST task view, container-level, so closing and reopening the Tasks
+   *  tab restores the filters (myne-md/myne#656 review). */
+  taskView: TaskView;
+  /** Whether the container carries an explicit task view. False on a vault
+   *  written before the container-level field existed, where the panel falls
+   *  back to the tab's own persisted view (myne-md/myne#656 review). */
+  taskViewIsSet: boolean;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -307,7 +326,7 @@ export type WorkspaceApi = {
   setItemPinned: (paneId: PaneId, item: WorkspaceItem, pinned: boolean) => void;
   /** Flip the per-leaf `stacked` layout flag of a pane (tab-modes / MYND-319). */
   toggleStackedInPane: (paneId: PaneId) => void;
-  /** Flip the focused pane's `stacked` layout flag — the palette-action entry. */
+  /** Flip the focused pane's `stacked` layout flag - the palette-action entry. */
   toggleStackedFocused: () => void;
 
   // ── reading-source-modes (MYND-299) ────────────────────────────
@@ -340,7 +359,7 @@ const WorkspaceContext = createContext<WorkspaceApi | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Named workspaces (MYND-308 task 4): the live workspace is backed by a
   // `NamedWorkspaces` container (N named slots + an active pointer), but the
-  // existing reducer surface is preserved EXACTLY — `state` is the active slot's
+  // existing reducer surface is preserved EXACTLY - `state` is the active slot's
   // descriptor and `setState` edits that slot. Every existing reducer call site
   // (`setState((s) => op(s, …))`) keeps compiling and behaving identically.
   const [container, setContainer] = useState<NamedWorkspaces>(() =>
@@ -363,7 +382,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   // Which pane (if any) is showing the empty "new tab" chooser (MYND-166).
-  // Lifted here — NOT PaneView-local — so a sidebar click (which routes
+  // Lifted here - NOT PaneView-local - so a sidebar click (which routes
   // through `openInFocused`) APPENDS into the pending new tab instead of
   // replacing the previously-active tab. Mirrored into a ref so the open ops
   // can read it synchronously inside their `setState` updaters.
@@ -449,7 +468,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setState],
   );
-  // Named workspaces (MYND-308 task 4) — container-level operations. Each is a
+  // Named workspaces (MYND-308 task 4) - container-level operations. Each is a
   // thin `setContainer((c) => op(c, …))` over the pure container ops; the loader
   // uses `restoreContainer` to apply a deserialized payload, and the switcher UI
   // uses save-as / switch / rename / delete.
@@ -485,7 +504,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // graph-connection-ux-polish task 5: the graph pane's device-local settings,
   // owned at the container level (window-global, like `expandedFolders`
   // above). All-default → drop the field (omit-when-default, mirrors the
-  // write-side check `serializeWorkspaces` also applies — kept in one place,
+  // write-side check `serializeWorkspaces` also applies - kept in one place,
   // `encodeGraphSettings`, so the two can't drift).
   const setGraphSettings = useCallback(
     (next: GraphSettings | ((prev: GraphSettings) => GraphSettings)) => {
@@ -497,6 +516,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+  const setTaskDisplay = useCallback((next: TaskDisplaySettings) => {
+    setContainer((c) => ({
+      ...c,
+      taskDisplay: encodeTaskDisplay(next) ? next : undefined,
+    }));
+  }, []);
   // Ref-backed live container so a persistence caller reading it never sees a
   // stale snapshot (mirrors `stateRef` below; the graceful-exit + coalesced-flush
   // paths in Editor.tsx call this from captured closures).
@@ -520,7 +545,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Close a note's tabs across every pane (#219). Leaf ids are stable across the
   // fold (closeTabOp only removes a tab, never renumbers panes); a pane without
   // the tab is a no-op, and the last-tab-of-the-only-leaf case leaves that pane
-  // tabless (the empty-editor shell) per the workspace invariant — never a crash.
+  // tabless (the empty-editor shell) per the workspace invariant - never a crash.
   const closeNoteEverywhere = useCallback(
     (id: NoteId) => {
       setPending(null);
@@ -581,7 +606,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // ── saved-view (item) tab ops (MYND-274) — operate on tagged items so a
+  // ── saved-view (item) tab ops (MYND-274) - operate on tagged items so a
   //    view tab is a first-class peer of a note tab. ───────────────────────
   const openView = useCallback(
     (viewId: ViewId) => {
@@ -613,11 +638,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         : openInFocusedTab(s, tasksItem()),
     );
   }, [setPending]);
-  const setTaskTabState = useCallback(
-    (paneId: PaneId, next: { filter?: string; folder?: string | null; tags?: readonly string[] }) => {
-      setState((s) => setTaskTabStateOp(s, paneId, next));
+  const setTaskViewState = useCallback(
+    (paneId: PaneId, next: TaskView) => {
+      setState((s) => setTaskViewStateOp(s, paneId, next));
+      // Mirror to the container so a CLOSED-and-reopened Tasks tab restores the
+      // filters instead of resetting them (myne-md/myne#656 review).
+      setContainer((c) => ({ ...c, taskView: taskViewToPersisted(next) }));
     },
-    [],
+    [setContainer],
   );
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
@@ -653,7 +681,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // ── tab-modes (MYND-319/320) — pin a tab + per-leaf stacked layout. ──
+  // ── tab-modes (MYND-319/320) - pin a tab + per-leaf stacked layout. ──
   const setItemPinned = useCallback(
     (paneId: PaneId, item: WorkspaceItem, pinned: boolean) => {
       setState((s) => setPinnedOp(s, paneId, item, pinned));
@@ -679,7 +707,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // reading-source-modes (MYND-299): side-by-side preview companion open-state,
-  // EPHEMERAL per pane (never persisted — like back/forward history). Held here so
+  // EPHEMERAL per pane (never persisted - like back/forward history). Held here so
   // the focused pane's bottom-bar "Preview" toggle and that pane's own editor
   // share one source of truth. Only meaningful in source mode.
   const [companionPanes, setCompanionPanes] = useState<ReadonlySet<PaneId>>(
@@ -769,7 +797,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [flushAll]);
 
   // ── Back/forward navigation history (MYND-260) ─────────────────────
-  // Per-pane, EPHEMERAL: held next to — never inside — the persisted pane
+  // Per-pane, EPHEMERAL: held next to - never inside - the persisted pane
   // tree, so a browsing trail never lands in `vault.workspace` (design grill
   // 2026-06-01 Q1). A reconcile pass folds each pane's live `activeTab` into
   // its history on every workspace change; the `navIntentRef` lets a
@@ -790,9 +818,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   // Step the FOCUSED pane along its history. The cursor target is re-activated
-  // through the ordinary `openInFocusedTab` transition — which re-opens a note
+  // through the ordinary `openInFocusedTab` transition - which re-opens a note
   // that has since left the strip (the common sidebar-browse case) or reveals
-  // one already open — so the content + sidebar selection follow for free.
+  // one already open - so the content + sidebar selection follow for free.
   const stepHistory = useCallback((delta: -1 | 1) => {
     const paneId = stateRef.current.focusedPaneId;
     const h = historiesRef.current.get(paneId);
@@ -813,6 +841,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
+  // Stable identity for the staging-effect dep in Editor.tsx: resolveTaskView
+  // builds a fresh object per call, so exposing its result directly would
+  // re-fire staging on every render (myne-md/myne#656 review). Keyed on the
+  // persisted container field, whose identity moves only when the view does.
+  const resolvedTaskView = useMemo(
+    () => resolveTaskView(container.taskView),
+    [container.taskView],
+  );
   const api = useMemo<WorkspaceApi>(
     () => ({
       root: state.root,
@@ -832,6 +868,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setExpandedFolders,
       graphSettings: container.graphSettings ?? DEFAULT_GRAPH_SETTINGS,
       setGraphSettings,
+      taskDisplay: container.taskDisplay ?? DEFAULT_TASK_DISPLAY,
+      setTaskDisplay,
+      taskView: resolvedTaskView,
+      taskViewIsSet: container.taskView !== undefined,
       restoreContainer,
       saveWorkspaceAs,
       switchWorkspace,
@@ -857,7 +897,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
-      setTaskTabState,
+      setTaskViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,
@@ -877,6 +917,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       container,
       leaves,
       focused,
+      resolvedTaskView,
       openInFocused,
       openNewTabInFocused,
       openToSide,
@@ -892,6 +933,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspacesSnapshot,
       setExpandedFolders,
       setGraphSettings,
+      setTaskDisplay,
       goBack,
       goForward,
       canGoBack,
@@ -911,7 +953,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
-      setTaskTabState,
+      setTaskViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,

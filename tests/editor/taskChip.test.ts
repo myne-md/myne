@@ -6,9 +6,9 @@
 // before, so they are tested directly rather than by eye:
 //
 //   - atomic ranges must match the decoration ranges EXACTLY (same predicate,
-//     same scope) — a wider atomic scope makes off-screen raw text atomic and the
+//     same scope) - a wider atomic scope makes off-screen raw text atomic and the
 //     caret starts skipping characters in ordinary-looking text;
-//   - widget identity must include the source position — CodeMirror reuses widget
+//   - widget identity must include the source position - CodeMirror reuses widget
 //     DOM when `eq` says two widgets are equal, so two chips with the same value
 //     on different lines would share DOM and a click would resolve to the wrong
 //     range after an edit shifts lines;
@@ -228,7 +228,7 @@ describe("recurrence and priority chips (task 4)", () => {
   });
 
   it("chips a valueless priority emoji, labelled by its meaning", () => {
-    // The marker IS the value here — there is no value node to read.
+    // The marker IS the value here - there is no value node to read.
     const { view, host } = mount("- [ ] urgent ⏫\n");
     expect(host.querySelector('[data-testid="editor.task-chip-priority"]')?.textContent).toBe(
       "high",
@@ -257,10 +257,31 @@ describe("recurrence and priority chips (task 4)", () => {
     }
     teardown(view, host);
   });
+
+  it("every chip carries an icon and a label, so icon-only is a CSS decision (myne-md/myne#656)", () => {
+    const { view, host } = mount(
+      "- [ ] x [due:: 2026-08-01] [priority:: highest]\n",
+    );
+    for (const el of host.querySelectorAll("[data-task-chip]")) {
+      // Both parts are always in the DOM; the icon-only setting hides the
+      // label at the root rather than changing what a widget builds.
+      expect(el.querySelector("svg.cm-task-chip-icon"), "icon").not.toBeNull();
+      expect(el.querySelector(".cm-task-chip-label"), "label").not.toBeNull();
+    }
+    const priority = host.querySelector('[data-task-chip="priority"]');
+    expect(
+      priority?.querySelector(".cm-task-chip-label")?.textContent,
+      "the priority label is present",
+    ).toBeTruthy();
+    // The priority icon encodes the LEVEL by shape, so an icon-only chip still
+    // distinguishes highest from lowest.
+    expect(priority?.querySelector("svg.cm-task-chip-icon")?.children.length).toBeGreaterThan(0);
+    teardown(view, host);
+  });
 });
 
 describe("the canon's prohibitions", () => {
-  it("the token uses a neutral fill — state is never carried by the background", async () => {
+  it("the token uses a neutral fill - state is never carried by the background", async () => {
     const { TASK_CHIP_TOKEN, taskChipCmTheme } = await import(
       "@myne/editor/host/notes/taskChipToken"
     );
@@ -328,7 +349,7 @@ describe("reveal policy (task 5)", () => {
     teardown(view, host);
   });
 
-  it("makes nothing atomic while revealed — revealed chips are raw text", async () => {
+  it("makes nothing atomic while revealed - revealed chips are raw text", async () => {
     const { openSearchPanel, search } = await import("@codemirror/search");
     const host = document.createElement("div");
     document.body.appendChild(host);
@@ -421,7 +442,7 @@ describe("chip write path (task 7)", () => {
   });
 
   it("editing one field converts EVERY task field on that line", () => {
-    // The emoji-form line becomes fully Myne-form — the accepted export
+    // The emoji-form line becomes fully Myne-form - the accepted export
     // asymmetry, made active here rather than latent.
     const { view, host } = docView("- [ ] ship it 📅 2026-08-01 🔁 every week ⏫\n");
     const chipFrom = view.state.doc.toString().indexOf("📅");
@@ -463,7 +484,7 @@ describe("chip write path (task 7)", () => {
 });
 
 describe("malformed values render as raw text with a hint (task 8)", () => {
-  it("does not chip a half-written date — it marks it instead", () => {
+  it("does not chip a half-written date - it marks it instead", () => {
     const { view, host } = mount("- [ ] x [due:: 2026-08]\n");
     expect(host.querySelectorAll('[data-testid="editor.task-chip-due"]').length).toBe(0);
     expect(host.querySelectorAll('[data-testid="editor.task-field-invalid-due"]').length).toBe(1);
@@ -480,7 +501,7 @@ describe("malformed values render as raw text with a hint (task 8)", () => {
   it("refuses an impossible date rather than correcting it", () => {
     const { view, host } = mount("- [ ] x [due:: 2026-02-31]\n");
     expect(host.querySelectorAll('[data-testid="editor.task-chip-due"]').length).toBe(0);
-    // The text is untouched — no silent correction to 2026-03-03 or similar.
+    // The text is untouched - no silent correction to 2026-03-03 or similar.
     expect(view.state.doc.toString()).toContain("2026-02-31");
     teardown(view, host);
   });
@@ -496,7 +517,7 @@ describe("malformed values render as raw text with a hint (task 8)", () => {
 
   it("flags a recurrence rule the closed vocabulary does not read (MYND-615 task 10)", () => {
     // When this chip shipped, MYND-615's rule grammar did not exist, so every
-    // rule chipped. It exists now, and an unreadable rule must LOOK unread —
+    // rule chipped. It exists now, and an unreadable rule must LOOK unread -
     // the silent alternative is data-loss-shaped.
     const { view, host } = mount("- [ ] x [repeat:: whenever I feel like it]\n");
     expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(0);
@@ -506,7 +527,7 @@ describe("malformed values render as raw text with a hint (task 8)", () => {
     teardown(view, host);
   });
 
-  it("a malformed field is NOT atomic — the caret must reach it to fix it", () => {
+  it("a malformed field is NOT atomic - the caret must reach it to fix it", () => {
     const { view, host } = mount("- [ ] x [due:: 2026-08]\n");
     let count = 0;
     view.state.facet(EditorView.atomicRanges).forEach((f) => {
@@ -638,7 +659,7 @@ describe("accessibility (task 10)", () => {
     teardown(view, host);
   });
 
-  it("a single keypress deletes a whole chip — atomic ranges make it one unit", () => {
+  it("a single keypress deletes a whole chip - atomic ranges make it one unit", () => {
     const { view, host } = mount("- [ ] x [due:: 2026-08-01]\n");
     const doc = view.state.doc.toString();
     const chipEnd = doc.indexOf("]", doc.indexOf("[due::")) + 1;
@@ -706,7 +727,7 @@ describe("unrecognized recurrence rule (MYND-615 task 10)", () => {
   });
 
   it("says what follows from it, not just that it failed", () => {
-    // The consequence — "this task won't repeat" — is the part the user cannot
+    // The consequence - "this task won't repeat" - is the part the user cannot
     // infer from a dotted underline.
     const { view, host } = mount("- [ ] x [repeat:: FREQ=DAILY]\n");
     const flagged = host.querySelector('[data-testid="editor.task-field-invalid-repeat"]');
@@ -721,7 +742,7 @@ describe("unrecognized recurrence rule (MYND-615 task 10)", () => {
     teardown(view, host);
   });
 
-  it("stays reachable — a mark decoration, so the caret can get in to fix it", () => {
+  it("stays reachable - a mark decoration, so the caret can get in to fix it", () => {
     const { view, host } = mount("- [ ] x [repeat:: not a rule]\n");
     let atomic = 0;
     view.state.facet(EditorView.atomicRanges).forEach((f) => {
@@ -742,7 +763,7 @@ describe("unrecognized recurrence rule (MYND-615 task 10)", () => {
     teardown(view, host);
   });
 
-  it("does not silently recur — the completion path declines on the same rule", async () => {
+  it("does not silently recur - the completion path declines on the same rule", async () => {
     const { nextOccurrenceLine } = await import("@myne/editor/decorations/task-recurrence");
     expect(
       nextOccurrenceLine("- [x] x [due:: 2026-08-01] [repeat:: not a rule]", {
@@ -773,11 +794,11 @@ describe("unrecognized recurrence rule (MYND-615 task 10)", () => {
 describe("anchorless recurrence rule (myne#197)", () => {
   // A rule with no date to repeat FROM parses perfectly and then does nothing.
   // That is the same data-loss-shaped silence the unrecognized-rule state exists
-  // to prevent — it simply was not covered, because the chip layer asked whether
+  // to prevent - it simply was not covered, because the chip layer asked whether
   // the vocabulary could PARSE the rule rather than whether the rule could be
   // EVALUATED on this line.
 
-  it("does not chip — the rule is readable but not workable", () => {
+  it("does not chip - the rule is readable but not workable", () => {
     const { view, host } = mount("- [ ] shower [repeat:: every day]\n");
     expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(0);
     const flagged = host.querySelector('[data-testid="editor.task-field-invalid-repeat"]');
@@ -813,7 +834,7 @@ describe("anchorless recurrence rule (myne#197)", () => {
     teardown(view, host);
   });
 
-  // myne#276 — the tooltip was the WHOLE explanation, and it required already
+  // myne#276 - the tooltip was the WHOLE explanation, and it required already
   // knowing where to hover. This one failure's repair is somewhere else on the
   // line (a due date that isn't there), so unlike the other three hints, reading
   // the flagged text is not the diagnosis. It renders inline.
@@ -825,7 +846,7 @@ describe("anchorless recurrence rule (myne#197)", () => {
     teardown(view, host);
   });
 
-  it("contributes no bytes — the note on disk is what the user typed", () => {
+  it("contributes no bytes - the note on disk is what the user typed", () => {
     const raw = "- [ ] shower [repeat:: every day]\n";
     const { view, host } = mount(raw);
     expect(view.state.doc.toString()).toBe(raw);
@@ -833,7 +854,7 @@ describe("anchorless recurrence rule (myne#197)", () => {
   });
 
   it("shows no inline hint for a rule that is simply unreadable", () => {
-    // That text IS the diagnosis — an aside repeating it would be noise.
+    // That text IS the diagnosis - an aside repeating it would be noise.
     const { view, host } = mount("- [ ] shower [repeat:: every fortnight]\n");
     expect(host.querySelector('[data-testid="editor.task-field-hint"]')).toBeNull();
     teardown(view, host);
@@ -903,7 +924,7 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
 
   // Only `locales/en/common.json` is hand-maintained; every other catalog is
   // Weblate-managed and must not be edited in the repo. So the second language
-  // is supplied at RUNTIME here — which is a truer test anyway: it proves the
+  // is supplied at RUNTIME here - which is a truer test anyway: it proves the
   // label comes from the catalog rather than from anything baked into the code.
   const useTurkish = async (): Promise<void> => {
     i18n.addResourceBundle(
@@ -958,7 +979,7 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
 // ── myne#280: `remind` is a chip kind ───────────────────────────────────────
 //
 // The read side already mapped the `⏰` marker and the index already carried
-// `VaultTask.remind`, but the chip layer did not — so a `[remind:: …]` field
+// `VaultTask.remind`, but the chip layer did not - so a `[remind:: …]` field
 // rendered as raw text, and the field the notification scheduler actually reads
 // was the one field with no visual presence at all.
 describe("the remind chip (myne#280)", () => {
