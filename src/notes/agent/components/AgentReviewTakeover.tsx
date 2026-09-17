@@ -73,8 +73,8 @@ const BACKDROP_STYLE: CSSProperties = {
 
 const CARD_STYLE: CSSProperties = {
   width: "100%",
-  // Wider than Settings' 1080: this card holds a unified diff of note text,
-  // and wrapping one costs more than a wide card does.
+  // Wider than Settings' 1080: this card holds a two-column split diff of note
+  // text, and keeping both columns readable costs more than a wide card does.
   maxWidth: 1200,
   height: "100%",
   background: "var(--paper)",
