@@ -141,7 +141,7 @@ describe("the + menu adds an absent field and edits a present one", () => {
     expect(menuRow("due")).not.toBeNull();
     menuRow("repeat").click();
     // Prefilled with the SOURCE value, so opening it does not clobber the rule.
-    expect((fieldInput() as HTMLSelectElement).value).toBe("interval");
+    expect(fieldInput().getAttribute("data-value")).toBe("interval");
   });
 });
 
@@ -235,8 +235,8 @@ describe("/due /repeat /priority slash commands", () => {
     const from = m.view.state.doc.toString().indexOf("/repeat");
     cmd("repeat").apply(m.view, from, from + "/repeat".length);
     const input = fieldInput();
-    expect(input.tagName).toBe("SELECT");
-    expect(input.classList.contains("cm-recurrence-family")).toBe(true);
+    expect(input.getAttribute("role")).toBe("combobox");
+    expect(input.closest(".cm-select")?.classList.contains("cm-recurrence-family")).toBe(true);
   });
 });
 
@@ -271,8 +271,6 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
   it("offers the due date in the same surface after an anchorless repeat commits", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
 
     // The rule the user chose is written - it is correct, and refusing it would
@@ -282,8 +280,8 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
     const chained = document.querySelector('[data-testid="editor.task-field-editor"]');
     expect(chained).not.toBeNull();
     // It is the DUE editor, not the repeat one that just closed: the repeat
-    // surface leads with a family `<select>`, the due surface with the calendar
-    // picker (myne#614).
+    // surface leads with a combobox (the hand-rolled control from myne#656), the
+    // due surface with the Myne calendar picker (myne#614).
     expect(chained!.getAttribute("aria-label")).toBe("Due date");
     expect(fieldInput().parentElement!.getAttribute("role")).toBe("gridcell");
   });
@@ -291,8 +289,6 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
   it("does not chain into the due editor when the line already has an anchor", () => {
     openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
     expect(document.querySelector('[data-testid="editor.task-field-editor"]')).toBeNull();
   });

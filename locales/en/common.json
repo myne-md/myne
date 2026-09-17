@@ -2511,7 +2511,7 @@
     "restoreVaultHeader": "Restore a vault",
     "accountTitle": "Enter your account number",
     "accountLead": "Find this where you saved your recovery phrase. It identifies the vault to restore.",
-    "accountInvalid": "Invalid account number - please check and re-enter.",
+    "accountInvalid": "Invalid account number — please check and re-enter.",
     "accountOptionalHint": "Don't have it? Leave this blank and continue. Your 24-word recovery phrase is all you need.",
     "paste": "Paste",
     "phraseGridHint": "Type each word, or paste all 24 at once to fill the grid.",

@@ -264,6 +264,36 @@ describe("toggling", () => {
     expect(onOpen).toHaveBeenCalledWith(TASK);
     cleanup();
   });
+
+  it("a keyboard toggle does not also open the row (myne-md/myne#656 review)", () => {
+    const onToggle = vi.fn();
+    const onOpen = vi.fn();
+    const { host, cleanup } = render(
+      <TaskRow task={TASK} scope="vault" today={TODAY} onToggle={onToggle} onOpen={onOpen} />,
+    );
+    const box = byTestId(host, "task-row.checkbox")!;
+    act(() =>
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })),
+    );
+    expect(onToggle).toHaveBeenCalledWith(TASK);
+    expect(onOpen).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("a keyboard activation on the note button opens exactly once (myne-md/myne#656 review)", () => {
+    const onOpen = vi.fn();
+    const { host, cleanup } = render(
+      <TaskRow task={TASK} scope="vault" today={TODAY} onOpen={onOpen} />,
+    );
+    const note = byTestId(host, "task-row.note")!;
+    act(() =>
+      note.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })),
+    );
+    // No click follows a bare keydown, so the button's own onClick stays
+    // silent and the row must not answer the bubbled key for it either.
+    expect(onOpen).not.toHaveBeenCalled();
+    cleanup();
+  });
 });
 
 describe("test ids are distinguishable per mount point", () => {

@@ -191,6 +191,19 @@ describe("the filter builder (myne-md/myne#656 review)", () => {
     expect(q(host, "tasks.filtersButton")).toBeNull();
     cleanup();
   });
+
+  it("takes focus on open and returns it to Filters on Escape (myne-md/myne#656 review)", () => {
+    const { host, cleanup } = render(panel());
+    openBuilder(host);
+    const dialog = q(host, "tasks.filtersPanel")!;
+    expect(document.activeElement).toBe(dialog);
+    act(() =>
+      dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
+    );
+    expect(q(host, "tasks.filtersPanel")).toBeNull();
+    expect(document.activeElement).toBe(q(host, "tasks.filtersButton"));
+    cleanup();
+  });
 });
 
 describe("the search box", () => {

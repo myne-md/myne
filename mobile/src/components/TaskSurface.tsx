@@ -34,6 +34,14 @@ export type TaskSurfaceProps = {
   /** Injected in tests; production reads the local calendar day. */
   today?: string;
   testIdPrefix?: string;
+  /**
+   * Controlled view state. The caller (EditorFlow) owns it so the view
+   * survives destination re-entry: every mount here is conditional, so
+   * component-local state would reset on each leave (myne-md/myne#656
+   * review). Absent → the surface keeps its own, for standalone mounts.
+   */
+  view?: TaskView;
+  onViewChange?: (next: TaskView) => void;
 };
 
 export function TaskSurface({
@@ -42,11 +50,14 @@ export function TaskSurface({
   onOpen,
   today,
   testIdPrefix,
+  view: controlledView,
+  onViewChange,
 }: TaskSurfaceProps): ReactNode {
-  // The view is component state: the mobile caller is a destination, and the
-  // shared panel persists desktop's per-tab copy. Mobile's default is `undone`,
-  // the same as desktop's vault-wide tab.
-  const [view, setView] = useState<TaskView>(DEFAULT_TASK_VIEW);
+  // Uncontrolled fallback for standalone mounts; EditorFlow passes both props
+  // and this state stays unused there.
+  const [ownView, setOwnView] = useState<TaskView>(DEFAULT_TASK_VIEW);
+  const view = controlledView ?? ownView;
+  const handleViewChange = onViewChange ?? setOwnView;
   const { tasks } = useVaultTasks();
 
   // The note-scoped surface narrows the SAME vault-wide fetch rather than asking
@@ -66,7 +77,7 @@ export function TaskSurface({
       // redundant in a note-scoped list and essential in a vault-wide one.
       rowScope={scope.kind === "note" ? "note" : "vault"}
       {...(tagsOf === undefined ? {} : { tagsOf })}
-      onViewChange={setView}
+      onViewChange={handleViewChange}
       // The write goes through the SHARED sequence with mobile IO - including
       // the content-hash guard, without which a sync pull-apply racing a
       // checkbox flip would be clobbered.
