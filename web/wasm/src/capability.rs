@@ -448,6 +448,24 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // feature's own PRD puts web out of scope, and Pending would advertise an
     // affordance the client is not going to grow.
     ("agent", Class::Unsupported),
+    // Agent memory + personality store (myne-md/myne#697): the `MYN1`
+    // catalog + `MYX1` per-entry files + `MYZ1` singleton. Unsupported for
+    // the same reason as `agent` directly above: the whole AI surface is
+    // absent on web (`localAi` is an absent capability, so the AI tab and
+    // the AI settings panel never mount), and the memory store has no
+    // meaning without a run to learn from or a surface to manage it.
+    // Unlike `chats` (ported whole because the browser is the client that
+    // needs history persistence most), memory is never READ on web: no
+    // system turn is ever built there, so dispatching the store would ship
+    // a vault-content writer no web path ever calls. The families still
+    // reach the browser over sync as opaque Class-1 blobs, exactly like
+    // every other synced singleton; only the local read/write commands
+    // are refused here.
+    //
+    // `Class::Unsupported` rather than `Class::Pending` deliberately: the
+    // feature's own PRD puts web out of scope, and Pending would advertise
+    // an affordance the client is not going to grow.
+    ("memory", Class::Unsupported),
     // Backup export/restore. `decisions.md` 2026-07-26 "Web capability set":
     // "Opening a backup file as an alternative entry path is not offered", and
     // the code lives in `src-tauri/`, so it would be net-new rather than

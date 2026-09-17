@@ -323,13 +323,18 @@ fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, Bac
         "vault.themes",
         "vault.attachments",
         "vault.chats",
+        // #697: the memory plane rides the same closed allowlist (the #256
+        // class: a family the classifier accepts but the collector never
+        // offers is missing from every backup, silently).
+        "vault.agent-memory",
+        "vault.personality",
     ] {
         let path = vault_dir.join(singleton);
         if path.is_file() {
             members.push((singleton.to_string(), path, false));
         }
     }
-    for dir in ["notes", "snapshots", "attachments", "chats"] {
+    for dir in ["notes", "snapshots", "attachments", "chats", "memories"] {
         let dir_path = vault_dir.join(dir);
         if !dir_path.is_dir() {
             continue;

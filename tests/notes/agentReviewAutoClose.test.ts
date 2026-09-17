@@ -64,7 +64,7 @@ function settle(proposal: Proposal) {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
-    },
+    memoryUpdated: 0,},
     currentRunEpoch(),
   );
 }

@@ -344,6 +344,10 @@ pub fn run() {
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
         .plugin(plugins::chats::init())
+        // myne-md/myne#697: the agent-memory + personality store. Same
+        // unlocked-slot gating as chats; the `ai_enabled` pref is the
+        // runtime gate, re-read per command host-side.
+        .plugin(plugins::memory::init())
         // myne#411: the device-local hide-vault-names option. Registered
         // unconditionally and reachable pre-unlock, because the picker it
         // governs is the screen that renders before any vault is open.

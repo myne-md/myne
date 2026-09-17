@@ -128,6 +128,7 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
     notesRead: agent.notesRead,
     iterations: agent.iterations,
     charsOffDevice: agent.charsOffDevice,
+    memoryUpdated: agent.memoryUpdated,
     end: agent.end?.kind ?? "finished",
     // The frozen proposal rides the turn (myne-md/myne#675): the store copies
     // it to plain data on settle, so history keeps what the run proposed even

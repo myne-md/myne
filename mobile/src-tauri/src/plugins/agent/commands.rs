@@ -38,6 +38,7 @@ use myne_core::plugins::agent::error::AgentError;
 use myne_core::plugins::agent::history::{
     history_budget, seed_messages, HistoryTurn, SeedControls,
 };
+use myne_core::plugins::agent::host_adapters::MemoryAdapter;
 use myne_core::plugins::agent::host_commands::{
     apply_from_host, probe_threshold, require_ai_enabled, require_unlocked, step, undo_from_host,
     AgentSessionState, AgentStepResult, AgentUndoResult, GrantPreview, HostScopeSource,
@@ -81,6 +82,7 @@ pub async fn agent_start<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, AgentInferenceState>,
     search: State<'_, SearchIndexState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
@@ -126,6 +128,13 @@ pub async fn agent_start<R: Runtime>(
     if let Ok(view) = runs.view(&run_id) {
         let _ = on_open.send(view);
     }
+    // Built before the call because `step` takes `app` by value.
+    let tauri_host = TauriHost::new(app.clone());
+    let memory = MemoryAdapter {
+        host: &tauri_host,
+        state: vault.inner(),
+        hooks: hooks.inner().clone(),
+    };
     step(
         app,
         run_id,
@@ -137,6 +146,9 @@ pub async fn agent_start<R: Runtime>(
         &MobileSearchAdapter {
             search: search.inner(),
         },
+        // The run's memory store (myne-md/myne#697): the shared
+        // `MemoryAdapter`, same as desktop wires.
+        Some(&memory),
         cancel,
         resolved.excluded_count,
         on_progress,
@@ -161,6 +173,7 @@ pub async fn agent_approve_scope<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, AgentInferenceState>,
     search: State<'_, SearchIndexState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
@@ -181,6 +194,13 @@ pub async fn agent_approve_scope<R: Runtime>(
     // is a flag nothing else writes to, so Stop and the lock teardown would both
     // be inert for this leg.
     let cancel = runs.cancel_flag(&run_id)?;
+    // Built before the call because `step` takes `app` by value.
+    let tauri_host = TauriHost::new(app.clone());
+    let memory = MemoryAdapter {
+        host: &tauri_host,
+        state: vault.inner(),
+        hooks: hooks.inner().clone(),
+    };
     step(
         app,
         run_id,
@@ -192,6 +212,9 @@ pub async fn agent_approve_scope<R: Runtime>(
         &MobileSearchAdapter {
             search: search.inner(),
         },
+        // The run's memory store (myne-md/myne#697): the shared
+        // `MemoryAdapter`, same as desktop wires.
+        Some(&memory),
         cancel,
         resolved.excluded_count,
         on_progress,

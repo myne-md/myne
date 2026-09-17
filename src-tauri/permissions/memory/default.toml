@@ -1,0 +1,52 @@
+# Permissions for the in-app `memory` Tauri plugin.
+# Picked up under the `memory:` ACL namespace because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `memory:default` (or `memory:allow-memory-read` / … individually).
+#
+# All six commands are Slot::Unlocked-gated reads/writes of the encrypted
+# agent-memory + personality store and inherit the main-window-only invariant
+# shared by the other vault plugins: v0.2 multi-window MUST NOT grant a memory
+# write permission to any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the memory plugin: the six agent-memory + personality storage commands."
+permissions = [
+    "allow-memory-list",
+    "allow-memory-read",
+    "allow-memory-write",
+    "allow-memory-delete",
+    "allow-personality-read",
+    "allow-personality-write",
+]
+
+[[permission]]
+identifier = "allow-memory-list"
+description = "Allow invoking memory:memory_list (Slot::Unlocked-gated memory roster read ordered by updated_at desc, tombstones excluded)."
+commands.allow = ["memory_list"]
+
+[[permission]]
+identifier = "allow-memory-read"
+description = "Allow invoking memory:memory_read (Slot::Unlocked-gated read of one memory entry's text; corrupt files surface EntryUnreadable, never a silent empty)."
+commands.allow = ["memory_read"]
+
+[[permission]]
+identifier = "allow-memory-write"
+description = "Allow invoking memory:memory_write (Slot::Unlocked-gated add/update of one memory entry; the write-time gate (schema + cap + injection scan) runs inside, decisions/ai/0590)."
+commands.allow = ["memory_write"]
+
+[[permission]]
+identifier = "allow-memory-delete"
+description = "Allow invoking memory:memory_delete (Slot::Unlocked-gated tombstone delete: marks the catalog row, removes the MYX1 file; idempotent)."
+commands.allow = ["memory_delete"]
+
+[[permission]]
+identifier = "allow-personality-read"
+description = "Allow invoking memory:personality_read (Slot::Unlocked-gated read of the vault.personality directives block; absent blob = the default empty voice)."
+commands.allow = ["personality_read"]
+
+[[permission]]
+identifier = "allow-personality-write"
+description = "Allow invoking memory:personality_write (Slot::Unlocked-gated whole-value replace of the personality block; user-authored only, the agent never writes it, decisions/ai/0590)."
+commands.allow = ["personality_write"]

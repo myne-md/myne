@@ -260,6 +260,63 @@ const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 /// `"membership-blob"`.
 const ROLE_STR_MEMBERSHIP_KEY: &[u8] = b"membership-key";
 
+/// Registered role string for the v0.1 agent-memory catalog KEK (encrypts the
+/// `vault.agent-memory` singleton: `agent_memory_blob.rs`, `MYN1`,
+/// `protocol.md` § 9.25, myne-md/myne#697). Load-bearing: drift silently
+/// changes the KEK. `root_key`-derived (like prefs/search/chats-catalog), so
+/// it is `itemsKey`-independent and survives a later epoch rotation. Written
+/// only while `ai_enabled` is on. DISTINCT from the AAD role string
+/// `"agent-memory-catalog"` and from the per-file family KEK
+/// `"agent-memory-key"`.
+const ROLE_STR_AGENT_MEMORY_CATALOG_KEY: &[u8] = b"agent-memory-catalog-key";
+
+/// Registered role string for the Phase 2 sync blob-id of `vault.agent-memory`
+/// (myne-md/myne#697; `protocol.md` § 3.4, `sync-protocol.md` § 10.2.6). Like
+/// the chats/themes catalogs, the memory catalog is a synced singleton outside
+/// the head manifest, so it needs a deterministic, device-independent 16-byte
+/// identifier in the sync metadata plane:
+/// `agent_memory_catalog_sync_id = derive_subkey(root_key, AgentMemoryCatalogSyncId)[0..16]`.
+/// Like `chats-catalog-sync-id` this derives an *identifier*, NOT key material:
+/// the catalog KEK stays `agent-memory-catalog-key`. The per-entry `MYX1`
+/// files need no sync-id role: their sync blob-id is the entry id's own 16
+/// bytes (the attachment-id pattern). Load-bearing: drift silently splits the
+/// catalog into a second sync record on every existing account.
+const ROLE_STR_AGENT_MEMORY_CATALOG_SYNC_ID: &[u8] = b"agent-memory-catalog-sync-id";
+
+/// Registered role string for the v0.1 per-entry agent-memory blob KEK
+/// (myne-md/myne#697; encrypts the `memories/<id-hex>` entries:
+/// `agent_memory_blob.rs`, `MYX1`, `protocol.md` § 9.26 + § 3.4). One KEK for
+/// the whole family; per-entry separation comes from the `memory_entry_id`
+/// AAD binding (§ 9.26.3), the `attachment-text-key` archetype.
+/// Load-bearing: drift silently changes the KEK. `root_key`-derived (like
+/// prefs/search/attachment-text), so it is `itemsKey`-independent and survives
+/// a later epoch rotation. DISTINCT from the AAD role string
+/// `"agent-memory-blob"` and from the catalog KEK
+/// `"agent-memory-catalog-key"`.
+const ROLE_STR_AGENT_MEMORY_KEY: &[u8] = b"agent-memory-key";
+
+/// Registered role string for the v0.1 agent-personality singleton KEK
+/// (encrypts the `vault.personality` voice-directive singleton:
+/// `agent_personality_blob.rs`, `MYZ1`, `protocol.md` § 9.27,
+/// myne-md/myne#697). Load-bearing: drift silently changes the KEK.
+/// `root_key`-derived (like prefs/search/themes), so it is
+/// `itemsKey`-independent and survives a later epoch rotation. User-authored
+/// only; written only while `ai_enabled` is on. DISTINCT from the AAD role
+/// string `"personality-blob"`.
+const ROLE_STR_AGENT_PERSONALITY_KEY: &[u8] = b"agent-personality-key";
+
+/// Registered role string for the Phase 2 sync blob-id of `vault.personality`
+/// (myne-md/myne#697; `protocol.md` § 3.4, `sync-protocol.md` § 10.2.7). The
+/// personality singleton is a synced singleton outside the head manifest, so
+/// it needs a deterministic, device-independent 16-byte identifier in the sync
+/// metadata plane:
+/// `agent_personality_sync_id = derive_subkey(root_key, AgentPersonalitySyncId)[0..16]`.
+/// Like `themes-sync-id` this derives an *identifier*, NOT key material: the
+/// singleton's KEK stays `agent-personality-key`. Load-bearing: drift
+/// silently splits the singleton into a second sync record on every existing
+/// account.
+const ROLE_STR_AGENT_PERSONALITY_SYNC_ID: &[u8] = b"agent-personality-sync-id";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -417,6 +474,51 @@ pub enum SubkeyRole {
     /// every other blob KEK so the families stay domain-separated; distinct from
     /// the AAD role `"membership-blob"`.
     MembershipKey,
+    /// KEK for the v0.1 agent-memory catalog singleton (`vault.agent-memory`,
+    /// `MYN1`, myne-md/myne#697; `protocol.md` § 9.25). Encrypts the canonical-JSON
+    /// memory roster under XChaCha20-Poly1305 (CTX commitment outer).
+    /// `root_key`-derived (like prefs/search/chats-catalog), so it is
+    /// `itemsKey`-independent and survives a later epoch rotation. Written only
+    /// while the `ai_enabled` opt-in is on. Distinct from every other blob KEK so
+    /// the families stay domain-separated; distinct from the per-file family KEK
+    /// `AgentMemoryKey` and from the AAD role `"agent-memory-catalog"`.
+    AgentMemoryCatalogKey,
+    /// Phase 2 sync blob-id derivation for `vault.agent-memory` (myne-md/myne#697;
+    /// `protocol.md` § 3.4, `sync-protocol.md` § 10.2.6). The first 16 bytes of
+    /// the derived output are the catalog's reserved sync-plane blob-id:
+    /// deterministic across the fleet, indistinguishable from a note UUID to
+    /// the server. Derives an **identifier**, NOT key material (like
+    /// `ChatsCatalogSyncId`); the catalog KEK stays `AgentMemoryCatalogKey`.
+    /// The per-entry `MYX1` files carry no sync-id role: their blob-id is the
+    /// entry id itself. Domain-separated from every other role.
+    AgentMemoryCatalogSyncId,
+    /// KEK for the v0.1 per-entry agent-memory blobs (`memories/<id-hex>`,
+    /// `MYX1`, myne-md/myne#697). Encrypts each entry's distilled text under
+    /// XChaCha20-Poly1305 (CTX commitment outer). ONE KEK for the whole
+    /// family; per-entry safety comes from the `memory_entry_id` AAD binding
+    /// (§ 9.26.3), the `AttachmentTextKey` archetype. `root_key`-derived (like
+    /// prefs/search/attachment-text), so it is `itemsKey`-independent and
+    /// survives a later epoch rotation. Distinct from every other blob KEK so
+    /// the families stay domain-separated; distinct from the catalog KEK
+    /// `AgentMemoryCatalogKey` and from the AAD role `"agent-memory-blob"`.
+    AgentMemoryKey,
+    /// KEK for the v0.1 agent-personality singleton (`vault.personality`,
+    /// `MYZ1`, myne-md/myne#697; `protocol.md` § 9.27). Encrypts the canonical-JSON
+    /// voice-directive block under XChaCha20-Poly1305 (CTX commitment outer).
+    /// `root_key`-derived (like prefs/search/themes), so it is
+    /// `itemsKey`-independent and survives a later epoch rotation.
+    /// User-authored only; written only while `ai_enabled` is on. Distinct from
+    /// every other blob KEK so the families stay domain-separated; distinct
+    /// from the AAD role `"personality-blob"`.
+    AgentPersonalityKey,
+    /// Phase 2 sync blob-id derivation for `vault.personality` (myne-md/myne#697;
+    /// `protocol.md` § 3.4, `sync-protocol.md` § 10.2.7). The first 16 bytes of
+    /// the derived output are the singleton's reserved sync-plane blob-id:
+    /// deterministic across the fleet, indistinguishable from a note UUID to
+    /// the server. Derives an **identifier**, NOT key material (like
+    /// `ThemesSyncId`); the singleton's KEK stays `AgentPersonalityKey`.
+    /// Domain-separated from every other role.
+    AgentPersonalitySyncId,
 }
 
 impl SubkeyRole {
@@ -432,7 +534,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 21] = [
+    pub const ALL: [SubkeyRole; 26] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -454,6 +556,11 @@ impl SubkeyRole {
         SubkeyRole::ChatsCatalogSyncId,
         SubkeyRole::ChatsKey,
         SubkeyRole::MembershipKey,
+        SubkeyRole::AgentMemoryCatalogKey,
+        SubkeyRole::AgentMemoryCatalogSyncId,
+        SubkeyRole::AgentMemoryKey,
+        SubkeyRole::AgentPersonalityKey,
+        SubkeyRole::AgentPersonalitySyncId,
     ];
 
     /// Registered role string (the part appended after the
@@ -482,6 +589,11 @@ impl SubkeyRole {
             SubkeyRole::ChatsCatalogSyncId => ROLE_STR_CHATS_CATALOG_SYNC_ID,
             SubkeyRole::ChatsKey => ROLE_STR_CHATS_KEY,
             SubkeyRole::MembershipKey => ROLE_STR_MEMBERSHIP_KEY,
+            SubkeyRole::AgentMemoryCatalogKey => ROLE_STR_AGENT_MEMORY_CATALOG_KEY,
+            SubkeyRole::AgentMemoryCatalogSyncId => ROLE_STR_AGENT_MEMORY_CATALOG_SYNC_ID,
+            SubkeyRole::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
+            SubkeyRole::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
+            SubkeyRole::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
         }
     }
 }
@@ -598,6 +710,11 @@ mod tests {
                 SubkeyRole::ChatsCatalogSyncId => 18,
                 SubkeyRole::ChatsKey => 19,
                 SubkeyRole::MembershipKey => 20,
+                SubkeyRole::AgentMemoryCatalogKey => 21,
+                SubkeyRole::AgentMemoryCatalogSyncId => 22,
+                SubkeyRole::AgentMemoryKey => 23,
+                SubkeyRole::AgentPersonalityKey => 24,
+                SubkeyRole::AgentPersonalitySyncId => 25,
             }
         }
 
@@ -1146,6 +1263,11 @@ mod tests {
                 SubkeyRole::ChatsCatalogSyncId => "chats-catalog-sync-id",
                 SubkeyRole::ChatsKey => "chats-key",
                 SubkeyRole::MembershipKey => "membership-key",
+                SubkeyRole::AgentMemoryCatalogKey => "agent-memory-catalog-key",
+                SubkeyRole::AgentMemoryCatalogSyncId => "agent-memory-catalog-sync-id",
+                SubkeyRole::AgentMemoryKey => "agent-memory-key",
+                SubkeyRole::AgentPersonalityKey => "agent-personality-key",
+                SubkeyRole::AgentPersonalitySyncId => "agent-personality-sync-id",
             }
         }
 

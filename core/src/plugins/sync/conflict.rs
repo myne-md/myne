@@ -642,6 +642,104 @@ mod tests {
         }
     }
 
+    /// Cross-implementation vector runner for the memory-catalog merges
+    /// (myne-md/myne#697), the `chats-merge` twin: it reads
+    /// `../myne-test-vectors/vectors/agent-memory-merge/v0.1/cases.json` and
+    /// drives the SAME published cases every other implementation reads, so a
+    /// port that disagrees is caught here rather than by a user losing an
+    /// entry on a sync round.
+    #[test]
+    fn memory_merge_matches_every_published_vector() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../myne-test-vectors/vectors/agent-memory-merge/v0.1/cases.json");
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            assert!(
+                std::env::var_os("MYNE_VECTORS_REQUIRED").is_none(),
+                "MYNE_VECTORS_REQUIRED is set but the agent-memory-merge vectors are absent at {}",
+                path.display(),
+            );
+            eprintln!(
+                "[skip] agent-memory-merge vectors absent at {}",
+                path.display()
+            );
+            return;
+        };
+        let doc: serde_json::Value = serde_json::from_str(&raw).expect("vectors parse as JSON");
+        assert_eq!(doc["schema"], "agent-memory-merge");
+        assert_eq!(doc["protocol_version"], "v0.1");
+        let cases = doc["cases"]
+            .as_array()
+            .expect("vectors carry a cases array");
+        assert!(
+            cases.len() >= 3,
+            "agent-memory-merge must carry at least 3 vectors (2 catalog_merge + 1 catalog_merge_assoc); found {}",
+            cases.len()
+        );
+        assert!(
+            !cases.is_empty(),
+            "agent-memory-merge vectors must not be empty"
+        );
+
+        fn catalog_map(case: &serde_json::Value, id: &str, field: &str) -> MemoryCatalogMap {
+            serde_json::from_value(case[field].clone())
+                .unwrap_or_else(|e| panic!("[{id}] {field} parses as a memory catalog map: {e}"))
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("case carries a vector_id");
+            let kind = case["case_kind"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+            seen.insert(kind.to_string());
+            match kind {
+                "catalog_merge" => {
+                    let local = catalog_map(case, id, "input_local");
+                    let remote = catalog_map(case, id, "input_remote");
+                    let expected = catalog_map(case, id, "expected_merged");
+                    assert_eq!(
+                        merge_memory_catalog(&local, &remote),
+                        expected,
+                        "[{id}] memory catalog merge"
+                    );
+                    // Commutativity is a published property, so a port that
+                    // gets one direction right and the other wrong is caught.
+                    assert_eq!(
+                        merge_memory_catalog(&remote, &local),
+                        expected,
+                        "[{id}] memory catalog merge, swapped (commutativity)"
+                    );
+                    // Idempotence: a re-merge of the winner is a no-op, which
+                    // is what stops a device pushing forever.
+                    assert_eq!(
+                        merge_memory_catalog(&expected, &expected),
+                        expected,
+                        "[{id}] memory catalog merge is idempotent"
+                    );
+                }
+                "catalog_merge_assoc" => {
+                    let a = catalog_map(case, id, "input_a");
+                    let b = catalog_map(case, id, "input_b");
+                    let c = catalog_map(case, id, "input_c");
+                    let expected = catalog_map(case, id, "expected_merged");
+                    let left = merge_memory_catalog(&merge_memory_catalog(&a, &b), &c);
+                    let right = merge_memory_catalog(&a, &merge_memory_catalog(&b, &c));
+                    assert_eq!(left, expected, "[{id}] (A+B)+C");
+                    assert_eq!(right, expected, "[{id}] A+(B+C)");
+                }
+                other => panic!("[{id}] unknown case_kind '{other}'"),
+            }
+        }
+        for required in ["catalog_merge", "catalog_merge_assoc"] {
+            assert!(
+                seen.contains(required),
+                "agent-memory-merge missing every case of case_kind '{required}': coverage regression"
+            );
+        }
+    }
+
     #[test]
     fn keep_both_plan_records_original_and_remote_body() {
         let plan = plan_note_keep_both(&[0x01; 16], [0xbb; 24]);
@@ -2176,5 +2274,61 @@ mod quarantine_restore_tests {
             assert_ne!(a, id.to_string());
             assert_ne!(b, id.to_string());
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// agent-memory catalog merge (myne-md/myne#697, sync-protocol.md §10.2.6)
+// ---------------------------------------------------------------------------
+
+use crate::plugins::memory::commands::{MemoryCatalogMap, MemoryEntryRow};
+
+/// Merge two `vault.agent-memory` catalog maps: the per-id causal join with
+/// remove-wins tombstone ties (the `merge_chats_catalog` discipline applied to
+/// the memory roster, § 9.25 + `sync-protocol.md` § 10.2.6). Commutative,
+/// idempotent and associative by construction.
+pub fn merge_memory_catalog(
+    local: &MemoryCatalogMap,
+    remote: &MemoryCatalogMap,
+) -> MemoryCatalogMap {
+    let mut merged = MemoryCatalogMap::new();
+    let ids = merge_set_union(
+        &local.keys().cloned().collect::<Vec<_>>(),
+        &remote.keys().cloned().collect::<Vec<_>>(),
+    );
+    for id in ids {
+        let entry = match (local.get(&id), remote.get(&id)) {
+            (Some(l), None) => l.clone(),
+            (None, Some(r)) => r.clone(),
+            (Some(l), Some(r)) => join_by_version(l, r, |e| e.version, memory_entry_tie_break),
+            (None, None) => unreachable!("id came from the key union"),
+        };
+        merged.insert(id, entry);
+    }
+    merged
+}
+
+/// Total-order tie-break for two memory roster rows at an equal `version`
+/// (a true concurrent mutation pair). **Remove-wins**: a tombstone outranks a
+/// live row. Within a class it compares every retained field so the order is
+/// total (`Equal` only when the rows are byte-identical): `quarantined` rides
+/// both tuples, so a hold-vs-release pair at one version still orders
+/// deterministically (myne-md/myne#709).
+fn memory_entry_tie_break(a: &MemoryEntryRow, b: &MemoryEntryRow) -> Ordering {
+    match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
+        (true, false) => Ordering::Greater, // remove-wins
+        (false, true) => Ordering::Less,
+        (true, true) => (a.deleted_at, a.created_at, a.updated_at, a.quarantined).cmp(&(
+            b.deleted_at,
+            b.created_at,
+            b.updated_at,
+            b.quarantined,
+        )),
+        (false, false) => (a.updated_at, a.version, a.created_at, a.quarantined).cmp(&(
+            b.updated_at,
+            b.version,
+            b.created_at,
+            b.quarantined,
+        )),
     }
 }

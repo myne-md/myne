@@ -86,7 +86,7 @@ function settle(end: LoopEnd, proposal: Proposal = ONE_EDIT) {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  }, currentRunEpoch());
+  memoryUpdated: 0,}, currentRunEpoch());
 }
 
 function mount() {

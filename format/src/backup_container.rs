@@ -55,6 +55,14 @@ impl<T: Read + Seek> ReadSeek for T {}
 pub const BACKUP_CONTAINER_MAGIC: [u8; 4] = *b"MYB1";
 
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
+///
+/// Deliberately NOT bumped for new member families (chats in myne-md/myne#675,
+/// agent-memory + personality in myne-md/myne#697): an older release restores
+/// a backup carrying an unknown member with `PathNotAllowlisted` at stage 3,
+/// and a version bump would not restore readability, it would only move the
+/// refusal from the member to the header. Forward-compat is by allowlist, not
+/// by version: unknown members refuse, known members restore. (myne-md/myne#697
+/// review: the accepted posture, stated here rather than bumped.)
 pub const BACKUP_CONTAINER_PROTOCOL_VERSION: u8 = 0x01;
 
 /// `reserved` byte at offset 5 — MUST be `0x00`.
@@ -108,6 +116,15 @@ pub enum MemberFamily {
     ChatsCatalog,
     /// `chats/<32-hex conversation id>` (§9.24, myne-md/myne#675).
     ConversationFile,
+    /// `vault.agent-memory` memory catalog (§9.25, myne-md/myne#697):
+    /// authoritative user data and a Class-1 sync member, so `sync ⊆ backup`
+    /// requires it here (the #256 class).
+    MemoryCatalog,
+    /// `memories/<32-hex entry id>` (§9.26, myne-md/myne#697).
+    MemoryEntry,
+    /// `vault.personality` personality blob (§9.27, myne-md/myne#697):
+    /// authoritative user data and a Class-1 sync member, same rule.
+    Personality,
 }
 
 /// Allocation-bound cap for a member of `family` (§9.11.6 — the exact cap
@@ -157,6 +174,24 @@ pub fn family_member_cap(family: MemberFamily) -> u64 {
         }
         // §9.24.4: 16 MiB plaintext cap + envelope overhead, rounded up.
         MemberFamily::ConversationFile => 17 * 1024 * 1024,
+        // §9.25.3: 1 MiB plaintext cap + 34-byte header + 32-byte CTX tag.
+        MemberFamily::MemoryCatalog => {
+            (protocol::agent_memory_catalog_blob::MAX_AGENT_MEMORY_CATALOG_PLAINTEXT_LEN
+                + protocol::agent_memory_catalog_blob::AGENT_MEMORY_CATALOG_HEADER_LEN
+                + 32) as u64
+        }
+        // §9.26.4: 256 KiB plaintext cap + envelope overhead, rounded up.
+        MemberFamily::MemoryEntry => {
+            (protocol::agent_memory_entry_blob::MAX_AGENT_MEMORY_PLAINTEXT_LEN
+                + protocol::agent_memory_entry_blob::AGENT_MEMORY_BLOB_HEADER_LEN
+                + 32) as u64
+        }
+        // §9.27.3: 256 KiB plaintext cap + 34-byte header + 32-byte CTX tag.
+        MemberFamily::Personality => {
+            (protocol::agent_personality_blob::MAX_AGENT_PERSONALITY_PLAINTEXT_LEN
+                + protocol::agent_personality_blob::AGENT_PERSONALITY_HEADER_LEN
+                + 32) as u64
+        }
     }
 }
 
@@ -309,6 +344,8 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
         "vault.themes" => return Some(MemberFamily::VaultThemes),
         "vault.attachments" => return Some(MemberFamily::AttachmentsCatalog),
         "vault.chats" => return Some(MemberFamily::ChatsCatalog),
+        "vault.agent-memory" => return Some(MemberFamily::MemoryCatalog),
+        "vault.personality" => return Some(MemberFamily::Personality),
         _ => {}
     }
     if let Some(rest) = path.strip_prefix("notes/") {
@@ -329,6 +366,11 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
         // stray file in `chats/` that is not a conversation id is not
         // containerized (same discipline as `mode_for`).
         return (rest.len() == 32 && is_lower_hex(rest)).then_some(MemberFamily::ConversationFile);
+    }
+    if let Some(rest) = path.strip_prefix("memories/") {
+        // Entry ids are 16 bytes (32 lower-hex chars, no separators): same
+        // discipline as the conversation-file arm above.
+        return (rest.len() == 32 && is_lower_hex(rest)).then_some(MemberFamily::MemoryEntry);
     }
     None
 }

@@ -59,6 +59,10 @@ export interface AgentSummaryJson {
   notesRead: number;
   iterations: number;
   charsOffDevice: number | null;
+  /** How many memory entries the run wrote (myne-md/myne#697, the desktop
+   *  `memoryUpdated` twin): absent on turns written before this client
+   *  learned the field, which reads as zero rather than malformed. */
+  memoryUpdated?: number;
   end: string;
   proposal?: {
     edits: { noteId: string; anchor: string; replacement: string }[];
@@ -167,7 +171,7 @@ function isFiniteNumber(v: unknown): v is number {
  *  its text but the summary is dropped, so a corrupt summary cannot flow into
  *  render paths (`summary.length`) while user text is never the price. */
 function parseAgentSummary(raw: Record<string, unknown>): AgentSummaryJson | null {
-  const { runId, summary, edits, newNotes, notesRead, iterations, charsOffDevice, end } = raw;
+  const { runId, summary, edits, newNotes, notesRead, iterations, charsOffDevice, memoryUpdated, end } = raw;
   if (typeof runId !== "string" || typeof summary !== "string") return null;
   if (
     !isFiniteNumber(edits) ||
@@ -189,6 +193,10 @@ function parseAgentSummary(raw: Record<string, unknown>): AgentSummaryJson | nul
     charsOffDevice,
     end,
   };
+  if (memoryUpdated !== undefined) {
+    if (!isFiniteNumber(memoryUpdated)) return null;
+    out.memoryUpdated = memoryUpdated;
+  }
   if (isRecord(raw["proposal"])) {
     const proposal = raw["proposal"];
     const editsOk =
