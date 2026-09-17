@@ -18,7 +18,7 @@ use crate::plugins::agent::error::AgentError;
 use crate::plugins::memory::commands::PersonalityView;
 
 /// What one `remember` action carries (the `decisions/ai/0590` schema:
-/// `remember{entry_id, text}`).
+/// `remember{entry_id, text}`, plus the run's own provenance, myne-md/myne#709).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RememberAction {
     /// Write (or overwrite) the entry named `entry_id`. A caller-supplied id
@@ -29,7 +29,31 @@ pub enum RememberAction {
     Upsert {
         entry_id: Option<String>,
         text: String,
+        /// The writing run's id, dash-stripped to 32 hex. Stored as the
+        /// entry's `source_conversation` link, which is what makes model rows
+        /// provenance-tagged and the authorship gate evaluable
+        /// (`decisions/ai/0591`): the loop always supplies this, so a model
+        /// row without a link cannot occur through this seam.
+        source_run_hex: String,
+        /// The folders of every note this run has read so far (deduped, raw
+        /// `folder:` values; unknown folders arrive as `""`, the vault root,
+        /// which the exclusion test never matches). The memory write checks
+        /// them against the live `ai_excluded_folders` set at the write
+        /// boundary, so a folder excluded mid-run refuses the write.
+        source_folders: Vec<String>,
     },
+}
+
+/// What one applied `remember` action reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RememberOutcome {
+    /// The entry id written (minted or adopted).
+    pub entry_id: String,
+    /// Whether the write was held: a model create whose text tripped the
+    /// scan persists as `quarantined` (listed for user review, never
+    /// injected) rather than going live. The loop reports this distinctly so
+    /// the model does not present a held entry as remembered.
+    pub quarantined: bool,
 }
 
 /// The loop's seam to the memory plugin.
@@ -44,10 +68,13 @@ pub trait MemoryStore: Send + Sync {
     /// blob → empty (the default voice).
     async fn personality_for_injection(&self) -> Result<PersonalityView, AgentError>;
     /// Apply one `remember` action. The plugin's write-time gate (schema +
-    /// cap + scan) runs inside; a scan rejection is `AgentError::MemoryScanRejected`.
+    /// cap + scan + authorship + exclusion) runs inside; a scan rejection is
+    /// `AgentError::MemoryScanRejected`, an authorship refusal
+    /// `AgentError::MemoryAuthorshipRefused`, an exclusion refusal
+    /// `AgentError::MemoryExcludedSource`.
     /// The impl owns the clock (the loop is host-generic; core compiles for
     /// wasm32 where a wall-clock read panics).
-    async fn remember(&self, action: RememberAction) -> Result<String, AgentError>;
+    async fn remember(&self, action: RememberAction) -> Result<RememberOutcome, AgentError>;
 }
 
 /// Render the system turn's memory + personality block (`decisions/ai/0590`).

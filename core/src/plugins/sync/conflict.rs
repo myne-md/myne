@@ -2311,18 +2311,24 @@ pub fn merge_memory_catalog(
 /// Total-order tie-break for two memory roster rows at an equal `version`
 /// (a true concurrent mutation pair). **Remove-wins**: a tombstone outranks a
 /// live row. Within a class it compares every retained field so the order is
-/// total (`Equal` only when the rows are byte-identical).
+/// total (`Equal` only when the rows are byte-identical): `quarantined` rides
+/// both tuples, so a hold-vs-release pair at one version still orders
+/// deterministically (myne-md/myne#709).
 fn memory_entry_tie_break(a: &MemoryEntryRow, b: &MemoryEntryRow) -> Ordering {
     match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
         (true, false) => Ordering::Greater, // remove-wins
         (false, true) => Ordering::Less,
-        (true, true) => (a.deleted_at, a.created_at, a.updated_at).cmp(&(
+        (true, true) => (a.deleted_at, a.created_at, a.updated_at, a.quarantined).cmp(&(
             b.deleted_at,
             b.created_at,
             b.updated_at,
+            b.quarantined,
         )),
-        (false, false) => {
-            (a.updated_at, a.version, a.created_at).cmp(&(b.updated_at, b.version, b.created_at))
-        }
+        (false, false) => (a.updated_at, a.version, a.created_at, a.quarantined).cmp(&(
+            b.updated_at,
+            b.version,
+            b.created_at,
+            b.quarantined,
+        )),
     }
 }
