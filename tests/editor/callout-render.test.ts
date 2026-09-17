@@ -123,13 +123,15 @@ describe("callouts", () => {
   // label, so it is what triggers a rebuild on that boundary; the *next edit* is
   // the same rebuild path and is the step the issue reports. `inclusive: true`
   // on the replacement is the fix.
-  it("re-labels on a language switch and keeps its header through the edit that follows", async () => {
+  it("re-labels on a language switch through the production ambient channel", async () => {
     m = mount("> [!note]\n> body text\n");
     expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
 
-    // A language switch alone does not touch the view; the following rebuild is
-    // what re-reads `i18n.t`. Injecting a minimal `tr` bundle keeps the assertion
-    // independent of a catalog that may not be loaded in this environment.
+    // The rebuild is driven the way production drives it: the host adapter
+    // carries the active language in `DateTimeDisplay.locale` and republishes
+    // when it changes, which fires the shared `ambientLabelsChanged` gate. A
+    // synthetic doc edit would pass through the `docChanged` gate instead and
+    // prove nothing about the ambient path.
     i18n.addResourceBundle(
       "tr",
       "common",
@@ -138,10 +140,43 @@ describe("callouts", () => {
       true,
     );
     await i18n.changeLanguage("tr");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, locale: "tr" });
+
+    const title = query(m, ".cm-callout-title");
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toContain("NOT-TR");
+    __resetDateTimeDisplayForTest();
+  });
+
+  it("keeps its header through the edit that follows a language switch", async () => {
+    m = mount("> [!note]\n> body text\n");
+    i18n.addResourceBundle(
+      "tr",
+      "common",
+      { editor: { callout: { label: { note: "NOT-TR" } } } },
+      true,
+      true,
+    );
+    await i18n.changeLanguage("tr");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, locale: "tr" });
     m.view.dispatch({ changes: { from: m.view.state.doc.length, insert: "x" } });
 
     const title = query(m, ".cm-callout-title");
     expect(title).not.toBeNull();
     expect(title!.textContent).toContain("NOT-TR");
+    __resetDateTimeDisplayForTest();
+  });
+
+  it("keeps end-of-line typing visible", () => {
+    // Pins that a keystroke landing exactly on the end of the header line
+    // renders: the header replacement must never absorb it into the hidden
+    // span, or the typed character would vanish with the document unchanged.
+    m = mount("> [!note]\n> body text\n");
+    const end = m.view.state.doc.line(1).to;
+    m.view.dispatch({ changes: { from: end, insert: "!" } });
+
+    expect(m.view.state.doc.toString()).toContain("> [!note]!");
+    expect(query(m, ".cm-callout-title")).not.toBeNull();
+    expect(renderedText(m)).toContain("!");
   });
 });
