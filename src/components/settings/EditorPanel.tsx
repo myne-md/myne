@@ -1,5 +1,5 @@
 // Settings → Editor panel: note-authoring behaviour preferences that are not
-// visual — spell-check (toggle + language picker, MYND-267) and daily-notes
+// visual - spell-check (toggle + language picker, MYND-267) and daily-notes
 // configuration (folder / date-format / template, MYND-191). Both moved here
 // from the Appearance panel, which had become a grab-bag of visual + editor
 // controls; the Editor panel keeps Appearance purely visual (theme / custom
@@ -8,7 +8,7 @@
 //
 // Each child control persists **disk-first** with no in-flight gating (the
 // writes are fast, not Argon2-bound), matching their prior behaviour under
-// Appearance. This panel is a thin composition shell — the persistence logic
+// Appearance. This panel is a thin composition shell - the persistence logic
 // lives in the two child components.
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -35,11 +35,20 @@ import { ViewsSettings } from "./ViewsSettings";
 import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
+import { SettingRow } from "./SettingRow";
+import { Segmented } from "../primitives/Segmented";
+import { Switch } from "../primitives/Switch";
 import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useWorkspace } from "../../notes/workspaceContext";
+import {
+  TASK_CHIP_COLORS,
+  TASK_CHIP_INK,
+  type TaskChipColor,
+} from "../../notes/taskDisplay";
 
 // Two-column layout: the controls scroll on the left, a live preview sticks on
-// the right. Only the Editor tab carries a preview — it is the one tab whose
+// the right. Only the Editor tab carries a preview - it is the one tab whose
 // settings (type size, line spacing, font) have an effect you cannot picture
 // without seeing it, and the editor itself is hidden behind the modal while you
 // choose. No other Settings tab needs one.
@@ -147,7 +156,7 @@ const SPELL_SQUIGGLE_STYLE: CSSProperties = {
 };
 
 // Live typography specimen for the Editor tab. Reads prefs via its own
-// `usePrefs` — the typography setters (and line-numbers / view-mode / spell
+// `usePrefs` - the typography setters (and line-numbers / view-mode / spell
 // toggles) bump the prefs nonce, which every `usePrefs` instance subscribes to
 // and re-reads on, so the specimen updates as the user changes a control (same
 // path the live editor updates through). It reflects the four typography
@@ -192,7 +201,7 @@ function EditorSettingsPreview() {
 
   let bodyEl: ReactNode;
   if (mode === "source") {
-    // Raw markdown, mono — what Source view shows.
+    // Raw markdown, mono - what Source view shows.
     const src = [`# ${heading}`, "", body, "", `- ${bullets[0]}`, `- ${bullets[1]}`];
     bodyEl = (
       <div>
@@ -272,10 +281,93 @@ export interface EditorPanelProps {
   onShowToast?: (message: string) => void;
 }
 
+const CHIP_SETTING_CONTROL_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+const CHIP_SAMPLE_STYLE: CSSProperties = {
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-pill)",
+  padding: "2px 8px",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-medium)",
+  whiteSpace: "nowrap",
+};
+
+/**
+ * Settings -> Editor -> Tasks: the task chip's ink colour (myne-md/myne#656
+ * item 4). Device-local and window-global, carried on the workspace container
+ * (not a vault pref). The stored value is a closed enum that SELECTS a token,
+ * so a tampered descriptor can never land a string in a style position.
+ */
+function TaskChipInkSetting(): ReactNode {
+  const { t } = useTranslation();
+  const ws = useWorkspace();
+  const value = ws.taskDisplay.chipColor;
+  return (
+    <SettingRow
+      label={t("settings.editor.taskChipColor.label")}
+      helper={t("settings.editor.taskChipColor.help")}
+      testId="settings.editor.taskChipColor"
+      anchorId="settings.editor.taskChipColor"
+      control={(helperId) => (
+        <div style={CHIP_SETTING_CONTROL_STYLE}>
+          <span
+            style={{ ...CHIP_SAMPLE_STYLE, color: TASK_CHIP_INK[value] }}
+            aria-hidden="true"
+          >
+            {t("settings.editor.taskChipColor.sample")}
+          </span>
+          <Segmented
+            options={TASK_CHIP_COLORS.map((c) => ({
+              value: c,
+              label: t(`settings.editor.taskChipColor.${c}`),
+            }))}
+            value={value}
+            onChange={(v) => ws.setTaskDisplay({ ...ws.taskDisplay, chipColor: v as TaskChipColor })}
+            ariaLabel={t("settings.editor.taskChipColor.label")}
+            ariaDescribedBy={helperId}
+            testId="settings.editor.taskChipColor.control"
+          />
+        </div>
+      )}
+    />
+  );
+}
+
+/**
+ * Settings -> Editor -> Tasks: icon-only priority chips (myne-md/myne#656 item
+ * 5). Device-local; applied through a root attribute so a live editor does not
+ * need reconfiguring.
+ */
+function TaskChipIconOnlySetting(): ReactNode {
+  const { t } = useTranslation();
+  const ws = useWorkspace();
+  return (
+    <SettingRow
+      label={t("settings.editor.taskChipIconOnly.label")}
+      helper={t("settings.editor.taskChipIconOnly.help")}
+      testId="settings.editor.taskChipIconOnly"
+      anchorId="settings.editor.taskChipIconOnly"
+      control={
+        <Switch
+          checked={ws.taskDisplay.iconOnly}
+          onChange={(next) => ws.setTaskDisplay({ ...ws.taskDisplay, iconOnly: next })}
+          ariaLabel={t("settings.editor.taskChipIconOnly.label")}
+          testId="settings.editor.taskChipIconOnly.control"
+        />
+      }
+    />
+  );
+}
+
 export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
   const { t } = useTranslation();
   // Task reminders (MYND-618) read their pref here and echo the toggle locally:
-  // `usePrefs` reads once on mount, so the panel — not the hook — is what keeps
+  // `usePrefs` reads once on mount, so the panel - not the hook - is what keeps
   // the switch in step with the write the block performs itself.
   const { prefs, setReminderHorizon } = usePrefs(onShowToast);
   // On a narrow dialog the 264px preview column is dropped (#391): it is
@@ -299,10 +391,10 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
         title={t("settings.editor.sections.text")}
         testId="settings.section.editor-text"
       >
-        {/* Editor-typography (editor-typography) — text size / line spacing /
+        {/* Editor-typography (editor-typography) - text size / line spacing /
             content width / font family presets. */}
         <TypographySettings />
-        {/* Line-number gutter toggle (editor-line-numbers, MYND-314) — off by
+        {/* Line-number gutter toggle (editor-line-numbers, MYND-314) - off by
             default. */}
         <LineNumbersSettings />
       </SettingsSection>
@@ -311,7 +403,7 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
         title={t("settings.editor.sections.editing")}
         testId="settings.section.editor-editing"
       >
-        {/* Vim keyboard mode (vim-keyboard-mode, MYND-313) — optional modal
+        {/* Vim keyboard mode (vim-keyboard-mode, MYND-313) - optional modal
             editing; off by default. The engine is only downloaded when this is
             turned on.
 
@@ -319,20 +411,20 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
             block in PrivacyPanel carries: a power-user editing affordance kept
             out of the default Settings surface. It stays in Editor rather than
             moving to a Developer panel so "where's my vim setting?" still lands
-            where the topic lives. Hiding is not disabling — an already-enabled
+            where the topic lives. Hiding is not disabling - an already-enabled
             keymap keeps running when the mode goes back off. */}
         {prefs.developer_mode && <VimModeSettings />}
-        {/* Default view mode (reading-source-modes, MYND-299) — Live/Reading/
+        {/* Default view mode (reading-source-modes, MYND-299) - Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />
-        {/* Date, time and zone DISPLAY (myne#279) — the single home for how a
+        {/* Date, time and zone DISPLAY (myne#279) - the single home for how a
             date is printed, replacing four surfaces that each decided for
             themselves. Display only: note bytes stay zone-free wall-clock. */}
         <DateTimeSettings />
-        {/* Focus-mode behaviours (focus-mode, MYND-348) — typewriter scroll +
+        {/* Focus-mode behaviours (focus-mode, MYND-348) - typewriter scroll +
             dim inactive lines, honored when focus mode (⇧⌘F) is active. */}
         <FocusModeSettings />
-        {/* Floating-toolbar customization (MYND-336) — reorder + show/hide the
+        {/* Floating-toolbar customization (MYND-336) - reorder + show/hide the
             selection toolbar's buttons over the frozen command vocabulary. */}
         <ToolbarCustomizeSettings />
       </SettingsSection>
@@ -341,9 +433,9 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
         title={t("settings.editor.sections.writing")}
         testId="settings.section.editor-writing"
       >
-        {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
+        {/* Spell-check configuration (MYND-267) - toggle + language picker. */}
         <SpellSettings />
-        {/* Task reminders (MYND-618) — note-authoring behaviour, which is why it
+        {/* Task reminders (MYND-618) - note-authoring behaviour, which is why it
             belongs in this group rather than under Appearance. Device-local:
             whether THIS machine is interrupted is a property of the machine. */}
         <ReminderSettings enabled={remindersOn} onEnabledChange={setRemindersEnabledEcho} />
@@ -360,6 +452,16 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
         />
       </SettingsSection>
 
+      <SettingsSection
+        title={t("settings.editor.sections.tasks")}
+        testId="settings.section.editor-tasks"
+      >
+        {/* Task chip ink colour (myne-md/myne#656 item 4) - device-local. */}
+        <TaskChipInkSetting />
+        {/* Icon-only priority chips (myne-md/myne#656 item 5) - device-local. */}
+        <TaskChipIconOnlySetting />
+      </SettingsSection>
+
       {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /
           title format / template, one section per period. Rendered at PANEL
           level rather than inside Writing above: `SettingsSection` draws a rule
@@ -372,10 +474,10 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
         title={t("settings.editor.sections.features")}
         testId="settings.section.editor-features"
       >
-        {/* Note-archive feature toggle — on by default; turning it off restores
+        {/* Note-archive feature toggle - on by default; turning it off restores
             every archived note and hides the archive controls. */}
         <ArchiveSettings />
-        {/* Views feature toggle (device-local) — off by default; counted on when
+        {/* Views feature toggle (device-local) - off by default; counted on when
             the vault already has saved views. Hides the sidebar "Views" entry. */}
         <ViewsSettings />
       </SettingsSection>

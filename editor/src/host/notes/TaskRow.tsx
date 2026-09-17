@@ -1,7 +1,7 @@
 // The shared task row (MYND-616, task 1).
 //
 // ONE row component for every task surface: the vault-wide tab, the note-scoped
-// right-panel tab, and — later — the query block. It lives in the **shared
+// right-panel tab, and - later - the query block. It lives in the **shared
 // package from day one** rather than in the desktop tree, because the mobile
 // surfaces consume it too and moving it afterwards would break two repositories
 // in the same change.
@@ -11,20 +11,31 @@
 // written for exactly this consumer and already exports `taskChipStyle()`.
 //
 // SCOPE, not caller identity. The row takes `scope` and decides for itself what
-// context to show — the source note is redundant in a note-scoped panel and
+// context to show - the source note is redundant in a note-scoped panel and
 // essential in a vault-wide list. Branching on "who mounted me" would put that
 // knowledge in three places and let them disagree; a parameter keeps it here.
 //
 // Canon rules that are constraints, not preferences:
 //   - **no green check, anywhere**. A completed row is expressed by a filled
-//     neutral box and struck-through muted text;
-//   - **state is never carried by a fill.** Overdue is coloured *text* on the
-//     date chip, never a red pill;
+//     box and struck-through text, never a tick glyph;
+//   - **completion is the one ruled exception to state-never-by-fill** in this
+//     panel: the box and the strike are ACCENT (`docs/design/README.md`
+//     "Task completion", `design-notes/ui/0587`). Everywhere else — the date
+//     chip's overdue ink, the editor's inline affordances — state stays text,
+//     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.
 
-import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactElement,
+} from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
+import { taskChipIcon } from "./taskChipIcon";
 import "./task-row.css";
 import { formatStoredValue } from "../lib/datetimeFormat";
 import { useDateTimeDisplay } from "../lib/useDateTimeDisplay";
@@ -41,9 +52,15 @@ export type TaskRowScope = "vault" | "note" | "query";
 export type TaskRowData = {
   /** Stable identity for React keys and for the toggle callback. */
   key: string;
-  /** The task's text — marker and fields already stripped (`taskDescription`). */
+  /** The task's text - marker and fields already stripped (`taskDescription`). */
   text: string;
   completed: boolean;
+  /**
+   * How far to indent this row, relative to the rows on screen (myne-md/myne#656
+   * item 7). `0`/absent is a top-level row. The panel computes it and promotes a
+   * task whose parent is filtered out back to `0`; the row only renders it.
+   */
+  depth?: number;
   /** Source note title, or null for an untitled note. */
   noteTitle: string | null;
   due?: string;
@@ -52,7 +69,7 @@ export type TaskRowData = {
   priority?: string;
   /**
    * The record's raw line was truncated, so it cannot be written (MYND-612
-   * task 5). The row still renders — dropping it would make the task vanish —
+   * task 5). The row still renders - dropping it would make the task vanish -
    * but its checkbox is disabled and says why.
    */
   oversized?: boolean;
@@ -81,20 +98,44 @@ export type TaskRowProps = {
    * case.
    */
   twoLine?: boolean;
+  /** Tighter horizontal padding, for the narrow note-scoped panel
+   *  (myne-md/myne#656 review). */
+  compactX?: boolean;
+  /**
+   * Render the date under the text as an accent icon + label instead of the
+   * right-hand chip, for the narrow note-scoped panel (myne-md/myne#656 review).
+   */
+  inlineDate?: boolean;
 };
+
+/** The chip's leading Lucide glyph, as a React element. */
+function ChipGlyph({ kind }: { kind: "due" | "remind" }): ReactElement {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el !== null) el.replaceChildren(taskChipIcon(kind, ""));
+  }, [kind]);
+  return (
+    <span
+      ref={ref}
+      style={{ display: "inline-flex", width: 12, height: 12, flex: "0 0 auto" }}
+      aria-hidden="true"
+    />
+  );
+}
 
 /**
  * The date the row files this task under: the due date, **falling back to the
  * reminder**.
  *
  * A task carrying only a reminder would otherwise read as undated and drop out
- * of every dated view — which is the case `remind` being absolute exists to
+ * of every dated view - which is the case `remind` being absolute exists to
  * support ("remind me Tuesday to call my mother"). The same axis is used by the
  * filter predicates; this function is display-side only and does not define it.
  *
  * Normalizes here rather than at each consumer. `TaskRowData` promises
  * optional-or-absent, but the `MYI1` row serializes `Option<String>` as `null`,
- * so a client whose boundary skipped the `taskWire.ts` decoder hands one down —
+ * so a client whose boundary skipped the `taskWire.ts` decoder hands one down -
  * and `undefined ?? null` is `null`, which `=== undefined` misses. Both
  * consumers then break differently: `isOverdue` slices a non-string (the iOS
  * Tasks-tab crash), and the render guard emits an empty date chip. One `== null`
@@ -109,7 +150,7 @@ function rowDate(task: TaskRowData): string | undefined {
  * Whether the row's date is in the past.
  *
  * Compares `YYYY-MM-DD` prefixes as strings, which is exact for that format and
- * needs no date library — the shape is fixed normatively by
+ * needs no date library - the shape is fixed normatively by
  * `markdown-dialect.md` §3.6.4, so this is consuming the type authority rather
  * than adding a second one. A date carrying a time still compares correctly
  * because the day prefix is what is sliced.
@@ -122,9 +163,14 @@ function isOverdue(task: TaskRowData, today: string): boolean {
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   gap: "var(--space-2)",
-  padding: "6px 8px",
+  // NO fixed height here: the windowed list wraps each row in a fixed-height
+  // box that centres it, while the note-scoped panel renders rows in flow with
+  // their natural (two-line) height (myne-md/myne#656 review).
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "var(--space-1) 8px",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
@@ -136,7 +182,6 @@ const BOX_BASE: CSSProperties = {
   flex: "0 0 auto",
   width: 14,
   height: 14,
-  marginTop: 3,
   borderRadius: "var(--radius-1)",
   border: "1px solid var(--line-2, var(--line-1))",
   background: "transparent",
@@ -147,12 +192,32 @@ const BOX_BASE: CSSProperties = {
 function boxStyle(completed: boolean, disabled: boolean): CSSProperties {
   return {
     ...BOX_BASE,
-    // A completed box is FILLED, not ticked. The canon forbids a green check,
-    // and a neutral fill says "done" without congratulating anyone.
-    background: completed ? "var(--fg-3)" : "transparent",
-    borderColor: completed ? "var(--fg-3)" : "var(--line-2, var(--line-1))",
+    // A completed box is FILLED, not ticked - the canon forbids a green check.
+    // The fill is the ACCENT (myne-md/myne#656, decided in the panel grill),
+    // which is the one place completion is allowed to read as state; the editor
+    // keeps its neutral inline treatment.
+    background: completed ? "var(--accent)" : "transparent",
+    borderColor: completed ? "var(--accent)" : "var(--line-2, var(--line-1))",
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
+  };
+}
+
+/**
+ * The row's box, indented by nesting depth. The base padding lives in
+ * `ROW_STYLE`; this only overrides the leading edge, so depth 0 is byte-identical
+ * to the flat row and only nested rows move. The step is a spacing token, so a
+ * theme that re-scales the scale re-scales the tree with it.
+ */
+function rowStyle(depth: number, compactX: boolean): CSSProperties {
+  const start = compactX ? "var(--space-1)" : "var(--space-2)";
+  const base = compactX
+    ? { ...ROW_STYLE, padding: `0 ${start}` }
+    : ROW_STYLE;
+  if (depth <= 0) return base;
+  return {
+    ...base,
+    paddingInlineStart: `calc(${start} + var(--space-4) * ${depth})`,
   };
 }
 
@@ -160,9 +225,14 @@ function textStyle(completed: boolean): CSSProperties {
   return {
     flex: "1 1 auto",
     minWidth: 0,
+    // One line, ellipsis: the windowed list has a FIXED row height, so wrapping
+    // would break the offset maths. The full text is on the `title` attr.
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
     textDecoration: completed ? "line-through" : "none",
-    color: completed ? "var(--fg-3)" : "var(--fg-1)",
-    overflowWrap: "anywhere",
+    // Completion is the one state this panel renders in accent (myne-md/myne#656).
+    color: completed ? "var(--accent)" : "var(--fg-1)",
   };
 }
 
@@ -176,7 +246,7 @@ const STACK_STYLE: CSSProperties = {
 };
 
 /** The second line. Left-aligned under the text, not right-aligned like the
- *  single-line meta block — a right-aligned second line reads as a separate
+ *  single-line meta block - a right-aligned second line reads as a separate
  *  column rather than as this row's own detail. */
 const SECOND_LINE_STYLE: CSSProperties = {
   display: "flex",
@@ -184,6 +254,14 @@ const SECOND_LINE_STYLE: CSSProperties = {
   gap: 6,
   flexWrap: "wrap",
   minWidth: 0,
+};
+
+const INLINE_DATE_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  color: "var(--accent)",
+  fontSize: "var(--text-xs)",
 };
 
 const META_STYLE: CSSProperties = {
@@ -218,7 +296,10 @@ export function TaskRow({
   onOpen,
   testIdPrefix = "task-row",
   twoLine = false,
+  compactX = false,
+  inlineDate = false,
 }: TaskRowProps): ReactElement {
+  const stacked = twoLine || inlineDate;
   const overdue = isOverdue(task, today);
   // myne#279: the row used to render the raw stored string, which meant a raw
   // ISO date and a time that was silently dropped by the `[0,10]` slice on the
@@ -227,6 +308,8 @@ export function TaskRow({
   const display = useDateTimeDisplay();
   const raw = rowDate(task);
   const date = raw === undefined ? undefined : formatStoredValue(raw, display);
+  const depth = task.depth ?? 0;
+  const [hover, setHover] = useState(false);
   const disabled = task.oversized === true || onToggle === undefined;
 
   const toggle = (): void => {
@@ -236,6 +319,9 @@ export function TaskRow({
   const onBoxKey = (e: KeyboardEvent<HTMLElement>): void => {
     if (e.key !== " " && e.key !== "Enter") return;
     e.preventDefault();
+    // The row itself opens on Enter/Space: without this, a keyboard toggle
+    // would bubble up and fire onOpen as well (myne-md/myne#656 review).
+    e.stopPropagation();
     toggle();
   };
 
@@ -244,15 +330,23 @@ export function TaskRow({
   // exactly the drift one shared component exists to prevent.
   const meta = (
     <>
-      {date === undefined ? null : (
+      {date === undefined ? null : inlineDate ? (
+        // Inline date (note-scoped panel): accent icon + text, no pill.
+        <span
+          style={INLINE_DATE_STYLE}
+          data-testid={`${testIdPrefix}.due`}
+          data-overdue={overdue ? "true" : undefined}
+        >
+          <ChipGlyph kind={task.due != null ? "due" : "remind"} />
+          {date}
+        </span>
+      ) : (
         <span
           style={{
             ...taskChipStyle(),
-            // State as coloured TEXT, never as a fill — the canon's rule, and
+            // State as coloured TEXT, never as a fill - the canon's rule, and
             // the reason this chip's background stays neutral while overdue.
-            // On the two-line layout this is also where the overdue indicator
-            // lives, which is what the second line is for.
-            color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.fg,
+            color: overdue ? "var(--danger)" : TASK_CHIP_TOKEN.ink,
           }}
           data-testid={`${testIdPrefix}.due`}
           data-overdue={overdue ? "true" : undefined}
@@ -267,7 +361,16 @@ export function TaskRow({
           type="button"
           style={NOTE_STYLE}
           data-testid={`${testIdPrefix}.note`}
-          onClick={() => onOpen?.(task)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen?.(task);
+          }}
+          // A keyboard activation clicks the button AND bubbles its keydown to
+          // the row, which would fire onOpen a second time (myne-md/myne#656
+          // review). The click already opens; the bubble must not.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
           title={task.noteTitle}
         >
           {task.noteTitle}
@@ -277,7 +380,42 @@ export function TaskRow({
   );
 
   return (
-    <div style={ROW_STYLE} data-testid={`${testIdPrefix}.row`} data-task-scope={scope}>
+    <div
+      style={{
+        ...rowStyle(depth, compactX),
+        // A clearly visible hover: the row is a navigation target, and a
+        // pointer alone was not enough to read (myne-md/myne#656 review).
+        background: hover ? "var(--paper-3)" : "transparent",
+        // A two-line row aligns its checkbox with the FIRST line, not the
+        // block's vertical centre (myne-md/myne#656 review).
+        alignItems: stacked ? "flex-start" : "center",
+        // The whole row is the navigation target when the caller can open the
+        // task (myne-md/myne#656 review).
+        cursor: onOpen === undefined ? "default" : "pointer",
+      }}
+      data-testid={`${testIdPrefix}.row`}
+      data-task-scope={scope}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      {...(onOpen === undefined
+        ? {}
+        : {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick: () => onOpen(task),
+            onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key === "Enter" || e.key === " ") {
+                // Inner controls (checkbox, note button) stop their own
+                // keydowns; this guard is the second half, for any control
+                // that does not (myne-md/myne#656 review).
+                if (e.target !== e.currentTarget) return;
+                e.preventDefault();
+                onOpen(task);
+              }
+            },
+          })}
+      {...(depth > 0 ? { "data-depth": String(depth) } : {})}
+    >
       <span
         role="checkbox"
         aria-checked={task.completed}
@@ -292,20 +430,33 @@ export function TaskRow({
         title={task.oversized === true ? i18n.t("tasks.row.tooLongToWrite") : undefined}
         tabIndex={disabled ? -1 : 0}
         // myne#284: the class carries a touch-only hit-area expander. The box
-        // stays 14×14 visually — the density is the point of this row — while
+        // stays 14×14 visually - the density is the point of this row - while
         // a coarse pointer gets the 44×44 the platform minimums ask for.
         className="myne-task-checkbox"
-        style={boxStyle(task.completed, disabled)}
+        style={{ ...boxStyle(task.completed, disabled), ...(stacked ? { marginTop: 3 } : {}) }}
         data-testid={`${testIdPrefix}.checkbox`}
-        onClick={toggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
         onKeyDown={onBoxKey}
       />
 
-      {twoLine ? (
+      {stacked ? (
         <span style={STACK_STYLE} data-testid={`${testIdPrefix}.stack`}>
           <span
-            style={{ ...textStyle(task.completed), flex: "0 1 auto" }}
+            style={{
+              ...textStyle(task.completed),
+              flex: "0 1 auto",
+              // The two-line layout exists to WRAP rather than truncate; the
+              // single-line one is the fixed-height windowed row.
+              whiteSpace: "normal",
+              overflow: "visible",
+              textOverflow: "clip",
+              overflowWrap: "anywhere",
+            }}
             data-testid={`${testIdPrefix}.text`}
+            title={task.text === "" ? undefined : task.text}
           >
             {task.text === "" ? i18n.t("tasks.row.untitled") : task.text}
           </span>
@@ -315,7 +466,11 @@ export function TaskRow({
         </span>
       ) : (
         <>
-          <span style={textStyle(task.completed)} data-testid={`${testIdPrefix}.text`}>
+          <span
+            style={textStyle(task.completed)}
+            data-testid={`${testIdPrefix}.text`}
+            title={task.text === "" ? undefined : task.text}
+          >
             {task.text === "" ? i18n.t("tasks.row.untitled") : task.text}
           </span>
           <span style={META_STYLE} data-testid={`${testIdPrefix}.meta`}>

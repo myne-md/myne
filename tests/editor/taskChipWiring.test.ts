@@ -35,7 +35,7 @@ afterEach(() => {
  * copy" of the shape buried inside `src/screens/Editor.tsx`, because that copy
  * could not be mounted here. The shape now lives in the shared editor package
  * (`installTaskChipEditor`), imported by BOTH desktop and mobile, so this test
- * exercises the **real** wire rather than a lookalike — and the gap it was
+ * exercises the **real** wire rather than a lookalike - and the gap it was
  * written to catch (a client that renders chips but installs no listener) is now
  * one line to get wrong instead of a whole duplicated block.
  */
@@ -74,6 +74,20 @@ function fieldInput(): HTMLInputElement | HTMLSelectElement {
   return document.querySelector('[data-testid="editor.task-field-input"]')!;
 }
 
+/** Pick `iso` on the Myne-owned calendar, moving to its month first (myne#614
+ *  replaced the native date input, which had a `.value` setter). Bidirectional
+ *  so the helper does not depend on the wall-clock month it runs in. */
+function pickDay(iso: string): void {
+  const editor = surface()!;
+  const prev = editor.querySelector('[data-testid="editor.task-date-prev"]') as HTMLElement;
+  const next = editor.querySelector('[data-testid="editor.task-date-next"]') as HTMLElement;
+  for (let i = 0; i < 120 && editor.querySelector(`[data-date="${iso}"]`) === null; i += 1) {
+    const shown = editor.querySelector("[data-date]")?.getAttribute("data-date") ?? "";
+    (iso < shown ? prev : next).click();
+  }
+  editor.querySelector<HTMLElement>(`[data-date="${iso}"]`)!.click();
+}
+
 describe("clicking a chip opens its editor", () => {
   it("opens for a due chip, prefilled with the SOURCE value", () => {
     cleanup.push(installChipListener());
@@ -81,7 +95,7 @@ describe("clicking a chip opens its editor", () => {
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(surface()).not.toBeNull();
-    expect((fieldInput() as HTMLInputElement).value).toBe("2026-08-01");
+    expect(fieldInput().getAttribute("data-date")).toBe("2026-08-01");
   });
 
   it("opens for a priority chip with the five levels", () => {
@@ -89,12 +103,12 @@ describe("clicking a chip opens its editor", () => {
     const { host } = mount();
     chip(host, "priority").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    const el = fieldInput() as HTMLSelectElement;
-    expect(el.tagName).toBe("SELECT");
-    expect(el.value).toBe("high");
+    const el = fieldInput();
+    expect(el.getAttribute("role")).toBe("combobox");
+    expect(el.getAttribute("data-value")).toBe("high");
   });
 
-  it("opens from the keyboard too — the chip is the only route in live mode", () => {
+  it("opens from the keyboard too - the chip is the only route in live mode", () => {
     cleanup.push(installChipListener());
     const { host } = mount();
     const el = chip(host, "due");
@@ -102,7 +116,7 @@ describe("clicking a chip opens its editor", () => {
     expect(surface()).not.toBeNull();
   });
 
-  it("does nothing when no listener is installed — the gap this file exists for", () => {
+  it("does nothing when no listener is installed - the gap this file exists for", () => {
     const { host } = mount();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     // This is what shipped: the event fires into nothing.
@@ -116,7 +130,7 @@ describe("committing reaches the document", () => {
     const { view, host } = mount();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     expect(view.state.doc.toString()).toContain("[due:: 2026-09-09]");
@@ -130,7 +144,7 @@ describe("committing reaches the document", () => {
     const before = view.state.doc.toString();
     chip(host, "due").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    (fieldInput() as HTMLInputElement).value = "2026-12-31";
+    pickDay("2026-12-31");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(view.state.doc.toString()).toBe(before);
@@ -138,8 +152,8 @@ describe("committing reaches the document", () => {
 
   it("commits against the CURRENT span after an edit above shifted every offset", () => {
     // The stale-offset trap, and it corrupts rather than fails. The popover
-    // stays open while the editor is live — a background autosave rewrites the
-    // frontmatter stamp about a second after any edit — so the offsets captured
+    // stays open while the editor is live - a background autosave rewrites the
+    // frontmatter stamp about a second after any edit - so the offsets captured
     // at click time no longer point at the field. Writing at them lands the new
     // value in whatever text has moved into that position; here, the heading.
     // The change-mapped StateField is what makes that unrepresentable.
@@ -149,13 +163,13 @@ describe("committing reaches the document", () => {
 
     view.dispatch({ changes: { from: 0, insert: "# A heading inserted above\n\n" } });
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     const text = view.state.doc.toString();
     expect(text).toContain("# A heading inserted above");
     expect(text).toContain("[due:: 2026-09-09]");
-    // Nothing was written into the heading — the failure a stale offset causes.
+    // Nothing was written into the heading - the failure a stale offset causes.
     expect(text.startsWith("# A heading inserted above\n\n- [ ] pay the rent")).toBe(true);
   });
 
@@ -171,7 +185,7 @@ describe("committing reaches the document", () => {
     view.dispatch({ changes: { from: line.from, to: line.to, insert: "gone" } });
     const after = view.state.doc.toString();
 
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
     expect(view.state.doc.toString()).toBe(after);
@@ -185,7 +199,7 @@ describe("committing reaches the document", () => {
 // committed exactly what that input held, so a chip carrying `2026-08-01 14:30`
 // came back as `2026-08-01`. `applyTaskFieldEdit` re-typed it through
 // `parseTaskInstant`, got `{date}` with no `time`, and the writer emitted a real
-// edit because the line differed — so the wall-clock time the user wrote was
+// edit because the line differed - so the wall-clock time the user wrote was
 // deleted from the note and autosaved, with no warning. Chips never open on
 // caret entry, so this popover is the ONLY way to touch the value.
 describe("a due chip carrying a time (myne#331)", () => {

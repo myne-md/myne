@@ -1,29 +1,30 @@
-// Task-tab state persistence (MYND-616 task 9).
+// Task-tab view persistence (MYND-616 task 9; view redesigned myne-md/myne#656).
 //
-// Filter and scope ride the **workspace descriptor**, per tab. Not a preference:
-// preferences are for stated choices like theme and auto-lock, and "which filter
-// am I looking at" is where the user is. Riding the descriptor also avoids the
-// roughly thirteen-site preference registration surface — of which the
-// specification roster is the one nothing verifies.
+// The view (filters + sort) rides the **workspace descriptor**, per tab. Not a
+// preference: "which filter am I looking at" is where the user is, and riding
+// the descriptor also avoids the roughly thirteen-site preference registration
+// surface.
 //
 // The descriptor is opaque to the storage codec, so none of this is a protocol
-// change. What the tests below actually pin is the two properties that make that
-// safe: **omit-when-default**, so an untouched task tab serializes
-// byte-identical to one written before this existed, and **degrade-don't-error**,
-// so junk or a future build's filter name cannot reject the whole blob and lose
-// every open tab.
+// change. What the tests pin is the two properties that make that safe:
+// **omit-when-default**, so an untouched task tab serializes byte-identical to
+// one written before this existed, and **degrade-don't-error**, so junk or a
+// future build's value cannot reject the whole blob and lose every open tab.
 
 import { describe, expect, it } from "vitest";
 import {
   emptyWorkspace,
   openInFocusedTab,
-  setTaskTabState,
+  setTaskViewState,
+  taskViewOf,
   tasksItem,
   TASKS_TAB_ID,
   parseItemKey,
   itemKey,
+  type WorkspaceItem,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
+import { DEFAULT_TASK_VIEW, type TaskView } from "../../src/notes/taskView";
 import { deserializeWorkspace, serializeWorkspace } from "../../src/lib/workspace-persist";
 
 function withTasksTab(): WorkspaceState {
@@ -42,6 +43,8 @@ function roundTrip(state: WorkspaceState): WorkspaceState {
   return parsed;
 }
 
+const view = (over: Partial<TaskView> = {}): TaskView => ({ ...DEFAULT_TASK_VIEW, ...over });
+
 describe("the tab kind itself", () => {
   it("is a singleton, like the graph", () => {
     const twice = openInFocusedTab(withTasksTab(), tasksItem());
@@ -55,126 +58,117 @@ describe("the tab kind itself", () => {
 });
 
 describe("omit-when-default", () => {
-  it("a fresh task tab carries neither key", () => {
-    // Byte-identical to a descriptor written before this feature existed.
-    const t = tab(withTasksTab());
-    expect(t.taskFilter).toBeUndefined();
-    expect(t.taskScope).toBeUndefined();
+  it("a fresh task tab carries no view key", () => {
+    expect(tab(withTasksTab()).taskView).toBeUndefined();
   });
 
-  it("selecting the default filter DROPS the key rather than writing it", () => {
-    let s = setTaskTabState(withTasksTab(), "p1", { filter: "overdue" });
-    expect(tab(s).taskFilter).toBe("overdue");
-    s = setTaskTabState(s, "p1", { filter: "today" });
-    expect(tab(s).taskFilter).toBeUndefined();
-  });
-
-  it("clearing the scope drops the key entirely", () => {
-    let s = setTaskTabState(withTasksTab(), "p1", { folder: "Projects", tags: ["work"] });
-    expect(tab(s).taskScope).toEqual({ folder: "Projects", tags: ["work"] });
-    s = setTaskTabState(s, "p1", { folder: null, tags: [] });
-    expect(tab(s).taskScope).toBeUndefined();
+  it("a non-default field writes the view; the default drops the whole key", () => {
+    let s = setTaskViewState(withTasksTab(), "p1", view({ sort: "priority" }));
+    expect(tab(s).taskView).toEqual({ sort: "priority" });
+    s = setTaskViewState(s, "p1", view());
+    expect(tab(s).taskView).toBeUndefined();
   });
 
   it("an empty tag list is omitted, not persisted as []", () => {
-    const s = setTaskTabState(withTasksTab(), "p1", { folder: "Projects", tags: [] });
-    expect(tab(s).taskScope).toEqual({ folder: "Projects" });
+    const s = setTaskViewState(withTasksTab(), "p1", view({ folders: ["Projects"], tags: [] }));
+    expect(tab(s).taskView).toEqual({ folders: ["Projects"] });
   });
 });
 
 describe("state survives a restart", () => {
-  it("filter and scope both round-trip", () => {
-    const s = setTaskTabState(withTasksTab(), "p1", {
-      filter: "upcoming",
-      folder: "Projects",
-      tags: ["work", "home"],
+  it("every axis round-trips", () => {
+    const s = setTaskViewState(
+      withTasksTab(),
+      "p1",
+      view({
+        status: "all",
+        due: "upcoming",
+        folders: ["Projects"],
+        noteId: "n7",
+        priority: "high",
+        sort: "note",
+      }),
+    );
+    expect(taskViewOf(tab(roundTrip(s)) as unknown as WorkspaceItem)).toEqual({
+      status: "all",
+      due: "upcoming",
+      folders: ["Projects"],
+      noteId: "n7",
+      tags: [],
+      priority: "high",
+      sort: "note",
     });
-    const back = tab(roundTrip(s));
-    expect(back.taskFilter).toBe("upcoming");
-    expect(back.taskScope).toEqual({ folder: "Projects", tags: ["work", "home"] });
   });
 
-  it("a default-state tab round-trips carrying neither key", () => {
-    expect(tab(roundTrip(withTasksTab())).taskFilter).toBeUndefined();
-    expect(tab(roundTrip(withTasksTab())).taskScope).toBeUndefined();
-  });
-
-  it("partial updates preserve the other half", () => {
-    let s = setTaskTabState(withTasksTab(), "p1", { folder: "Projects" });
-    s = setTaskTabState(s, "p1", { filter: "all" });
-    expect(tab(s).taskScope).toEqual({ folder: "Projects" });
-    expect(tab(s).taskFilter).toBe("all");
+  it("a default-state tab round-trips carrying no view key", () => {
+    expect(tab(roundTrip(withTasksTab())).taskView).toBeUndefined();
   });
 });
 
 describe("state is per tab, not global", () => {
-  it("a second pane's task tab is untouched", () => {
-    // Two panes each showing a task list must not fight over one setting.
-    const s = setTaskTabState(withTasksTab(), "p1", { filter: "overdue" });
-    // Applying to a pane id that does not exist changes nothing.
-    const other = setTaskTabState(s, "does-not-exist", { filter: "all" });
-    expect(tab(other).taskFilter).toBe("overdue");
-  });
-
-  it("leaves non-task tabs alone", () => {
-    const s = setTaskTabState(withTasksTab(), "p1", { filter: "overdue" });
-    const leaf = s.root as { tabs: Array<Record<string, unknown>> };
-    for (const t of leaf.tabs) {
-      if (t.kind !== "tasks") expect(t.taskFilter).toBeUndefined();
-    }
+  it("applying to a missing pane changes nothing", () => {
+    const s = setTaskViewState(withTasksTab(), "p1", view({ sort: "priority" }));
+    const other = setTaskViewState(s, "does-not-exist", view({ sort: "note" }));
+    expect(tab(other).taskView).toEqual({ sort: "priority" });
   });
 });
 
 describe("an unknown persisted value degrades to the default", () => {
-  const blob = (taskFilter: unknown, taskScope?: unknown): string =>
+  const blob = (taskView: unknown, legacy: Record<string, unknown> = {}): string =>
     JSON.stringify({
       root: {
         kind: "leaf",
         id: "p1",
-        tabs: [{ kind: "tasks", id: "tasks", taskFilter, taskScope }],
+        tabs: [{ kind: "tasks", id: "tasks", taskView, ...legacy }],
         activeTab: { kind: "tasks", id: "tasks" },
       },
       focusedPaneId: "p1",
     });
 
-  it("a filter name this build does not know becomes the default", () => {
-    // A future build might write `"this-week"`. Rejecting the blob would lose
-    // every open tab over one unknown string.
-    const parsed = deserializeWorkspace(blob("this-week"));
+  it("a value this build does not know becomes the default", () => {
+    const parsed = deserializeWorkspace(blob({ status: "this-week", sort: "nonsense" }));
     expect(parsed).not.toBeNull();
-    expect(tab(parsed!).taskFilter).toBeUndefined();
+    expect(tab(parsed!).taskView).toBeUndefined();
   });
 
-  it("junk in the filter slot does not reject the workspace", () => {
-    for (const junk of [42, null, {}, [], true]) {
+  it("junk in the view slot does not reject the workspace", () => {
+    for (const junk of [42, null, "nope", [], true]) {
       const parsed = deserializeWorkspace(blob(junk));
       expect(parsed).not.toBeNull();
-      expect(tab(parsed!).taskFilter).toBeUndefined();
+      expect(tab(parsed!).taskView).toBeUndefined();
     }
   });
 
-  it("junk in the scope slot degrades to the unset scope", () => {
-    for (const junk of ["nope", 7, [], { folder: 5 }, { tags: "work" }]) {
-      const parsed = deserializeWorkspace(blob("all", junk));
-      expect(parsed).not.toBeNull();
-      expect(tab(parsed!).taskScope).toBeUndefined();
-    }
+  it("keeps the good half of a half-junk view", () => {
+    const parsed = deserializeWorkspace(
+      blob({ folders: ["Projects"], tags: [1, "work", null], sort: "bogus" }),
+    );
+    expect(taskViewOf(tab(parsed!) as unknown as WorkspaceItem)).toEqual({
+      ...DEFAULT_TASK_VIEW,
+      folders: ["Projects"],
+      tags: ["work"],
+    });
   });
 
-  it("keeps the good half of a half-junk scope", () => {
-    const parsed = deserializeWorkspace(blob("all", { folder: "Projects", tags: [1, "work", null] }));
-    expect(tab(parsed!).taskScope).toEqual({ folder: "Projects", tags: ["work"] });
+  it("migrates a pre-redesign taskFilter/taskScope into the view", () => {
+    // The shape an already-open tab had before the redesign: a date bucket plus
+    // folder/tags. It must not silently lose its narrowing.
+    const parsed = deserializeWorkspace(blob(undefined, { taskFilter: "upcoming", taskScope: { folder: "Projects", tags: ["work"] } }));
+    expect(taskViewOf(tab(parsed!) as unknown as WorkspaceItem)).toEqual({
+      ...DEFAULT_TASK_VIEW,
+      due: "upcoming",
+      folders: ["Projects"],
+      tags: ["work"],
+    });
   });
+});
 
-  it("no preference field was added", async () => {
-    // The whole reason this rides the descriptor: a preference would need
-    // registration at roughly thirteen sites, one of which (the specification
-    // roster) nothing verifies. Read the prefs module's source and assert no
-    // task-panel key appears in it.
+describe("no preference field was added", () => {
+  it("the task view lives in the descriptor, not prefs", async () => {
     const fs = await import("node:fs");
     const src = fs.readFileSync("src/lib/prefs.ts", "utf-8");
     expect(src).not.toContain("task_filter");
     expect(src).not.toContain("task_scope");
-    expect(src).not.toContain("tasks_filter");
+    expect(src).not.toContain("task_view");
   });
 });

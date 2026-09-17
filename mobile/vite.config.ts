@@ -10,7 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 // shared packages under the parent `myne/` repo resolve regardless of cwd.
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
-// Tauri-aware Vite config — mirrors the main `myne` desktop repo.
+// Tauri-aware Vite config - mirrors the main `myne` desktop repo.
 // https://v2.tauri.app/start/frontend/vite/
 export default defineConfig(async () => ({
   plugins: [react()],
@@ -19,7 +19,7 @@ export default defineConfig(async () => ({
   // `myne/{editor,dialect}` packages (the WebView analog of the Rust
   // `path`-dep on `../../core`; decisions.md 2026-07-05). Alias the `@myne/*`
   // specifiers straight to that source so Vite compiles them into the mobile
-  // bundle — no publish/link step, exactly like the desktop repo does in-tree.
+  // bundle - no publish/link step, exactly like the desktop repo does in-tree.
   resolve: {
     alias: [
       { find: /^@myne\/editor\/CMEditor$/, replacement: sib("../editor/src/CMEditor.tsx") },
@@ -34,12 +34,12 @@ export default defineConfig(async () => ({
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
-      // The shared English catalog (repo-root `locales/en`) — now consumed only
+      // The shared English catalog (repo-root `locales/en`) - now consumed only
       // by `src/lib/welcomeNote.ts` for its seed-time welcome-note copy. (The
       // editor host resolved its labels through this too until MYND-485 moved it
       // onto the full `@myne/i18n` runtime below.)
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
-      // The shared react-i18next RUNTIME (MYND-485). NOTE — unlike @myne/editor /
+      // The shared react-i18next RUNTIME (MYND-485). NOTE - unlike @myne/editor /
       // dialect / copy (extracted top-level workspace packages), this aliases the
       // desktop APP source `../src/i18n/` directly, so mobile source-depends on
       // desktop internals with no package contract. It works because that runtime
@@ -49,16 +49,16 @@ export default defineConfig(async () => ({
       // `copy/`) and make desktop's `src/i18n` a re-export shim.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
       { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
-      // The shared DECORATION VOCABULARY (MYND-516) — the color-label slot list
+      // The shared DECORATION VOCABULARY (MYND-516) - the color-label slot list
       // and the folder-icon glyph table. Like @myne/i18n above, this aliases
       // desktop APP source (`../src/notes/`) with no package contract.
       // WHY it must be shared rather than copied: `folder_icons` / `item_colors`
       // are SYNCED prefs maps, so the VALUE crosses the client boundary. A
-      // hand-copy lets the vocabulary drift silently — desktop adds a 17th glyph,
+      // hand-copy lets the vocabulary drift silently - desktop adds a 17th glyph,
       // a user assigns it, the name syncs, and mobile's FolderGlyph resolves
       // `undefined` and falls back to the default folder. No type error, no test,
       // no build failure catches that; one alias does.
-      // NOTE — deliberately EXACT specifiers, not the `/(.*)$` subpath form the
+      // NOTE - deliberately EXACT specifiers, not the `/(.*)$` subpath form the
       // i18n alias uses: `../src/notes/` also holds Tauri-coupled modules
       // (readNote, vaultExport, …), and a wildcard would let those resolve into
       // the mobile bundle. Only the two PURE DATA modules are shared; the
@@ -75,10 +75,10 @@ export default defineConfig(async () => ({
       // Safe to alias despite living in Tauri-coupled `../src/lib/`: this module's
       // ONLY import is `import type { VaultTask }`, which erases at compile time,
       // so nothing from the desktop app tree reaches the mobile bundle. It costs
-      // ~0.7s of typecheck. Exact specifier, no wildcard — `../src/lib/` is full
+      // ~0.7s of typecheck. Exact specifier, no wildcard - `../src/lib/` is full
       // of modules that would drag `@tauri-apps/*` in.
       { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
-      // The ENROL GATE (myne-md/myne-mobile#38) — whether "Add this device" is
+      // The ENROL GATE (myne-md/myne-mobile#38) - whether "Add this device" is
       // a real action for this device, or dead UI that mints a second device
       // registration. Desktop fixed it once (MYND-635) and this client, which
       // keeps its own tree, went on offering the row to an already-syncing
@@ -88,24 +88,24 @@ export default defineConfig(async () => ({
       // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
       // imports at all.
       { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
-      // The LEGAL DOCUMENT URLs (operations#15) — which of the two published
+      // The LEGAL DOCUMENT URLs (operations#15) - which of the two published
       // editions of each text a client links to, keyed on interface language.
       // Shared rather than copied because a second copy is how one client ends
       // up linking at a slug the website no longer serves, silently, months
       // later: the URLs live in another repo entirely and nothing here would
       // notice them moving.
       // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
-      // imports at all — it is a slug table and one pure function.
+      // imports at all - it is a slug table and one pure function.
       { find: /^@myne\/legal-urls$/, replacement: sib("../src/lib/legal-urls.ts") },
       // The custom-theme SYNTAX DERIVATION (MYND-598). Shared for the same
       // reason as the reminder core: it encodes a readability rule both clients
-      // must answer identically — which of the 12 `--syntax-*` roles a custom
+      // must answer identically - which of the 12 `--syntax-*` roles a custom
       // palette leaves undefined get aliased to the built-in dark ramp. Desktop
       // has already had to fix this twice (MYND-356, then MYND-527 when the
       // first fix's all-or-nothing gate missed partial token sets); a hand-copy
       // is how it drifts a third time, silently, into unreadable code blocks.
       // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
-      // imports at all — pure functions over a `Record<string, string>`, no DOM,
+      // imports at all - pure functions over a `Record<string, string>`, no DOM,
       // no host calls. Exact specifier, no wildcard (same reasoning as above).
       { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
       // The measure-token CLAMP (deep-customization, myne#394). Shared for the
@@ -128,7 +128,7 @@ export default defineConfig(async () => ({
       // use it under its total ban on `@tauri-apps/*`. Exact specifier, no
       // wildcard (same reasoning as above).
       { find: /^@myne\/clipboard$/, replacement: sib("../src/lib/clipboard.ts") },
-      // The shared ORNAMENT LAYER (myne#394) — the stylesheet a theme's ornament
+      // The shared ORNAMENT LAYER (myne#394) - the stylesheet a theme's ornament
       // selections resolve against, plus the role helper components declare
       // through. Wildcard rather than exact, because the CSS is a second entry
       // point (`@myne/ornaments/ornaments.css`) and a client imports it from its
@@ -150,6 +150,7 @@ export default defineConfig(async () => ({
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
+      { find: /^@myne\/task-view$/, replacement: sib("../src/notes/taskView.ts") },
       { find: /^@myne\/task-write$/, replacement: sib("../src/notes/taskWriteCore.ts") },
       { find: /^@myne\/note-completion$/, replacement: sib("../src/notes/completeNoteCore.ts") },
       // The agent's wire types and its RAM-only run store (myne-md/myne#456).
@@ -186,7 +187,7 @@ export default defineConfig(async () => ({
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's
-    // node_modules — a second physical copy that silently breaks CM6's
+    // node_modules - a second physical copy that silently breaks CM6's
     // cross-module `instanceof`/facet invariants. Dedupe every engine dep so
     // Vite always resolves them to mobile's own single copy.
     dedupe: [
@@ -210,7 +211,7 @@ export default defineConfig(async () => ({
       "@lezer/markdown",
       "katex",
       "mermaid",
-      // Excalidraw canvas (drawing notes, MYND-515) — the aliased @myne/editor
+      // Excalidraw canvas (drawing notes, MYND-515) - the aliased @myne/editor
       // source lives outside the repo, so its bare `@excalidraw/excalidraw`
       // import otherwise resolves to editor/node_modules' copy; dedupe to
       // mobile's single copy (same class as the CodeMirror engine deps above).
@@ -240,7 +241,7 @@ export default defineConfig(async () => ({
   // One port per client, and they must not collide now that all three live in
   // one repo: desktop 1420 (hard-pinned, root vite.config.ts), web 1421, mobile
   // 1422 (HMR 1423). While mobile was a separate checkout it also claimed 1420,
-  // which was survivable only because nobody ran both at once — and it was not
+  // which was survivable only because nobody ran both at once - and it was not
   // actually survivable: `strictPort` made a running desktop server fail the
   // mobile start, and the flow-logic Playwright config's `reuseExistingServer`
   // did something worse, silently attaching the mobile specs to the DESKTOP app.

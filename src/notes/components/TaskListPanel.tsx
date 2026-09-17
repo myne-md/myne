@@ -1,78 +1,75 @@
-// The task list body (MYND-616, tasks 4–7).
+// The task list body (MYND-616, redesigned for myne-md/myne#656).
 //
 // ONE body for both surfaces. The vault-wide tab and the note-scoped right-panel
-// tab differ by the `scope` prop and by which task list they are handed —
-// nothing else. That is what makes them "literally one component with a scope
-// parameter" rather than two components that happen to look alike.
+// tab differ by the `rowScope` prop and by which task list they are handed.
 //
-// It carries: the four filters (with the overdue **count** on its own tab —
-// task 6), the scope selector (task 4/5), the shared `TaskRow`, and the four
-// distinct empty states (task 7).
+// **Toolbar, as revised after review:** a long search field with a `Filters`
+// button. The button opens a TWO-PANE builder that starts CLOSED (only the axis
+// list) and reveals an axis's values on click, with hover feedback everywhere.
+// Filters in force show as removable accent chips under the search, with a
+// `Clear all` at the end of the row; the builder carries its own `Clear all` in
+// a header at the top and a per-axis reset beside each applied value. The
+// note-scoped panel passes `minimal` and gets just the search field. Section
+// headers scroll with their rows.
 //
-// EMPTY-STATE TONE IS A CONSTRAINT, not a preference. The canon forbids a green
-// check and the product voice is honest rather than congratulatory: an empty
-// week is **stated, not celebrated**. No confetti, no "all done!", no tick. The
-// copy lives in the catalogue and the E2E asserts it, because copy drift is
-// exactly what a test catches and a review does not.
-//
-// The **rebuilding** state is distinct from a genuinely empty result. Showing
-// "no tasks" while the index is still being built is a wrong answer presented as
-// a finished one — the user concludes their tasks are gone.
+// The list is hand-rolled WINDOWED (a vault can hold thousands of tasks), with
+// fixed-height rows.
 
-import { useMemo, type CSSProperties, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { TaskRow, type TaskRowData, type TaskRowScope } from "@myne/editor/host/notes/TaskRow";
+import { Icon } from "../../components/primitives/Icon";
 import { taskDescription } from "../../dialect/taskFieldWriter";
 import {
-  filterAndSortTasks,
-  overdueCount,
-  TASK_FILTERS,
-  type TaskFilter,
-} from "../taskFilters";
-import { filterTasksByScope, isScopeEmpty, type TaskScope } from "../taskScope";
+  DEFAULT_TASK_VIEW,
+  distinctFolders,
+  distinctTags,
+  partitionTasks,
+  type TaskDueFilter,
+  type TaskPriorityFilter,
+  type TaskSort,
+  type TaskStatusFilter,
+  type TaskView,
+} from "../taskView";
+import { folderInScope } from "../taskScope";
+import { visibleDepths } from "../taskTree";
 import { taskRowKey } from "../taskWriteCore";
+import { TASK_ROW_HEIGHT, computeTaskWindow, flattenTaskList } from "../taskWindowing";
 import type { VaultTask } from "../taskIndex";
 
 export type TaskListPanelProps = {
   tasks: readonly VaultTask[];
-  scope: TaskScope;
-  filter: TaskFilter;
+  view: TaskView;
   today: string;
-  /** Which surface this is — passed straight through to every row. */
   rowScope: TaskRowScope;
-  /** Per-note tags, for the scope selector's tag half. */
   tagsOf?: (noteId: string) => readonly string[];
-  /** True while the index is still being built. A wrong empty list is worse
-   *  than a loading state, so this is rendered distinctly. */
   rebuilding?: boolean;
-  onFilterChange: (filter: TaskFilter) => void;
+  onViewChange: (next: TaskView) => void;
   onToggle?: (task: VaultTask) => void;
   onOpen?: (task: VaultTask) => void;
   testIdPrefix?: string;
-  /** Two-line rows (MYND-620 task 6). Passed straight to every row; the panel
-   *  does not decide the width, its caller does. */
-  twoLine?: boolean;
+  /** Strip the toolbar to a single search field (the note-scoped panel). */
+  minimal?: boolean;
 };
 
 const NO_TAGS: readonly string[] = [];
+const PRIORITIES = ["highest", "high", "medium", "low", "lowest"] as const;
 
-/**
- * Project an index record into what a row needs.
- *
- * The optional strings are spread on `== null`, not `=== undefined`: this is the
- * projection boundary, `TaskRowData` promises optional-or-absent, and a client
- * whose fetch skipped the `taskWire.ts` decoder hands a wire `null` down here.
- * `=== undefined` would copy it into the row verbatim, which is the crash the
- * row's own guard then has to survive. `lineIndex` keeps `=== null` deliberately
- * — there it is the note-task discriminator, not an absent value.
- */
-function toRowData(task: VaultTask): TaskRowData {
+function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
     key: taskRowKey(task),
-    // A note-task has no line; its title is the task.
     text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
+    ...(depth > 0 ? { depth } : {}),
     ...(task.due == null ? {} : { due: task.due }),
     ...(task.remind == null ? {} : { remind: task.remind }),
     ...(task.repeat == null ? {} : { repeat: task.repeat }),
@@ -81,41 +78,362 @@ function toRowData(task: VaultTask): TaskRowData {
   };
 }
 
-const STRIP_STYLE: CSSProperties = {
+/** Inline styles cannot express `:hover`, so each interactive row owns a flag. */
+function useHover(): [
+  boolean,
+  { onMouseEnter: () => void; onMouseLeave: () => void },
+] {
+  const [hover, setHover] = useState(false);
+  return [hover, { onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) }];
+}
+
+const PANEL_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  minHeight: 0,
+};
+
+const TOOLBAR_STYLE: CSSProperties = {
+  position: "relative",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  padding: "var(--space-3)",
+};
+
+// The note-scoped panel is narrow; its horizontal padding is a third of the
+// vault panel's (myne-md/myne#656 review).
+const MINIMAL_TOOLBAR_STYLE: CSSProperties = {
+  ...TOOLBAR_STYLE,
+  padding: "var(--space-2) var(--space-1)",
+};
+
+// The rule under the toolbar spans the CONTENT width, so it lines up with the
+// search field rather than the panel edges (myne-md/myne#656 review).
+const SEPARATOR_STYLE: CSSProperties = {
+  height: 1,
+  background: "var(--line-1)",
+};
+
+const SEARCH_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
+const SEARCH_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  boxSizing: "border-box",
+  padding: "var(--space-2) var(--space-3)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  color: "var(--fg-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+};
+
+const FILTERS_BUTTON_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "var(--space-2) var(--space-3)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  cursor: "pointer",
+};
+
+const FILTERS_BUTTON_HOVER_STYLE: CSSProperties = {
+  ...FILTERS_BUTTON_STYLE,
+  background: "var(--paper-2)",
+  color: "var(--fg-1)",
+};
+
+const FILTERS_COUNT_STYLE: CSSProperties = {
+  color: "var(--fg-3)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const CHIPS_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "var(--space-1)",
+};
+
+const CHIP_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "2px 8px",
+  border: "1px solid var(--accent-soft)",
+  borderRadius: "var(--radius-pill)",
+  background: "var(--accent-soft)",
+  color: "var(--accent)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  cursor: "pointer",
+};
+
+const CHIP_HOVER_STYLE: CSSProperties = {
+  ...CHIP_STYLE,
+  border: "1px solid var(--accent)",
+};
+
+const INLINE_CLEAR_STYLE: CSSProperties = {
+  marginLeft: "var(--space-1)",
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  cursor: "pointer",
+  textDecoration: "underline",
+};
+
+const INLINE_CLEAR_HOVER_STYLE: CSSProperties = {
+  ...INLINE_CLEAR_STYLE,
+  color: "var(--danger)",
+};
+
+const BUILDER_BACKDROP_STYLE: CSSProperties = {
+  position: "fixed",
+  inset: "0",
+  zIndex: 40,
+};
+
+// An OVERLAY anchored to the toolbar (right-aligned), not a flow child: opening
+// the builder must not push the list down (myne-md/myne#656 review). Anchoring
+// to the full-width toolbar and capping the width at the pane keeps it on
+// screen, which anchoring to the narrow button did not.
+const BUILDER_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  right: "var(--space-3)",
+  zIndex: 41,
+  display: "flex",
+  flexDirection: "column",
+  width: "min(calc(100% - var(--space-6)), 420px)",
+  boxSizing: "border-box",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper)",
+  overflow: "hidden",
+};
+
+const BUILDER_HEADER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--line-1)",
+};
+
+const BUILDER_TITLE_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_BODY_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+};
+
+const BUILDER_LEFT_STYLE: CSSProperties = {
+  flex: "0 0 168px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  padding: "var(--space-2)",
+  borderRight: "1px solid var(--line-1)",
+  background: "var(--paper-2)",
+};
+
+const BUILDER_LEFT_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-1)",
-  padding: "6px 8px",
-  borderBottom: "1px solid var(--line-1)",
-  flexWrap: "wrap",
 };
 
-function tabStyle(active: boolean): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    padding: "3px 9px",
-    borderRadius: "var(--radius-pill)",
-    // Selection is the ONE thing a fill may carry here; it is not state about
-    // the tasks, it is where the user is.
-    background: active ? "var(--paper-3)" : "transparent",
-    color: active ? "var(--fg-1)" : "var(--fg-2)",
-    border: "1px solid transparent",
-    fontFamily: "var(--font-sans)",
-    fontSize: 12,
-    fontWeight: active ? 600 : 500,
-    cursor: "pointer",
-  };
-}
+const BUILDER_LEFT_ITEM_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "var(--space-1)",
+  padding: "var(--space-2) var(--space-2)",
+  border: "none",
+  borderRadius: "var(--radius-2)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "left",
+  cursor: "pointer",
+};
 
-const COUNT_STYLE: CSSProperties = {
-  // A plain muted numeral. NOT a badge, NOT alarm-coloured — the canon's state
-  // rules forbid a pill that reads as a status, and an alarm colour would make
-  // the backlog shout every time the panel opens.
+const BUILDER_LEFT_ITEM_HOVER_STYLE: CSSProperties = {
+  ...BUILDER_LEFT_ITEM_STYLE,
+  background: "var(--paper-3)",
+};
+
+const BUILDER_LEFT_ITEM_ACTIVE_STYLE: CSSProperties = {
+  ...BUILDER_LEFT_ITEM_STYLE,
+  background: "var(--paper)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_APPLIED_STYLE: CSSProperties = {
+  color: "var(--accent)",
+  fontSize: "var(--text-xs)",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  maxWidth: "100%",
+};
+
+const RESET_X_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 20,
+  height: 20,
+  padding: 0,
+  border: "none",
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+  cursor: "pointer",
+};
+
+const RESET_X_HOVER_STYLE: CSSProperties = {
+  ...RESET_X_STYLE,
+  color: "var(--danger)",
+  background: "var(--paper-3)",
+};
+
+const BUILDER_RIGHT_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  padding: "var(--space-2)",
+  maxHeight: 300,
+  overflowY: "auto",
+};
+
+const BUILDER_EMPTY_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-5) var(--space-3)",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "center",
+};
+
+const BUILDER_RIGHT_TITLE_STYLE: CSSProperties = {
+  padding: "0 var(--space-2) var(--space-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const BUILDER_VALUE_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  width: "100%",
+  padding: "var(--space-2) var(--space-2)",
+  border: "none",
+  borderRadius: "var(--radius-2)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const BUILDER_VALUE_HOVER_STYLE: CSSProperties = {
+  ...BUILDER_VALUE_STYLE,
+  background: "var(--paper-2)",
+  color: "var(--fg-1)",
+};
+
+const BUILDER_VALUE_ACTIVE_STYLE: CSSProperties = {
+  ...BUILDER_VALUE_STYLE,
+  background: "var(--paper-3)",
+  color: "var(--fg-1)",
+  fontWeight: "var(--weight-medium)",
+};
+
+const BUILDER_VALUE_LABEL_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const SCROLL_STYLE: CSSProperties = {
+  flex: "1 1 auto",
+  minHeight: 0,
+  height: "100%",
+  overflowY: "auto",
+  position: "relative",
+};
+
+const HEADER_BASE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  boxSizing: "border-box",
+  height: TASK_ROW_HEIGHT - 2,
+  padding: "0 8px",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  color: "var(--fg-2)",
+  background: "var(--paper)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const HEADER_COUNT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   fontVariantNumeric: "tabular-nums",
-  fontSize: "var(--text-xs)",
+  fontWeight: 500,
+};
+
+const ROW_WRAP_STYLE: CSSProperties = {
+  height: TASK_ROW_HEIGHT,
+  boxSizing: "border-box",
+  overflow: "hidden",
+  // The row no longer carries `height: 100%`, so the fixed-height window box
+  // centres it (myne-md/myne#656 review).
+  display: "flex",
+  alignItems: "center",
 };
 
 const EMPTY_STYLE: CSSProperties = {
@@ -127,95 +445,690 @@ const EMPTY_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+/** A removable applied-filter chip; only the remove glyph turns red on hover. */
+function FilterChip({
+  label,
+  testId,
+  onRemove,
+}: {
+  label: string;
+  testId: string;
+  onRemove: () => void;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  return (
+    <button
+      type="button"
+      style={hover ? CHIP_HOVER_STYLE : CHIP_STYLE}
+      data-testid={testId}
+      {...handlers}
+      onClick={onRemove}
+    >
+      {label}
+      <span style={{ display: "inline-flex", color: hover ? "var(--danger)" : "inherit" }}>
+        <Icon name="x" size={12} />
+      </span>
+    </button>
+  );
+}
+
+type BuilderSection = "status" | "due" | "folder" | "note" | "tag" | "priority" | "sort";
+const BUILDER_SECTIONS: readonly BuilderSection[] = [
+  "status",
+  "due",
+  "folder",
+  "note",
+  "tag",
+  "priority",
+  "sort",
+];
+
+function BuilderLeftRow({
+  label,
+  applied,
+  active,
+  onSelect,
+  onReset,
+  testId,
+}: {
+  label: string;
+  applied: string | null;
+  active: boolean;
+  onSelect: () => void;
+  onReset: () => void;
+  testId: string;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  const [resetHover, resetHandlers] = useHover();
+  return (
+    <div style={BUILDER_LEFT_ROW_STYLE}>
+      <button
+        type="button"
+        style={
+          active
+            ? BUILDER_LEFT_ITEM_ACTIVE_STYLE
+            : hover
+              ? BUILDER_LEFT_ITEM_HOVER_STYLE
+              : BUILDER_LEFT_ITEM_STYLE
+        }
+        {...handlers}
+        aria-expanded={active}
+        data-testid={testId}
+        onClick={onSelect}
+      >
+        <span>{label}</span>
+        {applied === null ? null : (
+          <span style={BUILDER_APPLIED_STYLE} data-testid={`${testId}-applied`}>
+            {applied}
+          </span>
+        )}
+      </button>
+      {applied === null ? null : (
+        <button
+          type="button"
+          style={resetHover ? RESET_X_HOVER_STYLE : RESET_X_STYLE}
+          {...resetHandlers}
+          aria-label={`Clear ${label}`}
+          data-testid={`${testId}-reset`}
+          onClick={onReset}
+        >
+          <Icon name="x" size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BuilderValueRow({
+  label,
+  active,
+  onSelect,
+  testId,
+}: {
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+  testId: string;
+}): ReactElement {
+  const [hover, handlers] = useHover();
+  return (
+    <button
+      type="button"
+      style={active ? BUILDER_VALUE_ACTIVE_STYLE : hover ? BUILDER_VALUE_HOVER_STYLE : BUILDER_VALUE_STYLE}
+      {...handlers}
+      aria-checked={active}
+      role="menuitemradio"
+      data-testid={testId}
+      onClick={onSelect}
+    >
+      <Icon
+        name="check"
+        size={14}
+        style={{ flex: "0 0 auto", color: "var(--accent)", opacity: active ? 1 : 0 }}
+      />
+      <span style={BUILDER_VALUE_LABEL_STYLE}>{label}</span>
+    </button>
+  );
+}
+
+/**
+ * The two-pane filter builder. It opens with only the axis list; clicking an
+ * axis reveals its values on the right. The header carries `Clear all`, and each
+ * applied axis has its own reset beside it.
+ *
+ * Keyboard contract (myne-md/myne#656 review): the panel takes focus on open,
+ * Escape closes it, and focus returns to the Filters button that opened it.
+ * It is an inline non-modal builder (no focus trap): Tab may leave it, and
+ * Escape is the keyboard close.
+ */
+function TaskFilterBuilder({
+  view,
+  onViewChange,
+  onClose,
+  folderOptions,
+  noteOptions,
+  tagOptions,
+  testIdPrefix,
+}: {
+  view: TaskView;
+  onViewChange: (next: TaskView) => void;
+  onClose: () => void;
+  folderOptions: readonly string[];
+  noteOptions: readonly (readonly [string, string])[];
+  tagOptions: readonly string[];
+  testIdPrefix: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  // Starts CLOSED: no axis is chosen until the user clicks one.
+  const [section, setSection] = useState<BuilderSection | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Focus into the panel on open, and close on Escape (myne-md/myne#656
+  // review). The caller returns focus to the Filters button.
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el === null) return;
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    el.addEventListener("keydown", onKey);
+    return () => el.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const [clearHover, clearHandlers] = useHover();
+  const setView = (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch });
+
+  const axisLabel: Record<BuilderSection, string> = {
+    status: t("tasks.axis.status"),
+    due: t("tasks.axis.due"),
+    folder: t("tasks.axis.folder"),
+    note: t("tasks.axis.note"),
+    tag: t("tasks.axis.tag"),
+    priority: t("tasks.axis.priority"),
+    sort: t("tasks.axis.sort"),
+  };
+
+  const currentValue = (s: BuilderSection): string => {
+    switch (s) {
+      case "status":
+        return view.status;
+      case "due":
+        return view.due;
+      case "folder":
+        return "";
+      case "note":
+        return view.noteId ?? "";
+      case "tag":
+        return "";
+      case "priority":
+        return view.priority;
+      case "sort":
+        return view.sort;
+    }
+  };
+
+  /** Whether a value row reads as checked - membership for multi axes. */
+  const isActive = (s: BuilderSection, value: string): boolean => {
+    if (s === "folder") return value === "" ? view.folders.length === 0 : view.folders.includes(value);
+    if (s === "tag") return value === "" ? view.tags.length === 0 : view.tags.includes(value);
+    return value === currentValue(s);
+  };
+
+  const appliedLabel = (s: BuilderSection): string | null => {
+    // Multi-select axes show the FIRST value plus a "+N" count, so the fixed
+    // left column never widens or wraps (myne-md/myne#656 review).
+    const multi = (list: readonly string[]): string | null =>
+      list.length === 0 ? null : list.length === 1 ? list[0]! : `${list[0]!} +${list.length - 1}`;
+    if (s === "folder") return multi(view.folders);
+    if (s === "tag") return multi(view.tags);
+    const v = currentValue(s);
+    switch (s) {
+      case "status":
+        return v === DEFAULT_TASK_VIEW.status ? null : t(`tasks.status.${v}`);
+      case "due":
+        return v === "any" ? null : t(`tasks.due.${v}`);
+      case "note":
+        return v === "" ? null : (noteOptions.find(([id]) => id === v)?.[1] ?? null);
+      case "priority":
+        return v === "any" ? null : t(`tasks.priority.${v}`);
+      case "sort":
+        return v === "due" ? null : t(`tasks.sort.${v}`);
+    }
+  };
+
+  const clearAxis = (s: BuilderSection): void => {
+    switch (s) {
+      case "status":
+        setView({ status: DEFAULT_TASK_VIEW.status });
+        break;
+      case "due":
+        setView({ due: "any" });
+        break;
+      case "folder":
+        setView({ folders: [] });
+        break;
+      case "note":
+        setView({ noteId: null });
+        break;
+      case "tag":
+        setView({ tags: [] });
+        break;
+      case "priority":
+        setView({ priority: "any" });
+        break;
+      case "sort":
+        setView({ sort: "due" });
+        break;
+    }
+  };
+
+  const valuesFor = (s: BuilderSection): { value: string; label: string }[] => {
+    switch (s) {
+      case "status":
+        return [
+          { value: "undone", label: t("tasks.status.undone") },
+          { value: "all", label: t("tasks.status.all") },
+          { value: "done", label: t("tasks.status.done") },
+        ];
+      case "due":
+        return [
+          { value: "any", label: t("tasks.due.any") },
+          { value: "overdue", label: t("tasks.due.overdue") },
+          { value: "today", label: t("tasks.due.today") },
+          { value: "upcoming", label: t("tasks.due.upcoming") },
+          { value: "later", label: t("tasks.due.later") },
+          { value: "none", label: t("tasks.due.none") },
+        ];
+      case "folder":
+        return [
+          { value: "", label: t("tasks.view.allFolders") },
+          ...folderOptions.map((f) => ({ value: f, label: f })),
+        ];
+      case "note":
+        return [
+          { value: "", label: t("tasks.view.allNotes") },
+          ...noteOptions.map(([id, title]) => ({ value: id, label: title })),
+        ];
+      case "tag":
+        return [
+          { value: "", label: t("tasks.view.anyTag") },
+          ...tagOptions.map((tag) => ({ value: tag, label: tag })),
+        ];
+      case "priority":
+        return [
+          { value: "any", label: t("tasks.view.anyPriority") },
+          ...PRIORITIES.map((p) => ({ value: p, label: t(`tasks.priority.${p}`) })),
+        ];
+      case "sort":
+        return [
+          { value: "due", label: t("tasks.sort.due") },
+          { value: "dueDesc", label: t("tasks.sort.dueDesc") },
+          { value: "priority", label: t("tasks.sort.priority") },
+          { value: "note", label: t("tasks.sort.note") },
+        ];
+    }
+  };
+
+  const choose = (s: BuilderSection, value: string): void => {
+    switch (s) {
+      case "status":
+        setView({ status: value as TaskStatusFilter });
+        break;
+      case "due":
+        setView({ due: value as TaskDueFilter });
+        break;
+      case "folder":
+        setView({
+          folders:
+            value === ""
+              ? []
+              : view.folders.includes(value)
+                ? view.folders.filter((f) => f !== value)
+                : [...view.folders, value],
+        });
+        break;
+      case "note":
+        setView({ noteId: value === "" ? null : value });
+        break;
+      case "tag":
+        setView({
+          tags:
+            value === ""
+              ? []
+              : view.tags.includes(value)
+                ? view.tags.filter((x) => x !== value)
+                : [...view.tags, value],
+        });
+        break;
+      case "priority":
+        setView({ priority: value as TaskPriorityFilter });
+        break;
+      case "sort":
+        setView({ sort: value as TaskSort });
+        break;
+    }
+  };
+
+  return (
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      style={BUILDER_STYLE}
+      role="dialog"
+      aria-label={t("tasks.filters.title")}
+      data-testid={`${testIdPrefix}.filtersPanel`}
+    >
+      <div style={BUILDER_HEADER_STYLE}>
+        <span style={BUILDER_TITLE_STYLE}>{t("tasks.filters.title")}</span>
+        <button
+          type="button"
+          style={clearHover ? INLINE_CLEAR_HOVER_STYLE : INLINE_CLEAR_STYLE}
+          {...clearHandlers}
+          data-testid={`${testIdPrefix}.clearFiltersBuilder`}
+          onClick={() => onViewChange(DEFAULT_TASK_VIEW)}
+        >
+          {t("tasks.filters.clearAll")}
+        </button>
+      </div>
+      <div style={BUILDER_BODY_STYLE}>
+        <div style={BUILDER_LEFT_STYLE}>
+          {BUILDER_SECTIONS.map((s) => (
+            <BuilderLeftRow
+              key={s}
+              label={axisLabel[s]}
+              applied={appliedLabel(s)}
+              active={s === section}
+              testId={`${testIdPrefix}.builderTab.${s}`}
+              onSelect={() => setSection(s)}
+              onReset={() => clearAxis(s)}
+            />
+          ))}
+        </div>
+        <div style={BUILDER_RIGHT_STYLE} data-testid={`${testIdPrefix}.filtersValues`}>
+          {section === null ? (
+            <div style={BUILDER_EMPTY_STYLE} data-testid={`${testIdPrefix}.filtersHint`}>
+              <Icon name="list" size={20} />
+              <span>{t("tasks.filters.selectHint")}</span>
+            </div>
+          ) : (
+            <>
+              <span style={BUILDER_RIGHT_TITLE_STYLE}>{axisLabel[section]}</span>
+              {valuesFor(section).map((opt) => (
+                <BuilderValueRow
+                  key={opt.value === "" ? "__any" : opt.value}
+                  label={opt.label}
+                  active={isActive(section, opt.value)}
+                  testId={`${testIdPrefix}.builderOption.${section}.${opt.value === "" ? "any" : opt.value}`}
+                  onSelect={() => choose(section, opt.value)}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TaskListPanel({
   tasks,
-  scope,
-  filter,
+  view,
   today,
   rowScope,
-  twoLine,
   tagsOf,
   rebuilding = false,
-  onFilterChange,
+  onViewChange,
   onToggle,
   onOpen,
   testIdPrefix = "tasks",
+  minimal = false,
 }: TaskListPanelProps): ReactElement {
   const { t } = useTranslation();
+  const [search, setSearch] = useState("");
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [filtersHover, filtersHandlers] = useHover();
+  const [clearHover, clearHandlers] = useHover();
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+  // Escape close returns focus to the button that opened the builder
+  // (myne-md/myne#656 review); the backdrop path is a mouse close and moves
+  // no focus.
+  const closeBuilder = useCallback(() => {
+    setBuilderOpen(false);
+    filtersButtonRef.current?.focus();
+  }, []);
 
-  const scoped = useMemo(
-    () => filterTasksByScope(tasks, scope, tagsOf ?? (() => NO_TAGS)),
-    [tasks, scope, tagsOf],
+  const sections = useMemo(
+    () => partitionTasks(tasks, view, today, tagsOf ?? (() => NO_TAGS), search),
+    [tasks, view, today, tagsOf, search],
   );
-  const visible = useMemo(
-    () => filterAndSortTasks(scoped, filter, today),
-    [scoped, filter, today],
-  );
-  // Counted over the SCOPED set, not the visible one: the badge must answer
-  // "how much is behind" while the user is looking at Today.
-  const overdue = useMemo(() => overdueCount(scoped, today), [scoped, today]);
 
-  /**
-   * Which empty state applies. Four distinct answers, and the order matters:
-   * rebuilding first (a wrong empty list presented as a finished one is the
-   * worst of the four), then "no tasks at all", then scope, then filter.
-   */
-  const emptyKind = ((): "rebuilding" | "vault" | "scope" | "filter" | null => {
+  const depths = useMemo(() => {
+    const visible = new Set<string>();
+    for (const section of sections) for (const task of section.tasks) visible.add(taskRowKey(task));
+    return visibleDepths(tasks, visible);
+  }, [tasks, sections]);
+
+  const items = useMemo(() => flattenTaskList(sections, depths), [sections, depths]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewport, setViewport] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    const measure = (): void => setViewport(el.clientHeight);
+    measure();
+    const onScroll = (): void => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    el.scrollTop = 0;
+    setScrollTop(0);
+  }, [view, search]);
+
+  const window_ = computeTaskWindow(items, scrollTop, viewport);
+  const slice = items.slice(window_.start, window_.end);
+
+  const folderOptions = useMemo(() => distinctFolders(tasks), [tasks]);
+  const tagOptions = useMemo(() => distinctTags(tasks, tagsOf ?? (() => NO_TAGS)), [tasks, tagsOf]);
+  // A note is only offered when it is inside a selected folder, so the Folder
+  // and Note axes cannot contradict each other (myne-md/myne#656 review).
+  const noteOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const task of tasks) {
+      if (view.folders.length > 0 && !view.folders.some((f) => folderInScope(f, task.noteFolder))) {
+        continue;
+      }
+      if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("tasks.view.untitled"));
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [tasks, t, view.folders]);
+
+  // If a folder is (re)selected that excludes the chosen note, drop the note
+  // filter rather than showing an impossible combination.
+  useEffect(() => {
+    if (view.noteId === null || view.folders.length === 0) return;
+    const task = tasks.find((x) => x.noteId === view.noteId);
+    if (task === undefined) return;
+    if (!view.folders.some((f) => folderInScope(f, task.noteFolder))) {
+      onViewChange({ ...view, noteId: null });
+    }
+  }, [view, tasks, onViewChange]);
+
+  const setView = useCallback(
+    (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch }),
+    [onViewChange, view],
+  );
+
+  const chips = useMemo(() => {
+    const out: { key: string; label: string; clear: () => void }[] = [];
+    if (view.status !== DEFAULT_TASK_VIEW.status) {
+      out.push({ key: "status", label: t(`tasks.status.${view.status}`), clear: () => setView({ status: DEFAULT_TASK_VIEW.status }) });
+    }
+    if (view.due !== "any") {
+      out.push({ key: "due", label: `${t("tasks.axis.due")}: ${t(`tasks.due.${view.due}`)}`, clear: () => setView({ due: "any" }) });
+    }
+    for (const folder of view.folders) {
+      out.push({
+        key: `folder:${folder}`,
+        label: `${t("tasks.axis.folder")}: ${folder}`,
+        clear: () => setView({ folders: view.folders.filter((f) => f !== folder) }),
+      });
+    }
+    if (view.noteId !== null) {
+      const title = noteOptions.find(([id]) => id === view.noteId)?.[1] ?? t("tasks.view.untitled");
+      out.push({ key: "note", label: `${t("tasks.axis.note")}: ${title}`, clear: () => setView({ noteId: null }) });
+    }
+    for (const tag of view.tags) {
+      out.push({ key: `tag:${tag}`, label: `${t("tasks.axis.tag")}: ${tag}`, clear: () => setView({ tags: view.tags.filter((x) => x !== tag) }) });
+    }
+    if (view.priority !== "any") {
+      out.push({ key: "priority", label: `${t("tasks.axis.priority")}: ${t(`tasks.priority.${view.priority}`)}`, clear: () => setView({ priority: "any" }) });
+    }
+    if (view.sort !== "due") {
+      out.push({ key: "sort", label: `${t("tasks.axis.sort")}: ${t(`tasks.sort.${view.sort}`)}`, clear: () => setView({ sort: "due" }) });
+    }
+    return out;
+  }, [view, t, noteOptions, setView]);
+
+  const emptyKind = ((): "rebuilding" | "search" | "vault" | "filter" | null => {
     if (rebuilding) return "rebuilding";
-    if (visible.length > 0) return null;
+    if (items.length > 0) return null;
+    if (search.trim() !== "") return "search";
     if (tasks.length === 0) return "vault";
-    if (!isScopeEmpty(scope) && scoped.length === 0) return "scope";
     return "filter";
   })();
 
   return (
-    <div
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
-      data-testid={`${testIdPrefix}.panel`}
-    >
-      <div style={STRIP_STYLE} role="tablist" data-testid={`${testIdPrefix}.filters`}>
-        {TASK_FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            role="tab"
-            aria-selected={f === filter}
-            style={tabStyle(f === filter)}
-            data-testid={`${testIdPrefix}.filter.${f}`}
-            onClick={() => onFilterChange(f)}
-          >
-            {t(`tasks.filter.${f}`)}
-            {/* Absent rather than zero: a "0" is a statement about the backlog
-                that the user did not ask for. */}
-            {f === "overdue" && overdue > 0 ? (
-              <span style={COUNT_STYLE} data-testid={`${testIdPrefix}.overdueCount`}>
-                {overdue}
-              </span>
-            ) : null}
-          </button>
-        ))}
+    <div style={PANEL_STYLE} data-testid={`${testIdPrefix}.panel`}>
+      <div style={minimal ? MINIMAL_TOOLBAR_STYLE : TOOLBAR_STYLE}>
+        <div style={SEARCH_ROW_STYLE}>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("tasks.search.placeholder")}
+            aria-label={t("tasks.search.label")}
+            style={SEARCH_STYLE}
+            data-testid={`${testIdPrefix}.search`}
+          />
+          {minimal ? null : (
+            <button
+              type="button"
+              ref={filtersButtonRef}
+              style={filtersHover ? FILTERS_BUTTON_HOVER_STYLE : FILTERS_BUTTON_STYLE}
+              {...filtersHandlers}
+              aria-expanded={builderOpen}
+              aria-haspopup="dialog"
+              data-testid={`${testIdPrefix}.filtersButton`}
+              onClick={() => setBuilderOpen((o) => !o)}
+            >
+              <Icon name="settings" size={13} />
+              {t("tasks.filters.button")}
+              {chips.length > 0 ? (
+                <span style={FILTERS_COUNT_STYLE} data-testid={`${testIdPrefix}.filtersCount`}>
+                  {chips.length}
+                </span>
+              ) : null}
+            </button>
+          )}
+        </div>
+
+        {!minimal && builderOpen ? (
+          <>
+            <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
+            <TaskFilterBuilder
+              view={view}
+              onViewChange={onViewChange}
+              onClose={closeBuilder}
+              folderOptions={folderOptions}
+              noteOptions={noteOptions}
+              tagOptions={tagOptions}
+              testIdPrefix={testIdPrefix}
+            />
+          </>
+        ) : null}
+
+        {!minimal && chips.length > 0 ? (
+          <div style={CHIPS_ROW_STYLE} data-testid={`${testIdPrefix}.appliedFilters`}>
+            {chips.map((chip) => (
+              <FilterChip
+                key={chip.key}
+                label={chip.label}
+                testId={`${testIdPrefix}.applied.${chip.key}`}
+                onRemove={chip.clear}
+              />
+            ))}
+            <button
+              type="button"
+              style={clearHover ? INLINE_CLEAR_HOVER_STYLE : INLINE_CLEAR_STYLE}
+              {...clearHandlers}
+              data-testid={`${testIdPrefix}.clearFilters`}
+              onClick={() => onViewChange(DEFAULT_TASK_VIEW)}
+            >
+              {t("tasks.filters.clearAll")}
+            </button>
+          </div>
+        ) : null}
+
+        <div style={SEPARATOR_STYLE} aria-hidden="true" />
       </div>
 
-      <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "4px 0" }}>
+      <div ref={scrollRef} style={SCROLL_STYLE} data-testid={`${testIdPrefix}.scroll`}>
         {emptyKind !== null ? (
           <div style={EMPTY_STYLE} data-testid={`${testIdPrefix}.empty.${emptyKind}`}>
-            {t(`tasks.empty.${emptyKind}`)}
+            {t(`tasks.empty.${emptyKind}`, { query: search.trim() })}
           </div>
+        ) : minimal ? (
+          // The note-scoped panel is small and its rows carry an inline date
+          // under the text, so they are variable-height: render them in flow
+          // rather than through the fixed-height window (myne-md/myne#656).
+          items.map((item) =>
+            item.kind === "header" ? (
+              <div key={item.id} style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${item.section}`}>
+                <span>{t(`tasks.section.${item.section}`)}</span>
+                <span style={HEADER_COUNT_STYLE}>{item.count}</span>
+              </div>
+            ) : (
+              <TaskRow
+                key={item.id}
+                task={toRowData(item.task, item.depth)}
+                scope={rowScope}
+                today={today}
+                compactX
+                inlineDate
+                testIdPrefix={`${testIdPrefix}.row`}
+                {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
+                {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+              />
+            ),
+          )
         ) : (
-          visible.map((task) => (
-            <TaskRow
-              key={taskRowKey(task)}
-              task={toRowData(task)}
-              scope={rowScope}
-              {...(twoLine === undefined ? {} : { twoLine })}
-              today={today}
-              testIdPrefix={`${testIdPrefix}.row`}
-              {...(onToggle === undefined ? {} : { onToggle: () => onToggle(task) })}
-              {...(onOpen === undefined ? {} : { onOpen: () => onOpen(task) })}
-            />
-          ))
+          <>
+            <div style={{ height: window_.topPad }} aria-hidden="true" />
+            {slice.map((item) =>
+              item.kind === "header" ? (
+                <div key={item.id} style={HEADER_BASE} data-testid={`${testIdPrefix}.section.${item.section}`}>
+                  <span>{t(`tasks.section.${item.section}`)}</span>
+                  <span style={HEADER_COUNT_STYLE}>{item.count}</span>
+                </div>
+              ) : (
+                <div key={item.id} style={ROW_WRAP_STYLE}>
+                  <TaskRow
+                    task={toRowData(item.task, item.depth)}
+                    scope={rowScope}
+                    today={today}
+                    testIdPrefix={`${testIdPrefix}.row`}
+                    {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
+                    {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+                  />
+                </div>
+              ),
+            )}
+            <div style={{ height: window_.bottomPad }} aria-hidden="true" />
+          </>
         )}
       </div>
     </div>
   );
 }
+
+/** The default every caller starts from; re-exported so callers import one module. */
+export { DEFAULT_TASK_VIEW };

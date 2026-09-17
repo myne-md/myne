@@ -138,7 +138,7 @@ import { defaultGrantFor } from "@myne/agent-protocol";
 
 import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
-import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
+import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { takeReminderLanding } from "../../lib/reminderLanding";
 import { vaultTasks } from "../../lib/tasks";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
@@ -173,14 +173,14 @@ const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
 };
 
 /**
- * Editor flow — the wired main surface after unlock. Mirrors the static
+ * Editor flow - the wired main surface after unlock. Mirrors the static
  * `notes/05·06` list + `notes/07` reading + `workspace/08` editor +
  * `workspace/11 · Settings` screens, but driven by the real `notes` plugin.
  *
  * View machine: `list` ⇄ `editor`. Mount → `noteList()` then `noteRead()` per
  * id to derive a (title, snippet) for each row. `+` opens a blank editor;
  * tapping a row opens it on that note's plaintext (plain <textarea>, the mobile
- * port of the desktop B4.5 stub — no CodeMirror). Save → `noteCreate` /
+ * port of the desktop B4.5 stub - no CodeMirror). Save → `noteCreate` /
  * `noteUpdate`; delete → `noteDelete`. The gear (Settings tab) opens the
  * <SettingsSheet>; the "Personal ▾" bar opens a vault switcher.
  *
@@ -191,13 +191,13 @@ const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
 
 type Editing = { id: string | null };
 
-/** Left-to-right tab position — drives the slide direction of the page
+/** Left-to-right tab position - drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
  *  lower-indexed tab from the left (an iOS push/pop feel across the tab row). */
 const TAB_ORDER: Record<WorkspaceTab, number> = {
   notes: 0,
   // MYND-620: `tasks` is placed between notes and graph rather than appended,
-  // because this record is what decides the push/pop slide direction — a tab
+  // because this record is what decides the push/pop slide direction - a tab
   // that sits second in the bar and last in this record slides in from the
   // wrong side.
   tasks: 1,
@@ -214,7 +214,7 @@ const TAB_ORDER: Record<WorkspaceTab, number> = {
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
  *  the Appearance settings tangibly change the note editor. */
-// Reading-view (MarkdownView) base font px — matches the shared editor-typography
+// Reading-view (MarkdownView) base font px - matches the shared editor-typography
 // TEXT_SIZE presets so reading mode + the live editor + desktop stay consistent
 // (MYND-483). The live editor itself uses `typographyStyle` CSS vars, not this.
 const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
@@ -298,8 +298,8 @@ const SHEET_ACTIONS = {
 } as const;
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
-  "# Weekly review — 2026-06-15\n\nShipped the sync conflict resolver. Next: mobile share sheet and editor polish.",
-  "# Reading — Seeing Like a State\n\nLegibility as the central drive of the modern state. Chapter 1 notes.",
+  "# Weekly review - 2026-06-15\n\nShipped the sync conflict resolver. Next: mobile share sheet and editor polish.",
+  "# Reading - Seeing Like a State\n\nLegibility as the central drive of the modern state. Chapter 1 notes.",
 ];
 
 /** Title + snippet for a note. Prefers the managed `title:` frontmatter (desktop
@@ -327,7 +327,7 @@ function nextMobileDrawingTitle(
   return `Drawing ${max + 1}`;
 }
 
-/** One index-delta tracker per mount, built lazily — the factory allocates, and
+/** One index-delta tracker per mount, built lazily - the factory allocates, and
  *  this component re-renders on every keystroke. */
 function useIndexDeltaTracker(): IndexDeltaTracker {
   const ref = useRef<IndexDeltaTracker | null>(null);
@@ -368,6 +368,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const vaultId = stageVaultId ?? resolved;
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<WorkspaceTab>("notes");
+  // Task-view state lives HERE rather than in TaskSurface: every mount below
+  // is conditional, so component-local state would reset each time the user
+  // leaves and re-enters the destination. One state per scope family, matching
+  // desktop's per-tab persistence semantics (myne-md/myne#656 review).
+  const [vaultTaskView, setVaultTaskView] = useState<TaskView>(DEFAULT_TASK_VIEW);
+  const [noteTaskView, setNoteTaskView] = useState<TaskView>(DEFAULT_TASK_VIEW);
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
   // editor swap; medium/expanded ("regular") = persistent multi-pane split.
   // `view` stays the compact navigation intent; `editing` drives the detail
@@ -385,7 +391,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const prev = prevTabRef.current;
     prevTabRef.current = tab;
     if (tab === prev) return;
-    // Regular layouts don't page-flip — the prev ref still updates above so a
+    // Regular layouts don't page-flip - the prev ref still updates above so a
     // later rotation back to compact can't replay a stale slide.
     if (sizeClass !== "compact") return;
     const el = tabPaneRef.current;
@@ -405,7 +411,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [tab]);
 
   // Push/pop the whole screen when moving between the note LIST and the EDITOR
-  // (iOS nav feel — opening a note pushes in from the right, back pops from the
+  // (iOS nav feel - opening a note pushes in from the right, back pops from the
   // left). Both branches render `<Screen>` in the same slot, so React reuses the
   // element and `screenRef` stays valid across the swap. First paint doesn't run.
   const screenRef = useRef<HTMLDivElement>(null);
@@ -453,14 +459,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   // Raw note bodies (id → text), kept so the Graph tab can compute the wikilink
-  // graph without a second read — the list load already decrypts every note.
+  // graph without a second read - the list load already decrypts every note.
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [readingMode, setReadingMode] = useState(false);
-  // Raw (source) vs live-preview inside the editor — toggled from the FormatBar.
+  // Raw (source) vs live-preview inside the editor - toggled from the FormatBar.
   const [rawMode, setRawMode] = useState(false);
   const [editorText, setEditorText] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
@@ -470,11 +476,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const isDrawing = useMemo(() => isDrawingBody(editorText), [editorText]);
 
   // Regular size classes: focusing a note collapses the left panes (sidebar +
-  // note list) so the editor gets the full width — the EditorTopBar toggle reveals
+  // note list) so the editor gets the full width - the EditorTopBar toggle reveals
   // them, and the next note open auto-collapses again (the effect below). On
   // medium the main nav (TabBar) stays as a full-width bottom bar while collapsed.
   const [panesRevealed, setPanesRevealed] = useState(false);
-  // Collapse only for an EXISTING focused note (`editing.id` set) — a brand-new
+  // Collapse only for an EXISTING focused note (`editing.id` set) - a brand-new
   // note keeps the list on screen (you're still placing it; matches the tablet
   // flow-logic UX), so `editing?.id` not `editing`.
   const panesCollapsed = isRegular && tab === "notes" && editing?.id != null && !panesRevealed;
@@ -485,20 +491,20 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // No-op-write guard: the open note's RAW buffer text as of its last
   // successful read or write, keyed by id so a stale in-flight write can never
   // stamp another note's baseline. Every save path checks it and skips the
-  // disk write when the buffer is untouched — a rewrite of identical content
+  // disk write when the buffer is untouched - a rewrite of identical content
   // would burn a fresh nonce and bump `updated:`, which sync reads as a
   // phantom edit (conflict bait on every open+background). `updated:` is
   // stamped at write time, so the baseline deliberately stores the PRE-stamp
   // buffer and every comparison is raw-vs-raw.
   const loadedTextRef = useRef<{ id: string; text: string } | null>(null);
   /** True when the note's buffer is byte-identical to its last read/written
-   *  body — i.e. persisting now would be a pure no-op rewrite. */
+   *  body - i.e. persisting now would be a pure no-op rewrite. */
   const editorUnchanged = (id: string) =>
     loadedTextRef.current?.id === id && loadedTextRef.current.text === editorText;
 
   // Flush the open note to disk when the app is BACKGROUNDED / hidden. Mobile
   // otherwise persists only on an explicit exit (back / swipe-back / switching
-  // notes) — but a drawing has no such exit on tablet (you just draw and leave),
+  // notes) - but a drawing has no such exit on tablet (you just draw and leave),
   // so an edit was lost to an app suspend/kill before it ever hit disk (and thus
   // never synced). This closes that window: best-effort + detached; the foreground
   // sync loop pushes it on resume. `flushRef` reads the latest state so the
@@ -538,7 +544,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   useEffect(() => {
     // ONE listener pair for the whole app-background moment. Everything that must
     // reach disk before an OS kill hangs off it: the open note's body, and the
-    // sidebar folder-expand set (MYND-561 — `vault.workspace`'s only other write
+    // sidebar folder-expand set (MYND-561 - `vault.workspace`'s only other write
     // seam is `lockVault()`). Both are best-effort and independent; neither can
     // block the other, and a second registration for the same event would just be
     // two ways to get the same moment wrong.
@@ -620,7 +626,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   >(null);
   // MYND-620 task 4: the phone's answer to the desktop's note-scoped side panel.
   // There is no permanently-visible panel beside an editor on a phone, so the
-  // same information arrives as a sheet on request — the established mechanism
+  // same information arrives as a sheet on request - the established mechanism
   // that attachments, snapshots, templates, settings and the view editor all
   // already use.
   const [noteTasksOpen, setNoteTasksOpen] = useState(false);
@@ -641,14 +647,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   // Active `#tag` filter on the notes list (folded/lowercase key), or null.
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  // Notes-list sort: backend order ("none") / title A–Z / Z–A.
+  // Notes-list sort: backend order ("none") / title A-Z / Z-A.
   const [sortMode, setSortMode] = useState<"none" | "az" | "za">("none");
   // Which slice of the notes tab is shown: live notes / archive / trash.
   const [listView, setListView] = useState<"notes" | "archive" | "trash">("notes");
-  // MYND-620 task 3: the Tasks destination's folder/tag narrowing. Owned here so
-  // it survives leaving and re-entering the destination — a scope that silently
-  // reset on every visit would be a control that does not hold.
-  const [taskScope, setTaskScope] = useState<TaskScope>(EMPTY_SCOPE);
 
   // MYND-620 task 7: a reminder tapped while locked lands here, once, after
   // unlock. The editor mounts on every unlock path, which is the same seam the
@@ -663,7 +665,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       const landing = takeReminderLanding(await vaultTasks());
       if (!live || landing.kind === "none") return;
       // Either way the notification led somewhere: to the task's note when the
-      // identifier still names one, and to the Tasks list when it does not —
+      // identifier still names one, and to the Tasks list when it does not -
       // which is where that task would have been.
       setTab("tasks");
       if (landing.kind === "task") void openNote(landing.task.noteId);
@@ -683,7 +685,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // drills, so this stays null unless a future "new note in folder" sets it).
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   // OPEN folders in the inline hierarchy, keyed by folded folder identity
-  // (MYND-561). Owned by a module store — not `useState` — and persisted into the
+  // (MYND-561). Owned by a module store - not `useState` - and persisted into the
   // `vault.workspace` container so the set survives a restart; see
   // `lib/folder-expand-store.ts` for why the store owns it and
   // `lib/workspace-persist.ts` for the encoding + write cadence. Polarity is
@@ -692,13 +694,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const expandedFolders = useExpandedFolders();
   // Filter sheet (the single home for Tags / Views / Archive / Trash).
   const [filterOpen, setFilterOpen] = useState(false);
-  // Sort sheet — the sort-order picker (same modal treatment as Filter).
+  // Sort sheet - the sort-order picker (same modal treatment as Filter).
   const [sortOpen, setSortOpen] = useState(false);
-  // Views sheet — browse/activate saved views + create a new one.
+  // Views sheet - browse/activate saved views + create a new one.
   const [viewsOpen, setViewsOpen] = useState(false);
   // Inline note-list search (filters THIS page's list; NOT the command palette).
   const [searchQuery, setSearchQuery] = useState("");
-  // Command palette — opened from the header button (left of Settings).
+  // Command palette - opened from the header button (left of Settings).
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Tag Browser (multi-select tag filter → matching notes; desktop bottom-bar port).
   const [tagBrowserOpen, setTagBrowserOpen] = useState(false);
@@ -721,7 +723,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     | null
   >(null);
   const [folderPromptInput, setFolderPromptInput] = useState("");
-  // Color / folder-icon picker target (MYND-516) — a note (color only) or a
+  // Color / folder-icon picker target (MYND-516) - a note (color only) or a
   // folder (color + icon). Opened from the long-press action sheets.
   const [decoTarget, setDecoTarget] = useState<
     | { kind: "note"; id: string }
@@ -742,7 +744,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // ── Folder-expand persistence (MYND-561) ─────────────────────────────────────
   // Restore the open-folder set from `vault.workspace` once per unlock session.
-  // The store is the single owner, so this is a plain replace with disk truth —
+  // The store is the single owner, so this is a plain replace with disk truth -
   // no mount-order ref, and a toggle that beats it just gets overwritten (same
   // outcome as a cold start).
   //
@@ -751,7 +753,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // visible to an adversary with filesystem access even though its contents are
   // sealed, and desktop keeps that mtime from becoming an activity log by writing
   // on graceful exit only (design grill 2026-06-01 Q1). Backgrounding is the
-  // mobile equivalent — an OS kill of a backgrounded app is the normal way a
+  // mobile equivalent - an OS kill of a backgrounded app is the normal way a
   // mobile app dies.
   useEffect(() => {
     void ensureWorkspaceHydrated();
@@ -773,7 +775,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [viewEditor]);
 
 
-  // Managed frontmatter flags per note (trashed/archived/template/…) — the
+  // Managed frontmatter flags per note (trashed/archived/template/…) - the
   // live-set gate for the main list + the trash/archive views.
   const noteFlags = useMemo(() => {
     const m = new Map<string, NoteFlags>();
@@ -792,7 +794,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [notes, bodies]);
   const liveNotes = useMemo(() => notes.filter((n) => isLiveNote(noteFlags.get(n.id)!)), [notes, noteFlags]);
   // The note-set every RESOLVER surface runs against (graph, backlinks, the
-  // vault-indices sweep) — desktop's `resolverCache` rule, verbatim
+  // vault-indices sweep) - desktop's `resolverCache` rule, verbatim
   // (`src/notes/sidebarState.tsx`): trashed / soft-deleted / template /
   // conflict-copy out, **archived IN**. An archived note is hidden from the
   // working-set list but must still resolve as a link target and appear in the
@@ -804,7 +806,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     () =>
       notes
         // #260: the shared predicate, so the resolver's admission rule cannot
-        // drift from desktop's again. Archived notes stay resolvable — archive
+        // drift from desktop's again. Archived notes stay resolvable - archive
         // is a working-set filter, not a deletion.
         .filter((n) => {
           const f = noteFlags.get(n.id);
@@ -819,7 +821,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [notes, noteFlags, bodies],
   );
   // #46: `isTrashedNote` excludes TOMBSTONES (`deleted:`). Without that clause
-  // "Delete permanently" was a visible no-op — the tombstone it writes left the
+  // "Delete permanently" was a visible no-op - the tombstone it writes left the
   // row rendered, so the note looked like it was still in the trash.
   const trashedNotes = useMemo(
     () => notes.filter((n) => isTrashedNote(noteFlags.get(n.id) ?? {})),
@@ -829,7 +831,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     () => notes.filter((n) => isArchivedNote(noteFlags.get(n.id) ?? {})),
     [notes, noteFlags],
   );
-  // Template notes (`template: true`) — excluded from the live list; managed via
+  // Template notes (`template: true`) - excluded from the live list; managed via
   // the Templates sheet + instantiated by the daily-note engine.
   const templateNotes = useMemo(
     () =>
@@ -839,7 +841,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [notes, noteFlags, bodies],
   );
 
-  // Folder path per live note (from `folder:` frontmatter) — the drill-down tree.
+  // Folder path per live note (from `folder:` frontmatter) - the drill-down tree.
   const folderOf = useMemo(() => {
     const m = new Map<string, string | null>();
     for (const n of liveNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
@@ -848,12 +850,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // The interleave cache (MYND-596): note id → `updatedAt`, the recency key the
   // shared `orderContainerChildren` reads for unlisted notes. A superset (all
-  // notes) is fine — the ranker only touches the ids a container actually holds.
+  // notes) is fine - the ranker only touches the ids a container actually holds.
   const orderCache = useMemo<Map<string, OrderedNoteRecord>>(
     () => new Map(notes.map((n) => [n.id, { updatedAt: updatedById.get(n.id) ?? null }])),
     [notes, updatedById],
   );
-  // The FULL folder tree (fav/archive-unfiltered) — the reorder handlers resolve
+  // The FULL folder tree (fav/archive-unfiltered) - the reorder handlers resolve
   // a row's true `item_order` container against it, so a nudge is relative to the
   // note's real manual neighbours even when the fav strip hides some of them.
   // `[]` for the archived set is deliberate and load-bearing here: this tree
@@ -866,7 +868,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Folder-archive (MYND-470): the synced `archived_folders` set decluttered from
   // the working tree. A note under an archived folder keeps NO note-level flag
-  // (folder-archive never rewrites notes), so it sits in `liveNotes` — split those
+  // (folder-archive never rewrites notes), so it sits in `liveNotes` - split those
   // out so the Notes tree hides them (matching desktop) while they stay live +
   // resolvable (graph/tags/search), and browse them under the Archive view.
   const archivedKeys = useMemo(
@@ -888,7 +890,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     () => (folderArchivedOf.size === 0 ? liveNotes : liveNotes.filter((n) => !folderArchivedOf.has(n.id))),
     [liveNotes, folderArchivedOf],
   );
-  // The note→folder map with folder-archived notes removed — the map every
+  // The note→folder map with folder-archived notes removed - the map every
   // working-set query resolves against (desktop's `liveCache(cache, archivedKeys)`
   // equivalent). The unfiltered `folderOf` stays for the Archive view, which is
   // the one surface that must still see them.
@@ -905,8 +907,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     () => topLevelArchivedFolders(prefs.archived_folders),
     [prefs.archived_folders],
   );
-  // Folder of each note shown by the Archive view — folder-archived LIVE notes
-  // plus note-flag `archived:` notes — so the root can drop notes already under a
+  // Folder of each note shown by the Archive view - folder-archived LIVE notes
+  // plus note-flag `archived:` notes - so the root can drop notes already under a
   // folder row, and a folder drill can gather its subtree. id → folder.
   const archiveNoteFolderOf = useMemo(() => {
     const m = new Map<string, string | null>(folderArchivedOf);
@@ -929,7 +931,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     () => buildNoteGraphAndModel(resolverNotes, backendEdges ?? clientEdges(resolverNotes, bodies)),
     [backendEdges, resolverNotes, bodies],
   );
-  // The `#tag` index over the LIVE notes — drives the notes-list tag filter.
+  // The `#tag` index over the LIVE notes - drives the notes-list tag filter.
   const tagIndex = useMemo(() => buildTagIndex(liveNotes, bodies), [liveNotes, bodies]);
   // The scope strip's tag half. `noteTags` is already built for the tag browser;
   // a second derivation would be a second answer to "what tags does this note
@@ -955,7 +957,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [tagIndex]);
 
   // Saved views (prefs.saved_views) in display order (view_order first, then any
-  // id not yet ordered — e.g. a view authored on another client).
+  // id not yet ordered - e.g. a view authored on another client).
   const orderedViews = useMemo(() => {
     const byId = new Map(prefs.saved_views.map((v) => [v.id, v]));
     const seen = new Set<string>();
@@ -975,7 +977,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [orderedViews, activeViewId],
   );
   // The active view's grouped/sorted rows, computed by the SHARED query engine
-  // (`runView`) over the same resolvers the tag/folder chips use — so a saved
+  // (`runView`) over the same resolvers the tag/folder chips use - so a saved
   // view honours view_type + group_by + sort + columns identically to desktop.
   // The `property` leaf + grouping/sort/columns now resolve against the MYI1
   // property index (which the mobile sweep feeds since MYND-277/278). Null when
@@ -1059,7 +1061,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return [...s].sort();
   }, [folderOf]);
 
-  // Favorites (prefs.favorites — an ordered list of note UUIDs). Favorited notes
+  // Favorites (prefs.favorites - an ordered list of note UUIDs). Favorited notes
   // sort to the top of the notes list; a star toggle lives on each row.
   const favSet = useMemo(() => new Set(prefs.favorites), [prefs.favorites]);
   const toggleFavorite = useCallback(
@@ -1071,8 +1073,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [prefs.favorites],
   );
 
-  // Move-up/move-down reorder (MYND-596). Offered only in the plain notes tree —
-  // where `item_order` is the active ordering — and, for notes, never for a
+  // Move-up/move-down reorder (MYND-596). Offered only in the plain notes tree -
+  // where `item_order` is the active ordering - and, for notes, never for a
   // favorited one (it lives in the strip, ordered by `favorites`, not
   // `item_order`). Each nudge rewrites the acted row's container sequence and
   // persists via the whole-map `set_item_order`, then bumps the prefs nonce (the
@@ -1123,7 +1125,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [view, editing, prefs.editor_default_view_mode]);
 
   // Size-class transitions (rotation, iPad Split View drag, window resize):
-  // entering compact must land on a concrete screen — the editor when a note is
+  // entering compact must land on a concrete screen - the editor when a note is
   // open, the list otherwise. Regular layouts ignore `view`, but every setView
   // call still fires (navigation intent) so the view-keyed default-view-mode
   // effect above keeps working on all size classes. Deps intentionally narrow:
@@ -1141,7 +1143,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Both index feeds below are DELTA-driven (myne-mobile#41). `bodies` is a new
   // Map on every load, so an effect keyed on it re-fires whether or not any note
-  // actually changed — and both used to answer that by re-sending the entire
+  // actually changed - and both used to answer that by re-sending the entire
   // vault. The trackers hold what each index last accepted, so a re-fire that
   // carries one changed body is one apply. Nothing is recorded until the backend
   // takes it, so a rejected or cancelled item comes back on the next pass.
@@ -1149,7 +1151,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const indicesDelta = useIndexDeltaTracker();
   // Both indices belong to the OPEN vault. Every routine exit unmounts this
   // component (lock and switch both route through the unlock stage), but the
-  // vault id is a prop, so a swap without a remount is expressible — and a
+  // vault id is a prop, so a swap without a remount is expressible - and a
   // tracker carried across it would delta against another vault's index and
   // leave this one's records unwritten.
   useEffect(() => {
@@ -1159,7 +1161,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Keep the backend MYS1 search index synced with the live corpus (the WebView
   // already holds every note's plaintext). Debounced so a burst of edits settles
-  // once. The whole-corpus `search_index_replace` is the SEED — it runs on the
+  // once. The whole-corpus `search_index_replace` is the SEED - it runs on the
   // first pass after unlock, when there is no prior state to delta against; every
   // pass after that sends only what moved.
   useEffect(() => {
@@ -1175,7 +1177,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       }));
       const { changed, removed } = tracker.diff(corpus);
       // Seeding with a corpus reports every note as changed, so this covers the
-      // seed too — and an EMPTY vault correctly seeds nothing rather than
+      // seed too - and an EMPTY vault correctly seeds nothing rather than
       // re-sending an empty replace on every pass.
       if (changed.length === 0 && removed.length === 0) return;
       const seeding = tracker.isEmpty();
@@ -1205,14 +1207,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     };
   }, [liveNotes, bodies, searchDelta]);
 
-  // Feed the backend vault-indices (MYI1) — extract each CHANGED note's
+  // Feed the backend vault-indices (MYI1) - extract each CHANGED note's
   // links/tags TS-side, apply, then read the Turkish-correctly-folded edge dump
   // back to drive the graph + backlinks. Debounced; falls back to the client
   // graph on any failure.
   //
   // The applies run SEQUENTIALLY with a live `cancelled` check between them.
   // They used to be one `Promise.all` over the whole vault, and the flag only
-  // guarded the `setBackendEdges` at the end — so a save landing mid-sweep
+  // guarded the `setBackendEdges` at the end - so a save landing mid-sweep
   // stacked a second full sweep on the first instead of replacing it, and every
   // `extractRecord` parse in the map ran synchronously on the main thread before
   // the first await could yield.
@@ -1283,12 +1285,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Surgical vs whole-vault, the desktop split (`sidebarState.tsx` refreshOne /
   // refreshAll). `refreshAll` re-reads and re-decrypts EVERY note; it belongs to
-  // the paths that genuinely cannot know what moved — the first load after
+  // the paths that genuinely cannot know what moved - the first load after
   // unlock, and an incoming sync write. Every other write path knows the id it
   // just touched and must splice that one row instead, or saving one note costs
   // work proportional to the vault (myne-mobile#41).
   //
-  // A splice installs a new `bodies` Map identity, same as a full load — the
+  // A splice installs a new `bodies` Map identity, same as a full load - the
   // difference is that the two index feeds now diff against what they last
   // applied, so a new identity carrying one changed body is one apply.
 
@@ -1306,7 +1308,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       }
       // `note_list` returns ids sorted ascending and the list's own ordering
       // derives from that, so a new note is inserted in place rather than
-      // appended — otherwise the row order depends on how the note arrived.
+      // appended - otherwise the row order depends on how the note arrived.
       const next = [...prev, entry];
       next.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       return next;
@@ -1324,7 +1326,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setNotes((prev) => (prev.some((n) => n.id === id) ? prev.filter((n) => n.id !== id) : prev));
   }, []);
 
-  /** Re-read ONE note and splice it — for a write whose resulting body the
+  /** Re-read ONE note and splice it - for a write whose resulting body the
    *  caller does not hold (a backend-side rewrite, a materialized conflict copy).
    *  A failed read leaves the row as it was rather than blanking it. */
   const refreshOne = useCallback(
@@ -1371,7 +1373,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [loadEntries]);
 
   // #213: the resolver note-set fed to the shared editor so `![[Drawing]]` embeds
-  // (and wikilink chips generally) resolve — mobile did not wire this before, so
+  // (and wikilink chips generally) resolve - mobile did not wire this before, so
   // links rendered unresolved. `isDrawing` + `folder` come from the already-loaded
   // bodies, so no extra reads.
   const resolverNoteSet = useMemo<ResolverNote[]>(
@@ -1388,7 +1390,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [notes, bodies],
   );
 
-  // #213: the inline-drawing-embed IO seam. Mobile is an OPEN-FULL-SCREEN host —
+  // #213: the inline-drawing-embed IO seam. Mobile is an OPEN-FULL-SCREEN host -
   // tapping a drawing embed opens the drawing's own screen (reusing the existing
   // full-screen canvas) rather than a cramped inline canvas, and there is no
   // inline rename (no ref-rewriting rename on mobile). `saveScene`/`renameDrawing`
@@ -1419,7 +1421,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [],
   );
 
-  // #179: the whole-note drawing's Excalidraw API — its mobile-menu items (Theme /
+  // #179: the whole-note drawing's Excalidraw API - its mobile-menu items (Theme /
   // Canvas background / Reset) move to the ⋯ sheet since the hamburger is hidden.
   const drawingApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const drawingActions = useMemo(
@@ -1475,7 +1477,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [refreshAll]);
 
   // SYNC-37: the foreground sync loop (and manual `sync_now`) emit `sync://changed`
-  // after a pull writes incoming notes to disk — reload the list + bodies so notes
+  // after a pull writes incoming notes to disk - reload the list + bodies so notes
   // synced from another device actually appear without a manual refresh. Ported
   // from the desktop `Editor.tsx` listener.
   useEffect(() => {
@@ -1484,7 +1486,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     void (async () => {
       try {
         // The event carries no payload, so this genuinely cannot know which
-        // notes the pull wrote — one of the two paths that keeps `refreshAll`.
+        // notes the pull wrote - one of the two paths that keeps `refreshAll`.
         const handle = await listen("sync://changed", () => {
           if (!cancelled) void refreshAll();
         });
@@ -1572,7 +1574,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // Task-field chip activation (MYND-614): the shared task-chip decoration
   // dispatches `myne-open-task-chip`; the shared listener opens the field editor
   // anchored to that chip and writes the result back through the single writer
-  // seam. This is the SAME implementation the desktop installs — without it the
+  // seam. This is the SAME implementation the desktop installs - without it the
   // chips render and do nothing, which is exactly the state the mobile editor
   // shipped in (the decoration is cross-client; only desktop had listened).
   useEffect(() => installTaskChipEditor(), []);
@@ -1582,7 +1584,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // quick-unlock PIN fast-path actually appear on the next unlock.
   useEffect(() => {
     if (!HAS_TAURI) return;
-    // A6 envelope: the effective timeout is always in [30, 3600] — a sentinel/
+    // A6 envelope: the effective timeout is always in [30, 3600] - a sentinel/
     // replayed "off" (0) can no longer disable the idle lock (matches desktop's
     // always-on `effective_auto_lock_secs`). No disable path.
     const secs = effectiveMobileAutoLockSecs(prefs.auto_lock_seconds);
@@ -1590,8 +1592,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     //
     // This was a `setTimeout` the countdown restarted on every touch. A phone
     // suspends timers the moment the app leaves the foreground, so time spent
-    // backgrounded — which is most of the time a phone is unattended, and
-    // exactly the A6 "lost or stolen device" case auto-lock is for — never
+    // backgrounded - which is most of the time a phone is unattended, and
+    // exactly the A6 "lost or stolen device" case auto-lock is for - never
     // counted toward the deadline. A vault locked 30 seconds after the user
     // came back rather than 30 seconds after they left.
     //
@@ -1621,7 +1623,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     events.forEach((e) => window.addEventListener(e, markActive, { passive: true }));
     document.addEventListener("visibilitychange", onVisibility);
     // A coarse tick: the deadline is a timestamp comparison, so the interval
-    // only decides how promptly a FOREGROUND idle is noticed — the suspended
+    // only decides how promptly a FOREGROUND idle is noticed - the suspended
     // case is handled by the visibility check above.
     const timer = window.setInterval(evaluate, 5000);
     return () => {
@@ -1697,7 +1699,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // is consumed HERE once the editor mounts post-unlock; a tap while the app is
   // already open fires CAPTURE_EVENT below. `mode: "voice"` (the widget's mic
   // button, `myne://capture?mode=voice`) opens a fresh note AND the recording
-  // sheet in its ready state — the user taps Stop when done (safer than
+  // sheet in its ready state - the user taps Stop when done (safer than
   // auto-arming the mic on a cold launch).
   const startCapture = useCallback((mode: CaptureMode) => {
     newNote();
@@ -1721,7 +1723,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const runDrain = () => {
       // Share-import drain (§9.20, SYNC-4/6): decrypt + import any files shared
       // via the OS share sheet into the attachment library, host-side. A sibling
-      // of the capture drain — independent (it refreshes the library, not the
+      // of the capture drain - independent (it refreshes the library, not the
       // notes list) and self-serialising; its SF5 toast is rendered by
       // <ShareImportToast/>.
       void drainPendingShares();
@@ -1731,14 +1733,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         await sealStagedCaptures();
         const created = await drainPendingCaptures();
         // `refreshAll`, not `loadEntries`: the latter READS the vault and throws
-        // the result away — the drained captures never reached the list, and the
+        // the result away - the drained captures never reached the list, and the
         // cost was a second full decrypt of every note on every foreground.
         // The drain reports a count, not ids, so this is a legitimate whole-vault
-        // reload — and it only runs when something was actually created.
+        // reload - and it only runs when something was actually created.
         if (created > 0) await refreshAll();
       })();
     };
-    runDrain(); // on mount — every unlock path lands here
+    runDrain(); // on mount - every unlock path lands here
     // Also drain when the app returns to the foreground: a watch capture may have
     // been delivered + staged while we were backgrounded (there is no native
     // event bridge to JS yet, so foreground is the prompt-seal trigger).
@@ -1770,7 +1772,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       } catch {
         // A failed read must NOT bind the editor: committing an empty buffer
         // under the note's id would hand every later flush/save that id with a
-        // blank body — overwriting the real note (silent data loss). Stay on
+        // blank body - overwriting the real note (silent data loss). Stay on
         // the list and surface the failure there instead.
         setListError(t("editor.flow.openFailed"));
         return;
@@ -1802,7 +1804,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     try {
       const stamped = stampUpdated(editorText);
       // The written body IS the row's new content, so the list and both index
-      // feeds are updated from what we just wrote — no read, and nothing
+      // feeds are updated from what we just wrote - no read, and nothing
       // proportional to the vault (myne-mobile#41).
       if (editing.id === null) {
         const id = HAS_TAURI
@@ -1860,8 +1862,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    *  browser, templates). On compact the list is only reachable with no editor
    *  open (`exitEditor` precedes it), so this reduces to `openNote`. On regular
    *  the editor pane stays mounted next to the list: persist the in-progress
-   *  note first — an existing note through `openRelated`'s save-then-open, a
-   *  brand-new non-empty note by creating it — so a row tap never silently
+   *  note first - an existing note through `openRelated`'s save-then-open, a
+   *  brand-new non-empty note by creating it - so a row tap never silently
    *  discards typed text. */
   /**
    * myne-md/myne#613: register the folder a freshly-created note landed in.
@@ -1893,7 +1895,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     try {
       const id = editing.id;
       await fn(id);
-      // Archive/trash are frontmatter rewrites — the note stays on disk, so the
+      // Archive/trash are frontmatter rewrites - the note stays on disk, so the
       // row is re-read rather than dropped, and only that row.
       await refreshOne(id);
       exitEditor();
@@ -2047,7 +2049,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // take the full desired map). Assign = splice the one key; "None"/"Default" =
   // delete it. Key discipline (MYND-562): item_colors is keyed by note UUID OR
   // the folder's FOLDED identity (`folderKey`, applied at the decoration call
-  // sites); folder_icons by that folded key only — byte-identical to the keys
+  // sites); folder_icons by that folded key only - byte-identical to the keys
   // desktop writes, so a desktop-assigned decoration round-trips across case-
   // variants. The success-path nonce bump belongs to `writePref` inside
   // `lib/prefs.ts`.
@@ -2076,14 +2078,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     if (HAS_TAURI) void setFolderIcons(next).catch(ignorePrefsWriteFailure);
   }
   /** Open the color/icon picker for a folder (color + icon), closing the folder
-   *  action sheet first — the `openFolderPrompt` close-then-open idiom. */
+   *  action sheet first - the `openFolderPrompt` close-then-open idiom. */
   function openFolderDecoration(path: string) {
     setFolderActions(null);
     setDecoTarget({ kind: "folder", path });
   }
 
   /** Re-root every LIVE note (+ the deliberate/archived folder sets) under
-   *  `oldPath` to the matching path under `newPath` — the mobile folder rename/
+   *  `oldPath` to the matching path under `newPath` - the mobile folder rename/
    *  move primitive. Paths come from the tree (derived from the notes' own
    *  `folder:`), so a case-exact prefix match is reliable. */
   async function reRootFolderSubtree(oldPath: string, newPath: string) {
@@ -2141,7 +2143,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         if (icons.changed) await setFolderIcons(icons.next);
       });
     }
-    // Only the notes that actually moved were rewritten — a folder rename in a
+    // Only the notes that actually moved were rewritten - a folder rename in a
     // 500-note vault touching 3 notes costs 3 reads, not 500.
     await Promise.allSettled(moved.map((id) => refreshOne(id)));
   }
@@ -2261,7 +2263,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   /** Restore an archived folder (MYND-470): drop it (and any nested archived
    *  descendant) from `archived_folders` so its subtree returns to the live tree.
-   *  Prefs-only — no note bodies change. */
+   *  Prefs-only - no note bodies change. */
   async function restoreArchivedFolder(path: string) {
     const next = removeFolderFromArchive(prefs.archived_folders, path);
     if (HAS_TAURI)
@@ -2352,7 +2354,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     await openPeriod("daily");
   }
 
-  /** Copy the current note's Markdown to the clipboard (WebView clipboard API —
+  /** Copy the current note's Markdown to the clipboard (WebView clipboard API -
    *  no native plugin). Transient "Copied" feedback via the button label. */
   async function copyNote() {
     // myne-md/myne#455 opened on this function. It reached the WebView clipboard
@@ -2418,7 +2420,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     try {
       // Save the PDF under Documents (reachable even if the share sheet is
       // cancelled), then the native share sheet lets the user pick where to keep
-      // it (MYND-475). Sanitize the title to a bare basename first — a title with
+      // it (MYND-475). Sanitize the title to a bare basename first - a title with
       // `/`, `\`, or a leading `..` must not let join() escape Documents.
       const safe = title.replace(/[/\\]/g, "_").replace(/^\.+/, "").trim() || "note";
       const path = await join(await documentDir(), `${safe}.pdf`);
@@ -2455,12 +2457,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Heading outline of the note body (skips fenced code so `# in code` isn't a
   // heading). Each entry keeps the char offset so tapping jumps the caret there.
-  // MUST stay above the `view === "list"` early return — a hook called only in
+  // MUST stay above the `view === "list"` early return - a hook called only in
   // the editor branch renders "more hooks than the previous render" and crashes
   // the whole flow to a blank screen on the first list→editor transition.
   const outline = useMemo(() => deriveOutline(editorText), [editorText]);
 
-  // Unlinked mentions — live notes whose BODY contains this note's title as
+  // Unlinked mentions - live notes whose BODY contains this note's title as
   // plain text but that don't already wiki-link it (excludes the backlinks +
   // self). Feeds the right panel's `#` tab (distinct from the Tag Browser);
   // guarded on a ≥3-char title to avoid trivial-substring noise. Two-stage memo
@@ -2512,15 +2514,15 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // ── List pane (the former `view === "list"` early-return branch) ────────────
   // A render helper, not a component: it stays inside EditorFlow's scope (no
   // prop threading), and its derivations only run when a layout actually shows
-  // the list — the compact editor screen skips it entirely, so typing there
+  // the list - the compact editor screen skips it entirely, so typing there
   // never pays for the tree/filter/sort recomputation. `chrome` strips the
   // AppHeader / TabBar on expanded, where the sidebar absorbs both.
   const renderNotesPane = (chrome: { header: boolean; tabBar: boolean }) => {
     const viewActive = listView === "notes" && activeView != null;
     const searchNeedle = searchQuery.trim().toLowerCase();
     // The plain live-notes view renders the whole folder HIERARCHY (an inline
-    // expand/collapse tree). A tag/view/trash/archive filter — or an active inline
-    // search — renders a flat list instead.
+    // expand/collapse tree). A tag/view/trash/archive filter - or an active inline
+    // search - renders a flat list instead.
     const treeMode = listView === "notes" && !activeTag && !viewActive && searchNeedle === "";
     // Beeper-style favorites strip: the starred live notes, in the user's saved
     // favorites order. Shown only in the plain notes view (no search/tag/view);
@@ -2542,7 +2544,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         : folderOf;
     const titleOf = new Map(notes.map((n) => [n.id, n.title]));
     // MYND-596: folders and notes interleave in ONE display-ordered list PER
-    // container (shared `orderedChildren`) — a note can now sit above a folder,
+    // container (shared `orderedChildren`) - a note can now sit above a folder,
     // the same list desktop renders from the same synced `item_order`. The tree
     // is derived once from the fav/archive-filtered map and walked recursively.
     const tree = deriveTree(
@@ -2589,11 +2591,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 (n) => !isNoteFolderArchived(archiveNoteFolderOf.get(n.id) ?? null, archivedKeys),
               )
           : viewActive
-            ? [] // flat list bypassed for a view — MobileViewRenderHost renders it
+            ? [] // flat list bypassed for a view - MobileViewRenderHost renders it
             : activeTag
               ? workingNotes.filter((n) => (tagIndex.byTag.get(activeTag) ?? []).includes(n.id))
               : workingNotes;
-    // Inline search — matches the note title or its decrypted body, on-device.
+    // Inline search - matches the note title or its decrypted body, on-device.
     const searched =
       searchNeedle === ""
         ? filtered
@@ -2639,11 +2641,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     // Recursive folder-tree render with per-subtree STICKY headers. Each folder
     // header pins while ITS OWN subtree scrolls under it and un-pins once the
     // subtree is scrolled past (a sticky element is constrained to its wrapper),
-    // so nested folders stack + release correctly — the flat sticky list left
+    // so nested folders stack + release correctly - the flat sticky list left
     // deep headers stuck in the wrong places.
     const renderTree = (current: string | null, depth: number): ReactNode[] => {
       const out: ReactNode[] = [];
-      // ONE walk over the interleaved children — a FolderTreeRow for a folder
+      // ONE walk over the interleaved children - a FolderTreeRow for a folder
       // (recursing when expanded), a NoteRow for a note, in the returned order.
       for (const child of orderChildren(current)) {
         if (child.kind === "folder") {
@@ -2659,7 +2661,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   collapsed={isCollapsed}
                   indentPx={20 + depth * 18}
                   // Decorations key by the folded folder identity (MYND-562), not
-                  // the display path — so they match desktop across case-variants.
+                  // the display path - so they match desktop across case-variants.
                   icon={prefs.folder_icons[f.key]}
                   color={prefs.item_colors[f.key]}
                   onToggle={() => toggleFolder(f.key)}
@@ -2701,7 +2703,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const viewTitle = listView === "trash" ? t("notes.list.trash") : listView === "archive" ? t("notes.archive.title") : t("notes.list.notesHeading");
     return (
       <>
-        {/* Fixed header — sits OUTSIDE the animated pane so it stays put while
+        {/* Fixed header - sits OUTSIDE the animated pane so it stays put while
             the tab content slides between pages. */}
         {chrome.header && tab !== "templates" && (
           <AppHeader
@@ -2713,7 +2715,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           />
         )}
         {/* Ornament role (myne#394): the tab pane is the page a note is read and
-            written on, so it is the SURFACE role — the same call the desktop
+            written on, so it is the SURFACE role - the same call the desktop
             makes in `src/screens/Editor.tsx`. Boxes (callouts, quotes) already
             carry their role from the shared `editor/` decorations, which this
             client mounts; this is the half that is mobile's own. */}
@@ -2768,7 +2770,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 </div>
               </div>
 
-              {/* Secondary create/browse tiles — New drawing / Template / Daily
+              {/* Secondary create/browse tiles - New drawing / Template / Daily
                   note / Views. Each is hideable from Settings → Appearance: the
                   original three via MYND-479, New drawing (MYND-515) folded into
                   the same mechanism by MYND-538. */}
@@ -2895,7 +2897,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               </div>
             ) : viewActive ? (
               // A saved view renders its own grouped/typed surface (cards / table
-              // / list) in place of the flat note list — desktop parity. The host
+              // / list) in place of the flat note list - desktop parity. The host
               // owns its empty state (`view.empty`).
               activeView && viewResult ? (
                 <MobileViewRenderHost
@@ -3098,14 +3100,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         )}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
-            Files destination above — one component serving both a full-screen
+            Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
         {tab === "tasks" && (
           <TaskSurface
             scope={{ kind: "vault" }}
-            taskScope={taskScope}
-            onScopeChange={setTaskScope}
             tagsOf={tagsOfNote}
+            view={vaultTaskView}
+            onViewChange={setVaultTaskView}
             onOpen={(task) => {
               setTab("notes");
               void openNote(task.noteId);
@@ -3119,6 +3121,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "note-tasks" && editing?.id && (
           <TaskSurface
             scope={{ kind: "note", noteId: editing.id }}
+            view={noteTaskView}
+            onViewChange={setNoteTaskView}
             testIdPrefix="tasks.note-tab"
           />
         )}
@@ -3183,7 +3187,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onDelete={(id) =>
               void (async () => {
                 try {
-                  // Templates are synced `.myn` notes — route the delete so it
+                  // Templates are synced `.myn` notes - route the delete so it
                   // propagates as a tombstone under sync (not a bare local unlink).
                   // The tombstone is a REWRITE, so the row is re-read (and then
                   // filtered out as tombstoned) rather than dropped.
@@ -3408,7 +3412,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         )}
 
         {/* Color-label + folder-icon picker (MYND-516). The decoration key is the
-            folded folder identity (MYND-562) or the note UUID — resolved ONCE so a
+            folded folder identity (MYND-562) or the note UUID - resolved ONCE so a
             consumer can't mis-key it. */}
         {decoTarget &&
           (() => {
@@ -3520,7 +3524,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       )}
 
       {isDrawing ? (
-        // Drawing note (SF2) — the shared hardened Excalidraw canvas replaces
+        // Drawing note (SF2) - the shared hardened Excalidraw canvas replaces
         // CodeMirror. The scene loads from the body and re-serializes on change
         // into editorText, which saveNote persists (same path as a text note).
         <div
@@ -3554,10 +3558,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         // FormatBar below is DELIBERATELY KEPT: both offer the same commands, and
         // a thumb-reachable bar pinned over the keyboard beats a toolbar floating
         // on top of the selection the user is trying to see. (Desktop keeps the
-        // floating one — the flag defaults true.) Typography is applied via the
+        // floating one - the flag defaults true.) Typography is applied via the
         // canonical `typographyStyle(prefs)` CSS custom properties
         // (`--editor-text-size` / `--editor-font-family` / `--editor-line-spacing`)
-        // that the shared CM theme reads (MYND-483) — direct `fontSize`/etc. on
+        // that the shared CM theme reads (MYND-483) - direct `fontSize`/etc. on
         // the wrapper are OVERRIDDEN by CM's own `var(--editor-*)` rules, so a
         // change never reached the editor. `maxWidth` stays off (full-width phone).
         <div
@@ -3587,16 +3591,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // put this flow back on the guess it is meant to replace.
             noteId={editing?.id ?? null}
             // MYND-559: the FormatBar (driven by the `onReady` view above) is
-            // mobile's single formatting surface — suppress the engine's floating
+            // mobile's single formatting surface - suppress the engine's floating
             // selection toolbar so a word-select doesn't raise a second one.
             selectionToolbar={false}
             // #213: resolve wikilinks + recognize `![[Drawing]]` embeds. Mobile is
-            // an open-full-screen host — the embed shows a thumbnail that opens the
+            // an open-full-screen host - the embed shows a thumbnail that opens the
             // drawing on its own screen (drawingIo has openNote, no inline canvas).
             noteSet={resolverNoteSet}
             drawingIo={drawingIo}
             viewMode={rawMode ? "source" : "live"}
-            // Regular: the WS-01 prose measure — a 620px column (+ 56px gutters)
+            // Regular: the WS-01 prose measure - a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.
             style={
               isRegular
@@ -3608,7 +3612,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       )}
 
       {isDrawing ? null : readingMode ? (
-        // Reading mode hides the FormatBar (nothing to format) — but it must not
+        // Reading mode hides the FormatBar (nothing to format) - but it must not
         // be a one-way trap: a headingless note has an empty outline, so the
         // outline "Jump" can't get you out. A pinned Edit control always can.
         <ReadingBar onEdit={() => setReadingMode(false)} />
@@ -3629,7 +3633,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         />
       )}
 
-      {/* Off-screen print surface — `window.print()` (the PDF button) isolates
+      {/* Off-screen print surface - `window.print()` (the PDF button) isolates
           this via @media print (mobile.css). Frontmatter stripped; attachment
           embeds render inline via the attachment:// scheme. */}
       <div id="myne-print">
@@ -3664,7 +3668,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           onJump={() => {
             // Leave reading mode into the live editor; jumping to a specific
             // char offset now needs the CMEditor engine (scroll-anchor), a
-            // follow-up — for now the outline jump just opens the editor.
+            // follow-up - for now the outline jump just opens the editor.
             setRightPanel(false);
             setReadingMode(false);
           }}
@@ -3732,7 +3736,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           }}
           onInsertText={(text) => {
             // A finished audio transcript inserts its TEXT into the open note
-            // (MYND-563) — distinct from onInsert, which embeds an attachment ref.
+            // (MYND-563) - distinct from onInsert, which embeds an attachment ref.
             insertIntoEditor(text);
             setManageAttachments(false);
           }}
@@ -3744,6 +3748,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           {() => (
             <TaskSurface
               scope={{ kind: "note", noteId: editing.id as string }}
+              view={noteTaskView}
+              onViewChange={setNoteTaskView}
               onOpen={() => setNoteTasksOpen(false)}
               testIdPrefix="tasks.note"
             />
@@ -3756,7 +3762,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           noteId={editing.id}
           onClose={() => setHistoryOpen(false)}
           onRestored={() => {
-            // The live note was overwritten on disk — re-read it into the editor.
+            // The live note was overwritten on disk - re-read it into the editor.
             if (HAS_TAURI && editing?.id) void noteRead(editing.id).then(setEditorText).catch(() => {});
           }}
         />
@@ -3765,14 +3771,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     );
   };
 
-  // ── Shared overlays — the purge + move confirm sheets. Staged from BOTH the
+  // ── Shared overlays - the purge + move confirm sheets. Staged from BOTH the
   // list (trash-row Delete / long-press Move) and the editor ⋯ menu; they
   // previously rendered only in the editor view, which left the list-staged
-  // flows without their confirm sheet — rendering them in every layout fixes
+  // flows without their confirm sheet - rendering them in every layout fixes
   // that. ─────────────────────────────────────────────────────────────────────
   const renderSharedOverlays = () => (
     <>
-      {/* SF5 share-import confirmation toast (§9.20, SYNC-18) — self-contained,
+      {/* SF5 share-import confirmation toast (§9.20, SYNC-18) - self-contained,
           listens for the drain result; renders in every layout branch. */}
       {/* MYND-640: tapping the toast opens the library the share landed in.
           Without it the only signal a share arrived was a sentence that
@@ -3883,7 +3889,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // compact: the existing full-screen list ⇄ editor swap (unchanged phone
   // behavior, push/pop animation included). medium: list + detail side by side,
   // the phone's AppHeader + TabBar scoped to the list column. expanded: the
-  // WS-01 three-pane — sidebar + list + detail; the sidebar absorbs the
+  // WS-01 three-pane - sidebar + list + detail; the sidebar absorbs the
   // AppHeader/TabBar destinations, so neither renders. Graph / Files /
   // Templates span the full content width on regular (a graph squeezed into a
   // 316px column is useless).
@@ -3992,7 +3998,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 /** Heading outline of a note body. Skips fenced code blocks so a `#` inside a
  *  ``` fence isn't mistaken for a heading. */
 // Reuse the shared dialect's canonical heading model (single-parser rule) rather
-// than a second regex scan — it is fence-aware AND drops frontmatter pseudo-
+// than a second regex scan - it is fence-aware AND drops frontmatter pseudo-
 // headings, which the old hand-scan surfaced. `from` is the heading line's byte
 // offset, our OutlineItem `index`.
 function deriveOutline(text: string): OutlineItem[] {

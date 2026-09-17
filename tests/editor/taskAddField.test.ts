@@ -4,7 +4,7 @@
 // three-way menu, and the `/due` `/repeat` `/priority` slash commands.
 //
 // These exist so a user never types `[due:: …]` by hand. The write path is NOT
-// new — every route converges on the same tracked begin/apply seam a chip edit
+// new - every route converges on the same tracked begin/apply seam a chip edit
 // uses (`taskChipWiring.test.ts` covers that seam directly). What is new, and
 // what these cover, is: the `+` shows only on the caret's task line; the menu
 // adds an absent field and edits a present one; and the slash commands add a
@@ -30,7 +30,7 @@ afterEach(() => {
   cleanup = [];
   if (m !== null) teardown(m);
   m = null;
-  // Tear down any modal (menu / field editor) an assertion left open — each
+  // Tear down any modal (menu / field editor) an assertion left open - each
   // mounts under an `openModal` backdrop appended to <body>.
   for (const id of ["editor.task-field-menu", "editor.task-field-editor"]) {
     document
@@ -53,6 +53,20 @@ function menuRow(kind: string): HTMLElement {
 
 function fieldInput(): HTMLInputElement | HTMLSelectElement {
   return document.querySelector('[data-testid="editor.task-field-input"]')!;
+}
+
+/** Pick `iso` on the Myne-owned calendar, moving to its month first (myne#614
+ *  replaced the native date input, which had a `.value` setter). Bidirectional
+ *  so the helper does not depend on the wall-clock month it runs in. */
+function pickDay(iso: string): void {
+  const editor = document.querySelector('[data-testid="editor.task-field-editor"]')!;
+  const prev = editor.querySelector('[data-testid="editor.task-date-prev"]') as HTMLElement;
+  const next = editor.querySelector('[data-testid="editor.task-date-next"]') as HTMLElement;
+  for (let i = 0; i < 120 && editor.querySelector(`[data-date="${iso}"]`) === null; i += 1) {
+    const shown = editor.querySelector("[data-date]")?.getAttribute("data-date") ?? "";
+    (iso < shown ? prev : next).click();
+  }
+  editor.querySelector<HTMLElement>(`[data-date="${iso}"]`)!.click();
 }
 
 function commit(): void {
@@ -100,25 +114,25 @@ describe("the + menu adds an absent field and edits a present one", () => {
   it("a row for an ABSENT field opens an empty editor (add)", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("due").click();
-    expect((fieldInput() as HTMLInputElement).value).toBe("");
+    expect(document.querySelector('[data-testid="editor.task-field-editor"] [aria-selected="true"]')).toBeNull();
   });
 
   it("a row for a PRESENT field prefills its source value (edit, not clobber)", () => {
     openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
     menuRow("due").click();
-    expect((fieldInput() as HTMLInputElement).value).toBe("2026-08-01");
+    expect(fieldInput().getAttribute("data-date")).toBe("2026-08-01");
   });
 
   it("adding a due field through the menu lands it in the document", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("due").click();
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     commit();
     expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
   });
 
   it("still offers both rows on an anchorless repeat rule (myne#197)", () => {
-    // The rule renders as unread there, which is the point — but the menu is
+    // The rule renders as unread there, which is the point - but the menu is
     // the way OUT of that state, so it must keep offering the repeat row (to
     // edit the rule) and the due row (to give it a date). It keys on which
     // fields the line carries, not on whether they typed, and this pins that.
@@ -127,12 +141,12 @@ describe("the + menu adds an absent field and edits a present one", () => {
     expect(menuRow("due")).not.toBeNull();
     menuRow("repeat").click();
     // Prefilled with the SOURCE value, so opening it does not clobber the rule.
-    expect((fieldInput() as HTMLSelectElement).value).toBe("interval");
+    expect(fieldInput().getAttribute("data-value")).toBe("interval");
   });
 });
 
 describe("the + menu's skip row (myne#198)", () => {
-  // Skip advances from today, so the date is pinned — the menu reads the system
+  // Skip advances from today, so the date is pinned - the menu reads the system
   // clock because that is what production does.
   beforeEach(() => {
     vi.useFakeTimers();
@@ -154,7 +168,7 @@ describe("the + menu's skip row (myne#198)", () => {
 
   it("does not offer it for a rule Myne cannot read", () => {
     // The test is "can this occurrence be skipped", not "is there a repeat
-    // field" — an action that would silently do nothing is exactly the failure
+    // field" - an action that would silently do nothing is exactly the failure
     // the chip layer forbids itself.
     openMenu("- [ ] x [due:: 2026-07-01] [repeat:: every fortnight]\n");
     expect(skipRow()).toBeNull();
@@ -199,7 +213,7 @@ describe("/due /repeat /priority slash commands", () => {
     cmd("due").apply(m.view, from, from + "/due".length);
     // Trigger gone; still a task line, so no `- [ ] ` was prepended.
     expect(m.view.state.doc.toString()).toBe("- [ ] pay rent \n");
-    (fieldInput() as HTMLInputElement).value = "2026-10-10";
+    pickDay("2026-10-10");
     commit();
     expect(m.view.state.doc.toString()).toContain("[due:: 2026-10-10]");
   });
@@ -209,7 +223,7 @@ describe("/due /repeat /priority slash commands", () => {
     const from = m.view.state.doc.toString().indexOf("/due");
     cmd("due").apply(m.view, from, from + "/due".length);
     expect(m.view.state.doc.toString().startsWith("- [ ] pay rent")).toBe(true);
-    (fieldInput() as HTMLInputElement).value = "2026-10-10";
+    pickDay("2026-10-10");
     commit();
     const text = m.view.state.doc.toString();
     expect(text).toContain("- [ ] pay rent");
@@ -221,15 +235,15 @@ describe("/due /repeat /priority slash commands", () => {
     const from = m.view.state.doc.toString().indexOf("/repeat");
     cmd("repeat").apply(m.view, from, from + "/repeat".length);
     const input = fieldInput();
-    expect(input.tagName).toBe("SELECT");
-    expect(input.classList.contains("cm-recurrence-family")).toBe(true);
+    expect(input.getAttribute("role")).toBe("combobox");
+    expect(input.closest(".cm-select")?.classList.contains("cm-recurrence-family")).toBe(true);
   });
 });
 
 // ── myne#276: an anchorless repeat is explained, not silently minted ─────────
 //
 // #197 taught the chip layer to withhold the chip from a rule with nothing to
-// repeat FROM — correct, and the half that shipped. The half that did not is
+// repeat FROM - correct, and the half that shipped. The half that did not is
 // this one: the menu still offered **Repeat** on a bare task line with no
 // warning of any kind, and the only explanation for the raw text that followed
 // was a `title=` tooltip on the exact field span. From the user's side the whole
@@ -257,27 +271,24 @@ describe("an anchorless repeat explains itself (myne#276)", () => {
   it("offers the due date in the same surface after an anchorless repeat commits", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
 
-    // The rule the user chose is written — it is correct, and refusing it would
+    // The rule the user chose is written - it is correct, and refusing it would
     // discard it…
     expect(m!.view.state.doc.toString()).toContain("[repeat::");
     // …and the anchor it needs is asked for straight away, in the same surface.
     const chained = document.querySelector('[data-testid="editor.task-field-editor"]');
     expect(chained).not.toBeNull();
     // It is the DUE editor, not the repeat one that just closed: the repeat
-    // surface leads with a family `<select>`, the due surface with a text input.
+    // surface leads with a combobox (the hand-rolled control from myne#656), the
+    // due surface with the Myne calendar picker (myne#614).
     expect(chained!.getAttribute("aria-label")).toBe("Due date");
-    expect(fieldInput().tagName).toBe("INPUT");
+    expect(fieldInput().parentElement!.getAttribute("role")).toBe("gridcell");
   });
 
   it("does not chain into the due editor when the line already has an anchor", () => {
     openMenu("- [ ] pay the rent [due:: 2026-08-01]\n");
     menuRow("repeat").click();
-    (fieldInput() as HTMLSelectElement).value = "interval";
-    fieldInput().dispatchEvent(new Event("change", { bubbles: true }));
     commit();
     expect(document.querySelector('[data-testid="editor.task-field-editor"]')).toBeNull();
   });
@@ -293,11 +304,14 @@ describe("remind is authorable (myne#280)", () => {
   it("writes a reminder with a time through the menu", () => {
     openMenu("- [ ] call mother\n");
     menuRow("remind").click();
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
-    (document.querySelector('[data-testid="editor.task-field-time"]') as HTMLInputElement).value =
-      "09:00";
+    // myne#614: the picker is Myne-owned now, so select the cursor day and then add
+    // the seeded 09:00 time.
+    fieldInput().click();
+    (document.querySelector('[data-testid="editor.task-time-add"]') as HTMLElement).click();
     commit();
-    expect(m!.view.state.doc.toString()).toContain("[remind:: 2026-09-09 09:00]");
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(m!.view.state.doc.toString()).toContain(`[remind:: ${today} 09:00]`);
   });
 
   it("satisfies the repeat anchor, so no due date is chained after it", () => {
@@ -317,7 +331,7 @@ describe("remind is authorable (myne#280)", () => {
 //
 // Only the skip row tracked the line. A menu is easily open for longer than the
 // ~1 s autosave that rewrites the frontmatter `updated:` stamp, and any growth
-// above the task line moves it forward — so the offset captured at open time
+// above the task line moves it forward - so the offset captured at open time
 // landed in the PRECEDING line by the time a row was clicked. Nothing downstream
 // guards it: the writer rewrites whatever line text it is handed, so `[due:: …]`
 // could be appended to an unrelated task, to prose, or to a YAML line inside the
@@ -334,7 +348,7 @@ describe("the + menu survives a document shift (myne#326)", () => {
     m.view.dispatch({ changes: { from: 0, insert: "PREFIX-INSERTED\n" } });
 
     menuRow("due").click();
-    (fieldInput() as HTMLInputElement).value = "2026-09-09";
+    pickDay("2026-09-09");
     commit();
 
     const text = m.view.state.doc.toString();
@@ -357,5 +371,73 @@ describe("the + menu survives a document shift (myne#326)", () => {
 
     expect(() => menuRow("due").click()).not.toThrow();
     expect(m.view.state.doc.toString()).toBe("x");
+  });
+});
+
+// ── myne-md/myne#656: the menu stays mounted behind the field editor ─────────
+//
+// The menu used to end its tracking handle and close BEFORE opening the field
+// editor, so only one tracked span ever existed. The editor now BORROWS the
+// menu's handle - one live handle, mapped through document changes for as long
+// as either surface is open - which only works if the menu stays mounted and
+// its dismiss handler does not tear the handle down while the editor is up.
+describe("the + menu stays open behind the field editor (myne-md/myne#656)", () => {
+  function editor(): HTMLElement | null {
+    return document.querySelector('[data-testid="editor.task-field-editor"]');
+  }
+  function menu(): HTMLElement | null {
+    return document.querySelector('[data-testid="editor.task-field-menu"]');
+  }
+
+  it("keeps the menu mounted while the editor is open", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+    expect(editor()).not.toBeNull();
+    // The regression: the old handler called modal.close() on the menu here.
+    expect(menu()).not.toBeNull();
+  });
+
+  it("Escape closes the editor first and the menu second", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(editor()).toBeNull();
+    expect(menu()).not.toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(menu()).toBeNull();
+  });
+
+  it("a commit keeps the menu open for a second field", () => {
+    openMenu("- [ ] pay the rent\n");
+    menuRow("due").click();
+    // The due control is the Myne calendar (myne#614): pick a day button.
+    const day = document.querySelector<HTMLButtonElement>(
+      'button.cm-date-day[data-date="2026-09-09"]',
+    );
+    expect(day).not.toBeNull();
+    day!.click();
+    commit();
+    expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
+    expect(menu()).not.toBeNull();
+  });
+
+  it("writes the REAL kind, not the menu handle's placeholder `repeat`", () => {
+    // The menu's tracked handle is created with kind `repeat` (the menu tracks
+    // the whole line, not one field). If the editor applies through that handle
+    // without overriding the kind, a priority edit lands as `[repeat:: high]`.
+    openMenu("- [ ] pay the rent\n");
+    menuRow("priority").click();
+    fieldInput().click();
+    const option = document.querySelector(
+      '[data-testid="editor.task-field-input-option"][data-value="high"]',
+    ) as HTMLElement | null;
+    option!.click();
+    commit();
+
+    const text = m!.view.state.doc.toString();
+    expect(text).toContain("[priority:: high]");
+    expect(text).not.toContain("[repeat::");
   });
 });

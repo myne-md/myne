@@ -40,6 +40,7 @@
       "@myne/task-panel": ["../src/notes/components/TaskListPanel.tsx"],
       "@myne/task-filters": ["../src/notes/taskFilters.ts"],
       "@myne/task-scope": ["../src/notes/taskScope.ts"],
+      "@myne/task-view": ["../src/notes/taskView.ts"],
       "@myne/task-write": ["../src/notes/taskWriteCore.ts"],
       "@myne/note-completion": ["../src/notes/completeNoteCore.ts"],
       "@myne/agent-protocol": ["../src/lib/agent-protocol.ts"],

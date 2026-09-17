@@ -103,6 +103,12 @@ A SHA-256 hash of the canonical account number, truncated to 16 bytes: `SHA-256(
 
 Used in: `spec/protocol.md` §3.1, §8.3; `spec/account-number.md` §6, §7
 
+### **accent completion** &nbsp; 📦 *Product*
+
+The one surface where a completed task is drawn with state-by-fill: a finished row in the [task panel](#task-panel) fills its checkbox with `--accent` and strikes the task text through in `--accent`. A narrow, ruled exception to the canon rule that state is carried by icon and coloured text, never by a fill (`decisions.md` 2026-09-13, myne-md/myne#656). It is scoped to panel rows only — the editor's inline affordances keep the neutral treatment, the date chip's overdue ink stays `--danger` text, and the prohibition on a green check is untouched.
+
+Used in: `decisions.md` 2026-09-13 (myne-md/myne#656); `docs/design/README.md` "Task completion"
+
 ### **Active language set** &nbsp; 📦 *Product*
 
 The set of bundled dictionaries the [spell checker](#spell-check) currently checks against (SYNC-11). A word is accepted if it is valid in **any** member of the set (set-union, no per-note language detection) or in the **Personal dictionary**. The set is settings-driven (Settings → Appearance language picker) and defaults to the OS locale when bundled, unioned with en-US; it is passed to the engine's batch check as the `spell_check` command's `langs` argument. v0.1 bundles 23 languages (Turkish deferred).
@@ -1307,6 +1313,12 @@ Used in: `spec/protocol.md` §3.3, §9.3
 The KEK derived from `root_key` via `derive_key(root_key, "myne.v0.1 itemsKey-wrap")`. Wraps the singleton `itemsKey`. The first level in Myne's three-level note-key wrapping.
 
 Used in: `spec/protocol.md` §3.3
+
+### **icon-only priority** &nbsp; 📦 *Product*
+
+The appearance option that renders a task's priority as its icon alone instead of the word (Settings → Appearance, "Icon-only priority"). A display choice only: the stored [task inline field](#task-inline-field) keeps the full `priority` value, so toggling it changes no bytes in any note.
+
+Used in: myne-md/myne#656
 
 ### **Ignore list (spell-check)** &nbsp; 📦 *Product*
 
@@ -2698,6 +2710,12 @@ Its selected filter and [scope](#scope-selector) persist **with the tab** in the
 
 Used in: `decisions.md` 2026-07-28; MYND-616
 
+### **task view** &nbsp; 📦 *Product*
+
+Everything a [task panel](#task-panel) persists with its tab: the status, due, folder, note, tag and priority filters plus the within-section sort (`src/notes/taskView.ts`, `TaskView`). It persists **with the tab** in the workspace descriptor under the same omit-when-default rule the [task tab](#task-tab) established, so an untouched view serializes byte-identical to a descriptor written before the feature existed.
+
+Used in: `src/notes/taskView.ts`; myne-md/myne#656
+
 ### **task destination** &nbsp; 📦 *Product*
 
 The mobile placement of the vault-wide [task panel](#task-panel) (MYND-620): a top-level entry in the phone's bottom navigation bar, and a tab in the expanded-layout sidebar — the same shape the knowledge-graph view established.
@@ -2728,9 +2746,9 @@ Used in: `decisions.md` 2026-07-28; MYND-620
 
 ### **scope selector** &nbsp; 📦 *Product*
 
-The narrowing control on a [task panel](#task-panel): **one folder** (single-select, subtree-inclusive) **AND any of several tags** (multi-select, OR'd).
+The narrowing control on a [task panel](#task-panel): **any of several folders** (multi-select, subtree-inclusive, OR'd) **AND any of several tags** (multi-select, OR'd). A note narrowed to one file only offers notes inside the selected folders, so the two axes cannot contradict each other.
 
-***Myne-divergent* in the half people expect to be an AND**: several selected tags are OR'd, not AND'd. Most notes carry one of a user's top-level tags rather than several, so AND'ing two selections returns empty for most real choices — and a selector that usually yields nothing reads as broken rather than precise. Folder and tags are then AND'd with each other.
+***Myne-divergent* in both halves people expect to be an AND**: several selected folders are OR'd with each other, and several selected tags are OR'd with each other, rather than AND'd. AND'ing two tag selections returns empty for most real choices, since most notes carry one of a user's top-level tags rather than several, and a selector that usually yields nothing reads as broken rather than precise. The folder axis and the tag axis are then AND'd with each other.
 
 It adds **no expressiveness to the query surface**: every scope it can express is one of the closed `FilterNode` leaves the saved-views work already froze (`inFolder` / `hasTag` / `and` / `or` / `all`), which is checkable rather than merely asserted.
 
@@ -2743,6 +2761,12 @@ The muted glyph shown on a [note-task](#note-task) in the sidebar row and on its
 It marks the note as a task and says **nothing about completion** — deliberately not a check, and above all not a green check, which the design canon prohibits. Hideable via the `show_task_marker` preference, which is classified **Shared** rather than device-local: a marker's visibility is taste, not device capability, so it should not have to be re-chosen on every new device.
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-28
+
+### **task field editor** &nbsp; 📦 *Product*
+
+The per-field editing surface a [line-task](#line-task) opens from the `+` add-field menu (myne-md/myne#656): one control per field kind, with hand-rolled date and time pickers that render in the reader's `date_format` / `time_format` rather than the platform inputs (`decisions.md` 2026-09-13, myne-md/myne#614). The editor borrows the menu's tracked handle, so the menu stays mounted behind it and a commit can keep the menu open for a second field. A field the line cannot parse degrades field-by-field: the editor edits what it understands and preserves the rest as bytes.
+
+Used in: `decisions.md` 2026-09-13 (myne-md/myne#614); myne-md/myne#656
 
 ### **task inline field** &nbsp; 📦 *Product*
 
