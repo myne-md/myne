@@ -249,13 +249,13 @@ pub fn upsert_member(roster: &RosterMap, entry: RosterMemberEntry) -> RosterMap 
 
 /// Insert the owner's own row exactly once, at the roster's first creation.
 ///
-/// A later invite leaves an existing owner row (live or tombstoned) untouched:
-/// the owner row is written once and the member rows carry the churn. A
-/// brand-new owner lands at `version = 1` via [`upsert_member`]; anything
-/// present is returned unchanged, so a second invite never advances or
-/// rewrites it.
+/// A later invite leaves any existing owner row (live or tombstoned)
+/// untouched, even when the device-local person identity has changed and the
+/// candidate therefore has a different fingerprint. The owner row is written
+/// once and the member rows carry the churn. A brand-new owner lands at
+/// `version = 1` via [`upsert_member`].
 pub fn upsert_owner_once(roster: &RosterMap, owner: RosterMemberEntry) -> RosterMap {
-    if roster.contains_key(&owner.fingerprint_hex) {
+    if roster.values().any(|entry| entry.role == RosterRole::Owner) {
         roster.clone()
     } else {
         upsert_member(roster, owner)
@@ -568,6 +568,45 @@ mod tests {
             "aa".repeat(32),
             "owner row wrap is not rewritten"
         );
+    }
+
+    #[test]
+    fn upsert_owner_once_rejects_a_second_owner_with_a_different_identity() {
+        use super::RosterRole;
+        let (existing_fp, mut existing) = member(1, 5, false);
+        existing.role = RosterRole::Owner;
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(existing_fp.clone(), existing);
+
+        let (candidate_fp, mut candidate) = member(2, 0, false);
+        candidate.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&roster, candidate);
+
+        assert_eq!(out, roster, "the existing singleton owner is preserved");
+        assert!(out.contains_key(&existing_fp));
+        assert!(!out.contains_key(&candidate_fp));
+        assert_eq!(
+            out.values()
+                .filter(|entry| entry.role == RosterRole::Owner)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn upsert_owner_once_promotes_a_legacy_same_identity_member() {
+        use super::RosterRole;
+        let (fp, member_row) = member(1, 2, false);
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(fp.clone(), member_row);
+
+        let (_, mut owner) = member(1, 0, false);
+        owner.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&roster, owner);
+        let row = out.get(&fp).expect("present");
+
+        assert_eq!(row.role, RosterRole::Owner);
+        assert_eq!(row.version, 3);
     }
 
     #[test]
