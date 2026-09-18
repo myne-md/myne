@@ -260,13 +260,8 @@
       "title": "Lampiran",
       "transcribeDone": "Transkripsi selesai.",
       "transcribeFailed": "Transkripsi gagal. Silakan coba lagi.",
-      "transcribeTooLong": "Rekaman ini terlalu panjang untuk ditranskripsi. Audionya tetap terlampir, jadi Anda masih bisa memutarnya.",
-      "transcribeFeatureOff": "Ucapan-ke-teks mati. Nyalakan di Pengaturan → Transkripsi.",
-      "transcribeModelLoadFailed": "Tidak dapat memuat model ucapan-ke-teks. Pasang ulang Myne, atau periksa model kustom Anda di Pengaturan → Developer → AI.",
-      "transcribeNoModelHint": "Model ucapan-ke-teks tidak ada. Memasang ulang Myne akan memulihkannya.",
       "transcribeNoModel": "Pilih model ucapan-ke-teks di Pengaturan → Developer → AI.",
       "transcribeStarted": "Mentranskripsikan…",
-      "transcribeVaultLocked": "Buka kunci brankas Anda untuk mentranskripsikan.",
       "transcriptionModalClose": "Tutup transkripsi",
       "transcriptionModalTitle": "Transkripsi",
       "typeFilter": {

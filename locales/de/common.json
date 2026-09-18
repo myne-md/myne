@@ -260,13 +260,8 @@
       "title": "Anhänge",
       "transcribeDone": "Transkription abgeschlossen.",
       "transcribeFailed": "Transkription fehlgeschlagen. Bitte versuchen Sie es erneut.",
-      "transcribeTooLong": "Diese Aufnahme ist zu lang für eine Transkription. Die Audiodatei bleibt angehängt, Sie können sie also weiterhin abspielen.",
-      "transcribeFeatureOff": "Sprache zu Text ist aus. Schalten Sie es unter Einstellungen → Transkription ein.",
-      "transcribeModelLoadFailed": "Das Sprache-zu-Text-Modell konnte nicht geladen werden. Installieren Sie Myne neu oder prüfen Sie Ihr eigenes Modell unter Einstellungen → Developer → KI.",
-      "transcribeNoModelHint": "Das Sprache-zu-Text-Modell fehlt. Eine Neuinstallation von Myne stellt es wieder her.",
       "transcribeNoModel": "Wählen Sie unter Einstellungen → Developer → KI ein Sprache-zu-Text-Modell aus.",
       "transcribeStarted": "Wird transkribiert…",
-      "transcribeVaultLocked": "Entsperren Sie Ihren Tresor, um zu transkribieren.",
       "transcriptionModalClose": "Transkription schließen",
       "transcriptionModalTitle": "Transkription",
       "typeFilter": {

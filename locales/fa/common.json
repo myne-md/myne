@@ -260,13 +260,8 @@
       "title": "پیوست‌ها",
       "transcribeDone": "رونویسی کامل شد.",
       "transcribeFailed": "رونویسی ناموفق بود. دوباره تلاش کنید.",
-      "transcribeTooLong": "این ضبط برای رونویسی خیلی طولانی است. صدا پیوست می‌ماند، پس همچنان می‌توانید آن را پخش کنید.",
-      "transcribeFeatureOff": "تبدیل گفتار به نوشتار خاموش است. آن را در تنظیمات → رونویسی روشن کنید.",
-      "transcribeModelLoadFailed": "بارگذاری مدل گفتار به نوشتار ممکن نشد. Myne را دوباره نصب کنید، یا مدل سفارشی خود را در تنظیمات → توسعه‌دهنده → AI بررسی کنید.",
       "transcribeNoModel": "یک مدل گفتار به نوشتار در تنظیمات → توسعه‌دهنده → AI انتخاب کنید.",
-      "transcribeNoModelHint": "مدل گفتار به نوشتار موجود نیست. نصب دوبارهٔ Myne آن را بازمی‌گرداند.",
       "transcribeStarted": "در حال رونویسی…",
-      "transcribeVaultLocked": "برای رونویسی، خزانهٔ خود را باز کنید.",
       "transcriptionModalClose": "بستن رونویسی",
       "transcriptionModalTitle": "رونویسی",
       "typeFilter": {

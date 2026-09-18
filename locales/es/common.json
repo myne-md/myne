@@ -286,13 +286,8 @@
       "title": "Adjuntos",
       "transcribeDone": "Transcripción completada.",
       "transcribeFailed": "La transcripción falló. Inténtalo de nuevo.",
-      "transcribeTooLong": "Esta grabación es demasiado larga para transcribirla. El audio sigue adjunto, así que puedes reproducirlo.",
-      "transcribeFeatureOff": "La conversión de voz a texto está desactivada. Actívala en Ajustes → Transcripción.",
-      "transcribeModelLoadFailed": "No se pudo cargar el modelo de voz a texto. Reinstala Myne o comprueba tu modelo personalizado en Ajustes → Desarrollador → IA.",
-      "transcribeNoModelHint": "Falta el modelo de voz a texto. Al reinstalar Myne se restaura.",
       "transcribeNoModel": "Selecciona un modelo de voz a texto en Ajustes → Desarrollador → IA.",
       "transcribeStarted": "Transcribiendo…",
-      "transcribeVaultLocked": "Desbloquea tu bóveda para transcribir.",
       "transcriptionModalClose": "Cerrar la transcripción",
       "transcriptionModalTitle": "Transcripción",
       "typeFilter": {

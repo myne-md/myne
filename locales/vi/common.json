@@ -260,13 +260,8 @@
       "title": "Tệp đính kèm",
       "transcribeDone": "Đã chép lời xong.",
       "transcribeFailed": "Chép lời thất bại. Vui lòng thử lại.",
-      "transcribeTooLong": "Bản ghi âm này quá dài để chép lời. Tệp âm thanh vẫn được đính kèm, nên bạn vẫn có thể phát lại.",
-      "transcribeFeatureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
-      "transcribeModelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Hãy cài đặt lại Myne, hoặc kiểm tra mô hình tùy chỉnh của bạn trong Cài đặt → Nhà phát triển → AI.",
-      "transcribeNoModelHint": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
       "transcribeNoModel": "Chọn một mô hình chuyển giọng nói thành văn bản trong Cài đặt → Nhà phát triển → AI.",
       "transcribeStarted": "Đang chép lời…",
-      "transcribeVaultLocked": "Hãy mở khóa kho của bạn để chép lời.",
       "transcriptionModalClose": "Đóng bản chép lời",
       "transcriptionModalTitle": "Bản chép lời",
       "typeFilter": {

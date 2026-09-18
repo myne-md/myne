@@ -260,13 +260,8 @@
       "title": "Bilagor",
       "transcribeDone": "Transkriberingen är klar.",
       "transcribeFailed": "Transkriberingen misslyckades. Försök igen.",
-      "transcribeTooLong": "Den här inspelningen är för lång för att transkriberas. Ljudet finns kvar som bilaga, så du kan fortfarande spela upp det.",
-      "transcribeFeatureOff": "Tal till text är avstängt. Slå på det i Inställningar → Transkribering.",
-      "transcribeModelLoadFailed": "Kunde inte läsa in tal-till-text-modellen. Installera om Myne, eller kontrollera din egen modell i Inställningar → Utvecklare → AI.",
-      "transcribeNoModelHint": "Tal-till-text-modellen saknas. Att installera om Myne återställer den.",
       "transcribeNoModel": "Välj en tal-till-text-modell i Inställningar → Utvecklare → AI.",
       "transcribeStarted": "Transkriberar…",
-      "transcribeVaultLocked": "Lås upp ditt valv för att transkribera.",
       "transcriptionModalClose": "Stäng transkriberingen",
       "transcriptionModalTitle": "Transkribering",
       "typeFilter": {
