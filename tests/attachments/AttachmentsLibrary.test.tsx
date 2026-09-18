@@ -111,6 +111,8 @@ describe("AttachmentsLibrary top bar", () => {
 
     const sort = screen.getByRole("combobox", { name: "Sort attachments" });
     fireEvent.click(sort);
+    // The catalog spells it with a hyphen (8d665d2f normalized the en dash
+    // away); the accessible name must match the rendered label exactly.
     fireEvent.click(screen.getByRole("option", { name: "Name A-Z" }));
     expect(sort.textContent).toContain("Name A-Z");
   });

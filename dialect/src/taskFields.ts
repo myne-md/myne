@@ -170,6 +170,11 @@ export function parseTaskFields(line: string, tree?: Tree): TaskFields {
       const emojiPriority = EMOJI_PRIORITIES.get(bare);
       if (emojiPriority !== undefined) {
         if (result.priority === undefined) result.priority = emojiPriority;
+        else {
+          // The marker is the value: carry the word so the writer's verbatim
+          // emission (`[priority:: high]`) is a fixed point (myne-md/myne#703).
+          result.preserved.push({ key: "priority", value: emojiPriority, raw });
+        }
         return false;
       }
 
@@ -184,22 +189,40 @@ export function parseTaskFields(line: string, tree?: Tree): TaskFields {
         case "due":
         case "done":
         case "remind": {
-          if (result[key] !== undefined) return false; // first occurrence wins
-          const instant = parseTaskInstant(value);
-          if (instant === null) preserve(result.malformed);
-          else result[key] = instant;
+          if (result[key] === undefined) {
+            const instant = parseTaskInstant(value);
+            if (instant === null) preserve(result.malformed);
+            else result[key] = instant;
+          } else {
+            // A second telling is data, not a duplicate to drop: the writer
+            // re-emits the whole line from this record, so anything missing
+            // here is deleted by the next write (myne-md/myne#703).
+            preserve(result.preserved);
+          }
           return false;
         }
         case "repeat": {
           // The rule vocabulary belongs to MYND-615; here it is raw text.
-          if (result.repeat === undefined && value !== "") result.repeat = value;
+          // Two refusals in one branch (myne-md/myne#703): a value carrying
+          // `]` never reaches the slot, because the bracketed form the writer
+          // emits terminates the value at the first `]` and the next parse
+          // would move the rest into the description; and an empty value types
+          // nothing but is still data. Both are preserved, never dropped.
+          if (value.includes("]")) preserve(result.preserved);
+          else if (result.repeat !== undefined) preserve(result.preserved);
+          else if (value === "") preserve(result.malformed);
+          else result.repeat = value;
           return false;
         }
         case "priority": {
-          if (result.priority !== undefined) return false;
-          const word = value.toLowerCase();
-          if (PRIORITY_WORDS.has(word)) result.priority = word as TaskPriority;
-          else preserve(result.malformed);
+          if (result.priority === undefined) {
+            const word = value.toLowerCase();
+            if (PRIORITY_WORDS.has(word)) result.priority = word as TaskPriority;
+            else preserve(result.malformed);
+          } else {
+            // Same rule as due/done/remind above (myne-md/myne#703).
+            preserve(result.preserved);
+          }
           return false;
         }
         default: {

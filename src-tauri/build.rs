@@ -676,17 +676,18 @@ fn main() {
     // matching `local-inference:allow-<cmd>` — plus `generate_handler!`, which
     // nothing but a test checks. All three are compared, both directions, by
     // `build_rs_capability_json_and_generate_handler_agree` in that module.
-    // myne#529 + myne-md/myne#714: the `agent` plugin's ACL namespace is
-    // declared UNCONDITIONALLY, even though the plugin code itself stays
-    // gated behind `local-inference` (see `src/plugins/mod.rs`). The
-    // `detached-note.json` capability references `agent:default` in every
-    // build, and Tauri validates capability references at build time, so a
-    // feature-gated namespace leaves that reference dangling and the
-    // `--no-default-features` auditable build fails to compile. Declaring the
-    // names without the handlers is safe: no AI code is compiled (the plugin
-    // module, the engine and the handlers all stay behind the feature), and an
-    // invoke of a non-existent command fails closed at runtime rather than
-    // reaching a backend. The auditable build still compiles no AI path.
+    // myne#529: the `agent` plugin's ACL namespace, declared UNCONDITIONALLY
+    // even though the plugin itself compiles only under `local-inference`
+    // (see `src/plugins/mod.rs`). The `detached-note.json` capability names
+    // `agent:default` statically, and tauri_build fails a build whose
+    // capability references an undeclared namespace — which is how the
+    // `--no-default-features` auditable build broke (myne-md/myne#715). In an
+    // AI-free build the grant authorizes nothing (no plugin, no commands to
+    // invoke), so this is fail-closed, not a widening: the alternative is a
+    // capability that dangles by feature flag. What stays guarded is the
+    // plugin and its runtime `main`-only capability
+    // (`plugins/agent/mod.rs`); the namespace declaration itself carries no
+    // code and adds no dependency (the ai-free network gate still holds).
     attributes = attributes.plugin(
         "agent",
         // The eight agentic-note-editing commands. Same InlinedPlugin

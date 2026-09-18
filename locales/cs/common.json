@@ -312,13 +312,8 @@
       "title": "Přílohy",
       "transcribeDone": "Přepis dokončen.",
       "transcribeFailed": "Přepis selhal. Zkuste to prosím znovu.",
-      "transcribeTooLong": "Tato nahrávka je pro přepis příliš dlouhá. Zvuk zůstává přiložený, takže si jej můžete přehrát.",
-      "transcribeFeatureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
-      "transcribeModelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Přeinstalujte Myne, nebo zkontrolujte svůj vlastní model v Nastavení → Developer → AI.",
-      "transcribeNoModelHint": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
       "transcribeNoModel": "Vyberte model pro převod řeči na text v Nastavení → Developer → AI.",
       "transcribeStarted": "Probíhá přepis…",
-      "transcribeVaultLocked": "Pro přepis odemkněte svůj trezor.",
       "transcriptionModalClose": "Zavřít přepis",
       "transcriptionModalTitle": "Přepis",
       "typeFilter": {

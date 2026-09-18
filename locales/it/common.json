@@ -286,13 +286,8 @@
       "title": "Allegati",
       "transcribeDone": "Trascrizione completata.",
       "transcribeFailed": "Trascrizione non riuscita. Riprova.",
-      "transcribeTooLong": "Questa registrazione è troppo lunga per essere trascritta. L'audio resta allegato, quindi puoi comunque riprodurlo.",
-      "transcribeFeatureOff": "La conversione da voce a testo è disattivata. Attivala in Impostazioni → Trascrizione.",
-      "transcribeModelLoadFailed": "Impossibile caricare il modello da voce a testo. Reinstalla Myne, oppure controlla il tuo modello personalizzato in Impostazioni → Developer → AI.",
-      "transcribeNoModelHint": "Il modello da voce a testo è mancante. Reinstallando Myne viene ripristinato.",
       "transcribeNoModel": "Seleziona un modello da voce a testo in Impostazioni → Developer → AI.",
       "transcribeStarted": "Trascrizione in corso…",
-      "transcribeVaultLocked": "Sblocca la cassaforte per trascrivere.",
       "transcriptionModalClose": "Chiudi la trascrizione",
       "transcriptionModalTitle": "Trascrizione",
       "typeFilter": {

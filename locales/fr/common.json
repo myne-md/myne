@@ -286,13 +286,8 @@
       "title": "Pièces jointes",
       "transcribeDone": "Transcription terminée.",
       "transcribeFailed": "La transcription a échoué. Veuillez réessayer.",
-      "transcribeTooLong": "Cet enregistrement est trop long pour être transcrit. L'audio reste en pièce jointe, vous pouvez donc toujours l'écouter.",
-      "transcribeFeatureOff": "La reconnaissance vocale est désactivée. Activez-la dans Paramètres → Transcription.",
-      "transcribeModelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale. Réinstallez Myne, ou vérifiez votre modèle personnalisé dans Paramètres → Développeur → IA.",
-      "transcribeNoModelHint": "Le modèle de reconnaissance vocale est manquant. Réinstaller Myne le rétablit.",
       "transcribeNoModel": "Sélectionnez un modèle de reconnaissance vocale dans Paramètres → Développeur → IA.",
       "transcribeStarted": "Transcription en cours…",
-      "transcribeVaultLocked": "Déverrouillez votre coffre-fort pour transcrire.",
       "transcriptionModalClose": "Fermer la transcription",
       "transcriptionModalTitle": "Transcription",
       "typeFilter": {

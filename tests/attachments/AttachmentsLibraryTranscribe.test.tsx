@@ -131,11 +131,11 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
   // MYND-591: each normalized failure cause surfaces its own truthful toast;
   // anything unrecognized falls back to the generic failure copy.
   it.each([
-    ["feature_off", "attachments.library.transcribeFeatureOff"],
-    ["vault_locked", "attachments.library.transcribeVaultLocked"],
-    ["no_model", "attachments.library.transcribeNoModelHint"],
-    ["model_load_failed", "attachments.library.transcribeModelLoadFailed"],
-    ["too_long", "attachments.library.transcribeTooLong"],
+    ["feature_off", "editor.attachment.widget.transcribe.cause.featureOff"],
+    ["vault_locked", "editor.attachment.widget.transcribe.cause.vaultLocked"],
+    ["no_model", "editor.attachment.widget.transcribe.cause.noModel"],
+    ["model_load_failed", "editor.attachment.widget.transcribe.cause.modelLoadFailed"],
+    ["too_long", "editor.attachment.widget.transcribe.cause.tooLong"],
     ["failed", "attachments.library.transcribeFailed"],
   ] as const)("shows the per-cause toast when the run rejects %s", async (kind, key) => {
     transcriptionEnabled = true;

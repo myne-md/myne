@@ -260,13 +260,8 @@
       "title": "附件",
       "transcribeDone": "转录完成。",
       "transcribeFailed": "转录失败。请重试。",
-      "transcribeTooLong": "此录音过长，无法转录。音频仍作为附件保留，你仍然可以播放它。",
-      "transcribeFeatureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
-      "transcribeModelLoadFailed": "无法加载语音转文字模型。请重新安装 Myne，或在设置 → 开发者 → AI 中检查你的自定义模型。",
-      "transcribeNoModelHint": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
       "transcribeNoModel": "请在设置 → 开发者 → AI 中选择语音转文字模型。",
       "transcribeStarted": "正在转录…",
-      "transcribeVaultLocked": "请解锁保险库后再进行转录。",
       "transcriptionModalClose": "关闭转录",
       "transcriptionModalTitle": "转录",
       "typeFilter": {

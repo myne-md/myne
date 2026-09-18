@@ -401,13 +401,8 @@
       "title": "المرفقات",
       "transcribeDone": "اكتمل التفريغ النصي.",
       "transcribeFailed": "فشل التفريغ النصي. أعد المحاولة.",
-      "transcribeTooLong": "هذا التسجيل أطول من أن يُفرَّغ نصيًا. يبقى الصوت مرفقًا، فلا يزال بإمكانك تشغيله.",
-      "transcribeFeatureOff": "تحويل الكلام إلى نص معطّل. فعّله من الإعدادات → التفريغ النصي.",
-      "transcribeModelLoadFailed": "تعذّر تحميل نموذج تحويل الكلام إلى نص. أعد تثبيت Myne، أو تحقّق من نموذجك المخصّص في الإعدادات → المطوّر → AI.",
       "transcribeNoModel": "اختر نموذج تحويل الكلام إلى نص في الإعدادات → المطوّر → AI.",
-      "transcribeNoModelHint": "نموذج تحويل الكلام إلى نص مفقود. إعادة تثبيت Myne تستعيده.",
       "transcribeStarted": "جارٍ التفريغ…",
-      "transcribeVaultLocked": "افتح قفل خزنتك لإجراء التفريغ النصي.",
       "transcriptionModalClose": "إغلاق التفريغ النصي",
       "transcriptionModalTitle": "التفريغ النصي",
       "typeFilter": {
