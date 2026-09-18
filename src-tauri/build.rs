@@ -676,32 +676,37 @@ fn main() {
     // matching `local-inference:allow-<cmd>` — plus `generate_handler!`, which
     // nothing but a test checks. All three are compared, both directions, by
     // `build_rs_capability_json_and_generate_handler_agree` in that module.
-    // myne#529: the `agent` plugin's ACL namespace, declared under the SAME
-    // feature guard as `local-inference` because the plugin itself is (see
-    // `src/plugins/mod.rs`). A namespace declared in a build whose plugin is
-    // absent leaves `permissions/agent/default.toml` resolvable and the commands
-    // unreachable, and a capability referencing it would dangle.
-    if std::env::var_os("CARGO_FEATURE_LOCAL_INFERENCE").is_some() {
-        attributes = attributes.plugin(
-            "agent",
-            // The eight agentic-note-editing commands. Same InlinedPlugin
-            // discipline as the plugins around it: each command needs a matching
-            // `commands.allow` entry in `permissions/agent/default.toml` or the
-            // ACL resolver never authorizes the `plugin:agent|<cmd>` invoke, and
-            // it needs a line in `generate_handler!` or it is dead at runtime
-            // while everything else about it looks wired.
-            tauri_build::InlinedPlugin::new().commands(&[
-                "agent_start",
-                "agent_approve_scope",
-                "agent_preview_grant",
-                "agent_cancel",
-                "agent_apply",
-                "agent_undo",
-                "agent_last_run",
-                "agent_capability",
-            ]),
-        );
-    }
+    // myne#529: the `agent` plugin's ACL namespace, declared UNCONDITIONALLY
+    // even though the plugin itself compiles only under `local-inference`
+    // (see `src/plugins/mod.rs`). The `detached-note.json` capability names
+    // `agent:default` statically, and tauri_build fails a build whose
+    // capability references an undeclared namespace — which is how the
+    // `--no-default-features` auditable build broke (myne-md/myne#715). In an
+    // AI-free build the grant authorizes nothing (no plugin, no commands to
+    // invoke), so this is fail-closed, not a widening: the alternative is a
+    // capability that dangles by feature flag. What stays guarded is the
+    // plugin and its runtime `main`-only capability
+    // (`plugins/agent/mod.rs`); the namespace declaration itself carries no
+    // code and adds no dependency (the ai-free network gate still holds).
+    attributes = attributes.plugin(
+        "agent",
+        // The eight agentic-note-editing commands. Same InlinedPlugin
+        // discipline as the plugins around it: each command needs a matching
+        // `commands.allow` entry in `permissions/agent/default.toml` or the
+        // ACL resolver never authorizes the `plugin:agent|<cmd>` invoke, and
+        // it needs a line in `generate_handler!` or it is dead at runtime
+        // while everything else about it looks wired.
+        tauri_build::InlinedPlugin::new().commands(&[
+            "agent_start",
+            "agent_approve_scope",
+            "agent_preview_grant",
+            "agent_cancel",
+            "agent_apply",
+            "agent_undo",
+            "agent_last_run",
+            "agent_capability",
+        ]),
+    );
 
     if std::env::var_os("CARGO_FEATURE_LOCAL_INFERENCE").is_some() {
         attributes = attributes.plugin(

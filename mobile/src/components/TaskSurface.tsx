@@ -76,6 +76,8 @@ export function TaskSurface({
       // The row decides for itself what context to show: the source note is
       // redundant in a note-scoped list and essential in a vault-wide one.
       rowScope={scope.kind === "note" ? "note" : "vault"}
+      // Touch-sized checkboxes: the shared dense 14px box is a mouse target.
+      roomyBox
       {...(tagsOf === undefined ? {} : { tagsOf })}
       onViewChange={handleViewChange}
       // The write goes through the SHARED sequence with mobile IO - including

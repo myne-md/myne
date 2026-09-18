@@ -78,6 +78,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
+import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import {
   appendChatToken,
   failChatTurn,
@@ -91,6 +92,7 @@ import {
   beginRun,
   clearAgent,
   currentRunEpoch,
+  openRun,
   setUndoable,
   settleStep,
   useAgent,
@@ -885,5 +887,35 @@ describe("AiChatTab: starting a new conversation", () => {
     // conversation does not un-write them, so this must survive, which is why
     // the handler calls `clearAgent`, not `clearAgentForLock`.
     expect(screen.getByTestId("probe.undoable").textContent).toBe("yes");
+  });
+});
+
+describe("ChatComposer: Send turns into Stop while a run works", () => {
+  function startRunning(): void {
+    beginRun();
+    openRun(
+      { runId: "r1", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
+      currentRunEpoch(),
+    );
+  }
+
+  it("swaps Send for Stop and stops host-side on click", () => {
+    startRunning();
+    render(<ChatComposer openNoteId="n1" folders={[]} />);
+    expect(screen.queryByTestId("ai.composer-send")).toBeNull();
+    const stop = screen.getByTestId("ai.composer-stop");
+    fireEvent.click(stop);
+    expect(agentCancel).toHaveBeenCalledWith("r1");
+  });
+
+  it("ignores Enter while running instead of sending a second run", () => {
+    startRunning();
+    render(<ChatComposer openNoteId="n1" folders={[]} />);
+    agentStart.mockClear();
+    fireEvent.change(screen.getByTestId("ai.composer-input"), {
+      target: { value: "a second question" },
+    });
+    fireEvent.keyDown(screen.getByTestId("ai.composer-input"), { key: "Enter" });
+    expect(agentStart).not.toHaveBeenCalled();
   });
 });

@@ -408,4 +408,15 @@ describe("touch hit area", () => {
     expect(box.style.height).toBe("14px");
     cleanup();
   });
+
+  it("renders a 22 px box for touch surfaces that ask for roomyBox", () => {
+    // The phone's task list passes roomyBox: an invisible expander clipped by
+    // the windowed list's overflow kept the effective target near 14 px, so
+    // the visible box itself grows to the mobile Checkbox size instead.
+    const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} roomyBox />);
+    const box = byTestId(host, "task-row.checkbox") as HTMLElement;
+    expect(box.style.width).toBe("22px");
+    expect(box.style.height).toBe("22px");
+    cleanup();
+  });
 });

@@ -386,9 +386,11 @@ const CSS = `
   opacity: 1;
 }
 
-/* No hover on a touch device, so both cover affordances are simply always
-   visible there. Without this the whole feature is unreachable on a phone or
-   tablet, which the shared editor package also compiles for.
+/* Touch: the banner controls hide until tapped (myne-md/myne#715). Always
+   visible was the first posture and it kept two buttons over every cover;
+   the frame toggles a revealed class on tap (see cover-banner.ts), which
+   reads like :hover below. The Properties "Add cover" row stays always
+   visible: there is nothing to tap on a note without a cover.
 
    POSITION IS LOAD-BEARING: this must come after BOTH opacity-0 base rules.
    A media query adds no specificity, so with identical selectors source order
@@ -396,7 +398,9 @@ const CSS = `
    That is exactly what happened when the two per-control blocks were merged
    into one and the merged block landed above the add-cover base rule. */
 @media (pointer: coarse) {
-  .cm-cover-banner-controls,
+  .cm-cover-banner.cm-cover-revealed .cm-cover-banner-controls {
+    opacity: 1;
+  }
   .cm-fm-add-cover {
     opacity: 1;
   }

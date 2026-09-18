@@ -169,4 +169,32 @@ describe("the cover banner's hover controls", () => {
       expect(remove).toHaveBeenCalledWith("note-second");
     });
   });
+
+  // Tap-to-reveal on touch (myne-md/myne#715). The coarse-pointer CSS keeps
+  // the controls hidden until the frame carries `cm-cover-revealed`; these
+  // assert the frame half of that contract (the CSS half is a stylesheet).
+  describe("tap-to-reveal", () => {
+    function tap(el: HTMLElement | null): void {
+      el?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    }
+
+    it("starts hidden and toggles on frame taps", () => {
+      withCover({ openPicker: vi.fn(), remove: vi.fn() });
+      const view = mount("note-1");
+      const frame = control(view, COVER_BANNER_TESTID)!;
+      expect(frame.classList.contains("cm-cover-revealed")).toBe(false);
+      tap(frame);
+      expect(frame.classList.contains("cm-cover-revealed")).toBe(true);
+      tap(frame);
+      expect(frame.classList.contains("cm-cover-revealed")).toBe(false);
+    });
+
+    it("does not toggle when the tap lands on a control", () => {
+      withCover({ openPicker: vi.fn(), remove: vi.fn() });
+      const view = mount("note-1");
+      const frame = control(view, COVER_BANNER_TESTID)!;
+      tap(control(view, COVER_CHANGE_TESTID));
+      expect(frame.classList.contains("cm-cover-revealed")).toBe(false);
+    });
+  });
 });
