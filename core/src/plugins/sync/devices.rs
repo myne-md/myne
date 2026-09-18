@@ -515,6 +515,13 @@ pub enum SyncDeviceError {
     /// (`member_removal::MemberRemovalError::unavailable_message`):
     /// "Member removal is disabled until the roster wire ships."
     RemovalUnavailable,
+    /// The caller holds a member authority but the command needs the owner
+    /// (B2B, myne-md/myne#714). Split out of `NotEnrolled` and `BadRequest`
+    /// because the remedy is different in kind: nothing the member retypes
+    /// fixes it, only the owner can run the command. The UI hides
+    /// owner-only affordances from members, so this is the backend contract
+    /// for the future member client rather than a button a member sees.
+    NotOwner,
     /// Internal (task join, IO).
     Internal,
 }

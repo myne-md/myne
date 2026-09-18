@@ -13,12 +13,16 @@ import {
   removeMember,
   type InviteCommandView,
   type RosterMemberView,
+  type VaultAuthority,
 } from "../lib/invite";
 
 export type RosterMember = RosterMemberView;
 
 export interface RosterHook {
   members: RosterMember[];
+  /** The caller's vault authority. Defaults to `member` (fail-closed: admin
+   *  controls stay hidden until the backend confirms owner) and upgrades on load. */
+  authority: VaultAuthority;
   loading: boolean;
   error: string | null;
   reload: () => void;
@@ -34,6 +38,7 @@ export interface RosterHook {
 
 export function useRoster(): RosterHook {
   const [members, setMembers] = useState<RosterMember[]>([]);
+  const [authority, setAuthority] = useState<VaultAuthority>("member");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -45,15 +50,17 @@ export function useRoster(): RosterHook {
     let cancelled = false;
     setLoading(true);
     listRoster()
-      .then((rows) => {
+      .then((view) => {
         if (!cancelled) {
-          setMembers(rows);
+          setMembers(view.members);
+          setAuthority(view.authority);
           setError(null);
         }
       })
       .catch((e) => {
         if (!cancelled) {
           setMembers([]);
+          setAuthority("member");
           setError(String(e));
         }
       })
@@ -97,6 +104,7 @@ export function useRoster(): RosterHook {
 
   return {
     members,
+    authority,
     loading,
     error,
     reload,

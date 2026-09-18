@@ -9,7 +9,8 @@
 //! 1. **The schema**. a map from a member's identity fingerprint (the
 //!    canonical SAS value, 32 bytes lowercase hex) to a [`RosterMemberEntry`]:
 //!    the member's display name, the per-member wrapped `itemsKey`
-//!    (`wrapped_items_key_hex`), the causal `version`, the `deleted` flag
+//!    (`wrapped_items_key_hex`), the vault `role` (`owner`/`member`), the
+//!    causal `version`, the `deleted` flag
 //!    (a tombstone, remove-wins on merge), the `previous_keyset_fingerprint_hex`
 //!    key-rotation visibility chain (B12), and the `joined_at` timestamp.
 //! 2. **The codec**, canonical JSON for the map KEYS (a `BTreeMap` emits them
@@ -33,6 +34,36 @@ use super::conflict::join_by_version;
 use std::collections::BTreeMap;
 use std::string::String;
 use std::vec::Vec;
+
+/// A member's vault role: the singleton `owner` (the `root_key` holder, the
+/// only writer of this roster) or a plain `member`. The value rides inside
+/// the owner-sealed roster, so only the owner can write it, and it is
+/// administrative metadata: content write is flat and every member is an
+/// authorized writer (myne-md/myne#714).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum RosterRole {
+    Owner,
+    #[default]
+    Member,
+}
+
+/// True when the role is the `member` default the encoder omits, so a roster
+/// written before the field existed keeps parsing as member by construction.
+fn is_default_role(role: &RosterRole) -> bool {
+    matches!(role, RosterRole::Member)
+}
 
 /// One member's row in the vault roster.
 ///
@@ -73,6 +104,11 @@ pub struct RosterMemberEntry {
     /// it on merge (the resurrection guard).
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub deleted: bool,
+    /// The member's vault role. Administrative metadata inside the
+    /// owner-sealed roster; it gates no decryption and no read. Absent on
+    /// rosters written before the field existed, which parse as `member`.
+    #[serde(default, skip_serializing_if = "is_default_role")]
+    pub role: RosterRole,
     /// The PREVIOUS identity fingerprint this member row superseded, when
     /// a key rotation re-keyed the member (the `previousKeySet` chain,
     /// B12). Omitted when the member never rotated.
@@ -107,6 +143,7 @@ fn roster_tie_break(a: &RosterMemberEntry, b: &RosterMemberEntry) -> std::cmp::O
             &a.member_mldsa_vk_hex,
             a.joined_at,
             &a.previous_fingerprint_hex,
+            a.role,
         )
             .cmp(&(
                 &b.display_name,
@@ -116,6 +153,7 @@ fn roster_tie_break(a: &RosterMemberEntry, b: &RosterMemberEntry) -> std::cmp::O
                 &b.member_mldsa_vk_hex,
                 b.joined_at,
                 &b.previous_fingerprint_hex,
+                b.role,
             )),
     }
 }
@@ -209,6 +247,21 @@ pub fn upsert_member(roster: &RosterMap, entry: RosterMemberEntry) -> RosterMap 
     out
 }
 
+/// Insert the owner's own row exactly once, at the roster's first creation.
+///
+/// A later invite leaves any existing owner row (live or tombstoned)
+/// untouched, even when the device-local person identity has changed and the
+/// candidate therefore has a different fingerprint. The owner row is written
+/// once and the member rows carry the churn. A brand-new owner lands at
+/// `version = 1` via [`upsert_member`].
+pub fn upsert_owner_once(roster: &RosterMap, owner: RosterMemberEntry) -> RosterMap {
+    if roster.values().any(|entry| entry.role == RosterRole::Owner) {
+        roster.clone()
+    } else {
+        upsert_member(roster, owner)
+    }
+}
+
 /// Canonical-JSON serialization of the roster plaintext (the bytes
 /// `protocol::seal_membership_roster_raw` seals).
 ///
@@ -300,6 +353,7 @@ mod tests {
                 member_ed_pk_hex: "ef".repeat(32),
                 member_mldsa_vk_hex: "01".repeat(1952),
                 version,
+                role: RosterRole::Member,
                 deleted,
                 previous_fingerprint_hex: None,
                 joined_at: 1_700_000_000 + id as u64,
@@ -409,5 +463,163 @@ mod tests {
         let k1_out = out.get(&k1).expect("present");
         assert_eq!(k1_out.version, 2);
         assert_eq!(k1_out.wrapped_items_key_hex, "ff".repeat(32));
+    }
+
+    #[test]
+    fn role_is_emitted_for_owner_omitted_for_member_and_absent_reads_member() {
+        use super::RosterRole;
+        // An owner row spells its role on the wire.
+        let mut roster: RosterMap = BTreeMap::new();
+        let (k, mut v) = member(1, 1, false);
+        v.role = RosterRole::Owner;
+        roster.insert(k.clone(), v);
+        let bytes = encode_roster(&roster);
+        let text = std::str::from_utf8(&bytes).expect("roster JSON is UTF-8");
+        assert!(text.contains("\"role\":\"owner\""), "owner role is emitted");
+        let parsed = parse_roster(&bytes).expect("owner role parses");
+        assert_eq!(parsed.get(&k).expect("present").role, RosterRole::Owner);
+        // A member row omits the default, so a pre-role blob reads as member.
+        let mut plain: RosterMap = BTreeMap::new();
+        let (k2, v2) = member(2, 1, false);
+        plain.insert(k2.clone(), v2);
+        let member_bytes = encode_roster(&plain);
+        let member_text = std::str::from_utf8(&member_bytes).expect("UTF-8");
+        assert!(
+            !member_text.contains("role"),
+            "default member role is omitted"
+        );
+        let reparsed = parse_roster(&member_bytes).expect("member parses");
+        assert_eq!(reparsed.get(&k2).expect("present").role, RosterRole::Member);
+    }
+
+    #[test]
+    fn unknown_role_is_refused() {
+        let mut roster: RosterMap = BTreeMap::new();
+        let (k, v) = member(1, 1, false);
+        roster.insert(k, v);
+        let roster_bytes = encode_roster(&roster);
+        let text = std::str::from_utf8(&roster_bytes).expect("UTF-8");
+        let injected = text.replacen("\"version\"", "\"role\":\"superadmin\",\"version\"", 1);
+        assert!(parse_roster(injected.as_bytes()).is_none());
+    }
+
+    #[test]
+    fn merge_tie_break_considers_role() {
+        use super::RosterRole;
+        // Same member, same version, differing only in role. The member
+        // (Greater) wins the tie, and both argument orders agree.
+        let fp = member(1, 1, false).0;
+        let owner_entry = {
+            let (_, mut v) = member(1, 1, false);
+            v.role = RosterRole::Owner;
+            v
+        };
+        let member_entry = {
+            let (_, v) = member(1, 1, false);
+            v
+        };
+        let mut local_a: RosterMap = BTreeMap::new();
+        local_a.insert(fp.clone(), owner_entry);
+        let mut remote_a: RosterMap = BTreeMap::new();
+        remote_a.insert(fp.clone(), member_entry.clone());
+        let merged_ab = merge_rosters(&local_a, &remote_a);
+        assert_eq!(
+            merged_ab.get(&fp).expect("present").role,
+            RosterRole::Member
+        );
+        let merged_ba = merge_rosters(&remote_a, &local_a);
+        assert_eq!(
+            merged_ba.get(&fp).expect("present").role,
+            RosterRole::Member
+        );
+        assert_eq!(merged_ab, merged_ba, "merge is commutative");
+    }
+
+    #[test]
+    fn upsert_owner_once_inserts_at_version_one_when_absent() {
+        use super::RosterRole;
+        let empty: RosterMap = BTreeMap::new();
+        let (_, mut owner) = member(1, 0, false);
+        owner.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&empty, owner);
+        let row = out.get(&member(1, 0, false).0).expect("present");
+        assert_eq!(row.version, 1);
+        assert_eq!(row.role, RosterRole::Owner);
+    }
+
+    #[test]
+    fn upsert_owner_once_leaves_an_existing_owner_row_untouched() {
+        use super::RosterRole;
+        // An owner row at version 5 must not advance or rewrite when a later
+        // invite passes a fresh owner row.
+        let (fp, mut existing) = member(1, 5, false);
+        existing.role = RosterRole::Owner;
+        existing.wrapped_items_key_hex = "aa".repeat(32);
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(fp.clone(), existing);
+        let (_, mut fresh) = member(1, 0, false);
+        fresh.role = RosterRole::Owner;
+        fresh.wrapped_items_key_hex = "bb".repeat(32);
+        let out = super::upsert_owner_once(&roster, fresh);
+        let row = out.get(&fp).expect("present");
+        assert_eq!(row.version, 5, "owner row version is not advanced");
+        assert_eq!(
+            row.wrapped_items_key_hex,
+            "aa".repeat(32),
+            "owner row wrap is not rewritten"
+        );
+    }
+
+    #[test]
+    fn upsert_owner_once_rejects_a_second_owner_with_a_different_identity() {
+        use super::RosterRole;
+        let (existing_fp, mut existing) = member(1, 5, false);
+        existing.role = RosterRole::Owner;
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(existing_fp.clone(), existing);
+
+        let (candidate_fp, mut candidate) = member(2, 0, false);
+        candidate.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&roster, candidate);
+
+        assert_eq!(out, roster, "the existing singleton owner is preserved");
+        assert!(out.contains_key(&existing_fp));
+        assert!(!out.contains_key(&candidate_fp));
+        assert_eq!(
+            out.values()
+                .filter(|entry| entry.role == RosterRole::Owner)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn upsert_owner_once_promotes_a_legacy_same_identity_member() {
+        use super::RosterRole;
+        let (fp, member_row) = member(1, 2, false);
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(fp.clone(), member_row);
+
+        let (_, mut owner) = member(1, 0, false);
+        owner.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&roster, owner);
+        let row = out.get(&fp).expect("present");
+
+        assert_eq!(row.role, RosterRole::Owner);
+        assert_eq!(row.version, 3);
+    }
+
+    #[test]
+    fn upsert_owner_once_does_not_resurrect_a_tombstoned_owner() {
+        use super::RosterRole;
+        let (fp, tomb) = member(1, 3, true);
+        let mut roster: RosterMap = BTreeMap::new();
+        roster.insert(fp.clone(), tomb);
+        let (_, mut live) = member(1, 0, false);
+        live.role = RosterRole::Owner;
+        let out = super::upsert_owner_once(&roster, live);
+        let row = out.get(&fp).expect("present");
+        assert!(row.deleted, "tombstone is not resurrected");
+        assert_eq!(row.version, 3);
     }
 }
