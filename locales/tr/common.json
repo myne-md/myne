@@ -260,13 +260,8 @@
       "title": "Ekler",
       "transcribeDone": "Yazıya dökme tamamlandı.",
       "transcribeFailed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
-      "transcribeTooLong": "Bu kayıt yazıya dökülemeyecek kadar uzun. Ses ekli kalır, yani onu yine de dinleyebilirsiniz.",
-      "transcribeFeatureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
-      "transcribeModelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Myne’i yeniden kurun ya da Ayarlar → Geliştirici → Yapay Zeka bölümündeki özel modelinizi kontrol edin.",
-      "transcribeNoModelHint": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
       "transcribeNoModel": "Ayarlar → Geliştirici → Yapay Zeka bölümünden bir konuşmadan metne modeli seçin.",
       "transcribeStarted": "Yazıya dökülüyor…",
-      "transcribeVaultLocked": "Yazıya dökmek için kasanızın kilidini açın.",
       "transcriptionModalClose": "Metin dökümünü kapat",
       "transcriptionModalTitle": "Metin dökümü",
       "typeFilter": {

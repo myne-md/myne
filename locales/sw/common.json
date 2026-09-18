@@ -260,13 +260,8 @@
       "title": "Viambatisho",
       "transcribeDone": "Unukuzi umekamilika.",
       "transcribeFailed": "Unukuzi umeshindikana. Tafadhali jaribu tena.",
-      "transcribeTooLong": "Rekodi hii ni ndefu mno kunukuliwa. Sauti inabaki imeambatishwa, hivyo bado unaweza kuicheza.",
-      "transcribeFeatureOff": "Ubadilishaji wa sauti kuwa maandishi umezimwa. Uwashe katika Mipangilio → Unukuzi.",
-      "transcribeModelLoadFailed": "Imeshindwa kupakia modeli ya kubadilisha sauti kuwa maandishi. Sakinisha Myne upya, au kagua modeli yako maalum katika Mipangilio → Msanidi → AI.",
       "transcribeNoModel": "Chagua modeli ya kubadilisha sauti kuwa maandishi katika Mipangilio → Msanidi → AI.",
-      "transcribeNoModelHint": "Modeli ya kubadilisha sauti kuwa maandishi haipo. Kusakinisha Myne upya kunairejesha.",
       "transcribeStarted": "Inanukuu…",
-      "transcribeVaultLocked": "Fungua kasha lako ili kunukuu.",
       "transcriptionModalClose": "Funga unukuzi",
       "transcriptionModalTitle": "Unukuzi",
       "typeFilter": {

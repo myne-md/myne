@@ -286,13 +286,8 @@
       "title": "Atașamente",
       "transcribeDone": "Transcriere finalizată.",
       "transcribeFailed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
-      "transcribeTooLong": "Această înregistrare este prea lungă pentru a fi transcrisă. Fișierul audio rămâne atașat, așa că îl poți reda în continuare.",
-      "transcribeFeatureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
-      "transcribeModelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Reinstalează Myne sau verifică modelul personalizat din Setări → Developer → AI.",
-      "transcribeNoModelHint": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
       "transcribeNoModel": "Selectează un model de conversie a vorbirii în text din Setări → Developer → AI.",
       "transcribeStarted": "Se transcrie…",
-      "transcribeVaultLocked": "Deblochează-ți seiful pentru a transcrie.",
       "transcriptionModalClose": "Închide transcrierea",
       "transcriptionModalTitle": "Transcriere",
       "typeFilter": {
