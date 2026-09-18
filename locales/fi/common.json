@@ -260,13 +260,8 @@
       "title": "Liitteet",
       "transcribeDone": "Litterointi valmis.",
       "transcribeFailed": "Litterointi epäonnistui. Yritä uudelleen.",
-      "transcribeTooLong": "Tämä tallenne on liian pitkä litteroitavaksi. Ääni pysyy liitteenä, joten voit yhä toistaa sen.",
-      "transcribeFeatureOff": "Puheesta tekstiksi on pois päältä. Ota se käyttöön kohdasta Asetukset → Litterointi.",
-      "transcribeModelLoadFailed": "Puheentunnistusmallia ei voitu ladata. Asenna Myne uudelleen tai tarkista oma mallisi kohdasta Asetukset → Kehittäjä → Tekoäly.",
-      "transcribeNoModelHint": "Puheentunnistusmalli puuttuu. Mynen uudelleenasennus palauttaa sen.",
       "transcribeNoModel": "Valitse puheentunnistusmalli kohdasta Asetukset → Kehittäjä → Tekoäly.",
       "transcribeStarted": "Litteroidaan…",
-      "transcribeVaultLocked": "Avaa holvi litteroidaksesi.",
       "transcriptionModalClose": "Sulje litteraatti",
       "transcriptionModalTitle": "Litterointi",
       "typeFilter": {

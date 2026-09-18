@@ -260,13 +260,8 @@
       "title": "Vedlegg",
       "transcribeDone": "Transkribering fullført.",
       "transcribeFailed": "Transkribering mislyktes. Prøv igjen.",
-      "transcribeTooLong": "Dette opptaket er for langt til å transkriberes. Lydfilen er fortsatt vedlagt, så du kan fremdeles spille den av.",
-      "transcribeFeatureOff": "Tale-til-tekst er av. Slå det på i Innstillinger → Transkribering.",
-      "transcribeModelLoadFailed": "Kunne ikke laste tale-til-tekst-modellen. Installer Myne på nytt, eller sjekk den egendefinerte modellen din i Innstillinger → Utvikler → AI.",
-      "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En ny installasjon av Myne gjenoppretter den.",
       "transcribeNoModel": "Velg en tale-til-tekst-modell i Innstillinger → Utvikler → AI.",
       "transcribeStarted": "Transkriberer…",
-      "transcribeVaultLocked": "Lås opp hvelvet for å transkribere.",
       "transcriptionModalClose": "Lukk transkripsjonen",
       "transcriptionModalTitle": "Transkripsjon",
       "typeFilter": {

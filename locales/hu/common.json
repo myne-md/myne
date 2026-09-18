@@ -260,13 +260,8 @@
       "title": "Mellékletek",
       "transcribeDone": "Az átirat elkészült.",
       "transcribeFailed": "Az átirat készítése meghiúsult. Kérlek, próbáld újra.",
-      "transcribeTooLong": "Ez a felvétel túl hosszú az átirat készítéséhez. A hang mellékletként megmarad, így továbbra is le tudod játszani.",
-      "transcribeFeatureOff": "A beszéd szöveggé alakítása ki van kapcsolva. Kapcsold be a Beállítások → Átirat menüben.",
-      "transcribeModelLoadFailed": "Nem sikerült betölteni a beszédfelismerő modellt. Telepítsd újra a Myne-t, vagy ellenőrizd az egyéni modelledet a Beállítások → Fejlesztő → AI menüben.",
-      "transcribeNoModelHint": "Hiányzik a beszédfelismerő modell. A Myne újratelepítése visszaállítja.",
       "transcribeNoModel": "Válassz beszédfelismerő modellt a Beállítások → Fejlesztő → AI menüben.",
       "transcribeStarted": "Átirat készítése…",
-      "transcribeVaultLocked": "Az átirat készítéséhez oldd fel a széfedet.",
       "transcriptionModalClose": "Átirat bezárása",
       "transcriptionModalTitle": "Átirat",
       "typeFilter": {
