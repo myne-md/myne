@@ -1733,6 +1733,18 @@ pub enum SlotKind {
 /// note encrypt/decrypt borrows `root_key` + `items_key`; lock-on-idle
 /// (Phase 2+) borrows `unlocked_at`; `vault_change_password` borrows
 /// `vault_meta_bytes_hash` for the CAS check.
+/// Whether the unlocked vault is held as its administrator or as an invited
+/// participant. Set at unlock (or, later, at member adopt); the roster UI and
+/// the admin-only commands gate on this rather than inferring ownership from
+/// a crypto operation. Every populating path today is an owner path; the
+/// `member` value is the seam the future accept command will set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VaultAuthority {
+    Owner,
+    Member,
+}
+
 #[allow(dead_code)]
 pub struct UnlockedVault {
     pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
@@ -1740,6 +1752,30 @@ pub struct UnlockedVault {
     pub items_key_id: [u8; 16],
     pub unlocked_at: u64,
     pub vault_meta_bytes_hash: [u8; 32],
+    pub authority: VaultAuthority,
+}
+
+impl UnlockedVault {
+    /// Build an owner-held unlocked slot. All three populating paths
+    /// (password unlock, recovery promotion, quick-unlock) are owner paths
+    /// and build through this constructor, so the authority is `Owner` by
+    /// construction rather than by per-site repetition.
+    pub fn owner(
+        root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+        items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+        items_key_id: [u8; 16],
+        unlocked_at: u64,
+        vault_meta_bytes_hash: [u8; 32],
+    ) -> Self {
+        Self {
+            root_key,
+            items_key,
+            items_key_id,
+            unlocked_at,
+            vault_meta_bytes_hash,
+            authority: VaultAuthority::Owner,
+        }
+    }
 }
 
 /// Test-only helper: extract the [`UnlockedVault`] from a `Slot::Unlocked`
@@ -1824,13 +1860,15 @@ pub fn fixture_unlocked_with_keys(
     items_byte: u8,
     items_id_byte: u8,
 ) -> UnlockedVault {
-    UnlockedVault {
-        root_key: Zeroizing::new([root_byte; AEAD_KEY_LEN]),
-        items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
-        items_key_id: [items_id_byte; 16],
-        unlocked_at: 0,
-        vault_meta_bytes_hash: [0xFF; 32],
-    }
+    // Fixtures simulate an owner unlock; the member path is built by the
+    // future accept command, not by a fixture.
+    UnlockedVault::owner(
+        Zeroizing::new([root_byte; AEAD_KEY_LEN]),
+        Zeroizing::new([items_byte; AEAD_KEY_LEN]),
+        [items_id_byte; 16],
+        0,
+        [0xFF; 32],
+    )
 }
 
 /// Build a fixture [`RecoveringMaterial`] with byte-pattern arguments,
@@ -1860,6 +1898,26 @@ mod tests {
 
     fn fixture_recovering() -> RecoveringMaterial {
         fixture_recovering_with_keys(0xAA, 0xBB, 0xCC)
+    }
+
+    #[test]
+    fn owner_constructor_lands_owner_authority() {
+        // All three slot-populating paths (password unlock, recovery
+        // promotion, quick-unlock) are owner paths and must build through
+        // this constructor, so asserting it lands `Owner` pins all three.
+        let uv = UnlockedVault::owner(
+            Zeroizing::new([7u8; AEAD_KEY_LEN]),
+            Zeroizing::new([9u8; AEAD_KEY_LEN]),
+            [1u8; 16],
+            0,
+            [0xFF; 32],
+        );
+        assert_eq!(uv.authority, VaultAuthority::Owner);
+        assert_ne!(
+            VaultAuthority::Member,
+            VaultAuthority::Owner,
+            "member is a distinct authority for the future accept path"
+        );
     }
 
     /// Build a current-thread tokio runtime for a single test.
@@ -3059,14 +3117,14 @@ mod tests {
                 .await
                 .expect("slot was Recovering");
             // Build an UnlockedVault from the recovering material (mimics
-            // the A8f closure body's promotion step).
-            let promoted = UnlockedVault {
-                root_key: recovering.root_key,
-                items_key: recovering.items_key,
-                items_key_id: recovering.items_key_id,
-                unlocked_at: 0,
-                vault_meta_bytes_hash: [0xAA; 32],
-            };
+            // the A8f closure body's promotion step, which builds Owner).
+            let promoted = UnlockedVault::owner(
+                recovering.root_key,
+                recovering.items_key,
+                recovering.items_key_id,
+                0,
+                [0xAA; 32],
+            );
             state.set_unlocked(test_vault_id(), promoted).await;
 
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);

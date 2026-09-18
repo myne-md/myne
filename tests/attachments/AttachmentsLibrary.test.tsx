@@ -111,8 +111,8 @@ describe("AttachmentsLibrary top bar", () => {
 
     const sort = screen.getByRole("combobox", { name: "Sort attachments" });
     fireEvent.click(sort);
-    fireEvent.click(screen.getByRole("option", { name: "Name A–Z" }));
-    expect(sort.textContent).toContain("Name A–Z");
+    fireEvent.click(screen.getByRole("option", { name: "Name A-Z" }));
+    expect(sort.textContent).toContain("Name A-Z");
   });
 
   it("keeps a shrinkable, min-width:0 search field so it stays usable when the pane narrows", async () => {

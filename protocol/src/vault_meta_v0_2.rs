@@ -1288,4 +1288,131 @@ mod tests {
         std::println!("  }}");
         std::println!("]");
     }
+
+    /// Emit a single `roster_role` vector: a real two-row canonical roster
+    /// (owner + member) carrying the vault `role` field, sealed through the
+    /// live codec. The roster JSON matches `myne-core`'s `encode_roster`
+    /// output byte-for-byte (outer keys in BTreeMap order, per-entry fields
+    /// in declaration order, default values omitted); it was derived from a
+    /// run of that encoder over fixture-shaped (shape-valid) public halves,
+    /// not hand-shaped. The halves here are fixture bytes of the right
+    /// length, not live keypairs: key validity is pinned by the
+    /// `person-keypair` vectors, while this case pins that a roster carrying
+    /// roles seals, parses, and unseals through the real `vault.meta`
+    /// framing. Additive: the existing roster cases are untouched.
+    ///
+    /// `#[ignore]` because emitting vectors is a deliberate act. Run with:
+    /// `cargo test -p protocol --lib emit_roster_role_vector_for_paste -- --ignored --nocapture`
+    /// and paste the printed object into
+    /// `myne-test-vectors/vectors/vault-meta/v0.2/cases.json` (plus the
+    /// `case_kind` enum and branch in `schema/v0.2/vault-meta.json`, plus a
+    /// runner arm and coverage entry in `protocol/tests/vectors.rs`).
+    #[test]
+    #[ignore]
+    fn emit_roster_role_vector_for_paste() {
+        extern crate std;
+        fn rep(unit: &str, n: usize) -> alloc::string::String {
+            let mut s = alloc::string::String::new();
+            for _ in 0..n {
+                s.push_str(unit);
+            }
+            s
+        }
+        fn hex(b: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(b.len() * 2);
+            for x in b {
+                s.push_str(&alloc::format!("{x:02x}"));
+            }
+            s
+        }
+        fn escape_json_str(s: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(s.len() + 2);
+            out.push('"');
+            for c in s.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    _ => out.push(c),
+                }
+            }
+            out.push('"');
+            out
+        }
+        let base = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let mem_nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &mem_nonce).expect("seal");
+        // Canonical two-row roster: owner ("00..") then member ("ff..") in
+        // BTreeMap order. The owner spells `"role":"owner"`; the member omits
+        // the default. Joined times differ so the rows are not byte-twins.
+        let owner_fp = rep("00", 32);
+        let member_fp = rep("ff", 32);
+        let owner_row = alloc::format!(
+            "\"{fp}\":{{\"fingerprint_hex\":\"{fp}\",\"display_name\":\"Owner\",\"wrapped_items_key_hex\":\"{wrap}\",\"member_kem_ek_hex\":\"{kem}\",\"member_ed_pk_hex\":\"{ed}\",\"member_mldsa_vk_hex\":\"{vk}\",\"version\":1,\"role\":\"owner\",\"joined_at\":1700000000}}",
+            fp = owner_fp,
+            wrap = rep("ab", 32),
+            kem = rep("cd", 1184),
+            ed = rep("ef", 32),
+            vk = rep("01", 1952),
+        );
+        let member_row = alloc::format!(
+            "\"{fp}\":{{\"fingerprint_hex\":\"{fp}\",\"display_name\":\"Member\",\"wrapped_items_key_hex\":\"{wrap}\",\"member_kem_ek_hex\":\"{kem}\",\"member_ed_pk_hex\":\"{ed}\",\"member_mldsa_vk_hex\":\"{vk}\",\"version\":1,\"joined_at\":1700000001}}",
+            fp = member_fp,
+            wrap = rep("ab", 32),
+            kem = rep("cd", 1184),
+            ed = rep("ef", 32),
+            vk = rep("01", 1952),
+        );
+        let roster_plaintext = alloc::format!(
+            "{{{owner},{member}}}",
+            owner = owner_row,
+            member = member_row
+        );
+        let roster_plaintext_bytes = roster_plaintext.as_bytes().to_vec();
+        // Structural self-checks: the owner spells its role, the member omits
+        // the default. A mismatch here means the hand-built JSON drifted from
+        // `encode_roster` and the case must not ship.
+        assert!(roster_plaintext.contains("\"role\":\"owner\""));
+        assert!(!roster_plaintext.contains("\"role\":\"member\""));
+        let roster_nonce = [0xDD; MEMBERSHIP_ROSTER_NONCE_LEN];
+        let roster =
+            seal_membership_roster_raw(&ROOT, &roster_plaintext_bytes, &ACCT, &roster_nonce)
+                .expect("roster seal");
+        let mut roster_meta = base.clone();
+        roster_meta.membership = Some(Membership {
+            nonce: membership.nonce,
+            enc: membership.enc,
+            roster: Some(roster.clone()),
+        });
+        let roster_blob = serialize_vault_meta_v0_2(&roster_meta);
+        assert_eq!(roster_blob[5], 0x02);
+        let parsed = parse_vault_meta_v0_2(&roster_blob).expect("roster meta parses");
+        let back = unseal_membership_roster(
+            &ROOT,
+            parsed
+                .membership
+                .as_ref()
+                .and_then(|m| m.roster.as_ref())
+                .expect("roster"),
+            &ACCT,
+        )
+        .expect("unseal");
+        assert_eq!(back.as_slice(), roster_plaintext_bytes.as_slice());
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/roster-role\",");
+        std::println!("    \"description\": \"An NTV5 vault.meta with a real two-row canonical roster (owner + member) carrying the vault role field: the owner row spells role owner, the member row omits the default, sealed under membership_key with the roster AAD. parse_vault_meta_v0_2 must accept it and unseal_membership_roster must recover the exact plaintext under root_key = 0x11.., account_number_hash = 0x44..\",");
+        std::println!("    \"case_kind\": \"roster_role\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&roster_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!(
+            "    \"input_roster_nonce_hex\": \"{}\",",
+            hex(&roster.nonce)
+        );
+        std::println!(
+            "    \"expected_roster_plaintext_utf8\": {}",
+            escape_json_str(&roster_plaintext)
+        );
+        std::println!("  }},");
+    }
 }
