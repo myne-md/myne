@@ -260,13 +260,8 @@
       "title": "Bijlagen",
       "transcribeDone": "Transcriptie voltooid.",
       "transcribeFailed": "Transcriptie mislukt. Probeer het opnieuw.",
-      "transcribeTooLong": "Deze opname is te lang om te transcriberen. De audio blijft bijgevoegd, dus je kunt hem nog afspelen.",
-      "transcribeFeatureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
-      "transcribeModelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Installeer Myne opnieuw, of controleer je eigen model in Instellingen → Developer → AI.",
-      "transcribeNoModelHint": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
       "transcribeNoModel": "Selecteer een spraak-naar-tekstmodel in Instellingen → Developer → AI.",
       "transcribeStarted": "Transcriberen…",
-      "transcribeVaultLocked": "Ontgrendel je kluis om te transcriberen.",
       "transcriptionModalClose": "Transcriptie sluiten",
       "transcriptionModalTitle": "Transcriptie",
       "typeFilter": {

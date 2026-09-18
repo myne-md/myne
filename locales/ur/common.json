@@ -260,13 +260,8 @@
       "title": "منسلکات",
       "transcribeDone": "نقل نویسی مکمل۔",
       "transcribeFailed": "نقل نویسی ناکام رہی۔ براہِ کرم دوبارہ کوشش کریں۔",
-      "transcribeTooLong": "یہ ریکارڈنگ نقل نویسی کے لیے بہت طویل ہے۔ آڈیو منسلک ہی رہتی ہے، اس لیے آپ اسے پھر بھی چلا سکتے ہیں۔",
-      "transcribeFeatureOff": "آواز سے متن بند ہے۔ اسے ترتیبات → نقل نویسی میں آن کریں۔",
-      "transcribeModelLoadFailed": "آواز سے متن کا ماڈل لوڈ نہیں ہو سکا۔ Myne دوبارہ انسٹال کریں، یا ترتیبات → ڈیولپر → AI میں اپنا حسبِ ضرورت ماڈل جانچیں۔",
       "transcribeNoModel": "ترتیبات → ڈیولپر → AI میں آواز سے متن کا ماڈل منتخب کریں۔",
-      "transcribeNoModelHint": "آواز سے متن کا ماڈل موجود نہیں۔ Myne دوبارہ انسٹال کرنے سے یہ بحال ہو جاتا ہے۔",
       "transcribeStarted": "نقل نویسی ہو رہی ہے…",
-      "transcribeVaultLocked": "نقل نویسی کے لیے اپنا والٹ ان لاک کریں۔",
       "transcriptionModalClose": "نقل نویسی بند کریں",
       "transcriptionModalTitle": "نقل نویسی",
       "typeFilter": {

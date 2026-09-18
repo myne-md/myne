@@ -555,7 +555,7 @@ function TranscribeRow({ id, onInsertText }: { id: string; onInsertText?: (text:
           {errKind === "not_ready"
             ? t("attachments.library.transcribeNoModel")
             : errKind === "too_long"
-              ? t("attachments.library.transcribeTooLong")
+              ? t("editor.attachment.widget.transcribe.cause.tooLong")
               : t("attachments.library.transcribeFailed")}{" "}
           {/* No retry for "too_long": the same clip is refused every time, so
               offering the button would be advice that cannot work (myne#485). */}
