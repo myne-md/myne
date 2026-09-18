@@ -61,6 +61,7 @@ export function MemberRosterPanel({
   const { prefs } = usePrefs();
   const {
     members,
+    authority,
     loading,
     error,
     inviting,
@@ -169,6 +170,11 @@ export function MemberRosterPanel({
                 <span data-testid="member-roster.name" style={NAME_STYLE}>
                   {m.display_name}
                 </span>
+                <span data-testid="member-roster.role" style={CODE_STYLE}>
+                  {m.role === "owner"
+                    ? t("sync.memberRoster.ownerBadge")
+                    : t("sync.memberRoster.memberBadge")}
+                </span>
                 <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
                   {m.fingerprint_hex.slice(0, 16)}
                 </span>
@@ -186,16 +192,19 @@ export function MemberRosterPanel({
         </>
       )}
 
-      {/* Step 3: invite. */}
-      <Button
-        type="button"
-        variant="primary"
-        data-testid="member-roster.invite-button"
-        disabled={!personReady || inviting}
-        onClick={() => setInviteOpen(true)}
-      >
-        {t("sync.memberRoster.invite")}
-      </Button>
+      {/* Step 3: invite. Owner-only: a member is never shown an admin
+          control they cannot use (the backend refuses with `NotOwner`). */}
+      {authority === "owner" ? (
+        <Button
+          type="button"
+          variant="primary"
+          data-testid="member-roster.invite-button"
+          disabled={!personReady || inviting}
+          onClick={() => setInviteOpen(true)}
+        >
+          {t("sync.memberRoster.invite")}
+        </Button>
+      ) : null}
 
       {inviteOpen ? (
         <InviteMemberModal

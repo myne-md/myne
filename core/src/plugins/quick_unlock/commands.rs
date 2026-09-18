@@ -511,13 +511,13 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             state
                 .set_unlocked_locking_others(
                     vault_id,
-                    UnlockedVault {
+                    UnlockedVault::owner(
                         root_key,
                         items_key,
-                        items_key_id: meta.items_key_id,
-                        unlocked_at: host.monotonic_millis(),
+                        meta.items_key_id,
+                        host.monotonic_millis(),
                         vault_meta_bytes_hash,
-                    },
+                    ),
                 )
                 .await;
             // Success resets the consecutive-failure count. The vault is already
@@ -946,13 +946,13 @@ mod tests {
         state
             .set_unlocked(
                 vault_id,
-                UnlockedVault {
-                    root_key: Zeroizing::new(ROOT_KEY),
-                    items_key: Zeroizing::new(ITEMS_KEY),
-                    items_key_id: [0x07u8; 16],
-                    unlocked_at: 0,
-                    vault_meta_bytes_hash: [0u8; 32],
-                },
+                UnlockedVault::owner(
+                    Zeroizing::new(ROOT_KEY),
+                    Zeroizing::new(ITEMS_KEY),
+                    [0x07u8; 16],
+                    0,
+                    [0u8; 32],
+                ),
             )
             .await;
     }
@@ -1111,13 +1111,13 @@ mod tests {
         setup_state
             .set_unlocked(
                 vault_id,
-                UnlockedVault {
-                    root_key: Zeroizing::new(ROOT_KEY),
-                    items_key: Zeroizing::new(ITEMS_KEY),
-                    items_key_id: [0x07u8; 16],
-                    unlocked_at: 0,
-                    vault_meta_bytes_hash: [0u8; 32],
-                },
+                UnlockedVault::owner(
+                    Zeroizing::new(ROOT_KEY),
+                    Zeroizing::new(ITEMS_KEY),
+                    [0x07u8; 16],
+                    0,
+                    [0u8; 32],
+                ),
             )
             .await;
         crate::plugins::prefs::commands::set_screen_capture_protection_with_dir(

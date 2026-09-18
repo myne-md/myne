@@ -20,6 +20,7 @@ let mockMembers = [
   {
     fingerprint_hex: "ab".repeat(32),
     display_name: "Member One",
+    role: "member",
     version: 1,
     previous_fingerprint_hex: null,
     joined_at: 1_700_000_000,
@@ -29,9 +30,14 @@ let mockMembers = [
   },
 ];
 
+// The caller's vault authority per test. `owner` renders the invite control;
+// `member` must hide it.
+let mockAuthority: "owner" | "member" = "owner";
+
 vi.mock("../../src/hooks/useRoster", () => ({
   useRoster: () => ({
     members: mockMembers,
+    authority: mockAuthority,
     loading: false,
     error: null,
     reload: vi.fn(),
@@ -99,6 +105,39 @@ describe("MemberRosterPanel removal parking", () => {
       const notice = screen.getByTestId("member-roster.remove-disabled");
       expect(notice.textContent).toBe("sync.memberRoster.removeConfirm");
     } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("MemberRosterPanel roles", () => {
+  it("renders a role badge on each row", () => {
+    render(<MemberRosterPanel />);
+    try {
+      const badges = screen.getAllByTestId("member-roster.role");
+      expect(badges).toHaveLength(1);
+      expect(badges[0].textContent).toBe("sync.memberRoster.memberBadge");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("shows the invite control to the owner", () => {
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.invite-button")).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("hides the invite control from a member", () => {
+    mockAuthority = "member";
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.invite-button")).toBeNull();
+    } finally {
+      mockAuthority = "owner";
       cleanup();
     }
   });

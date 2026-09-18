@@ -3235,19 +3235,31 @@ device-local half is the **account record**.
 
 Used in: `spec/protocol.md` §9.3.1
 
+### **vault role** &nbsp; 📦 *Product*
+
+A member's standing in a B2B-shared vault: the singleton `owner` (the
+`root_key` holder, the only writer of the roster) or a plain `member`.
+Administrative metadata inside the owner-sealed roster: it gates no decryption
+and no read, and content write is flat, so every member is an authorized
+writer. Absent on rows written before the field existed, which read as
+`member` by construction.
+
+Used in: `design-notes/protocol/0593`; `core/src/plugins/sync/roster.rs`.
+
 ### **vault roster** &nbsp; 📦 *Product*
 
 The member list of a B2B-shared vault: one row per person, keyed by their
 [person fingerprint](#person-keypair), carrying the display name, the member's
 public halves (so any device can re-wrap a rotated `itemsKey` to them without a
-round-trip), their per-recipient `itemsKey` wrap, a causal `version`, a
+round-trip), their per-recipient `itemsKey` wrap, the vault [role](#vault-role),
+a causal `version`, a
 tombstone flag, an optional [previousKeySet](#previouskeyset) and the join time.
 Encoded as canonical JSON and sealed inside the
 [membership roster extension](#membership-roster-extension). Union-merged across
 devices with a remove-wins tie (a tombstone outranks a stale live row), so a
 removal cannot be resurrected.
 
-Used in: `design-notes/protocol/0592`; `core/src/plugins/sync/roster.rs`.
+Used in: `design-notes/protocol/0592`; `design-notes/protocol/0593`; `core/src/plugins/sync/roster.rs`.
 
 ### **vault picker** &nbsp; 📦 *Product*
 

@@ -775,13 +775,13 @@ pub(crate) async fn complete_recovery_with_path(
     state
         .set_unlocked(
             vault_id,
-            UnlockedVault {
-                root_key: recovering.root_key,
-                items_key: recovering.items_key,
-                items_key_id: recovering.items_key_id,
-                unlocked_at: now_ms,
+            UnlockedVault::owner(
+                recovering.root_key,
+                recovering.items_key,
+                recovering.items_key_id,
+                now_ms,
                 vault_meta_bytes_hash,
-            },
+            ),
         )
         .await;
 

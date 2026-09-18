@@ -5897,7 +5897,7 @@ fn vault_meta_v0_2_vectors() {
                     "[{id}] a tampered membership field must fail closed"
                 );
             }
-            "roster_present" => {
+            "roster_present" | "roster_role" => {
                 let blob = hex_decode(field(case, id, "input_blob_hex"));
                 let meta = parse_vault_meta_v0_2(&blob)
                     .unwrap_or_else(|e| panic!("[{id}] roster meta must parse: {e:?}"));
@@ -5972,7 +5972,12 @@ fn vault_meta_v0_2_vectors() {
             "vault-meta/v0.2 must cover membership case_kind {k}"
         );
     }
-    for k in ["roster_present", "roster_tampered", "roster_over_cap"] {
+    for k in [
+        "roster_present",
+        "roster_tampered",
+        "roster_over_cap",
+        "roster_role",
+    ] {
         assert!(
             seen.contains(k),
             "vault-meta/v0.2 must cover roster case_kind {k}"

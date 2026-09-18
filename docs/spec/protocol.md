@@ -959,7 +959,10 @@ rejects the blob per §10.3.1 strict-trailing (the fleet-event shape §10.3.1 po
 `0x02` signals the single-account field PLUS the roster envelope (the [vault roster](../glossary.md)
 member rows inside one AEAD envelope under the same `membership_key`, AAD role
 `"membership-roster-blob"`, 24-byte nonce + u32-BE length + ciphertext, 64 KiB cap, immediately
-after the 72 single-account bytes). A reader that predates `0x02` rejects the blob the same way
+after the 72 single-account bytes). Each member row carries a vault [role](../glossary.md)
+(`owner` or `member`), additive with an absent value reading as `member`; the role is
+administrative metadata inside the sealed envelope and changes neither the envelope framing
+nor the 0x02 merge class. A reader that predates `0x02` rejects the blob the same way
 (the newer-reads-older rule stops at an unknown minor revision, §10.1); 0580's `0x00`/`0x01`
 shapes parse unchanged. The extension's merge class is SHARED (union-merge + tombstone,
 `sync-protocol.md` §10.2), reversing the device-local classification for the extension only.

@@ -55,7 +55,8 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     // `memberSharing` capability is present, so every SyncPanel mount reaches
     // this command; an unanswered one resolves `undefined` and crashes the
     // panel's `.length` read.
-    if (cmd === "plugin:sync|sync_list_roster") return [];
+    if (cmd === "plugin:sync|sync_list_roster")
+      return { members: [], authority: "owner" };
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
