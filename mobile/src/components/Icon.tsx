@@ -32,6 +32,8 @@ export type IconName =
   | "eye-off"
   | "search"
   | "plus"
+  | "clock"
+  | "bookmark"
   | "lock"
   | "unlock"
   | "more-horizontal"
@@ -68,6 +70,10 @@ const PATHS: Record<IconName, string> = {
   "eye-off": "M9.9 4.2A9.6 9.6 0 0112 4c6.5 0 10 7 10 7a14 14 0 01-2.3 3M6.6 6.6A14 14 0 002 11s3.5 7 10 7a9.6 9.6 0 003.4-.6|M3 3l18 18|M9.5 9.5a3 3 0 004 4",
   search: "M11 19a8 8 0 100-16 8 8 0 000 16z|M21 21l-4.3-4.3",
   plus: "M12 5v14M5 12h14",
+  // Clock face with hands (history) + bookmark ribbon (memory): the AI tab's
+  // icon-only header buttons. Lucide stroke paths, same 24-grid language.
+  clock: "M12 21a9 9 0 100-18 9 9 0 000 18z|M12 7v5l3 2",
+  bookmark: "M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z",
   lock: "M5 11h14v10H5z|M8 11V7a4 4 0 018 0v4",
   unlock: "M5 11h14v10H5z|M8 11V7a4 4 0 017.5-2",
   "more-horizontal": "M5 12h.01M12 12h.01M19 12h.01",

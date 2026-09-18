@@ -102,6 +102,14 @@ export type TaskRowProps = {
    *  (myne-md/myne#656 review). */
   compactX?: boolean;
   /**
+   * Roomier checkbox (22px instead of 14) for touch surfaces. The phone's
+   * task list is the same shared row, and a 14px box with an invisible
+   * expander still reads as "tap exactly here" while its expanded area is
+   * clipped by the windowed list's overflow. A visibly bigger box is honest
+   * about where to tap. Desktop keeps the dense 14.
+   */
+  roomyBox?: boolean;
+  /**
    * Render the date under the text as an accent icon + label instead of the
    * right-hand chip, for the narrow note-scoped panel (myne-md/myne#656 review).
    */
@@ -189,9 +197,14 @@ const BOX_BASE: CSSProperties = {
   cursor: "pointer",
 };
 
-function boxStyle(completed: boolean, disabled: boolean): CSSProperties {
+/** The touch size matches the mobile `Checkbox` primitive (22px), so a task
+ *  box and a settings checkbox read as the same control. */
+const ROOMY_BOX = 22;
+
+function boxStyle(completed: boolean, disabled: boolean, roomy: boolean): CSSProperties {
   return {
     ...BOX_BASE,
+    ...(roomy ? { width: ROOMY_BOX, height: ROOMY_BOX } : {}),
     // A completed box is FILLED, not ticked - the canon forbids a green check.
     // The fill is the ACCENT (myne-md/myne#656, decided in the panel grill),
     // which is the one place completion is allowed to read as state; the editor
@@ -298,6 +311,7 @@ export function TaskRow({
   twoLine = false,
   compactX = false,
   inlineDate = false,
+  roomyBox = false,
 }: TaskRowProps): ReactElement {
   const stacked = twoLine || inlineDate;
   const overdue = isOverdue(task, today);
@@ -433,7 +447,7 @@ export function TaskRow({
         // stays 14×14 visually - the density is the point of this row - while
         // a coarse pointer gets the 44×44 the platform minimums ask for.
         className="myne-task-checkbox"
-        style={{ ...boxStyle(task.completed, disabled), ...(stacked ? { marginTop: 3 } : {}) }}
+        style={{ ...boxStyle(task.completed, disabled, roomyBox), ...(stacked ? { marginTop: 3 } : {}) }}
         data-testid={`${testIdPrefix}.checkbox`}
         onClick={(e) => {
           e.stopPropagation();
