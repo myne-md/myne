@@ -691,7 +691,7 @@ fn set_field<'a>(prefs: &'a protocol::PrefsView, field: &str) -> &'a Vec<String>
 /// [`set_rules`] does.
 ///
 /// A match is a roster, and a roster compared against nothing is the failure
-/// mode `CLAUDE.md` names: [`set_rules`] reads membership off `CLASSIFICATION`,
+/// mode `AGENTS.md` names: [`set_rules`] reads membership off `CLASSIFICATION`,
 /// so a field reclassified to `SetUnion` in that table (a one-line edit) would
 /// be accepted there and panic here, at a user's write, having compiled and
 /// passed clippy. `every_classified_set_field_is_accessible` walks the table and

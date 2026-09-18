@@ -11,7 +11,7 @@
 // the import flow itself is not E2E-reachable through the current harness, for two
 // independent reasons that both predate this epic —
 //   1. `ObsidianImportModal.tsx` carries ZERO `data-testid` attributes, so the
-//      modal is invisible to the driver (`src/CLAUDE.md`: "a screen without
+//      modal is invisible to the driver (`src/AGENTS.md`: "a screen without
 //      testids is invisible to E2E"). Adding that testid pass belongs with the
 //      entry-point generalization (MYND-586), which rewrites those surfaces.
 //   2. The import ENGINE is WebView-side TypeScript reached only through a native

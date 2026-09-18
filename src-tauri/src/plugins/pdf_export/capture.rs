@@ -28,7 +28,7 @@
 //!
 //! Every arm reduces native failures to the closed
 //! [`CaptureFailureKind`] — NSError / GError / HRESULT payloads never
-//! reach logs or IPC (DENY-list discipline; see `src-tauri/CLAUDE.md`).
+//! reach logs or IPC (DENY-list discipline; see `src-tauri/AGENTS.md`).
 //!
 //! All platform crates here are **transitive→direct promotions** of
 //! packages already pinned in `Cargo.lock` via tauri/wry (the

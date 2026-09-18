@@ -3,7 +3,7 @@
 // Two layers live here:
 //  1. IPC wrappers over the `backup` plugin's schedule commands — hand-mirror
 //     `src-tauri/src/plugins/backup/schedule.rs` (no codegen canary yet; see
-//     src/CLAUDE.md "Tauri command bindings").
+//     src/AGENTS.md "Tauri command bindings").
 //  2. The pure scheduling core (`intervalMs`, `isBackupDue`) + the orchestrator
 //     (`runScheduledBackupIfDue`) that reuses the EXISTING `vault_export_backup`
 //     verbatim. The orchestrator takes injected deps so it is unit-testable

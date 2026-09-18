@@ -6459,7 +6459,7 @@ export const ROSTER = Object.freeze([
     id: "web.browser.safari-gate",
     title: "Safari on macOS: the seat CI structurally cannot have",
     paths: [
-      "e2e-web/CLAUDE.md",
+      "e2e-web/AGENTS.md",
       "e2e-web/support/harness.ts",
       "e2e-web/support/session.ts",
       "web/src/environment-gate.ts",

@@ -21,7 +21,7 @@
 //
 // Deliberately a grep-shaped script in the same pattern as
 // `check-platform-seam.mjs` and lefthook's secret-scan — zero dependencies, node
-// built-ins only (root CLAUDE.md: adding a dependency is a security decision).
+// built-ins only (root AGENTS.md: adding a dependency is a security decision).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -291,7 +291,7 @@ for (const file of files) {
       // item whole. The merge-base guard had this hole too, so it is not a
       // regression, but the #274 note above claims the `;` shape is covered and
       // a guard whose stated coverage exceeds its real coverage is the thing
-      // root CLAUDE.md says costs more than no guard.
+      // root AGENTS.md says costs more than no guard.
       const code = line.replace(/\/\/.*$/, "");
       if (!sawBrace && /;\s*$/.test(code) && !/^\s*#\[/.test(line)) {
         skipping = false;

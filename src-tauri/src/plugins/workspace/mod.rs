@@ -19,7 +19,7 @@
 //! `workspace:default` bundles `allow-workspace-read` +
 //! `allow-workspace-write` + `allow-workspace-stage`, main-window-only.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The `workspace` command core and its `error` enums moved to `myne-core`
 // (phase3-web-client task 65 — the web client had no pane layout at all while

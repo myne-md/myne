@@ -52,7 +52,7 @@ pub enum EntryLink {
     /// that this side cannot see (`a/x -> b`, `b/y -> a`), which needs equality
     /// and nothing else. It is a hash rather than the path because a full
     /// filesystem path may not cross this boundary in any payload
-    /// (`src-tauri/CLAUDE.md` "Secret-handling logging discipline").
+    /// (`src-tauri/AGENTS.md` "Secret-handling logging discipline").
     Followable { target_key: String },
     /// Resolves outside the picked root — refused (TB6), same rule the
     /// read-seam validator applies, decided here so the walk can say so.
@@ -205,7 +205,7 @@ pub async fn import_read_file(root: String, path: String) -> Result<String, Impo
     tauri::async_runtime::spawn_blocking(move || {
         let bytes = Zeroizing::new(std::fs::read(&file).map_err(io)?);
         // `bytes.to_vec()` is the accepted microsecond intermediate (Plaintext-IPC
-        // read-side discipline, src-tauri/CLAUDE.md); the result String leaves via
+        // read-side discipline, src-tauri/AGENTS.md); the result String leaves via
         // IPC and the `Zeroizing<Vec<u8>>` zeroes on drop.
         String::from_utf8(bytes.to_vec()).map_err(|_| ImportReadError::NotUtf8)
     })

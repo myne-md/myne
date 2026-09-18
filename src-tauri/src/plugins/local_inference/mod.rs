@@ -19,7 +19,7 @@
 //! declared class per backend. The keyless sandboxed sidecar is still the one
 //! deferred piece (`threat-model.md` §7).
 //!
-//! Logging: DENY-list clean (`src-tauri/CLAUDE.md`) — the engine seam never
+//! Logging: DENY-list clean (`src-tauri/AGENTS.md`) — the engine seam never
 //! logs a prompt, note body, or embedding.
 //!
 //! **The SYNC-14 ambient bar, and what it does not defend against.** Ambient
@@ -495,7 +495,7 @@ mod resolve_engine_tests {
 
     /// The three-way ACL wiring check.
     ///
-    /// `src-tauri/CLAUDE.md` states the gap this closes: *"An ACL entry does
+    /// `src-tauri/AGENTS.md` states the gap this closes: *"An ACL entry does
     /// not wire a command — and nothing checks that it does."* A command can
     /// have its `build.rs` declaration and its capability permission, be
     /// missing from `generate_handler!`, and still compile, pass clippy, render
@@ -566,7 +566,7 @@ mod resolve_engine_tests {
             registered, declared,
             "generate_handler! and build.rs disagree. A command declared but not \
              registered compiles, passes clippy, renders its UI and is DEAD at \
-             runtime (src-tauri/CLAUDE.md)."
+             runtime (src-tauri/AGENTS.md)."
         );
         let expected_permissions: Vec<String> = declared.iter().map(|c| kebab(c)).collect();
         assert_eq!(

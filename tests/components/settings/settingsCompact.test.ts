@@ -1,7 +1,7 @@
 // #391 — pure Settings-dialog compact (restack) decision.
 //
 // The trigger is a window/dialog resize, which the tauri-driver E2E harness has
-// no primitive to drive (e2e/CLAUDE.md "states unreachable through real UI"), so
+// no primitive to drive (e2e/AGENTS.md "states unreachable through real UI"), so
 // the load-bearing decision is covered here as a Vitest unit; the hook in
 // `settingsCompact.ts` is thin ResizeObserver glue over this function.
 

@@ -63,7 +63,7 @@ import { failAgentTurn, getChat, sendAgentTurn, settleAgentTurn } from "./chatSt
 /** The already-localized strings the run's turns render.
  *
  *  Passed in rather than resolved here: this module is not a component, and
- *  `src/CLAUDE.md` bans freezing a resolved string at module scope (it would
+ *  `src/AGENTS.md` bans freezing a resolved string at module scope (it would
  *  capture the boot language). The caller has a `t` in hand. */
 export interface AgentRunCopy {
   /** What the user turn's scope chip says: "This note", or the folder name. */

@@ -35,7 +35,7 @@
 //! - **Content-type re-sniff** — the served `Content-Type` is derived
 //!   from the bytes, allowlist-fenced (in `scheme_core::build_response`).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::plugins::attachments::scheme_core::{
     bad_request, build_response, extract_id, forbidden, server_error, ServeKeys,

@@ -25,7 +25,7 @@
 //! purely a rebuildable RAM cache the WebView re-seeds with
 //! `search_index_replace` on the next unlock.
 //!
-//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" — no note plaintext (title/body/query) is ever logged here.
 
 use myne_core::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};

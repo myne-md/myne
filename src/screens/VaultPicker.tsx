@@ -38,7 +38,7 @@
 // vault" + "Restore from backup" action pair. Fallback "Vault N" rows carry
 // the SYNC-3 demotion through the label alone (italic + secondary ink); no
 // real labels or content for never-unlocked vaults. Tokens only — no raw
-// hex (`src/CLAUDE.md` design-token discipline).
+// hex (`src/AGENTS.md` design-token discipline).
 
 import {
   Fragment,

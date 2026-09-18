@@ -1946,7 +1946,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           // most at risk, and it does so while telling the user the cover write
           // failed when the note write had already succeeded.
           //
-          // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
+          // Settle (`src/AGENTS.md`, "A backend write made OUTSIDE a pane's
           // autosave loop leaves that pane holding a stale buffer"). This call
           // site is the one that needs it most and had none: the target is a
           // note in a VIEW RESULT, so by definition it is not the note this

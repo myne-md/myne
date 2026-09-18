@@ -22,7 +22,7 @@
 //! sensitive as the open notes (AS3/AS4), so they are zeroized on the
 //! lock path alongside the keys (see [`VaultIndicesState::clear`]).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -378,7 +378,7 @@ fn scan_objects(reply: &str) -> Vec<&str> {
 /// chooses that string, note text can steer what it writes, and an `"action"`
 /// value is exactly where steered text would land. So it is treated as
 /// note-derived and stays out of the log, which is the same rule
-/// `src-tauri/CLAUDE.md` states for every other model output.
+/// `src-tauri/AGENTS.md` states for every other model output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ReplyShape {
     /// Lines in the reply.

@@ -1,7 +1,7 @@
 // The endpoint screen's pin-source copy map (phase3-web-client task 84).
 //
 // `EndpointConfig` renders its pin explanation through `t(PIN_SOURCE_COPY[src])`
-// — a dynamic key, which is the pattern `src/CLAUDE.md` prescribes for
+// — a dynamic key, which is the pattern `src/AGENTS.md` prescribes for
 // module-level data, and which `scripts/check-i18n.mjs` cannot see: that guard
 // only detects static `t("…")` literals. So a typo in the map would render the
 // raw key string and no guard would notice.

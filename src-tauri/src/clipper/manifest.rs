@@ -46,7 +46,7 @@
 //!   dir). The Windows registry wiring is the installer's job; the JSON
 //!   body this module emits is identical.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the
 //! manifest carries no secret (a host name, a binary path, public
 //! extension IDs); it is config, not key material.
 //!
@@ -86,7 +86,7 @@ pub const FIREFOX_EXTENSION_ID: &str = "clipper@myne.md";
 /// Derivation (reproducible): base64-decode the manifest `key` (DER
 /// SubjectPublicKeyInfo) → SHA-256 → take the first 16 bytes → map each hex
 /// nibble `0..=f` to `a..=p`. Re-run this if the extension's `key` ever changes
-/// (a forced re-pair — see the root `CLAUDE.md` load-bearing-identifiers table).
+/// (a forced re-pair — see the root `AGENTS.md` load-bearing-identifiers table).
 /// Task 4's pairing handshake binds the SAME exact ID on the host side.
 pub const CHROMIUM_EXTENSION_ID: &str = "ebbbblnjddeockegombcnbiljefmlhbh";
 

@@ -64,7 +64,7 @@ interface StepEyebrowProps {
    *  (e.g. the first-run safety briefing — an alarm glyph would read as a
    *  warning, MYND-114). */
   icon?: IconName;
-  /** Mount marker for E2E (curated-prop testid discipline, src/CLAUDE.md). */
+  /** Mount marker for E2E (curated-prop testid discipline, src/AGENTS.md). */
   testId?: string;
   children: ReactNode;
 }

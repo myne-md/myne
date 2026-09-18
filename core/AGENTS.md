@@ -1,6 +1,6 @@
 # core/ — `myne-core`, the shared backend crate (Rust)
 
-> Subdirectory CLAUDE.md. Loaded when Claude reads files here. See repo-root `CLAUDE.md` for project-wide context, `src-tauri/CLAUDE.md` for the desktop host (its **secret-handling logging discipline is normative for this crate too**), and `protocol/CLAUDE.md` for the primitives underneath.
+> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for project-wide context, `src-tauri/AGENTS.md` for the desktop host (its **secret-handling logging discipline is normative for this crate too**), and `protocol/AGENTS.md` for the primitives underneath.
 
 ## What this crate is
 
@@ -118,7 +118,7 @@ Layer 2 is what the `tauri-ipc` feature gates: both native hosts keep their `gen
 
 The exception is **`vault_creation`**, whose entire plugin (its `init()`, `generate_handler!` and TTL evictor) lives in `src/plugins/vault_creation/mod.rs`; `src-tauri/src/plugins/mod.rs` only re-exports it and there is no desktop directory for it at all. Do not generalize from that file when adding a plugin.
 
-Adding a command therefore means edits in this crate **and** in each client that should expose it. The desktop-side checklist (build.rs namespace, `permissions/<plugin>/default.toml`, capability bundle, `generate_handler!`) is in `src-tauri/CLAUDE.md`; nothing verifies that the two halves agree, and a command added here alone ships dead.
+Adding a command therefore means edits in this crate **and** in each client that should expose it. The desktop-side checklist (build.rs namespace, `permissions/<plugin>/default.toml`, capability bundle, `generate_handler!`) is in `src-tauri/AGENTS.md`; nothing verifies that the two halves agree, and a command added here alone ships dead.
 
 ## Error modelling
 
@@ -194,13 +194,13 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
   and `vault_label::key::platform_keychain` returns `UnavailableKeychain` on every other target. So a
   feature that seals something under a keychain works on macOS and iOS and reports "cannot work here"
   on Windows, Linux and Android. That is the posture rather than an oversight (adding a keychain crate
-  is a dependency decision, which root `CLAUDE.md` classes as a security decision), but it has to
+  is a dependency decision, which root `AGENTS.md` classes as a security decision), but it has to
   reach the UI copy and the user guide, or both promise something two of the four platforms do not
   do. myne-md/myne#411 shipped a guide sentence blaming "a Linux desktop with no secret service",
   which implied Linux with one worked, and mentioned neither Windows nor Android.
 
 - **A breaking change here now fails in the same build, and it did not used to.** Mobile consumed this crate as a path dependency into a *sibling checkout*, so a changed trait method, a changed shared type, or a new `VaultLifecycleHooks` method compiled fine here and broke `MobileHooks` in another repository — which only went red once the change was already on `develop`. The mobile client moved in-repo on 2026-08-13 (`decisions.md`): `mobile/src-tauri` is a workspace member, `cargo clippy --workspace` compiles it, and the `mobile-compile` CI step gates it. No companion PR, no land order, no worktree dance. If you are following an older instruction that mentions any of those, it is stale.
-- **`../../CLAUDE.md` pointers in this crate do not resolve.** Modules that moved here brought their relative pointers along, where `../../CLAUDE.md` now names a `core/src/CLAUDE.md` that has never existed. Write new pointers **repo-relative** — `src-tauri/CLAUDE.md "Secret-handling logging discipline"` — which is what the crate-root modules already do.
+- **`../../AGENTS.md` pointers in this crate do not resolve.** Modules that moved here brought their relative pointers along, where `../../AGENTS.md` now names a `core/src/AGENTS.md` that has never existed. Write new pointers **repo-relative** — `src-tauri/AGENTS.md "Secret-handling logging discipline"` — which is what the crate-root modules already do.
 - **Diagnostic targets in this crate are `myne_core::…`, not the `myne::…` product targets the desktop crate uses**, and the reason is testability rather than taste: `tracing-test` filters its capture on the crate name, so a line emitted under `myne::agent` from here is invisible to the test asserting it carries no note content. Today: `myne_core::agent` (the agent loop and the edit-format probe) and `myne_core::http` (response framing and body size). Turn them on with `RUST_LOG=myne_core=debug`. Every field is a count, a duration or a closed-set identifier; `run_loop.rs`'s `the_trail_carries_no_part_of_the_reply_or_the_note` is the behavioural gate on that, and it fails by naming the marker that leaked.
 
 - **The secret-handling DENY list applies here in full.** Passwords, phrases, wrap/root/items keys, salts, nonces, `account_number_hash`, raw `vault.meta`, note plaintext, `note_id`, full filesystem paths, raw `io::Error` Display. On `wasm32` the only sink a `tracing` event has is the browser console — inside the served-code trust boundary — which is why `Cargo.toml` compiles every event below `warn` out of the wasm build entirely. That ceiling is compile-time; do not "temporarily" relax it.

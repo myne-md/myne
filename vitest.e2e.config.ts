@@ -54,7 +54,7 @@ export default defineConfig({
     // tears down per test, teardown in `finally`), so a retry runs against a
     // clean seat. This recovers TRANSIENT infra flakiness WITHOUT masking real
     // bugs — a genuinely broken or consistently-too-slow test fails every
-    // attempt; the e2e/CLAUDE.md "green 3× consecutive" authoring gate still owns
+    // attempt; the e2e/AGENTS.md "green 3× consecutive" authoring gate still owns
     // correctness. (Verified: notes-nc2 / spell / table-editing / sync-tombstone
     // each pass in isolation but flaked once under full-suite load.)
     retry: 2,

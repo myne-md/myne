@@ -54,7 +54,7 @@ pub enum ImportSourceDictionaryError {
 ///
 /// **No `Serialize` and no derived `Debug`**, both removed rather than never
 /// added: this is a source vault's decrypted private vocabulary, read out of
-/// the `MYD1` blob, and `src-tauri/CLAUDE.md`'s secret-handling DENY list
+/// the `MYD1` blob, and `src-tauri/AGENTS.md`'s secret-handling DENY list
 /// covers note-derived plaintext. A derived `Debug` puts the words one
 /// `tracing::debug!("{words:?}")` away from a log line with nothing in the tree
 /// to catch it, and the `Serialize` was dead surface the moment
@@ -106,7 +106,7 @@ pub async fn import_source_dictionary<R: Runtime>(
     // seam lends a wrapper precisely so this line cannot hand a bare `[u8; 32]`
     // out: a bare array is `Copy`, so it would live to the end of this command
     // across two `.await` points and drop unwiped, which is the thing
-    // `protocol/CLAUDE.md`'s memory-hygiene rule exists to stop.
+    // `protocol/AGENTS.md`'s memory-hygiene rule exists to stop.
     let root_key =
         import_source::with_keys(state.inner(), source_id, |root, _items, _id| root.clone())
             .await

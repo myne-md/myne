@@ -18,7 +18,7 @@
 //!   `agent-tooling/sessions/grill/2026-05-02-vault-unlock-password.md`
 //!   Q3 + Q4 + Final Summary.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use serde::Serialize;

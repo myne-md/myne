@@ -20,7 +20,7 @@
 //! the process. `scripts/check-lock-teardown.mjs` now fails if the body goes
 //! back to empty.
 //!
-//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline".
 
 // Re-exported for path-compatibility with any consumer referencing

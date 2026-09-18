@@ -5,7 +5,7 @@
 // `e2e/a11y-axe.e2e.ts` already runs the WCAG 2.1 AA rule set over the shared
 // screens — welcome, unlock, the editor, settings, the palette — and both
 // clients render that same source. Re-running it here would be the dual-driving
-// this lane exists to avoid (`e2e-web/CLAUDE.md`).
+// this lane exists to avoid (`e2e-web/AGENTS.md`).
 //
 // What it cannot cover is the set of screens that exist **only** on web:
 // account-number entry, the bootstrap password step, the pending-approval wait,

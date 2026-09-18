@@ -8,7 +8,7 @@
 //! Q1 (single-slot RwLock + Semaphore design) and the feature PRD
 //! at `agent-tooling/features/vault-unlock-password/prd.md`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // `state` (VaultRuntimeState), `error`, and the `commands` core (unlock / lock /
 // status probes) live in `myne-core` (shared with the desktop client). Mobile

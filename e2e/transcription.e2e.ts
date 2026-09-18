@@ -23,7 +23,7 @@
 //                   off, see `editor/src/attachments/widgets.ts`). The other ⋮
 //                   rows render throughout, so the menu opens either way.
 //
-// Per `e2e/CLAUDE.md` definition of done a new/changed scenario must go green 3×
+// Per `e2e/AGENTS.md` definition of done a new/changed scenario must go green 3×
 // consecutive via `./scripts/e2e-local.sh` before merge (it exercises the
 // `local-inference|transcribe` IPC path + the audio-widget transcript surface
 // through the ACL).
@@ -125,7 +125,7 @@ async function embedAudioAndReopen(s: Session, id: string): Promise<void> {
  * on a cold app, and it polls with a re-open for exactly that reason. tr1 and
  * tr3 clicked once and then waited the full 45 s budget on a row that was never
  * going to appear, with nothing to re-click. That is the same shape
- * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the victim looks like a broken
+ * `e2e/AGENTS.md` records for `clickNewMenuItem`: the victim looks like a broken
  * feature, and the fix is to re-fire the trigger rather than to wait longer. */
 async function openAudioMenuItem(s: Session, testId: string): Promise<void> {
   const row = await s.waitUntil(

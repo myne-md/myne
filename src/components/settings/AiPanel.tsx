@@ -197,7 +197,7 @@ function providerLabel(wire: string | null): string {
 /** Per-role side-load file filter for the OS picker (SYNC-1). */
 // File-picker filters. The `name` is user-visible in the OS dialog, so it is
 // stored as an i18n KEY and resolved with `t()` at usage (never frozen at module
-// scope — src/CLAUDE.md i18n discipline); the extensions are stable data.
+// scope — src/AGENTS.md i18n discipline); the extensions are stable data.
 const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }> = {
   generation: { nameKey: "settings.ai.modelFilter.gguf", extensions: ["gguf"] },
   embedding: {
@@ -853,7 +853,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           discovery, not enforcement.
 
           It is ALSO disabled when the build ships no tag model, with the reason
-          spelled out — the disabled-control discipline in `src/CLAUDE.md`: a
+          spelled out — the disabled-control discipline in `src/AGENTS.md`: a
           real label, no "coming soon" copy, and it enables itself on the build
           that lands the weights. Without it the switch persists `true` against
           a host that answers `not_ready` forever and a band that never appears,
@@ -1244,7 +1244,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             {/* The model chooser (SYNC-24). Gated on a stored key because
                 there is nothing to ask the provider WITH before then — a
                 disabled control with a real label, never "coming soon"
-                (src/CLAUDE.md disabled-control discipline). */}
+                (src/AGENTS.md disabled-control discipline). */}
             <label
               style={{ ...LABEL_STYLE, marginTop: "var(--space-2)" }}
               htmlFor="ai-provider-model"

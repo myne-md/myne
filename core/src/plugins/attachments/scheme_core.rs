@@ -10,7 +10,7 @@
 //! content-type from the decrypted bytes, and build the full response — the
 //! XSS-defense re-sniff invariant lives here.
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline" — the
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline" — the
 //! decrypted bytes, the blob bytes, the id, and paths are DENY-listed; only the
 //! served `&'static str` MIME label + a coarse status crosses a tracing boundary.
 
@@ -163,7 +163,7 @@ pub const ATTACHMENT_TEXT_PREVIEW_CAP: usize = 2 * 1024 * 1024;
 
 /// Outcome of reading an attachment's decrypted TEXT for an inline preview. The
 /// text crosses IPC as plaintext — same secret class as a note body
-/// (`src-tauri/CLAUDE.md` "Plaintext IPC"); the caller must never log it. Non-`Ok`
+/// (`src-tauri/AGENTS.md` "Plaintext IPC"); the caller must never log it. Non-`Ok`
 /// variants are non-distinguishing at the boundary (a wrong-key / tampered /
 /// cross-vault blob all collapse to `Denied`, mirroring the serve path's §6.4).
 pub enum ReadTextOutcome {

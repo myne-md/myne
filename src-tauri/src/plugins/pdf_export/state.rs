@@ -7,7 +7,7 @@
 //! `pdf_export_ready`; the render command awaits that signal before
 //! driving the native capture. The stash is `Zeroizing`-wrapped note
 //! plaintext (same secret class as the editor buffer — see
-//! `src-tauri/CLAUDE.md` "Plaintext IPC" pattern) and is cleared on
+//! `src-tauri/AGENTS.md` "Plaintext IPC" pattern) and is cleared on
 //! BOTH ends of every flight: at render finalize (success or failure)
 //! and from every lock-teardown site via
 //! [`super::teardown_on_lock`] (the `workspace::clear_staged_descriptor`

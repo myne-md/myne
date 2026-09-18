@@ -13,7 +13,7 @@
 // # Why that is worth a test rather than a shrug
 //
 // The desktop gate hides individual settings inside core panels as well as the
-// whole Developer rail group (`src/CLAUDE.md`), and the two clients share
+// whole Developer rail group (`src/AGENTS.md`), and the two clients share
 // `vault.prefs` — `developer_mode` is a real field that mobile reads and writes
 // nothing to. So the moment somebody ports a gated setting across, mobile gains
 // a gate with no toggle to open it: a setting that is invisible on the phone and

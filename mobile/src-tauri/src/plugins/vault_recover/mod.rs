@@ -7,7 +7,7 @@
 //! the host level by `vault_unlock::init()`; recover borrows via
 //! `Tauri::State<VaultRuntimeState>`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The vault-recover command core (`recover_with_phrase`, `complete_recovery`,
 // account-number selector) + `error` live in `myne-core` (shared with the

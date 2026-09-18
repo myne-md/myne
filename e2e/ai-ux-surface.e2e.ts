@@ -17,7 +17,7 @@
 //
 // The trust copy is public product voice (NOT a credential — SYNC-13 is about
 // phrases/passwords), so full-literal assertion is the sanctioned shape for
-// load-bearing banner copy (`e2e/CLAUDE.md`). Asserting against the imported
+// load-bearing banner copy (`e2e/AGENTS.md`). Asserting against the imported
 // constant (not a hardcoded string) keeps the suite honest if the copy is
 // revised — the constant is the single source both production and this suite read.
 //

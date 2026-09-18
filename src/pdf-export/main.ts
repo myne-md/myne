@@ -76,7 +76,7 @@ async function settleImages(): Promise<void> {
   if (failed > 0) {
     // Count only — an attachment id is a per-note correlation tag and a
     // filename is note content, so neither belongs in a log line
-    // (`src-tauri/CLAUDE.md` secret-handling discipline).
+    // (`src-tauri/AGENTS.md` secret-handling discipline).
     // eslint-disable-next-line no-console
     console.warn(
       `[pdf-export] ${failed} of ${outcomes.length} images failed to load; ` +

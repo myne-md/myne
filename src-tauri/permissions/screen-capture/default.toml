@@ -10,7 +10,7 @@
 # content, none decrypts anything, and the only values crossing in either
 # direction are booleans. Adding a command here without a matching entry in
 # `src-tauri/src/plugins/screen_capture/mod.rs`'s `generate_handler!` ships it
-# dead (root CLAUDE.md: an ACL entry does not wire a command, and nothing checks
+# dead (root AGENTS.md: an ACL entry does not wire a command, and nothing checks
 # that it does).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"

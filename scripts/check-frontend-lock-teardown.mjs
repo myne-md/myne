@@ -314,7 +314,7 @@ export const TEARDOWN_CALLS = [
     // Every leaving path, and this one holds the decrypted CONTENT rather than a
     // shape derived from it, so it is the stronger case of the entry above. It
     // sat unlisted while `resetDecodedAspects` was argued onto the roster from
-    // the same file, which is the false-exhaustiveness shape the root CLAUDE.md
+    // the same file, which is the false-exhaustiveness shape the root AGENTS.md
     // records for the `itemsKey-wrap` row: a roster that reads complete while
     // the larger store beside it is missing. The in-flight map is cleared with
     // the cache so a read crossing a lock cannot resolve into the next
@@ -398,7 +398,7 @@ export const TEARDOWN_CALLS = [
  * string literal would still fool it; the two call sites here contain none, the
  * over-capture assertion at the call site bounds the damage, and a
  * comment-and-string-aware walk is the thing this repo has already been burned
- * by writing twice (root `CLAUDE.md`, the `'` problem in both directions). */
+ * by writing twice (root `AGENTS.md`, the `'` problem in both directions). */
 export function bodyOf(src, at) {
   // The body's opening brace is the first `{` whose preceding non-whitespace
   // character is `)` or `>`. That covers all four shapes these files use:

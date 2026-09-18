@@ -31,7 +31,7 @@
 //
 // Plaintext lifetime is best-effort on the JS side — V8 strings are
 // immutable and not zeroizable; the load-bearing zeroize is Rust-side
-// via `Zeroizing<String>` (`src-tauri/CLAUDE.md` "Plaintext IPC across
+// via `Zeroizing<String>` (`src-tauri/AGENTS.md` "Plaintext IPC across
 // the WebView boundary").
 
 import { invoke } from "../platform/core";
@@ -56,7 +56,7 @@ const utf8Decoder = new TextDecoder();
  * either: it walks LIVE notes, so a daily folder emptied by trashing every daily
  * note stayed gone. A defaulted argument would have left the next create path
  * silently unregistered too; a required one makes the compiler name every
- * caller, which is `CLAUDE.md`'s own "a default is the arm that never fires".
+ * caller, which is `AGENTS.md`'s own "a default is the arm that never fires".
  *
  * Pass `null` for the vault root, and for a BULK caller that issues its own
  * single registration afterwards. Each prefs write re-encrypts the whole blob,

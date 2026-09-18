@@ -36,7 +36,7 @@
 //! and `build.rs InlinedPlugin::commands` lock-stepped — adding a command
 //! without the matching `commands.allow` entry is a security regression).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // Platform-agnostic plugin core, re-exported so `crate::plugins::secret_export::…`
 // paths keep resolving.

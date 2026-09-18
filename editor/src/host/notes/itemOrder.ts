@@ -119,7 +119,7 @@ export type OrderedNoteRecord = { updatedAt?: Date | null };
  * is created.
  *
  * **Required, not defaulted.** A default here is the arm that never fires
- * (`CLAUDE.md`), and it cost something real before it was made required: the
+ * (`AGENTS.md`), and it cost something real before it was made required: the
  * drag-reorder baseline in `useFolderManagement.ts` reuses this comparator on
  * the promise that "the sidebar's render order IS the reorder baseline", and it
  * silently took the default, so a drag while a pin was live computed a sequence

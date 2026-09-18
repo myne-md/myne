@@ -19,7 +19,7 @@
 //! language token + `<|transcribe|>` — never `<|translate|>` — so speech is
 //! transcribed in its own language, never silently rendered into English.
 //!
-//! Secret-handling (`src-tauri/CLAUDE.md`): the PCM samples are decrypted audio
+//! Secret-handling (`src-tauri/AGENTS.md`): the PCM samples are decrypted audio
 //! (AS1-class) and the produced transcript is note-class plaintext — **neither is
 //! ever logged**; only the bounded [`EngineError`] kind escapes.
 

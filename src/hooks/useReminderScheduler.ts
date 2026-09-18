@@ -86,7 +86,7 @@ export type ReminderSchedulerOptions = {
    * An optional field is an opt-in wire: omitting it compiles, the pass silently
    * falls back to the default, and the preference stops reaching the mechanism
    * again with nothing reporting it. That is this issue's own defect one layer
-   * up, and it is the shape `CLAUDE.md` records under "A guard parameter with a
+   * up, and it is the shape `AGENTS.md` records under "A guard parameter with a
    * default value is an opt-in guard". Required means deleting the line in
    * `Editor.tsx` is a compile error naming the site, which no test can be
    * deleted around.

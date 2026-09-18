@@ -18,7 +18,7 @@
 // content, not credentials.
 //
 // ⚠️ NEW SCENARIO — authored, not yet validated in the container. Per
-// e2e/CLAUDE.md's definition of done it must go green 3× consecutive
+// e2e/AGENTS.md's definition of done it must go green 3× consecutive
 // (`./scripts/e2e-buildrun.sh e2e/crdt-history.e2e.ts` ×3) before merge.
 
 import { expect, it } from "vitest";

@@ -1361,7 +1361,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Cosmetic-only; this pair is 55 lines. Note the rulebook contradiction to fix in myne-md/myne#479 rather than here: `core/CLAUDE.md:17` and `src-tauri/CLAUDE.md:15,67` both list `vault_repair` as having no mobile counterpart, while mobile ships the plugin, including a 564-line `commands.rs`, and grants `vault-repair:default`. Classify against the tree, never against the rulebook.",
+      "Cosmetic-only; this pair is 55 lines. Note the rulebook contradiction to fix in myne-md/myne#479 rather than here: `core/AGENTS.md:17` and `src-tauri/AGENTS.md:15,67` both list `vault_repair` as having no mobile counterpart, while mobile ships the plugin, including a 564-line `commands.rs`, and grants `vault-repair:default`. Classify against the tree, never against the rulebook.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/whisper.rs",
@@ -1650,7 +1650,7 @@ Five discriminators, each earned from a real case rather than invented:
 3. Payload versus predicate is the real seam, not module versus module.
 4. A navigation SHAPE is a screen; the exit DOOR is a decision.
 5. For a Rust-mirroring TS module the rubric is inherited: shared iff the Rust source is in
-   \`core/\` or \`protocol/\` (\`core/CLAUDE.md\`, "What does NOT live here").
+   \`core/\` or \`protocol/\` (\`core/AGENTS.md\`, "What does NOT live here").
 
 **Classify against the tree, never against a module's own header comment.** Several of those comments
 cite \`src-tauri/src/plugins/.../error.rs\` paths that no longer exist.
@@ -1722,7 +1722,7 @@ function checkProjection(roster, target = PROJECTION) {
   const have = existsSync(at(target)) ? readFileSync(at(target), "utf8") : "";
   if (have === want) return;
   // The message names both causes because the check cannot tell them apart, and
-  // `CLAUDE.md` forbids a failure message claiming more than its inputs prove.
+  // `AGENTS.md` forbids a failure message claiming more than its inputs prove.
   // An earlier draft said only "must not be hand-edited", which was an
   // accusation the comparison had no way to support.
   console.error(
@@ -2110,7 +2110,7 @@ function main() {
   // A reason is the record's whole value: it is what stops the next reader
   // re-deriving the verdict. An entry without one is a verdict pretending to be
   // one, and it renders as an empty table cell that `--check` accepts as
-  // consistent. The spec asserted this and the guard did not, so `CLAUDE.md`'s
+  // consistent. The spec asserted this and the guard did not, so `AGENTS.md`'s
   // claim that this guard enforces "a verdict AND a reason" was half true and
   // an entry could land empty through `pre-commit`.
   const reasonless = roster.filter((e) => !(e.reason ?? "").trim());

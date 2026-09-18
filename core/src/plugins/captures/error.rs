@@ -3,7 +3,7 @@
 //!
 //! Closed, `serde`-tagged set hand-mirrored on the TS side. No `String` field
 //! reaches the frontend; OS / codec detail is reduced to coarse variants per the
-//! secret-handling logging discipline (`../../CLAUDE.md`). Note that a corrupt /
+//! secret-handling logging discipline (`../../AGENTS.md`). Note that a corrupt /
 //! foreign / non-UTF-8 queue entry is NOT surfaced as an error — it is silently
 //! dropped by [`super::commands::take_pending`] (a queue entry that cannot become
 //! a note is discarded), so this enum only carries genuine backend/IO failures.

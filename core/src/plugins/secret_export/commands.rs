@@ -7,7 +7,7 @@
 //! UNTRUSTED (a compromised WebView could call this directly, bypassing the
 //! dialog), rejecting any path that resolves inside the app-data / vault tree.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — `contents` is a
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — `contents` is a
 //! secret (recovery phrase / account number); it is Zeroizing-wrapped on the
 //! first non-doc statement and never logged.
 

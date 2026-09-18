@@ -38,7 +38,7 @@
 //! The endpoint UX surfaces TOFU pins honestly as *pinned-on-first-connect,
 //! compare-across-devices*, never as *verified* (SYNC-43).
 //!
-//! See the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging discipline"
+//! See the main repo's `src-tauri/AGENTS.md` "Secret-handling logging discipline"
 //! for the DENY-list this wrapper (and the shared core) follow — no token /
 //! password / phrase / root_key / items_key bytes in any `tracing`/log/serialize.
 

@@ -33,7 +33,7 @@
 //! The secret-keeping discipline follows the backend-session precedent
 //! (`decisions.md` 2026-04-28 — `root_key` never crosses IPC): the host
 //! never holds a key, and the frame body (note plaintext — same secret
-//! class as `password`) is never logged (see `src-tauri/CLAUDE.md`
+//! class as `password`) is never logged (see `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline").
 //!
 //! ## Cap constants — reused from the codebase, not re-invented

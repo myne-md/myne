@@ -7,7 +7,7 @@
 // the same plane (§ 9.27). Consumed by the memory UI (the settings panel, the
 // chat popover) and by nothing else.
 //
-// No mock layer (per `src/CLAUDE.md`): these call the real IPC commands. Keep
+// No mock layer (per `src/AGENTS.md`): these call the real IPC commands. Keep
 // the types in lockstep with the Rust `MemoryReadError` / `MemoryMutateError`
 // serde shapes.
 

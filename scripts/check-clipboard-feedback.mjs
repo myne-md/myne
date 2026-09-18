@@ -49,7 +49,7 @@
 //
 // ── Verifying this guard ──────────────────────────────────────────────────────
 //
-// Per CLAUDE.md, verifying a guard means BREAKING it, in both directions:
+// Per AGENTS.md, verifying a guard means BREAKING it, in both directions:
 //
 //   1. Add `navigator.clipboard.writeText("x")` to a guarded file that is not the
 //      web seam. This must fail and name that file.

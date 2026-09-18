@@ -23,7 +23,7 @@
 //   2. `var(--paper-1)` at eight call sites, one of them in the shared
 //      `@myne/editor` package so it reached all three clients. There is no
 //      `--paper-1`: the surface ramp's light end is the bare `--paper`, and
-//      `src/CLAUDE.md` says so in those words. It resolved to nothing at every
+//      `src/AGENTS.md` says so in those words. It resolved to nothing at every
 //      one of them, including the recovery-phrase entry cells. `--accent-1` was
 //      the same mistake once, on mobile.
 //
@@ -274,7 +274,7 @@ function main() {
   // `existsSync`-confirmed by `presentSharedRoots`. So the branch was inert and
   // the header's claim that a missing root is a failure here was false, on a
   // checkout where the success line would have printed `ok` about a smaller
-  // walk. That is the `check-prefs-nonce.mjs` shape the root CLAUDE.md records.
+  // walk. That is the `check-prefs-nonce.mjs` shape the root AGENTS.md records.
   if (MISSING_ROOTS.length > 0) {
     console.error(
       "token-parity: shared root(s) named by scripts/lib/shared-roots.mjs are\n" +

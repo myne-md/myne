@@ -55,7 +55,7 @@
 //! thin OS layer on top, covered by a Unix-only integration test where the
 //! platform supports it.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — frames carry
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — frames carry
 //! note plaintext; this module logs only bounded outcome / framing labels,
 //! never a body, path, or token.
 

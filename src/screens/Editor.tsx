@@ -3918,7 +3918,7 @@ function CommandPaletteHost({
     // Re-subscribes when the focused note changes, which is what the vim `:q`
     // listener below does too. The alternative (an empty dep list plus a ref
     // mutated during render to keep the handler fresh) is the React-19 shape
-    // `src/CLAUDE.md` warns about, and buys nothing here.
+    // `src/AGENTS.md` warns about, and buys nothing here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
 

@@ -59,7 +59,7 @@
 //! set is read from Tauri's own construction sites, but neither iOS nor Android
 //! runs in CI. `mobile/docs/dev/device-matrix.md` §11 owns the confirmation.
 //
-// see: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging discipline"
+// see: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging discipline"
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime, Url};

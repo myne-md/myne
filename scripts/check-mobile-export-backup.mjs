@@ -60,7 +60,7 @@
 // Testable: `analyse(io)` takes its whole world as an argument, so
 // `tests/scripts/mobileExportBackup.test.ts` can inject each defect above and
 // assert the guard names it. A guard that has never failed is a guard nobody has
-// tested (root `CLAUDE.md`).
+// tested (root `AGENTS.md`).
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve, relative } from "node:path";

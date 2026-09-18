@@ -1,7 +1,7 @@
 // CSV reader for the CSV import adapter (importer-breadth epic, MYND-584).
 //
 // A small RFC-4180 parser rather than a dependency: the format is ~40 lines done
-// right, and `CLAUDE.md` treats every added dependency as a security decision. The
+// right, and `AGENTS.md` treats every added dependency as a security decision. The
 // cases that matter and that a naive `split(",")` gets wrong are all covered —
 // quoted fields, embedded commas, embedded newlines, and the `""` escape.
 //

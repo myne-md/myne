@@ -228,7 +228,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
   // and fixed on the way there, and the fifth is unresolved:
   //
   //   1. The pane keeps a STALE BUFFER after an out-of-band `note_update`
-  //      (`src/CLAUDE.md` states it; `PaneView` re-reads only when
+  //      (`src/AGENTS.md` states it; `PaneView` re-reads only when
   //      `contentReloadNonce` changes). Without a refresh-and-reopen the editor
   //      still showed the EMPTY note, so every line was blank and every
   //      double-click selected nothing. Fixed.
@@ -270,7 +270,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         await createNote(s, "ftp1note");
 
         // Written through the real note_update IPC rather than typed. The
-        // subject is PLACEMENT, and `e2e/CLAUDE.md` records what typing a long
+        // subject is PLACEMENT, and `e2e/AGENTS.md` records what typing a long
         // body through the driver costs: dropped keystrokes over a few hundred
         // characters, and a body that is not what the scenario meant to write.
         const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
@@ -301,7 +301,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         expect(wrote.err, "note_update should succeed").toBeUndefined();
 
         // REFRESH AND REOPEN. A backend write made outside the pane's autosave
-        // loop leaves that pane holding its stale buffer — `src/CLAUDE.md` states
+        // loop leaves that pane holding its stale buffer — `src/AGENTS.md` states
         // it, and `PaneView` re-reads only when `contentReloadNonce` changes.
         // Without this the editor still shows the EMPTY note, line 0 has no text,
         // the double-click selects nothing, and the scenario times out looking

@@ -67,7 +67,7 @@ pub async fn erase_all_labels(
     }
 
     // Counts only. A `VaultId` is a vault-stable correlation tag and is
-    // DENY-listed for logging (`src-tauri/CLAUDE.md`), and the label is the
+    // DENY-listed for logging (`src-tauri/AGENTS.md`), and the label is the
     // user's own text.
     tracing::info!(
         event = "vault_labels_erased",

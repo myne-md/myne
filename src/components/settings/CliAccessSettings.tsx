@@ -300,7 +300,7 @@ export function CliAccessSettings({
         // A COUNT, never the names: this attribute exists so an E2E scenario can
         // see that its typed exclusion registered, and a folder name in a
         // `data-*` would put vault content into every screenshot and CI failure
-        // artefact (src/CLAUDE.md "Test observability"). Reflects the OPTIMISTIC
+        // artefact (src/AGENTS.md "Test observability"). Reflects the OPTIMISTIC
         // prop — `usePrefs` updates local state before the `vault.prefs` write
         // resolves — so it proves the edit was accepted, NOT that it is on disk.
         // The on-disk fact is observable only through the door itself.

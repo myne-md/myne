@@ -329,7 +329,7 @@ pub fn bundled_weights_are_real() -> bool {
 /// What that cost: `image-ocr-search`'s io1 measured an EMPTY extraction against
 /// the production binary while `cargo test` was green on the very tests that
 /// claim OCR reads this exact fixture. A suite that reports success for a
-/// component it never exercised is the failure `CLAUDE.md` calls a silent-green
+/// component it never exercised is the failure `AGENTS.md` calls a silent-green
 /// skip, and this is the shape of it.
 ///
 /// Returns `false` only for the honest case: this checkout has no weights.

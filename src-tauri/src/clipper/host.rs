@@ -38,7 +38,7 @@
 //! [`HandoffOutcome::SilentlyIgnored`] which the loop maps to "write
 //! nothing".
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the loop
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the loop
 //! logs only bounded stage tags + closed error labels, never a frame body.
 
 use std::io::{Read, Write};

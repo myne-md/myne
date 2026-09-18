@@ -96,7 +96,7 @@ export async function saveAiEndpoint(
  * is read HERE and nowhere else, so a UI renders a reason it can switch on
  * rather than reaching into an error's internals. Note what it deliberately
  * does not return: the URL the user typed, or any path. A refusal names the
- * rule, never the input (`src-tauri/CLAUDE.md` DENY-list discipline — a settings
+ * rule, never the input (`src-tauri/AGENTS.md` DENY-list discipline — a settings
  * field's contents end up in screenshots and bug reports).
  */
 export function endpointRejectionOf(err: unknown): EndpointRejection | null {

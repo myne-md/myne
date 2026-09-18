@@ -10,7 +10,7 @@
 //
 // Plaintext lifetime is best-effort on the JS side — V8 strings are
 // immutable and not zeroizable; the load-bearing zeroize is Rust-side
-// via `Zeroizing<String>` (`src-tauri/CLAUDE.md` "Plaintext IPC across
+// via `Zeroizing<String>` (`src-tauri/AGENTS.md` "Plaintext IPC across
 // the WebView boundary").
 //
 // Each command rejects (never resolves) with its matching `Note*Error`
@@ -55,7 +55,7 @@ export type {
  * trashing every daily note stays gone.
  *
  * A defaulted argument would have left the next create path silently
- * unregistered too, which is `CLAUDE.md`'s own "a default is the arm that never
+ * unregistered too, which is `AGENTS.md`'s own "a default is the arm that never
  * fires". Required means the compiler names every caller. Byte-parity with
  * `src/notes/createNote.ts` is deliberate: `check-twin-drift.mjs` watches these
  * two, and the whole reason this defect existed on one side only is that the

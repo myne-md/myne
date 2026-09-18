@@ -16,7 +16,7 @@
 // be: "Myne can't run in this browser" sends a phone user looking for a
 // different browser, when what they want is the app. See `MOBILE_REFUSAL_TITLE`.
 //
-// Strings go through i18n like every other user-facing string (`src/CLAUDE.md`).
+// Strings go through i18n like every other user-facing string (`src/AGENTS.md`).
 // The English source lives in `environment-gate.ts` and is passed as
 // `defaultValue`, so the two cannot drift: the module that decides *which*
 // capability is missing is also the one that owns the sentence explaining it,
@@ -76,7 +76,7 @@ export function UnsupportedEnvironment({ missing }: { missing: RequiredCapabilit
     // `data-refusal` is the discriminator, not the heading text: which refusal
     // fired is a fact the browser E2E has to read in whatever language the
     // runner's browser happens to be set to. A stable testid plus a closed-set
-    // `data-*` is the sanctioned shape (`src/CLAUDE.md`, "Test observability");
+    // `data-*` is the sanctioned shape (`src/AGENTS.md`, "Test observability");
     // an interpolated testid is banned outright.
     <main
       style={PAGE}

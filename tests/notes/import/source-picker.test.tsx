@@ -4,13 +4,13 @@
 //
 // This suite exists partly to close a standing gap: before this change the importer
 // UI carried ZERO `data-testid` attributes, so the whole flow was invisible to both
-// the E2E driver and component tests (`src/CLAUDE.md`: "a screen without testids is
+// the E2E driver and component tests (`src/AGENTS.md`: "a screen without testids is
 // invisible to E2E"). The assertions below therefore address elements by testid, the
 // same way the E2E harness will.
 
 import { describe, expect, it, vi } from "vitest";
 // `fireEvent`, not `user-event`: the latter is NOT a dependency of this repo, and
-// adding one is a security decision here (CLAUDE.md), not a test convenience.
+// adding one is a security decision here (AGENTS.md), not a test convenience.
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { afterEach } from "vitest";
 // The capability seam is mocked rather than driven, because `has()` on the

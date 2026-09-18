@@ -12,12 +12,12 @@
 //! `State<'_, …>` list: this client resolves a `LocalInferenceState` and a
 //! `LocalInferenceVectorState` to build its engine and its embedding-backed
 //! searcher, and mobile resolves neither. That is the three-layer command shape
-//! `core/CLAUDE.md` describes, applied to a plugin that had not adopted it.
+//! `core/AGENTS.md` describes, applied to a plugin that had not adopted it.
 //!
 //! Which guards apply per command is documented on `mod.rs` and is unchanged by
 //! the move: they are the same functions, called from core now.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

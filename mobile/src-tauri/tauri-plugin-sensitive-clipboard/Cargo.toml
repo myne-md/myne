@@ -35,7 +35,7 @@ tauri-plugin = { version = "2", features = ["build"] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
-# Mandated rather than chosen: `src-tauri/CLAUDE.md`'s secret-handling discipline
+# Mandated rather than chosen: `src-tauri/AGENTS.md`'s secret-handling discipline
 # and `recovery-flow.md` §3.5 both require that once Rust receives a recovery
 # phrase it holds it in a `Zeroizing<String>`. The sibling
 # `tauri-plugin-share-intent` already carries this, and the desktop command for

@@ -1,6 +1,6 @@
 // The `protected-branch` pre-push guard's own spec (myne-md/myne#592).
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it. Inject
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it. Inject
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." That rule applies to this guard more sharply than to most,
 // because its load-bearing keys fail SILENTLY and GREEN:

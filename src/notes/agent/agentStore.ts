@@ -256,7 +256,7 @@ export function beginRun(): void {
  *
  *  **Required epoch, never defaulted.** A default would compare the current
  *  epoch to itself and pass unconditionally, which is the opt-in-guard shape
- *  the root `CLAUDE.md` records. */
+ *  the root `AGENTS.md` records. */
 export function openRun(view: AgentRunView, epoch: number): boolean {
   if (epoch !== runEpoch) return false;
   set({ view });
@@ -499,7 +499,7 @@ export function keptEdits(s: AgentState = state): ProposedEdit[] {
  *  function states about its own subtraction: a call site is not testable, and
  *  each of the five checks below is worth failing by name.
  *
- *  All four were verified the way `CLAUDE.md` requires, by deletion rather than
+ *  All four were verified the way `AGENTS.md` requires, by deletion rather than
  *  by a green run, and the refusal check is why that matters. A refused edit is
  *  not in `appliedEdits`, so it is still in `keptEdits`: the obvious test for a
  *  refusal therefore answers on the completeness check instead, and the FIRST

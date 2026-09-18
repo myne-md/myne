@@ -18,7 +18,7 @@
 //
 // ⚠️ NEW SCENARIO — authored to the harness conventions but NOT yet validated in
 // the container (this dev platform is macOS; the suite is Linux/tauri-driver
-// only). Definition of done per e2e/CLAUDE.md is "green 3× consecutive" via
+// only). Definition of done per e2e/AGENTS.md is "green 3× consecutive" via
 // ./scripts/e2e-buildrun.sh. Run ISOLATED — the full suite contaminates.
 
 import { expect, it } from "vitest";
