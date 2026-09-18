@@ -676,32 +676,36 @@ fn main() {
     // matching `local-inference:allow-<cmd>` — plus `generate_handler!`, which
     // nothing but a test checks. All three are compared, both directions, by
     // `build_rs_capability_json_and_generate_handler_agree` in that module.
-    // myne#529: the `agent` plugin's ACL namespace, declared under the SAME
-    // feature guard as `local-inference` because the plugin itself is (see
-    // `src/plugins/mod.rs`). A namespace declared in a build whose plugin is
-    // absent leaves `permissions/agent/default.toml` resolvable and the commands
-    // unreachable, and a capability referencing it would dangle.
-    if std::env::var_os("CARGO_FEATURE_LOCAL_INFERENCE").is_some() {
-        attributes = attributes.plugin(
-            "agent",
-            // The eight agentic-note-editing commands. Same InlinedPlugin
-            // discipline as the plugins around it: each command needs a matching
-            // `commands.allow` entry in `permissions/agent/default.toml` or the
-            // ACL resolver never authorizes the `plugin:agent|<cmd>` invoke, and
-            // it needs a line in `generate_handler!` or it is dead at runtime
-            // while everything else about it looks wired.
-            tauri_build::InlinedPlugin::new().commands(&[
-                "agent_start",
-                "agent_approve_scope",
-                "agent_preview_grant",
-                "agent_cancel",
-                "agent_apply",
-                "agent_undo",
-                "agent_last_run",
-                "agent_capability",
-            ]),
-        );
-    }
+    // myne#529 + myne-md/myne#714: the `agent` plugin's ACL namespace is
+    // declared UNCONDITIONALLY, even though the plugin code itself stays
+    // gated behind `local-inference` (see `src/plugins/mod.rs`). The
+    // `detached-note.json` capability references `agent:default` in every
+    // build, and Tauri validates capability references at build time, so a
+    // feature-gated namespace leaves that reference dangling and the
+    // `--no-default-features` auditable build fails to compile. Declaring the
+    // names without the handlers is safe: no AI code is compiled (the plugin
+    // module, the engine and the handlers all stay behind the feature), and an
+    // invoke of a non-existent command fails closed at runtime rather than
+    // reaching a backend. The auditable build still compiles no AI path.
+    attributes = attributes.plugin(
+        "agent",
+        // The eight agentic-note-editing commands. Same InlinedPlugin
+        // discipline as the plugins around it: each command needs a matching
+        // `commands.allow` entry in `permissions/agent/default.toml` or the
+        // ACL resolver never authorizes the `plugin:agent|<cmd>` invoke, and
+        // it needs a line in `generate_handler!` or it is dead at runtime
+        // while everything else about it looks wired.
+        tauri_build::InlinedPlugin::new().commands(&[
+            "agent_start",
+            "agent_approve_scope",
+            "agent_preview_grant",
+            "agent_cancel",
+            "agent_apply",
+            "agent_undo",
+            "agent_last_run",
+            "agent_capability",
+        ]),
+    );
 
     if std::env::var_os("CARGO_FEATURE_LOCAL_INFERENCE").is_some() {
         attributes = attributes.plugin(
