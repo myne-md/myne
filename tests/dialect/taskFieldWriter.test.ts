@@ -156,6 +156,45 @@ describe("planned edit", () => {
     expect(planTaskFieldWrite(line, parseTaskFields(line))).toBeNull();
   });
 
+  // myne-md/myne#703: every shape the parser keeps must survive a write.
+  // Canonical lines are already a fixed point; emoji lines convert once by
+  // design (§3.8.2) and are a fixed point after. In both cases the second
+  // plan is null and no field value is lost.
+  it.each([
+    "- [ ] x [due:: 2026-08-01] [due:: 2026-09-01]",
+    "- [ ] x [priority:: high] [priority:: low]",
+    "- [ ] x 🔺 ⏫",
+    "- [ ] x [repeat:: ]",
+    "- [ ] x 🔁",
+  ])("a write from its own parse loses nothing for %s", (line) => {
+    const before = parseTaskFields(line);
+    const out = applyPlan(line, before);
+    const after = parseTaskFields(out);
+    // Every typed slot and every kept value survives the round trip (`raw`
+    // is source bytes and legitimately changes on canonical conversion, so
+    // the comparison is on key and value — the meaning, not the spelling).
+    const meaning = (fs: { key: string; value: string }[]) =>
+      fs.map((f) => ({ key: f.key, value: f.value }));
+    expect(after.due).toEqual(before.due);
+    expect(after.repeat).toEqual(before.repeat);
+    expect(after.priority).toEqual(before.priority);
+    expect(meaning(after.preserved)).toEqual(meaning(before.preserved));
+    expect(meaning(after.malformed)).toEqual(meaning(before.malformed));
+    // And the emitted line is a fixed point: a second write drops nothing.
+    expect(planTaskFieldWrite(out, after)).toBeNull();
+  });
+
+  it("a repeat value the bracketed form cannot carry survives an edit byte-identically", () => {
+    const line = "- [ ] x 🔁 every ]day";
+    const before = parseTaskFields(line);
+    const out = applyPlan(line, { ...before, due: { date: "2026-08-01" } });
+    // The repeat span stays in its source bytes: emitting
+    // `[repeat:: every ]day]` would move `day]` into the description.
+    expect(out).toBe("- [ ] x [due:: 2026-08-01] 🔁 every ]day");
+    expect(parseTaskFields(out)).toEqual({ ...before, due: { date: "2026-08-01" } });
+    expect(planTaskFieldWrite(out, parseTaskFields(out))).toBeNull();
+  });
+
   it("touches no other line in a multi-line document", () => {
     const doc = "- [ ] first [due:: 2026-08-01]\n- [ ] second [due:: 2026-08-02]\n";
     const firstLine = doc.slice(0, doc.indexOf("\n"));
