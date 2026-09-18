@@ -153,7 +153,7 @@ export type ReminderHorizonSettingsProps = {
  * a guard holds a property it does not is the same defect one altitude up.
  *
  * Deliberately absent from `settingsSearchIndex.ts`, which is a departure from
- * `src/CLAUDE.md` and is recorded as one in `docs/decisions/clients/0541`
+ * `src/AGENTS.md` and is recorded as one in `docs/decisions/clients/0541`
  * rather than argued only here: its row exists only while reminders are on, so
  * a search hit would scroll to something not rendered for anyone with the
  * feature off. `settings.search.keywords.reminders` carries the horizon's words

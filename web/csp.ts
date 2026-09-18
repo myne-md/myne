@@ -96,7 +96,7 @@ export function buildCsp(config: CspConfig): string {
     // nothing else — the wasm core cannot instantiate without it.
     "script-src 'self' 'wasm-unsafe-eval'",
     // Inline styles are the one concession: the UI styles through React's
-    // `style={{}}` by project convention (`src/CLAUDE.md` — no Tailwind, no CSS
+    // `style={{}}` by project convention (`src/AGENTS.md` — no Tailwind, no CSS
     // modules), which produces inline style attributes. This does not permit
     // inline <script>.
     "style-src 'self' 'unsafe-inline'",

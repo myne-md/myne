@@ -176,7 +176,7 @@ pub fn csprng_self_check() -> bool {
 /// **`file:line` only. Never the payload.** A panic message is arbitrary text
 /// from arbitrary code: an `expect("failed to decode note {id}")` carries a note
 /// id, and an `unwrap` on a parse can carry the bytes that failed to parse — a
-/// note body. `src-tauri/CLAUDE.md`'s DENY list covers both, and this surface is
+/// note body. `src-tauri/AGENTS.md`'s DENY list covers both, and this surface is
 /// worse than a log file: the code it reaches is a browser console, readable by
 /// devtools, by any extension with devtools access, and by whoever the user
 /// screenshots it to.

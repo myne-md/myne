@@ -30,7 +30,7 @@
 //!   wipes (`zeroize_attachment_refs` / `abort_active_recording`) which ride
 //!   the desktop `hooks::VaultLifecycleHooks` seam.
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub(crate) mod compress;

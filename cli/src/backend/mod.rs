@@ -9,7 +9,7 @@
 //! grow an IPC-specific concept (a frame, a socket path, a JSON wire shape)
 //! in its signature, or that addition breaks. Same provider-seam pattern as
 //! `TokenStore` / `VaultLifecycleHooks` / `QuickUnlockProvider`
-//! (`src-tauri/CLAUDE.md`, `core/CLAUDE.md`).
+//! (`src-tauri/AGENTS.md`, `core/AGENTS.md`).
 //!
 //! **Behaviour-parity rule** (PRD "Implementation Decisions"): a method
 //! here is defined against the CORE's behaviour — for `list`, exactly

@@ -1,7 +1,7 @@
 //! Closed error taxonomy for the local-inference engine (local-ai epic,
 //! MYND-406, task 1).
 //!
-//! DENY-list clean per `src-tauri/CLAUDE.md` "Secret-handling logging
+//! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline": every variant is a bounded, content-free kind — a prompt, a
 //! note body, or an embedding vector never appears in an error value or its
 //! `Display`. Callers log [`EngineError::kind`] (a `&'static str`), never any

@@ -51,7 +51,7 @@
 //! a run dies with the foreground here by decision.
 //!
 //! Every other hook stays a no-op until its subsystem lands on mobile (see
-//! `mobile/CLAUDE.md`) — `zeroize_spell`, `abort_active_recording`,
+//! `mobile/AGENTS.md`) — `zeroize_spell`, `abort_active_recording`,
 //! `pdf_export_teardown_on_lock`, `detached_windows_teardown_on_lock` and
 //! `clear_staged_descriptor` are empty because mobile holds no spell engine, no
 //! in-process recording session, no pdf-export window, no detached (pop-out)
@@ -133,7 +133,7 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     // non-empty. If the state stops being managed under this exact type, the
     // teardown silently stops happening and the log stays clean, which is
     // precisely how myne#454 survived. Static tag only, no vault content
-    // (`src-tauri/CLAUDE.md` "Secret-handling logging discipline").
+    // (`src-tauri/AGENTS.md` "Secret-handling logging discipline").
     fn zeroize_search_index(&self) {
         match self.app.try_state::<myne_core::search::SearchIndexState>() {
             Some(search) => search.clear(),

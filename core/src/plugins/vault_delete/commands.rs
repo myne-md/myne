@@ -68,7 +68,7 @@
 //!   bug-canary, (c) partial-fail posture + v0.2 vault_repair
 //!   (Plane MYND-159), (d) VaultArtifactsPresent rename
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::VaultDeleteError;
 use crate::host::HostCtx;

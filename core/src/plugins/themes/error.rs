@@ -2,7 +2,7 @@
 //! `themes` plugin IPC error enum (MYND-486).
 //!
 //! A single closed taxonomy for the read + write custom-theme commands, DENY-list
-//! clean per `src-tauri/CLAUDE.md` "Secret-handling logging discipline" (no path
+//! clean per `src-tauri/AGENTS.md` "Secret-handling logging discipline" (no path
 //! strings, no key material, no kernel-error display strings). The rich
 //! [`theme_validator::ThemeError`] carried by [`ThemesError::Invalid`] surfaces
 //! only the offending token name / source line — never a value, never a path.

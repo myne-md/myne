@@ -3,7 +3,7 @@
 //! only** — the desktop infer/embed/chat/semantic-search commands are out of
 //! scope on mobile.
 //!
-//! Discipline (`src-tauri/CLAUDE.md`, normative here too): the decrypted WAV, the
+//! Discipline (`src-tauri/AGENTS.md`, normative here too): the decrypted WAV, the
 //! derived PCM, and the transcript are `Zeroizing`/never-logged; the model call
 //! runs under `spawn_blocking` (CPU-bound, keeps the async command `Send`), the
 //! engine reached ONLY through the `Engine` trait; the `transcription_enabled`

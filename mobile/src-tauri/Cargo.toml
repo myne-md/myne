@@ -133,7 +133,7 @@ zeroize = { version = "1.8", features = ["alloc", "derive"] }
 async-trait = "0.1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 # `tracing` for structured ops-side logging (stage tags + bounded
-# variant-name fields only; see the main repo's src-tauri/CLAUDE.md
+# variant-name fields only; see the main repo's src-tauri/AGENTS.md
 # "Secret-handling logging discipline").
 tracing = "0.1"
 # The actual log sink (desktop `lib.rs` parity). Without it every mobile
@@ -229,7 +229,7 @@ myne-core = { path = "../../core", features = ["test-support"] }
 # Placement: LAST in the file on purpose. A `[target.'cfg(…)'.dependencies]`
 # table terminates whatever section precedes it, so one written next to a
 # regular dependency silently swallows every declaration after it (root
-# `CLAUDE.md`, "Gotchas").
+# `AGENTS.md`, "Gotchas").
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError", "NSString", "NSURL", "NSValue"] }

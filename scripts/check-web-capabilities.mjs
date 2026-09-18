@@ -28,7 +28,7 @@
 // `Unsupported` must map to an absent capability. The mapping between the two
 // vocabularies is explicit below — it is the thing a reviewer should read.
 //
-// Zero dependencies, node built-ins only (root CLAUDE.md: adding a dependency is
+// Zero dependencies, node built-ins only (root AGENTS.md: adding a dependency is
 // a security decision), matching the other guards in this directory.
 
 import { readFileSync } from "node:fs";

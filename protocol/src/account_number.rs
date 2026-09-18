@@ -95,7 +95,7 @@ const DAMM32_MODULUS: u8 = 32;
 /// `cargo test -p protocol --lib emit_damm32_table_for_paste -- --ignored`
 /// (emits both this Rust const and the `account-number.md` § 4 markdown block).
 /// A lefthook pre-push step re-runs the generator and fails on drift. **Changing
-/// this table is a major-version event** (root `CLAUDE.md` load-bearing registry):
+/// this table is a major-version event** (root `AGENTS.md` load-bearing registry):
 /// it would reject already-distributed account numbers and break cross-impl
 /// validity agreement.
 // BEGIN GENERATED damm32-table (emit_damm32_table_for_paste) — do not edit by hand
@@ -146,7 +146,7 @@ const DAMM32_TABLE: [[u8; 32]; 32] = [
 /// (row = running interim digit, column = input symbol's 0..32 Crockford
 /// index). Returns a `'static` reference — the table is a compile-time const,
 /// so this never copies. Changing this table is a major-version event (root
-/// `CLAUDE.md` load-bearing registry).
+/// `AGENTS.md` load-bearing registry).
 pub fn damm32_table() -> &'static [[u8; 32]; 32] {
     &DAMM32_TABLE
 }
@@ -448,7 +448,7 @@ mod tests {
         // `DAMM32_TABLE` must equal the runtime polynomial construction at
         // every one of the 1024 cells. A future edit to `damm32_step` that
         // shifts any entry fails here — the table is a major-version-event
-        // artifact (root `CLAUDE.md` load-bearing registry). Orientation:
+        // artifact (root `AGENTS.md` load-bearing registry). Orientation:
         // `DAMM32_TABLE[interim][digit] == damm32_step(interim, digit)`.
         //
         // NOTE: at t=0 this is a tautology (the const was minted from

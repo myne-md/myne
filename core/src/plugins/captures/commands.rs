@@ -23,7 +23,7 @@
 //! The OS-free `*_in_dir(s)` cores take explicit dirs + a supplied key, so they
 //! unit-test end-to-end without a keychain or an `AppHandle` (the `#[tauri::command]`
 //! wrappers resolve the queue dirs + fetch the device key). See:
-//! ../../CLAUDE.md "Secret-handling logging discipline" — the dictated text and
+//! ../../AGENTS.md "Secret-handling logging discipline" — the dictated text and
 //! the wrap key are never logged.
 
 use std::path::Path;

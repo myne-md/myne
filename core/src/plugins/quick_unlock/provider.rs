@@ -10,7 +10,7 @@
 //! This module owns the trait + the test [`MockProvider`]. The concrete PIN
 //! and Apple-biometric providers land in their own modules (`pin.rs`, `apple.rs`).
 //!
-//! Secret-handling discipline (see `../../CLAUDE.md`): `wrap_key` material is
+//! Secret-handling discipline (see `../../AGENTS.md`): `wrap_key` material is
 //! always carried in `Zeroizing`; no provider ever logs a wrap key, PIN, or
 //! `root_key`.
 
@@ -35,7 +35,7 @@ pub struct ProviderSecret {
 /// Failure modes common to all wrap-key providers. Deliberately coarse — the
 /// command layer maps these onto user-facing outcomes (cancel → silent
 /// fallback to password; missing/hardware → offer re-setup) without leaking OS
-/// error detail (`../../CLAUDE.md` secret-handling logging discipline).
+/// error detail (`../../AGENTS.md` secret-handling logging discipline).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderError {
     // `UserCancelled` / `HardwareUnavailable` / `CredentialMissing` are

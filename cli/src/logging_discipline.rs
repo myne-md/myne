@@ -1,7 +1,7 @@
 //! Test-only: the CLI half of the door's logging discipline
 //! (cli-thin-client task 13; MYND-490).
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — the same
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — the same
 //! DENY list governs both sides of this socket, and this crate's mirror of
 //! the desktop's `cli_bridge::logging_discipline` audit is here.
 //!
@@ -232,7 +232,7 @@ fn every_stderr_write_interpolates_only_bounded_values() {
                     "{name}: `eprintln!` interpolates `{binding}`, which is not on the \
                      stderr allowlist. stderr is the diagnostic channel — a note id, a \
                      folder name, a path or an io::Error may never reach it \
-                     (src-tauri/CLAUDE.md \"Secret-handling logging discipline\")."
+                     (src-tauri/AGENTS.md \"Secret-handling logging discipline\")."
                 );
             }
             // A trailing positional argument would sidestep the placeholder

@@ -16,7 +16,7 @@
 //
 // React Query / SWR is intentionally NOT introduced — the cache shape
 // is trivial (1 bool today) and the lifetime is modal-scoped. Per
-// `CLAUDE.md` minimal-dep posture (TB9 audit anchor). When prefs grow
+// `AGENTS.md` minimal-dep posture (TB9 audit anchor). When prefs grow
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -18,7 +18,7 @@
 //! renders the English long name — a documented simplification, not a
 //! silent one (see [`WEEKDAY_NAMES`]).
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — this
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — this
 //! module touches no note content, id, folder name or path in any log line
 //! (it has no `tracing` call sites at all; every failure collapses to the
 //! same bounded [`DailyError`] the caller already logs, if it logs anything).

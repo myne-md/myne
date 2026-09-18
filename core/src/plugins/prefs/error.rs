@@ -1,7 +1,7 @@
 //! `prefs` plugin IPC error enums (MYND-160 Task 9).
 //!
 //! Two closed taxonomies — one for read, one for write — both
-//! DENY-list clean per `src-tauri/CLAUDE.md` "Secret-handling logging
+//! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" (no path strings, no key material, no kernel-error
 //! display strings). Hand-mirrored on the TS side at
 //! `src/types/prefs-error.ts` (Task 13).

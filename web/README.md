@@ -76,7 +76,7 @@ obligation moves to you** — the container cannot scrub a log it does not write
 Normative obligations, the rebuild-and-verify procedure and the AGPL §13
 source offer are in [`docs/self-host-web.md`](../docs/self-host-web.md) —
 this file stays a contributor's map of the target, not an operator runbook
-(`docs/CLAUDE.md`, operator-doc placement).
+(`docs/AGENTS.md`, operator-doc placement).
 
 ## State
 

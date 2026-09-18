@@ -14,7 +14,7 @@
 //! `VaultRepairError::PartialDelete`), so this layer never has to know who
 //! it serves.
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline" — the
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline" — the
 //! per-file path is on the DENY list and is never emitted; only the closed
 //! [`IoFailureKind`] reduction crosses the tracing boundary.
 
@@ -46,7 +46,7 @@ pub enum RootDisposal {
 /// A single failed unlink, reduced to a DENY-list-safe kind.
 ///
 /// The failing path is deliberately **not** retained — full filesystem
-/// paths are on the DENY list (`src-tauri/CLAUDE.md`). Only the closed
+/// paths are on the DENY list (`src-tauri/AGENTS.md`). Only the closed
 /// [`IoFailureKind`] survives, which is safe to emit via tracing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnlinkFailure {

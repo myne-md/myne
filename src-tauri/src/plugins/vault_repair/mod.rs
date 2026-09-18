@@ -30,7 +30,7 @@
 //! - Design session: `myne-agents/sessions/design/2026-06-06-vault-repair.md`
 //! - PRD: `myne-agents/features/vault-repair/prd.md`
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

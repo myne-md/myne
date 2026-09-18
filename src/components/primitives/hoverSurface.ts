@@ -10,7 +10,7 @@
 // all — the "I can't tell what's hoverable" complaint this closes).
 //
 // Why JS handlers and not a CSS `:hover` class: the app styles inline (no
-// Tailwind / CSS modules, `src/CLAUDE.md`), and an inline `background` always
+// Tailwind / CSS modules, `src/AGENTS.md`), and an inline `background` always
 // beats a stylesheet `:hover` on specificity — so a class would silently lose to
 // the element's own resting background. Mutating `e.currentTarget.style` is what
 // composes with inline styles, and it is the established pattern.

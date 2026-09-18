@@ -60,7 +60,7 @@ const NOT_A_READ = new Set(["vite-env.d.ts"]);
  * 1. `__TAURI*` (`__TAURI_INTERNALS__`) is what the Tauri WebView puts on
  *    `window`, and reading it is how a client asks "am I running inside Tauri at
  *    all". A build that "defined" it would be answering that question at compile
- *    time, which is the opposite of what the probe is for. Root `CLAUDE.md`
+ *    time, which is the opposite of what the probe is for. Root `AGENTS.md`
  *    names the same two files as the platform-seam guard's only runtime-global
  *    exemptions, for the same reason.
  * 2. `__MYNE_DETACHED*` (`__MYNE_DETACHED__`, `__MYNE_DETACHED_NOTE_ID__`) is

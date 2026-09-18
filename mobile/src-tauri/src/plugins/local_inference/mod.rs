@@ -11,7 +11,7 @@
 //! (`audio`/`whisper`/`engine`/`engine_candle`/`model_store`/`cancel`/`error`),
 //! with the desktop engine's generation (Qwen2) + embedding (Bert) roles dropped
 //! — mobile transcribes only. DENY-list logging is normative here
-//! (`src-tauri/CLAUDE.md`): audio, PCM, transcript, and model paths are never
+//! (`src-tauri/AGENTS.md`): audio, PCM, transcript, and model paths are never
 //! logged.
 
 #[cfg(feature = "local-inference")]

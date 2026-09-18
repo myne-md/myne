@@ -2,7 +2,7 @@
 //!
 //! Closed taxonomy mirroring `NoteUpdateError` / `NoteReadError` — DENY-list
 //! clean (no path strings, no note/snapshot identifiers, no kernel-error display
-//! strings). See `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! strings). See `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 //! Decode failures collapse to the single non-distinguishing `CannotDecrypt`
 //! per `protocol.md` §6.4. Hand-mirrored on the TS side.
 

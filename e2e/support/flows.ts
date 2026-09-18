@@ -269,7 +269,7 @@ export async function openPalette(session: Session): Promise<void> {
  * That helper re-fires the chord until the input exists, because a wait with
  * nothing to re-fire is a wait that can never recover. What followed was one
  * `sendKeys` and one `waitForElement`, which has exactly the failure
- * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the whole budget spent on a
+ * `e2e/AGENTS.md` records for `clickNewMenuItem`: the whole budget spent on a
  * row that a re-fire would have produced in a second.
  *
  * Two things can go wrong after the palette is up, and neither gets better with
@@ -885,7 +885,7 @@ export async function clickBySelector(
       }
       return true;
     },
-    // 45 s, and the number needs its argument because `e2e/CLAUDE.md` records a
+    // 45 s, and the number needs its argument because `e2e/AGENTS.md` records a
     // budget rise that fixed nothing: raising `DEFAULT_TIMEOUT_MS` 20 s -> 45 s
     // for the `clickNewMenuItem` flake only made each occurrence twice as
     // expensive, because that wait was STUCK with nothing to re-fire. This one
@@ -1660,7 +1660,7 @@ export async function typeIntoEditor(
  * write note content, for the reason `sync-replication.e2e.ts` states in one
  * line: "deterministic note_update IPC, no flaky editor typing".
  * `cards-cover-picker` and `editor-scroll-slack` do the same. It is production
- * IPC through the page seat, which `e2e/CLAUDE.md` sanctions explicitly, and it
+ * IPC through the page seat, which `e2e/AGENTS.md` sanctions explicitly, and it
  * is NOT a test hook.
  *
  * **What this gives up, stated rather than glossed:** the scenarios no longer

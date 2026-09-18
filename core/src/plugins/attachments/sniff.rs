@@ -19,7 +19,7 @@
 //!
 //! ## Why a hand-rolled sniffer (no `infer` / `tree_magic` dep)
 //!
-//! Adding a crate is a security decision (`CLAUDE.md` "minimal
+//! Adding a crate is a security decision (`AGENTS.md` "minimal
 //! direct-dependency surface"). The allowlist is nine formats with
 //! short, well-known magic prefixes (video adds a bounded major-brand /
 //! DocType check on top of the prefix); a compact hand-rolled match beats
@@ -41,7 +41,7 @@
 //!   re-sniff returns [`None`], the handler serves
 //!   `application/octet-stream` so the WebView cannot script-execute it.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the raw
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the raw
 //! bytes are DENY-listed; only the resolved `&'static str` MIME label
 //! (a non-secret structural value) crosses a tracing boundary.
 

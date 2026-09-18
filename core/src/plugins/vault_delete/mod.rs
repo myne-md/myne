@@ -8,7 +8,7 @@
 //! unlink runs through the shared [`crate::vault_sweep`] pipeline. The
 //! `tauri::Builder` `init()` wiring stays in each client crate.
 //!
-//! See: ../../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

@@ -33,7 +33,7 @@
 //! `engine_candle.rs` (`infer_tags_yields_before_it_ever_queues_for_the_compute_lock`).
 //!
 //! Content-free like everything else on this path: no prompt, note body, or
-//! reply is logged (DENY-list, `src-tauri/CLAUDE.md`).
+//! reply is logged (DENY-list, `src-tauri/AGENTS.md`).
 
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

@@ -10,7 +10,7 @@
 //! The payload is the desktop client's serialized node-position map + a
 //! staleness marker. Positions are derived from note structure (who-links-whom)
 //! — treated AS3-Sensitive like the workspace descriptor. It crosses IPC as a
-//! `String`; the Zeroizing-wrap + drop discipline (../../CLAUDE.md
+//! `String`; the Zeroizing-wrap + drop discipline (../../AGENTS.md
 //! "Secret-handling logging discipline", Plaintext-IPC pattern) applies.
 
 use super::error::{GraphLayoutReadError, GraphLayoutWriteError};

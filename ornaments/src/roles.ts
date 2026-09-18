@@ -39,7 +39,7 @@ export function isOrnamentRole(value: string): value is OrnamentRole {
  * ```
  *
  * Deliberately returns an object rather than a class string: it composes with
- * the inline-style convention this codebase uses everywhere (`src/CLAUDE.md`),
+ * the inline-style convention this codebase uses everywhere (`src/AGENTS.md`),
  * and it cannot collide with a class name.
  */
 export function ornamentRole(role: OrnamentRole): Record<string, string> {

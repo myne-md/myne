@@ -41,7 +41,7 @@
 //! future `allow-set-*`) per `decisions.md` 2026-05-27 "Forward
 //! commitment: prefs:write capability stays main-window-only".
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The `prefs` command core (`vault.prefs` read + every per-field setter) and
 // its `error` enum moved to `myne-core` (shared with the mobile client). The
@@ -381,7 +381,7 @@ mod desktop_tests {
 #[cfg(test)]
 mod acl_registration_guard {
     /// **An ACL entry does not wire a command — and nothing checks that it
-    /// does** (`src-tauri/CLAUDE.md`). A prefs command with its
+    /// does** (`src-tauri/AGENTS.md`). A prefs command with its
     /// `[[permission]]` block, its `[default]` bundle listing and a frontend
     /// caller, but missing from `generate_handler!`, compiles, passes clippy,
     /// renders its UI and is **dead at runtime**: the invoke rejects.

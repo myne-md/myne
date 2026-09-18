@@ -130,7 +130,7 @@ export type DeleteConfirmModalProps = {
   confirmLabel?: string;
   /**
    * Confirm-button `data-testid` override (curated-prop testid discipline,
-   * src/CLAUDE.md "Test observability"). Default: `"delete-confirm.confirm"`.
+   * src/AGENTS.md "Test observability"). Default: `"delete-confirm.confirm"`.
    * Callers whose E2E contract names a scoped confirm id (e.g. the
    * recovered-notes `sync.recovered-delete-confirm`) pass it here.
    */

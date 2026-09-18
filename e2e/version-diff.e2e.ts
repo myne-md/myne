@@ -1,7 +1,7 @@
 // Shared version-diff surfaces, end to end (MYND-334). Vault-count
 // precondition: 1 (weak KDF) for both scenarios.
 //
-// Two stories, one per scenario (the e2e/CLAUDE.md one-story rule — they do not
+// Two stories, one per scenario (the e2e/AGENTS.md one-story rule — they do not
 // share a boot):
 //
 //   vd1 — conflict compare → split → resolve → undo.
@@ -40,7 +40,7 @@
 // credentials; the password is the VR-1-style in-source constant (SYNC-13
 // applies to credentials, and none reaches any assert below).
 //
-// Validated per the e2e/CLAUDE.md definition of done: green 3× consecutive,
+// Validated per the e2e/AGENTS.md definition of done: green 3× consecutive,
 // run ISOLATED (`./scripts/e2e-one.sh version-diff`) against the production
 // `--no-bundle` binary. They are the first thing to drive the MYND-334 testid
 // pass for real (`conflicts.compare`, `conflicts.compare-view`, `diff.view`,

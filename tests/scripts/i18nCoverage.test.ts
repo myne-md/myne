@@ -1,6 +1,6 @@
 // Break tests for `scripts/check-i18n-coverage.mjs` (myne-md/myne#589).
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it. Inject
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it. Inject
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." Running the guard on the real tree proves only that the real
 // tree is currently clean, which is what the two documents this guard replaces
@@ -29,7 +29,7 @@
 //     first version of the guard reported ok on it while being wrong.
 //   - an English COPY EDIT must NOT move the generated record. A `--check`
 //     gate on a document that churns for edits its subject does not cover is
-//     the failure root `CLAUDE.md` records twin-inventory having shipped.
+//     the failure root `AGENTS.md` records twin-inventory having shipped.
 
 import { describe, expect, it } from "vitest";
 
@@ -375,7 +375,7 @@ describe("check-i18n-coverage: check 4, the generated record", () => {
 
   // The inverse, and the one that would have made the gate unusable: an English
   // COPY EDIT changes a value without changing the key set, so coverage is
-  // untouched and the record must not churn. Root CLAUDE.md records a generated
+  // untouched and the record must not churn. Root AGENTS.md records a generated
   // document that failed exactly this way, reddening pre-commit on any one-line
   // edit under a message claiming the file had been hand-edited.
   it("does NOT move when an English value is reworded but no key set changes", () => {

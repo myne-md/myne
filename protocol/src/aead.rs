@@ -270,7 +270,7 @@ pub fn aad_singleton_blob_v0_2(role: &[u8], account_number_hash: &[u8; 16]) -> V
 /// Distinct from [`aad_vault_items_key_wrap`] (no note_uuid). The
 /// `vault_`/`note_` prefix retires the one-letter
 /// `items_key`/`item_key` near-collision footgun — see
-/// `protocol/CLAUDE.md` for the naming-discipline rationale.
+/// `protocol/AGENTS.md` for the naming-discipline rationale.
 pub fn aad_note_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
     let mut aad =
         Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + items_key_id.len() + note_uuid.len());
@@ -3086,7 +3086,7 @@ mod tests {
     /// place to update. The v0.1 file's exclusion note has the same shape.
     ///
     /// `kdf_params` is the v0.1 canonical block on purpose. v0.2's own KDF is
-    /// **not allocated yet** (repo-root `CLAUDE.md`: only the AAD prefix, the
+    /// **not allocated yet** (repo-root `AGENTS.md`: only the AAD prefix, the
     /// HKDF context prefix, the `0x02` version byte and the `NC05` magic are
     /// pinned so far), so what these two cases pin is the *framing* — where the
     /// param block sits and that it is bound at all — not a v0.2 parameter

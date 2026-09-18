@@ -9,7 +9,7 @@
 // (fail-closed) over a decision made somewhere the user was not. So it lives in
 // its own device-local file and gets its own two commands.
 //
-// Signature parity (no codegen — see src/CLAUDE.md "Tauri command bindings"):
+// Signature parity (no codegen — see src/AGENTS.md "Tauri command bindings"):
 // keep this in step with `src-tauri/src/plugins/sync/tor.rs`.
 //
 // Desktop-only. The `torRouting` capability is absent on web — a page has no

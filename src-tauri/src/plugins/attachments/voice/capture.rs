@@ -326,7 +326,7 @@ impl CpalSource {
         let shared: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::new()));
         let err_cb = |_err| {
             // The error type may carry platform path detail; log a static label
-            // only (DENY-list discipline — see ../../CLAUDE.md).
+            // only (DENY-list discipline — see ../../AGENTS.md).
             tracing::warn!(stage = "voice_capture", "cpal input stream error");
         };
 

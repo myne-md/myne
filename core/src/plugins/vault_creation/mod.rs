@@ -8,7 +8,7 @@
 //! Q3 (backend session) and `backend-vault-creation/rfc.md` § Technical
 //! Architecture.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 //!
 //! Command bodies are scaffolded as `unimplemented!()` placeholders;
 //! Task 12 fills `begin`, Task 13 fills `commit`, Task 14 fills

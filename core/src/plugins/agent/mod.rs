@@ -39,7 +39,7 @@
 //! posture this inherits unchanged) and `docs/decisions/ai/0462` (the request
 //! class and the described-backend registry).
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod apply;
 pub mod edit;

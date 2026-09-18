@@ -202,7 +202,7 @@ function ensureWorker(): { worker: Worker; ready: Promise<void> } {
     // The location is captured into `where` — and ONLY the location. An
     // `ErrorEvent` carries `message` too, but a wasm abort's message can contain
     // a formatted panic payload, which may hold a path, a note id, or a fragment
-    // of plaintext (`src-tauri/CLAUDE.md`, secret-handling logging discipline).
+    // of plaintext (`src-tauri/AGENTS.md`, secret-handling logging discipline).
     // `filename:lineno` is bounded by construction, which is exactly what
     // `protocol.ts` specifies `where` to be.
     //

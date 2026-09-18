@@ -25,7 +25,7 @@
 //     no new magic) + a PS-1 residue scan over `snapshots/` proves no v1/v3
 //     plaintext leaked.
 //
-// Prune coverage boundary (downgrade record, per the e2e/CLAUDE.md downgrade
+// Prune coverage boundary (downgrade record, per the e2e/AGENTS.md downgrade
 // rule, recorded on MYND-232; SYNC-W2-4): the retention/prune clause is NOT an
 // E2E assertion. `snapshotPrune` has no UI surface (a thin IPC wrapper; the
 // eager write-path prune runs backend-side on every snapshot create), and
@@ -42,7 +42,7 @@
 // (SYNC-13 applies to credentials, which never reach any assert below).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per the
-// e2e/CLAUDE.md definition of done it must go green 3× consecutive via
+// e2e/AGENTS.md definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge; it introduces the SnapshotsPanel
 // testid pass (new selectors `snapshots.panel` / `snapshots.row` /
 // `snapshots.preview` / `snapshots.restore` / `snapshots.restore-confirm` /

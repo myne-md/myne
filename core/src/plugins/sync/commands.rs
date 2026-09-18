@@ -1109,7 +1109,7 @@ pub async fn sync_pending_conflicts<R: Runtime>(
 /// Decrypt a staged conflicting remote revision to its plaintext body, so the
 /// notes layer can materialize it as a keep-both copy. The body is the user's
 /// note plaintext (same secret class as `note_read`) — never logged. See the
-/// repo `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+/// repo `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 #[tauri::command]
 pub async fn sync_take_conflict<R: Runtime>(
     app: AppHandle<R>,

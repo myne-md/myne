@@ -19,7 +19,7 @@
 //
 // What it therefore cannot catch: a handle that is unhittable because something
 // paints over it, and the `:hover` reveal. Those are the pointer facts, and
-// `e2e/CLAUDE.md`'s own rule about not claiming more than the inputs prove is
+// `e2e/AGENTS.md`'s own rule about not claiming more than the inputs prove is
 // why they are named here rather than glossed.
 //
 // # Why the corner grip rather than the edge bar

@@ -2,7 +2,7 @@
 //
 // `runPaletteAction` and `searchAndOpenNote` both opened the palette, sent the
 // query, and then waited up to 45 s for a row. `openPalette` itself already
-// re-fires its chord until the input exists, for the reason `e2e/CLAUDE.md`
+// re-fires its chord until the input exists, for the reason `e2e/AGENTS.md`
 // records at length: a wait with nothing to re-fire spends its whole budget and
 // reports a timeout. The two lines after it never got the same treatment, and
 // both of their failure modes are permanent rather than slow:

@@ -3,7 +3,7 @@
 //!
 //! Every subkey derivation in the v0.1 protocol MUST go through
 //! [`derive_subkey`]. Direct calls to `hkdf::Hkdf::expand` from outside
-//! this module are forbidden by the CLAUDE.md "subkey derivation
+//! this module are forbidden by the AGENTS.md "subkey derivation
 //! discipline" rule; the rule is enforced structurally by keeping the
 //! `hkdf` crate `pub(crate)`-only inside `protocol/` (no `pub use`
 //! anywhere in `lib.rs`) and routing every primitive call through this

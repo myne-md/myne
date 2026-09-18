@@ -14,8 +14,8 @@
 # `myne-desktop` refused with `run_probe` taking 2 arguments and `ProbeProgress`
 # unresolved, while `core/src/plugins/agent/probe.rs` in this tree declared 3 and
 # defined the struct. rustc's own note pointed at line 164, and line 164 of
-# `.claude/worktrees/554-manual-test-debt/core/src/plugins/agent/probe.rs` is
-# exactly that function. Worktrees live under `.claude/worktrees/` by
+# `.opencode/worktrees/554-manual-test-debt/core/src/plugins/agent/probe.rs` is
+# exactly that function. Worktrees live under `.opencode/worktrees/` by
 # convention, so they are inside the bind mount and this is the normal case, not
 # an exotic one.
 #
@@ -126,7 +126,7 @@ E2E_FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PA
 
 # The cargo job cap, opt-in from the host, and the reason it needs a home here.
 #
-# `e2e/CLAUDE.md` records `rustc … (signal: 9, SIGKILL)` on `myne_desktop_lib` as
+# `e2e/AGENTS.md` records `rustc … (signal: 9, SIGKILL)` on `myne_desktop_lib` as
 # the OOM killer rather than a compile error, and names the fix in one line:
 # `CARGO_BUILD_JOBS=3`. No runner exposed it. Every one of them builds its
 # `E2E_ENV` as a fixed `export …` string that `docker run` cannot be told to

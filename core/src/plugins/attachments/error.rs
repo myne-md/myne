@@ -1,7 +1,7 @@
 //! `attachments` plugin IPC error enums (MYND-169).
 //!
 //! Closed taxonomies for `attachment_import`, `catalog_list`, and
-//! `attachment_delete`, all DENY-list clean per `src-tauri/CLAUDE.md`
+//! `attachment_delete`, all DENY-list clean per `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline" (no path strings, no key
 //! material, no attachment-id correlation tags, no kernel-error display
 //! strings). Hand-mirrored on the TS side by the library/insert

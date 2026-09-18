@@ -59,7 +59,7 @@ pub enum Outcome {
     /// path and expected type** and never the value — so a malformed note body
     /// yields "invalid type: string, expected u64 at .version", not the body.
     /// That bound is what makes this safe to return to the page at all;
-    /// `src-tauri/CLAUDE.md`'s secret-handling logging discipline governs the
+    /// `src-tauri/AGENTS.md`'s secret-handling logging discipline governs the
     /// same boundary on desktop.
     BadArgs { command: String, detail: String },
 }

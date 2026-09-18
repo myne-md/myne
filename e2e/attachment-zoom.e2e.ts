@@ -11,7 +11,7 @@
 //
 // ⚠ PLATFORM: tauri-driver, Linux-only. Authored on macOS; certify green 3× in
 // the container (`./scripts/e2e-buildrun.sh attachment-zoom` — touches product
-// code). See e2e/CLAUDE.md "definition of done".
+// code). See e2e/AGENTS.md "definition of done".
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

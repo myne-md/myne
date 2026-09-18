@@ -50,7 +50,7 @@
 //! which already needs to reach the app-process `note_create` over the SAME
 //! relay. This module does NOT pretend the host magically sees the `Slot`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the envelope
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the envelope
 //! carries note plaintext (`markdown_body`, same secret class as `password`);
 //! this module never logs a body, only bounded outcome labels.
 
@@ -367,7 +367,7 @@ pub enum HostReply {
     /// Accept; a Reject / timeout is a bounded `Error`, never `Paired`.
     Paired {
         /// The app-minted scoped pairing token (hex). A vault-stable correlation
-        /// tag — NEVER logged (see ../../CLAUDE.md secret-handling DENY list).
+        /// tag — NEVER logged (see ../../AGENTS.md secret-handling DENY list).
         token: String,
     },
     /// Phase-1 pairing reply (SYNC-6, two-phase handshake): the app opened the

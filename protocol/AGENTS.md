@@ -1,6 +1,6 @@
 # protocol/ — Myne v0.1 cryptographic primitives (Rust)
 
-> Subdirectory CLAUDE.md. Loaded when Claude reads files here. See repo-root `CLAUDE.md` for cryptographically load-bearing identifiers and project-wide context.
+> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for cryptographically load-bearing identifiers and project-wide context.
 
 ## Crate constraints (non-negotiable)
 

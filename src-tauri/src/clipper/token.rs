@@ -43,7 +43,7 @@
 //! task 7's at-rest representation lands, a fresh pairing per process is the
 //! in-memory behaviour.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — a token value
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — a token value
 //! and an extension ID are vault-stable correlation tags (the `salts,
 //! nonces` / `note_id` class); never logged. Only bounded outcome labels are
 //! emitted.

@@ -8,7 +8,7 @@
 //!
 //! Design history: PRD + MYND-22 grilling Q1–Q9 in `myne-agents/`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::super::vault_unlock::state::VaultRuntimeState;
 use super::error::VaultChangePasswordError;
@@ -193,7 +193,7 @@ pub(crate) async fn change_password_with_path(
 ) -> Result<(), VaultChangePasswordError> {
     // Wrap immediately so any early-return path drops the wrapper and
     // zeroes the bytes. Both passwords are wrapped on the FIRST non-
-    // doc statement of the function body per `src-tauri/CLAUDE.md`
+    // doc statement of the function body per `src-tauri/AGENTS.md`
     // "Secret-handling logging discipline" (Zeroizing wrap +
     // spawn_blocking move idiom). Plain `String` would drop without
     // zeroize.
@@ -641,7 +641,7 @@ pub(crate) async fn change_password_with_path(
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
-    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `src-tauri/AGENTS.md` "Secret-handling logging discipline".
     // `duration_ms` rounded down to 10ms granularity per
     // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry —
     // future-ready timing-channel resistance (Phase 1 A7 side-channel
@@ -1773,7 +1773,7 @@ mod tests {
     /// `vault_change_password::commands` for any `tracing::*!`
     /// argument that references DENY-listed secret material
     /// (password, wrap_key, root_key, items_key, item_key, salt,
-    /// nonce, account_hash, meta_bytes). Per `src-tauri/CLAUDE.md`
+    /// nonce, account_hash, meta_bytes). Per `src-tauri/AGENTS.md`
     /// "Secret-handling logging discipline" + `decisions.md`
     /// 2026-05-02 "manual grep is the live discipline check" — the
     /// pattern is reviewer-enforced; this test is the automated

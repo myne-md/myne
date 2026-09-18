@@ -16,7 +16,7 @@
 // `tests/notes/deleteSwapLoop.test.ts` re-implemented both predicates inside the
 // test file, which detects a change to the model and not to the app: deleting
 // both guards from `Editor.tsx` left every case green. A roster compared against
-// a second copy of itself proves nothing, which is the failure `CLAUDE.md`
+// a second copy of itself proves nothing, which is the failure `AGENTS.md`
 // records under "Verifying a guard means breaking it".
 //
 // Pure and dependency-free on purpose: no React, no workspace types beyond what

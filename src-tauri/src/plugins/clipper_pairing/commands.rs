@@ -24,7 +24,7 @@
 //! DENY-list discipline: the token value + the extension ID are vault-stable
 //! correlation tags — never logged. Only bounded outcome labels are emitted.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use serde::Serialize;
 use tauri::{AppHandle, Runtime, State};
@@ -162,7 +162,7 @@ pub struct PairedExtensionView {
     /// Unix seconds when this pairing was issued (the in-app Accept time), or
     /// `null` for a pre-feature record. User-meaningful display metadata — the
     /// "connected when" line; the timestamp itself lives inside the encrypted
-    /// `vault.prefs` (CLAUDE.md "user-meaningful timestamps live inside the
+    /// `vault.prefs` (AGENTS.md "user-meaningful timestamps live inside the
     /// encrypted blob"). The token value is never exposed.
     pub paired_at: Option<u64>,
 }

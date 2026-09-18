@@ -7,7 +7,7 @@
 // → password → a vault that does not exist locally yet, which desktop never
 // does.
 //
-// **`byTestId` only.** `e2e/CLAUDE.md`'s non-negotiable, and it applies to this
+// **`byTestId` only.** `e2e/AGENTS.md`'s non-negotiable, and it applies to this
 // lane verbatim: no CSS-class selectors, no text matching. Text selectors break
 // on translation and quietly re-pass when the wrong element happens to contain
 // the right substring.
@@ -135,7 +135,7 @@ export async function unlockToEditor(session: Session, password: string): Promis
  * sidebar, and a first-sync assertion that passes before the list renders would
  * pass on every run including the broken ones.
  *
- * Deliberately NOT a page-side call into the client: `e2e/CLAUDE.md`'s
+ * Deliberately NOT a page-side call into the client: `e2e/AGENTS.md`'s
  * zero-test-hooks rule applies to this lane verbatim, and an
  * `window.__MYNE_WEB_E2E__` bridge would be exactly the production hook it
  * forbids.
@@ -370,7 +370,7 @@ export async function openNoteContextMenu(
  * Asserts the text landed rather than trusting that the driver accepted it: a
  * `sendKeys` that resolves means the DRIVER took the keys, not that CodeMirror
  * applied them, and the desktop lane has paid for that distinction more than
- * once (`e2e/CLAUDE.md`, the `typeEmbedIntoEditor` note).
+ * once (`e2e/AGENTS.md`, the `typeEmbedIntoEditor` note).
  */
 export async function typeIntoEditor(session: Session, text: string): Promise<void> {
   await dismissImporterOfferIfPresent(session);

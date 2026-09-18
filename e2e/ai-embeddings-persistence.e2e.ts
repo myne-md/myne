@@ -103,7 +103,7 @@ function fakeModelPath(appDataDir: string, file: string): string {
 /** Select `file` as the EMBEDDING model via the real `set_model_path` IPC from
  *  the page seat (no OS file dialog to drive; the picker is the ONLY other entry
  *  and it's a native dialog WebDriver can't reach — the sanctioned `pageSeatInvoke`
- *  path for a backend command, `e2e/CLAUDE.md`). This is what gives
+ *  path for a backend command, `e2e/AGENTS.md`). This is what gives
  *  `hydrate_ai_vectors` a stable model identity so persistence engages, and — on
  *  the swap — changes that identity. Asserts the command resolved (no `err`). */
 async function selectEmbeddingModel(

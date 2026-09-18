@@ -7,7 +7,7 @@
 // `InlinedPlugin` list, the `[[permission]]` block, the `[default]` roster that
 // names it, and `generate_handler!`), plus the capability grant. Miss any of
 // them and the command fails CLOSED at runtime, on a device, which is the most
-// expensive place to find out. `src-tauri/CLAUDE.md` records that dropping an
+// expensive place to find out. `src-tauri/AGENTS.md` records that dropping an
 // identifier from a `[default]` bundle compiles clean, so nothing but this test
 // sees it.
 

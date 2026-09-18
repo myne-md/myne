@@ -1,6 +1,6 @@
 // Break tests for `scripts/check-i18n-duplicates.mjs` (myne-md/myne#649).
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it. Inject
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it. Inject
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." Running the guard on the real tree proves only that the real
 // tree is currently clean, which is what `check-i18n.mjs` and

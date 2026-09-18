@@ -36,7 +36,7 @@
 //! hosts rather than the open web — see the `dependency-policy.md` row.
 //!
 //! Logging: nothing here logs. No prompt, note body, API key, response, host or
-//! path reaches an error value or a panic message (`src-tauri/CLAUDE.md` DENY
+//! path reaches an error value or a panic message (`src-tauri/AGENTS.md` DENY
 //! list); [`ProviderTransportError`] variants are unit and content-free.
 
 // The consumers land in tasks 5 (registry + codec) and 9 (the consent gate).

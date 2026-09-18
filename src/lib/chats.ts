@@ -6,7 +6,7 @@
 // backed up. Consumed by the persistence-backed chat store (task 7) and the
 // conversation-list UI (task 8).
 //
-// No mock layer (per `src/CLAUDE.md`): these call the real IPC commands. Keep
+// No mock layer (per `src/AGENTS.md`): these call the real IPC commands. Keep
 // the types in lockstep with the Rust `ChatsReadError` / `ChatsMutateError`
 // serde shapes.
 

@@ -15,7 +15,7 @@
 // (NOT `src/lib/attachments.ts` — that file is owned by the library agent and
 // may not exist). The command + its error taxonomy are defined Rust-side in
 // `src-tauri/src/plugins/attachments/{commands,error}.rs`; the shapes below are
-// hand-mirrored per the no-codegen note in `src/CLAUDE.md`.
+// hand-mirrored per the no-codegen note in `src/AGENTS.md`.
 
 import type { Text } from "@codemirror/state";
 import { getHost } from "../host";

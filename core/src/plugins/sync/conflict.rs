@@ -1774,7 +1774,7 @@ pub async fn list_quarantine_entries(
 /// Read + decrypt one quarantined blob to its plaintext body. The decode AAD
 /// is the suffix-stripped base uuid (see [`parse_quarantine_file_name`]).
 /// The body is the user's note plaintext (same secret class as `note_read`)
-/// — never logged. See the repo `src-tauri/CLAUDE.md` "Secret-handling
+/// — never logged. See the repo `src-tauri/AGENTS.md` "Secret-handling
 /// logging discipline".
 pub async fn read_quarantine_with_dir(
     io: &dyn crate::vault_io::VaultIo,
@@ -1897,7 +1897,7 @@ pub async fn pending_conflicts(
 /// notes layer can materialize it as a keep-both copy.
 ///
 /// The body is the user's note plaintext (same secret class as `note_read`) —
-/// never logged. See `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+/// never logged. See `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 pub async fn take_conflict(
     io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,

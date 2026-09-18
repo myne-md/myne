@@ -56,7 +56,7 @@
 // not come back.**
 //
 // Zero dependencies, node built-ins only — same pattern as
-// `check-core-io-seam.mjs` / `check-core-task-seam.mjs` (root CLAUDE.md: adding
+// `check-core-io-seam.mjs` / `check-core-task-seam.mjs` (root AGENTS.md: adding
 // a dependency is a security decision).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -69,7 +69,7 @@ import { join, relative, sep } from "node:path";
 // failed while every other mobile plugin, going through `myne-core`, kept
 // working. The guard reported `0 still debt` the whole time, over a tree it
 // never opened. A root list that omits a whole client is the
-// `check-prefs-nonce.mjs` shape the root CLAUDE.md records: the success line
+// `check-prefs-nonce.mjs` shape the root AGENTS.md records: the success line
 // says `ok` and means it about less than the reader assumes.
 const ROOTS = ["core/src", "src-tauri/src", "mobile/src-tauri/src", "format/src", "decrypt/src"];
 

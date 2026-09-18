@@ -7,7 +7,7 @@
 //! [`InvertedIndex`] misses a 10k budget. So this harness benchmarks the
 //! custom engine against the target budget table and emits a PASS/FAIL
 //! report; it deliberately does NOT pull tantivy's large transitive tree
-//! into the dependency graph just to benchmark (`CLAUDE.md` minimal
+//! into the dependency graph just to benchmark (`AGENTS.md` minimal
 //! direct-dependency surface / TB9 audit anchor / reproducible builds).
 //! If a 10k budget is missed, THEN tantivy is added + a real comparison run
 //! (and a `decisions.md` dep-justification) — only then.
