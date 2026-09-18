@@ -545,6 +545,16 @@ pre-commit:
       # `node scripts/check-i18n-coverage.mjs --emit`.
       run: node scripts/check-i18n-coverage.mjs --check
 
+    i18n-duplicates:
+      # One product fact, one string (myne-md/myne#649): fails on any UNRECORDED
+      # pair of catalog entries sharing English (the drift that left 21 catalogs
+      # translating the same transcription sentence twice), on a changed key set,
+      # on a stale record, and on a missing/short/placeholder reason. Roster is
+      # scripts/i18n-duplicate-groups.json; new intentional sharing lands via
+      # `node scripts/check-i18n-duplicates.mjs --record` plus a written reason.
+      glob: "*.{ts,tsx,json}"
+      run: node scripts/check-i18n-duplicates.mjs --check
+
     decisions-index:
       # design-notes.md is generated over design-notes/**. Without this, the first person to
       # add a decision hand-edits the index, and the next regeneration silently discards it.
