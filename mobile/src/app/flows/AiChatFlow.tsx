@@ -73,6 +73,7 @@ import { AiHistorySheet } from "./AiHistorySheet";
 import { MemorySheet } from "./MemorySheet";
 import { usePrefs } from "../../lib/use-prefs";
 import { Button } from "../../components/Button";
+import { Icon } from "../../components/Icon";
 import { ScreenScroll } from "../../components/layout";
 import { AiReviewFlow } from "./AiReviewFlow";
 import { AiUndoStrip } from "./AiUndoStrip";
@@ -92,7 +93,11 @@ const INPUT: CSSProperties = {
   flex: 1,
   minWidth: 0,
   resize: "none",
-  minHeight: 40,
+  // Single-line height matches the Send button's 52 (`Button` primary
+  // geometry) so the pair reads as one bar: border-box keeps padding and
+  // the hairline inside the 52 whatever the theme sets them to.
+  boxSizing: "border-box",
+  minHeight: 52,
   maxHeight: 140,
   padding: "var(--space-2)",
   border: "1px solid var(--line-2)",
@@ -134,6 +139,45 @@ const COST: CSSProperties = {
   marginTop: "var(--space-1)",
   fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
+};
+
+// Slim icon toolbar above the composer: history, memory, new chat. It used
+// to be a text-button row at the top of the screen, far from where it acts.
+const TOOLBAR: CSSProperties = {
+  flex: "none",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "var(--space-1) var(--space-3)",
+  borderTop: "1px solid var(--line-1)",
+  background: "var(--bg-1)",
+};
+
+/** One toolbar icon button: ghost, content-sized, 44px tall. */
+const TOOLBAR_BUTTON_STYLE: CSSProperties = {
+  padding: "0 var(--space-2)",
+  height: 44,
+};
+
+// Chat bubbles, the desktop language: user right on bg-2, assistant left on
+// paper-2. Plain full-width paragraphs made who-said-what hard to scan.
+const BUBBLE_BASE: CSSProperties = {
+  maxWidth: "92%",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-2) var(--space-3)",
+};
+
+const BUBBLE_USER: CSSProperties = {
+  ...BUBBLE_BASE,
+  alignSelf: "flex-end",
+  background: "var(--bg-2)",
+};
+
+const BUBBLE_ASSISTANT: CSSProperties = {
+  ...BUBBLE_BASE,
+  alignSelf: "flex-start",
+  background: "var(--paper-2)",
 };
 
 export function AiChatFlow({
@@ -532,35 +576,16 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
 
   return (
     <>
-      <div
-        style={{
-          flex: "none",
-          display: "flex",
-          gap: "var(--space-2)",
-          padding: "var(--space-2) var(--space-3) 0",
-        }}
-      >
-        <Button
-          variant="ghost"
-          full={false}
-          data-testid="ai.history-button"
-          onClick={() => setSheetOpen(true)}
-        >
-          {t("editor.chrome.rightPanel.aiChat.historyTitle")}
-        </Button>
-        {/* The memory entry point (myne-md/myne#697): the desktop popover
-            has no phone posture, so it opens the memory sheet instead. */}
-        <Button
-          variant="ghost"
-          full={false}
-          data-testid="ai.memory-button"
-          onClick={() => setMemorySheetOpen(true)}
-        >
-          {t("editor.chrome.rightPanel.aiChat.memory")}
-        </Button>
-      </div>
       <ScreenScroll>
-        <div data-testid="ai.chat" style={{ padding: "var(--space-3)" }}>
+        <div
+          data-testid="ai.chat"
+          style={{
+            padding: "var(--space-3)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-2)",
+          }}
+        >
           {/* The open conversation's settled turns, read-only and oldest-first.
               The live run below is the present; this is the past. Assistant
               turns show the run's own closing summary (the answer in one
@@ -572,11 +597,12 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
               data-testid="ai.history-turn"
               data-role={turn.role}
               data-kind={turn.kind}
+              style={turn.role === "user" ? BUBBLE_USER : BUBBLE_ASSISTANT}
             >
               {turn.role === "user" ? (
-                <p style={MUTED}>{turn.text}</p>
+                <p style={{ ...BODY_TEXT, margin: 0 }}>{turn.text}</p>
               ) : (
-                <p style={BODY_TEXT}>
+                <p style={{ ...BODY_TEXT, margin: 0 }}>
                   {turn.agentSummary !== undefined && turn.agentSummary.summary.length > 0
                     ? turn.agentSummary.summary
                     : turn.text}
@@ -629,9 +655,9 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           {asked !== null && (
             // The user's own words, echoed so the answer below has something to
             // be an answer to.
-            <p data-testid="ai.chat-asked" style={MUTED}>
-              {asked}
-            </p>
+            <div data-testid="ai.chat-asked" style={BUBBLE_USER}>
+              <p style={{ ...BODY_TEXT, margin: 0 }}>{asked}</p>
+            </div>
           )}
 
           {agent.running && (
@@ -646,9 +672,9 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
               a diff. Presented as the model's claim: note content can steer
               it. */}
           {summary.length > 0 && (
-            <p data-testid="ai.agent-answer" style={BODY_TEXT}>
-              {summary}
-            </p>
+            <div data-testid="ai.agent-answer" style={BUBBLE_ASSISTANT}>
+              <p style={{ ...BODY_TEXT, margin: 0 }}>{summary}</p>
+            </div>
           )}
 
           {agent.error !== null && (
@@ -735,6 +761,55 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         </p>
       )}
 
+      {/* History / memory / new chat, where they act: directly above the
+          composer rather than a screen away at the top. Slim icon row, the
+          labels kept as accessible names. */}
+      <div style={TOOLBAR}>
+        <Button
+          variant="ghost"
+          full={false}
+          data-testid="ai.history-button"
+          aria-label={t("editor.chrome.rightPanel.aiChat.historyTitle")}
+          onClick={() => setSheetOpen(true)}
+          style={TOOLBAR_BUTTON_STYLE}
+        >
+          <Icon name="clock" size={22} />
+        </Button>
+        {/* The memory entry point (myne-md/myne#697): the desktop popover
+            has no phone posture, so it opens the memory sheet instead. */}
+        <Button
+          variant="ghost"
+          full={false}
+          data-testid="ai.memory-button"
+          aria-label={t("editor.chrome.rightPanel.aiChat.memory")}
+          onClick={() => setMemorySheetOpen(true)}
+          style={TOOLBAR_BUTTON_STYLE}
+        >
+          <Icon name="bookmark" size={22} />
+        </Button>
+        {openTurns.length > 0 || activeId !== null || asked !== null ? (
+          <Button
+            variant="ghost"
+            full={false}
+            data-testid="ai.new-chat"
+            aria-label={t("editor.chrome.rightPanel.aiChat.newChat")}
+            onClick={() => {
+              // Desktop's New chat stops host-side before forgetting: an
+              // abandoned run settles later and repopulates the transcript
+              // of a conversation the user just left.
+              stop();
+              clearAgent();
+              setAsked(null);
+              setActiveId(null);
+              setOpenTurns([]);
+            }}
+            style={TOOLBAR_BUTTON_STYLE}
+          >
+            <Icon name="plus" size={22} />
+          </Button>
+        ) : null}
+      </div>
+
       <div style={COMPOSER_BAR}>
         <textarea
           data-testid="ai.composer-input"
@@ -749,14 +824,22 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           onChange={(e) => setDraft(e.target.value)}
         />
         {agent.running ? (
-          <Button variant="secondary" data-testid="ai.composer-stop" onClick={stop}>
+          <Button
+            variant="secondary"
+            full={false}
+            data-testid="ai.composer-stop"
+            onClick={stop}
+            style={{ flex: "none" }}
+          >
             {t("agent.progress.cancel")}
           </Button>
         ) : (
           <Button
             data-testid="ai.composer-send"
+            full={false}
             disabled={draft.trim().length === 0 || grant === null || probing || refused}
             onClick={() => void send()}
+            style={{ flex: "none" }}
           >
             {t("editor.chrome.rightPanel.aiChat.send")}
           </Button>
