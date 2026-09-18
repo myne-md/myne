@@ -46,6 +46,7 @@ import { Button } from "../../components/primitives/Button";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
 import { Segmented } from "../../components/primitives/Segmented";
 import {
+  agentCancel,
   agentCapability,
   agentPreviewGrant,
   type GrantPreview,
@@ -244,8 +245,19 @@ export function ChatComposer({
   const refused = probe === "failed" || verdict?.passed === false;
   const empty = message.trim().length === 0;
   const blocked = empty || busy || probing || refused || grant === null;
+  // While a run works there is no second Stop control: this button turns
+  // into it, in place, like the mobile composer already does. The id may
+  // genuinely be null on the first leg (before `agentStart` reports the
+  // view), and then the tap has nothing to address yet.
+  const running = agent.running;
+  const runId = agent.view?.runId ?? null;
+
+  function stop(): void {
+    if (runId !== null) void agentCancel(runId);
+  }
 
   async function submit(): Promise<void> {
+    if (running) return;
     if (blocked) return;
     const text = message.trim();
     if (grant === null) return;
@@ -418,6 +430,10 @@ export function ChatComposer({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          // While a run works the button below is Stop, so this form never
+          // submits: only the button stops a run, never a stray Enter from
+          // typing the next message.
+          if (running) return;
           void submit();
         }}
         style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-2)" }}
@@ -432,9 +448,12 @@ export function ChatComposer({
             // Enter sends, Shift+Enter breaks the line. `isComposing` is the
             // load-bearing half: an IME commits its candidate with Enter, so
             // without it a Turkish, Japanese or Korean user sends the first
-            // syllable they meant to accept.
+            // syllable they meant to accept. While a run works Enter does
+            // nothing: stopping is the button's job, never a keystroke typed
+            // into the next message.
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
+              if (running) return;
               void submit();
             }
           }}
@@ -443,25 +462,37 @@ export function ChatComposer({
           disabled={busy}
           style={INPUT_STYLE}
         />
-        <Button
-          type="submit"
-          variant="primary"
-          data-testid="ai.composer-send"
-          disabled={blocked}
-        >
-          {probing
-            ? // **The count, once the host has reported one.** The plain label
-              // is still what the first frames show, because the first attempt
-              // has not been announced yet at the moment Send is pressed, and a
-              // "0 of 3" would be a number describing nothing.
-              probeAt === null
-              ? t("agent.composer.checking")
-              : t("agent.composer.checkingAt", {
-                  attempt: probeAt.attempt,
-                  of: probeAt.of,
-                })
-            : t("editor.chrome.rightPanel.aiChat.send")}
-        </Button>
+        {running ? (
+          <Button
+            type="button"
+            variant="secondary"
+            data-testid="ai.composer-stop"
+            disabled={runId === null}
+            onClick={stop}
+          >
+            {t("agent.progress.cancel")}
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            variant="primary"
+            data-testid="ai.composer-send"
+            disabled={blocked}
+          >
+            {probing
+              ? // **The count, once the host has reported one.** The plain label
+                // is still what the first frames show, because the first attempt
+                // has not been announced yet at the moment Send is pressed, and a
+                // "0 of 3" would be a number describing nothing.
+                probeAt === null
+                ? t("agent.composer.checking")
+                : t("agent.composer.checkingAt", {
+                    attempt: probeAt.attempt,
+                    of: probeAt.of,
+                  })
+              : t("editor.chrome.rightPanel.aiChat.send")}
+          </Button>
+        )}
       </form>
     </div>
   );

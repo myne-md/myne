@@ -16,7 +16,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../../components/primitives/Button";
 import {
   agentApproveScope,
   agentCancel,
@@ -218,12 +217,11 @@ export function AgentProgress() {
       style={{
         display: "flex",
         alignItems: "center",
-        // One step tighter than before: `--space-3` was spacing three separate
-        // items, and these now read as one sentence with a separator in it.
-        gap: "var(--space-2)",
+        flexWrap: "wrap",
+        rowGap: "var(--space-1)",
+        columnGap: "var(--space-2)",
         padding: "var(--space-2) var(--space-3)",
         background: "var(--bg-1)",
-        borderBottom: "1px solid var(--line-1)",
         color: "var(--fg-2)",
       }}
     >
@@ -254,7 +252,7 @@ export function AgentProgress() {
       </span>
 
       {/* Continuously visible, by design. See the module note. */}
-      <span data-testid="agentProgress.scopeTotal">
+      <span data-testid="agentProgress.scopeTotal" style={{ whiteSpace: "nowrap" }}>
         {t("agent.progress.scopeTotal", { count: view.scopeTotal })}
       </span>
 
@@ -262,7 +260,10 @@ export function AgentProgress() {
           count is climbing is the shape the no-cap decision leaves visible.
           Parenthesised because it qualifies the total beside it rather than
           standing as a third independent fact. */}
-      <span data-testid="agentProgress.grants" style={{ color: "var(--fg-3)" }}>
+      <span
+        data-testid="agentProgress.grants"
+        style={{ color: "var(--fg-3)", whiteSpace: "nowrap" }}
+      >
         {"("}
         {t("agent.progress.grantsUser", { count: view.userGrants })}
         {", "}
@@ -294,20 +295,16 @@ export function AgentProgress() {
         iterations={agent.iterations}
         notesRead={agent.notesRead}
         charsOffDevice={agent.charsOffDevice}
+        style={{
+          color: "var(--fg-3)",
+          fontSize: "var(--text-xs)",
+          flexBasis: "100%",
+        }}
       />
 
-      <span style={{ flex: 1 }} />
-
-      {running ? (
-        <Button
-          variant="ghost"
-          onClick={() => void agentCancel(view.runId)}
-          data-testid="agentProgress.cancel"
-        >
-          {t("agent.progress.cancel")}
-        </Button>
-      ) : null}
-
+      {/* No Stop control here: stopping lives on the composer's Send button,
+          which turns into Stop while a run works, so there is exactly one
+          place to end a run and it sits under the user's hands. */}
       {agent.error ? (
         <span data-testid="agentProgress.error" style={{ color: "var(--danger)" }}>
           {agent.error}

@@ -123,6 +123,27 @@ const HEADER_ROW_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: "var(--space-2)",
+  flexWrap: "wrap",
+  rowGap: "var(--space-1)",
+};
+
+const HEADER_ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flex: 1,
+  minWidth: 0,
+  flexWrap: "wrap",
+  gap: "var(--space-1)",
+  rowGap: "var(--space-1)",
+};
+
+/** Icon-only header buttons (History, Memory, New chat). Text labels cost a
+ *  third of a 280px sidebar; the meanings are stable enough for icons with
+ *  the translated label kept as the accessible name + hover title. */
+const HEADER_ICON_BUTTON_STYLE: CSSProperties = {
+  padding: "var(--space-1)",
+  flexShrink: 0,
 };
 
 /** Optional handlers the Editor wires; absent in isolation (e.g. tests). */
@@ -689,28 +710,36 @@ export function AiChatTab({
         <div style={SECTION_HEADING_STYLE}>
           {t("editor.chrome.rightPanel.tabs.aiChat")}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+        <div style={HEADER_ACTIONS_STYLE}>
           <Button
             type="button"
             variant="ghost"
+            icon="clock"
+            aria-label={t("editor.chrome.rightPanel.aiChat.history")}
+            title={t("editor.chrome.rightPanel.aiChat.history")}
             data-testid="ai.history-button"
             onClick={() => setHistoryOpen(true)}
-          >
-            {t("editor.chrome.rightPanel.aiChat.history")}
-          </Button>
+            style={HEADER_ICON_BUTTON_STYLE}
+          />
           <Button
             type="button"
             variant="ghost"
+            icon="bookmark"
+            aria-label={t("editor.chrome.rightPanel.aiChat.memory")}
+            title={t("editor.chrome.rightPanel.aiChat.memory")}
             data-testid="ai.memory-button"
             onClick={() => setMemoryOpen((open) => !open)}
-          >
-            {t("editor.chrome.rightPanel.aiChat.memory")}
-          </Button>
+            style={HEADER_ICON_BUTTON_STYLE}
+          />
           {chat.turns.length > 0 ? (
             <Button
               type="button"
               variant="ghost"
               data-testid="ai.new-chat"
+              style={HEADER_ICON_BUTTON_STYLE}
+              icon="plus"
+              aria-label={t("editor.chrome.rightPanel.aiChat.newChat")}
+              title={t("editor.chrome.rightPanel.aiChat.newChat")}
               onClick={() => {
                 // **Stop what it is clearing, host side, before clearing it.**
                 // Forgetting a run is not stopping one: an abandoned one still
@@ -739,9 +768,7 @@ export function AiChatTab({
                 clearChat();
                 clearAgent();
               }}
-            >
-              {t("editor.chrome.rightPanel.aiChat.newChat")}
-            </Button>
+            />
           ) : null}
           {persistLagging ? (
             <span
@@ -767,6 +794,10 @@ export function AiChatTab({
               borderRadius: "var(--radius-1)",
               padding: "1px var(--space-1)",
               whiteSpace: "nowrap",
+              flexShrink: 0,
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {resting !== "ready"

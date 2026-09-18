@@ -174,6 +174,16 @@ class CoverBannerWidget extends WidgetType {
 
     frame.setAttribute("data-state", "resolved");
 
+    // Tap-to-reveal on touch: the frame toggles `cm-cover-revealed`, which the
+    // coarse-pointer CSS reads like `:hover`. Taps inside the controls are
+    // left alone so the buttons keep working. No global listener and no
+    // outside-tap close: the widget DOM is rebuilt by CM6, so anything wider
+    // than the frame would leak, and a second tap hides them again.
+    frame.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest(".cm-cover-banner-controls") !== null) return;
+      frame.classList.toggle("cm-cover-revealed");
+    });
+
     // Change / Remove, revealed on hover. Omitted entirely when the host has no
     // cover seam (the affordance is hidden rather than shown broken), and when
     // the surface is READ-ONLY.

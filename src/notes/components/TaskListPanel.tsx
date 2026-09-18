@@ -58,6 +58,8 @@ export type TaskListPanelProps = {
   testIdPrefix?: string;
   /** Strip the toolbar to a single search field (the note-scoped panel). */
   minimal?: boolean;
+  /** Roomier row checkboxes for touch surfaces; desktop keeps the dense box. */
+  roomyBox?: boolean;
 };
 
 const NO_TAGS: readonly string[] = [];
@@ -866,6 +868,7 @@ export function TaskListPanel({
   onOpen,
   testIdPrefix = "tasks",
   minimal = false,
+  roomyBox = false,
 }: TaskListPanelProps): ReactElement {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -1094,6 +1097,7 @@ export function TaskListPanel({
                 today={today}
                 compactX
                 inlineDate
+                roomyBox={roomyBox}
                 testIdPrefix={`${testIdPrefix}.row`}
                 {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                 {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
@@ -1115,6 +1119,7 @@ export function TaskListPanel({
                     task={toRowData(item.task, item.depth)}
                     scope={rowScope}
                     today={today}
+                    roomyBox={roomyBox}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
