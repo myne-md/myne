@@ -240,4 +240,50 @@ describe("shape", () => {
     const r = parseTaskFields("- [ ] x [due:: 2026-08-01] [due:: 2026-09-01]");
     expect(r.due).toEqual({ date: "2026-08-01" });
   });
+
+  // myne-md/myne#703: a second telling is data, not a duplicate to drop. The
+  // writer re-emits the whole line from the record, so a repeat that never
+  // reaches the record is deleted by the next write.
+  it("preserves a repeated typed key instead of dropping it", () => {
+    const r = parseTaskFields("- [ ] x [due:: 2026-08-01] [due:: 2026-09-01]");
+    expect(r.due).toEqual({ date: "2026-08-01" });
+    expect(r.preserved).toMatchObject([{ key: "due", value: "2026-09-01" }]);
+  });
+
+  it("preserves repeated priority markers in both dialects", () => {
+    const words = parseTaskFields("- [ ] x [priority:: high] [priority:: low]");
+    expect(words.priority).toBe("high");
+    expect(words.preserved).toMatchObject([{ key: "priority", value: "low" }]);
+
+    const emoji = parseTaskFields("- [ ] x 🔺 ⏫");
+    expect(emoji.priority).toBe("highest");
+    expect(emoji.preserved).toMatchObject([{ key: "priority", value: "high" }]);
+  });
+
+  it("preserves a repeated repeat rule", () => {
+    const r = parseTaskFields("- [ ] x 🔁 every day 🔁 every week");
+    expect(r.repeat).toBe("every day");
+    expect(r.preserved).toMatchObject([{ key: "repeat", value: "every week" }]);
+  });
+
+  it("keeps an empty repeat as malformed instead of dropping it", () => {
+    const r = parseTaskFields("- [ ] x [repeat:: ]");
+    expect(r.repeat).toBeUndefined();
+    expect(r.malformed.map((f) => f.key)).toEqual(["repeat"]);
+  });
+
+  it("keeps a bare repeat marker as malformed", () => {
+    const r = parseTaskFields("- [ ] x 🔁");
+    expect(r.repeat).toBeUndefined();
+    expect(r.malformed.map((f) => f.key)).toEqual(["repeat"]);
+  });
+
+  it("keeps a repeat value the emitted form cannot carry as preserved", () => {
+    // `[repeat:: every ]day]` would terminate the value at the first `]` on
+    // re-parse, so the value never reaches the slot — or the writer could not
+    // re-emit it. It stays verbatim in the record either way.
+    const r = parseTaskFields("- [ ] x 🔁 every ]day");
+    expect(r.repeat).toBeUndefined();
+    expect(r.preserved).toMatchObject([{ key: "repeat", value: "every ]day" }]);
+  });
 });
