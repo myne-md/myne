@@ -260,13 +260,8 @@
       "title": "添付ファイル",
       "transcribeDone": "文字起こしが完了しました。",
       "transcribeFailed": "文字起こしに失敗しました。もう一度お試しください。",
-      "transcribeTooLong": "この録音は長すぎて文字起こしできません。音声は添付されたままなので、再生はできます。",
-      "transcribeFeatureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
-      "transcribeModelLoadFailed": "文字起こしモデルを読み込めませんでした。Myneを再インストールするか、設定 → 開発者 → AI でカスタムモデルを確認してください。",
-      "transcribeNoModelHint": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
       "transcribeNoModel": "設定 → 開発者 → AI で文字起こしモデルを選択してください。",
       "transcribeStarted": "文字起こし中…",
-      "transcribeVaultLocked": "文字起こしするには保管庫のロックを解除してください。",
       "transcriptionModalClose": "文字起こしを閉じる",
       "transcriptionModalTitle": "文字起こし",
       "typeFilter": {

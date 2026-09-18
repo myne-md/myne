@@ -96,17 +96,19 @@ const SORT_OPTION_KEYS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "name-desc", labelKey: "attachments.library.sort.nameDesc" },
 ];
 
-// Toast i18n KEY per transcription-failure cause (MYND-591) — resolved with
-// `t()` at usage time (never a frozen resolved string). `"failed"` and any
-// unrecognized kind fall back to the generic failure toast at the call site.
+// Toast i18n KEY per transcription-failure cause (MYND-591, myne-md/myne#649).
+// One product fact has one string: both surfaces share the editor cause family
+// (`editor.attachment.widget.transcribe.cause.*`), resolved with `t()` at usage
+// time (never a frozen resolved string). `"failed"` and any unrecognized kind
+// fall back to the generic failure toast at the call site.
 const TRANSCRIBE_TOAST_KEY: Readonly<
   Record<Exclude<TranscribeErrorKind, "failed">, string>
 > = {
-  feature_off: "attachments.library.transcribeFeatureOff",
-  vault_locked: "attachments.library.transcribeVaultLocked",
-  no_model: "attachments.library.transcribeNoModelHint",
-  model_load_failed: "attachments.library.transcribeModelLoadFailed",
-  too_long: "attachments.library.transcribeTooLong",
+  feature_off: "editor.attachment.widget.transcribe.cause.featureOff",
+  vault_locked: "editor.attachment.widget.transcribe.cause.vaultLocked",
+  no_model: "editor.attachment.widget.transcribe.cause.noModel",
+  model_load_failed: "editor.attachment.widget.transcribe.cause.modelLoadFailed",
+  too_long: "editor.attachment.widget.transcribe.cause.tooLong",
 };
 
 interface AttachmentsLibraryProps {

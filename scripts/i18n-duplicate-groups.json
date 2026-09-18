@@ -1,0 +1,435 @@
+[
+  {
+    "value": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
+    "keys": [
+      "accountBootstrap.verifyChanged",
+      "join.verifyChanged",
+      "sync.devices.verifyChanged",
+      "sync.join.verifyChanged"
+    ],
+    "reason": "Same mid-verification change warning on all four bootstrap/join/device-verify screens; one product fact."
+  },
+  {
+    "value": "Enter your account number",
+    "keys": [
+      "accountEntry.title",
+      "recover.accountTitle"
+    ],
+    "reason": "Same step title on account entry and recover; one step, two flows."
+  },
+  {
+    "value": "No attachments match your search.",
+    "keys": [
+      "attachments.library.emptyNoResultsTitle",
+      "attachments.library.noMatch"
+    ],
+    "reason": "Same empty-search string as the library title and empty state on one screen; shared copy, accepted."
+  },
+  {
+    "value": "Transcription failed. Please try again.",
+    "keys": [
+      "attachments.library.transcribeFailed",
+      "editor.attachment.widget.transcribe.failed"
+    ],
+    "reason": "Generic transcription fallback shared by the library toast and the editor widget; cause-specific strings must NOT be shared (myne-md/myne#649)."
+  },
+  {
+    "value": "Attachments need the app (not the browser preview).",
+    "keys": [
+      "attachments.needAppPreview",
+      "editor.flow.attachNeedsApp"
+    ],
+    "reason": "Same browser-preview gate on desktop and the mobile editor flow; one gate, two clients, intentionally identical."
+  },
+  {
+    "value": "That file is too large (max 64 MB).",
+    "keys": [
+      "attachments.tooLarge",
+      "editor.flow.attachTooLarge"
+    ],
+    "reason": "Same size-cap notice on desktop and the mobile editor flow; one cap, two clients, intentionally identical."
+  },
+  {
+    "value": "Only images and PDFs can be attached.",
+    "keys": [
+      "attachments.unsupported",
+      "editor.flow.attachUnsupported"
+    ],
+    "reason": "Same attach-type gate on desktop and the mobile editor flow; one gate, two clients, intentionally identical."
+  },
+  {
+    "value": "Another vault operation is in progress. Wait for it to finish, then try again.",
+    "keys": [
+      "backup.errors.export.authOperationInProgress",
+      "backup.errors.restore.authOperationInProgress",
+      "export.vault.errors.authOperationInProgress"
+    ],
+    "reason": "Same backend-busy error on backup export, backup restore and vault export; one error, three call sites."
+  },
+  {
+    "value": "That destination folder is not usable.",
+    "keys": [
+      "backup.errors.export.invalidDestination",
+      "export.note.errors.destinationUnusable"
+    ],
+    "reason": "Same bad-destination error on backup export and note export; one error, two call sites."
+  },
+  {
+    "value": "Not enough space at the destination.",
+    "keys": [
+      "backup.errors.export.ioNoSpace",
+      "export.note.errors.ioNoSpace"
+    ],
+    "reason": "Same IO-space error on backup export and note export; one error, two call sites."
+  },
+  {
+    "value": "No permission to write at the destination.",
+    "keys": [
+      "backup.errors.export.ioPermissionDenied",
+      "export.note.errors.ioPermissionDenied"
+    ],
+    "reason": "Same IO-permission error on backup export and note export; one error, two call sites."
+  },
+  {
+    "value": "Toggle side-by-side preview",
+    "keys": [
+      "commands.actions.togglePreview.label",
+      "editor.chrome.bottomBar.togglePreview"
+    ],
+    "reason": "Same action label on the command palette and the bottom bar; the palette mirrors the UI, intentionally identical."
+  },
+  {
+    "value": "What the assistant remembers",
+    "keys": [
+      "editor.chrome.rightPanel.aiChat.memoryPopoverTitle",
+      "settings.memory.heading"
+    ],
+    "reason": "Same feature name as the memory popover title and the Settings heading; one feature, two labels."
+  },
+  {
+    "value": "Entry removed everywhere.",
+    "keys": [
+      "editor.chrome.rightPanel.aiChat.memoryPopoverDeleted",
+      "settings.memory.deletedToast"
+    ],
+    "reason": "Same delete toast in the agent memory widget and Settings memory panel; one event, one string."
+  },
+  {
+    "value": "Could not delete the entry.",
+    "keys": [
+      "editor.chrome.rightPanel.aiChat.memoryPopoverDeleteFailed",
+      "settings.memory.deleteFailed"
+    ],
+    "reason": "Same delete failure in the agent memory widget and Settings memory panel; one error, two call sites."
+  },
+  {
+    "value": "Couldn't read this entry. It is still stored; delete it here or fix it in Settings.",
+    "keys": [
+      "editor.chrome.rightPanel.aiChat.memoryPopoverEntryFailed",
+      "settings.memory.entryUnreadable"
+    ],
+    "reason": "Same unreadable-entry error in the agent memory widget and Settings memory panel; generic error, intentionally shared."
+  },
+  {
+    "value": "This note could not be read.",
+    "keys": [
+      "export.note.errors.cannotDecrypt",
+      "export.note.flow.couldNotRead"
+    ],
+    "reason": "Same unreadable-note error on the two export-note stages; one error, two stages."
+  },
+  {
+    "value": "The vault is locked. Unlock it, then try again.",
+    "keys": [
+      "export.note.errors.vaultLocked",
+      "export.vault.errors.vaultLocked"
+    ],
+    "reason": "Same locked-vault error on note export and vault export; one error, two call sites."
+  },
+  {
+    "value": "Cannot read the vault file.",
+    "keys": [
+      "failClosed.ioError.title",
+      "vault.ioBanner.cannotRead"
+    ],
+    "reason": "Same unreadable-vault title on the fail-closed screen and the IO banner; one error, two call sites."
+  },
+  {
+    "value": "Couldn't delete that note. Try again.",
+    "keys": [
+      "notes.archive.deleteError",
+      "notes.trash.deleteError"
+    ],
+    "reason": "Same delete failure on the archive and trash twins; identical operations, identical string."
+  },
+  {
+    "value": "“{{name}}” and its {{count}} note",
+    "keys": [
+      "notes.archive.folderDeleteBody",
+      "notes.list.deleteFolderBody"
+    ],
+    "reason": "Same folder-delete dialog body from the archive and the notes list, singular form; one dialog, two entry points."
+  },
+  {
+    "value": "“{{name}}” and its {{count}} notes",
+    "keys": [
+      "notes.archive.folderDeleteBody",
+      "notes.list.deleteFolderBody"
+    ],
+    "reason": "Same folder-delete dialog body from the archive and the notes list; one dialog, two entry points."
+  },
+  {
+    "value": "Couldn't restore that note. Try again.",
+    "keys": [
+      "notes.archive.restoreError",
+      "notes.trash.restoreError"
+    ],
+    "reason": "Same restore failure on the archive and trash twins; identical operations, identical string."
+  },
+  {
+    "value": "Choose your Obsidian vault folder",
+    "keys": [
+      "notes.import.modal.folderPickerTitle",
+      "notes.import.source.obsidian.pickerTitle"
+    ],
+    "reason": "Same folder-picker title on the import modal and the Obsidian source step; one picker, two entry points."
+  },
+  {
+    "value": "Something went wrong. Try again.",
+    "keys": [
+      "notes.snapshots.errorGeneric",
+      "sync.panel.recovered.errorGeneric"
+    ],
+    "reason": "Same generic failure on snapshots and the sync panel; generic fallback, intentionally shared."
+  },
+  {
+    "value": "Use at least {{n}} characters.",
+    "keys": [
+      "password.createForm.tooShort",
+      "settings.changePassword.tooShort"
+    ],
+    "reason": "Same password-policy sentence on the create form and change-password; one policy, stated once."
+  },
+  {
+    "value": "Recovery cancelled: vault was locked.",
+    "keys": [
+      "recover.errors.cancelledVaultLocked",
+      "vaultRecover.passwordReset.errors.cancelledVaultLocked"
+    ],
+    "reason": "Same cancelled-recovery notice on recover and password reset; one event, two entry points."
+  },
+  {
+    "value": "Operation in progress. Please wait.",
+    "keys": [
+      "recover.errors.operationInProgress",
+      "vaultRecover.passwordReset.errors.operationInProgress"
+    ],
+    "reason": "Same busy notice on recover and password reset; one state, two entry points."
+  },
+  {
+    "value": "Unexpected error. Please try again.",
+    "keys": [
+      "recover.errors.unexpected",
+      "unlock.errors.unexpected",
+      "vaultRecover.passwordReset.errors.unexpected"
+    ],
+    "reason": "Same generic failure on recover, unlock and password reset; generic fallback, intentionally shared."
+  },
+  {
+    "value": "Vault file not found. Please restart the app.",
+    "keys": [
+      "recover.errors.vaultNotFound",
+      "unlock.errors.vaultNotFound",
+      "vault.ioBanner.notFound"
+    ],
+    "reason": "Same missing-vault error on recover, unlock and the IO banner; one error, three call sites."
+  },
+  {
+    "value": "Vault file is unreadable. Restore from a backup.",
+    "keys": [
+      "recover.vaultUnreadable",
+      "settings.account.vaultUnreadable",
+      "unlock.vaultUnreadable"
+    ],
+    "reason": "Same unreadable-vault error on recover, settings and unlock; one error, three call sites."
+  },
+  {
+    "value": "Something went wrong. Please try again.",
+    "keys": [
+      "recover.genericError",
+      "settings.account.genericChangeError"
+    ],
+    "reason": "Same generic failure on recover and account change; generic fallback, intentionally shared."
+  },
+  {
+    "value": "Never stored, never transmitted. It encrypts your keys on this device.",
+    "keys": [
+      "createVault.passwordHelper",
+      "recover.passwordHelper"
+    ],
+    "reason": "Same password-helper sentence on vault create and vault recover; one guarantee, stated once."
+  },
+  {
+    "value": "New password must be at least 12 characters.",
+    "keys": [
+      "settings.account.changePasswordError.weakNewPassword",
+      "vaultRecover.passwordReset.errors.weakPassword"
+    ],
+    "reason": "Same password-policy sentence in settings and vault recover; one policy, stated once."
+  },
+  {
+    "value": "Could not save that setting. Try again.",
+    "keys": [
+      "settings.appearance.taskMarkerSaveError",
+      "settings.reminders.saveError"
+    ],
+    "reason": "Same save failure in Appearance task-marker and Reminders panels; generic error, intentionally shared."
+  },
+  {
+    "value": "Couldn't save preference. Please try again.",
+    "keys": [
+      "settings.appearance.timestampsSaveError",
+      "settings.typography.errorSave"
+    ],
+    "reason": "Same save failure in Appearance and Typography panels; generic error, intentionally shared."
+  },
+  {
+    "value": "Could not save this setting.",
+    "keys": [
+      "settings.attachmentCompression.errorSaveSetting",
+      "settings.attachmentOcr.errorSaveSetting",
+      "settings.folderNotes.errorSaveSetting"
+    ],
+    "reason": "Same save failure on the three attachment settings panels; generic error, intentionally shared."
+  },
+  {
+    "value": "Couldn't save that setting.",
+    "keys": [
+      "settings.dateTime.errorSave",
+      "settings.transcription.errorSaveSetting"
+    ],
+    "reason": "Same save failure in Date-Time and Transcription panels; generic error, intentionally shared."
+  },
+  {
+    "value": "Couldn't read the current setting. Flip the switch to set it again.",
+    "keys": [
+      "settings.network.errorRead",
+      "settings.privacy.hideVaultNamesErrorRead"
+    ],
+    "reason": "Same unreadable-setting error in Network and Privacy panels; generic error, intentionally shared."
+  },
+  {
+    "value": "Another vault operation is in progress. Try again in a moment.",
+    "keys": [
+      "settings.quickUnlock.errorBusy",
+      "vaultCreation.errors.vaultBusyAuth.body"
+    ],
+    "reason": "Same backend-busy error on quick-unlock and vault creation; one error, two call sites."
+  },
+  {
+    "value": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
+    "keys": [
+      "sync.endpoint.confirmFingerprintRequired",
+      "sync.join.confirmFingerprintRequired"
+    ],
+    "reason": "Same SAS-verification warning on the join and settings confirm screens; one product fact, intentionally identical."
+  },
+  {
+    "value": "Add this device to an account",
+    "keys": [
+      "sync.join.title",
+      "vaultPicker.joinDevice",
+      "vaultSwitcher.joinDevice",
+      "welcome.joinCta"
+    ],
+    "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
+  },
+  {
+    "value": "Double-check this number. It doesn't look right.",
+    "keys": [
+      "join.accountHint",
+      "sync.settings.accountNumberHint"
+    ],
+    "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
+  },
+  {
+    "value": "Couldn't copy. Use \"Save as file\" instead.",
+    "keys": [
+      "vaultCreation.account.copyFailed",
+      "vaultCreation.phrase.copyFailed"
+    ],
+    "reason": "Same copy-failed notice on the account-number and phrase steps; one event, one string."
+  },
+  {
+    "value": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
+    "keys": [
+      "vaultCreation.account.downloadStarted",
+      "vaultCreation.phrase.downloadStarted"
+    ],
+    "reason": "Same download-arrived notice on the account-number and phrase steps of vault creation; one event, one string."
+  },
+  {
+    "value": "Saved. It is a plain text file, so keep it somewhere only you can read.",
+    "keys": [
+      "vaultCreation.account.savedToFile",
+      "vaultCreation.phrase.savedToFile"
+    ],
+    "reason": "Same save-to-file confirmation on the account-number and phrase steps; one event, one string."
+  },
+  {
+    "value": "Before you create your vault",
+    "keys": [
+      "vaultCreation.briefing.eyebrow",
+      "vaultCreation.briefing.heading"
+    ],
+    "reason": "Briefing eyebrow repeats the briefing heading on one screen; same-screen duplication, accepted as designed."
+  },
+  {
+    "value": "If this takes longer than 30 seconds, close the window and try again.",
+    "keys": [
+      "vaultCreation.encrypting.footerHint",
+      "vaultRecover.decrypting.footerHint"
+    ],
+    "reason": "Same slow-operation hint on the encrypting and decrypting footers; one hint, two flows."
+  },
+  {
+    "value": "No vaults could be loaded right now.",
+    "keys": [
+      "vaultPicker.noneLoaded",
+      "vaultRecover.select.loadFailed"
+    ],
+    "reason": "Same empty-state on the vault picker and recover select; one state, two screens."
+  },
+  {
+    "value": "Could not update the account grouping. Nothing was changed.",
+    "keys": [
+      "picker.accountError",
+      "vaultPicker.accountError"
+    ],
+    "reason": "Same grouping-write error on the picker twins; identical screens, identical string."
+  },
+  {
+    "value": "Account actions are unavailable while vault names are hidden.",
+    "keys": [
+      "picker.accountHidden",
+      "vaultPicker.accountHidden"
+    ],
+    "reason": "Same hidden-names notice on the picker twins; identical screens, identical string."
+  },
+  {
+    "value": "That name is too long. Keep it under 512 characters.",
+    "keys": [
+      "picker.labelTooLong",
+      "vaultPicker.labelTooLong"
+    ],
+    "reason": "Same label-length error on the picker twins; identical screens, identical string."
+  },
+  {
+    "value": "The account grouping could not be read on this device. Nothing was changed.",
+    "keys": [
+      "picker.accountUnreadable",
+      "vaultPicker.accountUnreadable"
+    ],
+    "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
+  }
+]

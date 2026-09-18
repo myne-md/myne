@@ -260,13 +260,8 @@
       "title": "첨부 파일",
       "transcribeDone": "텍스트 변환이 완료되었습니다.",
       "transcribeFailed": "텍스트 변환에 실패했습니다. 다시 시도하세요.",
-      "transcribeTooLong": "이 녹음은 너무 길어 텍스트로 변환할 수 없습니다. 오디오는 첨부된 채로 남아 있어 계속 재생할 수 있습니다.",
-      "transcribeFeatureOff": "음성 텍스트 변환이 꺼져 있습니다. 설정 → 텍스트 변환에서 켜세요.",
-      "transcribeModelLoadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다. Myne를 다시 설치하거나, 설정 → 개발자 → AI에서 지정한 사용자 지정 모델을 확인하세요.",
-      "transcribeNoModelHint": "음성 텍스트 변환 모델이 없습니다. Myne를 다시 설치하면 복원됩니다.",
       "transcribeNoModel": "설정 → 개발자 → AI에서 음성 텍스트 변환 모델을 선택하세요.",
       "transcribeStarted": "텍스트로 변환하는 중…",
-      "transcribeVaultLocked": "텍스트로 변환하려면 보관함을 잠금 해제하세요.",
       "transcriptionModalClose": "변환된 텍스트 닫기",
       "transcriptionModalTitle": "변환된 텍스트",
       "typeFilter": {

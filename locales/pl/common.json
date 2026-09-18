@@ -312,13 +312,8 @@
       "title": "Załączniki",
       "transcribeDone": "Transkrypcja zakończona.",
       "transcribeFailed": "Transkrypcja nie powiodła się. Spróbuj ponownie.",
-      "transcribeTooLong": "To nagranie jest zbyt długie, aby je transkrybować. Dźwięk pozostaje załączony, więc nadal możesz go odtworzyć.",
-      "transcribeFeatureOff": "Zamiana mowy na tekst jest wyłączona. Włącz ją w Ustawienia → Transkrypcja.",
-      "transcribeModelLoadFailed": "Nie udało się załadować modelu zamiany mowy na tekst. Zainstaluj Myne ponownie lub sprawdź swój własny model w Ustawienia → Deweloper → AI.",
-      "transcribeNoModelHint": "Brakuje modelu zamiany mowy na tekst. Ponowna instalacja Myne go przywraca.",
       "transcribeNoModel": "Wybierz model zamiany mowy na tekst w Ustawienia → Deweloper → AI.",
       "transcribeStarted": "Transkrybowanie…",
-      "transcribeVaultLocked": "Odblokuj skarbiec, aby transkrybować.",
       "transcriptionModalClose": "Zamknij transkrypcję",
       "transcriptionModalTitle": "Transkrypcja",
       "typeFilter": {

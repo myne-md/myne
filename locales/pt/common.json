@@ -286,13 +286,8 @@
       "title": "Anexos",
       "transcribeDone": "Transcrição concluída.",
       "transcribeFailed": "A transcrição falhou. Tente novamente.",
-      "transcribeTooLong": "Esta gravação é demasiado longa para ser transcrita. O áudio continua anexado, por isso ainda pode reproduzi-lo.",
-      "transcribeFeatureOff": "A voz para texto está desligada. Ligue-a em Definições → Transcrição.",
-      "transcribeModelLoadFailed": "Não foi possível carregar o modelo de voz para texto. Reinstale o Myne ou verifique o seu modelo personalizado em Definições → Programador → IA.",
-      "transcribeNoModelHint": "Falta o modelo de voz para texto. Reinstalar o Myne repõe-no.",
       "transcribeNoModel": "Selecione um modelo de voz para texto em Definições → Programador → IA.",
       "transcribeStarted": "A transcrever…",
-      "transcribeVaultLocked": "Desbloqueie o cofre para transcrever.",
       "transcriptionModalClose": "Fechar a transcrição",
       "transcriptionModalTitle": "Transcrição",
       "typeFilter": {
