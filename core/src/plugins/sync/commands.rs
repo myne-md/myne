@@ -554,6 +554,23 @@ pub struct PersonIdentityView {
     pub fingerprint_hex: String,
 }
 
+/// Refuse an admin-only command invoked under a member authority (B2B,
+/// myne-md/myne#714). The roster UI hides owner-only affordances from
+/// members, so this is the backend contract for the future member client
+/// rather than a button a member sees. It mirrors the cryptographic
+/// enforcement (only a `root_key` holder can seal a roster peers accept)
+/// with a clear refusal instead of a generic `BadRequest` or `NotEnrolled`.
+fn require_owner(
+    authority: crate::plugins::vault_unlock::state::VaultAuthority,
+) -> Result<(), SyncDeviceError> {
+    match authority {
+        crate::plugins::vault_unlock::state::VaultAuthority::Owner => Ok(()),
+        crate::plugins::vault_unlock::state::VaultAuthority::Member => {
+            Err(SyncDeviceError::NotOwner)
+        }
+    }
+}
+
 /// **Invite a member to the unlocked vault** (B2B identity substrate,
 /// myne-md/myne#698 task 5-6 command core).
 ///
@@ -582,16 +599,21 @@ pub async fn sync_invite_member<R: Runtime>(
     // `slots.read()` across `active_vault_id()`'s own `slots.read()` is the
     // tokio RwLock deadlock shape (a queued writer blocks the second acquire
     // while the first stays held).
-    let (root_key, items_key) = {
+    let (root_key, items_key, authority) = {
         let slot = state.inner().slot_read_active().await;
         match &*slot {
             crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => (
                 zeroize::Zeroizing::new(*uv.root_key),
                 zeroize::Zeroizing::new(*uv.items_key),
+                uv.authority,
             ),
             _ => return Err(SyncDeviceError::NotEnrolled),
         }
     };
+    // Owner-only: a member gets the typed `NotOwner` refusal rather than a
+    // generic failure further down. The cryptographic enforcement (only a
+    // `root_key` holder can seal a roster peers accept) still holds behind it.
+    require_owner(authority)?;
     let owner = state
         .inner()
         .clone_person_identity()
@@ -604,6 +626,12 @@ pub async fn sync_invite_member<R: Runtime>(
         &member_mldsa_vk_hex,
     )
     .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    // Refuse a self-invite (the helper names the consequence: the member
+    // upsert would overwrite the owner row and silently demote the owner).
+    if super::invite::is_self_invite(&owner, &member_public) {
+        return Err(SyncDeviceError::BadRequest);
+    }
 
     // Serialize the whole-blob `vault.meta` read-modify-write against every
     // other lifecycle mutation BEFORE reading: the permit must be held across
@@ -665,6 +693,30 @@ pub async fn sync_invite_member<R: Runtime>(
         super::invite::wrapped_hex(&wrapped),
         &vault_label,
         created_at_secs,
+        super::roster::RosterRole::Member,
+    );
+    // The owner's own row is written at the first invite, alongside the
+    // member's row. It carries the owner's public halves and an `itemsKey`
+    // wrap to the owner, marked `owner`, so the roster lists who administers
+    // the vault. A later invite leaves it untouched (`upsert_owner_once`).
+    // The row stamps the invite time and the vault label as its joined-at
+    // and display name: the owner has no earlier roster timestamp and no
+    // chosen name, so these are the invite-time values, not a claim about
+    // when the owner joined or what they are called.
+    let owner_public = owner.public_half();
+    let owner_wrapped = protocol::person_rekey::wrap_items_key_to_member(
+        &items_key,
+        &owner_public,
+        &account_number_hash,
+        &mut rng,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+    let owner_row = super::invite::invited_member_row(
+        &owner_public,
+        super::invite::wrapped_hex(&owner_wrapped),
+        &vault_label,
+        created_at_secs,
+        super::roster::RosterRole::Owner,
     );
     if let Err(e) = write_roster_row(
         state.inner(),
@@ -676,6 +728,7 @@ pub async fn sync_invite_member<R: Runtime>(
         &mut meta,
         &root_key,
         &account_number_hash,
+        owner_row,
         row,
     )
     .await
@@ -715,6 +768,7 @@ async fn write_roster_row(
     meta: &mut protocol::VaultMeta,
     root_key: &[u8; 32],
     account_number_hash: &[u8; 16],
+    owner_row: super::roster::RosterMemberEntry,
     row: super::roster::RosterMemberEntry,
 ) -> Result<(), SyncDeviceError> {
     // The auth permit arrives held from `sync_invite_member` (acquired before
@@ -729,17 +783,24 @@ async fn write_roster_row(
         }
         None => super::roster::RosterMap::new(),
     };
+    // The owner's own row is written at the first invite and never advanced
+    // afterwards. `upsert_owner_once` inserts it only when the fingerprint is
+    // absent, so a later invite leaves the owner's version and wrap untouched.
+    // A self-invite cannot reach this point: `sync_invite_member` refuses a
+    // member fingerprint equal to the owner's, so the member upsert below
+    // never shares the owner's key.
+    let with_owner = super::roster::upsert_owner_once(&current, owner_row);
     // Refuse to re-invite a tombstoned member rather than writing the unchanged
     // roster and handing back a live invite frame: `upsert_member` leaves a
     // tombstone alone (remove-wins), so the member would accept an invite that
     // the roster never records and no later rotation re-wraps.
-    if current
+    if with_owner
         .get(&row.fingerprint_hex)
         .is_some_and(|existing| existing.deleted)
     {
         return Err(SyncDeviceError::BadRequest);
     }
-    let updated = super::roster::upsert_member(&current, row);
+    let updated = super::roster::upsert_member(&with_owner, row);
     let plaintext = super::roster::encode_roster(&updated);
     let mut nonce = [0u8; protocol::MEMBERSHIP_ROSTER_NONCE_LEN];
     getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Transport)?;
@@ -807,12 +868,14 @@ pub struct InviteCommandView {
 pub async fn sync_list_roster<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
-) -> Result<Vec<RosterMemberView>, SyncDeviceError> {
+) -> Result<RosterListView, SyncDeviceError> {
     let host = crate::host::tauri_host::TauriHost::new(app.clone());
     let io = crate::vault_io::StdVaultIo;
     let slot = state.inner().slot_read_active().await;
-    let root_key = match &*slot {
-        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => uv.root_key.clone(),
+    let (root_key, authority) = match &*slot {
+        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+            (uv.root_key.clone(), uv.authority)
+        }
         _ => return Err(SyncDeviceError::NotEnrolled),
     };
     drop(slot);
@@ -844,11 +907,22 @@ pub async fn sync_list_roster<R: Runtime>(
         None => super::roster::RosterMap::new(),
     };
 
-    Ok(roster
-        .into_values()
-        .filter(|m| !m.deleted)
-        .map(RosterMemberView::from_entry)
-        .collect())
+    Ok(RosterListView {
+        members: roster
+            .into_values()
+            .filter(|m| !m.deleted)
+            .map(RosterMemberView::from_entry)
+            .collect(),
+        authority,
+    })
+}
+
+/// The roster listing plus the caller's vault authority, so the UI gates
+/// admin affordances on one typed source rather than inferring ownership.
+#[derive(Debug, serde::Serialize)]
+pub struct RosterListView {
+    pub members: Vec<RosterMemberView>,
+    pub authority: crate::plugins::vault_unlock::state::VaultAuthority,
 }
 
 /// One roster row as the UI consumes it.
@@ -856,6 +930,8 @@ pub async fn sync_list_roster<R: Runtime>(
 pub struct RosterMemberView {
     pub fingerprint_hex: String,
     pub display_name: String,
+    /// The member's vault role (`owner` or `member`), serialized lowercase.
+    pub role: super::roster::RosterRole,
     pub version: u64,
     pub previous_fingerprint_hex: Option<String>,
     pub joined_at: u64,
@@ -872,6 +948,7 @@ impl RosterMemberView {
         Self {
             fingerprint_hex: e.fingerprint_hex,
             display_name: e.display_name,
+            role: e.role,
             version: e.version,
             previous_fingerprint_hex: e.previous_fingerprint_hex,
             joined_at: e.joined_at,
@@ -902,6 +979,17 @@ pub async fn sync_remove_member<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     member_fingerprint_hex: String,
 ) -> Result<(), SyncDeviceError> {
+    // The parked pipeline refuses everyone with `RemovalUnavailable`; check
+    // the authority first so a member gets the typed `NotOwner` refusal
+    // rather than the parked one.
+    let authority = {
+        let slot = state.inner().slot_read_active().await;
+        match &*slot {
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => uv.authority,
+            _ => return Err(SyncDeviceError::NotEnrolled),
+        }
+    };
+    require_owner(authority)?;
     super::member_removal::remove_member_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
@@ -1915,5 +2003,35 @@ mod tests {
         assert_eq!(hex.len(), 32);
         let back = hex16(&hex).expect("round-trip hex must parse");
         assert_eq!(back, bytes);
+    }
+
+    #[test]
+    fn require_owner_passes_owner_and_refuses_member() {
+        use crate::plugins::vault_unlock::state::VaultAuthority;
+        assert_eq!(super::require_owner(VaultAuthority::Owner), Ok(()));
+        assert_eq!(
+            super::require_owner(VaultAuthority::Member),
+            Err(SyncDeviceError::NotOwner)
+        );
+    }
+
+    #[test]
+    fn roster_member_view_carries_the_role() {
+        use crate::plugins::sync::roster::{RosterMemberEntry, RosterRole};
+        let entry = RosterMemberEntry {
+            fingerprint_hex: "aa".repeat(32),
+            display_name: "Owner".into(),
+            wrapped_items_key_hex: "bb".repeat(32),
+            member_kem_ek_hex: "cd".repeat(1184),
+            member_ed_pk_hex: "ef".repeat(32),
+            member_mldsa_vk_hex: "01".repeat(1952),
+            version: 1,
+            role: RosterRole::Owner,
+            deleted: false,
+            previous_fingerprint_hex: None,
+            joined_at: 0,
+        };
+        let view = super::RosterMemberView::from_entry(entry);
+        assert_eq!(view.role, RosterRole::Owner);
     }
 }

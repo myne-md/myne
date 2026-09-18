@@ -1045,13 +1045,13 @@ pub async fn unlock_with_path(
     let switched_from = state
         .set_unlocked_locking_others(
             vault_id,
-            UnlockedVault {
+            UnlockedVault::owner(
                 root_key,
                 items_key,
                 items_key_id,
-                unlocked_at: now_ms,
+                now_ms,
                 vault_meta_bytes_hash,
-            },
+            ),
         )
         .await;
     if matches!(switched_from, Slot::Unlocked(_)) {

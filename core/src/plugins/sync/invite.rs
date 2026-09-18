@@ -75,21 +75,23 @@ pub fn invite_create(
     Ok(invite)
 }
 
-/// Build the roster row for a just-invited member, so the invite WRITES the
-/// first roster row instead of only minting a frame. Without this the roster
+/// Build a roster row for a person joining the vault, so the invite WRITES a
+/// roster row instead of only minting a frame. Without this the roster
 /// extension is never created: `sync_list_roster` answers empty forever and
 /// `sync_remove_member` is unreachable.
 ///
-/// The row carries the member's public halves (so any device can re-wrap a
+/// The row carries the person's public halves (so any device can re-wrap a
 /// rotated `itemsKey` without a round-trip) and the per-recipient wrap the
 /// invite embedded. The vault label is used as the display name until the
 /// accept side learns the member's chosen name; it is the only name available
-/// at invite time.
+/// at invite time. The caller passes the vault `role`: `member` for an
+/// invited teammate, `owner` for the owner's own row.
 pub fn invited_member_row(
     member_public: &PersonPublicHalf,
     wrapped_items_key_hex: String,
     vault_label: &str,
     joined_at_secs: u64,
+    role: crate::plugins::sync::roster::RosterRole,
 ) -> crate::plugins::sync::roster::RosterMemberEntry {
     crate::plugins::sync::roster::RosterMemberEntry {
         fingerprint_hex: hex_lower(member_public.fingerprint()),
@@ -99,10 +101,20 @@ pub fn invited_member_row(
         member_ed_pk_hex: hex_lower(member_public.ed_pk()),
         member_mldsa_vk_hex: hex_lower(member_public.mldsa_vk()),
         version: 0, // assigned by `upsert_member`
+        role,
         deleted: false,
         previous_fingerprint_hex: None,
         joined_at: joined_at_secs,
     }
+}
+
+/// True when an invite names its own inviter: the member public half belongs
+/// to the held owner identity. The caller must refuse it, because the member
+/// upsert would otherwise overwrite the owner row with a member row and
+/// silently demote the owner. Pure fingerprint equality, so it is unit
+/// testable without a vault.
+pub fn is_self_invite(owner: &PersonKeyPair, member_public: &PersonPublicHalf) -> bool {
+    member_public.fingerprint() == owner.fingerprint()
 }
 
 /// The acceptor's core: open the sealed frame with the member's own
@@ -344,5 +356,44 @@ mod tests {
             s.push(HEX[(b & 0x0f) as usize] as char);
         }
         s
+    }
+
+    #[test]
+    fn invited_member_row_takes_a_role_and_starts_unversioned() {
+        use crate::plugins::sync::roster::RosterRole;
+        let owner = owner_pair();
+        let member = member_pair();
+        let owner_row = invited_member_row(
+            &owner.public_half(),
+            "ab".repeat(64),
+            "Team Vault",
+            1_760_000_000,
+            RosterRole::Owner,
+        );
+        assert_eq!(owner_row.role, RosterRole::Owner);
+        assert_eq!(owner_row.version, 0, "upsert assigns the version");
+        assert_eq!(owner_row.fingerprint_hex, hex_lower(owner.fingerprint()));
+        let member_row = invited_member_row(
+            &member.public_half(),
+            "cd".repeat(64),
+            "Team Vault",
+            1_760_000_000,
+            RosterRole::Member,
+        );
+        assert_eq!(member_row.role, RosterRole::Member);
+        assert_eq!(member_row.version, 0);
+    }
+
+    #[test]
+    fn self_invite_is_detected_by_fingerprint_equality() {
+        let owner = owner_pair();
+        let member = member_pair();
+        let outsider = outsider_pair();
+        // The same identity on both sides is a self-invite and must refuse.
+        assert!(is_self_invite(&owner, &owner.public_half()));
+        // Different identities proceed, including a stranger's: the check is
+        // equality, not membership, so it cannot over-refuse.
+        assert!(!is_self_invite(&owner, &member.public_half()));
+        assert!(!is_self_invite(&owner, &outsider.public_half()));
     }
 }

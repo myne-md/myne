@@ -17,10 +17,16 @@ export interface PersonIdentityView {
   fingerprint_hex: string;
 }
 
+/** A vault role as the backend serializes it (lowercase). One shared type
+ *  so the three call sites cannot drift into three spellings. */
+export type VaultAuthority = "owner" | "member";
+
 /** One roster row as the UI consumes it. */
 export interface RosterMemberView {
   fingerprint_hex: string;
   display_name: string;
+  /** The member's vault role, serialized lowercase by the backend. */
+  role: VaultAuthority;
   version: number;
   previous_fingerprint_hex: string | null;
   joined_at: number;
@@ -66,9 +72,18 @@ export async function inviteMember(input: {
   });
 }
 
-/** List the unlocked vault's B2B roster (non-tombstoned rows). */
-export async function listRoster(): Promise<RosterMemberView[]> {
-  return invoke<RosterMemberView[]>("plugin:sync|sync_list_roster");
+/**
+ * The roster listing plus the caller's vault authority, so the UI gates
+ * admin affordances on one typed source rather than inferring ownership.
+ */
+export interface RosterListView {
+  members: RosterMemberView[];
+  authority: VaultAuthority;
+}
+
+/** List the unlocked vault's B2B roster (non-tombstoned rows) and authority. */
+export async function listRoster(): Promise<RosterListView> {
+  return invoke<RosterListView>("plugin:sync|sync_list_roster");
 }
 
 /** Remove a member. PARKED until the roster wire ships: the backend refuses

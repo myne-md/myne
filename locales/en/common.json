@@ -3911,6 +3911,8 @@
       "hint": "Members of this vault. Each joins with their own identity and credentials.",
       "empty": "No members yet. Inviting someone is the next step.",
       "rotated": "Key rotated",
+      "ownerBadge": "Owner",
+      "memberBadge": "Member",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Member removal is currently disabled until the roster sync follow-on ships. Invited members keep access to what they already synced, and nothing here removes them yet.",
