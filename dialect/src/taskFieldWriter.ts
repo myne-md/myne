@@ -61,7 +61,16 @@ export function serializeTaskFields(fields: TaskFields): string {
   if (fields.repeat !== undefined) parts.push(field("repeat", fields.repeat));
   if (fields.done !== undefined) parts.push(field("done", instant(fields.done)));
 
-  const verbatim = (f: PreservedTaskField) => parts.push(field(f.key, f.value));
+  // A preserved or malformed value the bracketed form cannot carry is emitted
+  // in its source bytes instead. The bracketed value ends at the first `]`,
+  // so emitting `[repeat:: every ]day]` would move `day]` into the description
+  // on the next parse and the line would not be a fixed point. Only the emoji
+  // dialect can produce such a value (its values run to end-of-line), and its
+  // raw span re-parses to the same record from its new position at the end of
+  // the line — fields are always last, and the value holds no `[`, marker, or
+  // token-initial `#` that would end it early (myne-md/myne#703).
+  const verbatim = (f: PreservedTaskField) =>
+    parts.push(f.value.includes("]") ? f.raw : field(f.key, f.value));
   fields.preserved.forEach(verbatim);
   fields.malformed.forEach(verbatim);
 
