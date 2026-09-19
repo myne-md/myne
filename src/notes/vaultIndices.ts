@@ -8,11 +8,6 @@
 // second resolver, so chip-vs-panel resolution can never diverge.
 
 import { invoke } from "../platform/core";
-// Sub-entry, not the barrel: `@myne/editor` re-exports CMEditor + myneExtensions,
-// and this module is on the boot path (editor-host → vaultIndices), so a barrel
-// import would drag the whole CodeMirror graph into the first-load bundle.
-// wikilink/anchor is CodeMirror-free (it only depends on @myne/dialect).
-import { extractBlockAnchors } from "@myne/editor/wikilink/anchor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
 import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
@@ -60,74 +55,38 @@ export type TagEntry = {
   display: string;
 };
 
-/** One imported `^block-id` anchor — TS mirror of the Rust `BlockAnchor`
- *  (MYND-382). Enumerate-only: surfaces markers that already exist (import),
- *  never mints one. `preview` is the tagged block's first-line text (picker
- *  secondary line). serde camelCase. */
-export type BlockAnchorEntry = {
-  blockId: string;
-  preview: string;
-};
-
-/** One heading — TS mirror of the Rust `HeadingEntry` (myne#216). Text + level
- *  only; the byte offsets `headingSections` also produces serve FOLDING, which
- *  runs against the open note's own parse and needs no vault-wide copy.
- *  serde camelCase. */
-export type HeadingEntry = {
-  text: string;
-  level: number;
-};
-
-/** One vault-wide heading row — TS mirror of the Rust `VaultHeadingRow`
- *  (myne#216). Deliberately carries no note title/folder: the consumer joins
- *  against the resident note-set anyway (that join is where trashed/template
- *  exclusion lives), and a second copy here would go stale between a rename and
- *  the re-apply that follows it. */
-export type VaultHeadingRow = {
-  noteId: string;
-  text: string;
-  level: number;
-};
-
-/** Max characters of block text kept as the picker preview line. */
-const BLOCK_ANCHOR_PREVIEW_CAP = 120;
-
-/** The line-tail marker grammar (mirrors `extractBlockAnchors`) — used only to
- *  strip the ` ^id` suffix from a preview line. */
-const BLOCK_MARKER_TAIL = /(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$/;
-
-/**
- * Enumerate a note's imported `^block-id` anchors as `{blockId, preview}`
- * entries for the vault-wide `[[^^` index (MYND-382). Reuses the single dialect
- * scanner `extractBlockAnchors` for the marker grammar, then derives each
- * preview from the tagged block's line (marker stripped, whitespace-collapsed,
- * capped). Enumerate-only — mints nothing.
- */
-export function extractBlockAnchorEntries(body: string): BlockAnchorEntry[] {
-  return extractBlockAnchors(body).map(({ blockId, from }) => {
-    const nl = body.indexOf("\n", from);
-    const line = body.slice(from, nl === -1 ? undefined : nl);
-    let preview = line.replace(BLOCK_MARKER_TAIL, "").replace(/\s+/g, " ").trim();
-    // An own-line marker (`^id` alone on its line) is Obsidian's form for a
-    // NON-paragraph block (table / list / callout / code): the marker refers to
-    // the PRECEDING block, so the marker line strips to empty. Fall back to the
-    // nearest preceding non-empty line so the picker still shows a real preview.
-    if (preview === "") preview = precedingNonEmptyLine(body, from);
-    return { blockId, preview: preview.slice(0, BLOCK_ANCHOR_PREVIEW_CAP) };
-  });
-}
-
-/** The nearest non-empty line strictly before offset `from` (a marker line's
- *  start), whitespace-collapsed — the preview for an own-line block marker. */
-function precedingNonEmptyLine(body: string, from: number): string {
-  const before = body.slice(0, from > 0 ? from - 1 : 0);
-  const lines = before.split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const trimmed = lines[i]!.replace(/\s+/g, " ").trim();
-    if (trimmed !== "") return trimmed;
-  }
-  return "";
-}
+// The vault-wide picker halves that are not desktop-specific, meaning the
+// `[[##` heading row/entry types with their join and the `[[^^` block-anchor
+// types with their per-note extraction, moved to
+// `@myne/editor/host/notes/{vaultHeadings,blockAnchors}` (myne-md/myne#452), so
+// the mobile client answers them with this code rather than a copy of it. Same
+// move `graphModel` made in #199, and re-exported here for the same reason:
+// THIS module stays the IPC surface and every existing import site keeps
+// working unchanged.
+// Sub-entries, not the barrel: `@myne/editor` re-exports CMEditor +
+// myneExtensions, and this module is on the boot path (editor-host ->
+// vaultIndices), so a barrel import would drag the whole CodeMirror graph into
+// the first-load bundle. Both modules below are CodeMirror-free (`blockAnchors`
+// reaches `wikilink/anchor`, which depends only on `@myne/dialect`). Keep these
+// paths; do not collapse them to `@myne/editor`.
+export {
+  extractBlockAnchorEntries,
+  type BlockAnchorEntry,
+  type VaultBlockAnchor,
+} from "@myne/editor/host/notes/blockAnchors";
+export type {
+  HeadingEntry,
+  VaultHeadingRow,
+} from "@myne/editor/host/notes/vaultHeadings";
+import {
+  extractBlockAnchorEntries,
+  type BlockAnchorEntry,
+  type VaultBlockAnchor,
+} from "@myne/editor/host/notes/blockAnchors";
+import type {
+  HeadingEntry,
+  VaultHeadingRow,
+} from "@myne/editor/host/notes/vaultHeadings";
 
 /**
  * Build the note's tag list: inline `#tags` (already numeric-rejected +
@@ -220,18 +179,6 @@ export async function vaultIndicesAllEdges(): Promise<
 export async function vaultIndicesOrphans(): Promise<string[]> {
   return await invoke<string[]>("plugin:vault-indices|vault_indices_orphans");
 }
-
-/** One resolved vault-wide block anchor — TS mirror of the Rust
- *  `VaultBlockAnchor` (MYND-382). The `[[^^` picker row: which note carries the
- *  anchor (id + title) + the block id + preview. Opening inserts a
- *  `[[<note>^blockId]]` deep-link. */
-export type VaultBlockAnchor = {
-  noteId: string;
-  noteTitle: string | null;
-  noteFolder: string | null;
-  blockId: string;
-  preview: string;
-};
 
 /**
  * Every imported `^block-id` anchor across the vault (MYND-382, the `[[^^`

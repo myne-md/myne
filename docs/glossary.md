@@ -1152,6 +1152,14 @@ The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialize
 
 Used in: `spec/sync-protocol.md` (vault head)
 
+### **heading record** &nbsp; 📦 *Product*
+
+The per-note record set the structured index ([`vault.indices`](#vaultindices) / [`MYI1`](#myi1), `spec/protocol.md` §9.8.2) holds for each heading in a note body: `{text, level}` and nothing else. The source for the vault-wide `[[##` picker, replacing a read-and-reparse of every note body on each index change. Sibling of the [line-task projection](#line-task-projection) and the [block anchor](#block-anchor) records in the same payload, and the cheapest of the three: the client fills it from the parse an index update already runs, so it costs no extra pass.
+
+Two deliberate omissions. The **byte offsets** a heading scanner also produces are not stored: they serve heading folding, which runs against the open note's own parse, and a vault-wide copy of them would go stale. And a row carries **no note title or folder**, unlike a block-anchor row, because the consumer must join against the resident note-set regardless, to drop trashed and template notes, and that join already holds both. The index itself is trash-blind.
+
+Used in: `spec/protocol.md` §9.8.2; `decisions.md` 2026-09-19 (0594)
+
 ### **HKDF (HKDF-SHA-256)** &nbsp; 🔐 *Primitive*
 
 The HMAC-based Extract-and-Expand Key Derivation Function defined in RFC 5869, instantiated with SHA-256. Myne calls `HKDF-Extract(salt=zero_32, IKM=root_key)` once per session to produce the PRK, then `HKDF-Expand(PRK, info=context_string, L)` for each subkey. All HKDF-Expand invocations go through the `derive_key` helper (§3.2.1) — direct invocation is forbidden.
@@ -3313,7 +3321,7 @@ Vault-level singleton encrypted blob ([`MYG1`](#myg1), `spec/protocol.md` §9.19
 
 ### **vault.indices** &nbsp; 📦 *Product*
 
-Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records** (MYND-31 design; persistence landed by MYND-271). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
+Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records**, plus three per-note record kinds the entry used to omit: the imported **[block anchor](#block-anchor) records** behind the `[[^^` picker (MYND-382), the **[line-task projection](#line-task-projection)** (MYND-612), and the **[heading records](#heading-record)** behind the `[[##` picker (myne#216) (MYND-31 design; persistence landed by MYND-271, and `spec/protocol.md` §9.8.2 is the normative enumeration). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
 
 Used in: `spec/protocol.md` §9.8; `decisions.md` 2026-06-14 (MYND-271)
 

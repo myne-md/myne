@@ -174,9 +174,12 @@ fn main() {
             )
             .plugin(
                 // MYND-31 (A11 — VaultIndices): shared from `myne-core`; the
-                // same 12 commands the desktop registers. Adding a command here
+                // same 16 commands the desktop registers. Adding a command here
                 // without a matching entry in
                 // `permissions/vault-indices/default.toml` is a security bug.
+                // The count is spelled out because it was stale twice (it read
+                // "12" while the list held 13, then 14), and a stale number reads
+                // as a checked one.
                 "vault-indices",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "vault_indices_apply",
@@ -193,6 +196,11 @@ fn main() {
                     "vault_indices_persist",
                     "vault_indices_hydrate",
                     "vault_indices_tasks",
+                    // myne-md/myne#452: the `[[##` and `[[^^` whole-vault picker
+                    // dumps. Both pickers already mount on mobile, so their
+                    // absence here showed up as two pickers that opened empty.
+                    "vault_indices_headings",
+                    "vault_indices_block_anchors",
                 ]),
             )
             .plugin(
