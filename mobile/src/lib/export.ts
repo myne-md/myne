@@ -17,7 +17,7 @@
 // myne-md/myne#491. See `mobile/src-tauri/src/backup_exclude.rs`.
 
 import { invoke } from "../platform/core";
-import { documentDir, join } from "../platform/path";
+import { exportPath } from "../platform/path";
 
 /** Result of {@link vaultExportMarkdown} — mirror of Rust `VaultExportSummary`. */
 export interface VaultExportSummary {
@@ -56,6 +56,10 @@ export async function defaultExportDestination(): Promise<{ path: string; label:
   const p = (n: number) => String(n).padStart(2, "0");
   const stamp = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}${p(now.getMinutes())}`;
   const name = `Myne Export ${stamp}`;
-  const path = await join(await documentDir(), name);
-  return { path, label: `Documents/${name}` };
+  const { path, dir, name: basename } = await exportPath(name);
+  // The label names the basename the HOST used, not the one passed in. The two
+  // are the same for this literal and differ the moment a name carries a
+  // separator, and a label built from the argument names a file that does not
+  // exist.
+  return { path, label: `${dir}/${basename}` };
 }

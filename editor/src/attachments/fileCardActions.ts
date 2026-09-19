@@ -21,11 +21,14 @@ import { showAttachmentToast } from "./toast";
 export const REVEAL_ATTACHMENT_EVENT = "myne:reveal-attachment";
 
 /**
- * Export (Save As) one attachment's decrypted bytes. Opens the native save
- * dialog with the filename as the default; cancelling is a silent no-op. The
- * plaintext is decrypted + written entirely host-side (it never re-enters the
- * WebView). Type-agnostic — the single shared action behind both the file-card
- * Export menu item and the image/PDF lightbox Save-As button (both MYND-173).
+ * Export (Save As) one attachment's decrypted bytes. The HOST decides the
+ * destination: desktop opens a native save dialog with the filename as the
+ * default and cancelling is a silent no-op, while mobile has no dialog at all
+ * and returns a path under its export directory, sanitized host-side, which may
+ * differ from `filename`. The plaintext is decrypted and written entirely
+ * host-side (it never re-enters the WebView). Type-agnostic, the single shared
+ * action behind both the file-card Export menu item and the image/PDF lightbox
+ * Save-As button (both MYND-173).
  */
 export async function exportAttachment(id: string, filename: string): Promise<void> {
   let dest: string | null;
@@ -35,16 +38,46 @@ export async function exportAttachment(id: string, filename: string): Promise<vo
     // entirely host-side (it never re-enters the WebView).
     dest = await pickExportDestination(filename);
   } catch {
+    // The string this renders is deliberately NOT "Couldn't open the save
+    // dialog." any more (myne#517). Desktop opens one; mobile has none, and
+    // `pickExportDestination` there is a host call that can REFUSE, including
+    // when the export directory's platform-backup exclusion does not read back
+    // as set. Telling a phone user that a dialog failed names an affordance the
+    // platform does not have, and sends a support report hunting for it.
+    //
+    // What this still cannot do is distinguish that security refusal from a full
+    // disk: both arrive here as a rejected promise and both render as one
+    // sentence. Giving the refusal its own string needs a new key in 32
+    // catalogs; the host-side kind reaches the console in the meantime.
     showAttachmentToast(i18n.t("editor.attachment.actions.saveDialogFailed"), "error");
     return;
   }
   if (dest === null) return; // cancelled
+  // The file that will actually exist, which is NOT always the `filename`
+  // argument. Mobile sanitizes host-side, so an attachment named `../../x`
+  // lands as `_.._x` and one named `..pdf` lands under the caller's fallback;
+  // naming the argument in the toast reports a file that is not there. Desktop's
+  // dialog can rename too. Derived from the destination rather than passed back
+  // through the seam, because the destination is what the host committed to.
+  const written = dest.split(/[\\/]/).pop() || filename;
   try {
-    // The OS save dialog already confirmed any overwrite → overwrite = true.
+    // `overwrite = true`. On DESKTOP the OS save dialog already asked. On mobile
+    // nothing asked, and that is a real gap rather than a nicety: two exports
+    // whose sanitized basenames collide overwrite each other silently, which the
+    // caller-supplied fallback makes reachable for odd names as well as for
+    // genuinely identical ones. Closing it needs a non-clobbering destination or
+    // a confirmation the host seam has no way to express today, so the toast
+    // naming the REAL file is what makes the collision visible in the meantime.
     await attachmentExport(id, dest, true);
-    showAttachmentToast(i18n.t("editor.attachment.actions.exported", { filename }), "success");
+    showAttachmentToast(
+      i18n.t("editor.attachment.actions.exported", { filename: written }),
+      "success",
+    );
   } catch {
-    showAttachmentToast(i18n.t("editor.attachment.actions.exportFailed", { filename }), "error");
+    showAttachmentToast(
+      i18n.t("editor.attachment.actions.exportFailed", { filename: written }),
+      "error",
+    );
   }
 }
 

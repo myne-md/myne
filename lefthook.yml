@@ -198,6 +198,22 @@ pre-commit:
       glob: "{mobile/**,scripts/check-mobile-export-backup.mjs}"
       run: node scripts/check-mobile-export-backup.mjs
 
+    mobile-plugin-acl:
+      # myne#517: every `<plugin>:default` grant in the mobile capability
+      # resolves to a permission set that exists. Deleting
+      # permissions/<plugin>/default.toml leaves `cargo build` GREEN, because
+      # tauri-utils maps a `<plugin>:default` with no default_permission onto an
+      # EMPTY set with no error, so every command in that plugin is refused at
+      # runtime and the feature is simply inert with nothing reporting it.
+      #
+      # Same glob shape as its neighbour above and a wider denominator: all 27
+      # mobile plugin permission directories, compared both ways. Separate from
+      # the export-backup guard on purpose: this is availability (a grant must
+      # resolve), that one is confidentiality (plaintext must not reach a
+      # platform backup).
+      glob: "{mobile/**,scripts/check-mobile-plugin-acl.mjs}"
+      run: node scripts/check-mobile-plugin-acl.mjs
+
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
       # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a

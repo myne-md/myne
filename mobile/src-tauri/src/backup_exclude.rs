@@ -15,13 +15,34 @@
 //!
 //! ## What this module does
 //!
-//! Sets `NSURLIsExcludedFromBackupKey` on the **directory**, once, at startup.
+//! Sets `NSURLIsExcludedFromBackupKey` on the **directory**, through one body
+//! with two entry points (myne-md/myne#517). [`ensure`] resolves the directory,
+//! creates it, applies the exclusion and hands the path back only if all three
+//! succeeded. [`init`] walks [`ExportDir::ALL`] through it once at startup, and
+//! `plugin:export-dir|export_path` walks the one export destination through it
+//! on every export, which is what the WebView's `exportPath()` seam calls.
 //! Directory-level exclusion covers files created inside it afterwards (Apple
-//! QA1719), so one call closes all four writers and every future one, instead of
-//! each write site having to remember. The Android half of the same decision is
-//! declarative and lives in `android-widgets/src/main/res/xml/myne_backup_rules
-//! *.xml`; `scripts/check-mobile-export-backup.mjs` holds the two halves to the
-//! same directory roster in both directions.
+//! QA1719), so the startup call alone already closed all four writers and every
+//! future one. What the command adds is that no caller ever HOLDS a destination
+//! whose exclusion did not take: the startup path warns and carries on, because
+//! a failure there must not block a launch, while the command fails closed,
+//! because its caller's next act is to write plaintext into what it returns.
+//!
+//! [`init`] stays rather than being replaced by the command, and the reason is
+//! not symmetry. It carries the second, written purpose of repairing a container
+//! restored from an older backup that predates this call, and it is what makes
+//! `mobile/docs/dev/device-matrix.md` §8 row 8.9 ("launch the app once, then
+//! `ls -l@` Documents") runnable exactly as written. That row has never been
+//! run, and rewriting an unrun procedure is how it stops being run.
+//!
+//! The Android half of the same decision is declarative and lives in
+//! `android-widgets/src/main/res/xml/myne_backup_rules*.xml`;
+//! `scripts/check-mobile-export-backup.mjs` holds the Android rules to the
+//! directory roster this enum defines. One direction: every name here must be
+//! excluded there. The reverse, an XML `<exclude>` for a directory nothing
+//! writes to, is not flagged, and saying "both directions" (as this doc did for
+//! a round) describes the pre-myne#517 guard, which compared a hand-kept TS
+//! roster against a `&[&str]` and had a stale-entry arm to go with it.
 //!
 //! The exclusion is a property of the destination, **not** a substitute for the
 //! `0600` create mode or the app-data containment check in
@@ -64,121 +85,240 @@
 //! flag genuinely lands (`the_exclusion_lands_as_the_backupd_xattr`). The
 //! composition of the two is five visible lines and a reviewer's job.
 
-/// The directories this module excludes from platform backup, as the *names*
-/// `scripts/check-mobile-export-backup.mjs` compares against the roster of
-/// `@tauri-apps/api/path` accessors the mobile tree actually calls and against
-/// the Android backup-rules XML. A directory reachable from `mobile/src` that is
-/// absent here is an egress channel nothing closed — which is exactly the
-/// pre-#491 state, one accessor over.
+/// A directory this module keeps out of the platform's automatic cloud backup.
 ///
-/// Kept as a plain slice rather than folded into [`init`] so the guard can read
-/// the iOS side of the contract without parsing Rust control flow. That
-/// convenience used to cost a fail-open hole: the guard reads this literal and
-/// never the `match` that maps a name to a resolver, so a name added here with
-/// no arm compiled, passed every check, and warned to a device log nobody reads
-/// while excluding nothing. [`resolver_kind`] and
-/// [`tests::every_excluded_dir_has_a_resolver`] close it, so an unwired entry
-/// now fails `cargo test` on every platform rather than at runtime on one.
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
-pub const EXCLUDED_DIRS: &[&str] = &["Documents"];
-
-/// Which Tauri path accessor resolves a roster name, or `None` when nothing
-/// does. Split out of [`init`] so the mapping is testable off iOS: the failure
-/// it guards (a roster entry with no resolver) is a property of the pair, and
-/// pairing them only inside an `#[cfg(target_os = "ios")]` function is what made
-/// the mismatch invisible to every platform anything runs on.
-#[derive(Debug, PartialEq, Eq)]
-pub enum ResolverKind {
-    /// `PathResolver::document_dir()`, the directory `documentDir()` hands the
-    /// WebView.
-    DocumentDir,
+/// A TYPE rather than the `EXCLUDED_DIRS: &[&str]` roster this used to be
+/// (myne-md/myne#517). The string list needed [`ExportDir::from_name`]'s
+/// ancestor and a test beside it to stop a name being added with nothing behind
+/// it, because a name is only a name: it compiled, satisfied the guard, the
+/// Android XML and the TS roster all at once, then excluded nothing at runtime
+/// and said so only in a device log. A variant cannot be added without an arm in
+/// [`Self::name`] and one in [`Self::resolve`], and the compiler is what says
+/// so. A test can be deleted; a match arm cannot.
+///
+/// [`Self::name`] survives the change because two things compare against these
+/// directory NAMES and neither of them reads Rust: the Android backup-rules XML,
+/// and `scripts/check-mobile-export-backup.mjs`, which requires every name here
+/// to be excluded there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportDir {
+    /// The app's `Documents` container, `PathResolver::document_dir()` on both
+    /// targets. It is the directory `documentDir()` used to hand the WebView
+    /// directly, and is now reachable only through `plugin:export-dir|export_path`.
+    Documents,
 }
 
-/// Note the deliberate absence of a catch-all returning a default: an unknown
-/// name resolves to `None`, and the test turns that into a build failure.
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
-pub fn resolver_kind(dir: &str) -> Option<ResolverKind> {
-    match dir {
-        "Documents" => Some(ResolverKind::DocumentDir),
-        _ => None,
+impl ExportDir {
+    /// Every variant, which is what [`init`] walks at startup.
+    ///
+    /// Hand-written, and that is the one hole the enum opens which the slice did
+    /// not have: a variant declared with both of its match arms present is still
+    /// absent from here, and so is never excluded at startup.
+    /// `scripts/check-mobile-export-backup.mjs` compares this list against the
+    /// `enum ExportDir` declaration for exactly that reason, in ONE direction:
+    /// a declared variant absent from here fails. The reverse, this list naming
+    /// a variant the enum does not declare, is E0599 and does not compile, so a
+    /// guard arm for it was two messages for a defect `cargo build` already
+    /// refuses. This doc said "both directions" for a round while
+    /// `docs/decisions/security/0595` said one; the entry was the correct half.
+    #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+    pub const ALL: &'static [ExportDir] = &[ExportDir::Documents];
+
+    /// The directory's NAME, relative to the platform export root rather than a
+    /// path. This is the string the Android backup rules carry in
+    /// `<exclude domain="external" path="…"/>` and the string the guard reads.
+    pub const fn name(self) -> &'static str {
+        match self {
+            ExportDir::Documents => "Documents",
+        }
+    }
+
+    /// The inverse of [`Self::name`], and note the deliberate absence of a
+    /// catch-all returning a default: an unknown name resolves to `None`, and
+    /// `tests::an_unwired_directory_resolves_to_nothing` turns a catch-all added
+    /// later into a test failure.
+    ///
+    /// `cfg(test)` rather than an `allow(dead_code)`, because the test module is
+    /// its only caller and saying so is cheaper than a silenced warning. It was
+    /// `cfg_attr(not(target_os = "ios"), allow(dead_code))` for one round, which
+    /// warned on exactly the target that matters here and nowhere else: the
+    /// Linux CI runner cannot build for iOS at all, so
+    /// `cargo check --target aarch64-apple-ios-sim` by hand is what found it.
+    #[cfg(test)]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "Documents" => Some(ExportDir::Documents),
+            _ => None,
+        }
+    }
+
+    /// Resolve through Tauri's own path API rather than composing the path here:
+    /// this MUST be the same directory the export flows write into, and the only
+    /// way to guarantee that is to ask the same resolver they ask.
+    fn resolve<R: tauri::Runtime>(
+        self,
+        resolver: &tauri::path::PathResolver<R>,
+    ) -> tauri::Result<std::path::PathBuf> {
+        match self {
+            ExportDir::Documents => resolver.document_dir(),
+        }
     }
 }
 
-/// Exclude the app's export directories from iCloud Backup. Idempotent — the
-/// resource value is re-set on every launch, which also repairs a container
-/// restored from an older backup that predates this call.
+/// Why [`ensure`] did not hand back a directory.
+///
+/// Closed taxonomy, and it carries no path string. The startup path logs it, and
+/// `plugin:export-dir|export_path` maps it onto its own IPC error. See the main
+/// repo's `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnsureError {
+    /// Tauri's path resolver failed, so there is no directory to speak of.
+    Unresolved,
+    /// The directory could not be created.
+    Mkdir(std::io::ErrorKind),
+    /// The resolved path is not UTF-8, so the Foundation bridge cannot take it.
+    NonUtf8,
+    /// The exclusion flag does not read back as set on the directory.
+    NotExcluded,
+}
+
+impl EnsureError {
+    /// The `event` field the startup path logs. The four strings are the ones
+    /// `init` has always emitted, kept verbatim so a device-log grep written
+    /// against the old shape still finds the new one.
+    #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+    pub const fn event(self) -> &'static str {
+        match self {
+            EnsureError::Unresolved => "backup_exclude_unresolved",
+            EnsureError::Mkdir(_) => "backup_exclude_mkdir_failed",
+            EnsureError::NonUtf8 => "backup_exclude_non_utf8_path",
+            EnsureError::NotExcluded => "backup_exclude_failed",
+        }
+    }
+}
+
+/// Resolve, create, exclude, in that order, and hand the path back only when all
+/// three succeeded.
+///
+/// **The order is the property**, and it is asserted by
+/// `tests::the_exclusion_is_applied_before_the_caller_holds_a_path` rather than
+/// described here, because a comment cannot carry it: if the mkdir and the
+/// exclude are ever swapped the failure is silent, the flag lands on nothing,
+/// and every export after that is backed up while this function still returns
+/// `Ok`.
+///
+/// `exclude` is a parameter rather than a direct call so that ordering is
+/// observable off iOS. Everything here except the Foundation call is
+/// platform-independent, and the Foundation call is the one part that already
+/// has its own tests (`tests::macos`). Injecting it is what lets the ordering be
+/// checked by `cargo test` on Linux and on a Mac, rather than only on a device
+/// nobody has run row 8.9 against.
+fn ensure_with<F>(
+    resolved: tauri::Result<std::path::PathBuf>,
+    exclude: F,
+) -> Result<std::path::PathBuf, EnsureError>
+where
+    F: FnOnce(&str) -> bool,
+{
+    let path = resolved.map_err(|_| EnsureError::Unresolved)?;
+    // A first launch that has not exported anything yet may have no such
+    // directory. Create it now: the flag has to be set BEFORE the first write,
+    // and setting it on a missing path is a no-op that would leave the first
+    // export backed up (`tests::macos::a_missing_directory_is_not_reported_as_excluded`
+    // is that claim, checked rather than assumed). Unconditional because
+    // `create_dir_all` is already `Ok(())` on an existing directory, and an
+    // `exists()` test in front of it only adds a window in which the answer
+    // stops being true.
+    std::fs::create_dir_all(&path).map_err(|e| EnsureError::Mkdir(e.kind()))?;
+    let as_str = path.to_str().ok_or(EnsureError::NonUtf8)?;
+    if !exclude(as_str) {
+        // Fail CLOSED, which is the one place the command and the startup path
+        // differ: handing the path back here would give a caller a directory
+        // nothing excluded, and that caller's next act is to write plaintext
+        // into it. `init` turns this into a warn and carries on, because a
+        // failure there must not block a launch and the pre-#491 behaviour is
+        // what it falls back to.
+        return Err(EnsureError::NotExcluded);
+    }
+    Ok(path)
+}
+
+/// The platform's exclusion call.
+#[cfg(target_os = "ios")]
+fn exclude_from_backup_at(path: &str) -> bool {
+    apple::exclude_from_backup(path)
+}
+
+/// Android carries the same property declaratively, the two `<application>`
+/// attributes `android:dataExtractionRules` and `android:fullBackupContent`, from
+/// the committed `android-widgets` library manifest, so there is nothing to do
+/// at runtime. Desktop targets have no platform backup of this kind. `true`
+/// rather than `false`, because the directory IS excluded on Android by a
+/// mechanism this function does not own; answering `false` would fail every
+/// export there on a property that holds.
+#[cfg(not(target_os = "ios"))]
+fn exclude_from_backup_at(_path: &str) -> bool {
+    true
+}
+
+/// Resolve `dir`, create it, and exclude it from platform backup. The shared
+/// body behind both entry points: [`init`] at startup and
+/// `plugin:export-dir|export_path` on every export.
+pub fn ensure<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    dir: ExportDir,
+) -> Result<std::path::PathBuf, EnsureError> {
+    use tauri::Manager;
+
+    ensure_with(dir.resolve(app.path()), exclude_from_backup_at)
+}
+
+/// Which directory every mobile export flow writes into.
+///
+/// Named here rather than derived from [`ExportDir::ALL`], because which
+/// directory the exports land in is a decision and not a consequence of the
+/// roster's length. It is a `const` rather than a literal inside
+/// [`ensure_export_dir`] so that the plugin's `dir` field and the path it
+/// accompanies come from ONE variant: they were two independent
+/// `ExportDir::Documents` mentions for a review round, which is the same drift
+/// the field exists to remove, one level down.
+pub const EXPORT_DESTINATION: ExportDir = ExportDir::Documents;
+
+/// The single destination every mobile export flow writes into, ready to be
+/// written into.
+pub fn ensure_export_dir<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<std::path::PathBuf, EnsureError> {
+    ensure(app, EXPORT_DESTINATION)
+}
+
+/// Exclude the app's export directories from iCloud Backup at startup.
+/// Idempotent, the resource value is re-set on every launch, which also repairs
+/// a container restored from an older backup that predates this call.
 ///
 /// Never panics and never blocks startup: every failure is a `tracing::warn!`,
 /// following `share_file.rs` / `screen_guard.rs`. A failure here means the
-/// directory stays backed up, which is the pre-#491 behaviour, not a crash.
+/// directory stays backed up, which is the pre-#491 behaviour, not a crash. The
+/// export command is the half that fails closed.
 #[cfg(target_os = "ios")]
 pub fn init<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    use tauri::Manager;
-
-    let resolver = app.path();
-    for dir in EXCLUDED_DIRS {
-        // Resolve through Tauri's own path API rather than composing the path
-        // here: this MUST be the same directory `documentDir()` returns to the
-        // WebView, and the only way to guarantee that is to ask the same
-        // resolver the WebView asks.
-        let path = match resolver_kind(dir) {
-            Some(ResolverKind::DocumentDir) => resolver.document_dir(),
-            None => {
-                // Unreachable in a tree that passes `cargo test`; kept because
-                // the alternative is a panic on a startup path.
-                tracing::warn!(
-                    event = "backup_exclude_unknown_dir",
-                    dir = *dir,
-                    "no resolver wired for this directory; not excluded"
-                );
-                continue;
-            }
-        };
-        let Ok(path) = path else {
+    for dir in ExportDir::ALL {
+        if let Err(e) = ensure(app, *dir) {
             tracing::warn!(
-                event = "backup_exclude_unresolved",
-                dir = *dir,
-                "path resolver failed; directory not excluded from backup"
-            );
-            continue;
-        };
-        // A first launch that has not exported anything yet may have no such
-        // directory. Create it now: the flag has to be set BEFORE the first
-        // write, and setting it on a missing path is a no-op that would leave
-        // the first export backed up. Unconditional because `create_dir_all` is
-        // already `Ok(())` on an existing directory, and an `exists()` test in
-        // front of it only adds a window in which the answer stops being true.
-        if let Err(e) = std::fs::create_dir_all(&path) {
-            tracing::warn!(
-                event = "backup_exclude_mkdir_failed",
-                dir = *dir,
-                error_kind = ?e.kind(),
-                "could not create directory; not excluded from backup"
-            );
-            continue;
-        }
-        let Some(path) = path.to_str() else {
-            tracing::warn!(
-                event = "backup_exclude_non_utf8_path",
-                dir = *dir,
-                "path is not UTF-8; directory not excluded from backup"
-            );
-            continue;
-        };
-        if !apple::exclude_from_backup(path) {
-            tracing::warn!(
-                event = "backup_exclude_failed",
-                dir = *dir,
-                "the exclusion flag does not read back as set; directory not excluded from backup"
+                event = e.event(),
+                dir = dir.name(),
+                reason = ?e,
+                "directory not excluded from platform backup"
             );
         }
     }
 }
 
-/// Android carries the same property declaratively — the two `<application>`
-/// attributes `android:dataExtractionRules` and `android:fullBackupContent`, from
-/// the committed `android-widgets` library manifest — so there is nothing to do
-/// at runtime. Desktop targets have no platform backup of this kind.
+/// Android carries the same property declaratively (see
+/// [`exclude_from_backup_at`]), so there is nothing to do at startup. Desktop
+/// targets have no platform backup of this kind. The export command still runs
+/// [`ensure`] on these targets, because the resolve-and-create half is needed
+/// everywhere; only the exclusion half is a no-op.
 #[cfg(not(target_os = "ios"))]
 pub fn init<R: tauri::Runtime>(_app: &tauri::AppHandle<R>) {}
 
@@ -258,49 +398,156 @@ mod apple {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolver_kind, EXCLUDED_DIRS};
+    use super::{ensure_with, EnsureError, ExportDir};
+
+    /// A scratch directory that removes itself, so a failing assert does not
+    /// leave one behind. Deliberately separate from the one inside
+    /// `mod macos`: these tests run on every platform and that module compiles
+    /// only on a Mac.
+    struct ScratchDir(std::path::PathBuf);
+
+    impl ScratchDir {
+        fn new(tag: &str) -> Self {
+            let mut path = std::env::temp_dir();
+            path.push(format!(
+                "myne-ensure-export-dir-{tag}-{}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).expect("scratch dir");
+            Self(path)
+        }
+    }
+
+    impl Drop for ScratchDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     /// The roster is what `scripts/check-mobile-export-backup.mjs` compares the
     /// Android rules XML against; an empty or duplicated one would make that
     /// comparison vacuous while still passing.
     #[test]
     fn excluded_dirs_is_non_empty_and_unique() {
-        assert!(!EXCLUDED_DIRS.is_empty(), "roster may not be empty");
+        assert!(!ExportDir::ALL.is_empty(), "roster may not be empty");
         let mut seen = std::collections::BTreeSet::new();
-        for dir in EXCLUDED_DIRS {
-            assert!(seen.insert(*dir), "duplicate directory in roster: {dir}");
-            assert!(!dir.is_empty(), "empty directory name in roster");
+        for dir in ExportDir::ALL {
+            let name = dir.name();
+            assert!(seen.insert(name), "duplicate directory in roster: {name}");
+            assert!(!name.is_empty(), "empty directory name in roster");
             assert!(
-                !dir.contains('/') && !dir.contains('\\'),
+                !name.contains('/') && !name.contains('\\'),
                 "roster holds directory NAMES relative to the platform export \
-                 root, not paths: {dir}"
+                 root, not paths: {name}"
             );
         }
     }
 
-    /// The fail-open hole the guard cannot see. `scripts/check-mobile-export-backup.mjs`
-    /// reads the `EXCLUDED_DIRS` literal and never the mapping, so a name added
-    /// to the roster with no resolver behind it satisfies the guard, the Android
-    /// XML and the TS roster all at once, then excludes nothing at runtime and
-    /// says so only in a device log.
+    /// The fail-open hole the guard cannot see, in the form it takes now that
+    /// the roster is a type.
+    ///
+    /// Renamed from `every_excluded_dir_has_a_resolver`, because that is no
+    /// longer what it does and the name is what the next grep finds. `ExportDir::resolve` is exhaustive, so a variant
+    /// with no resolver arm no longer compiles and this test cannot be about
+    /// that any more. What it is about instead is the NAME: two things outside
+    /// Rust compare against `name()` (the Android rules XML and the guard), and
+    /// a name that does not map back to the variant that produced it means the
+    /// roster and the resolver have drifted while every match stayed exhaustive.
     #[test]
-    fn every_excluded_dir_has_a_resolver() {
-        for dir in EXCLUDED_DIRS {
-            assert!(
-                resolver_kind(dir).is_some(),
-                "EXCLUDED_DIRS carries {dir:?} and no resolver arm answers it, so iOS would \
-                 warn and exclude nothing. Add the arm in `resolver_kind`."
+    fn every_roster_name_maps_back_to_its_variant() {
+        for dir in ExportDir::ALL {
+            assert_eq!(
+                ExportDir::from_name(dir.name()),
+                Some(*dir),
+                "ExportDir::ALL carries {dir:?}, whose name {:?} maps back to something else. \
+                 The Android XML and scripts/check-mobile-export-backup.mjs both address this \
+                 directory by that name, so the two sides are describing different directories.",
+                dir.name()
             );
         }
     }
 
     /// Reject the name nothing resolves, rather than trusting a `match` to have
-    /// no catch-all. A `_ => Some(ResolverKind::DocumentDir)` would make the
-    /// test above pass for every possible string.
+    /// no catch-all. A `_ => Some(ExportDir::Documents)` would make the test
+    /// above pass for every possible string.
     #[test]
     fn an_unwired_directory_resolves_to_nothing() {
-        assert!(resolver_kind("Downloads").is_none());
-        assert!(resolver_kind("").is_none());
+        assert!(ExportDir::from_name("Downloads").is_none());
+        assert!(ExportDir::from_name("").is_none());
+    }
+
+    /// **The ordering property, asserted rather than described.** The exclusion
+    /// must be applied before anything can be written into the directory, and
+    /// the only writer is whoever holds the path, so the claim is that the
+    /// exclusion runs while the directory exists and is still empty, and that
+    /// the path is returned afterwards.
+    ///
+    /// Swapping the `create_dir_all` and the `exclude` in [`super::ensure_with`]
+    /// fails the first assert; deleting the `create_dir_all` fails it too. Both
+    /// were checked by reverting, because a test that passes against the defect
+    /// it names is not a test.
+    #[test]
+    fn the_exclusion_is_applied_before_the_caller_holds_a_path() {
+        let scratch = ScratchDir::new("order");
+        let target = scratch.0.join("Documents");
+        let order = std::cell::RefCell::new(Vec::<&'static str>::new());
+
+        let out = ensure_with(Ok(target.clone()), |path| {
+            let at = std::path::Path::new(path);
+            assert!(
+                at.is_dir(),
+                "the exclusion ran before the directory existed, so it lands on nothing \
+                 and every export after it is backed up"
+            );
+            assert_eq!(
+                std::fs::read_dir(at).expect("read_dir").count(),
+                0,
+                "something was written into the directory before it was excluded"
+            );
+            order.borrow_mut().push("excluded");
+            true
+        });
+
+        order.borrow_mut().push("returned");
+        assert_eq!(out.expect("ensure_with"), target);
+        assert_eq!(*order.borrow(), ["excluded", "returned"]);
+    }
+
+    /// Fail closed. A directory whose exclusion did not take must not reach a
+    /// caller, because the caller's next act is to write plaintext into it.
+    /// Deleting the early return in [`super::ensure_with`] fails this.
+    #[test]
+    fn a_directory_that_could_not_be_excluded_is_not_handed_to_the_caller() {
+        let scratch = ScratchDir::new("closed");
+        let target = scratch.0.join("Documents");
+
+        let out = ensure_with(Ok(target.clone()), |_| false);
+
+        assert_eq!(out, Err(EnsureError::NotExcluded));
+        // The mkdir DID run, and the caller still got nothing. That is the
+        // point: the directory existing is not what an export is allowed to
+        // proceed on.
+        assert!(target.is_dir());
+    }
+
+    /// A resolver failure stops before anything is created, so a wrong or
+    /// missing container is never quietly brought into existence.
+    #[test]
+    fn an_unresolved_directory_is_never_created() {
+        let calls = std::cell::Cell::new(0_u32);
+
+        let out = ensure_with(
+            Err(tauri::Error::Io(std::io::Error::other("no document dir"))),
+            |_| {
+                calls.set(calls.get() + 1);
+                true
+            },
+        );
+
+        assert_eq!(out, Err(EnsureError::Unresolved));
+        assert_eq!(calls.get(), 0, "the exclusion ran on an unresolved path");
     }
 
     /// The Apple half, run for real. macOS is the only Apple target anything in

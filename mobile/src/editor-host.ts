@@ -17,7 +17,9 @@ import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/h
 import { isMediaTarget } from "@myne/editor/host/notes/graphModel";
 import i18n from "@myne/i18n";
 import { openUrl } from "./lib/open-url";
-import { documentDir, join } from "./platform/path";
+import { exportFallbackStem } from "./lib/exportFallbackStem";
+import { logErrorKind } from "./lib/vault-creation-logging";
+import { exportPath } from "./platform/path";
 import {
   attachmentExport,
   attachmentImport,
@@ -100,12 +102,33 @@ const host: EditorHost = {
     // `Android/data/` has been closed to the system Files app since API 30. See
     // `./platform/path.ts`. It is excluded from platform cloud backup on both:
     // myne-md/myne#491, `backup_exclude.rs`.) Overwrites by name
-    // (exportAttachment is called with overwrite=true). Sanitize to a bare
-    // basename first — a crafted attachment name containing `/`, `\`, or a
-    // leading `..` must not let join() escape the Documents directory.
+    // (exportAttachment is called with overwrite=true). The attachment name is
+    // untrusted and is NOT sanitized here any more: `exportPath` reduces it to a
+    // bare basename host-side, in the same call that applies the backup
+    // exclusion, so a crafted name containing `/`, `\` or a leading `..` cannot
+    // escape the export directory (myne#517).
+    //
+    // A fallback is required and dropping it was a real regression rather than a
+    // tightening: the rename prompt rejects only the empty and unchanged cases
+    // and `attachment_rename` rejects only the empty one, so an attachment
+    // renamed to `..` reaches the catalog, and without one it could never be
+    // exported again. The stem is derived rather than the literal
+    // `"attachment"` the deleted TypeScript used, because that literal is
+    // exactly what `auto_filename` produces; see `./lib/exportFallbackStem`.
+    //
+    // The kind is logged before re-throwing, because the shared caller renders
+    // every rejection as one sentence: a `NotExcluded` refusal (the export
+    // directory's backup exclusion did not read back) is otherwise
+    // indistinguishable from a full disk, and this line is the only thing that
+    // makes it diagnosable. Same discipline as `secret-export.ts`: the closed
+    // error KIND only, never a path or a filename.
     pickExportDestination: async (filename) => {
-      const safe = filename.replace(/[/\\]/g, "_").replace(/^\.+/, "").trim() || "attachment";
-      return join(await documentDir(), safe);
+      try {
+        return (await exportPath(filename, exportFallbackStem(filename))).path;
+      } catch (e) {
+        logErrorKind(e, "export-destination-failed");
+        throw e;
+      }
     },
   },
   // The shared `/record` slash command records into the CMEditor view. Mobile
