@@ -69,24 +69,14 @@ export type TagEntry = {
 // the first-load bundle. Both modules below are CodeMirror-free (`blockAnchors`
 // reaches `wikilink/anchor`, which depends only on `@myne/dialect`). Keep these
 // paths; do not collapse them to `@myne/editor`.
-export {
-  extractBlockAnchorEntries,
-  type BlockAnchorEntry,
-  type VaultBlockAnchor,
-} from "@myne/editor/host/notes/blockAnchors";
-export type {
-  HeadingEntry,
-  VaultHeadingRow,
-} from "@myne/editor/host/notes/vaultHeadings";
 import {
   extractBlockAnchorEntries,
   type BlockAnchorEntry,
   type VaultBlockAnchor,
 } from "@myne/editor/host/notes/blockAnchors";
-import type {
-  HeadingEntry,
-  VaultHeadingRow,
-} from "@myne/editor/host/notes/vaultHeadings";
+import type { HeadingEntry, VaultHeadingRow } from "@myne/editor/host/notes/vaultHeadings";
+export { extractBlockAnchorEntries };
+export type { BlockAnchorEntry, VaultBlockAnchor, HeadingEntry, VaultHeadingRow };
 
 /**
  * Build the note's tag list: inline `#tags` (already numeric-rejected +

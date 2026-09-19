@@ -15,22 +15,9 @@ import type { StoredProperty } from "@myne/editor/host/notes/queryEngine";
 // (myne-md/myne#199): a second declaration of a wire type is a second answer
 // waiting to drift. Both were desktop-only until myne-md/myne#452; they are
 // re-exported so a mobile call site names them without a second import path.
-export type {
-  HeadingEntry,
-  VaultHeadingRow,
-} from "@myne/editor/host/notes/vaultHeadings";
-export type {
-  BlockAnchorEntry,
-  VaultBlockAnchor,
-} from "@myne/editor/host/notes/blockAnchors";
-import type {
-  HeadingEntry,
-  VaultHeadingRow,
-} from "@myne/editor/host/notes/vaultHeadings";
-import type {
-  BlockAnchorEntry,
-  VaultBlockAnchor,
-} from "@myne/editor/host/notes/blockAnchors";
+import type { HeadingEntry, VaultHeadingRow } from "@myne/editor/host/notes/vaultHeadings";
+import type { BlockAnchorEntry, VaultBlockAnchor } from "@myne/editor/host/notes/blockAnchors";
+export type { HeadingEntry, VaultHeadingRow, BlockAnchorEntry, VaultBlockAnchor };
 
 // One outbound wikilink edge — mirror of Rust `WikilinkEdge` (camelCase). The
 // local re-declaration is gone (myne-md/myne#199): it typed `targetKind` as a

@@ -177,9 +177,8 @@ fn main() {
                 // same 16 commands the desktop registers. Adding a command here
                 // without a matching entry in
                 // `permissions/vault-indices/default.toml` is a security bug.
-                // The count is spelled out because it was stale twice (it read
-                // "12" while the list held 13, then 14), and a stale number reads
-                // as a checked one.
+                // The count is a weak stand-in for the parity check
+                // `plugins::agent` carries; it has been stale twice.
                 "vault-indices",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "vault_indices_apply",

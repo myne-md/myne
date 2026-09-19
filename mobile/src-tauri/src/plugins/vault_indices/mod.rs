@@ -8,13 +8,14 @@
 //! The whole plugin core (state + commands + `MYI1` persist + error) lives in
 //! `myne-core` (`myne_core::plugins::vault_indices`, shared with the desktop
 //! client). Mobile registers the same 16 commands the desktop registers and
-//! manages `VaultIndicesState` in `lib.rs` setup. The count is written out here
-//! because it was wrong twice: it said 12 while the list held 13, then 14, and a
-//! stale number reads as a checked one. Three sites move in lockstep and nothing
-//! compares them, since there is no mobile ACL parity test: this list,
-//! `build.rs`'s `InlinedPlugin` mirror, and
-//! `permissions/vault-indices/default.toml` (two edits, the `[default]` array
-//! and a `[[permission]]` block).
+//! manages `VaultIndicesState` in `lib.rs` setup. Three sites move in lockstep
+//! and nothing compares them: this list, `build.rs`'s `InlinedPlugin` mirror,
+//! and `permissions/vault-indices/default.toml` (two edits, the `[default]`
+//! array and a `[[permission]]` block). The count is written out as a weak stand
+//! -in and it has been stale twice, which is the argument for adopting what
+//! `plugins::agent` and `plugins::prefs` already carry: an in-crate
+//! `#[cfg(test)]` parity check that `include_str!`s all three and compares them
+//! both ways.
 //!
 //! The lock-teardown wipe is wired, and is NOT wired here: `myne-core` calls
 //! `VaultLifecycleHooks::zeroize_vault_indices` at every slot-drop site, and
