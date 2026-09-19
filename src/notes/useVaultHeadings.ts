@@ -36,8 +36,9 @@ import { vaultHeadings } from "./vaultIndices";
 
 // The join moved to `@myne/editor/host/notes/vaultHeadings` (myne-md/myne#452)
 // so the mobile client runs this code rather than a copy of it. Re-exported at
-// its old path: every desktop importer, and `tests/notes/vaultHeadingsJoin.test.ts`,
-// keep working unchanged.
+// its old path for its one remaining importer outside this file,
+// `tests/notes/vaultHeadingsJoin.test.ts`. The block-anchor twin next door has
+// no such shim, so this one goes when that test is repointed.
 export { joinVaultHeadings };
 
 /**
