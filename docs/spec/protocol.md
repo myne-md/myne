@@ -1378,7 +1378,7 @@ Offset  Size       Field                  Description
                                           T' (§5.1). AAD binding in §9.8.3.
 ```
 
-The header is 34 bytes, identical in shape to `vault.search` (§9.6.1) / `vault.workspace` (§9.7.1): offset 5 carries `index_format_version` (the structured-index schema evolves independently of the protocol version — adding a new property type or edge field bumps this byte). The KEK is `vault_indices_key = DeriveSubkey(root_key, "vault-indices-key")` per §3.2 + §3.4; as with `prefs_key` / `search_index_key`, no `vault_indices_key_id` field appears (it is selected deterministically from `root_key`).
+The header is 34 bytes, identical in shape to `vault.search` (§9.6.1) / `vault.workspace` (§9.7.1): offset 5 carries `index_format_version` (the structured-index schema evolves independently of the protocol version — a change of index representation or serialization bumps this byte; a purely additive trailing field does not, under the carve-out and its stated limit in §9.8.2). The KEK is `vault_indices_key = DeriveSubkey(root_key, "vault-indices-key")` per §3.2 + §3.4; as with `prefs_key` / `search_index_key`, no `vault_indices_key_id` field appears (it is selected deterministically from `root_key`).
 
 Magic + `protocol_version` + `index_format_version` MUST all be checked **before** any decryption is attempted (the magic-byte-before-decrypt discipline of §9.2 / §9.3). A mismatch on any of the three rejects the blob and the client rebuilds (§9.8.4).
 
@@ -1387,11 +1387,64 @@ Magic + `protocol_version` + `index_format_version` MUST all be checked **before
 The inner plaintext is an **`index_format_version`-tagged opaque payload**: this specification does NOT fix its internal structure, because the index representation is a client-implementation choice this layer must not constrain (identical posture to §9.6.2 / §9.7.2). For `index_format_version 0x02` the payload is a [postcard](https://docs.rs/postcard)-serialized snapshot of:
 
 1. a **staleness manifest** — a map `note_id → content_nonce` recording, for each indexed note, the `.myn` `content_nonce` (§9.2) observed when it was indexed (the same decryption-free staleness signal `vault.search` uses, §9.6.4); and
-2. the **serialized structured index** — the wikilink edge set (title-keyed, per-occurrence, with edge metadata), the folded tag index, the title→note resolution map, the **typed property records** (per note: the arbitrary frontmatter `key → {type, value}` pairs typed per §3.6.4, stored as opaque pre-typed values — Rust never re-parses YAML; the typing happens TS-side, MYND-271 Build-B), the **imported block-anchor records** (MYND-382: per note, its `^block-id` markers as `{block_id, preview}` — the enumerate-only source for the `[[^^` vault-wide block-deep-link picker; extracted TS-side by the single dialect scanner, never minted), and the **line-task records** (MYND-612: per note, its task-list lines as `{line_index, raw_line, completed}` plus the five `markdown-dialect.md` §3.8 metadata fields — `due`, `repeat`, `done`, `priority`, `remind` — each an **opaque verbatim source substring**. As with property records, Rust stores and returns them and interprets nothing: no date parsing, no comparison, no arithmetic. The typing authority is §3.6.4 as extended to inline task-field values, and it lives TS-side; a second Rust-side interpretation would be a second type authority).
+2. the **serialized structured index** — the wikilink edge set (title-keyed, per-occurrence, with edge metadata), the folded tag index, the title→note resolution map, the **typed property records** (per note: the arbitrary frontmatter `key → {type, value}` pairs typed per §3.6.4, stored as opaque pre-typed values — Rust never re-parses YAML; the typing happens TS-side, MYND-271 Build-B), the **imported block-anchor records** (MYND-382: per note, its `^block-id` markers as `{block_id, preview}` — the enumerate-only source for the `[[^^` vault-wide block-deep-link picker; extracted TS-side by the single dialect scanner, never minted), and the **line-task records** (MYND-612: per note, its task-list lines as `{line_index, raw_line, completed}` plus the five `markdown-dialect.md` §3.8 metadata fields — `due`, `repeat`, `done`, `priority`, `remind` — each an **opaque verbatim source substring**. As with property records, Rust stores and returns them and interprets nothing: no date parsing, no comparison, no arithmetic. The typing authority is §3.6.4 as extended to inline task-field values, and it lives TS-side; a second Rust-side interpretation would be a second type authority), and the **heading records** (myne#216: per note, its headings as `{text, level}`, the source for the `[[##` vault-wide heading picker. Extracted TS-side off the parse an index update already runs, with the frontmatter guard applied, so unlike the two record kinds above it adds no scanning pass. Text and level only: the byte offsets a heading scanner also produces serve folding, which runs against the open note's own parse and needs no vault-wide copy).
 
 **MYND-612 bumped this byte from `0x01` to `0x02`**, and the bump is deliberate rather than incidental. The precedent for additive payload growth (§9.6.2's trailing `extractor_version` / `schema_version`) leans on postcard being non-self-describing, so an older snapshot lacking a trailing field simply fails to decode. That is an implementation property of the serializer, **not a guarantee of the format**: if it ever stopped holding, a pre-612 blob would decode successfully against the new struct and yield a silently incorrect index — task records missing from an index that reports itself complete. An explicit version byte, checked before decryption alongside the magic and protocol version, cannot fail that way. A `0x01` blob is therefore rejected outright and the client rebuilds (§9.8.4).
 
-All of (1)+(2) ride INSIDE the AEAD envelope by necessity: `note_id`s + `content_nonce`s are per-note correlation tags, and titles / folders / tags / wikilink targets / property keys-and-values are note plaintext or directly derived from it — all confidential vault content (AS3/AS4). None may appear in the cleartext header. Because the payload is engine-opaque, a v0.1 client that changes the index representation (a new property type, a new edge field, a different serialization) bumps `index_format_version`; older decoders reject and rebuild. As with `vault.search`, postcard (not the canonical JSON of §9.5.2) is chosen because the index is large and never cross-validated field-by-field (§9.6.2's rationale applies verbatim).
+**The carve-out for an additive trailing field, and its limit.** An *additive* evolution of the
+snapshot struct itself, meaning a new trailing field on a per-note record, does **not** bump
+`index_format_version`, for the reason §9.6.2 states for `extractor_version` and `schema_version`:
+postcard is non-self-describing AND positional, so `deserialize_struct` asks for a fixed number of
+fields and a snapshot written before the field existed cannot satisfy the read. `#[serde(default)]`
+cannot fire at end of input, so there is **no** state in which an older snapshot loads with the new
+field empty and reports itself complete. Where the read fails, the load path answers "no snapshot"
+and §9.8.4's fall-to-rebuild runs, which is what a bump would have caused. This is what myne#216's
+heading records did (myne-md/myne#452), and MYND-382's block-anchor records before them.
+
+**The limit is that this is a property of the serializer, not of the format**, exactly as the
+paragraph above says, and the guarantee it buys is narrower than "the read fails". What is
+guaranteed is that the missing field cannot silently **default**. What is **not** guaranteed is that
+every such read reports an error, and the difference is where §9.6.2's reasoning stops travelling.
+There the trailing field is on the TOP-LEVEL snapshot struct, so a snapshot that lacks it runs the
+buffer out and errors cleanly. Here it is on a per-note record inside a map, so in a multi-record
+snapshot the reader does not reach end of input at all: it consumes the following record's bytes as
+the missing field and desynchronises, and `from_bytes` performs no trailing-byte check, so a read
+whose remaining bytes happen to satisfy the UTF-8 and discriminant checks can terminate successfully
+with a wrong `records` map.
+
+**That residual is worse than a failed read and the difference is stated rather than left to be
+inferred.** The staleness manifest is decoded before the records and survives intact, so the
+reconcile keys on a correct manifest, marks those notes unchanged, and never re-extracts them; the
+wrong map is installed, and the next persist writes it back. §9.8.4's fall-to-rebuild is triggered by
+a decode FAILURE, and this path is by construction not one, so nothing ever rebuilds it. No note is
+at risk, because `vault.indices` is a rebuildable cache and the `.myn` files remain authoritative,
+but the cache can be durably wrong rather than transiently so. **Exactly one earlier field shares
+this**: MYND-382's block-anchor records, which are also a per-note trailing field added without a
+bump. MYND-612's line-tasks do not, because that change DID bump the byte, so a pre-612 snapshot is
+rejected at the header check (§9.8.1) and never reaches postcard. §9.6.2's two fields do not either,
+for the top-level reason above.
+
+**A bump WOULD close that residual, and this is the trade rather than a claim that it would not.**
+Raising the byte rejects every existing `0x02` blob at the header check before postcard sees it, so
+no pre-addition snapshot is ever parsed again and the desync cannot arise. What it costs is a
+whole-vault rebuild for every vault in existence, including the majority that have already
+re-persisted with the new field and hold nothing a desync could reach. The residual needs a
+pre-addition snapshot to still be on disk AND a desynchronised read whose bytes pass the UTF-8 and
+discriminant checks, on a cache that is rebuildable by definition, and the population it can affect
+shrinks to nothing as vaults re-persist. That is the judgement; an implementation weighing it
+differently is free to bump.
+
+**An implementation that does not get the no-silent-default property from its own serializer owes an
+explicit version bump instead**, because the guarantee here is the rebuild, not the defaulting. This
+codebase pins it with a test rather than trusting it:
+`core/src/plugins/vault_indices/persist.rs`'s
+`a_snapshot_missing_a_trailing_field_fails_to_decode_rather_than_defaulting` serializes a snapshot in
+the pre-myne#216 shape, through the real envelope, and asserts the decode returns nothing, in the
+one-record and the multi-record shape alike. If a postcard or serde change ever makes a missing
+trailing field default, that test goes red and this carve-out has to be revisited before anything
+ships.
+
+All of (1)+(2) ride INSIDE the AEAD envelope by necessity: `note_id`s + `content_nonce`s are per-note correlation tags, and titles / folders / tags / wikilink targets / property keys-and-values are note plaintext or directly derived from it — all confidential vault content (AS3/AS4). None may appear in the cleartext header. Because the payload is engine-opaque, a v0.1 client that changes the index REPRESENTATION (a new property type, a different record shape, a different serialization) bumps `index_format_version`; older decoders reject and rebuild. The one carve-out is the additive trailing field above, and it is a carve-out rather than a second rule: the byte still denotes the codec's inner-plaintext format, and the rebuild still happens, by the serializer rather than by the version check. As with `vault.search`, postcard (not the canonical JSON of §9.5.2) is chosen because the index is large and never cross-validated field-by-field (§9.6.2's rationale applies verbatim).
 
 #### 9.8.3 AAD construction
 

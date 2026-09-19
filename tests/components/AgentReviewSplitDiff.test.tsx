@@ -57,6 +57,10 @@ function settleWith(edits: ProposedEdit[]) {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
+      // myne#697 made this required on the settle payload without updating this
+      // fixture, so `check-test-typecheck.mjs` has been red on develop since. The
+      // test trees are outside `pnpm build`, which is why nothing else said so.
+      memoryUpdated: 0,
     },
     currentRunEpoch(),
   );

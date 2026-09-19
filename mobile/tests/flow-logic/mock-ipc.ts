@@ -171,6 +171,45 @@ export interface MockConfig {
    *  verbatim: Rust does no filtering, sorting or date comparison, so a test
    *  seeds the records and the surfaces do the rest. */
   tasks?: Record<string, unknown>[];
+  /** Seeded whole-vault heading rows (myne-md/myne#452). `vault_indices_headings`
+   *  returns them verbatim, trash-blind exactly as Rust does, so a spec can seed a
+   *  row for a note that is NOT resident and assert the client-side join drops it.
+   *  Rows carry no note title or folder by design; the join supplies both. */
+  vaultHeadings?: Array<{ noteId: string; text: string; level: number }>;
+  /** Seeded whole-vault block-anchor rows (myne-md/myne#452). Trash-blind exactly
+   *  as Rust is, like the heading rows above, so a spec can seed a row for a note
+   *  that is NOT resident and assert `joinVaultBlockAnchors` drops it. The rows
+   *  carry a `noteTitle` and `noteFolder` of their own; the join discards both in
+   *  favour of the resident note's, so seeding a row with a STALE title is how a
+   *  spec asserts that. */
+  vaultBlockAnchors?: Array<{
+    noteId: string;
+    noteTitle: string | null;
+    noteFolder: string | null;
+    blockId: string;
+    preview: string;
+  }>;
+  /** Serve the two picker dumps from what `vault_indices_apply` was actually
+   *  SENT, rather than from the seeded arrays alone (myne-md/myne#452).
+   *
+   *  Without this the mock is a static array, so a re-read after an apply returns
+   *  exactly what a stale set already holds and "the index moved and the picker
+   *  refreshed" is unobservable BY CONSTRUCTION, whatever a spec asserts. With
+   *  it, a note's applied records replace its seeded rows, seeded rows for notes
+   *  that were never applied survive (which is how a non-resident row stays
+   *  seedable), and an in-session edit changes what the next read returns. */
+  vaultPickersFromApplies?: boolean;
+  /** Delay the FIRST `vault_indices_headings` read by this many ms while later
+   *  reads answer at once (myne-md/myne#452). That is the out-of-order case the
+   *  monotonic sequence guard exists for: a slow early read resolving AFTER a
+   *  newer one, and overwriting it with a staler set. Nothing else can produce
+   *  it, because every read here is otherwise instantaneous. */
+  vaultPickerFirstReadDelayMs?: number;
+  /** Reject the first N `vault_indices_headings` and `vault_indices_block_anchors`
+   *  calls before serving the seeded rows (myne-md/myne#452). Both commands are
+   *  `Slot::Unlocked`-gated, so a read racing an auto-lock rejects for real; this
+   *  is how a spec drives that without a lock. The count is per command. */
+  vaultPickerFailures?: number;
   /** Canned `vault_indices_property_keys` — the view editor's property /
    *  groupBy / sort / column picker universe. */
   propertyKeys?: string[];
@@ -448,6 +487,55 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         searchApplies: [],
         searchRemoves: [],
       });
+    };
+
+    // myne-md/myne#452: what `vault_indices_apply` was sent, per note, so the two
+    // dumps below can answer from it. Keyed on the window so it outlives the
+    // handler closure.
+    type AppliedRows = { headings: unknown[]; blockAnchors: unknown[] };
+    const appliedStore = (): Record<string, AppliedRows> => {
+      const w = window as unknown as { __appliedIndexRows?: Record<string, AppliedRows> };
+      return (w.__appliedIndexRows ??= {});
+    };
+    /** Seeded rows for notes nothing has applied, plus every applied note's own
+     *  rows, each tagged with its note id the way Rust tags them. */
+    const servePickerRows = (
+      seeded: Array<Record<string, unknown>>,
+      key: "headings" | "blockAnchors",
+    ): Array<Record<string, unknown>> => {
+      if (config.vaultPickersFromApplies !== true) return seeded;
+      const applied = appliedStore();
+      const fromApplies = Object.entries(applied).flatMap(([noteId, rows]) =>
+        (rows[key] as Array<Record<string, unknown>>).map((r) => ({ noteId, ...r })),
+      );
+      const seededForUnapplied = seeded.filter(
+        (r) => applied[String(r.noteId ?? "")] === undefined,
+      );
+      return [...seededForUnapplied, ...fromApplies];
+    };
+    let headingReads = 0;
+    /** Hold an already-computed answer back, WITHOUT postponing the moment it was
+     *  computed. The first version awaited before serving, so the delayed read
+     *  snapshotted the store AFTER the applies had landed and returned exactly
+     *  what the newer read returned: the out-of-order case could not exist and
+     *  removing the sequence guard left every case green. Snapshot first, deliver
+     *  late, which is what a slow IPC round-trip actually does. */
+    const holdBack = async <T>(rows: T, readIndex: number): Promise<T> => {
+      const ms = config.vaultPickerFirstReadDelayMs ?? 0;
+      if (ms > 0 && readIndex === 1) {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+      }
+      return rows;
+    };
+    // myne-md/myne#452: per-command rejection budget for `vaultPickerFailures`.
+    // Counted on the window so it survives the handler closure being re-entered.
+    const failPicker = (which: string): boolean => {
+      const budget = config.vaultPickerFailures ?? 0;
+      if (budget <= 0) return false;
+      const w = window as unknown as { __pickerFailures?: Record<string, number> };
+      const seen = (w.__pickerFailures ??= {});
+      seen[which] = (seen[which] ?? 0) + 1;
+      return seen[which] <= budget;
     };
 
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
@@ -946,10 +1034,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // the unknown-command `[]` fallback is what makes the count assertable.
       "plugin:vault-indices|vault_indices_apply": (args) => {
         feed().indicesApplies.push(String(args.noteId ?? ""));
+        // myne-md/myne#452: keep what was sent, so the two dumps can answer from
+        // it rather than from a static array a re-read cannot change.
+        appliedStore()[String(args.noteId ?? "")] = {
+          headings: (args.headings ?? []) as unknown[],
+          blockAnchors: (args.blockAnchors ?? []) as unknown[],
+        };
         return null;
       },
       "plugin:vault-indices|vault_indices_remove": (args) => {
         feed().indicesRemoves.push(String(args.noteId ?? ""));
+        delete appliedStore()[String(args.noteId ?? "")];
         return null;
       },
       "plugin:search|search_index_replace": (args) => {
@@ -977,6 +1072,30 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // parameterized accessor would move the §3.6.4 type authority out of the
       // dialect layer, so every surface filters the one list.
       "plugin:vault-indices|vault_indices_tasks": () => config.tasks ?? [],
+      // myne-md/myne#452: the two whole-vault picker dumps. Mocked EXPLICITLY
+      // rather than left to the unknown-command `[]` fallback below, and that is
+      // the whole reason this arm exists: the fallback is what made the missing
+      // wiring invisible. Mobile registered neither command and passed neither
+      // prop, so `[[##` and `[[^^` opened with zero rows, and a spec driving them
+      // would have seen zero rows here too, from the fallback, and passed.
+      "plugin:vault-indices|vault_indices_headings": async () => {
+        const readIndex = (headingReads += 1);
+        if (failPicker("headings")) throw { kind: "slot_not_unlocked" };
+        return await holdBack(
+          servePickerRows(
+            (config.vaultHeadings ?? []) as Array<Record<string, unknown>>,
+            "headings",
+          ),
+          readIndex,
+        );
+      },
+      "plugin:vault-indices|vault_indices_block_anchors": () => {
+        if (failPicker("blockAnchors")) throw { kind: "slot_not_unlocked" };
+        return servePickerRows(
+          (config.vaultBlockAnchors ?? []) as Array<Record<string, unknown>>,
+          "blockAnchors",
+        );
+      },
       "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
       "plugin:vault-indices|vault_indices_property_values": (args) =>
         config.propertyValues?.[String(args.key ?? "")] ?? [],
