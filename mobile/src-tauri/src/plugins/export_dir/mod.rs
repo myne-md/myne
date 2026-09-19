@@ -40,11 +40,8 @@
 //!      is now one answer, and no EXPORT FLOW composes another: the accessors
 //!      are gone from the seam and the whole `core:path:` namespace is gone from
 //!      `capabilities/default.json`, so `plugin:path|*` is not reachable at all.
-//!      Not "the WebView cannot compose another", which is the sentence the
-//!      paragraph above retracts and which stood here for two review rounds
-//!      anyway, seventeen lines under its own correction. A file that retracts a
-//!      claim and then restates it is worse than one that only states it,
-//!      because the retraction reads as the fix having been applied.
+//!      Not "the WebView cannot compose another", which is the claim the
+//!      paragraph above retracts.
 //!   2. **The path-traversal sanitizer**, which existed twice, hand-rolled, in
 //!      TypeScript (`EditorFlow.tsx` and `editor-host.ts`) and not at all in the
 //!      other two flows, which did not need it. It is one function here, and
@@ -205,11 +202,8 @@ fn split_extension(name: &str) -> (&str, &str) {
         Some(dot) if dot > 0 => {
             let extension = &name[dot..];
             let body = &extension[1..];
-            // ASCII-alphanumeric, which is what an extension is. A length
-            // bound alone is not enough and the test is what said so:
-            // `"Meeting notes. Draft two"` has a ten-byte dotless suffix, so a
-            // length-only rule cut it in half and would have appended
-            // `". Draft two"` to a fallback.
+            // ASCII-alphanumeric, which is what an extension is. The doc above
+            // carries why the length bound alone is not enough.
             if !body.is_empty()
                 && body.len() <= 10
                 && body.chars().all(|c| c.is_ascii_alphanumeric())
@@ -292,24 +286,22 @@ fn is_direct_child(path: &Path, dir: &Path, name: &str) -> bool {
 ///
 /// `async` so the `create_dir_all` and the two Foundation resource-value round
 /// trips do not run inline on the IPC thread. The body is synchronous; the
-/// attribute is what moves it off, with no signature change, and it matches
-/// every other IO-performing command in this crate.
+/// attribute is what moves it off, with no signature change. What it moves the
+/// body onto is a Tauri async-runtime worker (`tauri::ipc`'s
+/// `respond_async_serialized` calls `async_runtime::spawn`), NOT the blocking
+/// pool: `core/src/task.rs`'s `spawn_blocking` seam is a different mechanism
+/// and this command does not use it. Accepted for one `create_dir_all` and two
+/// Foundation calls per export, and stated rather than implied because the
+/// attribute name suggests otherwise.
 ///
 /// Not slot-gated. It reveals no vault content and touches no vault key: it
 /// creates and names a directory the platform already gives this app.
 ///
 /// **What it is NOT**, because the first draft of this doc claimed otherwise and
 /// the claim reached `docs/threat-model.md`: this is not the only way the WebView
-/// can name a destination. Each of the three export COMMANDS takes a
-/// caller-supplied path string, and the note PDF hands one to the host as an
-/// event payload (`lib.rs`, `export-note-pdf` to `pdf_export::present`) with no
-/// containment check at all; a literal absolute path needs no `plugin:path`
-/// grant, so dropping `core:path:default` does not close that. What this IS: the
-/// only way to obtain an export directory that is guaranteed to exist and to be
-/// excluded from platform backup, and the only destination the four export flows
-/// compose. The writers remain the enforcement point for containment, and
-/// `sync-ledger.md` ACCEPT-1 records that resolving each destination inside its
-/// own export command is a larger, separate piece of work.
+/// can name a destination. The module header enumerates every writer and every
+/// sink, and it is the copy to keep current. The writers remain the enforcement
+/// point for containment.
 #[tauri::command(async)]
 fn export_path<R: Runtime>(
     app: AppHandle<R>,
