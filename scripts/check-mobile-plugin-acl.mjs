@@ -22,10 +22,11 @@
 // direction to fail in, which is exactly why nobody notices.
 //
 // This is a DIFFERENT property from `check-mobile-export-backup.mjs`, which is
-// why it is a different file. That guard is about confidentiality: plaintext
-// must not reach a platform backup. This one is about availability: a grant must
-// resolve to something. They were one file for two review rounds, and mixing
-// them is what took that file to 898 lines while covering one plugin of 27.
+// why it is a different file, and this is the copy of that argument to keep
+// current. That guard is about confidentiality: plaintext must not reach a
+// platform backup. This one is about availability: a grant must resolve to
+// something. Mixing them is what took one file to 898 lines while covering one
+// plugin of 27.
 //
 // Scope: the mobile client only. Desktop has the same lockstep shape and is not
 // covered here; generalising is a separate change with its own denominator, and
@@ -92,7 +93,6 @@ export function stripRustLineComments(source) {
   return source.replace(/^[ \t]*\/\/.*$/gm, "");
 }
 
-
 /** Strip `#` line comments. Anchored, because `#` appears mid-line in prose. */
 export function stripTomlComments(toml) {
   return toml.replace(/^[ \t]*#.*$/gm, "");
@@ -146,23 +146,14 @@ export function analyse(io) {
   if (!io.exists(BUILD_RS)) {
     fail(`${BUILD_RS}: missing, so this guard cannot know which plugins exist.`);
   } else {
-    // Comment-stripped, and the history of this line is why it is worth a
-    // sentence. A stripper was written here first, an injection appeared to
-    // prove it inert, and the comment that replaced it claimed the pattern could
-    // not be fooled because a commented-out declaration always puts `//` BETWEEN
-    // the quoted name and `tauri_build::InlinedPlugin::new()`.
-    //
-    // That claim was false, and the injection behind it was the weak one: it
-    // commented out a MULTI-LINE block, which is the one shape where the claim
-    // holds. A single commented line carrying both tokens puts the `//` at the
-    // START, before either of them, and the pattern reads straight through.
-    // Driven through `analyse(io)` against the real `build.rs`, one such line
-    // raised the parsed plugin count from 28 to 29 and produced a failure naming
-    // a plugin that does not exist.
-    //
-    // It failed LOUD rather than silent, which is the only reason this was a
-    // carry item rather than a blocker. It is the same class this branch spent
-    // four rounds on, one guard over: a claim and its check drifting apart.
+    // Comment-stripped. A commented-out declaration does NOT always put the
+    // `//` between the quoted name and `tauri_build::InlinedPlugin::new()`,
+    // which is the shape the pattern below would survive: a SINGLE commented
+    // line carrying both tokens puts the `//` at the start, before either of
+    // them, and the pattern reads straight through it. Driven through
+    // `analyse(io)` against the real `build.rs`, one such line raised the parsed
+    // plugin count from 28 to 29 and produced a failure naming a plugin that
+    // does not exist.
     const build = stripRustLineComments(io.read(BUILD_RS));
     for (const m of build.matchAll(
       /"([a-z0-9-]+)",\s*tauri_build::InlinedPlugin::new\(\)\s*(?:\.commands\(&\[)?([^\]]*)\]?/g,
@@ -292,16 +283,14 @@ export function analyse(io) {
     // all. This asks whether the ones `build.rs` DECLARES are among them, which
     // is the question a typo answers wrongly: `commands.allow = ["export_pathh"]`
     // satisfies every check above and refuses `plugin:export-dir|export_path` at
-    // runtime. That class was command-specific in the guard this was extracted
-    // from and did not travel with it; it is here now because re-running the old
-    // injections is what found it missing.
+    // runtime.
     //
     // ONE direction only, deliberately. A permission may allow a command
     // `build.rs` does not list, because naming a command there is OPTIONAL
     // (`src-tauri/CLAUDE.md` "Capability ACL"). Running the reverse direction
     // produces 49 failures across TWO directories, `prefs` (47) and
-    // `vault-unlock` (2), not the one this comment used to name. So a declared
-    // command must be allowed, and an allowed command need not be declared.
+    // `vault-unlock` (2). So a declared command must be allowed, and an allowed
+    // command need not be declared.
     // Measured against all 27 directories before this check landed: zero
     // pre-existing gaps in the direction that IS checked.
     const allowed = new Set();

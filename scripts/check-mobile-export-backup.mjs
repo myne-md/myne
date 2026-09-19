@@ -36,9 +36,8 @@
 //
 // The FIVE-SITE ACL lockstep found during this work is a sibling property and
 // lives in `scripts/check-mobile-plugin-acl.mjs`, over all 27 mobile plugin
-// permission directories rather than this one. It is availability (a grant must
-// RESOLVE to something) where this file is confidentiality, and keeping both
-// here is what took this file to 898 lines while covering one plugin of 27.
+// permission directories rather than this one. Its header carries why that is a
+// separate file.
 //
 // SCOPE, deliberately narrower than `scripts/lib/shared-roots.mjs`: mobile files
 // alone, because the property is mobile-specific. Desktop and web pick a
@@ -66,9 +65,10 @@
 // defect in THIS FILE, and asserts the failure is named. A guard that has never
 // failed is a guard nobody has tested (root `CLAUDE.md`).
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { dirname, join, resolve, relative } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { TS_FILES, walkFiles } from "./lib/surface-files.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -78,10 +78,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  * because `check-platform-seam.mjs` exempts it that way
  * (`rel === guard.seam || rel.startsWith(guard.seam + sep)`). Reading one FILE
  * was a hole, a sibling of `path.ts` re-exporting `downloadDir` compiles and
- * ships; reading one LEVEL was the same hole one directory down. Both were
- * found by reproducing the pre-#517 drift class that the deleted tree-wide
- * consumer scan used to catch, which is the "closing one blind spot opens
- * another one line away" shape root `CLAUDE.md` records.
+ * ships; reading one LEVEL was the same hole one directory down.
  */
 export const SEAM_DIR = "mobile/src/platform";
 /** The one seam member that must exist, because rule 5 reads it by name. */
@@ -125,8 +122,6 @@ export const RETIRED_GRANT_PREFIX = "core:path:";
  * decides the wording, and a reviewer reading the failure should see which
  * argument is being made against the line they just wrote.
  *
- * Four branches of message-building lived here for a review round, which is
- * thirty lines to differentiate sentences that all end in "this is refused".
  * Unlisted names get the general form, which is also the right answer for an
  * accessor nobody has classified.
  */
@@ -290,6 +285,30 @@ export function blockBody(xml, name) {
   return match ? match[1] : null;
 }
 
+/**
+ * Every file under `<root>/<dir>` matching `pattern`, recursively, as keys
+ * relative to `root` with forward slashes, or `[]` when the directory is absent.
+ *
+ * `walkFiles` rather than a walk of our own: that module's header states the
+ * rule ("a guard that needs a directory's files imports this") and carries the
+ * `withFileTypes` measurement and the symlink narrowing that come with it. Two
+ * things are added here and both are load-bearing. The slash normalisation,
+ * because rule 0 compares a walked path against `PATH_SEAM` by equality and a
+ * Windows `\` would make that miss silently, taking rule 5's seam check with it.
+ * And `[]` for an absent directory rather than `walkFiles`'s default throw,
+ * because rule 0 turns an empty seam into a NAMED failure ("a rule 0 that reads
+ * nothing is a rule 0 that passes everything") and rule 3b is opportunistic by
+ * design, so absence there is the ordinary case.
+ */
+function walk(root, dir, pattern) {
+  const found = walkFiles([join(root, dir)], {
+    relativeTo: root,
+    extensions: pattern,
+    missingIsNull: true,
+  });
+  return (found ?? []).map((file) => file.replaceAll("\\", "/"));
+}
+
 /** The default world: the real repository on disk. */
 export function diskIo(root = repoRoot) {
   return {
@@ -299,37 +318,9 @@ export function diskIo(root = repoRoot) {
      * Every `.ts` / `.tsx` under the seam directory, RECURSIVELY: see `SEAM_DIR`
      * for why one level was not enough. Sorted, so a failure list is stable.
      */
-    listSeam: () => {
-      const abs = join(root, SEAM_DIR);
-      if (!existsSync(abs)) return [];
-      const found = [];
-      const walk = (dir) => {
-        for (const entry of readdirSync(dir, { withFileTypes: true })) {
-          const full = join(dir, entry.name);
-          if (entry.isDirectory()) walk(full);
-          else if (/\.(ts|tsx)$/.test(entry.name))
-            found.push(relative(root, full).replaceAll("\\", "/"));
-        }
-      };
-      walk(abs);
-      return found.sort();
-    },
+    listSeam: () => walk(root, SEAM_DIR, TS_FILES).sort(),
     /** Merged manifests, if an Android build has produced any. */
-    listMergedManifests: () => {
-      const abs = join(root, ANDROID_MERGED_GLOB_ROOT);
-      if (!existsSync(abs)) return [];
-      const found = [];
-      const walk = (dir) => {
-        for (const entry of readdirSync(dir, { withFileTypes: true })) {
-          const full = join(dir, entry.name);
-          if (entry.isDirectory()) walk(full);
-          else if (entry.name === "AndroidManifest.xml")
-            found.push(relative(root, full).replaceAll("\\", "/"));
-        }
-      };
-      walk(abs);
-      return found;
-    },
+    listMergedManifests: () => walk(root, ANDROID_MERGED_GLOB_ROOT, /^AndroidManifest\.xml$/),
   };
 }
 
@@ -482,20 +473,75 @@ export function analyse(io) {
         }
       }
       // 4b. The directory NAMES, which are what the Android XML and rule 2 below
-      // address. A variant with no `name()` arm is E0004 and an empty name is
-      // `backup_exclude::tests::excluded_dirs_is_non_empty_and_unique`, on every
-      // platform, so neither is checked here; what this guard reads is a
-      // `_ =>` catch-all, which compiles and answers for every future variant
-      // at once.
+      // address. A variant with no `name()` arm at all is E0004, so that case
+      // cannot reach this guard; what this guard reads is a `_ =>` catch-all,
+      // which compiles and answers for every future variant at once.
       if (/_\s*=>/.test(nameFn[1])) {
         fail(
           `${RUST_MODULE}: \`name()\` has a \`_ =>\` catch-all, so a new variant silently ` +
             `inherits some other directory's name instead of failing to compile.`,
         );
       }
+
+      // 4b-i. The directory names, read from TWO rosters that must agree.
+      //
+      // `named` is the one the COMPILER guarantees: `name()` is an exhaustive
+      // `match self`, so every variant has an arm or the crate does not build,
+      // and the one way to satisfy that without naming each variant is the
+      // `_ =>` catch-all the check directly above refuses. The enum body is a
+      // regex over source lines, which is a weaker claim about the same set.
+      //
+      // What this replaces is `if (dir && inAll.has(variant))`, where `dir` was
+      // `named.get(variant)` and the `&&` was doing two silent drops. An arm
+      // this guard cannot READ leaves the variant out of `named`: a block body
+      // `ExportDir::X => { "X" }`, a named constant instead of a string literal,
+      // an `A | B => "x"` alternation. The empty name leaves it falsy. Either
+      // way the directory left `requiredDirs`, which is the set rules 2 and 3
+      // hold the Android XML to, so the XML stopped having to exclude it, on a
+      // green run, with nothing naming it. That is the defect the enum-body
+      // parser eleven lines up refuses to permit on its own side, left open on
+      // this one, and closing one arm of the `&&` while leaving the other is how
+      // a blind spot moves one token over rather than going away.
+      //
+      // So both drops FAIL by name, and the roster stays the INTERSECTION rather
+      // than becoming `named` outright. That last part is not a detail and the
+      // spec is what said so: driving the set off `named` alone made an EMPTY
+      // enum body still produce a roster, which walked straight past the vacuity
+      // floor below, the one check that exists for "rules 2 and 3 compared
+      // nothing". An intersection can only ever shrink toward that floor, never
+      // fabricate a roster, so the two hold each other rather than trading
+      // places.
+      for (const variant of named.keys()) {
+        if (!variants.has(variant)) {
+          fail(
+            `${RUST_MODULE}: \`name()\` has an arm for \`ExportDir::${variant}\`, which the ` +
+              `enum-body parse did not see as a variant. The two readings of the roster ` +
+              `disagree, and rules 2 and 3 compare the Android XML against what they share.`,
+          );
+        }
+      }
       for (const variant of variants) {
         const dir = named.get(variant);
-        if (dir && inAll.has(variant)) requiredDirs.add(dir);
+        if (dir === undefined) {
+          fail(
+            `${RUST_MODULE}: \`ExportDir::${variant}\` is declared and this guard could not ` +
+              `read its \`name()\` arm. \`name()\` is exhaustive, so the arm exists and is ` +
+              `written in a shape this guard does not match (a block body \`=> { "…" }\`, a ` +
+              `named constant instead of a literal, or an \`A | B => "…"\` alternation). The ` +
+              `directory would be absent from the set rules 2 and 3 hold the Android XML to, ` +
+              `so nothing would require the XML to exclude it. Teach the guard the shape ` +
+              `rather than leaving the name to be dropped.`,
+          );
+          continue;
+        }
+        if (dir === "") {
+          fail(
+            `${RUST_MODULE}: \`ExportDir::${variant}\`'s \`name()\` arm is the empty string, ` +
+              `so it names no directory for rules 2 and 3 to require of the Android XML.`,
+          );
+          continue;
+        }
+        if (inAll.has(variant)) requiredDirs.add(dir);
       }
 
       // 4c. The command's destination is one of the directories startup
@@ -673,14 +719,12 @@ export function analyse(io) {
   // ── 5. The chokepoint is wired, and the route around it stays shut ────────
   // Narrowed deliberately. The five-site ACL lockstep this rule used to carry
   // moved to `scripts/check-mobile-plugin-acl.mjs`, where it covers all 27
-  // mobile plugin permission directories instead of this one. That is an
-  // AVAILABILITY property, a grant must resolve to something, and this file is
-  // about confidentiality. What stays here is the part about the export path.
+  // mobile plugin permission directories instead of this one. What stays here
+  // is the part about the export path.
   const invokeLiteral = `plugin:${PLUGIN_NAME}|${COMMAND}`;
   // Bounded, not `includes`. A substring match accepts
   // `plugin:export-dir|export_pathh`, which is a command that does not exist and
-  // an export flow that fails at runtime, and the guard said ok. Found by
-  // enumerating the classes the extracted rule 5 used to catch and running each.
+  // an export flow that fails at runtime, and the guard said ok.
   const invokeRe = new RegExp(`plugin:${PLUGIN_NAME}\\|${COMMAND}(?![A-Za-z0-9_])`);
   if (pathSeamSource !== null && !invokeRe.test(pathSeamSource)) {
     fail(
@@ -699,10 +743,8 @@ export function analyse(io) {
     // Bounded, for the same reason the invoke literal above is: an unanchored
     // `includes` is satisfied by any name this one PREFIXES, so renaming the
     // call to `ensure_export_dir_unchecked` left the guard printing ok on a
-    // tree where the function it names is not called. That is C15's defect
-    // repeated four lines below C15's fix, which is what enumerating the
-    // classes does not catch either: it was in the list, and the list said
-    // "caught", because the injection deleted the call rather than renaming it.
+    // tree where the function it names is not called. Deleting the call outright
+    // is the injection that does NOT find this; renaming it is the one that does.
     if (!/backup_exclude::ensure_export_dir(?![A-Za-z0-9_])/.test(source)) {
       fail(
         `${PLUGIN_MODULE}: does not call \`backup_exclude::ensure_export_dir\`. That function IS ` +
@@ -715,8 +757,7 @@ export function analyse(io) {
     }
     // These two did NOT travel to `check-mobile-plugin-acl.mjs` and belong here:
     // that guard reads the ACL files, and these are the Rust half of the same
-    // command being reachable at all. Both were dropped by the extraction and
-    // found missing by re-running the classes the old rule 5 caught.
+    // command being reachable at all.
     if (!new RegExp(`generate_handler!\\[[^\\]]*\\b${COMMAND}\\b`).test(source)) {
       fail(
         `${PLUGIN_MODULE}: \`${COMMAND}\` is not in \`generate_handler!\`, so it is not ` +
@@ -810,9 +851,8 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
       // 3b is opportunistic (`gen/android` is git-ignored, so it is absent in a
       // fresh clone and in CI), and printing the count only when non-zero made a
       // run that skipped merger precedence byte-identical to one that checked
-      // it. Two reviewers hit that in a row, each believing 3b had run. A silent
-      // skip reads as a pass, which is the failure this repository records by
-      // name elsewhere.
+      // it. A silent skip reads as a pass, which is the failure this repository
+      // records by name elsewhere.
       (mergedManifests > 0
         ? `; ${mergedManifests} merged manifest(s) checked`
         : `; NO merged manifest present, so rule 3b compared nothing (run an Android build to ` +
