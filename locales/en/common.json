@@ -761,7 +761,7 @@
         "exportFailed": "Couldn't export {{filename}}.",
         "renamed": "Renamed to {{name}}.",
         "renameFailed": "Couldn't rename the attachment.",
-        "saveDialogFailed": "Couldn't open the save dialog."
+        "saveDialogFailed": "Couldn't choose where to save this file."
       },
       "compression": {
         "bulkNotice_one": "{{count}} image compressed: {{from}} → {{to}}",

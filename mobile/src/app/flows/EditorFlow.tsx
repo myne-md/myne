@@ -11,7 +11,7 @@ import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listen
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "../../platform/event";
-import { documentDir, join } from "../../platform/path";
+import { exportPath } from "../../platform/path";
 import {
   Button,
   Screen,
@@ -2420,10 +2420,19 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     try {
       // Save the PDF under Documents (reachable even if the share sheet is
       // cancelled), then the native share sheet lets the user pick where to keep
-      // it (MYND-475). Sanitize the title to a bare basename first - a title with
-      // `/`, `\`, or a leading `..` must not let join() escape Documents.
-      const safe = title.replace(/[/\\]/g, "_").replace(/^\.+/, "").trim() || "note";
-      const path = await join(await documentDir(), `${safe}.pdf`);
+      // it (MYND-475). The title is untrusted and is NOT sanitized here any
+      // more: `exportPath` reduces it to a bare basename host-side, so a title
+      // carrying `/`, `\` or a leading `..` cannot address anything outside the
+      // export directory (myne#517). The hand-rolled version that used to sit
+      // here existed in two of the four export flows and in neither of the
+      // other two.
+      //
+      // The `"note"` fallback is the one the deleted TypeScript carried, and it
+      // is load-bearing rather than defensive: a note whose derived title is
+      // `...` sanitizes away entirely, and without it the export fails. The
+      // extension survives the sanitizer host-side, so this stays one argument
+      // rather than a stem plus a suffix.
+      const { path } = await exportPath(`${title}.pdf`, "note");
       await emit("export-note-pdf", { title, html, path });
     } catch {
       setEditorError(t("editor.flow.exportFailed"));

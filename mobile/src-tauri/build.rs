@@ -415,6 +415,19 @@ fn main() {
                 // list with the `generate_handler!` in that mod.
                 "local-inference",
                 tauri_build::InlinedPlugin::new().commands(&["transcribe", "read_transcript"]),
+            )
+            .plugin(
+                // The one destination a plaintext export may name
+                // (myne-md/myne#517). `export_path` resolves the export
+                // directory, creates it, excludes it from the platform's
+                // automatic cloud backup and sanitizes the filename, in one
+                // call, so the WebView composes no destination of its own and
+                // `core:path:default` could be dropped from
+                // `capabilities/default.json`. Adding a command here without a
+                // matching entry in `permissions/export-dir/default.toml` is a
+                // security bug.
+                "export-dir",
+                tauri_build::InlinedPlugin::new().commands(&["export_path"]),
             ),
     )
     .unwrap();
