@@ -741,12 +741,12 @@ export const myneTheme = EditorView.theme({
     lineHeight: "0",
     padding: "var(--space-2)",
     cursor: "pointer",
-    // Separate tiles, GitHub-style: each button carries its own surface, border
-    // and shadow rather than the cluster sharing one panel.
+    // Separate tiles, GitHub-style: each button carries its own surface and
+    // border rather than the cluster sharing one panel. No shadow: on the light
+    // card a drop shadow under every tile read heavier than the controls are.
     background: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
-    boxShadow: "var(--shadow-1)",
   },
   // The hover and active fills must be FIXED-LIGHT, like the surface they sit
   // on: `--paper-2` is theme-aware, so in the dark and AMOLED themes it painted
@@ -791,7 +791,6 @@ export const myneTheme = EditorView.theme({
     background: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
-    boxShadow: "var(--shadow-1)",
   },
   ".cm-mermaid-chrome:hover": {
     background: "var(--diagram-hover, rgba(11, 11, 9, 0.09))",
