@@ -616,11 +616,13 @@ export const myneTheme = EditorView.theme({
     textDecorationSkipInk: "none",
   },
 
-  // Mermaid diagrams (MYND-49) — rendered SVG sits on its OWN fixed-light card so
-  // it reads in BOTH editor themes (Mermaid's palette assumes a light surface; on
-  // the dark editor its edge labels were unreadable). The outer `.cm-mermaid` is a
-  // transparent, measured spacer (padding, not margin — see note above); the inner
-  // `.cm-mermaid-card` carries the light surface.
+  // Mermaid diagrams (MYND-49) — the rendered SVG sits on its own card that
+  // follows the ACTIVE THEME (myne-md/myne#708 follow-up; this supersedes the
+  // fixed-light clause of decision 0566). Card, chrome and mermaid's own palette
+  // all bind to Myne tokens, so a dark or AMOLED theme gets a dark diagram rather
+  // than a white panel. The outer `.cm-mermaid` is a transparent, measured spacer
+  // (padding, not margin — see note above); the inner `.cm-mermaid-card` carries
+  // the surface.
   //
   // "Fixed-light" is what the paragraph above has always claimed and what the ink
   // below has always been; the SURFACE had drifted to `var(--paper)`, which is
@@ -651,11 +653,11 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     boxSizing: "border-box",
     overflowX: "auto",
-    backgroundColor: "var(--diagram-surface)",
+    backgroundColor: "var(--paper)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
   },
   ".cm-mermaid-fallback .cm-mermaid-card": {
     display: "block",
@@ -665,7 +667,7 @@ export const myneTheme = EditorView.theme({
     textAlign: "left",
     fontFamily: "var(--font-mono)",
     fontSize: "0.9em",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
     overflowX: "auto",
   },
   // The render failure's own reason, under the monospace fallback. Before
@@ -683,7 +685,7 @@ export const myneTheme = EditorView.theme({
     // deliberately non-theme-aware `--diagram-surface`, so the theme token would
     // put pale salmon on near-white at roughly 2.5:1. That is the exact drift
     // #629 is about, one element over: the surface fixed and the ink moving.
-    color: "var(--diagram-danger)",
+    color: "var(--danger)",
   },
 
   // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the
@@ -734,7 +736,7 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-mermaid-control": {
     appearance: "none",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -744,19 +746,15 @@ export const myneTheme = EditorView.theme({
     // Separate tiles, GitHub-style: each button carries its own surface and
     // border rather than the cluster sharing one panel. No shadow: on the light
     // card a drop shadow under every tile read heavier than the controls are.
-    background: "var(--diagram-surface)",
+    background: "var(--paper-2)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
   },
-  // The hover and active fills must be FIXED-LIGHT, like the surface they sit
-  // on: `--paper-2` is theme-aware, so in the dark and AMOLED themes it painted
-  // a dark patch on a light control bar and the hover read as nothing at all.
-  // Same class of drift decision 0566 records for the card's own ink.
+  // The tiles sit on `--paper-2`, so the hover step is `--paper-3`: both come
+  // from the active theme's surface ramp, which is what makes the hover read in
+  // every theme. A fixed-light fill was invisible in the dark and AMOLED ones.
   ".cm-mermaid-control:hover": {
-    background: "var(--diagram-hover, rgba(11, 11, 9, 0.09))",
-  },
-  ".cm-mermaid-control:active": {
-    background: "var(--diagram-hover, rgba(11, 11, 9, 0.16))",
+    background: "var(--paper-3)",
   },
   ".cm-mermaid-control:focus-visible": {
     outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
@@ -780,7 +778,7 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-mermaid-chrome": {
     appearance: "none",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
     display: "inline-flex",
     alignItems: "center",
     gap: "var(--space-1)",
@@ -788,15 +786,12 @@ export const myneTheme = EditorView.theme({
     lineHeight: "1",
     padding: "var(--space-1) var(--space-2)",
     cursor: "pointer",
-    background: "var(--diagram-surface)",
+    background: "var(--paper-2)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
   },
   ".cm-mermaid-chrome:hover": {
-    background: "var(--diagram-hover, rgba(11, 11, 9, 0.09))",
-  },
-  ".cm-mermaid-chrome:active": {
-    background: "var(--diagram-hover, rgba(11, 11, 9, 0.16))",
+    background: "var(--paper-3)",
   },
   ".cm-mermaid-chrome:focus-visible": {
     outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
@@ -816,7 +811,7 @@ export const myneTheme = EditorView.theme({
     overflow: "hidden",
     width: "90vw",
     height: "90vh",
-    background: "var(--diagram-surface)",
+    background: "var(--paper)",
     borderRadius: "var(--radius-2, 6px)",
   },
 
