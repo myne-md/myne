@@ -24,6 +24,14 @@ export type MermaidRenderer = (
 
 type Loader = () => Promise<MermaidRenderer>;
 
+/** Whether the document is wearing a dark theme. Each client's theme layer
+ *  applies `data-theme` on `:root`; absent means light. */
+function isDarkTheme(): boolean {
+  if (typeof document === "undefined") return false;
+  const theme = document.documentElement.dataset.theme;
+  return theme === "dark" || theme === "amoled";
+}
+
 let load: Loader = async () => {
   const mermaidMod = await import("mermaid");
   const mermaid = mermaidMod.default;
@@ -44,38 +52,46 @@ let load: Loader = async () => {
     // makes measurement and display agree by construction rather than by both
     // happening to sit under the same ancestor.
     fontFamily: "var(--font-sans)",
-    // The diagram follows the ACTIVE THEME (myne-md/myne#708 follow-up). The
-    // card, the chrome and mermaid's own palette all bind to Myne tokens, so a
-    // dark or AMOLED theme gets a dark diagram instead of a white panel. This
+    // The diagram follows the ACTIVE THEME (myne-md/myne#708 follow-up). This
     // supersedes the fixed-light clause of decision 0566, whose whole reason was
-    // that mermaid's palette was pinned light while the surface was not: with
-    // both sides on tokens the drift it guarded against cannot happen. The values
-    // are `var(...)`, which mermaid emits verbatim into its `<style>` block, so
-    // they resolve against the editor's `:root` at paint time.
-    theme: "default",
-    themeVariables: {
-      fontFamily: "var(--font-sans)",
-      background: "var(--paper)",
-      edgeLabelBackground: "var(--paper)",
-      textColor: "var(--ink-1)",
-      lineColor: "var(--ink-2)",
-      // Node fills + borders + label text (flowchart / class / state / ER …).
-      mainBkg: "var(--paper-2)",
-      primaryColor: "var(--paper-2)",
-      primaryBorderColor: "var(--line-2)",
-      primaryTextColor: "var(--ink-1)",
-      secondaryColor: "var(--paper-3)",
-      secondaryBorderColor: "var(--line-2)",
-      secondaryTextColor: "var(--ink-1)",
-      tertiaryColor: "var(--paper-2)",
-      tertiaryBorderColor: "var(--line-2)",
-      tertiaryTextColor: "var(--ink-1)",
-      nodeBorder: "var(--line-2)",
-      nodeTextColor: "var(--ink-1)",
-      titleColor: "var(--ink-1)",
-      clusterBkg: "var(--paper-2)",
-      clusterBorder: "var(--line-1)",
-    },
+    // that mermaid's palette was pinned light while the surface was not.
+    //
+    // NOT `var(--token)` values: mermaid feeds these through its colour library
+    // to derive the rest of the palette, and a `var()` is not a colour it can
+    // parse, so the render throws and the block falls back to raw source. The
+    // palette is therefore chosen here, at initialize time, from the theme the
+    // document is actually wearing. A theme switch mid-session is picked up on
+    // the next WebView reload rather than re-initialising mermaid per render.
+    theme: isDarkTheme() ? "dark" : "default",
+    themeVariables: isDarkTheme()
+      ? { fontFamily: "var(--font-sans)" }
+      : {
+          fontFamily: "var(--font-sans)",
+          // The light node palette is pinned (not just edge/text colors):
+          // relying on mermaid's class-based `<style>` fills alone left flowchart
+          // nodes rendering as the SVG default (black `fill`) in the standalone
+          // export, so explicit fills bake a visible light fill into every node
+          // class and a flowchart reads identically in-editor and in export.
+          background: "#fbfbfa",
+          edgeLabelBackground: "#fbfbfa",
+          textColor: "#1a1a17",
+          lineColor: "#6b6a64",
+          mainBkg: "#eef0f4",
+          primaryColor: "#eef0f4",
+          primaryBorderColor: "#c8c7c1",
+          primaryTextColor: "#1a1a17",
+          secondaryColor: "#e6eaf0",
+          secondaryBorderColor: "#c8c7c1",
+          secondaryTextColor: "#1a1a17",
+          tertiaryColor: "#f0f1f4",
+          tertiaryBorderColor: "#c8c7c1",
+          tertiaryTextColor: "#1a1a17",
+          nodeBorder: "#c8c7c1",
+          nodeTextColor: "#1a1a17",
+          titleColor: "#1a1a17",
+          clusterBkg: "#f4f4f2",
+          clusterBorder: "#e3e2dd",
+        },
   });
   return async (id, code) => {
     try {
