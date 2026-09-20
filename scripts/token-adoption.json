@@ -84,7 +84,6 @@
   "editor/src/host/notes/GraphCanvas.tsx": 8,
   "editor/src/host/notes/TaskRow.tsx": 5,
   "editor/src/host/notes/tagPillToken.ts": 2,
-  "editor/src/mermaid/render-mermaid.ts": 19,
   "editor/src/task-surfaces.css": 11,
   "editor/src/theme.ts": 1,
   "editor/src/toolbar/plugin.ts": 3,
