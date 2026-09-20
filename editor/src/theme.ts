@@ -686,6 +686,87 @@ export const myneTheme = EditorView.theme({
     color: "var(--diagram-danger)",
   },
 
+  // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the
+  // positioning context, the viewport clips, and the SVG carries the pan/zoom
+  // transform. Values are tokens (or `var(--x, fallback)`, whose fallback never
+  // runs and is not counted) because `check-token-adoption.mjs` ratchets this
+  // file: a new numeric literal here would fail the commit.
+  ".cm-mermaid-card-viewer": {
+    display: "block",
+    overflowX: "hidden",
+  },
+  ".cm-mermaid-frame": {
+    position: "relative",
+  },
+  ".cm-mermaid-viewport": {
+    position: "relative",
+    overflow: "hidden",
+    width: "100%",
+    outline: "none",
+    touchAction: "none",
+  },
+  ".cm-mermaid-viewport:focus-visible": {
+    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
+    outlineOffset: "var(--focus-ring-offset, 2px)",
+  },
+  ".cm-mermaid-svg": {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    transformOrigin: "0 0",
+    display: "block",
+  },
+  ".cm-mermaid-controls": {
+    position: "absolute",
+    bottom: "var(--space-1)",
+    right: "var(--space-1)",
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: "var(--space-0)",
+    background: "var(--diagram-surface)",
+    border: "1px solid var(--line-1)",
+    borderRadius: "var(--radius-2, 6px)",
+    boxShadow: "var(--shadow-2)",
+    opacity: "0.92",
+  },
+  ".cm-mermaid-control": {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "var(--diagram-ink)",
+    font: "inherit",
+    lineHeight: "1",
+    padding: "var(--space-1)",
+    cursor: "pointer",
+    borderRadius: "var(--radius-1, 3px)",
+  },
+  ".cm-mermaid-control:hover": {
+    background: "var(--paper-2)",
+  },
+  ".cm-mermaid-percent": {
+    minWidth: "3em",
+    textAlign: "center",
+    fontVariantNumeric: "tabular-nums",
+  },
+  ".cm-mermaid-expand": {
+    position: "fixed",
+    inset: "0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--overlay-backdrop, rgba(11, 11, 9, 0.6))",
+    zIndex: "50",
+  },
+  ".cm-mermaid-expand-stage": {
+    position: "relative",
+    overflow: "hidden",
+    width: "90vw",
+    height: "90vh",
+    background: "var(--diagram-surface)",
+    borderRadius: "var(--radius-2, 6px)",
+  },
+
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.
   // Prose-first: the gutter blends into the editor surface (no chrome block) and
   // the numbers recede — faint, mono, slightly smaller — so they never compete
