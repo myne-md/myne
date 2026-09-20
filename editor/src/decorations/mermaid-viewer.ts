@@ -55,26 +55,38 @@ const PAN_STEP = 100;
  */
 function editorSlotRect(view: EditorView): DOMRect {
   const own = view.dom.getBoundingClientRect();
-  let left = own.left;
-  let top = own.top;
-  let right = own.right;
-  let bottom = own.bottom;
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+  let left = Math.max(own.left, 0);
+  let top = Math.max(own.top, 0);
+  let right = Math.min(own.right, winW);
+  let bottom = Math.min(own.bottom, winH);
   let el: HTMLElement | null = view.dom.parentElement;
   while (el !== null) {
     const r = el.getBoundingClientRect();
-    left = Math.max(left, r.left);
-    top = Math.max(top, r.top);
-    right = Math.min(right, r.right);
-    bottom = Math.min(bottom, r.bottom);
+    // A zero-area ancestor (a collapsed or display:none wrapper) would clip
+    // everything to nothing and is not the slot; skipping it is what keeps the
+    // intersection meaningful.
+    if (r.width > 0 && r.height > 0) {
+      left = Math.max(left, r.left);
+      top = Math.max(top, r.top);
+      right = Math.min(right, r.right);
+      bottom = Math.min(bottom, r.bottom);
+    }
     el = el.parentElement;
   }
-  left = Math.max(left, 0);
-  top = Math.max(top, 0);
-  right = Math.min(right, window.innerWidth);
-  bottom = Math.min(bottom, window.innerHeight);
   const width = Math.max(0, right - left);
   const height = Math.max(0, bottom - top);
-  if (width < 40 || height < 40) return own;
+  if (width < 40 || height < 40) {
+    // Never hand back more than the window, even on the degenerate path: the
+    // whole failure this replaces was an overlay 1580px tall in a 720px window.
+    return new DOMRect(
+      Math.max(own.left, 0),
+      Math.max(own.top, 0),
+      Math.min(own.right, winW) - Math.max(own.left, 0),
+      Math.min(own.bottom, winH) - Math.max(own.top, 0),
+    );
+  }
   return new DOMRect(left, top, width, height);
 }
 
