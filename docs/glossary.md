@@ -989,7 +989,9 @@ hand-rolled in two of the four and absent from the other two.
 boundary. The three export commands still take a caller-supplied path string, and a literal absolute
 path needs no `plugin:path` grant, so the mobile capability dropping the whole `core:path:` namespace
 does not close that route; the note PDF does not go through a command at all. Containment stays with
-the writers, which is where `threat-model.md` TB6 already puts it. What the chokepoint gives is the
+the writers, which is where `threat-model.md` TB3's plaintext-egress exception already puts
+it. (This read `TB6` until review round 6. TB6 is server persistent storage; §3 defines no
+WebView-to-host boundary row, so the old citation pointed at a boundary the model does not have.) What the chokepoint gives is the
 only way to obtain an export directory guaranteed to exist and to be excluded, and one place where
 the ordering (create, then exclude, then hand over) is asserted by a test rather than described by a
 comment. Structurally the twin of the [prefs chokepoint](#prefs-chokepoint): one function every write

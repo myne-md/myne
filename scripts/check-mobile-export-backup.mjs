@@ -125,6 +125,46 @@ export const RETIRED_GRANT_PREFIX = "core:path:";
  * Unlisted names get the general form, which is also the right answer for an
  * accessor nobody has classified.
  */
+/**
+ * Which Tauri path accessor each `ExportDir` NAME is allowed to resolve
+ * through: a reasoned allowlist of (name, resolver) pairs. One-directional,
+ * and only the `Documents` entry describes a variant that exists: a name the
+ * enum declares must pair with the accessor listed here, while an entry here
+ * that no variant uses is not flagged.
+ *
+ * The hole this closes was found in review round 6 and nothing on any side saw
+ * it. `name()` and `resolve()` are two independent match arms over the same
+ * variant, and the two halves of this property read DIFFERENT ones: the Android
+ * arm is name-driven (rule 2 requires `<exclude path="<name()>"/>`) while the
+ * iOS arm is path-driven (the Foundation flag goes on whatever `resolve()`
+ * returned). A variant whose `name()` says `Documents` while its `resolve()`
+ * hands back the pictures container therefore gets an Android rule excluding a
+ * directory the exports are not in, while the directory they ARE in is excluded
+ * by nothing, and the guard, the compiler and every Rust test stay green. The
+ * three things that look like they cover it do not:
+ * `tests::every_roster_name_maps_back_to_its_variant` round-trips `name()`
+ * through `from_name`, tying the name to the VARIANT rather than to the
+ * resolved path; `excluded_dirs_is_non_empty_and_unique` asserts non-empty,
+ * unique and separator-free; and `resolve` being an exhaustive match guarantees
+ * a resolver EXISTS, not that it resolves where the name claims.
+ *
+ * An ALLOWLIST rather than a derivation, and the limit is worth stating: this
+ * guard cannot execute Tauri's resolver, so it cannot prove the returned path's
+ * basename equals the name. What it can do is refuse a pairing no human has
+ * classified. A new pair is a decision, and it costs one entry here plus the
+ * reviewer's argument for it, which is the same shape as `EXTERNAL_GRANTS` and
+ * `UNGRANTED_PLUGINS` in the sibling guard.
+ */
+export const RESOLVER_FOR_DIR = {
+  Documents: "document_dir",
+  Downloads: "download_dir",
+  Pictures: "picture_dir",
+  Videos: "video_dir",
+  Music: "audio_dir",
+  Desktop: "desktop_dir",
+  Public: "public_dir",
+};
+
 export const ACCESSOR_HINT = {
   documentDir: "that directory IS excluded, and that is not the same as safe",
   downloadDir: "nothing excludes that directory on EITHER platform",
@@ -412,6 +452,9 @@ export function analyse(io) {
     const nameFn = source.match(
       /fn name\(self\)\s*->\s*&'static str\s*\{([\s\S]*?)\n {4}\}/,
     );
+    // Everything from `fn resolve<` to the first 4-space-indented close, which
+    // is the end of the fn. Rule 4b-ii reads its arms.
+    const resolveFn = source.match(/fn resolve<[\s\S]*?\n {4}\}/);
 
     if (!enumBlock) {
       fail(
@@ -542,6 +585,55 @@ export function analyse(io) {
           continue;
         }
         if (inAll.has(variant)) requiredDirs.add(dir);
+      }
+
+      // 4b-ii. `name()` and `resolve()` must agree, which nothing tied before.
+      // See `RESOLVER_FOR_DIR` for the failure and why this is an allowlist
+      // rather than a derivation. Read for every variant in the intersection,
+      // so a disagreement fails even when both arms are individually valid.
+      if (!resolveFn) {
+        fail(
+          `${RUST_MODULE}: could not find \`fn resolve<…>\`, so nothing checks that a ` +
+            `directory's NAME (what the Android rules exclude) and the accessor it resolves ` +
+            `through (what the iOS flag is applied to) describe the same directory.`,
+        );
+      } else {
+        const resolvers = new Map(
+          [...resolveFn[0].matchAll(/ExportDir::([A-Za-z0-9]+)\s*=>\s*resolver\.([a-z_]+)\(\)/g)].map(
+            (m) => [m[1], m[2]],
+          ),
+        );
+        for (const variant of variants) {
+          const dir = named.get(variant);
+          if (dir === undefined || dir === "") continue; // 4b-i already failed it.
+          const resolver = resolvers.get(variant);
+          if (resolver === undefined) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` has no \`resolve()\` arm this guard ` +
+                `can read (expected \`ExportDir::${variant} => resolver.<accessor>()\`). Without ` +
+                `it nothing checks that the directory the Android rules exclude by NAME is the ` +
+                `one the iOS flag is applied to.`,
+            );
+            continue;
+          }
+          const expected = RESOLVER_FOR_DIR[dir];
+          if (expected === undefined) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` names directory "${dir}", which is not ` +
+                `in RESOLVER_FOR_DIR, so this guard cannot say which accessor it should resolve ` +
+                `through. Classify the pair there with the reason it is correct.`,
+            );
+          } else if (expected !== resolver) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` names directory "${dir}" but resolves ` +
+                `through \`resolver.${resolver}()\`, where RESOLVER_FOR_DIR expects ` +
+                `\`resolver.${expected}()\`. The Android rules exclude by NAME and the iOS flag ` +
+                `is applied to the RESOLVED path, so these two disagreeing means the XML ` +
+                `excludes a directory the exports are not written to, while the one they are ` +
+                `written to is excluded by nothing.`,
+            );
+          }
+        }
       }
 
       // 4c. The command's destination is one of the directories startup

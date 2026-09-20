@@ -124,7 +124,7 @@ const host: EditorHost = {
     // error KIND only, never a path or a filename.
     pickExportDestination: async (filename) => {
       try {
-        return (await exportPath(filename, exportFallbackStem(filename))).path;
+        return (await exportPath(filename, await exportFallbackStem(filename))).path;
       } catch (e) {
         logErrorKind(e, "export-destination-failed");
         throw e;

@@ -13,12 +13,16 @@
 //! `core:path:default` does not close that route. The fourth writer does not go
 //! through a command at all: the note PDF reaches the host as an event payload
 //! (`emit("export-note-pdf", { title, html, path })` to `pdf_export::present`)
-//! with no containment check anywhere on the path. A sixth sink sits beside it
-//! and is a READ rather than a write, named here because every other
-//! enumeration this change wrote reads as exhaustive over "ways the WebView
-//! hands the host a path": `mobile/src/lib/share.ts` emits `share-file` with a
-//! path that `lib.rs` hands to `share_file::present`, which puts whatever file
-//! it is given into `UIActivityViewController`. `core:event:default` is granted,
+//! with no containment check anywhere on the path. The fifth is a READ rather
+//! than a write: `attachments|attachment_import`'s `ImportSource::Path` arm
+//! (`core/src/plugins/attachments/commands.rs:473`, granted at
+//! `mobile/src-tauri/permissions/attachments/default.toml:39`) takes a
+//! caller-supplied path and reads whatever is at it. The sixth sits beside it
+//! and is also a read: `mobile/src/lib/share.ts` emits `share-file` with a path
+//! that `lib.rs` hands to `share_file::present`, which puts whatever file it is
+//! given into `UIActivityViewController`. Rounds 3 to 5 each asked for the fifth
+//! by name and the ordinal jumped from four to six until round 6; that jump was
+//! the tell, and it is the reason a list here is numbered rather than bulleted. `core:event:default` is granted,
 //! so the WebView can emit an arbitrary path to either. What this command IS: the
 //! only way to obtain an export directory that is guaranteed to exist and to be
 //! excluded from platform backup, and the only destination the four export flows
@@ -299,9 +303,10 @@ fn is_direct_child(path: &Path, dir: &Path, name: &str) -> bool {
 ///
 /// **What it is NOT**, because the first draft of this doc claimed otherwise and
 /// the claim reached `docs/threat-model.md`: this is not the only way the WebView
-/// can name a destination. The module header enumerates every writer and every
-/// sink, and it is the copy to keep current. The writers remain the enforcement
-/// point for containment.
+/// can name a destination. The module header carries the enumeration, and it is
+/// the copy to keep current. It is not asserted to be exhaustive, and the
+/// sentence this replaced asserted exactly that over a list that was short by
+/// one. The writers remain the enforcement point for containment.
 #[tauri::command(async)]
 fn export_path<R: Runtime>(
     app: AppHandle<R>,
