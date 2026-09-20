@@ -97,17 +97,6 @@ const CSS = `
   user-select: none;
   -webkit-user-select: none;
 }
-.cm-mermaid-debug {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 60;
-  color: var(--danger);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.8em);
-  white-space: pre;
-  pointer-events: none;
-}
 `;
 
 let injected = false;
