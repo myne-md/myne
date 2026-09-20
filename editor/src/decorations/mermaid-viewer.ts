@@ -392,6 +392,24 @@ export function buildMermaidViewer(opts: {
     });
     expandController.setPercent(lastPercent);
 
+    // TEMPORARY diagnostic: reads the geometry off the running app, because the
+    // failure is a layout one and nothing else can see it.
+    const debug = document.createElement("pre");
+    debug.className = "cm-mermaid-debug";
+    const report = () => {
+      const r = overlay.getBoundingClientRect();
+      debug.textContent = [
+        `overlay top=${Math.round(r.top)} left=${Math.round(r.left)} w=${Math.round(r.width)} h=${Math.round(r.height)}`,
+        `window ${window.innerWidth}x${window.innerHeight}`,
+        `stage ${stage.clientWidth}x${stage.clientHeight}`,
+        `svg ${svg.style.width} x ${svg.style.height}`,
+        `transform ${svg.style.transform}`,
+      ].join("\n");
+    };
+    report();
+    overlay.appendChild(debug);
+    setTimeout(report, 300);
+
     // Esc closes, and the editor rect is re-read while the window changes size.
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
