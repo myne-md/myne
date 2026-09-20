@@ -716,13 +716,6 @@ export const myneTheme = EditorView.theme({
     outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
     outlineOffset: "var(--focus-ring-offset, 2px)",
   },
-  ".cm-mermaid-svg": {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    transformOrigin: "0 0",
-    display: "block",
-  },
 
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.
   // Prose-first: the gutter blends into the editor surface (no chrome block) and

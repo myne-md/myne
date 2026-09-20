@@ -13,6 +13,13 @@
 // custom theme, which is what `scripts/check-token-adoption.mjs` ratchets.
 
 const CSS = `
+.cm-mermaid-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  display: block;
+}
 .cm-mermaid-controls {
   position: absolute;
   bottom: var(--space-2);
