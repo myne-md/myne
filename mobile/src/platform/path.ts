@@ -1,4 +1,5 @@
-// Platform seam: the plaintext export destination.
+// Platform seam: the plaintext export destination, and the WebView half of the
+// mobile export chokepoint (`docs/glossary.md`, **export chokepoint**).
 //
 // Not a re-export of `@tauri-apps/api/path`. This file used to be
 // `export { documentDir, join } from "@tauri-apps/api/path";` and four export
@@ -6,7 +7,9 @@
 // hook having excluded that directory from the platform's automatic cloud
 // backup. `exportPath()` replaced it in myne#517: one call into the host that
 // resolves the directory, creates it, applies the exclusion and sanitizes the
-// name, and hands back a destination only when all four succeeded.
+// name, and hands back a destination only when all four succeeded. That one
+// call is the chokepoint; this file is the only way to reach it from
+// `mobile/src`.
 //
 // Three things changed shape, and each of them was a place the answer could
 // drift:
@@ -51,6 +54,13 @@
 // what refuses it, and it refuses `documentDir` too, because reaching for the
 // directory directly is how a flow gets past the sanitizer and the ordering
 // above.
+//
+// And the chokepoint is NOT a containment boundary, which the name invites:
+// the three export commands still take a caller-supplied path string and the
+// note PDF reaches the host as an event payload, so containment stays with the
+// writers (`threat-model.md` TB3's plaintext-egress exception). What it gives
+// is the only way to obtain an export directory guaranteed to exist and to be
+// excluded.
 //
 // See `./core.ts` for why this tree has a seam.
 

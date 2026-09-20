@@ -45,7 +45,21 @@ import {
   stripXmlComments,
 } from "../../scripts/check-mobile-export-backup.mjs";
 
-/** A file set that passes every rule, as the baseline each defect mutates. */
+/**
+ * A file set that passes every rule, as the baseline each defect mutates.
+ *
+ * **TWO `ExportDir` variants, and that is load-bearing rather than incidental.**
+ * With one, every way of losing a directory from `requiredDirs` empties it, so
+ * the vacuity floor answers and no rule-4b-i case can ever be the reason a run
+ * is red: reverting the whole of 4b-i left this spec 66/66 green while the
+ * defect it closes was live (review round 6, F1). A second variant is what lets
+ * the roster SHRINK without emptying, which is the only state in which the
+ * drop-one-directory defect is distinguishable from the read-nothing one.
+ *
+ * `Pictures` rather than `Downloads`, deliberately: three cases below ADD a
+ * `Downloads` variant themselves, and a baseline that already held one would
+ * turn each of them into a duplicate-variant fixture testing something else.
+ */
 function healthyFiles(): Record<string, string> {
   return {
     [PATH_SEAM]: `import { invoke } from "./core";
@@ -58,15 +72,18 @@ export function exportPath(filename: string) {
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="external" path="Documents" />
+        <exclude domain="external" path="Pictures" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="external" path="Documents" />
+        <exclude domain="external" path="Pictures" />
     </device-transfer>
 </data-extraction-rules>
 `,
     [ANDROID_RULES_LEGACY]: `<?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <exclude domain="external" path="Documents" />
+    <exclude domain="external" path="Pictures" />
 </full-backup-content>
 `,
     [ANDROID_MANIFEST]: `<manifest>
@@ -77,14 +94,26 @@ export function exportPath(filename: string) {
 `,
     [RUST_MODULE]: `pub enum ExportDir {
     Documents,
+    Pictures,
 }
 
 impl ExportDir {
-    pub const ALL: &'static [ExportDir] = &[ExportDir::Documents];
+    pub const ALL: &'static [ExportDir] = &[ExportDir::Documents, ExportDir::Pictures];
 
     pub const fn name(self) -> &'static str {
         match self {
             ExportDir::Documents => "Documents",
+            ExportDir::Pictures => "Pictures",
+        }
+    }
+
+    fn resolve<R: tauri::Runtime>(
+        self,
+        resolver: &tauri::path::PathResolver<R>,
+    ) -> tauri::Result<std::path::PathBuf> {
+        match self {
+            ExportDir::Documents => resolver.document_dir(),
+            ExportDir::Pictures => resolver.picture_dir(),
         }
     }
 }
@@ -169,22 +198,30 @@ describe("the baseline is green", () => {
     // MOVES the value in the fixture and requires the guard's answer to move
     // with it. A guard that had stopped parsing the Rust and was reporting a
     // hardcoded set would pass the first assertion and fail the second.
-    expect([...run(healthyFiles()).requiredDirs]).toEqual(["Documents"]);
+    expect([...run(healthyFiles()).requiredDirs]).toEqual(["Documents", "Pictures"]);
 
     const files = healthyFiles();
     files[RUST_MODULE] = files[RUST_MODULE].replace(
       'ExportDir::Documents => "Documents",',
       'ExportDir::Documents => "Papers",',
     );
-    expect([...run(files).requiredDirs]).toEqual(["Papers"]);
+    expect([...run(files).requiredDirs]).toEqual(["Papers", "Pictures"]);
   });
 
   it("fails rather than passing when the roster comes back empty", () => {
     // The direction that matters more than any single rule: rules 2 and 3
     // iterate the roster, so an empty one makes both of them pass over any
     // Android file at all. The guard has to say it read nothing.
+    //
+    // BOTH variants are removed, because the fixture now declares two. This is
+    // the intersection case as well as the vacuity one: the `name()` arms are
+    // deliberately left in place, so `named` is non-empty while `variants` is
+    // empty, which is exactly the state the rejected `named`-driven design
+    // would have walked straight past with a roster of two.
     const files = healthyFiles();
-    files[RUST_MODULE] = files[RUST_MODULE].replace("    Documents,\n", "");
+    files[RUST_MODULE] = files[RUST_MODULE]
+      .replace("    Documents,\n", "")
+      .replace("    Pictures,\n", "");
     const out = messages(files);
     expect(out).toContain("the directory roster came back EMPTY");
     expect(out).toContain("rules 2 and 3 below checked no directory");
@@ -351,6 +388,12 @@ describe("drift class 2: the Android rules fall behind", () => {
     // reproduce it: with no closing tag to reach, the match fails either way and
     // the test passes against a guard that has stopped stripping. That version
     // was written first and caught nothing.
+    //
+    // And `<cloud-backup>` must exclude EVERY directory the roster requires,
+    // which is why `Pictures` is here beside `Documents`. Leave one unmet and
+    // the assertion below fires for that directory whether or not stripping
+    // works, so the case passes against an identity stripper. It did, for as
+    // long as the baseline held one variant and this fixture held one exclude.
     const files = healthyFiles();
     files[ANDROID_RULES_MODERN] = `<?xml version="1.0"?>
 <!--
@@ -360,6 +403,7 @@ describe("drift class 2: the Android rules fall behind", () => {
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="external" path="Documents" />
+        <exclude domain="external" path="Pictures" />
     </cloud-backup>
     <device-transfer>
     </device-transfer>
@@ -369,9 +413,14 @@ describe("drift class 2: the Android rules fall behind", () => {
   });
 
   it("is not fooled by an <exclude> that appears only in a comment", () => {
+    // `Pictures` is excluded for real so that `Documents` is the ONLY unmet
+    // directory, and it is reachable only through the comment. Without that,
+    // the assertion fires for `Pictures` regardless and the case passes against
+    // a guard that has stopped stripping.
     const files = healthyFiles();
     files[ANDROID_RULES_LEGACY] = `<?xml version="1.0"?>
 <full-backup-content>
+    <exclude domain="external" path="Pictures" />
     <!-- <exclude domain="external" path="Documents" /> was here; see myne#491 -->
 </full-backup-content>
 `;
@@ -576,6 +625,118 @@ describe("drift class 4: the iOS roster stops matching", () => {
       'ExportDir::Documents => "Documents",\n            _ => "Documents",',
     );
     expect(messages(files)).toContain("`name()` has a `_ =>` catch-all");
+  });
+
+  // ── rule 4b-i: a directory may not leave `requiredDirs` SILENTLY ──────────
+  //
+  // Each of the three cases below asserts its own message AND asserts that the
+  // vacuity floor did NOT fire. The second half is the point. Reverting 4b-i to
+  // the `if (dir && inAll.has(variant))` it replaced left this whole spec green
+  // (review round 6, F1), because the fixture held one variant, so every drop
+  // emptied the roster and the floor answered for a check that was doing
+  // nothing. Asserting the floor is ABSENT is what stops that recurring: a case
+  // that starts passing for the floor's reason fails here instead.
+  //
+  // The acceptance test is per case, not per suite. Revert 4b-i and each of
+  // these three must go red on its own.
+
+  it("fails when a name() arm is written in a shape it cannot read, rather than dropping the directory", () => {
+    // A block body is the shape: `named` never gets `Pictures`, so before 4b-i
+    // the directory left `requiredDirs` and nothing required the Android XML to
+    // exclude it. `Documents` survives, so the roster is non-empty and the
+    // vacuity floor is not what answers.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      'ExportDir::Pictures => "Pictures",',
+      'ExportDir::Pictures => { "Pictures" }',
+    );
+    const out = messages(files);
+    expect(out).toContain("`ExportDir::Pictures` is declared and this guard could not");
+    expect(out).toContain("read its `name()` arm");
+    expect(out).not.toContain("came back EMPTY");
+    expect([...run(files).requiredDirs]).toEqual(["Documents"]);
+  });
+
+  it("fails on an empty-string name() arm, the other half of the same truthiness test", () => {
+    // `named.get(variant)` returns `""`, which the pre-4b-i `dir &&` treated
+    // exactly as a missing arm. Closing one arm of that test and leaving this
+    // one is how the blind spot moves one token over.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      'ExportDir::Pictures => "Pictures",',
+      'ExportDir::Pictures => "",',
+    );
+    const out = messages(files);
+    expect(out).toContain("`ExportDir::Pictures`'s `name()` arm is the empty string");
+    expect(out).not.toContain("came back EMPTY");
+    expect([...run(files).requiredDirs]).toEqual(["Documents"]);
+  });
+
+  it("fails when name() has an arm for a variant the enum body does not declare", () => {
+    // The reverse direction, and the one the intersection exists for: the two
+    // readings of the roster disagree. Neither reading is trusted over the
+    // other, so the guard says so rather than picking one.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      'ExportDir::Pictures => "Pictures",',
+      'ExportDir::Pictures => "Pictures",\n            ExportDir::Archive => "Archive",',
+    );
+    const out = messages(files);
+    expect(out).toContain("`name()` has an arm for `ExportDir::Archive`");
+    expect(out).toContain("enum-body parse did not see as a variant");
+    expect(out).not.toContain("came back EMPTY");
+    expect([...run(files).requiredDirs]).toEqual(["Documents", "Pictures"]);
+  });
+
+  // ── rule 4b-ii: name() and resolve() describe the same directory ─────────
+  //
+  // Review round 6 measured the uncovered shape as `failures = 0`, and it is
+  // the sharpest of the three because both arms are individually valid: the
+  // Android rules exclude by NAME and the iOS flag lands on the RESOLVED path,
+  // so the XML excludes a directory the exports are not in while the one they
+  // are in is excluded by nothing.
+
+  it("fails when name() and resolve() describe different directories", () => {
+    // The reviewer's exact case: name()="Documents" with resolve()=picture_dir.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      "ExportDir::Documents => resolver.document_dir(),",
+      "ExportDir::Documents => resolver.picture_dir(),",
+    );
+    const out = messages(files);
+    expect(out).toContain('names directory "Documents" but resolves');
+    expect(out).toContain("resolver.picture_dir()");
+    expect(out).toContain("resolver.document_dir()");
+  });
+
+  it("fails on a directory name no pair in RESOLVER_FOR_DIR classifies", () => {
+    // Fail-closed on the unknown rather than skipping it, which is the arm that
+    // keeps the allowlist from quietly stopping to describe the tree.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE]
+      .replace('ExportDir::Pictures => "Pictures",', 'ExportDir::Pictures => "Snapshots",')
+      .replace(
+        '<exclude domain="external" path="Pictures" />',
+        '<exclude domain="external" path="Snapshots" />',
+      );
+    expect(messages(files)).toContain("which is not in RESOLVER_FOR_DIR");
+  });
+
+  it("fails when a variant has no resolve() arm this guard can read", () => {
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      "ExportDir::Pictures => resolver.picture_dir(),",
+      "ExportDir::Pictures => picture_dir_for(self),",
+    );
+    expect(messages(files)).toContain("has no `resolve()` arm this guard can read");
+  });
+
+  it("fails by name when resolve() is renamed out from under the guard", () => {
+    // The silent-skip direction: with no `fn resolve`, 4b-ii would check
+    // nothing, so it says what it could not read instead of reporting ok.
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace("fn resolve<", "fn locate<");
+    expect(messages(files)).toContain("could not find `fn resolve<");
   });
 
   it("still fails when the command's destination is not a directory startup excludes", () => {
