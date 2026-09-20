@@ -46,21 +46,35 @@ const PAN_STEP = 100;
  * The VISIBLE editor slot, in viewport coordinates.
  *
  * Not `view.dom.getBoundingClientRect()`: on the desktop client the CodeMirror
- * editor grows to its content height and an outer pane scroller scrolls it, so
- * `view.dom`'s rect is the whole note rather than the slot on screen. The
- * clipping ancestor (the first ancestor that scrolls or hides its overflow) is
- * that slot.
+ * editor grows to its content height and an app-level scroller moves it, so the
+ * editor's own rect is the whole note rather than the slot on screen. Rather than
+ * guess which ancestor clips (there is more than one, and their class names are
+ * not this module's to know), the editor's rect is intersected with every
+ * ancestor and with the window: what survives is exactly the visible slot.
  */
 function editorSlotRect(view: EditorView): DOMRect {
+  const own = view.dom.getBoundingClientRect();
+  let left = own.left;
+  let top = own.top;
+  let right = own.right;
+  let bottom = own.bottom;
   let el: HTMLElement | null = view.dom.parentElement;
   while (el !== null) {
-    const overflowY = getComputedStyle(el).overflowY;
-    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") {
-      return el.getBoundingClientRect();
-    }
+    const r = el.getBoundingClientRect();
+    left = Math.max(left, r.left);
+    top = Math.max(top, r.top);
+    right = Math.min(right, r.right);
+    bottom = Math.min(bottom, r.bottom);
     el = el.parentElement;
   }
-  return view.dom.getBoundingClientRect();
+  left = Math.max(left, 0);
+  top = Math.max(top, 0);
+  right = Math.min(right, window.innerWidth);
+  bottom = Math.min(bottom, window.innerHeight);
+  const width = Math.max(0, right - left);
+  const height = Math.max(0, bottom - top);
+  if (width < 40 || height < 40) return own;
+  return new DOMRect(left, top, width, height);
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
