@@ -690,9 +690,11 @@ export const myneTheme = EditorView.theme({
 
   // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the
   // positioning context, the viewport clips, and the SVG carries the pan/zoom
-  // transform. Values are tokens (or `var(--x, fallback)`, whose fallback never
-  // runs and is not counted) because `check-token-adoption.mjs` ratchets this
-  // file: a new numeric literal here would fail the commit.
+  // transform. The pan/zoom cluster and the top-right chrome are NOT here: the
+  // expanded viewer is appended to `document.body`, outside CodeMirror's theme
+  // scope, so those rules live in `mermaid-viewer-styles.ts` and serve both
+  // scopes. Values below are tokens because `check-token-adoption.mjs` ratchets
+  // this file: a new numeric literal here would fail the commit.
   ".cm-mermaid-card-viewer": {
     display: "block",
     overflowX: "hidden",
@@ -720,102 +722,6 @@ export const myneTheme = EditorView.theme({
     left: "0",
     transformOrigin: "0 0",
     display: "block",
-  },
-  // GitHub's 3x3 pan/zoom cluster, bottom-right, always visible (the mobile
-  // WebView has no hover). Up and zoom-in on the top row, left/reset/right in
-  // the middle, down and zoom-out on the bottom; the empty corners are the
-  // grid template's `.` cells.
-  ".cm-mermaid-controls": {
-    position: "absolute",
-    bottom: "var(--space-2)",
-    right: "var(--space-2)",
-    display: "grid",
-    gridTemplateColumns: "repeat(3, auto)",
-    gridTemplateAreas: '". up zin" "lft rst rgt" ". dwn zot"',
-    gap: "var(--space-1)",
-  },
-  ".cm-mermaid-control": {
-    appearance: "none",
-    color: "var(--ink-1)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    lineHeight: "0",
-    padding: "var(--space-2)",
-    cursor: "pointer",
-    // Separate tiles, GitHub-style: each button carries its own surface and
-    // border rather than the cluster sharing one panel. No shadow: on the light
-    // card a drop shadow under every tile read heavier than the controls are.
-    background: "var(--paper-2)",
-    border: "1px solid var(--line-1)",
-    borderRadius: "var(--radius-2, 6px)",
-  },
-  // The tiles sit on `--paper-2`, so the hover step is `--paper-3`: both come
-  // from the active theme's surface ramp, which is what makes the hover read in
-  // every theme. A fixed-light fill was invisible in the dark and AMOLED ones.
-  ".cm-mermaid-control:hover": {
-    background: "var(--paper-3)",
-  },
-  ".cm-mermaid-control:focus-visible": {
-    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
-    outlineOffset: "-2px",
-  },
-  ".cm-mermaid-control-up": { gridArea: "up" },
-  ".cm-mermaid-control-zin": { gridArea: "zin" },
-  ".cm-mermaid-control-lft": { gridArea: "lft" },
-  ".cm-mermaid-control-rst": { gridArea: "rst" },
-  ".cm-mermaid-control-rgt": { gridArea: "rgt" },
-  ".cm-mermaid-control-dwn": { gridArea: "dwn" },
-  ".cm-mermaid-control-zot": { gridArea: "zot" },
-  // Top-right chrome: an icon plus its word, the shape the app's own window
-  // chrome reads in.
-  ".cm-mermaid-chrome-bar": {
-    position: "absolute",
-    top: "var(--space-2)",
-    right: "var(--space-2)",
-    display: "flex",
-    gap: "var(--space-1)",
-  },
-  ".cm-mermaid-chrome": {
-    appearance: "none",
-    color: "var(--ink-1)",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "var(--space-1)",
-    font: "inherit",
-    lineHeight: "1",
-    padding: "var(--space-1) var(--space-2)",
-    cursor: "pointer",
-    background: "var(--paper-2)",
-    border: "1px solid var(--line-1)",
-    borderRadius: "var(--radius-2, 6px)",
-  },
-  ".cm-mermaid-chrome:hover": {
-    background: "var(--paper-3)",
-  },
-  ".cm-mermaid-chrome:focus-visible": {
-    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
-    outlineOffset: "-2px",
-  },
-  // Expanded: the active editor's own rect, turned into the diagram (see
-  // `mermaid-viewer.ts`). Deliberately NOT a dimmed app-wide modal, so there is
-  // no backdrop fill: the tab, the sidebar and the status bar stay put.
-  ".cm-mermaid-expand": {
-    position: "fixed",
-    zIndex: "50",
-    overflow: "hidden",
-    background: "var(--paper)",
-    border: "1px solid var(--line-1)",
-    outline: "none",
-  },
-  ".cm-mermaid-expand-stage": {
-    position: "absolute",
-    inset: "0",
-    overflow: "hidden",
-    outline: "none",
-    touchAction: "none",
-    userSelect: "none",
-    WebkitUserSelect: "none",
   },
 
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.

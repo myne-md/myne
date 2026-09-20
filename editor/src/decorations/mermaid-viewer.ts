@@ -28,6 +28,7 @@ import {
   type ZoomPanController,
 } from "../attachments/image-zoom-controller";
 import { mermaidZoomStore } from "../attachments/session-caches";
+import { ensureMermaidViewerStyles } from "./mermaid-viewer-styles";
 
 /** Ceiling on a note-declared diagram box, in CSS px. Same availability bound
  *  `giveNaturalSize` states, restated because this module reads the viewBox
@@ -250,6 +251,9 @@ export function buildMermaidViewer(opts: {
   if (!(svg instanceof SVGSVGElement)) return null;
   const natural = mermaidNaturalSize(svg);
   if (natural === null) return null;
+  // The chrome is styled from a global sheet: the expanded viewer lives outside
+  // CodeMirror's theme scope (see mermaid-viewer-styles.ts).
+  ensureMermaidViewerStyles();
 
   const viewport = document.createElement("div");
   viewport.className = "cm-mermaid-viewport";
