@@ -11739,8 +11739,9 @@ mod tests {
         let root_a: [u8; 32] = [0x42; 32];
         let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
         let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
-        // 0xF2, the next free entry after the sibling generators' 0xF1.
-        let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+        // 0xF3, the next entry free after the sibling generators' 0xF1 and the
+        // periodic-notes case's 0xF2. (0xF2 was used here once and collided.)
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF3; AEAD_NONCE_LEN];
         let prefs = PrefsView {
             ribbon_items: Some(alloc::vec![
                 String::from("note.new"),

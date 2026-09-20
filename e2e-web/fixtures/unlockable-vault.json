@@ -1,4 +1,5 @@
 {
+  "//": "secret-scan:allow: test fixture vault credential, a fake value and never a real secret",
   "password": "fixture-vault-password-7x3k9q",
   "accountNumber": "MY-G0D6-EVW1-A5TR-MG24-5SHD",
   "quarantinedBody": "quarantined fixture note: quokkazephyr",
