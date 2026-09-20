@@ -31,6 +31,7 @@ import {
   linesRevealed,
 } from "./cursor-aware";
 import { loadMermaidRenderer, type MermaidRenderer } from "../mermaid/render-mermaid";
+import { buildMermaidViewer, type MermaidViewer } from "./mermaid-viewer";
 import i18n from "@myne/editor/i18n";
 
 /**
@@ -130,6 +131,9 @@ function diagramId(code: string): string {
   return "mmd-" + Math.abs(h).toString(36);
 }
 
+/** Live viewers by widget root, so `destroy` can unwind their listeners. */
+const viewers = new WeakMap<HTMLElement, MermaidViewer>();
+
 class MermaidWidget extends WidgetType {
   constructor(
     private readonly code: string,
@@ -171,13 +175,16 @@ class MermaidWidget extends WidgetType {
     card.textContent = i18n.t("editor.mermaid.rendering");
     root.appendChild(card);
 
-    // Click-to-edit: atomic block widget, so place the cursor at the fence source
-    // on click (reveals raw ```mermaid for editing), like the math/table widgets.
-    root.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      view.dispatch({ selection: { anchor: this.from }, userEvent: "select.pointer" });
+    // Reveal the raw ```mermaid fence and put the caret on it. The viewer's
+    // control bar and a double-click on the diagram both call this (the widget
+    // no longer owns `mousedown`, which pan needs).
+    const onEdit = () => {
+      view.dispatch({
+        selection: { anchor: this.from },
+        userEvent: "select.pointer",
+      });
       view.focus();
-    });
+    };
 
     void this.renderer(diagramId(this.code), this.code)
       .then(({ svg, error }) => {
@@ -186,6 +193,15 @@ class MermaidWidget extends WidgetType {
         } else {
           card.innerHTML = svg; // securityLevel:'strict' → sanitized SVG (SYNC-5)
           giveNaturalSize(card);
+          // The bounded, interactive viewer (myne-md/myne#708). Returns null on
+          // an unreadable viewBox, in which case the card stays as drawn.
+          const viewer = buildMermaidViewer({
+            view,
+            card,
+            code: this.code,
+            onEdit,
+          });
+          if (viewer !== null) viewers.set(root, viewer);
         }
         // The SVG/fallback changes the block's height AFTER CM first measured the
         // "Rendering…" placeholder; without a re-measure the height map is stale
@@ -208,8 +224,20 @@ class MermaidWidget extends WidgetType {
       });
     return root;
   }
-  ignoreEvent(event: Event): boolean {
-    return event.type !== "mousedown"; // own the click; ignore the rest
+  /** Unwind the viewer's listeners when CodeMirror drops the widget. Without
+   *  this every recycled diagram would leak a window resize listener and a
+   *  pointer-capture set. */
+  destroy(dom: HTMLElement): void {
+    const viewer = viewers.get(dom);
+    if (viewer !== undefined) {
+      viewer.destroy();
+      viewers.delete(dom);
+    }
+  }
+  /** Own every event. The widget handles pan/zoom/edit itself and CodeMirror
+   *  must not also act on them (the drawing embed does the same). */
+  ignoreEvent(): boolean {
+    return true;
   }
 }
 

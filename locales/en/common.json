@@ -1274,7 +1274,19 @@
     },
     "mermaid": {
       "rendering": "Rendering diagram…",
-      "renderFailed": "This diagram could not be rendered: {{reason}}"
+      "renderFailed": "This diagram could not be rendered: {{reason}}",
+      "viewerLabel": "Diagram viewer",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "reset": "Reset zoom to fit",
+      "panUp": "Pan up",
+      "panDown": "Pan down",
+      "panLeft": "Pan left",
+      "panRight": "Pan right",
+      "edit": "Edit diagram source",
+      "editGlyph": "\u270E",
+      "expand": "Expand diagram",
+      "expandClose": "Close expanded diagram"
     },
     "slash": {
       "aiContinue": "Continue writing (AI)",

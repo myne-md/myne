@@ -16,6 +16,7 @@ import { resetScrollMemory } from "../notes/scrollMemory";
 import { resetRecentNotes } from "../notes/recentNotes";
 import { resetDecodedAspects } from "../editor/attachments/decoded-aspect";
 import {
+  resetMermaidZoom,
   resetPreviewCache,
   resetTranscripts,
 } from "../editor/attachments/session-caches";
@@ -146,6 +147,10 @@ export async function lockVault(): Promise<void> {
   // button does not reload the WebView.
   teardownStep("resetPreviewCache", () => resetPreviewCache());
   teardownStep("resetTranscripts", () => resetTranscripts());
+  // The remembered mermaid diagram zoom (myne-md/myne#708): module scope, keyed
+  // by a hash of the diagram source, so it is vault-derived the same way the
+  // preview cache is. Cleared with its neighbours on this leg.
+  teardownStep("resetMermaidZoom", () => resetMermaidZoom());
   // The ambient date/time DISPLAY store, which is module scope in
   // `@myne/editor` and read by every surface that prints a date. It holds the
   // reader's chosen formats and their TIME ZONE, all derived from decrypted

@@ -328,6 +328,24 @@ export const TEARDOWN_CALLS = [
     },
   },
   {
+    call: "resetMermaidZoom",
+    declaredIn: "editor/src/attachments/session-caches.ts",
+    holds:
+      "the session zoom percentage per rendered mermaid diagram, keyed by a hash of the diagram source",
+    // Same paths as `resetPreviewCache`, and for the same class of reason: a
+    // percentage is not plaintext, but the key is a fingerprint of note content,
+    // so the map enumerates the diagrams this vault holds. Left uncleared it
+    // would also restore the PREVIOUS vault's scale onto a diagram whose source
+    // hash happened to collide. myne-md/myne#708.
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    skips: {
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-render on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
+    },
+  },
+  {
     call: "clearChatHistoryPersistForLock",
     declaredIn: "mobile/src/lib/chatHistory.ts",
     holds:
