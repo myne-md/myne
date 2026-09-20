@@ -704,6 +704,9 @@ export const myneTheme = EditorView.theme({
     width: "100%",
     outline: "none",
     touchAction: "none",
+    // Dragging to pan must never select the diagram's text labels.
+    userSelect: "none",
+    WebkitUserSelect: "none",
   },
   ".cm-mermaid-viewport:focus-visible": {
     outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
@@ -716,38 +719,97 @@ export const myneTheme = EditorView.theme({
     transformOrigin: "0 0",
     display: "block",
   },
+  // GitHub's 3x3 pan/zoom cluster, bottom-right, always visible (the mobile
+  // WebView has no hover). Up and zoom-in on the top row, left/reset/right in
+  // the middle, down and zoom-out on the bottom; the empty corners are the
+  // grid template's `.` cells.
   ".cm-mermaid-controls": {
     position: "absolute",
-    bottom: "var(--space-1)",
-    right: "var(--space-1)",
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
+    bottom: "var(--space-2)",
+    right: "var(--space-2)",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, auto)",
+    gridTemplateAreas: '". up zin" "lft rst rgt" ". dwn zot"',
     gap: "var(--space-0)",
+    padding: "var(--space-0)",
     background: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     boxShadow: "var(--shadow-2)",
-    opacity: "0.92",
+    overflow: "hidden",
   },
   ".cm-mermaid-control": {
     appearance: "none",
     border: "none",
     background: "transparent",
     color: "var(--diagram-ink)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: "0",
+    padding: "var(--space-2)",
+    cursor: "pointer",
+    borderRadius: "0",
+  },
+  // The hover and active fills must be FIXED-LIGHT, like the surface they sit
+  // on: `--paper-2` is theme-aware, so in the dark and AMOLED themes it painted
+  // a dark patch on a light control bar and the hover read as nothing at all.
+  // Same class of drift decision 0566 records for the card's own ink.
+  ".cm-mermaid-control:hover": {
+    background: "var(--diagram-hover, rgba(11, 11, 9, 0.09))",
+  },
+  ".cm-mermaid-control:active": {
+    background: "var(--diagram-hover, rgba(11, 11, 9, 0.16))",
+  },
+  ".cm-mermaid-control:focus-visible": {
+    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
+    outlineOffset: "-2px",
+  },
+  ".cm-mermaid-control-up": { gridArea: "up" },
+  ".cm-mermaid-control-zin": { gridArea: "zin" },
+  ".cm-mermaid-control-lft": { gridArea: "lft" },
+  ".cm-mermaid-control-rst": { gridArea: "rst" },
+  ".cm-mermaid-control-rgt": { gridArea: "rgt" },
+  ".cm-mermaid-control-dwn": { gridArea: "dwn" },
+  ".cm-mermaid-control-zot": { gridArea: "zot" },
+  // Top-right chrome: an icon plus its word, the shape the app's own window
+  // chrome reads in.
+  ".cm-mermaid-chrome-bar": {
+    position: "absolute",
+    top: "var(--space-2)",
+    right: "var(--space-2)",
+    display: "flex",
+    gap: "var(--space-0)",
+    padding: "var(--space-0)",
+    background: "var(--diagram-surface)",
+    border: "1px solid var(--line-1)",
+    borderRadius: "var(--radius-2, 6px)",
+    boxShadow: "var(--shadow-1)",
+    overflow: "hidden",
+  },
+  ".cm-mermaid-chrome": {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "var(--diagram-ink)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--space-1)",
     font: "inherit",
     lineHeight: "1",
-    padding: "var(--space-1)",
+    padding: "var(--space-1) var(--space-2)",
     cursor: "pointer",
-    borderRadius: "var(--radius-1, 3px)",
+    borderRadius: "0",
   },
-  ".cm-mermaid-control:hover": {
-    background: "var(--paper-2)",
+  ".cm-mermaid-chrome:hover": {
+    background: "var(--diagram-hover, rgba(11, 11, 9, 0.09))",
   },
-  ".cm-mermaid-percent": {
-    minWidth: "3em",
-    textAlign: "center",
-    fontVariantNumeric: "tabular-nums",
+  ".cm-mermaid-chrome:active": {
+    background: "var(--diagram-hover, rgba(11, 11, 9, 0.16))",
+  },
+  ".cm-mermaid-chrome:focus-visible": {
+    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
+    outlineOffset: "-2px",
   },
   ".cm-mermaid-expand": {
     position: "fixed",

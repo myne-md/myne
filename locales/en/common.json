@@ -1284,9 +1284,11 @@
       "panLeft": "Pan left",
       "panRight": "Pan right",
       "edit": "Edit diagram source",
-      "editGlyph": "\u270E",
+      "editText": "Edit",
       "expand": "Expand diagram",
-      "expandClose": "Close expanded diagram"
+      "expandText": "Expand",
+      "expandClose": "Close expanded diagram",
+      "expandCloseText": "Close"
     },
     "slash": {
       "aiContinue": "Continue writing (AI)",

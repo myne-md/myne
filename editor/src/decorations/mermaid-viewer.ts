@@ -4,8 +4,7 @@
 // static card: horizontal scroll only, the vertical axis unbounded, and every
 // `mousedown` dropped back to source so a drag could never start. This wraps the
 // SVG in a clipping viewport, fits it to the column, and drives the SHARED
-// pan/zoom controller (`attachments/image-zoom-controller.ts`) from an
-// always-visible control bar.
+// pan/zoom controller (`attachments/image-zoom-controller.ts`).
 //
 // Render-only, and the mechanism is what keeps that true: zoom and pan are a CSS
 // `transform` on the LIVE SVG node already in the DOM. Nothing is re-parsed,
@@ -13,9 +12,13 @@
 // `docs/threat-model.md` §7's "mermaid sanitizes its own output and that is what
 // is injected" stays literally true. The note's bytes are never touched.
 //
-// Everything is shared by desktop, web and mobile: the control bar is
-// always-visible rather than hover-revealed because the mobile WebView has no
-// hover, and the controller carries the pinch path for touch.
+// Chrome: the pan/zoom cluster is GitHub's (a 3x3 grid bottom-right: up and
+// zoom-in on the top row, left/reset/right in the middle, down and zoom-out on
+// the bottom), and the edit affordance sits top-right as an icon plus the word
+// "Edit", the way the app's own window chrome reads. Everything is shared by
+// desktop, web and mobile: the chrome is always visible rather than
+// hover-revealed because the mobile WebView has no hover, and the controller
+// carries the pinch path for touch.
 
 import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
@@ -39,6 +42,8 @@ const MAX_VIEWPORT_PX = 560;
 const VIEWPORT_FRACTION = 0.55;
 /** Pan distance for the arrow buttons and the arrow keys, in stage px. */
 const PAN_STEP = 100;
+
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** Stable session-store key for a diagram's source. */
 export function mermaidSourceKey(code: string): string {
@@ -66,21 +71,72 @@ export interface MermaidViewer {
   remeasure(): void;
 }
 
-/** One control-bar button. `stopPropagation` keeps the press off the stage, so
- *  a click on a control never starts a pan. */
-function controlButton(
+/** Lucide-shaped paths, drawn as DOM (never `innerHTML`, never emoji — TB2),
+ *  1.5px stroke in `currentColor` so they inherit the button's token colour. */
+const ICONS: Record<string, readonly string[]> = {
+  "chevron-up": ["m18 15-6-6-6 6"],
+  "chevron-down": ["m6 9 6 6 6-6"],
+  "chevron-left": ["m15 18-6-6 6-6"],
+  "chevron-right": ["m9 18 6-6-6-6"],
+  "zoom-in": [
+    "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z",
+    "m21 21-4.35-4.35",
+    "M11 8v6",
+    "M8 11h6",
+  ],
+  "zoom-out": [
+    "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z",
+    "m21 21-4.35-4.35",
+    "M8 11h6",
+  ],
+  reset: [
+    "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
+    "M3 3v5h5",
+  ],
+  pencil: ["M12 20h9", "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"],
+  maximize: [
+    "M8 3H5a2 2 0 0 0-2 2v3",
+    "M21 8V5a2 2 0 0 0-2-2h-3",
+    "M3 16v3a2 2 0 0 0 2 2h3",
+    "M16 21h3a2 2 0 0 0 2-2v-3",
+  ],
+  x: ["M18 6 6 18", "m6 6 12 12"],
+};
+
+function icon(name: keyof typeof ICONS): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  for (const d of ICONS[name]) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
+/** One square icon button for the pan/zoom cluster. */
+function gridButton(
+  area: string,
   testid: string,
   label: string,
-  glyph: string,
+  iconName: keyof typeof ICONS,
   onClick: () => void,
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "cm-mermaid-control";
+  button.className = `cm-mermaid-control cm-mermaid-control-${area}`;
   button.setAttribute("data-testid", testid);
   button.setAttribute("aria-label", label);
   button.title = label;
-  button.textContent = glyph;
+  button.appendChild(icon(iconName));
   button.addEventListener("click", (e) => {
     e.stopPropagation();
     onClick();
@@ -88,95 +144,59 @@ function controlButton(
   return button;
 }
 
-interface Controls {
-  readonly el: HTMLDivElement;
-  setPercent(pct: number): void;
+/** One icon-plus-word button for the top-right chrome. */
+function chromeButton(
+  testid: string,
+  label: string,
+  text: string,
+  iconName: keyof typeof ICONS,
+  onClick: () => void,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cm-mermaid-chrome";
+  button.setAttribute("data-testid", testid);
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  const span = document.createElement("span");
+  span.className = "cm-mermaid-chrome-text";
+  span.textContent = text;
+  button.append(icon(iconName), span);
+  button.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+  return button;
 }
 
-/** The GitHub-shaped control bar: zoom out / percentage-reset / zoom in, the
- *  four pan arrows, edit source and expand. */
-function buildControls(
-  getController: () => ZoomPanController | null,
-  onEdit: () => void,
-  onExpand: () => void,
-): Controls {
-  const el = document.createElement("div");
-  el.className = "cm-mermaid-controls";
-  const zoomOut = controlButton(
-    "editor.mermaid.zoom-out",
-    i18n.t("editor.mermaid.zoomOut"),
-    "\u2212",
-    () => getController()?.zoomOut(),
+/** GitHub's 3x3 pan/zoom cluster, bottom-right. */
+function buildGrid(getController: () => ZoomPanController | null): HTMLDivElement {
+  const grid = document.createElement("div");
+  grid.className = "cm-mermaid-controls";
+  grid.append(
+    gridButton("up", "editor.mermaid.pan-up", i18n.t("editor.mermaid.panUp"), "chevron-up", () =>
+      getController()?.pan(0, PAN_STEP),
+    ),
+    gridButton("zin", "editor.mermaid.zoom-in", i18n.t("editor.mermaid.zoomIn"), "zoom-in", () =>
+      getController()?.zoomIn(),
+    ),
+    gridButton("lft", "editor.mermaid.pan-left", i18n.t("editor.mermaid.panLeft"), "chevron-left", () =>
+      getController()?.pan(PAN_STEP, 0),
+    ),
+    gridButton("rst", "editor.mermaid.reset", i18n.t("editor.mermaid.reset"), "reset", () =>
+      getController()?.reset(),
+    ),
+    gridButton("rgt", "editor.mermaid.pan-right", i18n.t("editor.mermaid.panRight"), "chevron-right", () =>
+      getController()?.pan(-PAN_STEP, 0),
+    ),
+    gridButton("dwn", "editor.mermaid.pan-down", i18n.t("editor.mermaid.panDown"), "chevron-down", () =>
+      getController()?.pan(0, -PAN_STEP),
+    ),
+    gridButton("zot", "editor.mermaid.zoom-out", i18n.t("editor.mermaid.zoomOut"), "zoom-out", () =>
+      getController()?.zoomOut(),
+    ),
   );
-  const percent = document.createElement("button");
-  percent.type = "button";
-  percent.className = "cm-mermaid-control cm-mermaid-percent";
-  percent.setAttribute("data-testid", "editor.mermaid.reset");
-  percent.setAttribute("aria-label", i18n.t("editor.mermaid.reset"));
-  percent.setAttribute("aria-live", "polite");
-  percent.addEventListener("click", (e) => {
-    e.stopPropagation();
-    getController()?.reset();
-  });
-  const zoomIn = controlButton(
-    "editor.mermaid.zoom-in",
-    i18n.t("editor.mermaid.zoomIn"),
-    "+",
-    () => getController()?.zoomIn(),
-  );
-  const panUp = controlButton(
-    "editor.mermaid.pan-up",
-    i18n.t("editor.mermaid.panUp"),
-    "\u2191",
-    () => getController()?.pan(0, PAN_STEP),
-  );
-  const panDown = controlButton(
-    "editor.mermaid.pan-down",
-    i18n.t("editor.mermaid.panDown"),
-    "\u2193",
-    () => getController()?.pan(0, -PAN_STEP),
-  );
-  const panLeft = controlButton(
-    "editor.mermaid.pan-left",
-    i18n.t("editor.mermaid.panLeft"),
-    "\u2190",
-    () => getController()?.pan(PAN_STEP, 0),
-  );
-  const panRight = controlButton(
-    "editor.mermaid.pan-right",
-    i18n.t("editor.mermaid.panRight"),
-    "\u2192",
-    () => getController()?.pan(-PAN_STEP, 0),
-  );
-  const edit = controlButton(
-    "editor.mermaid.edit",
-    i18n.t("editor.mermaid.edit"),
-    i18n.t("editor.mermaid.editGlyph"),
-    onEdit,
-  );
-  const expand = controlButton(
-    "editor.mermaid.expand",
-    i18n.t("editor.mermaid.expand"),
-    "\u26F6",
-    onExpand,
-  );
-  el.append(
-    zoomOut,
-    percent,
-    zoomIn,
-    panUp,
-    panDown,
-    panLeft,
-    panRight,
-    edit,
-    expand,
-  );
-  return {
-    el,
-    setPercent(pct) {
-      percent.textContent = `${pct}%`;
-    },
-  };
+  return grid;
 }
 
 /**
@@ -202,7 +222,7 @@ export function buildMermaidViewer(opts: {
   viewport.tabIndex = 0;
   viewport.setAttribute("role", "group");
   viewport.setAttribute("aria-label", i18n.t("editor.mermaid.viewerLabel"));
-  // The frame is the positioning context for the control bar, so the bar is a
+  // The frame is the positioning context for the chrome, so the chrome is a
   // SIBLING of the clipping viewport and cannot be clipped by it.
   const frame = document.createElement("div");
   frame.className = "cm-mermaid-frame";
@@ -272,13 +292,29 @@ export function buildMermaidViewer(opts: {
     backdrop.appendChild(stage);
     stage.appendChild(svg);
 
-    let expandController: ZoomPanController | null = null;
-    const expandControls = buildControls(
-      () => expandController,
-      opts.onEdit,
-      () => closeExpand(),
+    const chrome = document.createElement("div");
+    chrome.className = "cm-mermaid-chrome-bar";
+    chrome.append(
+      chromeButton(
+        "editor.mermaid.edit",
+        i18n.t("editor.mermaid.edit"),
+        i18n.t("editor.mermaid.editText"),
+        "pencil",
+        opts.onEdit,
+      ),
+      chromeButton(
+        "editor.mermaid.expand-close",
+        i18n.t("editor.mermaid.expandClose"),
+        i18n.t("editor.mermaid.expandCloseText"),
+        "x",
+        () => closeExpand(),
+      ),
     );
-    backdrop.appendChild(expandControls.el);
+    backdrop.appendChild(chrome);
+
+    let expandController: ZoomPanController | null = null;
+    const grid = buildGrid(() => expandController);
+    backdrop.appendChild(grid);
     expandController = mountZoom({
       stage,
       element: svg,
@@ -300,10 +336,9 @@ export function buildMermaidViewer(opts: {
       keyboard: true,
       ready: true,
       panTarget: stage,
-      onPercent: expandControls.setPercent,
     });
     expandController.setPercent(lastPercent);
-    host.installTrap(backdrop, expandControls.el);
+    host.installTrap(backdrop, chrome);
 
     expandClose = () => {
       if (expandClose === null) return;
@@ -334,7 +369,6 @@ export function buildMermaidViewer(opts: {
       panTarget: viewport,
       onPercent: (pct) => {
         lastPercent = pct;
-        controls.setPercent(pct);
       },
       onCommit: () => {
         mermaidZoomStore.set(key, lastPercent);
@@ -342,8 +376,27 @@ export function buildMermaidViewer(opts: {
       },
     });
 
-  const controls = buildControls(() => controller, opts.onEdit, openExpand);
-  frame.appendChild(controls.el);
+  // Top-right chrome: Edit (icon plus word), then Expand.
+  const chromeBar = document.createElement("div");
+  chromeBar.className = "cm-mermaid-chrome-bar";
+  chromeBar.append(
+    chromeButton(
+      "editor.mermaid.edit",
+      i18n.t("editor.mermaid.edit"),
+      i18n.t("editor.mermaid.editText"),
+      "pencil",
+      opts.onEdit,
+    ),
+    chromeButton(
+      "editor.mermaid.expand",
+      i18n.t("editor.mermaid.expand"),
+      i18n.t("editor.mermaid.expandText"),
+      "maximize",
+      openExpand,
+    ),
+  );
+  frame.appendChild(chromeBar);
+  frame.appendChild(buildGrid(() => controller));
 
   controller = mountInline();
   // Restore a scale remembered from an earlier mount of the same diagram. The
@@ -353,8 +406,8 @@ export function buildMermaidViewer(opts: {
     controller.setPercent(remembered);
   }
 
-  // Double-click edits, matching the control bar's edit button. Registered on
-  // the viewport so it works anywhere on the diagram.
+  // Double-click edits, matching the chrome's Edit button. Registered on the
+  // viewport so it works anywhere on the diagram.
   viewport.addEventListener("dblclick", (e) => {
     e.preventDefault();
     opts.onEdit();
