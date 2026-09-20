@@ -114,8 +114,6 @@ export function mermaidNaturalSize(
 
 export interface MermaidViewer {
   destroy(): void;
-  /** Re-fit after the editor viewport changed size. */
-  remeasure(): void;
 }
 
 /** Lucide-shaped paths, drawn as DOM (never `innerHTML`, never emoji — TB2),
@@ -498,9 +496,6 @@ export function buildMermaidViewer(opts: {
       const close = expandClose;
       expandClose = null;
       close?.();
-    },
-    remeasure() {
-      controller?.remeasure();
     },
   };
 }
