@@ -797,22 +797,25 @@ export const myneTheme = EditorView.theme({
     outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
     outlineOffset: "-2px",
   },
+  // Expanded: the active editor's own rect, turned into the diagram (see
+  // `mermaid-viewer.ts`). Deliberately NOT a dimmed app-wide modal, so there is
+  // no backdrop fill: the tab, the sidebar and the status bar stay put.
   ".cm-mermaid-expand": {
     position: "fixed",
-    inset: "0",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "var(--overlay-backdrop, rgba(11, 11, 9, 0.6))",
     zIndex: "50",
+    overflow: "hidden",
+    background: "var(--paper)",
+    border: "1px solid var(--line-1)",
+    outline: "none",
   },
   ".cm-mermaid-expand-stage": {
-    position: "relative",
+    position: "absolute",
+    inset: "0",
     overflow: "hidden",
-    width: "90vw",
-    height: "90vh",
-    background: "var(--paper)",
-    borderRadius: "var(--radius-2, 6px)",
+    outline: "none",
+    touchAction: "none",
+    userSelect: "none",
+    WebkitUserSelect: "none",
   },
 
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.

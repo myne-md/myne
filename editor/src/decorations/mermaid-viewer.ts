@@ -22,7 +22,6 @@
 
 import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
-import { openModal } from "@myne/editor/host/lib/imperative-modal";
 import {
   mountZoom,
   type ContentBox,
@@ -279,17 +278,32 @@ export function buildMermaidViewer(opts: {
     controller?.destroy();
     controller = null;
 
-    const host = openModal({
-      backdropClass: "cm-mermaid-expand",
-      onDismiss: () => closeExpand(),
-    });
-    const backdrop = host.backdrop;
-    backdrop.setAttribute("role", "dialog");
-    backdrop.setAttribute("aria-modal", "true");
-    backdrop.setAttribute("aria-label", i18n.t("editor.mermaid.viewerLabel"));
+    // Expanded is the ACTIVE EDITOR turned into the diagram, not a modal floating
+    // over the app: the surface is pinned to the editor's own rect, so the tab,
+    // the sidebar and the status bar stay exactly where they were. `position:
+    // fixed` plus that rect is deliberate: it needs no `position: relative` on a
+    // CodeMirror ancestor, which would be a layout change to a surface this
+    // feature does not own.
+    const overlay = document.createElement("div");
+    overlay.className = "cm-mermaid-expand";
+    overlay.tabIndex = -1;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", i18n.t("editor.mermaid.viewerLabel"));
+    const place = () => {
+      const r = opts.view.dom.getBoundingClientRect();
+      overlay.style.top = `${r.top}px`;
+      overlay.style.left = `${r.left}px`;
+      overlay.style.width = `${r.width}px`;
+      overlay.style.height = `${r.height}px`;
+    };
+    place();
+    document.body.appendChild(overlay);
+
     const stage = document.createElement("div");
     stage.className = "cm-mermaid-expand-stage";
-    backdrop.appendChild(stage);
+    stage.tabIndex = 0;
+    overlay.appendChild(stage);
     stage.appendChild(svg);
 
     const chrome = document.createElement("div");
@@ -310,11 +324,11 @@ export function buildMermaidViewer(opts: {
         () => closeExpand(),
       ),
     );
-    backdrop.appendChild(chrome);
+    overlay.appendChild(chrome);
 
     let expandController: ZoomPanController | null = null;
     const grid = buildGrid(() => expandController);
-    backdrop.appendChild(grid);
+    overlay.appendChild(grid);
     expandController = mountZoom({
       stage,
       element: svg,
@@ -338,15 +352,27 @@ export function buildMermaidViewer(opts: {
       panTarget: stage,
     });
     expandController.setPercent(lastPercent);
-    host.installTrap(backdrop, chrome);
+
+    // Esc closes, and the editor rect is re-read while the window changes size.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeExpand();
+      }
+    };
+    overlay.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", place);
+    stage.focus();
 
     expandClose = () => {
       if (expandClose === null) return;
       expandClose = null;
+      overlay.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", place);
       expandController?.destroy();
       expandController = null;
       viewport.appendChild(svg);
-      host.close();
+      overlay.remove();
       if (!destroyed) {
         controller = mountInline();
         remeasureHost();
