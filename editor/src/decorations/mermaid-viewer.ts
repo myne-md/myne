@@ -42,6 +42,27 @@ const VIEWPORT_FRACTION = 0.55;
 /** Pan distance for the arrow buttons and the arrow keys, in stage px. */
 const PAN_STEP = 100;
 
+/**
+ * The VISIBLE editor slot, in viewport coordinates.
+ *
+ * Not `view.dom.getBoundingClientRect()`: on the desktop client the CodeMirror
+ * editor grows to its content height and an outer pane scroller scrolls it, so
+ * `view.dom`'s rect is the whole note rather than the slot on screen. The
+ * clipping ancestor (the first ancestor that scrolls or hides its overflow) is
+ * that slot.
+ */
+function editorSlotRect(view: EditorView): DOMRect {
+  let el: HTMLElement | null = view.dom.parentElement;
+  while (el !== null) {
+    const overflowY = getComputedStyle(el).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") {
+      return el.getBoundingClientRect();
+    }
+    el = el.parentElement;
+  }
+  return view.dom.getBoundingClientRect();
+}
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** Stable session-store key for a diagram's source. */
@@ -291,7 +312,7 @@ export function buildMermaidViewer(opts: {
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-label", i18n.t("editor.mermaid.viewerLabel"));
     const place = () => {
-      const r = opts.view.dom.getBoundingClientRect();
+      const r = editorSlotRect(opts.view);
       overlay.style.top = `${r.top}px`;
       overlay.style.left = `${r.left}px`;
       overlay.style.width = `${r.width}px`;
