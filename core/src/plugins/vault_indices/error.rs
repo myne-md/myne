@@ -1,6 +1,6 @@
 //! `vault_indices` plugin IPC error enum (MYND-31 / A11, Task 1).
 //!
-//! Closed taxonomy, DENY-list clean per `src-tauri/CLAUDE.md`
+//! Closed taxonomy, DENY-list clean per `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline" (no path strings, no key
 //! material, no note_id / title content). Hand-mirrored on the TS side
 //! at `src/types/vault-indices-error.ts`.

@@ -15,7 +15,7 @@
 //! security decision"). Higher-order resampling (e.g. windowed-sinc) is a
 //! localized quality swap behind this same signature if ever needed.
 //!
-//! Logging: DENY-list clean (`src-tauri/CLAUDE.md`). The decoded PCM is
+//! Logging: DENY-list clean (`src-tauri/AGENTS.md`). The decoded PCM is
 //! AS1-class decrypted audio — **never logged**; [`AudioError`] carries no
 //! sample data, only a bounded kind.
 

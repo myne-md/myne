@@ -1,7 +1,7 @@
 // "Credentials never reach failure output" — the non-negotiable, tested
 // (MYND-574 task 105).
 //
-// It is the fourth rule in `e2e/CLAUDE.md` and the one most likely to be
+// It is the fourth rule in `e2e/AGENTS.md` and the one most likely to be
 // written blind alongside a driver and never exercised, because a redactor that
 // silently does nothing looks exactly like one that works. It is also the rule
 // with the most forms to get wrong: a browser DOM dump carries input VALUES, and

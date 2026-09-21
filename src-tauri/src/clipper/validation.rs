@@ -33,7 +33,7 @@
 //! field-level validation primitives those tasks compose, not the
 //! envelope schema. The seams are the public `validate_*` functions.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — a frame
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — a frame
 //! body / note body carries note plaintext; this module never logs a
 //! body, only the closed [`ValidationError`] variant name and non-secret
 //! lengths.

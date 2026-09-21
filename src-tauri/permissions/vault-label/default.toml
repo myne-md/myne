@@ -9,7 +9,7 @@
 # vault label, returns one, or reaches vault content: the only value crossing
 # either way is a boolean. Adding a command here without a matching entry in
 # `src-tauri/src/plugins/vault_label/mod.rs`'s `generate_handler!` ships it dead
-# (root CLAUDE.md: an ACL entry does not wire a command, and nothing checks that
+# (root AGENTS.md: an ACL entry does not wire a command, and nothing checks that
 # it does).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"

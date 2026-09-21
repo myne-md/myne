@@ -66,7 +66,7 @@ pub struct LegalConsent {
 /// Failure surface for reading/writing the record.
 ///
 /// Two variants and no `String`: this reaches the UI, and a path in an error
-/// message is a disclosure (`src-tauri/CLAUDE.md` DENY list).
+/// message is a disclosure (`src-tauri/AGENTS.md` DENY list).
 #[derive(Debug, Clone, Copy, Error, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", content = "detail")]
 pub enum LegalConsentError {

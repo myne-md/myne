@@ -23,7 +23,7 @@
 //! Behind `tauri-ipc`, because `TauriHost` is: a consumer that wants core
 //! without Tauri has no `AppHandle` to build one from.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 #![cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 
 use crate::host::tauri_host::TauriHost;

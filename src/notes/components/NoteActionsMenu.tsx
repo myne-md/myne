@@ -11,7 +11,7 @@
 // The component owns only presentation + dismissal: the anchored dropdown
 // (modeled on `WorkspaceSwitcherControl`), Esc / outside-click close (the
 // `ContextMenu` discipline), and keyboard menu navigation. Token-only inline
-// styling, no Tailwind (src/CLAUDE.md).
+// styling, no Tailwind (src/AGENTS.md).
 
 import {
   Fragment,

@@ -32,7 +32,7 @@
 //! Best-effort end-to-end — a locked slot, an absent model, or an IO miss stops
 //! the walk silently and never blocks or fails unlock.
 //!
-//! Secret-handling (`src-tauri/CLAUDE.md`): note bodies + derived folders are
+//! Secret-handling (`src-tauri/AGENTS.md`): note bodies + derived folders are
 //! plaintext — never logged (DENY-list). Only bounded, id-free counters reach
 //! `tracing`. The transient `Vec<NoteForIndex>` holds decrypted bodies for the
 //! duration of the walk, exactly as `search_sync`'s rebuild `fetched` map does,
@@ -152,7 +152,7 @@ fn read_account_number_hash(vault_meta_path: &std::path::Path) -> Option<[u8; 16
 pub const AI_VECTORS_HYDRATED_EVENT: &str = "ai://vectors-hydrated";
 
 /// Payload of [`AI_VECTORS_HYDRATED_EVENT`]. Counts only — never a `note_id`,
-/// nonce, or vector (DENY-list; `src-tauri/CLAUDE.md`).
+/// nonce, or vector (DENY-list; `src-tauri/AGENTS.md`).
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct AiVectorsHydrated {
     /// Total notes resident in the store after the walk.

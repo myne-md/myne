@@ -14,7 +14,7 @@
 // Deliberately a grep-shaped script in the same pattern as lefthook's
 // secret-scan / eof-newline / cargo-lock-singleton guards — NOT an ESLint
 // rule. The repo has no JS linter, and adding one is a dependency decision
-// (root CLAUDE.md: "Adding a dependency is a security decision"), not a side
+// (root AGENTS.md: "Adding a dependency is a security decision"), not a side
 // effect of a seam guard. Zero dependencies, node built-ins only.
 //
 // Runs in `pre-commit` (lefthook) and as a CI backstop, so `--no-verify`
@@ -207,7 +207,7 @@ const VIOLATION = /(?:^|[^A-Za-z0-9_$])(?:from|import|require)\s*\(?\s*(["'])(@t
 // The seam's OTHER bypass: the Tauri runtime global (#387). Not a module
 // specifier, so `VIOLATION` above cannot see it — and the shape is documented
 // and working one tree over (`e2e/support/flows.ts`'s `pageSeatInvoke`, blessed
-// by `e2e/CLAUDE.md`), which puts it one copy-paste from a module under `src/`.
+// by `e2e/AGENTS.md`), which puts it one copy-paste from a module under `src/`.
 //
 // Broad by design: Tauri injects `__TAURI__`, `__TAURI_INTERNALS__`,
 // `__TAURI_EVENT_PLUGIN_INTERNALS__` and `__TAURI_TO_IPC_KEY__` today, and an
@@ -405,7 +405,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         `\npinned by \`tests/platform/seam-contract.ts\`); a runtime-global call answers` +
         `\na \`TypeError\` on \`undefined.invoke\` and drops out of that audit.` +
         `\n\nDriving production IPC from the page seat is sanctioned in \`e2e/\` only` +
-        `\n(\`pageSeatInvoke\`, \`e2e/CLAUDE.md\`), which is outside this guard's roots.`,
+        `\n(\`pageSeatInvoke\`, \`e2e/AGENTS.md\`), which is outside this guard's roots.`,
     );
     process.exit(1);
   }

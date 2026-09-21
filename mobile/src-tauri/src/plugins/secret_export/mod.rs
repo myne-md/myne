@@ -18,7 +18,7 @@
 //! path so `generate_handler!` finds its hidden `__cmd__` item (a bare `pub use`
 //! of the `#[tauri::command]` fn would drop it).
 //!
-//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline".
 
 // Re-exported for path-compatibility with any consumer referencing

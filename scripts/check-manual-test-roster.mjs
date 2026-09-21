@@ -166,7 +166,7 @@ export const DENOMINATORS = Object.freeze([
   // gallery (see NOT_A_SURFACE_ROSTER). Added after review found that a new
   // mobile flow file entered the tree with nothing failing: Rule 1 catches a
   // DELETED one, and until this line nothing caught a new one, while
-  // `CLAUDE.md` named this directory as mobile's surfaces in the same sentence
+  // `AGENTS.md` named this directory as mobile's surfaces in the same sentence
   // that claimed a surface entering the tree fails by name.
   { dir: join("mobile", "src", "app", "flows"), extensions: TS_FILES },
   { dir: "e2e", extensions: /\.e2e\.ts$/ },
@@ -352,7 +352,7 @@ export function coverageGaps(roots, dirExists, exempt = NOT_A_SURFACE_ROSTER) {
  * @param {Ratchet|null} io.ratchet the recorded pair, or an explicit `null` to skip the ratchet rules.
  *                                  REQUIRED as a key: a default here would be the arm that never
  *                                  fires, excusing a future caller from Rule 5 without anyone
- *                                  choosing it (`CLAUDE.md`, myne-md/myne#533).
+ *                                  choosing it (`AGENTS.md`, myne-md/myne#533).
  * @param {object} [io.notASurface] the exemption map; defaults to the module's own
  * @param {Array}  [io.denominators] the denominator roster; defaults to {@link DENOMINATORS}
  * @param {{gatedTiers: string[], gatedClients: string[]}} [io.baseline] the gate floor; defaults to {@link RATCHET_BASELINE}

@@ -102,7 +102,7 @@
 //
 // # Verifying this guard
 //
-// Per CLAUDE.md, running it proves nothing. Inject the defect: blank one
+// Per AGENTS.md, running it proves nothing. Inject the defect: blank one
 // required hook body in `mobile/src-tauri/src/hooks.rs`, confirm this names
 // that exact client+hook pair, restore. Then confirm it stays SILENT for a
 // legitimately-empty hook whose state the client does not hold (mobile's

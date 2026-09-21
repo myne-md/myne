@@ -37,7 +37,7 @@
 //! (`src/hooks/useRevealAfterIdleLock.ts`) now asks the host for the fixed
 //! sequence instead of driving the window itself.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 

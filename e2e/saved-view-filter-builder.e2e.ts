@@ -19,7 +19,7 @@
 //
 // VERIFICATION STATUS (2026-07-16): vf1+vf2+vf3 green 3× consecutive in the
 // container (single-file isolated runs, fresh production build) — the
-// e2e/CLAUDE.md definition of done. Run ISOLATED per the
+// e2e/AGENTS.md definition of done. Run ISOLATED per the
 // full-suite-contamination note.
 
 import { expect, it } from "vitest";

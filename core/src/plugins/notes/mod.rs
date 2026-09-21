@@ -18,7 +18,7 @@
 //! (`src-tauri/src/plugins/notes/desktop_commands.rs`); the `tauri::Builder`
 //! `init()` wiring stays in each client crate.
 //!
-//! See: ../../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod crdt;

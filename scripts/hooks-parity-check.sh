@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI backstop for pre-commit checks that otherwise live ONLY in the lefthook
 # pre-commit set (lefthook.yml) and are therefore bypassable with --no-verify /
-# LEFTHOOK=0 / a clone that never ran `lefthook install`. CLAUDE.md's model is
+# LEFTHOOK=0 / a clone that never ran `lefthook install`. AGENTS.md's model is
 # "hooks are the local net, CI is the remote gate" — but these had no remote
 # gate at all. This script provides it. Git-only (no cargo/node), so it stays
 # cheap and runs in any image with git + file installed.

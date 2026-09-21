@@ -1,7 +1,7 @@
 //! `attachments` plugin IPC error enums (MYND-169).
 //!
 //! Closed taxonomies for `attachment_import`, `catalog_list`, and
-//! `attachment_delete`, all DENY-list clean per `src-tauri/CLAUDE.md`
+//! `attachment_delete`, all DENY-list clean per `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline" (no path strings, no key
 //! material, no attachment-id correlation tags, no kernel-error display
 //! strings). Hand-mirrored on the TS side by the library/insert
@@ -42,6 +42,16 @@ pub enum AttachmentImportError {
     /// unlock gate.
     #[error("vault is not unlocked")]
     Locked,
+
+    /// A member-held session tried to import. The content-addressed
+    /// `attachment-id` is keyed under the OWNER `root_key` and must stay so
+    /// across a B2B migration (spec §9.9; an id that moved would orphan every
+    /// existing blob and duplicate every re-import), so a member session, which
+    /// has no root key by construction, cannot mint one. Typed rather than
+    /// `Locked`: the vault IS unlocked, and re-prompting for a password fixes
+    /// nothing.
+    #[error("attachment import requires the vault owner")]
+    NotOwner,
 
     /// The file exceeds the § 9.9 64 MiB cap. Carries the cap so the UI
     /// can render "max 64 MiB" without hardcoding the constant. The

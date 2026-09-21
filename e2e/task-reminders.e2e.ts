@@ -2,7 +2,7 @@
 //
 // The reminder block became a reachable user-facing flow when it was rendered
 // into Settings → Editor and its scheduler mounted, so it owes a scenario on this
-// harness (root `CLAUDE.md`: a new user-facing flow ships WITH its E2E coverage).
+// harness (root `AGENTS.md`: a new user-facing flow ships WITH its E2E coverage).
 //
 // Two things here are structurally out of reach of the unit suite, and they are
 // the whole reason for this file:

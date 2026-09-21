@@ -272,7 +272,9 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
       { initialProps: { id: "note-1" as string | null, body: "v0" } },
     );
     rerender({ id: "note-1" as string | null, body: "v1" });
-    act(() => result.current.flushOutgoing());
+    await act(async () => {
+      await result.current.flushOutgoing();
+    });
     expect(saveImpl).toHaveBeenCalledWith("note-1", "v1");
   });
 

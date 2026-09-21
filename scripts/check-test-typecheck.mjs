@@ -39,7 +39,7 @@
 // config gap rather than anything a test author did. It accounts for ~390 of
 // the ~620 raw errors and would bury every real finding. Removing the filter is
 // a one-line change once `@types/node` is a devDependency; adding a dependency
-// is a security decision here (CLAUDE.md), so it is a decision to take
+// is a security decision here (AGENTS.md), so it is a decision to take
 // deliberately rather than a side effect of landing this guard.
 //
 // Usage:

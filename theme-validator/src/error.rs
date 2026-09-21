@@ -10,7 +10,7 @@
 //!
 //! Only the token name + 1-based source line are ever surfaced — never a value,
 //! never a path, never a kernel error string (DENY-list clean per
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline"; theme files are
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline"; theme files are
 //! plaintext app-config, not vault/key material).
 //!
 //! The desktop plugin's `ThemeCommandError` (which wraps this type plus an

@@ -12,7 +12,7 @@
 //! to the `consume_clips` task, which encrypts + imports it OFF the capture
 //! thread and emits `VOICE_CLIP_EVENT` so the WebView inserts its embed. The
 //! final (sub-cap) clip is returned by `stop`. See `decisions.md` voice-notes
-//! entry + ../../CLAUDE.md "Secret-handling logging discipline".
+//! entry + ../../AGENTS.md "Secret-handling logging discipline".
 
 use std::sync::atomic::{AtomicI16, Ordering};
 use std::sync::Arc;

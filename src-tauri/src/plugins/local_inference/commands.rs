@@ -5,7 +5,7 @@
 //! [`infer_with_engine`] / [`embed_with_engine`]. The cores hold the
 //! Plaintext-IPC discipline in exactly one place:
 //!   - the prompt/text is `Zeroizing`-wrapped on the first statement, so every
-//!     early-return path zeroes the bytes (`src-tauri/CLAUDE.md` "Plaintext IPC
+//!     early-return path zeroes the bytes (`src-tauri/AGENTS.md` "Plaintext IPC
 //!     across the WebView boundary");
 //!   - the model call runs under `spawn_blocking` (CPU-bound; keeps the async
 //!     command `Send`), the engine reached ONLY via the `Engine` trait;
@@ -539,10 +539,10 @@ pub async fn transcribe<R: Runtime>(
     // the only place with `.await` access to the slot map (mirror the
     // `attachment://` serve path).
     let keys = match vault_state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return Err(EngineError::VaultLocked),
     };
@@ -585,7 +585,7 @@ pub async fn transcribe<R: Runtime>(
         // user already has; the transcript is never logged (DENY-list).
         persist_transcript_cache(
             &vault_dir,
-            &keys.root_key,
+            &keys.shared,
             &attachment_id,
             &transcript,
             &app_for_cache,
@@ -621,11 +621,15 @@ pub async fn transcribe<R: Runtime>(
 /// bytes are a vault-stable correlation tag — used, never logged (DENY-list).
 fn read_account_number_hash(
     vault_dir: &Path,
-) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
+) -> Option<(
+    protocol::MetaVersion,
+    [u8; protocol::VAULT_META_ACCOUNT_HASH_LEN],
+)> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     // Either generation (myne-md/myne#433).
     protocol::parse_vault_meta_any(&bytes)
-        .map(|m| m.account_number_hash)
+        .map(|m| (version, m.account_number_hash))
         .ok()
 }
 
@@ -638,7 +642,7 @@ fn read_account_number_hash(
 /// swallowed. DENY-list: no transcript / hash / path is logged.
 fn persist_transcript_cache<R: Runtime>(
     vault_dir: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     attachment_id_hex: &str,
     transcript: &str,
     app: &AppHandle<R>,
@@ -648,12 +652,11 @@ fn persist_transcript_cache<R: Runtime>(
     else {
         return;
     };
-    let Some(account_number_hash) = read_account_number_hash(vault_dir) else {
+    let Some((version, account_number_hash)) = read_account_number_hash(vault_dir) else {
         return;
     };
     let model_hash = super::model_store::transcription_model_hash_for(app);
-    let attachment_text_key =
-        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let attachment_text_key = shared.derive(version, protocol::SubkeyRole::AttachmentTextKey);
     let _ = myne_core::plugins::attachments::text_cache::write_transcript(
         vault_dir,
         &attachment_text_key,
@@ -681,7 +684,7 @@ pub async fn read_transcript<R: Runtime>(
     app: AppHandle<R>,
     vault_state: State<'_, VaultRuntimeState>,
 ) -> Result<Option<String>, EngineError> {
-    let Some(root_key) = vault_state.peek_unlocked_root_key_clone().await else {
+    let Some(shared) = vault_state.peek_unlocked_shared_singleton_key().await else {
         return Err(EngineError::NotReady);
     };
     let active_id = vault_state.active_vault_id().await;
@@ -690,7 +693,7 @@ pub async fn read_transcript<R: Runtime>(
     // Decrypt + decode the cache off the async thread (the KEK moves into the
     // closure and drops on exit).
     let transcript = tokio::task::spawn_blocking(move || -> Option<String> {
-        read_cached_transcript(&vault_dir, &root_key, &attachment_id)
+        read_cached_transcript(&vault_dir, &shared, &attachment_id)
     })
     .await
     .map_err(|_| EngineError::TranscriptionFailed)?;
@@ -703,14 +706,13 @@ pub async fn read_transcript<R: Runtime>(
 /// plaintext — never logged.
 fn read_cached_transcript(
     vault_dir: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     attachment_id_hex: &str,
 ) -> Option<String> {
     let attachment_id =
         myne_core::plugins::attachments::commands::hex_decode_id(attachment_id_hex)?;
-    let account_number_hash = read_account_number_hash(vault_dir)?;
-    let attachment_text_key =
-        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let (version, account_number_hash) = read_account_number_hash(vault_dir)?;
+    let attachment_text_key = shared.derive(version, protocol::SubkeyRole::AttachmentTextKey);
     let extracted = myne_core::plugins::attachments::text_cache::read_extracted(
         vault_dir,
         &attachment_text_key,

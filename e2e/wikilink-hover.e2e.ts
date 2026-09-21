@@ -77,7 +77,7 @@ describeE2E("wh1 a wikilink says where it goes on hover (myne-md/myne#555)", () 
         await createNote(s, "Kaynak Notu");
 
         // Written through `note_update` and reopened rather than typed: `[`
-        // races CodeMirror's bracket auto-close, which `e2e/CLAUDE.md` records
+        // races CodeMirror's bracket auto-close, which `e2e/AGENTS.md` records
         // four rounds of. This scenario is about the HOVER, not about typing a
         // wikilink — that is covered where typing is the subject.
         await seedEmbedIntoNote(s, `\nBir [[${TARGET}]] baglantisi.`);

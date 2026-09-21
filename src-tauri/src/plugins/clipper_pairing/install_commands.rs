@@ -10,7 +10,7 @@
 //! outside any vault, readable at boot before unlock.
 //!
 //! The manifest is config, not key material (host name + binary path + public
-//! extension IDs). Per `src-tauri/CLAUDE.md` "Secret-handling logging discipline"
+//! extension IDs). Per `src-tauri/AGENTS.md` "Secret-handling logging discipline"
 //! we still keep full paths out of logs — bounded outcome labels only.
 
 use tauri::{AppHandle, Runtime};

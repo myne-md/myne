@@ -25,7 +25,7 @@
 //! is no mutating grant to withhold from a v0.2 non-main window, because there is
 //! no mutating command.
 //!
-//! See: `src-tauri/CLAUDE.md` (main repo) "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` (main repo) "Secret-handling logging discipline".
 
 // The `themes` command core (the `vault.themes` read/import/export/delete
 // bodies) and its `error` enum live in `myne-core`, shared with the desktop

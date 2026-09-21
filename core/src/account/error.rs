@@ -4,7 +4,7 @@
 //!
 //! Closed, `serde`-tagged set, following the `vault_label` precedent. No
 //! `String` field reaches the frontend; OS and codec detail is reduced to coarse
-//! variants per the secret-handling logging discipline (`src-tauri/CLAUDE.md`).
+//! variants per the secret-handling logging discipline (`src-tauri/AGENTS.md`).
 //! In particular **no variant can carry the account label**, which is the user's
 //! own text and is treated as AS3-sensitive exactly as the `vault.prefs` `label`
 //! field is.

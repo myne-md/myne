@@ -335,7 +335,7 @@ mod tests {
         // from the constant, not written as a literal next to 0x02: this test
         // asserted `0x02` before the V1→V2 bump, and a bump that leaves the
         // literal behind turns the rejection test into a tautology
-        // (`protocol/CLAUDE.md`, "Bumping a version constant silently inverts
+        // (`protocol/AGENTS.md`, "Bumping a version constant silently inverts
         // the tests that used the next value as 'the future'").
         blob[5] = EMBEDDINGS_BLOB_FORMAT_V2 + 1;
         assert_eq!(
@@ -523,7 +523,7 @@ mod tests {
         let mut pf_format = blob_small.clone();
         // The next UNALLOCATED format byte, read from the constant rather than
         // written as a literal — `0x02` was this fixture's "future" until the
-        // V1→V2 bump made it the present (`protocol/CLAUDE.md`).
+        // V1→V2 bump made it the present (`protocol/AGENTS.md`).
         pf_format[5] = EMBEDDINGS_BLOB_FORMAT_V2 + 1;
         // The SUPERSEDED format byte: a snapshot written before the model
         // identity became a tagged union. A port that accepts it decodes a

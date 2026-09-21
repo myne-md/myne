@@ -3,7 +3,7 @@
 //! Desktop-only, and reachable **pre-unlock**. Which is the whole point of two
 //! of them. See `mod.rs` for why this plugin exists at all.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline". Nothing here
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline". Nothing here
 //! takes or returns anything but booleans, and the only error that crosses is
 //! the closed `ScreenCaptureOverrideError` (an `IoFailureKind` tag or `Parse`,
 //! never a path).

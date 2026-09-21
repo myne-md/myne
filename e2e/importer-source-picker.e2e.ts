@@ -4,7 +4,7 @@
 // possible BECAUSE this epic added the importer's `data-testid` pass —
 // `ObsidianImportModal.tsx` previously carried zero testids, so the modal was
 // invisible to the driver and no import flow could be E2E-driven at all
-// (`src/CLAUDE.md`: "a screen without testids is invisible to E2E").
+// (`src/AGENTS.md`: "a screen without testids is invisible to E2E").
 //
 // ASSERTED-VS-DEFERRED SPLIT (the `vault-export` suite's documented pattern): the
 // picker step and the per-source setup step are driven for real. The step AFTER

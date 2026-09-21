@@ -23,7 +23,7 @@
 // received before this task. The bytes still never cross IPC on desktop: Rust
 // opens the path inside its own root-confined read, which is both faster (no
 // 64 MiB round trip through V8) and the reason the plaintext-IPC window stays
-// as small as it is (`src-tauri/CLAUDE.md`, Plaintext-IPC pattern).
+// as small as it is (`src-tauri/AGENTS.md`, Plaintext-IPC pattern).
 //
 // A future web host mints the other kind — `handle` is the `File` — and
 // `importSourceFor` grows a branch that streams it. That branch belongs to the

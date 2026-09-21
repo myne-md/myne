@@ -10,7 +10,7 @@
 // web dispatcher's refusal table agree. Not one of them observes Tauri
 // enforcing any of it. That is a gap of exactly the kind the repo's own rule
 // warns about ("verifying a guard means breaking it"): the ACL is a
-// security-load-bearing file (`src-tauri/CLAUDE.md`) whose enforcement had
+// security-load-bearing file (`src-tauri/AGENTS.md`) whose enforcement had
 // never been seen, only assumed. A capability file that stopped being wired to
 // the runtime at all — a build-time regression, a Tauri upgrade changing how
 // capabilities resolve — would leave every existing test green.

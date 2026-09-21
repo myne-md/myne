@@ -2,7 +2,7 @@
 //!
 //! Closed taxonomy mirroring the `NoteDeleteError` shape — DENY-list
 //! clean (no path strings, no note identifiers, no kernel-error
-//! display strings). See `src-tauri/CLAUDE.md` "Secret-handling
+//! display strings). See `src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline".
 //!
 //! The variant set is pinned by `decisions.md` 2026-05-26 entries

@@ -25,7 +25,7 @@
 //
 // `sentence` is a `load-bearing-copy.ts` constant passed in by the flow. Its
 // exact wording is a privacy property, E2E-pinned by full-literal equality, and
-// rendered identically in every locale (`src/CLAUDE.md` "Do NOT i18n
+// rendered identically in every locale (`src/AGENTS.md` "Do NOT i18n
 // load-bearing copy"). Only the chrome around it — title, buttons — is
 // translated. A future editor who "fixes" the untranslated paragraph breaks the
 // property; the test asserting full-string equality is what catches it.

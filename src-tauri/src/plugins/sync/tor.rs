@@ -107,7 +107,7 @@ pub struct TorStateView {
 }
 
 /// Failure surface for the two write/read-preference commands. No `String`, no
-/// path (`src-tauri/CLAUDE.md` DENY list).
+/// path (`src-tauri/AGENTS.md` DENY list).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum TorRoutingError {
@@ -204,7 +204,7 @@ fn bundled_sidecar<R: Runtime>(
 /// the module doc argues for.
 ///
 /// Takes its config path, IO, gate and sidecar as parameters — the
-/// `*_with_path` layer of the three-layer command shape (`core/CLAUDE.md`), so
+/// `*_with_path` layer of the three-layer command shape (`core/AGENTS.md`), so
 /// the whole rule is drivable from a test with no Tauri runtime and no arti.
 async fn set_tor_routing_at(
     io: &dyn VaultIo,

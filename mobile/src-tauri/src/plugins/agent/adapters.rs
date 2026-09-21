@@ -18,7 +18,7 @@
 //! real difference in behaviour rather than a shim, and it is stated on the
 //! implementation rather than hidden inside it.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 use myne_core::plugins::agent::error::AgentError;
 use myne_core::plugins::agent::tools::{ScopeSearcher, SearchHit};

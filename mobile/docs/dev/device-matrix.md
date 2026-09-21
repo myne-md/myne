@@ -36,7 +36,7 @@ See `mobile-iphone-sideload` (internal note) for the full first-run walkthrough.
 
 ## 2. WKWebView version-matrix axis
 
-The rendering engine is **WKWebView ≠ Android WebView ≠ desktop Chromium** (`mobile/CLAUDE.md`):
+The rendering engine is **WKWebView ≠ Android WebView ≠ desktop Chromium** (`mobile/AGENTS.md`):
 CSS, font rendering, storage quotas, and gesture handling differ. **Per release, pick the iOS OS /
 WKWebView versions to cover** — at minimum the **oldest supported iOS** and the **current iOS** on a
 real device. Note the device model + iOS build in the run log so a render regression is bisectable.

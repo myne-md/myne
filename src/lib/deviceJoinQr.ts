@@ -1,6 +1,6 @@
 // TS binding for the desktop device-join QR command (MYND-466).
 // Mirrors `sync::qr::sync_device_join_qr` (src-tauri/src/plugins/sync/qr.rs).
-// No mock layer — real Tauri command (see src/CLAUDE.md "Tauri command bindings").
+// No mock layer — real Tauri command (see src/AGENTS.md "Tauri command bindings").
 
 import { invoke } from "../platform/core";
 import i18n from "../i18n";

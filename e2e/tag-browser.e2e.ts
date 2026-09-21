@@ -9,7 +9,7 @@
 // VERIFICATION STATUS (tag-system #2, 2026-06-14): authored to the harness
 // conventions but NOT yet run on this dev platform (macOS; the suite is
 // Linux/tauri-driver only — `pnpm test:e2e` self-skips off-platform). Definition
-// of done per e2e/CLAUDE.md is "green 3× in the container" (./scripts/e2e-local.sh)
+// of done per e2e/AGENTS.md is "green 3× in the container" (./scripts/e2e-local.sh)
 // and MUST be met before merge. Coexistence with the graph's own tag dropdown
 // (TS-4 / story 14) is structural — GraphView's picker is untouched by this slice
 // — so it is asserted by construction, not separately driven here (would need new

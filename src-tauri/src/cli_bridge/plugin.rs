@@ -32,7 +32,7 @@
 //! a terminal's Unix socket, and the sidecar it would talk to is a file inside
 //! a desktop bundle.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — the reply
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — the reply
 //! carries an age in seconds and one directory path the user owns, and this
 //! module logs nothing.
 

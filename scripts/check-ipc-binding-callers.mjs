@@ -4,7 +4,7 @@
 // THE FAILURE THIS PREVENTS. A Tauri command is wired through five places that
 // each look complete on their own: `build.rs`, the plugin's permission file, the
 // capability bundle, `generate_handler!`, and a TypeScript binding that wraps
-// `invoke("plugin:x|y")`. `src-tauri/CLAUDE.md` already records that an ACL
+// `invoke("plugin:x|y")`. `src-tauri/AGENTS.md` already records that an ACL
 // entry does not wire a command; this is the layer above that. Every one of the
 // five can be right while NOTHING CALLS THE BINDING, and then the whole feature
 // behind it ships inert: the Rust core, its tests, its ACL row and its recorded

@@ -22,7 +22,7 @@
 //!   file materially stronger isolation (per-app), which is why it is the
 //!   accepted v1 mobile tier until the keychain provider lands.
 //!
-//! Token bytes are never logged (`src-tauri/CLAUDE.md` "Secret-handling logging
+//! Token bytes are never logged (`src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" DENY-list) — the trait impls carry that discipline.
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};

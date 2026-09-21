@@ -36,7 +36,7 @@
 //! this read needs: it happens before the user has done anything.
 //! [`crate::vault_label::key::platform_keychain`] is Apple-only, every other target
 //! gets `UnavailableKeychain`, and wiring the Windows credential store is a
-//! dependency decision in its own right (root `CLAUDE.md`). `MYQ1` is not a
+//! dependency decision in its own right (root `AGENTS.md`). `MYQ1` is not a
 //! counter-example and is stated apart rather than listed above, because it is
 //! **provider-agnostic** (`protocol.md` § 9.14.2): its PIN provider derives a
 //! `wrap_key` through Argon2id with no keychain, so it does ship on Windows and
@@ -89,7 +89,7 @@
 //! ## Why it is not gated out of the wasm build
 //!
 //! `captures`, `export` and `share_import` ARE module-gated for `wasm32`, on the
-//! rule `core/CLAUDE.md` states: a ported command that always answers
+//! rule `core/AGENTS.md` states: a ported command that always answers
 //! "unsupported" is dead code pretending to be a feature. This module is
 //! deliberately not, and the difference is that it exposes no command. It is a
 //! file reader and a reducer, with no `#[tauri::command]`, no host-only call and
@@ -135,7 +135,7 @@ pub struct ScreenCaptureOverride {
 /// Failure surface for reading or writing the override file.
 ///
 /// Two variants and no `String`: this reaches the UI, and a path in an error
-/// message is a disclosure (`src-tauri/CLAUDE.md` DENY list). Mirrors
+/// message is a disclosure (`src-tauri/AGENTS.md` DENY list). Mirrors
 /// [`crate::vault_label::hide_flag::HideFlagError`] and
 /// [`crate::plugins::sync::tor_config::TorConfigError`] exactly, because it is the
 /// same kind of file with the same two ways of going wrong.

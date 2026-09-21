@@ -38,7 +38,7 @@
 //! limiter would hand a fresh full budget to every `myne` invocation, which
 //! is exactly the shape of the loop this bounds.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — the
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — the
 //! limiter holds counts and timestamps, never a note id, folder or body.
 
 use std::sync::atomic::{AtomicBool, Ordering};

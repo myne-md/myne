@@ -27,7 +27,7 @@
 // panel already follows.
 //
 // Copy discipline: every sentence comes from `load-bearing-copy.ts` verbatim
-// and is never i18n'd (`src/CLAUDE.md`), because the exact wording is a
+// and is never i18n'd (`src/AGENTS.md`), because the exact wording is a
 // threat-model-bounded claim. Only the chrome around it is translated.
 
 import type { CSSProperties } from "react";

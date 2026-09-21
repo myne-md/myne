@@ -17,7 +17,7 @@
 //! reproducible; `f32::total_cmp` gives a total order over scores (NaN-safe).
 //!
 //! Secret-handling: never log a query, a vector, a score, or a `note_id`
-//! (`src-tauri/CLAUDE.md`). The `embed` closure is the `Engine::embed` seam
+//! (`src-tauri/AGENTS.md`). The `embed` closure is the `Engine::embed` seam
 //! (stub in tests) — no direct inference-crate dependency here.
 
 #![cfg_attr(not(test), allow(dead_code))]

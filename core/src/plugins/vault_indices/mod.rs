@@ -14,7 +14,7 @@
 //! wipe (`zeroize_vault_indices`) is desktop-side (it rides the desktop
 //! `hooks::VaultLifecycleHooks` seam — mobile installs `NoopHooks`).
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

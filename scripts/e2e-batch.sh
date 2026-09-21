@@ -33,7 +33,7 @@ IMAGE=myne-e2e
 # because the exit code cannot distinguish the two. `Test Files  N skipped (N)`
 # with no `passed` on the line means every file in that run skipped.
 # **`MYNE_E2E_RETRIES=0` is how you hunt flake, and until now no runner offered
-# it.** `e2e/CLAUDE.md` says so in as many words: with retries on, a failing
+# it.** `e2e/AGENTS.md` says so in as many words: with retries on, a failing
 # attempt is erased from the report and the flake rate reads as zero no matter
 # how bad it is. The config's own default is 2, which is right for a gate and
 # exactly wrong for a measurement.

@@ -30,7 +30,7 @@
 //! `VaultRuntimeState`) — registered in [`init`]'s `.setup` via
 //! `app.manage`, the `vault-creation` precedent.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

@@ -208,7 +208,7 @@ fn default_true() -> bool {
 /// (myne-md/myne#444).
 ///
 /// Hand-rolled rather than reached for by enabling `zeroize/serde`, which
-/// `src-tauri/CLAUDE.md` rejects by name: that feature wraps the `Deserialize`
+/// `src-tauri/AGENTS.md` rejects by name: that feature wraps the `Deserialize`
 /// impl with zeroize-on-drop semantics without touching serde's own parsing
 /// intermediates, so it buys dependency surface (TB9 is an audit anchor) for a
 /// property it does not actually deliver. Four lines here deliver the part that
@@ -453,7 +453,7 @@ pub struct PrefsView {
     /// emission**, not serde, so skipping the serde field does not touch the
     /// blob. The UI is given a `has_key` boolean instead.
     ///
-    /// It is also DENY-listed for logging (`src-tauri/CLAUDE.md`).
+    /// It is also DENY-listed for logging (`src-tauri/AGENTS.md`).
     ///
     /// Canonical key `ai_provider_key` — after `ai_provider_consent`
     /// (`c` < `k`), before `ai_provider_model` (`k` < `m`). Omitted when
@@ -4280,7 +4280,7 @@ pub fn canonical_clock_member_cost(key: &str, value_digits: usize) -> usize {
 }
 
 /// Encode a `vault.prefs` blob with caller-supplied randomness
-/// (`_raw` per `protocol/CLAUDE.md` randomness-injection convention).
+/// (`_raw` per `protocol/AGENTS.md` randomness-injection convention).
 ///
 /// Returns the 34-byte header followed by `ciphertext || T'` per spec
 /// § 9.5.1. Reject inputs that would exceed [`MAX_PREFS_PLAINTEXT_LEN`]
@@ -11739,8 +11739,9 @@ mod tests {
         let root_a: [u8; 32] = [0x42; 32];
         let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
         let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
-        // 0xF2, the next free entry after the sibling generators' 0xF1.
-        let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+        // 0xF3, the next entry free after the sibling generators' 0xF1 and the
+        // periodic-notes case's 0xF2. (0xF2 was used here once and collided.)
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF3; AEAD_NONCE_LEN];
         let prefs = PrefsView {
             ribbon_items: Some(alloc::vec![
                 String::from("note.new"),

@@ -616,11 +616,13 @@ export const myneTheme = EditorView.theme({
     textDecorationSkipInk: "none",
   },
 
-  // Mermaid diagrams (MYND-49) — rendered SVG sits on its OWN fixed-light card so
-  // it reads in BOTH editor themes (Mermaid's palette assumes a light surface; on
-  // the dark editor its edge labels were unreadable). The outer `.cm-mermaid` is a
-  // transparent, measured spacer (padding, not margin — see note above); the inner
-  // `.cm-mermaid-card` carries the light surface.
+  // Mermaid diagrams (MYND-49) — the rendered SVG sits on its own card that
+  // follows the ACTIVE THEME (myne-md/myne#708 follow-up; this supersedes the
+  // fixed-light clause of decision 0566). Card, chrome and mermaid's own palette
+  // all bind to Myne tokens, so a dark or AMOLED theme gets a dark diagram rather
+  // than a white panel. The outer `.cm-mermaid` is a transparent, measured spacer
+  // (padding, not margin — see note above); the inner `.cm-mermaid-card` carries
+  // the surface.
   //
   // "Fixed-light" is what the paragraph above has always claimed and what the ink
   // below has always been; the SURFACE had drifted to `var(--paper)`, which is
@@ -651,11 +653,11 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     boxSizing: "border-box",
     overflowX: "auto",
-    backgroundColor: "var(--diagram-surface)",
+    backgroundColor: "var(--paper)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
   },
   ".cm-mermaid-fallback .cm-mermaid-card": {
     display: "block",
@@ -665,7 +667,7 @@ export const myneTheme = EditorView.theme({
     textAlign: "left",
     fontFamily: "var(--font-mono)",
     fontSize: "0.9em",
-    color: "var(--diagram-ink)",
+    color: "var(--ink-1)",
     overflowX: "auto",
   },
   // The render failure's own reason, under the monospace fallback. Before
@@ -683,7 +685,36 @@ export const myneTheme = EditorView.theme({
     // deliberately non-theme-aware `--diagram-surface`, so the theme token would
     // put pale salmon on near-white at roughly 2.5:1. That is the exact drift
     // #629 is about, one element over: the surface fixed and the ink moving.
-    color: "var(--diagram-danger)",
+    color: "var(--danger)",
+  },
+
+  // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the
+  // positioning context, the viewport clips, and the SVG carries the pan/zoom
+  // transform. The pan/zoom cluster and the top-right chrome are NOT here: the
+  // expanded viewer is appended to `document.body`, outside CodeMirror's theme
+  // scope, so those rules live in `mermaid-viewer-styles.ts` and serve both
+  // scopes. Values below are tokens because `check-token-adoption.mjs` ratchets
+  // this file: a new numeric literal here would fail the commit.
+  ".cm-mermaid-card-viewer": {
+    display: "block",
+    overflowX: "hidden",
+  },
+  ".cm-mermaid-frame": {
+    position: "relative",
+  },
+  ".cm-mermaid-viewport": {
+    position: "relative",
+    overflow: "hidden",
+    width: "100%",
+    outline: "none",
+    touchAction: "none",
+    // Dragging to pan must never select the diagram's text labels.
+    userSelect: "none",
+    WebkitUserSelect: "none",
+  },
+  ".cm-mermaid-viewport:focus-visible": {
+    outline: "var(--focus-ring-width, 2px) solid var(--accent-1, currentColor)",
+    outlineOffset: "var(--focus-ring-offset, 2px)",
   },
 
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.

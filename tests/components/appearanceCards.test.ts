@@ -17,7 +17,7 @@
 // once, without rendering anything.
 //
 // Deliberately reading `src/styles/tokens.css` and not `docs/design/
-// colors_and_type.css`: the design copy is a SUBSET (`src/CLAUDE.md`) and
+// colors_and_type.css`: the design copy is a SUBSET (`src/AGENTS.md`) and
 // carries no `:root[data-theme="amoled"]` block at all, so a third of this
 // matrix would silently go unchecked — the third with the pure-black background,
 // which is the one whose card is most obviously wrong when it drifts.

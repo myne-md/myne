@@ -20,7 +20,7 @@
 //!   gating, tracing pattern, test posture)
 //! - Tasks: `agent-tooling/features/vault-change-password/tasks.md`
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The vault-change-password command core + `error` live in `myne-core` (shared
 // with the desktop client). Re-exported so existing
