@@ -84,6 +84,38 @@ export function fitState(b: ZoomBounds): ZoomState {
 }
 
 /**
+ * The scale at which the content's WIDTH matches the stage.
+ *
+ * This is the mermaid viewer's rest scale (myne-md/myne#708): a diagram is drawn
+ * as large as the column allows rather than fit to the smaller of the two axes,
+ * because fitting a tall diagram to a short box is what myne-md/myne#629 records
+ * as "every node a sub-pixel dot". `fitW` is the contained box, so this is >= 1
+ * and is exactly 1 when width is already the binding axis.
+ */
+export function fitWidthK(b: ZoomBounds): number {
+  return b.fitW > 0 ? b.stageW / b.fitW : b.minK;
+}
+
+/**
+ * The rest scale for a viewer whose default is "fit the width, never upscale
+ * past natural size". `hundredPercentK` is the natural mark, so the min of the
+ * two upscales a small diagram only as far as its own pixels.
+ */
+export function restK(b: ZoomBounds): number {
+  return clampK(Math.min(fitWidthK(b), b.hundredPercentK), b);
+}
+
+/** The rest view: fit to width (capped at natural), centred. */
+export function restState(b: ZoomBounds): ZoomState {
+  return constrainPan({ k: restK(b), tx: 0, ty: 0 }, b);
+}
+
+/** Is the view at its rest scale? */
+export function isRest(s: ZoomState, b: ZoomBounds): boolean {
+  return Math.abs(s.k - restK(b)) < 1e-3;
+}
+
+/**
  * Zoom to `k2raw` (clamped) while keeping the stage point `(cx, cy)` pinned to
  * the same image content — i.e. zoom toward the cursor / pinch midpoint.
  */

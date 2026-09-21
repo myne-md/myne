@@ -369,7 +369,8 @@ function healthyFiles(): Record<string, string> {
     "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
     "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,
     "editor/src/attachments/session-caches.ts": `export function resetPreviewCache(): void {}
-export function resetTranscripts(): void {}\n`,
+export function resetTranscripts(): void {}
+export function resetMermaidZoom(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
@@ -381,6 +382,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetMermaidZoom();
   resetDateTimeDisplayForLock();
 }
 `,
@@ -398,6 +400,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetMermaidZoom();
   resetDateTimeDisplayForLock();
 }
 `,
@@ -411,6 +414,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetMermaidZoom();
   resetDateTimeDisplayForLock();
 }
 `,
