@@ -1110,7 +1110,7 @@ const ROSTER = [
     verdict: "screen",
     destination: "undecided",
     reason:
-      "Path arithmetic. The two clients address DIFFERENT directories on purpose: desktop re-exports `appDataDir`, mobile `documentDir`, because desktop picks an export destination through the OS save dialog and mobile has no dialog to pick with (myne-md/myne#491). Making the member lists match would be wrong on both sides.",
+      "Path arithmetic on one side, an export chokepoint on the other, and the two stopped having the same SHAPE in myne-md/myne#517. Desktop re-exports `appDataDir` and `join` from Tauri and composes a destination in TypeScript, which is right there because the user picks it through the OS save dialog. Mobile has no dialog to pick with (myne-md/myne#491), so the app picks for the user, and since #517 it picks in Rust: the whole module is one `exportPath(filename)` over `plugin:export-dir|export_path`, which resolves the directory, creates it, applies the platform backup exclusion and sanitizes the filename in one call. Mobile grants no `core:path` capability at all as a result. Making the member lists match would be wrong on both sides, and matching them now would mean putting the backup exclusion behind a client that has no platform backup.",
   },
 
   // ── The two Rust/TS pairs the merge brought in

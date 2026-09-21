@@ -2460,6 +2460,9 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/secret-export.ts",
       "mobile/src/lib/export.ts",
       "mobile/src-tauri/src/plugins/secret_export/",
+      "mobile/src-tauri/src/plugins/export_dir/",
+      "mobile/src-tauri/permissions/export-dir/default.toml",
+      "mobile/src-tauri/capabilities/default.json",
     ],
     clients: ["ios", "android"],
     automatedBy: [
@@ -2467,8 +2470,8 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a real iPhone, export the recovery phrase to a file. From a Mac with the device connected, download the app container (Xcode → Window → Devices and Simulators → Download Container) and run `xattr -l` on the export directory inside it: `com.apple.metadata:com_apple_backup_excludeItem` must be present on the directory itself. Confirm the exported file is inside that directory and not somewhere else in the container. Then observe the BACKUP rather than the flag, which is the half nothing else covers: take an encrypted local backup of the device in Finder, and confirm the export directory and the exported file are absent from it, either by restoring the backup to a spare device or by inspecting the backup's file manifest. The xattr read is the precondition; the backup is the observation.",
-        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is a macOS unit test that sets the flag on a temp directory and reads it back, which establishes that the shipped Foundation call works and says nothing about iOS honouring it, and docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
+        see: "On a real iPhone, export the recovery phrase to a file. From a Mac with the device connected, download the app container (Xcode → Window → Devices and Simulators → Download Container) and run `xattr -l` on the export directory inside it: `com.apple.metadata:com_apple_backup_excludeItem` must be present on the directory itself. Confirm the exported file is inside that directory and not somewhere else in the container. Then observe the BACKUP rather than the flag, which is the half nothing else covers: take an encrypted local backup of the device in Finder, and confirm the export directory and the exported file are absent from it, either by restoring the backup to a spare device or by inspecting the backup's file manifest. The xattr read is the precondition; the backup is the observation. Since myne-md/myne#517 there is a cheaper precondition available BEFORE the export, and it is worth doing first because it separates the two halves of the mechanism: launch the app and read the xattr with nothing exported yet, which exercises the startup call alone (this is device-matrix row 8.9); then export and read it again, which exercises the command. If the first read is clean and the second is not, the startup hook is the half that broke.",
+        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is two unit tests that between them establish the shipped Foundation call works and that the exclusion is applied to the directory before any caller holds a path to it, and neither says anything about iOS honouring the flag, and docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
         clients: ["ios"],
         estimateMin: 8,
         tier: "core",

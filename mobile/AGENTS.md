@@ -73,9 +73,28 @@ Phase 3 mobile is the **minimum viable** read+write client. Feature parity with 
 
 ## The platform seam under `mobile/src` (myne#492)
 
-`mobile/src/platform/` is the ONE place under `mobile/src` allowed to import `@tauri-apps/*`. Six
-modules, one per host capability: `core`, `event`, `path`, `window`, `clipboardManager`, `deepLink`.
-Everything else under `mobile/src` imports from there. `scripts/check-platform-seam.mjs` enforces it
+`mobile/src/platform/` is the ONE place under `mobile/src` allowed to import `@tauri-apps/*`. **Five**
+modules, one per host capability: `core`, `event`, `path`, `window`, `deepLink`. Everything else under
+`mobile/src` imports from there. (This paragraph said six and listed a `clipboardManager`, and BOTH were
+right when written: `clipboardManager.ts` landed with the seam in `f643633c` on 2026-08-15 and was
+removed in `48f06b73` the next day, when clipboard writes moved to the sensitive-clipboard plugin.
+The paragraph was never updated. It is the count that went stale, not the history, and saying the
+module "never existed" would be a worse error than the one it replaced, because this sentence exists
+to stop the next reader restoring it. `docs/glossary.md`'s **platform seam** entry carried the same
+six for the same reason.)
+
+**`path` is the one member that is not a re-export**, and the difference is load-bearing rather than
+stylistic. It was `export { documentDir, join } from "@tauri-apps/api/path";` until myne#517, and
+four export flows each composed `join(await documentDir(), name)` before relying on a startup hook
+having excluded that directory from the platform's automatic cloud backup. It is now a single
+`exportPath(filename)` over `plugin:export-dir|export_path`, which resolves the directory, creates
+it, applies the exclusion and sanitizes the filename in one host-side call and returns a path only
+when all four succeeded. Two consequences worth knowing before editing anything here:
+`core:path:default` is **gone** from `capabilities/default.json`, so `plugin:path|*` is unreachable
+rather than merely unused; and re-adding a raw accessor to this file still COMPILES, because
+`check-platform-seam.mjs` permits this directory to import `@tauri-apps/api/path` by design.
+`scripts/check-mobile-export-backup.mjs` rule 0 is the only thing that refuses it, and it refuses
+`documentDir` too. `design-notes/security/0595`. `scripts/check-platform-seam.mjs` enforces it
 in `pre-commit` and in CI, so `--no-verify` does not slip one through, and it fails on the runtime
 global (`__TAURI…__`) too, which is not a module specifier and so slips the import rule. Exactly one
 file per client may name that global, and here it is `mobile/src/lib/app-window.ts`.
