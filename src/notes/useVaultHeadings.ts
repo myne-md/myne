@@ -26,46 +26,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VaultHeading } from "../editor/wikilink/vault-headings";
+import {
+  joinVaultHeadings,
+  type VaultHeadingRow,
+} from "@myne/editor/host/notes/vaultHeadings";
 import { useIndexNonce } from "./indexNonce";
 import { useResolverNotes } from "./resolverNotes";
-import type { ResolverNote } from "./resolveWikilink";
-import { vaultHeadings, type VaultHeadingRow } from "./vaultIndices";
+import { vaultHeadings } from "./vaultIndices";
 
-/**
- * Join raw index rows against the resident note-set into the picker's shape.
- *
- * Rows whose note is absent from `notes` are DROPPED — that is how trashed and
- * template notes stay out of the picker, and it is the only exclusion this
- * function performs (`resolverCache` already decided what "resident" means).
- *
- * Output order follows `notes`, then document order within each note, so the
- * result is deterministic even though the index returns rows in hash order.
- * Pure — unit-testable without React.
- */
-export function joinVaultHeadings(
-  rows: readonly VaultHeadingRow[],
-  notes: readonly ResolverNote[],
-): VaultHeading[] {
-  const byNote = new Map<string, VaultHeadingRow[]>();
-  for (const row of rows) {
-    const bucket = byNote.get(row.noteId);
-    if (bucket === undefined) byNote.set(row.noteId, [row]);
-    else bucket.push(row);
-  }
-  const out: VaultHeading[] = [];
-  for (const note of notes) {
-    for (const row of byNote.get(note.noteUuid) ?? []) {
-      out.push({
-        noteUuid: note.noteUuid,
-        title: note.title,
-        folder: note.folder,
-        heading: row.text,
-        level: row.level,
-      });
-    }
-  }
-  return out;
-}
+// The join moved to `@myne/editor/host/notes/vaultHeadings` (myne-md/myne#452)
+// so the mobile client runs this code rather than a copy of it. Re-exported at
+// its old path for its one remaining importer outside this file,
+// `tests/notes/vaultHeadingsJoin.test.ts`. The block-anchor twin next door has
+// no such shim, so this one goes when that test is repointed.
+export { joinVaultHeadings };
 
 /**
  * The vault-wide heading set. Refetched when the SYNC-5 index nonce changes (a

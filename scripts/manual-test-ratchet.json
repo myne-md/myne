@@ -453,7 +453,25 @@
     "    specific monitor + clamping off a disconnected one + the unsaved-edit",
     "    keep-both, which need a real multi-monitor session and observe a file on",
     "    disk across two windows; standard, so it gates nothing. 30 + 24 = 54, the",
-    "    whole of 10533 -> 10587; gatedMinutes rises by the 20 core-gated minutes."
+    "    whole of 10533 -> 10587; gatedMinutes rises by the 20 core-gated minutes.",
+    "",
+    "CEILING RAISED 10675 -> 10705 by myne-md/myne#452, in the sanctioned direction:",
+    "two flows that were DEAD on the handsets and are now live there.",
+    "",
+    "  + the vault-wide `[[##` and `[[^^` pickers on ios and android, one item each",
+    "    (7 and 8 minutes, standard, on two clients = 30). Both pickers already",
+    "    mounted on mobile and both returned nothing, because the two backend",
+    "    commands were never registered and the two props were never passed; #452",
+    "    wires them. So this is not a new estimate against an existing surface, it",
+    "    is the first estimate against a surface that did not previously do",
+    "    anything. Both are standard, not core, matching the `[[` popup item they",
+    "    sit beside in `editor.wikilinks`, so gatedMinutes is unchanged and the",
+    "    whole 30 lands on the ceiling. What each one buys that no lane here can:",
+    "    the heading item's second leg locks and unlocks the vault so a REAL",
+    "    Slot::Unlocked refusal is observed (the flow tier mocks IPC, so it can",
+    "    only simulate one), and the anchor item's second leg switches vaults",
+    "    without relaunching to confirm one vault's titles and body previews are",
+    "    not left rendered inside another's picker."
   ],
   "gatedTiers": [
     "core"
@@ -467,6 +485,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10675,
+  "totalMinutesCeiling": 10705,
   "gatedMinutes": 3837
 }
