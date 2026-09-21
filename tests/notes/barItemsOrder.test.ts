@@ -15,16 +15,16 @@ describe("resolveBarOrder", () => {
   });
 
   it("honours the stored order, appending omitted canonical ids", () => {
-    // Stored puts graph + lock first; the rest follow in canonical order.
-    const out = resolveBarOrder(["graph", "lock"]);
-    expect(out.slice(0, 2)).toEqual(["graph", "lock"]);
+    // Stored puts tags + lock first; the rest follow in canonical order.
+    const out = resolveBarOrder(["tags", "lock"]);
+    expect(out.slice(0, 2)).toEqual(["tags", "lock"]);
     // Every canonical id appears exactly once (a permutation).
     expect([...out].sort()).toEqual([...RIGHT_CLUSTER_DEFAULT_ORDER].sort());
   });
 
   it("drops unknown + duplicate stored ids", () => {
-    const out = resolveBarOrder(["graph", "ghost", "graph", "tags"]);
-    expect(out.slice(0, 2)).toEqual(["graph", "tags"]);
+    const out = resolveBarOrder(["tags", "ghost", "tags", "views"]);
+    expect(out.slice(0, 2)).toEqual(["tags", "views"]);
     expect(out).not.toContain("ghost");
     expect([...out].sort()).toEqual([...RIGHT_CLUSTER_DEFAULT_ORDER].sort());
   });

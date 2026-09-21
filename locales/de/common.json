@@ -1898,8 +1898,7 @@
         "reset": "Auf Standard zurücksetzen",
         "showArrows": "Richtungspfeile anzeigen",
         "title": "Graph-Einstellungen"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {

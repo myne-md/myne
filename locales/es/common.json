@@ -1969,8 +1969,7 @@
         "reset": "Restablecer los valores predeterminados",
         "showArrows": "Mostrar flechas de dirección",
         "title": "Ajustes del grafo"
-      },
-      "tagPlaceholder": "Etiqueta…"
+      }
     },
     "import": {
       "base": {

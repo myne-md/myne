@@ -115,23 +115,42 @@ describe("ColorGroupEditor — empty state", () => {
     expect(document.querySelector('[data-testid="editor.color-groups-list"]')).toBeNull();
   });
 
-  it("adds an enabled, first-palette-colored rule", () => {
+  it("adds an enabled, first-palette-colored rule, in ONE step", () => {
     render(<ColorGroupEditor />);
+    // Add rule opens the filter builder itself and the rule exists only once
+    // that is confirmed (myne-md/myne#727 curation). It used to persist an
+    // "Untitled rule" immediately and leave the filter behind a second click.
     fireEvent.click(screen.getByTestId("editor.color-group-add"));
+    expect(screen.getByTestId("filter-builder-stub")).not.toBeNull();
+    expect(setColorGroups).not.toHaveBeenCalled();
+    act(() =>
+      builderProps!.onSave({
+        combinator: "and",
+        groups: [
+          {
+            combinator: "and",
+            conditions: [{ type: "tag", value: "work", negated: false }],
+          },
+        ],
+      }),
+    );
     expect(persisted()).toHaveLength(1);
     expect(persisted()[0]).toMatchObject({
       name: "",
       color: PALETTE_KEYS[0],
       enabled: true,
-      filter: { kind: "all" },
+      filter: { kind: "hasTag", tag: "work" },
     });
     expect(persisted()[0]!.id).toMatch(/[0-9a-f-]{36}/);
+    // Confirming closes it: the modal is not left open behind the new row.
+    expect(document.querySelector('[data-testid="filter-builder-stub"]')).toBeNull();
   });
 
   it("appends a new rule at the end — last authored is lowest precedence", () => {
     rules = [rule({ id: "a" }), rule({ id: "b" })];
     render(<ColorGroupEditor />);
     fireEvent.click(screen.getByTestId("editor.color-group-add"));
+    act(() => builderProps!.onSave({ combinator: "and", groups: [] }));
     expect(persisted().map((r: ColorGroup) => r.id).slice(0, 2)).toEqual(["a", "b"]);
     expect(persisted()).toHaveLength(3);
   });

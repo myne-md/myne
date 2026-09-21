@@ -1,0 +1,71 @@
+// The title bar's top-right corner: whether anything is floated there
+// (myne-md/myne#727).
+//
+// The failure this pins is a pair of duplicated conditions that disagreed. The
+// tab strip's right clearance asked "is the attachments view showing?", while
+// the two controls it was reserving room for asked "is a NOTE tab focused?" as
+// well. On the graph tab nothing was rendered and the room was reserved anyway,
+// so the strip's overflow caret floated a control's width off the right edge.
+//
+// Driving the predicate directly is the point: the bug was never in the strip
+// or in a control, it was in the QUESTION, and a test that mounts either one
+// would be testing a consumer of the answer rather than the answer.
+
+import { describe, expect, it } from "vitest";
+import { topRightFloatsShown } from "../../src/notes/topRightFloats";
+
+const base = {
+  centerView: "editor",
+  focusedTabKind: "note",
+  pendingNewTabPaneId: null,
+  focusedPaneId: "pane-1",
+} as const;
+
+describe("topRightFloatsShown", () => {
+  it("is true for an open note tab, which is what the controls act on", () => {
+    expect(topRightFloatsShown({ ...base })).toBe(true);
+  });
+
+  it("is FALSE on a non-note tab, the graph, the task list, a saved view", () => {
+    // THE reported bug. Neither the "…" menu nor the right-sidebar toggle is
+    // rendered on a non-note tab, so the tab strip must not reserve their room:
+    // reserving it left the caret off the right edge with nothing beside it.
+    // Tab kinds only: the attachments view is a `CenterView`, and it has its
+    // own case below.
+    for (const kind of ["graph", "tasks", "view"] as const) {
+      expect(
+        topRightFloatsShown({ ...base, focusedTabKind: kind }),
+        `focusedTabKind=${kind}`,
+      ).toBe(false);
+    }
+  });
+
+  it("is false on the new-tab chooser, where there is no active tab at all", () => {
+    expect(topRightFloatsShown({ ...base, focusedTabKind: undefined })).toBe(
+      false,
+    );
+  });
+
+  it("is false while a new-tab chip is open over existing tabs", () => {
+    // The chooser is not a note, even though the tab under it is.
+    expect(
+      topRightFloatsShown({
+        ...base,
+        pendingNewTabPaneId: base.focusedPaneId,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false in the attachments library, which replaces the pane entirely", () => {
+    expect(
+      topRightFloatsShown({ ...base, centerView: "attachments" }),
+    ).toBe(false);
+  });
+
+  it("is false when a pending chip is open in ANOTHER pane", () => {
+    // Only the focused pane's chip matters: the controls follow the focus.
+    expect(
+      topRightFloatsShown({ ...base, pendingNewTabPaneId: "pane-2" }),
+    ).toBe(true);
+  });
+});

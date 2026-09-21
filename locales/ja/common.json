@@ -1898,8 +1898,7 @@
         "reset": "デフォルトに戻す",
         "showArrows": "方向の矢印を表示",
         "title": "グラフ設定"
-      },
-      "tagPlaceholder": "タグ…"
+      }
     },
     "import": {
       "base": {

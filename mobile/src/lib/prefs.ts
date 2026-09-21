@@ -112,6 +112,25 @@ export type FilterNode =
  *  shape the query engine (#2), the renderer (#5), and the `.base` importer (#6)
  *  bind to. Mirrors Rust `SavedView`. The optional fields are omitted on the wire
  *  when unset (Rust `skip_serializing_if`), so they read back as `undefined`. */
+/**
+ * One graph colour-group rule (myne-md/myne#727). Mirrors Rust
+ * `protocol::color_group::ColorGroup`, and `filter` reuses {@link FilterNode} —
+ * the single canonical filter AST also used by {@link SavedView}.
+ *
+ * It reached this client's prefs mirror when the graph did: `color_groups` is
+ * SHARED, whole-value-LWW vault content, so a phone that could not read it drew
+ * a graph with no colour groups while the desktop it synced with drew all of
+ * them, from the same vault.
+ */
+export interface ColorGroup {
+  id: string;
+  name: string;
+  /** A design-token palette key, never a hex value. */
+  color: string;
+  enabled: boolean;
+  filter: FilterNode;
+}
+
 export interface SavedView {
   /** Stable unique id (a UUIDv7 in practice). */
   id: string;
@@ -665,6 +684,13 @@ export interface PrefsView {
    * in vaults with no views → the Rust decoder defaults it to `[]`.
    */
   saved_views: SavedView[];
+  /**
+   * The graph colour-group rules (myne-md/myne#727). Serialized from Rust
+   * `Vec<ColorGroup>`; empty (the default) is byte-identical to a pre-feature
+   * `vault.prefs`. Evaluated by the SHARED `resolveGraphColorGroups`, so both
+   * clients agree about precedence and about an unsupported filter leaf.
+   */
+  color_groups: ColorGroup[];
   /**
    * Saved-view display order (MYND-273) — view ids in views-list / sidebar order
    * (SYNC-10). A sequence: the backend preserves element order verbatim (not

@@ -196,6 +196,92 @@ export function collectRuleTags(
 }
 
 /**
+ * The groups a graph shows when the vault has authored NO rules: one per
+ * top-level tag, in the palette's order (myne-md/myne#727).
+ *
+ * **Derived, never written.** An earlier version of this persisted the groups
+ * into `color_groups` on first graph open, and it was a data-loss bug rather
+ * than a convenience: `color_groups` is SHARED, whole-value LWW content, and
+ * "the rule list is empty" is the same state before the prefs read resolves, on
+ * a failed prefs read, and after a user deliberately deletes every rule. A
+ * reader that cannot tell those apart must not write. Deriving them at render
+ * time gives the product outcome (a graph that arrives coloured, with hubs)
+ * with no write at all, and the panel offers to MATERIALISE them into real
+ * rules when the user wants to edit them, which is the one moment the write is
+ * what the user asked for.
+ *
+ * Three bounds, unchanged from the version that wrote them: only tags covering
+ * at least two notes (a tag on one note is a label, not a group), at most as
+ * many tags as the palette has colours, and sorted by note count descending so
+ * the biggest cluster gets the first colour rather than whichever tag sorted
+ * first.
+ */
+export function defaultTagGroups(
+  tags: ReadonlyArray<{ key: string; display: string; subtreeCount: number }>,
+): Array<{ key: string; display: string; color: string }> {
+  return [...tags]
+    .filter((tag) => tag.subtreeCount >= 2)
+    .sort((a, b) => b.subtreeCount - a.subtreeCount)
+    .slice(0, GROUP_COLOR_KEYS.length)
+    .map((tag, i) => ({
+      key: tag.key,
+      display: tag.display,
+      color: GROUP_COLOR_KEYS[i]!,
+    }));
+}
+
+/** {@link defaultTagGroups} as authorable rules, for the one moment the user
+ *  asks for them to become editable. Ids are generated HERE rather than in the
+ *  derived path, because only a materialised rule needs one. */
+export function defaultTagGroupsAsRules(
+  tags: ReadonlyArray<{ key: string; display: string; subtreeCount: number }>,
+): ColorGroup[] {
+  return defaultTagGroups(tags).map((group) => ({
+    id: crypto.randomUUID(),
+    name: group.display,
+    color: group.color,
+    enabled: true,
+    filter: { kind: "hasTag", tag: group.key },
+  }));
+}
+
+/** A tag that gets a NODE, with the colour of the rule that claimed it. */
+export interface TagNodeRule {
+  /** The folded tag key, the node id is `tag:<key>`. */
+  readonly key: string;
+  /** The color-group token key (`group-teal`), i.e. the rule's own colour. */
+  readonly color: string;
+}
+
+/**
+ * The enabled rules that are a SINGLE bare `hasTag` leaf, i.e. the tags that
+ * become NODES in the whole-vault view (myne-md/myne#727).
+ *
+ * A tag node claims "these notes carry this tag", and only a bare `hasTag` rule
+ * makes exactly that claim. A rule that combines a tag with a folder, or with a
+ * `not`, colours a SUBSET of the tag's notes, so drawing a hub for it would
+ * connect the hub to notes the rule does not match and the picture would lie
+ * about its own grouping. Those rules still colour notes; they just do not
+ * claim a hub. Stated as a bound rather than left to be discovered.
+ *
+ * The query set is unchanged by this: {@link collectRuleTags} already collects
+ * every bare `hasTag` tag, so a tag hub costs no extra index call.
+ */
+export function tagNodeRules(
+  rules: ReadonlyArray<ColorGroup>,
+): TagNodeRule[] {
+  const out: TagNodeRule[] = [];
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (rule.filter.kind !== "hasTag") continue;
+    const folded = foldSegment(rule.filter.tag);
+    if (folded.trim().length === 0) continue;
+    out.push({ key: folded, color: rule.color });
+  }
+  return out;
+}
+
+/**
  * Assemble the resolver's input from what the graph pane already holds: the
  * model's node ids, the resident note-set's folder map, and the tag index's
  * answer for each tag {@link collectRuleTags} asked about (`folded tag → note
@@ -220,4 +306,51 @@ export function buildColorGroupNoteMeta(
     }
     return { id, tags, folder: folderById.get(id) ?? null };
   });
+}
+
+/**
+ * The categorical palette, in the order the picker offers it (myne-md/myne#727).
+ *
+ * One list, because two places need the ORDER and not just the set: the editor
+ * offers it to the user, and the default grouping that colours a fresh graph by
+ * tag assigns them in sequence, where the order is precedence (the evaluator is
+ * first-match-wins). A second copy is how the picker and the default grouping
+ * would come to disagree about what "the first colour" means.
+ *
+ * The stored `ColorGroup.color` is the bare token name without the leading
+ * `--`; the canvas resolves it as `var(--${color})`.
+ */
+export const GROUP_COLOR_KEYS: ReadonlyArray<string> = [
+  "group-olive",
+  "group-fern",
+  "group-teal",
+  "group-denim",
+  "group-indigo",
+  "group-violet",
+  "group-orchid",
+  "group-rose",
+];
+
+/**
+ * The rules a client should EVALUATE: the vault's authored ones, or the derived
+ * default grouping by tag when there are none (myne-md/myne#727).
+ *
+ * Extracted so both clients derive identically rather than each having its own
+ * copy of "authored wins, else derive". The derived rules carry synthetic ids
+ * and are never persisted: writing them was a data-loss bug, because an empty
+ * rule list is the same state before the prefs read resolves, on a failed read,
+ * and after a deliberate deletion.
+ */
+export function effectiveColorGroups(
+  authored: ReadonlyArray<ColorGroup>,
+  tags: ReadonlyArray<{ key: string; display: string; subtreeCount: number }>,
+): ColorGroup[] {
+  if (authored.length > 0) return [...authored];
+  return defaultTagGroups(tags).map((group, i) => ({
+    id: `derived-default-${i}`,
+    name: group.display,
+    color: group.color,
+    enabled: true,
+    filter: { kind: "hasTag", tag: group.key },
+  }));
 }

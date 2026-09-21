@@ -1898,8 +1898,7 @@
         "reset": "Palauta oletukset",
         "showArrows": "Näytä suuntanuolet",
         "title": "Kaavion asetukset"
-      },
-      "tagPlaceholder": "Tunniste…"
+      }
     },
     "import": {
       "base": {

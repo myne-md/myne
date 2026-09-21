@@ -2040,8 +2040,7 @@
         "reset": "Przywróć domyślne",
         "showArrows": "Pokaż strzałki kierunku",
         "title": "Ustawienia grafu"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {

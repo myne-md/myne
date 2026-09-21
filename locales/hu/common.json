@@ -1898,8 +1898,7 @@
         "reset": "Visszaállítás alapértelmezettre",
         "showArrows": "Iránynyilak megjelenítése",
         "title": "Gráf beállításai"
-      },
-      "tagPlaceholder": "Címke…"
+      }
     },
     "import": {
       "base": {

@@ -55,6 +55,7 @@ import { bumpPrefsNonce, withPrefsBatch } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
 import { buildTagIndex } from "../../lib/tags";
+import { tagIndexToGraphTags } from "@myne/graph-overlay";
 import { publishEditorTagTree } from "../../lib/editor-tag-bridge";
 import { maybeSeedTestData } from "../../lib/seed";
 import { countWords } from "../../lib/word-count";
@@ -933,6 +934,20 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   );
   // The `#tag` index over the LIVE notes - drives the notes-list tag filter.
   const tagIndex = useMemo(() => buildTagIndex(liveNotes, bodies), [liveNotes, bodies]);
+  // The graph's tag inputs (myne-md/myne#727): the same index the tag browser
+  // uses, turned into the two shapes the SHARED overlay builder takes. Computed
+  // here rather than in the graph tab because this is where the index lives, and
+  // `tagIndexToGraphTags` derives the subtree-inclusive count the Rust tag tree
+  // reports on desktop, so both clients agree about which tags qualify for the
+  // derived default grouping.
+  const graphTags = useMemo(
+    () =>
+      tagIndexToGraphTags(
+        tagIndex.byTag,
+        new Map(tagIndex.tags.map(({ tag }) => [foldSegment(tag), tag])),
+      ),
+    [tagIndex],
+  );
   // The scope strip's tag half. `noteTags` is already built for the tag browser;
   // a second derivation would be a second answer to "what tags does this note
   // carry".
@@ -3031,7 +3046,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           </>
         )}
 
-        {tab === "graph" && <GraphTab model={graphModel} onOpen={(id) => void openFromList(id)} />}
+        {tab === "graph" && (
+          <GraphTab
+            model={graphModel}
+            onOpen={(id) => void openFromList(id)}
+            tags={graphTags.tags}
+            members={graphTags.members}
+          />
+        )}
         {/* The AI destination (myne-md/myne#457). The scope is the open note
             when there is one and the whole vault otherwise, which is the
             default `design-notes/ai/0515` names; task 11 makes it something

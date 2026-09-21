@@ -1898,8 +1898,7 @@
         "reset": "Varsayılanlara sıfırla",
         "showArrows": "Yön oklarını göster",
         "title": "Grafik ayarları"
-      },
-      "tagPlaceholder": "Etiket…"
+      }
     },
     "import": {
       "base": {
