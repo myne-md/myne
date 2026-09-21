@@ -7,7 +7,7 @@
 // out-of-scope MOV degrades to `application/octet-stream` because the brand-gate
 // excludes QuickTime's `qt  ` major brand (SYNC-2 of the video-attachments epic).
 //
-// Per `e2e/CLAUDE.md` the inline `<video>` widget RENDER and the
+// Per `e2e/AGENTS.md` the inline `<video>` widget RENDER and the
 // error→file-card fallback are Vitest-DOM concerns, covered in
 // `tests/editor/attachment-widgets.test.tsx` (routing + native controls + the
 // graceful swap). This scenario proves the data chain that player rides on — the
@@ -18,7 +18,7 @@
 // (unlock reads params from vault.meta).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-buildrun.sh e2e/video-attachment.e2e.ts` before merge (it
 // exercises the new `video/mp4` + `video/webm` sniffer arms through the real
 // attachment-import ACL; tauri-driver is Linux-only, so it cannot run on macOS).

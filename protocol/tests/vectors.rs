@@ -67,7 +67,7 @@ fn companion_vectors_root() -> PathBuf {
 
 /// Whether a missing fixture is a **failure** rather than a skip.
 ///
-/// The native lane's skip-on-absent-companion contract (`protocol/CLAUDE.md`)
+/// The native lane's skip-on-absent-companion contract (`protocol/AGENTS.md`)
 /// is right for a contributor with no companion checked out and wrong for the
 /// one CI step whose entire job is to assert: there, `[skip]` on every runner
 /// reports green having verified nothing, which is the state the
@@ -116,7 +116,7 @@ fn missing_fixture(category: &str, path: &std::path::Path) -> Option<String> {
 ///
 /// * **native** — read from `../myne-test-vectors/vectors/<category>/<version>/cases.json`
 ///   at run time. A missing companion prints `[skip]` and returns `None`, which
-///   is the long-standing contract (`protocol/CLAUDE.md`): the companion is
+///   is the long-standing contract (`protocol/AGENTS.md`): the companion is
 ///   optional for a contributor and required for the gate.
 /// * **wasm32** — a browser has no filesystem to read at run time, so the
 ///   fixtures are baked in at COMPILE time behind the `browser-vectors` feature.

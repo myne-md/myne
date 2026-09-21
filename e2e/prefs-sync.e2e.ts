@@ -15,7 +15,7 @@
 //      shared-subset push gate + classification split (§10.2).
 //
 // The theme write + prefs reads are driven via the sanctioned page-seat IPC
-// (production commands, no test hook — e2e/CLAUDE.md): reads keep the
+// (production commands, no test hook — e2e/AGENTS.md): reads keep the
 // assertions byte-precise about WHAT replicated.
 
 import { describe, expect, it } from "vitest";

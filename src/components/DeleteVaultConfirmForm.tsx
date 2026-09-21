@@ -30,7 +30,7 @@
 // false there in the dangerous direction: someone trying to destroy their notes
 // would believe they had. So the idle-mode copy is selected by the capability
 // and its body is a load-bearing constant, not an i18n string — same rule as
-// `REMOVE_DEVICE_DISCLOSURE` (`src/CLAUDE.md`, "Do NOT i18n load-bearing copy").
+// `REMOVE_DEVICE_DISCLOSURE` (`src/AGENTS.md`, "Do NOT i18n load-bearing copy").
 //
 // The typed-DELETE gate does NOT relax on that path. Unsynced edits die with the
 // local copy and nothing brings them back, which is the one genuinely

@@ -29,6 +29,7 @@ use super::state::{
 };
 use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
+use crate::plugins::vault_unlock::state::SharedSingletonKey;
 use protocol::{
     compute_manifest_hash, derive_subkey, derive_subkey_versioned,
     encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
@@ -773,7 +774,7 @@ fn read_singleton_nonce(bytes: &[u8], base: &[u8; 4], later: &[&[u8; 4]]) -> Opt
 /// them.
 ///
 /// `family` is a static label for the skip log. Nothing else is logged: the
-/// nonces themselves are DENY-listed (`src-tauri/CLAUDE.md`), and the blob id
+/// nonces themselves are DENY-listed (`src-tauri/AGENTS.md`), and the blob id
 /// is a vault-stable correlation tag.
 fn verified_singleton_download(
     transport: &dyn SyncTransport,
@@ -979,12 +980,12 @@ fn personality_file_path(vault_root: &Path) -> std::path::PathBuf {
 /// plane closed, never open.
 async fn memory_sync_enabled(
     io: &dyn crate::vault_io::VaultIo,
-    root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: &[u8; 16],
     vault_root: &Path,
     version: MetaVersion,
 ) -> bool {
-    let prefs_key = derive_subkey_versioned(version, root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(version, SubkeyRole::PrefsKey);
     io.read(&vault_root.join("vault.prefs"))
         .await
         .ok()
@@ -1358,7 +1359,7 @@ async fn sync_catalog_phase(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
-    root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: &[u8; 16],
     vault_root: &Path,
     state: &mut SyncState,
@@ -1371,7 +1372,7 @@ async fn sync_catalog_phase(
         .lock()
         .await;
 
-    let catalog_key = derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(version, SubkeyRole::AttachmentsCatalogKey);
     let path = catalog_file_path(vault_root);
     let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_catalog_nonce);
@@ -1565,7 +1566,7 @@ async fn sync_prefs_phase(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
-    root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: &[u8; 16],
     vault_root: &Path,
     state: &mut SyncState,
@@ -1578,7 +1579,7 @@ async fn sync_prefs_phase(
     // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
     let _guard = crate::plugins::prefs::commands::write_mutex().lock().await;
 
-    let prefs_key = derive_subkey_versioned(version, root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(version, SubkeyRole::PrefsKey);
     let path = vault_root.join("vault.prefs");
     let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
@@ -3041,7 +3042,7 @@ async fn sync_themes_phase(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
-    root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: &[u8; 16],
     vault_root: &Path,
     state: &mut SyncState,
@@ -3059,8 +3060,7 @@ async fn sync_themes_phase(
     // (myne#301). A torn slot on the web client otherwise supplied both the
     // local nonce and, further down, the bytes pushed to the server, where
     // every peer decodes them to empty.
-    let themes_key_for_read =
-        derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
+    let themes_key_for_read = shared.derive(version, SubkeyRole::CustomThemesKey);
     let local_bytes = crate::plugins::themes::commands::read_verified_themes_bytes(
         io,
         vault_root,
@@ -3080,7 +3080,7 @@ async fn sync_themes_phase(
     // `ThemesPhase` returns only flags.)
     // §9.21.4 read semantic: any local decode failure falls back to empty.
     let decode_local = || {
-        let themes_key = derive_subkey_versioned(version, root_key, SubkeyRole::CustomThemesKey);
+        let themes_key = shared.derive(version, SubkeyRole::CustomThemesKey);
         let map =
             decode_themes_map_or_empty(&themes_key, account_number_hash, local_bytes.as_deref());
         (themes_key, map)
@@ -3531,6 +3531,28 @@ pub(crate) async fn sync_meta_phase(
     let local_changed = dirty || (baseline.is_some() && baseline != Some(local_hash.as_str()));
     let server_changed = baseline.is_none() || baseline != Some(server_hash.as_str());
 
+    // NTV6 guard. An `NTV6` `vault.meta` carries a B2B tail OUTSIDE `VaultMeta`
+    // (the owner-wrapped group key, the group-key epoch and the signed roster).
+    // `parse_vault_meta_any` now accepts the NTV6 base and `meta_version_of`
+    // maps it to `V0_2`, so the adopt and merge branches below would re-serialize
+    // through `serialize_vault_meta_v0_2`, silently DROP the tail and downgrade a
+    // migrated vault to `NTV5` — after which no root-tier unlock opens the
+    // group-sealed `itemsKey` and the vault is locked out. NTV6 meta sync is
+    // Grill 4, so only a VERBATIM push of our own NTV6 bytes is allowed here;
+    // adopt and merge are refused.
+    let is_ntv6 = |b: &[u8]| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice());
+    if is_ntv6(&local_bytes) || is_ntv6(&server_bytes) {
+        if local_changed && !server_changed {
+            if may_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
+                state.meta_baseline_hex = Some(local_hash);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
+                return MetaPhaseOutcome::Pushed;
+            }
+            return MetaPhaseOutcome::NoChange;
+        }
+        return MetaPhaseOutcome::Skipped;
+    }
+
     // Only the server changed (I have no pending local change) → adopt it. Validate
     // compatibility first: never overwrite the local credential root with a meta
     // whose recovery-side / KDF / itemsKey diverges (a hostile or corrupt server).
@@ -3765,6 +3787,7 @@ pub async fn run_sync_cycle(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: [u8; 16],
     device_id: [u8; 16],
     token: &str,
@@ -3840,6 +3863,7 @@ pub async fn run_sync_cycle(
             io,
             transport,
             root_key,
+            shared,
             account_number_hash,
             device_id,
             token,
@@ -3903,6 +3927,7 @@ async fn sync_cycle_attempt(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     root_key: &[u8; 32],
+    shared: &SharedSingletonKey,
     account_number_hash: [u8; 16],
     device_id: [u8; 16],
     token: &str,
@@ -3976,7 +4001,7 @@ async fn sync_cycle_attempt(
     // scans nothing, and inserts no baselines. It pushes/pulls nothing for
     // these ids, exactly as a vault with no conversations stays chats-silent.
     let memory_on =
-        memory_sync_enabled(io, root_key, &account_number_hash, vault_root, version).await;
+        memory_sync_enabled(io, shared, &account_number_hash, vault_root, version).await;
     let memory_catalog_id = memory_on.then(|| agent_memory_catalog_sync_id(root_key));
     let personality_id = memory_on.then(|| agent_personality_sync_id(root_key));
     // In-memory union of the per-entry files (entry id → on-disk nonce),
@@ -4460,7 +4485,7 @@ async fn sync_cycle_attempt(
             io,
             transport,
             token,
-            root_key,
+            shared,
             &account_number_hash,
             vault_root,
             state,
@@ -4621,7 +4646,7 @@ async fn sync_cycle_attempt(
         io,
         transport,
         token,
-        root_key,
+        shared,
         &account_number_hash,
         vault_root,
         state,
@@ -4659,7 +4684,7 @@ async fn sync_cycle_attempt(
         io,
         transport,
         token,
-        root_key,
+        shared,
         &account_number_hash,
         vault_root,
         state,
@@ -6211,6 +6236,7 @@ mod tests {
             &IO,
             transport,
             root_key,
+            &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(*root_key)),
             account_number_hash,
             device_id,
             token,
@@ -8176,6 +8202,7 @@ mod tests {
             &IO,
             t.as_ref(),
             &root_key,
+            &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
             &tok,
@@ -8254,6 +8281,7 @@ mod tests {
             &IO,
             t.as_ref(),
             &root_key,
+            &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
             &tok,
@@ -8333,6 +8361,7 @@ mod tests {
             &IO,
             t.as_ref(),
             &root_key,
+            &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
             &tok,
@@ -10179,6 +10208,7 @@ mod tests {
             &IO,
             transport,
             root_key,
+            &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(*root_key)),
             account_number_hash,
             device_id,
             token,
@@ -11067,7 +11097,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11132,7 +11162,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11175,7 +11205,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11215,7 +11245,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11253,7 +11283,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11282,7 +11312,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11318,7 +11348,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11337,7 +11367,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11376,7 +11406,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11425,7 +11455,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11462,7 +11492,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11523,7 +11553,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11568,7 +11598,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -11676,7 +11706,7 @@ mod tests {
                 &IO,
                 &t_a,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir_a,
                 &mut st_a,
@@ -11714,7 +11744,7 @@ mod tests {
                 &IO,
                 &t_b,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir_b,
                 &mut st_b,
@@ -11808,7 +11838,7 @@ mod tests {
                 &IO,
                 &t_a,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir_a,
                 &mut st_a,
@@ -11884,7 +11914,7 @@ mod tests {
                 &IO,
                 &t_a,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir_a,
                 &mut st_a,
@@ -12847,7 +12877,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -12874,7 +12904,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -12933,7 +12963,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -12991,7 +13021,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13021,7 +13051,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13057,7 +13087,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13095,7 +13125,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13159,7 +13189,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13217,7 +13247,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13277,7 +13307,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,
@@ -13359,7 +13389,7 @@ mod tests {
                 &IO,
                 &t,
                 "tok",
-                &ROOT,
+                &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT)),
                 &HASH,
                 &dir,
                 &mut st,

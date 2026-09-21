@@ -51,7 +51,7 @@
 //!
 //! ## Logging discipline
 //!
-//! Per `src-tauri/CLAUDE.md` "Secret-handling logging discipline", a full
+//! Per `src-tauri/AGENTS.md` "Secret-handling logging discipline", a full
 //! filesystem path and a `VaultId` are both DENY-listed. This module keeps
 //! both off the tracing surface entirely — it emits nothing, by design (every
 //! IO failure is swallowed best-effort, exactly like the registry cache).

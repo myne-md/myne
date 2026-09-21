@@ -6,7 +6,7 @@
 //   - src-tauri/src/plugins/attachments/error.rs    (AttachmentImportError,
 //     CatalogListError, AttachmentDeleteError, AttachmentRenameError)
 //
-// No mock layer (src/CLAUDE.md "Tauri command bindings") — the real
+// No mock layer (src/AGENTS.md "Tauri command bindings") — the real
 // commands are invoked directly. Signature drift between these wrappers
 // and the Rust `#[command]` definitions has no automated canary yet;
 // keep them in lockstep by hand.

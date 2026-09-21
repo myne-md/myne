@@ -31,7 +31,7 @@
 // generator fixtures (unlock reads params from vault.meta).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge (it introduces the
 // attachments-library tile/⋮-menu/rename/used-in-notes/delete testids and
 // the MYA1/MYC1 at-rest asserters).

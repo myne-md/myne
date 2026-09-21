@@ -15,7 +15,7 @@
 // ⚠ PLATFORM: the harness drives the production binary via tauri-driver and is
 // Linux-only — authored to the conventions but MUST be run green 3× in the
 // container (`./scripts/e2e-local.sh`) before merge; not executed on the
-// authoring machine (macOS). See e2e/CLAUDE.md "definition of done".
+// authoring machine (macOS). See e2e/AGENTS.md "definition of done".
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";

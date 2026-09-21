@@ -24,7 +24,7 @@
 // to — the create path is still reachable from the command palette / picker).
 //
 // Penpot canon: `flow--vault-switcher (MYND-205)`, page "4c - Navigation &
-// Sidebar". Tokens-only (no raw hex, no Tailwind) per `src/CLAUDE.md`.
+// Sidebar". Tokens-only (no raw hex, no Tailwind) per `src/AGENTS.md`.
 
 import {
   useEffect,

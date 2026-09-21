@@ -112,7 +112,11 @@ import { TemplatesSheet } from "./TemplatesSheet";
 import { unmarkTemplate, createTemplate } from "../../lib/templates";
 import { deriveTitleSnippet } from "../../lib/note-title";
 import { searchIndexReplace, searchIndexApply, searchIndexRemove, type SearchDoc } from "../../lib/search";
-import { vaultIndicesApply, vaultIndicesRemove, vaultIndicesAllEdges, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge } from "../../lib/vault-indices";
+import { vaultIndicesApply, vaultIndicesRemove, vaultIndicesAllEdges, vaultIndicesHeadings, vaultIndicesBlockAnchors, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge, type VaultHeadingRow, type VaultBlockAnchor } from "../../lib/vault-indices";
+import { joinVaultHeadings } from "@myne/editor/host/notes/vaultHeadings";
+import { joinVaultBlockAnchors } from "@myne/editor/host/notes/blockAnchors";
+import type { VaultHeading } from "@myne/editor/wikilink/vault-headings";
+import type { VaultBlockAnchor as EditorVaultBlockAnchor } from "@myne/editor/wikilink/vault-block-anchors";
 import { extractRecord } from "../../lib/indices-extract";
 import { createIndexDeltaTracker, type IndexDeltaTracker } from "../../lib/index-delta";
 import { buildNoteGraphAndModel, clientEdges } from "../../lib/backend-graph";
@@ -186,7 +190,7 @@ const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
  *
  * Note plaintext is held in component-local state for the controlled textarea
  * and wiped on every exit path + on unmount (best-effort; the load-bearing
- * zeroize is Rust-side per `src-tauri/CLAUDE.md`).
+ * zeroize is Rust-side per `src-tauri/AGENTS.md`).
  */
 
 type Editing = { id: string | null };
@@ -335,6 +339,33 @@ function useIndexDeltaTracker(): IndexDeltaTracker {
   return ref.current;
 }
 
+
+/** The cleared value for a vault-scoped picker set. An empty ARRAY and not
+ *  `null`: `null` reaches `<CMEditor>` as an absent prop, which it reads as "no
+ *  opinion" and does not dispatch, so the compartment would keep the previous
+ *  vault's rows. One shared value rather than a fresh `[]` per site, so the
+ *  `[vaultId]` reset does not churn the joins' memo deps. */
+const EMPTY_ROWS = Object.freeze([]) as readonly never[];
+
+/** How many times a failed picker read is RE-ISSUED against the same index
+ *  value before it gives up until the index next moves. Retries, not attempts:
+ *  three retries after the first read, so four reads over roughly six seconds.
+ *  Both commands are `Slot::Unlocked`-gated, so the failure this covers is a
+ *  read racing an auto-lock: transient, and worth a few seconds rather than a
+ *  session.
+ *
+ *  Exhausting it is not terminal: the budget resets on the next real index
+ *  bump, so editing any note recovers both pickers. `vault-pickers.flow.ts`
+ *  asserts the stranded state AND that recovery, at a refusal count measured
+ *  against the running page rather than computed from this number, because the
+ *  boot sweep produces more than one index value. Changing this constant does
+ *  not move that fixture's count, so re-measure rather than deriving it. */
+const PICKER_FETCH_RETRIES = 3;
+
+/** Delay between those attempts. Long enough that a relock-then-unlock can
+ *  complete inside the budget, short enough that a user who opens `[[##`
+ *  straight after unlocking does not watch an empty picker. */
+const PICKER_FETCH_RETRY_MS = 1_500;
 
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
@@ -635,6 +666,34 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // Backend vault-indices edge dump (null until the first sweep; drives the
   // Turkish-correct graph + backlinks). Falls back to the client graph in dev.
   const [backendEdges, setBackendEdges] = useState<[string, WikilinkEdge[]][] | null>(null);
+  // myne-md/myne#452: the two whole-vault picker sets, raw as the index returns
+  // them. Empty until a read lands, and empty again whenever the vault changes.
+  //
+  // There is deliberately no "not read yet" state distinct from "read and
+  // empty". Neither is observable (see `EMPTY_ROWS`: both render zero rows), and
+  // the `[vaultId]` effect below runs in the first effect flush, before the
+  // debounced read is issued, so a `null` initialiser would survive one frame.
+  // Reintroducing the distinction needs BOTH a mount guard on that effect and a
+  // consumer that can tell the two apart. Today nothing can.
+  const [headingRows, setHeadingRows] = useState<readonly VaultHeadingRow[]>(EMPTY_ROWS);
+  const [blockAnchorRows, setBlockAnchorRows] = useState<readonly VaultBlockAnchor[]>(EMPTY_ROWS);
+  // The refresh key those reads are keyed on: the sweep below bumps it in
+  // lockstep with the delta tracker, so every reader re-queries once the index
+  // moved. Desktop's counterpart is the module-scope SYNC-5 nonce in
+  // `src/notes/vaultIndices.ts`, which this client does not use and could not
+  // share: this one is vault-scoped, resettable, and carries a retry budget the
+  // desktop counter has no equivalent of.
+  //
+  // `attempt` rides along so a FAILED read can re-issue without pretending the
+  // index moved. Every real bump resets it to 0, so the budget is per index
+  // change rather than per session.
+  const [pickerFetch, setPickerFetch] = useState<{ index: number; attempt: number }>({
+    index: 0,
+    attempt: 0,
+  });
+  // Monotonic, so a read that resolves after a newer one is DISCARDED rather
+  // than the newer one being cancelled (desktop's `useVaultHeadings` guard).
+  const pickerFetchSeq = useRef(0);
   // Permanent-delete confirm target: a note id being purged from Trash, or null.
   const [purgeId, setPurgeId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -1157,6 +1216,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   useEffect(() => {
     searchDelta.reset();
     indicesDelta.reset();
+    // myne-md/myne#452: the two picker sets are vault-scoped for the same reason
+    // the trackers are. `EMPTY_ROWS` and never `null`, or the memos below hand
+    // `<CMEditor>` an absent prop and the compartment keeps vault A's rows.
+    // Belt and braces on purpose: the joins already drop every row whose note
+    // the new vault does not hold, but a filter is not a lifecycle and the two
+    // are not guaranteed to commit in the same render.
+    // `tests/editor/vault-picker-facet-clearing.test.tsx` is that contract
+    // against a mounted editor.
+    setHeadingRows(EMPTY_ROWS);
+    setBlockAnchorRows(EMPTY_ROWS);
+    setPickerFetch({ index: 0, attempt: 0 });
   }, [vaultId, searchDelta, indicesDelta]);
 
   // Keep the backend MYS1 search index synced with the live corpus (the WebView
@@ -1235,21 +1305,39 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       const { changed, removed } = tracker.diff(corpus);
       if (changed.length === 0 && removed.length === 0) return;
       void (async () => {
+        // Whether this pass moved the backend index at all. Set in lockstep with
+        // the tracker, because the two have to agree: a note that is marked
+        // applied will not be re-sent by any later pass, so if the tracker moved
+        // and the nonce did not, the readers below never learn the index changed.
+        let moved = false;
         try {
           for (const id of removed) {
             if (cancelled) return;
             await vaultIndicesRemove(id);
             tracker.markRemoved(id);
+            moved = true;
           }
           for (const note of changed) {
             if (cancelled) return;
             await vaultIndicesApply(extractRecord(note.id, note.title, note.folder, note.body));
             tracker.markApplied(note);
+            moved = true;
           }
           const edges = await vaultIndicesAllEdges();
           if (!cancelled) setBackendEdges(edges);
         } catch {
           if (!cancelled) setBackendEdges(null);
+        } finally {
+          // myne-md/myne#452. In `finally`, and deliberately NOT behind
+          // `cancelled`: a newer pass computes its delta from the tracker this
+          // one already marked, so a cancellation landing after the last apply
+          // leaves the replacement sweep with an EMPTY delta and an early
+          // return, and a bump skipped here is a bump nothing ever makes.
+          // `refreshAll` installs a fresh `bodies` Map on every call, a no-op
+          // sync pull included, so that race is ordinary rather than exotic.
+          // `finally` also covers the throwing path, where the loops may have
+          // applied and marked several notes before the failure.
+          if (moved) setPickerFetch((p) => ({ index: p.index + 1, attempt: 0 }));
         }
       })();
     }, 400);
@@ -1258,6 +1346,90 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       window.clearTimeout(t);
     };
   }, [resolverNotes, bodies, indicesDelta]);
+
+  // myne-md/myne#452: read the two whole-vault picker sets back.
+  //
+  // Its OWN effect, not the tail of the sweep above, and that is load-bearing: a
+  // read changes no note signature, so nothing re-issues one. Sharing the
+  // sweep's body meant a pass that reached the applies and then failed or was
+  // superseded left both sets empty with the delta already consumed, and both
+  // pickers listed nothing for the rest of the session.
+  //
+  // Keyed on `pickerFetch` instead, which the sweep bumps in lockstep with the
+  // tracker, so "the index moved" and "the readers were told" cannot come apart.
+  // Desktop reaches the same place through `useIndexNonce`.
+  useEffect(() => {
+    if (!HAS_TAURI) return;
+    const seq = ++pickerFetchSeq.current;
+    let retryTimer: number | null = null;
+    // 400 ms is the cadence the two index sweeps above already debounce at, not
+    // a measured figure. It rides on top of the sweep's own 400, so a keystroke
+    // reaches the pickers roughly 800 ms plus the apply loop after it lands.
+    const t = window.setTimeout(() => {
+      void (async () => {
+        // One read each rather than a `Promise.all`, so one command being
+        // unregistered cannot blank the OTHER picker. A superseded read is
+        // dropped by the sequence guard rather than a `cancelled` flag, which
+        // would skip the retry too and make a cancellation look like a refusal.
+        let failed = false;
+        try {
+          const rows = await vaultIndicesHeadings();
+          if (seq === pickerFetchSeq.current) setHeadingRows(rows);
+        } catch {
+          failed = true;
+        }
+        try {
+          const rows = await vaultIndicesBlockAnchors();
+          if (seq === pickerFetchSeq.current) setBlockAnchorRows(rows);
+        } catch {
+          failed = true;
+        }
+        // Retry against the SAME index value, since nothing else will: on this
+        // client no nonce moves until a note is edited, so without this one
+        // unlucky boot read costs the pickers the whole session.
+        if (failed && seq === pickerFetchSeq.current && pickerFetch.attempt < PICKER_FETCH_RETRIES) {
+          retryTimer = window.setTimeout(() => {
+            // The equality test is belt and braces, not a race: the cleanup
+            // below clears `retryTimer` on every dependency change, so this can
+            // only fire while `pickerFetch` is still the value it closed over.
+            setPickerFetch((p) =>
+              p.index === pickerFetch.index && p.attempt === pickerFetch.attempt
+                ? { index: p.index, attempt: p.attempt + 1 }
+                : p,
+            );
+          }, PICKER_FETCH_RETRY_MS);
+        }
+      })();
+    }, 400);
+    return () => {
+      window.clearTimeout(t);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      // Invalidate this run's sequence. A NEW run increments it, so the guards
+      // above already drop a superseded read; an UNMOUNT does not. Without this
+      // the async body resumes after teardown, writes both row states, and arms
+      // a retry timer the cleanup has already read as null and so never clears.
+      // Unmount here is a lock or a vault switch, which is exactly when nothing
+      // should still be pending against the vault that just closed.
+      pickerFetchSeq.current += 1;
+    };
+  }, [vaultId, pickerFetch]);
+
+  // The `[[##` picker's set. The join is not a formatting step: the Rust index
+  // is trash-blind, so joining against `resolverNotes` is what keeps trashed,
+  // template and conflict-copy notes out, and it supplies each row's title and
+  // folder fresh rather than as of the last apply. See `joinVaultHeadings`.
+  const vaultHeadings = useMemo<readonly VaultHeading[]>(
+    () => joinVaultHeadings(headingRows, resolverNotes),
+    [headingRows, resolverNotes],
+  );
+  // The `[[^^` picker's set, through the twin join in the same shared module,
+  // and the stakes are higher here because a `[[^^` row is a DEEP LINK. These
+  // rows carry a `noteTitle`/`noteFolder` of their own and the join deliberately
+  // ignores them: the resident note-set's copy is the one a rename updates.
+  const vaultBlockAnchors = useMemo<readonly EditorVaultBlockAnchor[]>(
+    () => joinVaultBlockAnchors(blockAnchorRows, resolverNotes),
+    [blockAnchorRows, resolverNotes],
+  );
 
   // In-memory note store for browser-dev (no Tauri host). The real backend
   // owns persistence under `pnpm tauri dev`; this keeps `pnpm dev` demoable.
@@ -1445,7 +1617,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // (`src/screens/Editor.tsx`). Without it React 19 dev runs this twice, both
   // runs read the pre-write `deliberate_folders`, and the second issues a
   // duplicate ADD write: a second full `vault.prefs` re-encrypt on every dev
-  // unlock. `src/CLAUDE.md`: "Effects run twice; design with idempotency."
+  // unlock. `src/AGENTS.md`: "Effects run twice; design with idempotency."
   const booted = useRef(false);
   useEffect(() => {
     if (booted.current) return;
@@ -3065,7 +3237,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // close the editor, so `editing` and `editorText` survive holding
             // PRE-apply bytes; `editorUnchanged(id)` then reads true, and the
             // next keystroke saves that stale buffer over the change the user
-            // just approved. `src/CLAUDE.md` states this as a rule ("the pane's
+            // just approved. `src/AGENTS.md` states this as a rule ("the pane's
             // next autosave writes that stale buffer back over the change"), the
             // desktop screen discharges it with `reloadOpenNote`, and this file
             // already carries the same pattern for `SnapshotsSheet.onRestored`.
@@ -3607,6 +3779,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // an open-full-screen host - the embed shows a thumbnail that opens the
             // drawing on its own screen (drawingIo has openNote, no inline canvas).
             noteSet={resolverNoteSet}
+            // myne-md/myne#452: the vault-wide `[[##` and `[[^^` picker sets.
+            // `wikilinkPickerExtension` composes both extensions unconditionally,
+            // so an absent prop here reads to the user as "this vault has none"
+            // rather than as "not wired".
+            vaultHeadings={vaultHeadings}
+            vaultBlockAnchors={vaultBlockAnchors}
             drawingIo={drawingIo}
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure - a 620px column (+ 56px gutters)

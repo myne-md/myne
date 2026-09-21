@@ -266,7 +266,7 @@ export class AttachmentImageWidget extends WidgetType {
      *  edit can move an embed between the two forms, and the handles have to
      *  follow it. */
     /*
-     * REQUIRED, deliberately. A default here is the shape the root CLAUDE.md
+     * REQUIRED, deliberately. A default here is the shape the root AGENTS.md
      * records as an opt-in guard: a call site that forgets the argument gets
      * `false`, which is a valid inline embed with no resize handles, and `eq()`
      * then compares `false === false`, so nothing rebuilds to tell anyone.
@@ -1930,7 +1930,7 @@ export function makeResolvedWidget(
    *
    *  Required, not defaulted to the inline arm. A default here would answer for
    *  every future caller in the direction that draws no handles, which is the
-   *  shape `CLAUDE.md` records under "a guard parameter with a default value is
+   *  shape `AGENTS.md` records under "a guard parameter with a default value is
    *  an opt-in guard": the arm that never fires is the one a new call site
    *  silently takes. Both builders state their form. */
   block: boolean,

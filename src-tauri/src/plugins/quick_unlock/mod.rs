@@ -11,7 +11,7 @@
 //! (generalized macOS → macOS + iOS, decisions.md 2026-07-12). This crate only
 //! registers the six shared commands.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // Re-exported so existing `crate::plugins::quick_unlock::{attempt, error, pin,
 // provider, commands}::…` paths keep resolving (`hooks.rs` reaches

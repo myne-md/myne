@@ -16,14 +16,14 @@
 //! `#[tauri::command]` wrappers resolve the active vault dir. Any failure on read
 //! collapses to the empty theme store (fall-back-to-empty, § 9.21.4).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::ThemesError;
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_themes_blob, derive_subkey_versioned, encode_themes_blob_versioned, meta_version_of,
-    parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_themes_blob, encode_themes_blob_versioned, meta_version_of, parse_vault_meta_any,
+    MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -680,13 +680,13 @@ async fn read_themes_map_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<ThemesMap, ThemesError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
     let (meta_version, account_number_hash) =
         read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let themes_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::CustomThemesKey);
+    let themes_key = shared.derive(meta_version, SubkeyRole::CustomThemesKey);
     read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await
 }
 
@@ -705,13 +705,13 @@ async fn mutate_themes_with_dir(
     // SYNC-6 writer-guard: hold the slot read guard across the atomic_write so a
     // slots WRITE-lock holder (backup quiescence, vault_lock, vault_delete)
     // queues behind the in-flight write instead of observing a torn vault dir.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
     let (meta_version, account_number_hash) =
         read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let themes_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::CustomThemesKey);
+    let themes_key = shared.derive(meta_version, SubkeyRole::CustomThemesKey);
 
     // A read that FAILED aborts the mutation (#255): re-sealing a map we never
     // read would replace the stored themes with an empty store — and this blob

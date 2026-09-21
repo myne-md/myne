@@ -18,7 +18,7 @@
 //
 // This header used to end "the decision unit-tested in Vitest (the trigger is a
 // window resize, which the tauri-driver harness cannot drive — the
-// `e2e/CLAUDE.md` 'states unreachable through real UI' downgrade)". The first
+// `e2e/AGENTS.md` 'states unreachable through real UI' downgrade)". The first
 // clause is true of the DESKTOP harness and was read as true of the feature, so
 // the pure function was tested and the wiring was not — and the wiring was
 // broken from the start: the observer was never attached, so the restack never
@@ -96,7 +96,7 @@ export function useSettingsCompactObserver(
    * was unit-tested as a pure function and its WIRING was never exercised. The
    * pure half was correct the whole time.
    *
-   * No default value, deliberately — root `CLAUDE.md`: "a guard parameter with
+   * No default value, deliberately — root `AGENTS.md`: "a guard parameter with
    * a default value is an opt-in guard, and the default is the arm that never
    * fires". A second caller must say when its element exists rather than
    * inheriting the answer that hid this for as long as it did.

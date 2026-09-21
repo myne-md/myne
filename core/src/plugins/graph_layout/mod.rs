@@ -22,7 +22,7 @@
 //! `init()` is per-client: each host builds its own plugin registering the
 //! same 2 commands under its own `graph-layout:default` capability grant.
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

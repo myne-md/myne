@@ -63,7 +63,7 @@
 // Testable: `analyse(io)` takes its whole world as an argument, so
 // `tests/scripts/mobileExportBackup.test.ts` injects each defect above, and each
 // defect in THIS FILE, and asserts the failure is named. A guard that has never
-// failed is a guard nobody has tested (root `CLAUDE.md`).
+// failed is a guard nobody has tested (root `AGENTS.md`).
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

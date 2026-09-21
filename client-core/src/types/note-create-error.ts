@@ -38,7 +38,7 @@ export type NoteCreateError =
    * `<vault>/notes/<note_id>.myn` already exists. Backend-generated
    * UUIDv7 makes a real collision astronomically improbable; this
    * variant is the canary the `atomic_write(replace=false)` helper
-   * guarantees per `src-tauri/CLAUDE.md` "Defensive guards".
+   * guarantees per `src-tauri/AGENTS.md` "Defensive guards".
    *
    * **Not user-facing in normal flow.** If this surfaces, the editor
    * should retry with a fresh `note_create` (which mints a new

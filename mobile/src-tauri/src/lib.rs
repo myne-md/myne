@@ -18,8 +18,8 @@
 // (MYI1) IS shared from `myne-core` and registered here (its lock-teardown
 // wipe is a desktop-only hooks side-effect).
 //
-// See the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
-// discipline" and `protocol/CLAUDE.md` for the rules these modules follow.
+// See the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
+// discipline" and `protocol/AGENTS.md` for the rules these modules follow.
 
 // The crate-root support modules (atomic_write, paths, text, vault_registry, …)
 // moved to `myne-core` (shared with the desktop client). Re-exported so existing

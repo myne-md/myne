@@ -22,7 +22,7 @@
 //     (`editor.backlink-row[data-source-id=<B>]`), clicks it, and asserts
 //     navigation to B.
 //
-// Coverage boundary (recorded on MYND-231, per the e2e/CLAUDE.md downgrade
+// Coverage boundary (recorded on MYND-231, per the e2e/AGENTS.md downgrade
 // rule): the graph-only index surfaces — `vault_indices_orphans`,
 // `vault_indices_all_edges`, forward-links, and the GraphView tag/orphans
 // filters — are reachable ONLY through GraphView, which carries zero

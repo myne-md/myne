@@ -2,7 +2,7 @@
 //! `workspace` plugin IPC error enums (MYND-166).
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline" (no path
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline" (no path
 //! strings, no key material, no kernel-error display). Mirrored on the TS
 //! side at `src/types/workspace-error.ts`.
 //!

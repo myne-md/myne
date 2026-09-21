@@ -4,7 +4,7 @@
 //! Used by every Tauri-layer plugin that surfaces a `ProtocolError` via
 //! `tracing::error!(stage = "...", protocol_error_kind = ...)`. A new
 //! variant in the protocol crate compile-fails the match here —
-//! drift-detecting per `src-tauri/CLAUDE.md` "Closed-enum mapping rule".
+//! drift-detecting per `src-tauri/AGENTS.md` "Closed-enum mapping rule".
 //!
 //! Pre-MYND-22 this mapping was duplicated verbatim across
 //! `vault_unlock`, `vault_recover`, and `vault_change_password`

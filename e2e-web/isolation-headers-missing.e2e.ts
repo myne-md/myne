@@ -150,7 +150,7 @@ describeE2E("a deployment without the isolation headers", () => {
     // nothing.
     //
     // It stays because an origin is what OPFS keys a vault by, which
-    // `e2e-web/CLAUDE.md` calls the more dangerous shared thing in this lane,
+    // `e2e-web/AGENTS.md` calls the more dangerous shared thing in this lane,
     // and two arms of one file asserting opposite boot outcomes should not
     // share one. But it is not load-bearing here, and pretending it was would
     // leave the next reader with a cache theory to chase.

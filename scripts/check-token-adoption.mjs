@@ -96,7 +96,7 @@ const EXEMPT = [
   // drift rather than a decision: the two are the same kind of file, and the
   // consequence is that a token DEFINITION added to mobile trips a guard whose
   // whole subject is consuming tokens rather than defining them. That is the
-  // `check-prefs-nonce` shape the root CLAUDE.md records, where a roster kept a
+  // `check-prefs-nonce` shape the root AGENTS.md records, where a roster kept a
   // client out and the success line still read ok (myne-md/myne#629).
   "mobile/src/styles/tokens.css",
   "src/dialect/html/print-stylesheet.ts", // standalone PDF doc; embeds its own :root

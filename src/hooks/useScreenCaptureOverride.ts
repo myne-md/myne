@@ -110,7 +110,7 @@ function readOnce(): void {
  * Whether the device override is suppressing protection right now, for callers
  * outside React.
  *
- * The command palette needs this and cannot use the hook. `src/CLAUDE.md` states
+ * The command palette needs this and cannot use the hook. `src/AGENTS.md` states
  * the rule it exists to satisfy: "a command-palette action that reaches the same
  * setting needs the same guard, or the palette reopens the door the panel just
  * closed." The Privacy panel renders the per-vault switch inert while the

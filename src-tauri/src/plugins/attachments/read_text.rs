@@ -9,7 +9,7 @@
 //!
 //! Secret-handling: the returned `text` is note-body-class plaintext — it is
 //! DENY-listed and MUST NOT be logged or placed in any tracing field; see
-//! `src-tauri/CLAUDE.md` "Plaintext IPC across the WebView boundary".
+//! `src-tauri/AGENTS.md` "Plaintext IPC across the WebView boundary".
 
 use crate::plugins::attachments::extract::{extract_docx_blocks, extract_xlsx_grid, DocxBlockKind};
 use crate::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
@@ -59,10 +59,10 @@ pub async fn attachment_read_text<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
 ) -> Result<AttachmentTextResponse, AttachmentReadTextError> {
     let keys = match state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return Err(AttachmentReadTextError::Locked),
     };
@@ -119,10 +119,10 @@ pub async fn attachment_read_structured<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
 ) -> Result<StructuredContent, AttachmentReadTextError> {
     let keys = match state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return Err(AttachmentReadTextError::Locked),
     };
@@ -199,11 +199,15 @@ fn source_format_label(format: SourceFormat) -> &'static str {
 /// vault-stable correlation tag: used, never logged (DENY-list).
 fn read_account_number_hash(
     vault_dir: &Path,
-) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
+) -> Option<(
+    protocol::MetaVersion,
+    [u8; protocol::VAULT_META_ACCOUNT_HASH_LEN],
+)> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     // Either generation (myne-md/myne#433).
     protocol::parse_vault_meta_any(&bytes)
-        .map(|m| m.account_number_hash)
+        .map(|m| (version, m.account_number_hash))
         .ok()
 }
 
@@ -213,13 +217,12 @@ fn read_account_number_hash(
 /// text is plaintext — never logged.
 fn read_cached_extracted_text(
     vault_dir: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     id_hex: &str,
 ) -> Option<AttachmentExtractedText> {
     let attachment_id = super::commands::hex_decode_id(id_hex)?;
-    let account_number_hash = read_account_number_hash(vault_dir)?;
-    let attachment_text_key =
-        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let (version, account_number_hash) = read_account_number_hash(vault_dir)?;
+    let attachment_text_key = shared.derive(version, protocol::SubkeyRole::AttachmentTextKey);
     let extracted = super::text_cache::read_extracted(
         vault_dir,
         &attachment_text_key,
@@ -255,15 +258,15 @@ pub async fn attachment_read_extracted_text<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Option<AttachmentExtractedText>, AttachmentReadTextError> {
-    let root_key = match state.peek_unlocked_root_key_clone().await {
-        Some(root_key) => root_key,
+    let shared = match state.peek_unlocked_shared_singleton_key().await {
+        Some(shared) => shared,
         None => return Err(AttachmentReadTextError::Locked),
     };
     let vault_dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| AttachmentReadTextError::Io)?;
-    // Blob read + AEAD decrypt → CPU/IO-bound → spawn_blocking. `root_key`
-    // (Zeroizing) moves into the closure and wipes on exit.
-    tokio::task::spawn_blocking(move || read_cached_extracted_text(&vault_dir, &root_key, &id))
+    // Blob read + AEAD decrypt → CPU/IO-bound → spawn_blocking. `shared`
+    // moves into the closure and its key material wipes on exit.
+    tokio::task::spawn_blocking(move || read_cached_extracted_text(&vault_dir, &shared, &id))
         .await
         .map_err(|_join| {
             tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");

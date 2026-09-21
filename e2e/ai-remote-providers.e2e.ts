@@ -24,7 +24,7 @@
 // The three remote FAILURE states (unauthorized / quota exhausted / provider
 // unreachable) and the indicator naming the provider on a real remote answer
 // are not driven here, because a request that actually reaches a provider
-// cannot be faked without a production test hook, which `e2e/CLAUDE.md`
+// cannot be faked without a production test hook, which `e2e/AGENTS.md`
 // forbids outright ("Zero test hooks"):
 //
 //   * `ProviderHost` has a PRIVATE field and is minted only from the
@@ -80,7 +80,7 @@ import { type Session } from "./support/webdriver";
  *  the exact failure `scripts/check-prefs-nonce.mjs` exists to prevent in
  *  production code, and it bites a scenario the same way.
  *
- *  It is also `e2e/CLAUDE.md`'s rule stated plainly: build on the layers. */
+ *  It is also `e2e/AGENTS.md`'s rule stated plainly: build on the layers. */
 async function openAiPanel(s: Session): Promise<void> {
   await enableDeveloperMode(s);
   const rail = await s.waitUntil(

@@ -4,7 +4,7 @@
 //!
 //! # What this file is load-bearing for
 //!
-//! `protocol/CLAUDE.md`: *"Nonce reuse is catastrophic — `getrandom` is the only
+//! `protocol/AGENTS.md`: *"Nonce reuse is catastrophic — `getrandom` is the only
 //! acceptable source for nonces in v0.1. There is no counter-mode fallback."*
 //! Every write path in the product draws from here: the per-note
 //! `content_nonce` (`blob.rs`), an attachment's key plus its two nonces

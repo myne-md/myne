@@ -86,7 +86,7 @@ step(interim, symbol):
 
 **The literal table in §4.2 is normative**; this construction is the informative derivation. An independent implementation MAY either paste the table verbatim or implement the construction and verify it against the table — the two are byte-identical.
 
-**Commutativity note.** The operation is commutative (`x ∗ y = y ∗ x`), so the quasigroup is **not** *fully* totally anti-symmetric — only **weakly** so. This is correct and intended: the Damm check equation needs only weak total anti-symmetry (the source of the all-single-error + all-adjacent-transposition guarantee), and the zero diagonal gives the "valid ⟺ final interim is 0" property. An implementation MUST NOT "fix" the table to be fully anti-symmetric — that changes the table and is a major-version event (see root `CLAUDE.md` load-bearing registry).
+**Commutativity note.** The operation is commutative (`x ∗ y = y ∗ x`), so the quasigroup is **not** *fully* totally anti-symmetric — only **weakly** so. This is correct and intended: the Damm check equation needs only weak total anti-symmetry (the source of the all-single-error + all-adjacent-transposition guarantee), and the zero diagonal gives the "valid ⟺ final interim is 0" property. An implementation MUST NOT "fix" the table to be fully anti-symmetric — that changes the table and is a major-version event (see root `AGENTS.md` load-bearing registry).
 
 ### 4.2 Frozen quasigroup table (normative)
 

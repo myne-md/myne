@@ -73,7 +73,7 @@ function civilDateIn(zone: string): string {
  *    returns: one run in three reported `"Untitled"` for the whole 30 s. A tab
  *    label is a rendering of a title that is parsed out of the note body after
  *    it loads, so it is a race by construction, and the failure is permanent
- *    rather than slow — exactly the class `e2e/CLAUDE.md` says a bigger budget
+ *    rather than slow — exactly the class `e2e/AGENTS.md` says a bigger budget
  *    cannot reach.
  *
  * What the claim is actually about is which note EXISTS, so that is what is

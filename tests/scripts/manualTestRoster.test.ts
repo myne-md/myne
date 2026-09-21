@@ -113,7 +113,7 @@ describe("the healthy baseline", () => {
   });
 
   it("refuses to run at all when the ratchet key is missing, rather than skipping Rule 5", () => {
-    // The parameter-with-a-default trap CLAUDE.md records from myne#533: the
+    // The parameter-with-a-default trap AGENTS.md records from myne#533: the
     // default would be the arm that never fires, excusing a future caller from
     // the whole ratchet rule without anyone choosing it.
     const io = healthy() as Record<string, unknown>;

@@ -24,6 +24,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickNoteRow,
   createNote,
   dismissImporterOffer,
   runPaletteAction,
@@ -156,11 +157,24 @@ describeE2E("hlf2 fold-all / unfold-all via the command palette (MYND-300)", () 
         // The fresh note has no headings/lists worth folding → no placeholder.
         expect((await s.findElements(FOLD_PLACEHOLDER)).length).toBe(0);
 
-        // Switch back to the first note via its sidebar row.
-        const rowA = await s.waitForElement(
-          '[data-testid="notes.row"]:not([aria-current="true"])',
-        );
-        await rowA.click();
+        // Switch back to the first note via ITS OWN row, addressed by title.
+        //
+        // The `:not([aria-current="true"])` form this replaces picks the first
+        // row that is not active, which is not necessarily "Fold Note A": the
+        // sidebar is not ordered the way the test created the notes, so the row
+        // it clicked could be any other note, the pane never switched, and the
+        // folds (correctly, since we never left) stayed put — the failure named
+        // the ephemeral assertion while the click had gone to the wrong row.
+        const rows = await s.byTestIdAll("notes.row");
+        let rowAId = "";
+        for (const row of rows) {
+          if ((await row.textContent()).includes("Fold Note A")) {
+            rowAId = (await row.attribute("data-note-id")) ?? "";
+            break;
+          }
+        }
+        expect(rowAId, "Fold Note A must have a sidebar row to switch back to").not.toBe("");
+        await clickNoteRow(s, rowAId);
         await s.waitUntil(
           async () =>
             (await s.findElements(FOLD_PLACEHOLDER)).length === 0 ? true : null,

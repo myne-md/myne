@@ -18,7 +18,7 @@
 //! them in via [`RenderContext`]. A given `(template, context)` pair always
 //! renders byte-identical output; there is no hidden time or locale input. This
 //! mirrors the discipline elsewhere in the crate where randomness/clock is
-//! caller-supplied (cf. the `_raw` convention in `protocol/CLAUDE.md`).
+//! caller-supplied (cf. the `_raw` convention in `protocol/AGENTS.md`).
 //!
 //! ## Closed vocabulary
 //!

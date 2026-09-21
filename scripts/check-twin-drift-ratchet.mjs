@@ -41,7 +41,7 @@
 // CURRENT set, and refuses when that set has GROWN: a re-baseline that locks in
 // a regression is the one edit that is never legitimate, and it is exactly what
 // a naive `--record` offers the moment the build goes red. That refusal is the
-// half nobody tests, CLAUDE.md records `check-ipc-binding-callers.mjs`'s
+// half nobody tests, AGENTS.md records `check-ipc-binding-callers.mjs`'s
 // placeholder passing its own reason check, and the lesson generalises: run
 // `--record` on a DIRTY tree and check that the guard still fails afterwards.
 // `tests/scripts/twinDriftRatchet.test.ts` does exactly that.

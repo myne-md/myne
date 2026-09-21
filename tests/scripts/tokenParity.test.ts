@@ -9,7 +9,7 @@ import {
 
 // Injection suite for `scripts/check-token-parity.mjs`.
 //
-// Per `CLAUDE.md`: verifying a guard means BREAKING it, not running it. Each
+// Per `AGENTS.md`: verifying a guard means BREAKING it, not running it. Each
 // defect the guard claims to catch is injected here against a synthetic file
 // set, never against `src/` or `mobile/src/`, so a crashed run cannot leave a
 // production stylesheet corrupted, and the guard must NAME it.

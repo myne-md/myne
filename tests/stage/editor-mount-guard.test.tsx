@@ -8,7 +8,7 @@
 // Ratified downgrade: component-level coverage with the mount probe
 // mocked — the ONE seam the guard exists to distrust.
 //
-// Contract under test (Q5β-1 belt+suspenders, `src/CLAUDE.md`):
+// Contract under test (Q5β-1 belt+suspenders, `src/AGENTS.md`):
 // - `vault_is_unlocked` → false while Stage = editor ⇒
 //   `<FailClosedError reason="invalid-state" />` in place of the editor
 //   body (which never mounts).

@@ -10,6 +10,16 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useRoster } from "../../hooks/useRoster";
+import { startB2bMigration } from "../../lib/invite";
+
+/** The `kind` of a serialized backend error, or `null` for anything else. */
+function syncErrorKind(e: unknown): string | null {
+  if (e && typeof e === "object" && "kind" in e) {
+    const kind = (e as { kind: unknown }).kind;
+    if (typeof kind === "string") return kind;
+  }
+  return null;
+}
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
@@ -62,6 +72,7 @@ export function MemberRosterPanel({
   const {
     members,
     authority,
+    groupKeyEpoch,
     loading,
     error,
     inviting,
@@ -164,6 +175,11 @@ export function MemberRosterPanel({
         </p>
       ) : (
         <>
+          {groupKeyEpoch !== null ? (
+            <p data-testid="member-roster.epoch" style={STATUS_STYLE}>
+              {t("sync.memberRoster.epoch", { epoch: groupKeyEpoch })}
+            </p>
+          ) : null}
           <ul data-testid="member-roster.list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {members.map((m) => (
               <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex} style={ROW_STYLE}>
@@ -178,7 +194,25 @@ export function MemberRosterPanel({
                 <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
                   {m.fingerprint_hex.slice(0, 16)}
                 </span>
-                {m.previous_fingerprint_hex ? (
+                {/* A cryptographic key change and an owner-confirmed relink are
+                    DIFFERENT states and must read differently: the first is a
+                    new identity the owner has not vouched for, the second is the
+                    owner re-confirming a transition. */}
+                {m.continuity === "changed" ? (
+                  <span data-testid="member-roster.key-changed" style={ERROR_STYLE}>
+                    {t("sync.memberRoster.keyChanged")}
+                  </span>
+                ) : null}
+                {m.continuity === "owner-confirmed" ? (
+                  <span data-testid="member-roster.relink-confirmed" style={CODE_STYLE}>
+                    {t("sync.memberRoster.relinkConfirmed")}
+                  </span>
+                ) : null}
+                {/* A legacy roster row carries `continuity: null` while still
+                    forwarding `previous_fingerprint_hex`; treat it as the
+                    `current` arm so a rotated legacy row keeps its badge. */}
+                {(m.continuity === "current" || m.continuity === null) &&
+                m.previous_fingerprint_hex ? (
                   <span data-testid="member-roster.rotated" style={CODE_STYLE}>
                     {t("sync.memberRoster.rotated")}
                   </span>
@@ -187,7 +221,7 @@ export function MemberRosterPanel({
             ))}
           </ul>
           <p data-testid="member-roster.remove-disabled" style={STATUS_STYLE}>
-            {t("sync.memberRoster.removeConfirm")}
+            {t("sync.memberRoster.removalLimits")}
           </p>
         </>
       )}
@@ -211,15 +245,32 @@ export function MemberRosterPanel({
           busy={inviting}
           onCancel={() => setInviteOpen(false)}
           onSubmit={async (input) => {
+            const vaultLabel = prefs.label ?? t("sync.memberRoster.untitledVault");
+            const args = {
+              ...input,
+              // The vault's own name (the sealed `vault.prefs.label`), not the
+              // panel heading: the invited member is told what the shared vault
+              // is called.
+              vaultLabel,
+              createdAtSecs: Math.floor(Date.now() / 1000),
+            };
             try {
-              await invite({
-                ...input,
-                // The vault's own name (the sealed `vault.prefs.label`), not
-                // the panel heading: the invited member is told what the
-                // shared vault is called.
-                vaultLabel: prefs.label ?? t("sync.memberRoster.untitledVault"),
-                createdAtSecs: Math.floor(Date.now() / 1000),
-              });
+              await invite(args);
+              setInviteOpen(false);
+              return;
+            } catch (e) {
+              // The first B2B action on a pre-B2B vault migrates it to NTV6.
+              // The backend refuses the invite with `MigrationRequired` until
+              // that commit, so run the explicit migration and retry ONCE. Any
+              // other failure is reported as-is.
+              if (syncErrorKind(e) !== "MigrationRequired") {
+                setActionError(t("sync.memberRoster.inviteFailed"));
+                return;
+              }
+            }
+            try {
+              await startB2bMigration(vaultLabel);
+              await invite(args);
               setInviteOpen(false);
             } catch {
               setActionError(t("sync.memberRoster.inviteFailed"));

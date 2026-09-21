@@ -20,7 +20,7 @@
 //! which is the whole reason `crate::task` exists, and
 //! `scripts/check-core-task-seam.mjs` is what keeps it the only door.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};

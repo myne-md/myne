@@ -27,7 +27,7 @@
 //! seams (`VaultStatusSource`, `ClipAssembler`). This is what lets the
 //! decode → dispatch → encode loop run in a unit test over an in-memory
 //! pipe with a fake [`NoteLister`], with no `AppHandle` / `tauri::test`
-//! harness (core/CLAUDE.md's stated reason for avoiding that harness: the
+//! harness (core/AGENTS.md's stated reason for avoiding that harness: the
 //! TB9 Cargo.lock discipline). The production seam, [`AppNoteLister`],
 //! bridges the real async `note_list_from_host` call via
 //! `tauri::async_runtime::block_on` — the same bridge
@@ -37,7 +37,7 @@
 //! returning — the ids this trait hands back are already in-scope, so a
 //! `NoteLister` caller never has to remember to filter.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — a `list`
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — a `list`
 //! reply body carries note ids only (a vault-stable correlation tag, same
 //! DENY class as salts/nonces per that doc); this module never logs a
 //! request/response body, only the bounded outcome tags below.

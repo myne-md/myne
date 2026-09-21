@@ -30,7 +30,7 @@
 //! exception: their temp sibling lives at the **user-chosen export
 //! destination**, which is plaintext by the user's own intent
 //! (threat-model TB3 egress exception), never inside the vault. See
-//! `src-tauri/CLAUDE.md` "Atomic file writes" (amended 2026-06-11).
+//! `src-tauri/AGENTS.md` "Atomic file writes" (amended 2026-06-11).
 //!
 //! ## Export-destination writes: [`atomic_write_unclobbered`]
 //!

@@ -44,7 +44,7 @@
 //! is why this module, which *does* run in dev, is the more valuable half of
 //! the change.
 //
-// see: src-tauri/CLAUDE.md "Secret-handling logging discipline"
+// see: src-tauri/AGENTS.md "Secret-handling logging discipline"
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Runtime, Url};

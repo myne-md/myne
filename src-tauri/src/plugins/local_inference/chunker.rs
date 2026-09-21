@@ -7,7 +7,7 @@
 //! **Pure over `(NoteId, &str)`.** No embedding, no model, no IPC, no I/O — it
 //! turns a note's decrypted markdown into heading/paragraph-window [`Chunk`]s,
 //! each carrying only its source `{note_id, byte-range}` (the `vault.indices`
-//! per-occurrence model, root `CLAUDE.md` §9.8). It deliberately does **not**
+//! per-occurrence model, root `AGENTS.md` §9.8). It deliberately does **not**
 //! copy the plaintext into the returned value: a chunk is an *index* into the
 //! already-resident source, so no second plaintext buffer is minted here (the
 //! RAM vector store, task 2, owns the zeroize-on-lock lifecycle). Callers slice

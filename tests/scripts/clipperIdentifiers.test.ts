@@ -4,7 +4,7 @@
  *
  * # Why a guard gets its own test
  *
- * Root `CLAUDE.md` is explicit: "Verifying a guard means breaking it, not
+ * Root `AGENTS.md` is explicit: "Verifying a guard means breaking it, not
  * running it. A guard that has never failed is a guard nobody has tested."
  * Three consecutive reviews of one feature found a check that passed while the
  * thing it checked was wrong, and in each case the check had just been *fixed*
@@ -64,7 +64,7 @@ function tree(): string {
   mkdirSync(join(dir, "src-tauri", "src", "clipper"), { recursive: true });
   cpSync(join(REPO_ROOT, GUARD), join(dir, GUARD));
   cpSync(join(REPO_ROOT, MANIFEST_RS), join(dir, MANIFEST_RS));
-  cpSync(join(REPO_ROOT, "CLAUDE.md"), join(dir, "CLAUDE.md"));
+  cpSync(join(REPO_ROOT, "AGENTS.md"), join(dir, "AGENTS.md"));
   return dir;
 }
 
@@ -120,7 +120,7 @@ function patchManifestRs(dir: string, from: string, to: string): void {
 //
 // **Both layouts, for the reason the guard now carries in its own comment.**
 // Companions are cloned NESTED at `<repo>/myne-clipper`
-// (`workspace/manifest.txt`); from a worktree under `.claude/worktrees/<name>`
+// (`workspace/manifest.txt`); from a worktree under `.opencode/worktrees/<name>`
 // that same directory is three levels up. This file hardcoded only the second,
 // so it passed from a worktree and failed from the ordinary checkout with the
 // guard reporting NOT CHECKED — four cross-repo assertions that looked like a
@@ -202,9 +202,9 @@ describe("the clipper-identifier guard", () => {
     // constant changed without it leaves a wrong identifier published in the
     // document whose whole job is being the reference.
     const dir = tree();
-    const claude = readFileSync(join(dir, "CLAUDE.md"), "utf8");
+    const claude = readFileSync(join(dir, "AGENTS.md"), "utf8");
     writeFileSync(
-      join(dir, "CLAUDE.md"),
+      join(dir, "AGENTS.md"),
       claude.replaceAll("md.myne.clipper", "md.myne.clipper-OLD"),
     );
     const r = run(dir, { companionDir: REAL_COMPANION });

@@ -3,7 +3,7 @@
 // template `src/pdf-export/main.ts` so the standalone-HTML assembler and
 // the PDF hidden window serve the same faces from one source).
 //
-// The bundled self-hosted faces (public/fonts/ — see src/CLAUDE.md "Design
+// The bundled self-hosted faces (public/fonts/ — see src/AGENTS.md "Design
 // tokens"). PRINT_CSS references the family NAMES only (both the "…
 // Variable" and plain forms, mirroring colors_and_type.css); a standalone
 // document serves the faces itself via these rules. Both names map to the

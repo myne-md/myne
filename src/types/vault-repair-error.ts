@@ -5,7 +5,7 @@
 // serialize as `{"kind": "<Variant>"}`; payload-carrying variants nest as
 // `{"kind": "<Variant>", "detail": <inner>}`.
 //
-// Hand-mirrored (no codegen yet — see `src/CLAUDE.md` "Tauri command
+// Hand-mirrored (no codegen yet — see `src/AGENTS.md` "Tauri command
 // bindings"). Adding a Rust variant without mirroring it here is a drift
 // bug the `default: assertNever` in the consumer surfaces at compile time.
 

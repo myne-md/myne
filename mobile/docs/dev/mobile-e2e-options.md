@@ -6,7 +6,7 @@
 
 ## 1. What the desktop e2e stack is (the thing we want to reuse)
 
-(Full detail: main repo `docs/dev/e2e.md` + `e2e/CLAUDE.md`.)
+(Full detail: main repo `docs/dev/e2e.md` + `e2e/AGENTS.md`.)
 
 - **Runner**: Vitest (`vitest run --config vitest.e2e.config.ts`), serial
   (`fileParallelism:false`), 180 s/test, 2 retries.

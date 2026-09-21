@@ -55,7 +55,7 @@ async function waitEnabled(session: Session, expected: "true" | "false"): Promis
 // which is why the victim moved between runs and read as a loaded host.
 // `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
 // before any worker starts. Measured after the fix, `--retry=0`, warm
-// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+// container: 16 consecutive clean runs, which is the bar `e2e/AGENTS.md` sets.
 describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("the Browser clipper toggle renders off by default and round-trips on→off", async () => {

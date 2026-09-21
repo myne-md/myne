@@ -7,7 +7,7 @@
 // `vault-unlock.ts`. The load-bearing zeroize is Rust-side via the
 // plugin's first-line `Zeroizing<String>` wrap on both
 // `current_password` and `new_password` parameters (per
-// `src-tauri/CLAUDE.md` "Secret-handling logging discipline"). The
+// `src-tauri/AGENTS.md` "Secret-handling logging discipline"). The
 // wrapper drops its closure-captured references on resolve/reject so
 // the JS heap allocations become GC-able. Callers (PasswordChangeForm
 // + AccountPanel) keep both passwords in component-local state and

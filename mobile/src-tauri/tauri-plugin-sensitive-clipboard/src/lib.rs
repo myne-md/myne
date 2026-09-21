@@ -220,7 +220,7 @@ async fn write_text<R: Runtime>(app: AppHandle<R>, value: String) -> Result<(), 
 /// Write a credential: device-confined and expiring where the OS supports it.
 #[tauri::command]
 async fn write_secret<R: Runtime>(app: AppHandle<R>, value: String) -> Result<(), Error> {
-    // First non-doc statement, per `src-tauri/CLAUDE.md`'s secret-handling
+    // First non-doc statement, per `src-tauri/AGENTS.md`'s secret-handling
     // discipline and `recovery-flow.md` §3.5's MUST: once Rust holds a recovery
     // phrase, it holds it in a `Zeroizing<String>`. The desktop command for the
     // identical operation does this on its own first line.

@@ -12,7 +12,7 @@
 // (Ctrl+K to open, `palette.option[data-kind="note"]` rows, `data-note-id` the
 // discriminator); only the queries + assertions are new.
 //
-// DoD reminder (e2e/CLAUDE.md): certify with `./scripts/e2e-buildrun.sh
+// DoD reminder (e2e/AGENTS.md): certify with `./scripts/e2e-buildrun.sh
 // search-query-operators` green 3× consecutive in the container — this touches
 // production code (the palette + parser), so a rebuild is required.
 

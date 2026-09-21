@@ -2,7 +2,7 @@
 //!
 //! Closed, `serde`-tagged set hand-mirrored on the TS side. No `String` field
 //! reaches the frontend; provider/OS detail is reduced to coarse variants per
-//! the secret-handling logging discipline (`../../CLAUDE.md`).
+//! the secret-handling logging discipline (`../../AGENTS.md`).
 
 use crate::io_failure_kind::IoFailureKind;
 use serde::Serialize;

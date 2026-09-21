@@ -11,7 +11,7 @@
 //! `graph-layout:default` bundles `allow-graph-layout-read` +
 //! `allow-graph-layout-write`, main-window-only.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The `graph_layout` command core and its `error` enums moved to `myne-core`
 // (shared with the mobile client — the `prefs`/`snapshots` extraction

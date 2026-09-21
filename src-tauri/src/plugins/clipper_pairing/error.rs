@@ -1,6 +1,6 @@
 //! Closed error surface for the `clipper-pairing` IPC commands (TB10, task 4).
 //!
-//! DENY-list clean per `src-tauri/CLAUDE.md` "Secret-handling logging
+//! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline": a pairing token value + an extension ID are vault-stable
 //! correlation tags (the `salts, nonces` / `note_id` class) — they are NEVER
 //! placed in an error payload or a `tracing::*!` argument. The variants below

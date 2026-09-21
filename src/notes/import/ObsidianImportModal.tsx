@@ -1182,7 +1182,7 @@ function suggestName(segment: string): string {
 /**
  * Why a link was not followed. Exhaustive over the reason union with a `never`
  * default, and returns a KEY the caller resolves — a `t()` frozen at module
- * level would capture the boot language (`src/CLAUDE.md`).
+ * level would capture the boot language (`src/AGENTS.md`).
  */
 function unfollowedLinkDetailKey(reason: UnfollowedLink["reason"]): string {
   switch (reason) {

@@ -231,7 +231,7 @@ export function UnlinkedMentionsSection({
 
   return (
     <div
-      // Observability only (`src/CLAUDE.md` "Test observability"). This surface
+      // Observability only (`src/AGENTS.md` "Test observability"). This surface
       // carried NO testid at all, which made it invisible to the E2E lane: the
       // `links.backlinks-and-mentions` roster row asks whether the df ceiling
       // engages on a ~25-note corpus, and there was nothing for a scenario to

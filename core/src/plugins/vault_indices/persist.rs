@@ -219,6 +219,102 @@ mod tests {
         assert!(decode_snapshot(&KEY, &other_hash, &blob).is_none());
     }
 
+    /// A record as it was serialized BEFORE a trailing field was added: the
+    /// same shape as [`NoteRecord`] minus `headings`. Only ever written, never
+    /// read, which is what lets it stand in for a snapshot an older build left
+    /// on disk.
+    #[derive(Serialize)]
+    struct PreHeadingsRecord {
+        title: Option<String>,
+        folder: Option<String>,
+        title_key: Option<String>,
+        edges: Vec<WikilinkEdge>,
+        tags: Vec<TagEntry>,
+        properties: Vec<PropertyEntry>,
+        block_anchors: Vec<BlockAnchor>,
+        tasks: Vec<TaskRecord>,
+    }
+
+    #[derive(Serialize)]
+    struct PreHeadingsSnapshot<'a> {
+        manifest: &'a NonceManifest,
+        records: &'a BTreeMap<String, PreHeadingsRecord>,
+    }
+
+    fn pre_headings_record(title: &str) -> PreHeadingsRecord {
+        let full = record_with_property(title);
+        PreHeadingsRecord {
+            title: full.title,
+            folder: full.folder,
+            title_key: full.title_key,
+            edges: full.edges,
+            tags: full.tags,
+            properties: full.properties,
+            block_anchors: full.block_anchors,
+            tasks: full.tasks,
+        }
+    }
+
+    /// **`#[serde(default)]` does NOT make an older snapshot readable, and the
+    /// spec depends on it not doing so.**
+    ///
+    /// postcard is non-self-describing and positional: `deserialize_struct`
+    /// hands serde a `SeqAccess` sized to the TARGET struct's field count, so
+    /// the reader always attempts an Nth field and `#[serde(default)]` never
+    /// fires at end of input. A snapshot written before a trailing field existed
+    /// therefore fails to decode, `decode_snapshot` answers `None`, and the load
+    /// path falls to the §9.8.4 rebuild.
+    ///
+    /// That is the ONLY reason `index_format_version` could stay at `0x02` when
+    /// myne#216 added `headings`: the serializer already forces the rebuild a
+    /// version bump would have forced. `docs/spec/protocol.md` §9.8.2 and
+    /// `docs/decisions/protocol/0594` both rest on it, and §9.8.2 says in as
+    /// many words that this is an implementation property of the serializer
+    /// rather than a guarantee of the format. So it is pinned here rather than
+    /// believed: if a postcard or serde-derive change ever makes `next_element`
+    /// return `Ok(None)` at end of input, this test goes red and the two
+    /// documents have to be revisited before anything ships.
+    ///
+    /// Both shapes are covered because they fail for different reasons. With one
+    /// record the buffer simply ends; with two, the reader consumes the NEXT
+    /// record's leading bytes as the missing field and desynchronises, which is
+    /// the case that could in principle decode into garbage rather than erroring.
+    #[test]
+    fn a_snapshot_missing_a_trailing_field_fails_to_decode_rather_than_defaulting() {
+        for count in [1usize, 2] {
+            let mut recs: BTreeMap<String, PreHeadingsRecord> = BTreeMap::new();
+            for i in 0..count {
+                recs.insert(format!("note-{i}"), pre_headings_record("Alpha"));
+            }
+            let manifest = NonceManifest::new();
+            let plaintext = postcard::to_allocvec(&PreHeadingsSnapshot {
+                manifest: &manifest,
+                records: &recs,
+            })
+            .expect("the pre-headings snapshot serializes");
+            let blob = encode_vault_indices_blob(&KEY, &ACCOUNT_HASH, &plaintext)
+                .expect("the blob envelope encodes");
+
+            assert!(
+                decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
+                "a {count}-record snapshot missing its trailing `headings` field decoded instead \
+                 of failing. `#[serde(default)]` is filling it, so an older blob now loads with \
+                 an empty heading set and reports itself complete. protocol.md §9.8.2 and \
+                 decision 0594 both argue the opposite and must be corrected before this ships"
+            );
+        }
+    }
+
+    /// The other direction, so the test above cannot pass by decoding nothing:
+    /// the CURRENT shape through the same envelope decodes fine.
+    #[test]
+    fn the_current_snapshot_shape_decodes_through_the_same_envelope() {
+        let recs = records();
+        let manifest = manifest_of(&[("a", 1)]);
+        let blob = encode_snapshot(&KEY, &ACCOUNT_HASH, &manifest, &recs).expect("encode");
+        assert!(decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_some());
+    }
+
     #[test]
     fn reconcile_delta_flags_changed_new_and_deleted() {
         // Loaded manifest: a@1, b@1, c@1.

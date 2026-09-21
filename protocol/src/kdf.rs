@@ -90,6 +90,26 @@ const SALT_PREFIX_RECOVERY_V0_2: &[u8] = b"myne.v0.2 argon2id-recovery|";
 /// ships post-v0.2-birth-format.
 const SALT_PREFIX_PERSON_KEYPAIR_V0_2: &[u8] = b"myne.v0.2 argon2id-person-keypair|";
 
+/// Salt domain for the person-scoped SCRAM secret.
+pub const SALT_PREFIX_PERSON_SERVER_AUTH_V0_2: &[u8] = b"myne.v0.2 argon2id-person-server-auth|";
+
+/// Salt domain for one person's private profile in one vault.
+pub const SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2: &[u8] =
+    b"myne.v0.2 argon2id-person-vault-profile|";
+
+/// Domain for deriving a stable per-person, per-vault profile identifier.
+pub const PERSON_PROFILE_ID_PREFIX: &[u8] = b"myne.person-profile-id v1|";
+
+/// The FIXED salt randomizer for the private-profile KDF.
+///
+/// The profile key must be reproducible from the phrase alone on every client
+/// (spec §9.28: "derive its deterministic ... key from the normalized phrase"),
+/// so there is no per-device salt to store or sync — a random salt would make
+/// the profile unopenable on a second device. Separation comes from the domain
+/// prefix and the `profile_id`, which already binds the person-id hash and the
+/// vault's account-number hash; this constant is deliberately not secret.
+pub const PERSON_VAULT_PROFILE_SALT_RANDOM: [u8; 16] = [0u8; 16];
+
 /// Argon2id salt length: 16 bytes (truncated SHA-256 output).
 pub const ARGON2_SALT_LEN: usize = 16;
 
@@ -292,6 +312,52 @@ pub fn derive_person_keypair_wrap_key_from_normalized(
     argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 
+/// Derive a person-scoped SCRAM secret from the normalized recovery phrase.
+pub fn derive_person_server_auth_key_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    person_id_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(
+        SALT_PREFIX_PERSON_SERVER_AUTH_V0_2,
+        person_id_hash,
+        salt_random,
+    );
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// Derive a private AI-profile key scoped to one person and one vault.
+pub fn derive_person_vault_profile_key_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    profile_id: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(
+        SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2,
+        profile_id,
+        salt_random,
+    );
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// The private-profile key with the spec's fixed salt — the production entry
+/// point. [`derive_person_vault_profile_key_from_normalized`] stays for vector
+/// generation, where the salt is an explicit input.
+pub fn derive_person_vault_profile_key(
+    phrase_normalized: &str,
+    profile_id: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    derive_person_vault_profile_key_from_normalized(
+        phrase_normalized,
+        &PERSON_VAULT_PROFILE_SALT_RANDOM,
+        profile_id,
+        params,
+    )
+}
+
 /// The person-id hash: `SHA-256("myne.person-id|" || phrase_normalized)[:16]`.
 ///
 /// It occupies the `account_number_hash` salt slot in
@@ -309,6 +375,18 @@ pub fn person_id_hash(phrase_normalized: &str) -> [u8; 16] {
     let mut h = Sha256::new();
     h.update(PERSON_ID_PREFIX);
     h.update(phrase_normalized.as_bytes());
+    let out = h.finalize();
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&out[..16]);
+    id
+}
+
+/// The stable id for one person's private profile in one vault.
+pub fn person_profile_id(person_id_hash: &[u8; 16], account_number_hash: &[u8; 16]) -> [u8; 16] {
+    let mut h = Sha256::new();
+    h.update(PERSON_PROFILE_ID_PREFIX);
+    h.update(person_id_hash);
+    h.update(account_number_hash);
     let out = h.finalize();
     let mut id = [0u8; 16];
     id.copy_from_slice(&out[..16]);
@@ -468,7 +546,7 @@ mod tests {
 
     #[test]
     fn salt_prefixes_match_spec_verbatim() {
-        // Spec § 3.1 — load-bearing identifiers (CLAUDE.md "Cryptographically
+        // Spec § 3.1 — load-bearing identifiers (AGENTS.md "Cryptographically
         // load-bearing identifiers"). Any drift silently invalidates every
         // vault on disk.
         assert_eq!(SALT_PREFIX_PASSWORD, b"myne.v0.1 argon2id-password|");
@@ -1299,5 +1377,29 @@ mod tests {
 
         std::fs::write("/tmp/myne_bip39_recovery_vectors.json", dump.as_bytes())
             .expect("write bip39-recovery vectors dump");
+    }
+
+    #[test]
+    fn person_scram_and_private_profile_domains_are_distinct() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let person_id = person_id_hash(phrase);
+        let profile_id = person_profile_id(&person_id, &FIXED_ACCOUNT_HASH);
+
+        let scram = derive_person_server_auth_key_from_normalized(
+            phrase,
+            &FIXED_SALT_RANDOM,
+            &person_id,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("person SCRAM key");
+        let profile = derive_person_vault_profile_key_from_normalized(
+            phrase,
+            &FIXED_SALT_RANDOM,
+            &profile_id,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("private profile key");
+
+        assert_ne!(scram.as_slice(), profile.as_slice());
     }
 }

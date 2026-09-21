@@ -30,7 +30,7 @@
 //
 // Certified green 3× consecutive in the container on 2026-08-15
 // (`./scripts/e2e-buildrun.sh embed-overflow-menu`, then two `e2e-one.sh` runs
-// against the same binary), per e2e/CLAUDE.md "definition of done".
+// against the same binary), per e2e/AGENTS.md "definition of done".
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

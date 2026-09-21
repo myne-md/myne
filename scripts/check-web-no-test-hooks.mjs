@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // No production test hooks in the served bundle (phase3-web-client task 105).
 //
-// `e2e/CLAUDE.md`'s second non-negotiable, inherited by the web lane: at-rest
+// `e2e/AGENTS.md`'s second non-negotiable, inherited by the web lane: at-rest
 // state is arranged by writing FIXTURE BYTES, never by a backdoor the app ships.
 // The rule exists because a test hook is indistinguishable from an attack
 // surface — a `window.__test.unlock(...)` that a scenario calls is a
@@ -73,7 +73,7 @@ const FORBIDDEN = [
   ],
   [
     /["'`]\?test-stage=/,
-    "a `?test-stage=` query-parameter backdoor — `src/CLAUDE.md` records that this " +
+    "a `?test-stage=` query-parameter backdoor — `src/AGENTS.md` records that this " +
       "was considered for the desktop app and REFUSED (dev may not bypass production guards)",
   ],
   [
@@ -136,7 +136,7 @@ the whole threat model (threat-model.md TB11).
 
 Arrange at-rest state by writing FIXTURE BYTES into OPFS before the app boots —
 the browser analogue of the desktop lane's byte surgery on a seeded vault
-directory (e2e-web/CLAUDE.md, non-negotiable 2).`);
+directory (e2e-web/AGENTS.md, non-negotiable 2).`);
   process.exit(1);
 }
 

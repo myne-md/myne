@@ -24,7 +24,7 @@
 //! source of truth in-session; the blob is only its durable copy.
 //!
 //! Secret-handling: a vector is derived from plaintext — never log a vector, a
-//! `content_nonce`, or a `note_id` (see `src-tauri/CLAUDE.md` "Secret-handling
+//! `content_nonce`, or a `note_id` (see `src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline"; `note_id` is a vault-stable correlation tag).
 //!
 //! ## Scope of this slice
@@ -78,7 +78,7 @@ impl ChunkKey {
 /// One `app.manage`d RAM store: chunk vectors + the note→nonce staleness
 /// manifest. Not `Sync`-wrapped here — the plugin wraps it in the same
 /// `tokio::sync::Mutex` the vault-runtime state uses so an `.await`-held guard
-/// stays `Send` (`src-tauri/CLAUDE.md` Gotchas).
+/// stays `Send` (`src-tauri/AGENTS.md` Gotchas).
 #[derive(Debug, Default)]
 pub struct AiVectorStore {
     /// `{note_id, byte-range}` → embedding. 384-dim in production (SYNC-1); the

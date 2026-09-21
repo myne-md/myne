@@ -1965,10 +1965,11 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
       "e2e/math.e2e.ts",
+      "e2e/mermaid-viewer.e2e.ts",
     ],
     manual: [
       {
-        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note scrolls inside its own card rather than shrinking or dragging the note sideways, and the whole card is legible against the editor background in light, dark and AMOLED. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
+        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note opens fitted inside a clipped viewer rather than dragging the note sideways, the whole card is legible against the editor background in light, dark and AMOLED, drag pans a zoomed diagram, Ctrl/Cmd + wheel zooms while a plain wheel still scrolls the note, and on a phone a two-finger pinch zooms and the control bar is reachable without hover.",
         whyNotAutomated: "Mermaid lays out by measuring text with getBBox against the live engine's font metrics, which differ between WebKitGTK, WKWebView, Android WebView and WebView2; render-mermaid.ts states in its own header that jsdom cannot run the render, and there is no Mermaid scenario in any E2E lane.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 6,
@@ -2374,10 +2375,13 @@ export const ROSTER = Object.freeze([
     title: "Wikilinks and link autocomplete",
     paths: [
       "editor/src/wikilink/",
+      "editor/src/host/notes/vaultHeadings.ts",
+      "editor/src/host/notes/blockAnchors.ts",
       "src/notes/resolveWikilink.ts",
       "src/notes/renameWikilinks.ts",
       "src/notes/renamePreflight.ts",
       "src/notes/useVaultBlockAnchors.ts",
+      "src/notes/useVaultHeadings.ts",
       "src/notes/linkMention.ts",
       "src/notes/decorationRewrite.ts",
     ],
@@ -2402,6 +2406,20 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "No harness drives a handset, and the popup's placement is decided against the visual viewport that the OS keyboard shrinks.",
         clients: ["ios", "android"],
         estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        see: "On a real phone, in a vault holding several notes with headings, type [[## inside a note. Confirm the picker lists headings from OTHER notes rather than only the open one, that a trashed note's headings are absent, and that tapping a row inserts a link carrying the owning note's current title. Then lock the vault from the picker's own screen, unlock, and type [[## again: the list must come back rather than staying empty for the rest of the session.",
+        whyNotAutomated: "The heading set is read over IPC behind a Slot::Unlocked gate, so the lock-and-return leg needs the real backend refusing a real read, which no mock reproduces; and the surface is WKWebView on iOS and Android System WebView, neither of which any harness here drives.",
+        clients: ["ios", "android"],
+        estimateMin: 7,
+        tier: "standard",
+      },
+      {
+        see: "On a real phone, open a vault holding notes imported from Obsidian that carry ^block-id markers, and type [[^^ inside a note. Confirm the picker lists anchors from other notes with a readable preview line, that anchors in trashed notes are absent, and that tapping one inserts a [[Note^id]] link that resolves when tapped. Then switch to a second vault WITHOUT relaunching and confirm the first vault's note titles and preview text are nowhere in the picker.",
+        whyNotAutomated: "The preview lines and note titles are vault plaintext held in WebView memory, so the cross-vault leg is only observable on a device that has both vaults enrolled and a real keychain unlock between them; the surface is WKWebView on iOS and Android System WebView, neither of which any harness here drives.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
         tier: "standard",
       },
     ],
@@ -6462,7 +6480,7 @@ export const ROSTER = Object.freeze([
     id: "web.browser.safari-gate",
     title: "Safari on macOS: the seat CI structurally cannot have",
     paths: [
-      "e2e-web/CLAUDE.md",
+      "e2e-web/AGENTS.md",
       "e2e-web/support/harness.ts",
       "e2e-web/support/session.ts",
       "web/src/environment-gate.ts",

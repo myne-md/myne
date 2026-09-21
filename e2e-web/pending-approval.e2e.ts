@@ -39,7 +39,7 @@
 //
 // # Why this belongs in the WEB lane
 //
-// `e2e-web/CLAUDE.md`'s rule is web-specific behaviour only: a flow in the
+// `e2e-web/AGENTS.md`'s rule is web-specific behaviour only: a flow in the
 // shared `src/` tree owes one desktop scenario and nothing here. This qualifies
 // on the entry path. **Sync-required entry is web-only**: a browser starting
 // from an empty origin has no vault to create and must be told which account to

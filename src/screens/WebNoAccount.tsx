@@ -68,7 +68,7 @@ export function WebNoAccount({ wall }: WebNoAccountProps) {
         {t(`web.wall.${key}.title`)}
       </h1>
       {/* Static testid + a discriminator attribute, not an interpolated name
-          (phase3-web-client task 100). `src/CLAUDE.md`'s observability contract
+          (phase3-web-client task 100). `src/AGENTS.md`'s observability contract
           asks for exactly this shape — one stable selector per element, the
           VARIANT in a `data-*` — and holding to it uniformly on the pre-unlock
           screens is what lets a guard reject an interpolated `data-*` outright.

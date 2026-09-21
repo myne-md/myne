@@ -143,7 +143,7 @@ pub fn write_extracted(
 /// `Engine`-aware command, never widening the pure text-extractor seam). Returns
 /// the persisted [`ExtractedText`] so the caller can inspect the status /
 /// truncation without re-reading. The transcript is plaintext (AS3-Sensitive) —
-/// never logged (DENY-list; `src-tauri/CLAUDE.md`).
+/// never logged (DENY-list; `src-tauri/AGENTS.md`).
 ///
 /// Native-only (see the module-level "Why the producers stop at wasm32" note).
 #[cfg(not(target_arch = "wasm32"))]

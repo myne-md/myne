@@ -20,7 +20,7 @@
 // are an LFS blob, and its output would not be deterministic even with them.
 //
 // Timing note: the trigger's real 1.5 s debounce is waited OUT, not shortened.
-// `e2e/CLAUDE.md`'s zero-test-hooks rule leaves no way to reach `debounceMs`
+// `e2e/AGENTS.md`'s zero-test-hooks rule leaves no way to reach `debounceMs`
 // from here that is not a production test hook, and none is needed — every wait
 // below is a `waitUntil` poll on a settled condition, so the interval costs
 // wall-clock, not determinism.

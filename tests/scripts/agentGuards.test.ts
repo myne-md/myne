@@ -1,6 +1,6 @@
 // Injection tests for the three guards myne-md/myne#529 added.
 //
-// Root `CLAUDE.md`: verifying a guard means BREAKING it, and a guard fix
+// Root `AGENTS.md`: verifying a guard means BREAKING it, and a guard fix
 // "verified" by a green tree is non-evidence, because a guard that has stopped
 // checking is green by definition. Each guard's own header records that it was
 // broken by hand once and what that found. A hand break proves nothing about

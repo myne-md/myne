@@ -12,7 +12,7 @@
 //! in `decisions.md`: variant encodes the error class; tracing stage
 //! tag does call-site disambiguation.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use serde::Serialize;

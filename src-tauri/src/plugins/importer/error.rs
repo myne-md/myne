@@ -3,7 +3,7 @@
 //! Secret-logging discipline: no path string and no `io::Error::Display` (which
 //! may carry a path on some kernels) ever crosses the IPC boundary — I/O
 //! failures are reduced to the closed [`IoFailureKind`] enum first. See
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 use crate::io_failure_kind::IoFailureKind;
 use serde::Serialize;

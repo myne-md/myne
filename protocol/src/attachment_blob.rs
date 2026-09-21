@@ -297,7 +297,7 @@ pub(crate) enum DecryptCause {
 /// **`_raw` contract (caller-supplied randomness).** The caller MUST
 /// source `attachment_key`, `attachment_key_nonce`, and `content_nonce`
 /// from a CSPRNG-grade source and never reuse a nonce under the same
-/// key. See `protocol/CLAUDE.md` `_raw` convention. Production callers
+/// key. See `protocol/AGENTS.md` `_raw` convention. Production callers
 /// SHOULD use [`encode_attachment_blob`].
 ///
 /// `content_type` is the attachment's MIME, bound into

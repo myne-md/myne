@@ -1,7 +1,7 @@
 // MYND-192 — pure responsive auto-collapse decision.
 //
 // The window-resize trigger is unreachable through the tauri-driver E2E
-// harness (no window-rect primitive), so per e2e/CLAUDE.md the load-bearing
+// harness (no window-rect primitive), so per e2e/AGENTS.md the load-bearing
 // logic is covered here as a Vitest unit (E2E downgrade recorded on
 // MYND-192). The hook in `responsiveCollapse.ts` is thin ResizeObserver
 // glue over this function. Cases pin: both-fit, right-first yield,

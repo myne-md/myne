@@ -19,7 +19,7 @@
 //! The whole pairing surface is cheap, synchronous, in-RAM bookkeeping — no
 //! `.await` is ever held across the lock, so a `std::sync::Mutex` is correct
 //! and avoids the async-mutex contention discipline the gotcha note in
-//! `src-tauri/CLAUDE.md` warns about. (Compare the heavy plugins, which hold
+//! `src-tauri/AGENTS.md` warns about. (Compare the heavy plugins, which hold
 //! `tokio::sync::Mutex` because they `.await` mid-section.)
 //!
 //! ## Task-7 persistence seam
@@ -30,7 +30,7 @@
 //! after every `issue` / `revoke` to persist. Nothing in THIS module does
 //! I/O — the seam is intentionally a pure value in + pure value out.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use std::sync::Mutex;
 
@@ -191,7 +191,7 @@ impl PairingState {
     /// (myne#290): restore the session under its ORIGINAL challenge and drop the
     /// token that was just minted.
     ///
-    /// The defensive-guard shape `src-tauri/CLAUDE.md` documents for
+    /// The defensive-guard shape `src-tauri/AGENTS.md` documents for
     /// `vault_creation::commit_with_vault_path` — "restore the session under its
     /// token so retry stays non-destructive". Without it, a failed
     /// `persist_registry` left the pairing in the worst possible state: the

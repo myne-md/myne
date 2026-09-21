@@ -4,7 +4,7 @@
 //! Closed, `serde`-tagged set, following the `captures` / `share_import`
 //! precedent. No `String` field reaches the frontend; OS and codec detail is
 //! reduced to coarse variants per the secret-handling logging discipline
-//! (`src-tauri/CLAUDE.md`). In particular **no variant can carry the label**,
+//! (`src-tauri/AGENTS.md`). In particular **no variant can carry the label**,
 //! which is the user's own text and is treated as AS3-sensitive exactly as the
 //! `vault.prefs` `label` field is.
 //!
@@ -64,7 +64,7 @@ impl From<IoFailureKind> for VaultLabelError {
 /// `match` per call site: no variant of this enum can carry the label, and this
 /// is what keeps it that way by construction instead of by each site remembering
 /// not to format the error. Adding a variant compile-fails here, which is the
-/// point (`src-tauri/CLAUDE.md` "Closed-enum mapping rule").
+/// point (`src-tauri/AGENTS.md` "Closed-enum mapping rule").
 pub fn vault_label_error_kind(e: &VaultLabelError) -> &'static str {
     match e {
         VaultLabelError::KeychainUnavailable => "keychain_unavailable",

@@ -25,7 +25,7 @@
 //! - `protocol.md` §9.1 (vault layout — `.myn` filename is the
 //!   canonical UUIDv7)
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::host::HostCtx;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
@@ -68,7 +68,7 @@ pub async fn note_create_from_host(
     plaintext: String,
     io: &dyn VaultIo,
 ) -> Result<String, NoteCreateError> {
-    // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): the index needs
+    // First-line Plaintext-IPC wrap (`src-tauri/AGENTS.md`): the index needs
     // the body AFTER the core consumes its own copy, so bound this retained
     // copy to a `Zeroizing` wrapper — it wipes on every early-return and at
     // function exit (after the post-write `upsert`) rather than lingering as a
@@ -178,7 +178,7 @@ pub async fn note_create_with_dir(
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Every early-return path drops
     // the wrapper and zeroes the bytes (see
-    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline").
+    // `src-tauri/AGENTS.md` "Secret-handling logging discipline").
     let plaintext = Zeroizing::new(plaintext);
 
     // Acquire the slot read guard and HOLD it across spawn_blocking +
@@ -358,7 +358,7 @@ pub async fn note_create_with_dir(
 /// Static-string label for [`NoteCreateError`] variants — emitted via
 /// `tracing` without crossing the IPC boundary. Mirrors the
 /// `vault_unlock`'s `protocol_error_kind` discipline (see
-/// `src-tauri/CLAUDE.md` "Secret-handling logging discipline" closed-
+/// `src-tauri/AGENTS.md` "Secret-handling logging discipline" closed-
 /// enum mapping rule). A new variant compile-fails this match, so
 /// drift between the public enum and the tracing label is structurally
 /// caught.
@@ -756,7 +756,7 @@ pub async fn note_update_from_host(
     expected_base_hash_hex: Option<String>,
     io: &dyn VaultIo,
 ) -> Result<(), NoteUpdateError> {
-    // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): bound the
+    // First-line Plaintext-IPC wrap (`src-tauri/AGENTS.md`): bound the
     // index-feeding copy to `Zeroizing` so it wipes on every early-return and
     // at function exit rather than lingering as a plain `String` across the
     // `.await`. The core takes a fresh plain clone and re-wraps it first-line.
@@ -961,7 +961,7 @@ pub async fn note_update_with_dir(
 ) -> Result<NoteUpdateOutcome, NoteUpdateError> {
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Same Plaintext-IPC discipline
-    // as `note_create_with_dir` (see `src-tauri/CLAUDE.md`).
+    // as `note_create_with_dir` (see `src-tauri/AGENTS.md`).
     let plaintext = Zeroizing::new(plaintext);
 
     // Strict NoteId parse FIRST — before any path concatenation.
@@ -1352,7 +1352,7 @@ pub struct NoteBatchUpdate {
 /// oversize body) aborts the **whole** batch with the vault untouched —
 /// there is no per-item partial-success surface.
 ///
-/// **Secret-handling** (`src-tauri/CLAUDE.md`): every plaintext is
+/// **Secret-handling** (`src-tauri/AGENTS.md`): every plaintext is
 /// first-line `Zeroizing`-wrapped; `note_id`, plaintext, and full paths
 /// never reach any `tracing` line; the encode runs on a `spawn_blocking`
 /// thread with the slot read-guard held across it (same `vault_lock`
@@ -2052,7 +2052,7 @@ pub async fn note_delete_with_dir(
 /// - `.myn` files whose stem fails [`NoteId::parse`] →
 ///   `tracing::warn!(stage = "skip_malformed_uuid", cause = ?cause)`,
 ///   corruption canary. The offending stem string itself is **never**
-///   logged (DENY-list compliance per `src-tauri/CLAUDE.md`
+///   logged (DENY-list compliance per `src-tauri/AGENTS.md`
 ///   "Secret-handling logging discipline").
 pub fn enumerate_notes_dir(notes_dir: &std::path::Path) -> std::io::Result<Vec<NoteId>> {
     let entries: Vec<crate::vault_io::DirEntry> = std::fs::read_dir(notes_dir)?
@@ -2089,7 +2089,7 @@ pub fn note_ids_from_entries(entries: &[crate::vault_io::DirEntry]) -> Vec<NoteI
             // Non-UTF-8 filename (Linux can hold arbitrary bytes; APFS /
             // NTFS normalize but accept many invalid sequences). Benign
             // OS-level housekeeping noise — the offending bytes never
-            // appear in tracing per `src-tauri/CLAUDE.md` DENY list.
+            // appear in tracing per `src-tauri/AGENTS.md` DENY list.
             // Non-UTF-8 filenames are handled at the seam boundary now; this
             // block is retained so the control flow below reads unchanged.
         }
@@ -3288,7 +3288,7 @@ mod tests {
     fn list_with_dir_skip_events_do_not_leak_offending_stem_string() {
         // DENY-list compliance: `note_id` strings (and the offending
         // pre-parse stem variants) must never appear in any captured
-        // tracing field. Per `src-tauri/CLAUDE.md` "Secret-handling
+        // tracing field. Per `src-tauri/AGENTS.md` "Secret-handling
         // logging discipline".
         let tmp = ScopedTempDir::new("list-trace-deny").unwrap();
         let notes_dir = notes_dir_under(tmp.path()).unwrap();

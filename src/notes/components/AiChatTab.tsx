@@ -439,7 +439,7 @@ function AgentTurnView({
 
 /** One transcript turn (user or assistant). Assistant turns render the streaming
  *  caret, the error state, and the citation chips. Design uses design-token CSS
- *  variables only (no hex), per `src/CLAUDE.md`.
+ *  variables only (no hex), per `src/AGENTS.md`.
  *
  *  **Memoized, and the reason is the streaming path.** Each token arrives in its
  *  own task, so React does not batch them: one store dispatch, one tab render

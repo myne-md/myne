@@ -8,7 +8,7 @@
 //! ([`crate::plugins::notes::commands::enumerate_notes_dir`]), and the shared
 //! embed tokenizer ([`crate::plugins::attachments::reconcile::extract_att_embed_spans`]).
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 use crate::io_failure_kind::IoFailureKind;
 use crate::plugins::notes::decode::decode_note_any;
