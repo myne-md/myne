@@ -104,6 +104,7 @@ pub async fn change_password_from_host(
         // myne-md/myne#698: the backend-held person identity dies with the slot
         // on this force-relock too (AS21 "every lock path").
         let _ = state.take_person_identity().await;
+        let _ = state.take_person_profile().await;
         hooks.zeroize_search_index();
         // MYND-262/266: wipe the spell engine + personal/ignore sets (each add
         // already persisted, so nothing to flush — only RAM to zeroize).
@@ -433,32 +434,65 @@ pub(crate) async fn change_password_with_path(
             //       cloned root_key + slot's items_key are both held
             //       in memory; this verify only confirms vault.meta's
             //       wrap is consistent with our memory state).
-            let items_key_wrap_key = protocol::derive_subkey_versioned(
-                version,
-                &root_key_for_seal,
-                protocol::SubkeyRole::ItemsKeyWrap,
-            );
-            let aad_items = if version == protocol::MetaVersion::V0_2 {
-                protocol::aad_vault_items_key_wrap_v0_2(&existing.items_key_id)
+            // On `NTV6` the `itemsKey` wrap is sealed under the GROUP tier, so
+            // the root-tier verify below would always AEAD-fail; unwrap the group
+            // key with the (already verified) root key and open the items wrap
+            // through the group tier instead.
+            if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+                    .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
+                let group = protocol::unlock_group_key_ntv6(
+                    &b2b,
+                    &protocol::OwnerKey::new(*root_key_for_seal),
+                )
+                .map_err(|e| {
+                    tracing::error!(
+                        stage = "items_key_wrap_verify",
+                        error_kind = "InvalidVaultMeta",
+                        protocol_error_kind = protocol_error_kind(&e),
+                        "group key unwrap failed POST current-password verify"
+                    );
+                    VaultChangePasswordError::InvalidVaultMeta
+                })?;
+                let group_key = protocol::GroupKey::new(*group);
+                let items_opened = protocol::unlock_items_key_ntv6(&b2b, &group_key).map_err(|e| {
+                    tracing::error!(
+                        stage = "items_key_wrap_verify",
+                        error_kind = "InvalidVaultMeta",
+                        protocol_error_kind = protocol_error_kind(&e),
+                        "items_key group-tier unwrap failed POST current-password verify"
+                    );
+                    VaultChangePasswordError::InvalidVaultMeta
+                })?;
+                drop(items_opened);
             } else {
-                protocol::aad_vault_items_key_wrap(&existing.items_key_id)
-            };
-            let items_opened = protocol::aead_open_ctx(
-                &items_key_wrap_key,
-                &existing.items_key_nonce,
-                &existing.enc_items_key,
-                &aad_items,
-            )
-            .map_err(|e| {
-                tracing::error!(
-                    stage = "items_key_wrap_verify",
-                    error_kind = "InvalidVaultMeta",
-                    protocol_error_kind = protocol_error_kind(&e),
-                    "items_key wrap AEAD-open failed POST current-password verify"
+                let items_key_wrap_key = protocol::derive_subkey_versioned(
+                    version,
+                    &root_key_for_seal,
+                    protocol::SubkeyRole::ItemsKeyWrap,
                 );
-                VaultChangePasswordError::InvalidVaultMeta
-            })?;
-            drop(items_opened);
+                let aad_items = if version == protocol::MetaVersion::V0_2 {
+                    protocol::aad_vault_items_key_wrap_v0_2(&existing.items_key_id)
+                } else {
+                    protocol::aad_vault_items_key_wrap(&existing.items_key_id)
+                };
+                let items_opened = protocol::aead_open_ctx(
+                    &items_key_wrap_key,
+                    &existing.items_key_nonce,
+                    &existing.enc_items_key,
+                    &aad_items,
+                )
+                .map_err(|e| {
+                    tracing::error!(
+                        stage = "items_key_wrap_verify",
+                        error_kind = "InvalidVaultMeta",
+                        protocol_error_kind = protocol_error_kind(&e),
+                        "items_key wrap AEAD-open failed POST current-password verify"
+                    );
+                    VaultChangePasswordError::InvalidVaultMeta
+                })?;
+                drop(items_opened);
+            }
 
             // (d) Sample fresh CSPRNG salt + nonce for the new
             //     password-side wrap.
@@ -489,14 +523,30 @@ pub(crate) async fn change_password_with_path(
             //     primitive. Recovery-side + items_key wrap byte-
             //     preserved per `recovery-flow.md` §4.4 — the helper
             //     enforces the invariant internally.
-            let new_bytes = protocol::rewrite_vault_meta_password_side_versioned(
-                version,
-                &existing,
-                &root_key_for_seal,
-                &new_password,
-                &fresh_salt,
-                &fresh_nonce,
-            )
+            let rewrite = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+                // An `NTV6` rewrite must carry the B2B tail (owner-wrapped group
+                // key, epoch, sealed roster); the versioned v0.2 rewrite would
+                // re-serialize as `NTV5` and drop it.
+                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+                    .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
+                protocol::rewrite_vault_meta_password_side_ntv6(
+                    &b2b,
+                    &root_key_for_seal,
+                    &new_password,
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            } else {
+                protocol::rewrite_vault_meta_password_side_versioned(
+                    version,
+                    &existing,
+                    &root_key_for_seal,
+                    &new_password,
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            };
+            let new_bytes = rewrite
             .map_err(|e| {
                 tracing::error!(
                     stage = "vault_meta_rewrite",

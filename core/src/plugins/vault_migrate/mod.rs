@@ -25,6 +25,7 @@
 //! progress events.
 
 pub(crate) mod adopt;
+pub mod b2b;
 pub mod progress;
 
 use crate::host::HostCtx;

@@ -35,9 +35,9 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
-    derive_subkey_versioned, encode_attachments_catalog_versioned, meta_version_of,
-    parse_vault_meta_any, read_or_empty_versioned, AttachmentMeta, AttachmentsCatalog, MetaVersion,
-    SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
+    encode_attachments_catalog_versioned, meta_version_of, parse_vault_meta_any,
+    read_or_empty_versioned, AttachmentMeta, AttachmentsCatalog, MetaVersion, SubkeyRole,
+    ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
     VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
@@ -625,7 +625,7 @@ where
     //     key. All three are dropped at function exit (Zeroizing).
     // SYNC-6 writer-guard (MYND-32): guard bound across the blob +
     // catalog atomic_writes below.
-    let (_slots_guard, items_key, items_key_id, root_key) = state
+    let (slots_guard, items_key, items_key_id, shared) = state
         .hold_unlocked_attachment_material()
         .await
         .ok_or(AttachmentImportError::Locked)?;
@@ -638,9 +638,23 @@ where
             Err(MetaParseFailed) => return Err(AttachmentImportError::InvalidVaultMeta),
         };
 
-    // (6) Content-addressed id (keyed under root_key; stable within the
-    //     vault, no cross-vault equality oracle).
-    let attachment_id = compute_attachment_id(&root_key, &file_bytes);
+    // (6) Content-addressed id. The id-HMAC is OWNER-root-keyed and stays so
+    //     across a B2B migration (spec §9.9): an id that moved with the group
+    //     tier would orphan every existing blob and duplicate every re-import.
+    //     A member session has no root key, so it refuses here rather than
+    //     minting an id nothing else can match.
+    let owner_root = match &*slots_guard {
+        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+            uv.owner_root_key().map(|k| zeroize::Zeroizing::new(**k))
+        }
+        _ => None,
+    };
+    let attachment_id = compute_attachment_id(
+        owner_root
+            .as_deref()
+            .ok_or(AttachmentImportError::NotOwner)?,
+        &file_bytes,
+    );
     let id_hex = hex_encode(&attachment_id);
 
     // (7) Serialize the catalog read-modify-write under the per-plugin
@@ -649,8 +663,7 @@ where
 
     // (8) Dedup: read the catalog; if the id already exists, return the
     //     EXISTING entry verbatim (no re-store, no timestamp churn).
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308): this path REWRITES the
     // catalog a few statements below, and rebuilding it from the empty base an
@@ -779,7 +792,7 @@ where
     // write and a partial read look like. Trading unreadable bytes on disk for
     // a delete on a read path is the wrong direction on a data path.
     #[cfg(not(target_arch = "wasm32"))]
-    let attachment_text_key = protocol::derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let attachment_text_key = shared.derive(meta_version, SubkeyRole::AttachmentTextKey);
     let filename_for_extract = filename.clone();
     // Only the CPU work stays inside `run_blocking` (task 44): the AEAD seal and
     // the text extraction. Every byte that reaches storage now goes through the
@@ -947,6 +960,7 @@ where
 fn attachment_import_error_kind(e: &AttachmentImportError) -> &'static str {
     match e {
         AttachmentImportError::Locked => "Locked",
+        AttachmentImportError::NotOwner => "NotOwner",
         AttachmentImportError::Oversize { .. } => "Oversize",
         AttachmentImportError::UnsupportedType => "UnsupportedType",
         AttachmentImportError::Io { .. } => "Io",
@@ -1014,8 +1028,8 @@ pub(crate) async fn catalog_list_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Vec<CatalogEntry>, CatalogListError> {
-    let root_key = state
-        .peek_unlocked_root_key_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(CatalogListError::Locked)?;
 
@@ -1025,8 +1039,7 @@ pub(crate) async fn catalog_list_with_dir(
             Err(MetaParseFailed) => return Err(CatalogListError::InvalidVaultMeta),
         };
 
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     let catalog = read_catalog_or_empty(
         io,
@@ -1140,7 +1153,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // scan) — the import/delete writer-guard pattern. Clone the material
     // once: root_key derives the catalog KEK; items_key + items_key_id
     // decrypt the notes.
-    let (_slots_guard, items_key, items_key_id, root_key) = state
+    let (_slots_guard, items_key, items_key_id, shared) = state
         .hold_unlocked_attachment_material()
         .await
         .ok_or(AttachmentUnusedListError::Locked)?;
@@ -1154,8 +1167,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // Hard-IO surfaces (`read_catalog`, not `read_catalog_or_empty`): a
     // masked-empty catalog would report a populated vault as "nothing to
     // clean". Absent catalog → empty → empty unused list (correct).
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         io,
         &vault_dir.join("vault.attachments"),
@@ -1387,7 +1399,7 @@ pub async fn attachment_clean_unused_with_dir(
         return Err(AttachmentCleanUnusedError::CorpusIncomplete);
     }
 
-    let (_slots_guard, items_key, items_key_id, root_key) = state
+    let (_slots_guard, items_key, items_key_id, shared) = state
         .hold_unlocked_attachment_material()
         .await
         .ok_or(AttachmentCleanUnusedError::Locked)?;
@@ -1397,8 +1409,7 @@ pub async fn attachment_clean_unused_with_dir(
             Ok((v, h)) => (v, h),
             Err(MetaParseFailed) => return Err(AttachmentCleanUnusedError::InvalidVaultMeta),
         };
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
 
     // Authoritative re-verify scan over ALL notes (fail-closed). Decrypts
     // every note → spawn_blocking. This closes the review→confirm TOCTOU:
@@ -1631,7 +1642,7 @@ pub async fn reclaim_stray_attachment_blobs(
         );
         return;
     };
-    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+    let Some(shared) = state.peek_unlocked_shared_singleton_key().await else {
         // A concurrent lock raced (Phase 2 only) — skip.
         tracing::warn!(event = "stray_scan_skipped", reason = "slot_not_unlocked");
         return;
@@ -1652,8 +1663,7 @@ pub async fn reclaim_stray_attachment_blobs(
                 return;
             }
         };
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
 
     let _write_guard = catalog_write_mutex().lock().await;
     // No `run_blocking` wrapper any more: what this does is a catalog read, a
@@ -1735,8 +1745,8 @@ pub async fn attachment_delete_with_dir(
 
     // SYNC-6 writer-guard (MYND-32): guard bound across the catalog
     // atomic_write below.
-    let (_slots_guard, root_key) = state
-        .hold_unlocked_root_key()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(AttachmentDeleteError::Locked)?;
 
@@ -1748,8 +1758,7 @@ pub async fn attachment_delete_with_dir(
 
     let _write_guard = catalog_write_mutex().lock().await;
 
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
     let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
@@ -1919,8 +1928,8 @@ pub(crate) async fn attachment_rename_with_dir(
 
     // SYNC-6 writer-guard (MYND-32): guard bound across the catalog
     // atomic_write below.
-    let (_slots_guard, root_key) = state
-        .hold_unlocked_root_key()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(AttachmentRenameError::Locked)?;
 
@@ -1932,8 +1941,7 @@ pub(crate) async fn attachment_rename_with_dir(
 
     let _write_guard = catalog_write_mutex().lock().await;
 
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
     let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
@@ -2020,7 +2028,7 @@ pub async fn attachment_serve_with_dir(
     let attachment_id = hex_decode_id(id).ok_or(AttachmentServeError::Denied)?;
     let id_hex = hex_encode(&attachment_id);
 
-    let Some((items_key, items_key_id, root_key)) = state.peek_unlocked_attachment_material().await
+    let Some((items_key, items_key_id, shared)) = state.peek_unlocked_attachment_material().await
     else {
         return Err(AttachmentServeError::Locked);
     };
@@ -2034,8 +2042,7 @@ pub async fn attachment_serve_with_dir(
     // The catalog carries the `content_type` bound into the blob's inner AAD at
     // encode time, so a missing entry means the blob cannot be decoded at all —
     // reported as not-found rather than denied, matching the desktop handler.
-    let catalog_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         io,
         &vault_dir.join("vault.attachments"),
@@ -2244,16 +2251,16 @@ pub enum CatalogLoadError {
 
 /// The full catalog-for-export ritual, owned by the attachments
 /// plugin: read `vault.meta`'s `account_number_hash` (the catalog AAD
-/// identity, §9.10.3), derive the catalog KEK from `root_key`, and
-/// [`read_catalog`]. Shared by the per-note attachments export
-/// (`plugins::notes`) and the whole-vault tree export
+/// identity, §9.10.3), derive the catalog KEK from the session's shared
+/// singleton tier, and [`read_catalog`]. Shared by the per-note attachments
+/// export (`plugins::notes`) and the whole-vault tree export
 /// (`plugins::export`) — both read-only consumers where a
 /// masked-empty catalog would mis-report referenced attachments as
 /// missing, so the hard-IO-error surface is the right one.
 pub async fn load_catalog_for_export(
     io: &dyn VaultIo,
     vault_root: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
 ) -> Result<AttachmentsCatalog, CatalogLoadError> {
     let (meta_version, account_number_hash) =
         match read_account_number_hash(io, &vault_root.join("vault.meta")).await {
@@ -2261,8 +2268,7 @@ pub async fn load_catalog_for_export(
             Ok(Err(MetaParseFailed)) => return Err(CatalogLoadError::InvalidVaultMeta),
             Err(kind) => return Err(CatalogLoadError::MetaIo(kind)),
         };
-    let catalog_key =
-        derive_subkey_versioned(meta_version, root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     read_catalog(
         io,
         &vault_root.join("vault.attachments"),
@@ -2347,14 +2353,14 @@ pub(crate) async fn attachment_export_with_dir(
     // (2) Slot peek: items_key + items_key_id decrypt the blob; root_key
     //     derives the catalog KEK (for the content_type bound into the
     //     blob AAD). All three wipe on drop.
-    let Some((items_key, items_key_id, root_key)) = state.peek_unlocked_attachment_material().await
+    let Some((items_key, items_key_id, shared)) = state.peek_unlocked_attachment_material().await
     else {
         tracing::debug!(stage = "slot_check", outcome = "vault_locked");
         return Err(AttachmentExportError::Locked);
     };
 
     // (3) Catalog lookup → the content_type (AAD) + existence check.
-    let catalog = load_catalog_for_export(io, vault_dir, &root_key)
+    let catalog = load_catalog_for_export(io, vault_dir, &shared)
         .await
         .map_err(|e| match e {
             CatalogLoadError::InvalidVaultMeta => AttachmentExportError::InvalidVaultMeta,
@@ -2490,8 +2496,7 @@ pub async fn hydrate_attachment_refs_core(
         );
         return;
     };
-    let Some((items_key, items_key_id, _root_key)) =
-        state.peek_unlocked_attachment_material().await
+    let Some((items_key, items_key_id, _shared)) = state.peek_unlocked_attachment_material().await
     else {
         // A concurrent lock raced — skip; the next unlock rebuilds.
         tracing::warn!(
