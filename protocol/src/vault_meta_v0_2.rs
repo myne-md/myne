@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! `NTV5` next-major (v0.2) `vault.meta` codec — the whole-vault-migration key
-//! hierarchy (`docs/spec/protocol.md` §10.4.1, automerge-sync-migration #420).
+//! v0.2 `vault.meta` codecs: migration-only `NTV5` and B2B `NTV6`.
+//! `NTV5` carries the whole-vault-migration key hierarchy
+//! (`docs/spec/protocol.md` §10.4.1, automerge-sync-migration #420); `NTV6`
+//! adds the mandatory group-key package, epoch and signed roster envelope.
 //!
 //! Byte-identical **layout** to the v0.1 `MYV1` `vault.meta` (§9.3, 345 bytes):
 //! `magic · version · reserved · account_number_hash · kdf_params ·
@@ -56,6 +58,128 @@ pub const VAULT_META_V0_2_MAGIC: [u8; 4] = *b"NTV5";
 
 /// `protocol_version` byte (offset 4) for the v0.2 `vault.meta` — `0x02`.
 pub const VAULT_META_V0_2_PROTOCOL_VERSION: u8 = 0x02;
+
+/// `NTV6` magic for the B2B vault metadata frame.
+pub const VAULT_META_NTV6_MAGIC: [u8; 4] = *b"NTV6";
+
+/// The B2B frame retains v0.2's content protocol generation.
+pub const VAULT_META_NTV6_PROTOCOL_VERSION: u8 = 0x02;
+
+/// A parsed `NTV6` metadata frame. All B2B fields are mandatory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct B2bVaultMeta {
+    pub base: VaultMeta,
+    pub group_key_nonce: [u8; AEAD_NONCE_LEN],
+    pub enc_group_key: [u8; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+    pub group_key_epoch: u64,
+    pub signed_roster_envelope: Vec<u8>,
+}
+
+const B2B_ROSTER_ENVELOPE_CAP: usize = MEMBERSHIP_ROSTER_CT_CAP;
+const B2B_META_FIXED_LEN: usize =
+    VAULT_META_LEN + AEAD_NONCE_LEN + VAULT_META_WRAPPED_ITEMS_KEY_LEN + 8 + 4;
+
+/// Serialize an `NTV6` B2B metadata frame. The caller supplies a previously
+/// authenticated owner-wrapped group key and signed roster envelope; their
+/// cryptographic construction belongs to the owner and roster codecs.
+pub fn serialize_vault_meta_ntv6(meta: &B2bVaultMeta) -> Result<Vec<u8>, ProtocolError> {
+    if meta.base.membership.is_some()
+        || meta.group_key_epoch == 0
+        || meta.signed_roster_envelope.len() < crate::person_invite::SEALED_GROUP_ROSTER_MIN_LEN
+        || meta.signed_roster_envelope.len() > B2B_ROSTER_ENVELOPE_CAP
+    {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let mut out = serialize_vault_meta(&meta.base).to_vec();
+    out[0..4].copy_from_slice(&VAULT_META_NTV6_MAGIC);
+    out[4] = VAULT_META_NTV6_PROTOCOL_VERSION;
+    out[5] = 0x00;
+    out.extend_from_slice(&meta.group_key_nonce);
+    out.extend_from_slice(&meta.enc_group_key);
+    out.extend_from_slice(&meta.group_key_epoch.to_be_bytes());
+    out.extend_from_slice(&(meta.signed_roster_envelope.len() as u32).to_be_bytes());
+    out.extend_from_slice(&meta.signed_roster_envelope);
+    Ok(out)
+}
+
+/// Rewrite an `NTV6` `vault.meta`'s password side (fresh salt + nonce), carrying
+/// the B2B tail (owner-wrapped group key, epoch, sealed roster) byte-identical.
+///
+/// The v0.2 rewrite returns `NTV5` bytes for the base; re-serializing those as
+/// `NTV5` would DROP the tail and lock the vault out, so this re-frames the
+/// rewritten base as `NTV6` with the original tail. Used by recovery and
+/// change-password on a migrated vault.
+pub fn rewrite_vault_meta_password_side_ntv6(
+    existing: &B2bVaultMeta,
+    root_key: &[u8; AEAD_KEY_LEN],
+    new_password: &str,
+    fresh_salt: &[u8; ARGON2_SALT_LEN],
+    fresh_nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Vec<u8>, ProtocolError> {
+    let rewritten_base = rewrite_vault_meta_password_side_v0_2(
+        &existing.base,
+        root_key,
+        new_password,
+        fresh_salt,
+        fresh_nonce,
+    )?;
+    let base = parse_vault_meta_v0_2(&rewritten_base)?;
+    serialize_vault_meta_ntv6(&B2bVaultMeta {
+        base,
+        group_key_nonce: existing.group_key_nonce,
+        enc_group_key: existing.enc_group_key,
+        group_key_epoch: existing.group_key_epoch,
+        signed_roster_envelope: existing.signed_roster_envelope.clone(),
+    })
+}
+
+/// Parse a strict `NTV6` B2B metadata frame without opening its encrypted
+/// group-key package or roster envelope.
+pub fn parse_vault_meta_ntv6(bytes: &[u8]) -> Result<B2bVaultMeta, ProtocolError> {
+    if bytes.len() < B2B_META_FIXED_LEN
+        || bytes.get(0..4) != Some(VAULT_META_NTV6_MAGIC.as_slice())
+        || bytes[4] != VAULT_META_NTV6_PROTOCOL_VERSION
+        || bytes[5] != 0x00
+    {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let roster_len_start = VAULT_META_LEN + AEAD_NONCE_LEN + VAULT_META_WRAPPED_ITEMS_KEY_LEN + 8;
+    let roster_len = u32::from_be_bytes(
+        bytes[roster_len_start..roster_len_start + 4]
+            .try_into()
+            .unwrap(),
+    ) as usize;
+    if !(crate::person_invite::SEALED_GROUP_ROSTER_MIN_LEN..=B2B_ROSTER_ENVELOPE_CAP)
+        .contains(&roster_len)
+        || bytes.len() != B2B_META_FIXED_LEN + roster_len
+    {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let mut as_v0_1 = [0u8; VAULT_META_LEN];
+    as_v0_1.copy_from_slice(&bytes[..VAULT_META_LEN]);
+    as_v0_1[0..4].copy_from_slice(&VAULT_META_MAGIC);
+    as_v0_1[4] = VAULT_META_PROTOCOL_VERSION;
+    let base = parse_vault_meta(&as_v0_1)?;
+    let nonce_start = VAULT_META_LEN;
+    let enc_start = nonce_start + AEAD_NONCE_LEN;
+    let epoch_start = enc_start + VAULT_META_WRAPPED_ITEMS_KEY_LEN;
+    let mut group_key_nonce = [0u8; AEAD_NONCE_LEN];
+    group_key_nonce.copy_from_slice(&bytes[nonce_start..enc_start]);
+    let mut enc_group_key = [0u8; VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_group_key.copy_from_slice(&bytes[enc_start..epoch_start]);
+    let group_key_epoch =
+        u64::from_be_bytes(bytes[epoch_start..roster_len_start].try_into().unwrap());
+    if group_key_epoch == 0 {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    Ok(B2bVaultMeta {
+        base,
+        group_key_nonce,
+        enc_group_key,
+        group_key_epoch,
+        signed_roster_envelope: bytes[B2B_META_FIXED_LEN..].to_vec(),
+    })
+}
 
 /// Serialize a [`VaultMeta`] as an `NTV5` (v0.2) blob — byte-identical to the
 /// `MYV1` layout (§9.3) with the `NTV5` magic + `0x02` version. The field bytes
@@ -199,22 +323,44 @@ pub fn meta_version_of(bytes: &[u8]) -> Option<MetaVersion> {
     match bytes.get(0..4) {
         Some(m) if m == VAULT_META_MAGIC.as_slice() => Some(MetaVersion::V0_1),
         Some(m) if m == VAULT_META_V0_2_MAGIC.as_slice() => Some(MetaVersion::V0_2),
+        Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => Some(MetaVersion::V0_2),
         _ => None,
     }
 }
 
-/// Parse a `vault.meta` of EITHER generation into a [`VaultMeta`], dispatching on
-/// the magic: `NTV5` → [`parse_vault_meta_v0_2`], otherwise the v0.1
-/// [`parse_vault_meta`]. The extracted fields (`account_number_hash`,
-/// `kdf_params`, `items_key_id`, the wrapped keys) live at identical offsets in
-/// both layouts, so a caller that only needs those fields is version-agnostic —
-/// which is exactly what lets every singleton/index/sync reader keep working on a
-/// migrated vault without a bespoke NTV5 branch.
+/// Parse a `vault.meta` of ANY generation into its base [`VaultMeta`],
+/// dispatching on the magic: `NTV5` → [`parse_vault_meta_v0_2`], `NTV6` → the
+/// v0.2 base prefix of the B2B frame, otherwise the v0.1 [`parse_vault_meta`].
+/// The extracted fields (`account_number_hash`, `kdf_params`, `items_key_id`,
+/// the wrapped keys) live at identical offsets in every layout, so a caller that
+/// only needs those fields is version-agnostic — which is exactly what lets
+/// every singleton/index/sync reader keep working on a migrated vault without a
+/// bespoke branch.
+///
+/// An `NTV6` frame is the v0.2 base (345 bytes) plus a B2B tail, so this parses
+/// the base prefix and ignores the tail; the NTV6-specific fields (owner-wrapped
+/// group key, epoch, signed roster) go through [`parse_vault_meta_ntv6`]. This
+/// is a READ of the base only: it never treats the tail as a base field.
 pub fn parse_vault_meta_any(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
-    if bytes.get(0..4) == Some(VAULT_META_V0_2_MAGIC.as_slice()) {
-        parse_vault_meta_v0_2(bytes)
-    } else {
-        parse_vault_meta(bytes)
+    match bytes.get(0..4) {
+        Some(m) if m == VAULT_META_V0_2_MAGIC.as_slice() => parse_vault_meta_v0_2(bytes),
+        Some(m) if m == VAULT_META_MAGIC.as_slice() => parse_vault_meta(bytes),
+        Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => {
+            // The frame's base prefix carries the NTV6 magic, so patch the
+            // header back to the shared base layout before parsing — exactly as
+            // `parse_vault_meta_ntv6` does. The base FIELDS are byte-identical
+            // across every generation; only the header differs.
+            let mut base = [0u8; VAULT_META_LEN];
+            base.copy_from_slice(
+                bytes
+                    .get(..VAULT_META_LEN)
+                    .ok_or(ProtocolError::InvalidVaultMeta)?,
+            );
+            base[0..4].copy_from_slice(&VAULT_META_MAGIC);
+            base[4] = VAULT_META_PROTOCOL_VERSION;
+            parse_vault_meta(&base)
+        }
+        _ => Err(ProtocolError::InvalidVaultMeta),
     }
 }
 
@@ -348,6 +494,41 @@ pub fn unlock_root_key_v0_2_recovery(
         &aad_recovery_wrap_v0_2(&meta.kdf_params),
     )?;
     to_key(pt)
+}
+
+/// Unwrap the current B2B `group_key` with the owner's root-tier key.
+pub fn unlock_group_key_ntv6(
+    meta: &B2bVaultMeta,
+    owner_key: &crate::subkey::OwnerKey,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, ProtocolError> {
+    let wrap_key =
+        crate::subkey::derive_owner_subkey_v0_2(owner_key, crate::subkey::OwnerRole::GroupKeyWrap);
+    let plaintext = aead_open_ctx(
+        &wrap_key,
+        &meta.group_key_nonce,
+        &meta.enc_group_key,
+        &crate::aead::aad_vault_group_key_wrap_v0_2(
+            &meta.base.account_number_hash,
+            meta.group_key_epoch,
+        ),
+    )?;
+    to_key(plaintext)
+}
+
+/// Unwrap `itemsKey` through the B2B group tier.
+pub fn unlock_items_key_ntv6(
+    meta: &B2bVaultMeta,
+    group_key: &crate::subkey::GroupKey,
+) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, ProtocolError> {
+    let wrap_key =
+        crate::subkey::derive_group_subkey_v0_2(group_key, crate::subkey::GroupRole::ItemsKeyWrap);
+    let plaintext = aead_open_ctx(
+        &wrap_key,
+        &meta.base.items_key_nonce,
+        &meta.base.enc_items_key,
+        &aad_vault_items_key_wrap_v0_2(&meta.base.items_key_id),
+    )?;
+    to_key(plaintext)
 }
 
 /// Re-wrap `root_key` under a NEW v0.2 password wrap (fresh salt + nonce),
@@ -637,6 +818,116 @@ mod tests {
             &[0x05; 24],
         )
         .expect("encode NTV5")
+    }
+
+    fn ntv6_fixture() -> B2bVaultMeta {
+        let signed_roster = crate::person_invite::SignedGroupRoster {
+            payload: alloc::vec![0xC3; 32],
+            signature: crate::person_key::PersonSigned {
+                ed25519_sig: [0xD4; crate::person_key::PERSON_ED25519_SIG_LEN],
+                mldsa_sig: alloc::vec![0xE5; crate::person_key::PERSON_MLDSA_SIG_LEN],
+            },
+        };
+        // The roster is sealed under the group tier, so the fixture needs a
+        // group key (any fixed one: these tests only round-trip and validate).
+        let group_key = [0x77u8; 32];
+        let signed_roster_envelope = crate::person_invite::seal_group_roster(
+            &group_key,
+            &ACCT,
+            1,
+            &[0x66; AEAD_NONCE_LEN],
+            &signed_roster,
+        )
+        .expect("sealed roster");
+        B2bVaultMeta {
+            base: parse_vault_meta_v0_2(&encode()).expect("parse base NTV5"),
+            group_key_nonce: [0xA1; AEAD_NONCE_LEN],
+            enc_group_key: [0xB2; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            group_key_epoch: 1,
+            signed_roster_envelope,
+        }
+    }
+
+    #[test]
+    fn ntv6_b2b_meta_round_trips_and_pre_ntv6_readers_refuse_it() {
+        let meta = ntv6_fixture();
+        let bytes = serialize_vault_meta_ntv6(&meta).expect("serialize NTV6");
+        assert_eq!(&bytes[..4], b"NTV6");
+        assert_eq!(bytes[4], 0x02);
+        assert_eq!(meta_version_of(&bytes), Some(MetaVersion::V0_2));
+        assert_eq!(parse_vault_meta_ntv6(&bytes), Ok(meta.clone()));
+        // The base-only reader accepts NTV6 and returns the v0.2 base, so every
+        // singleton/index/sync reader keeps working on a B2B-migrated vault.
+        assert_eq!(parse_vault_meta_any(&bytes), Ok(meta.base));
+        assert_eq!(
+            parse_vault_meta_v0_2(&bytes),
+            Err(ProtocolError::InvalidVaultMeta)
+        );
+        assert_eq!(
+            parse_vault_meta(&bytes),
+            Err(ProtocolError::InvalidVaultMeta)
+        );
+    }
+
+    #[test]
+    fn ntv6_writer_requires_epoch_and_signed_roster() {
+        let mut meta = ntv6_fixture();
+        meta.group_key_epoch = 0;
+        assert_eq!(
+            serialize_vault_meta_ntv6(&meta),
+            Err(ProtocolError::InvalidVaultMeta)
+        );
+
+        meta.group_key_epoch = 1;
+        meta.signed_roster_envelope.clear();
+        assert_eq!(
+            serialize_vault_meta_ntv6(&meta),
+            Err(ProtocolError::InvalidVaultMeta)
+        );
+
+        meta.signed_roster_envelope = alloc::vec![0xC3; 32];
+        assert_eq!(
+            serialize_vault_meta_ntv6(&meta),
+            Err(ProtocolError::InvalidVaultMeta)
+        );
+    }
+
+    #[test]
+    fn ntv6_reader_rejects_every_structural_malformed_class() {
+        let valid = serialize_vault_meta_ntv6(&ntv6_fixture()).expect("serialize NTV6");
+        let mut cases = alloc::vec::Vec::new();
+
+        let mut wrong_magic = valid.clone();
+        wrong_magic[3] = b'5';
+        cases.push(wrong_magic);
+
+        let mut wrong_version = valid.clone();
+        wrong_version[4] = 0x01;
+        cases.push(wrong_version);
+
+        let mut zero_epoch = valid.clone();
+        let epoch_start = VAULT_META_LEN + AEAD_NONCE_LEN + VAULT_META_WRAPPED_ITEMS_KEY_LEN;
+        zero_epoch[epoch_start..epoch_start + 8].fill(0);
+        cases.push(zero_epoch);
+
+        let mut zero_roster_len = valid.clone();
+        let roster_len_start = epoch_start + 8;
+        zero_roster_len[roster_len_start..roster_len_start + 4].fill(0);
+        cases.push(zero_roster_len);
+
+        let mut trailing = valid.clone();
+        trailing.push(0);
+        cases.push(trailing);
+
+        cases.push(valid[..valid.len() - 1].to_vec());
+        cases.push(valid[..B2B_META_FIXED_LEN - 1].to_vec());
+
+        for malformed in cases {
+            assert_eq!(
+                parse_vault_meta_ntv6(&malformed),
+                Err(ProtocolError::InvalidVaultMeta)
+            );
+        }
     }
 
     #[test]

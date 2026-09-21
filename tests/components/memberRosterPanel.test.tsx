@@ -9,6 +9,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { RosterMemberView } from "../../src/lib/invite";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -16,7 +17,7 @@ vi.mock("react-i18next", () => ({
 
 // The roster rows per test. `members: []` renders the invite-only empty
 // state; a non-empty list renders the rows plus the removal-disabled notice.
-let mockMembers = [
+let mockMembers: RosterMemberView[] = [
   {
     fingerprint_hex: "ab".repeat(32),
     display_name: "Member One",
@@ -27,17 +28,21 @@ let mockMembers = [
     member_ed_pk_hex: "cd".repeat(32),
     member_kem_ek_hex: "ef".repeat(32),
     member_mldsa_vk_hex: "01".repeat(48),
+    continuity: null,
   },
 ];
 
 // The caller's vault authority per test. `owner` renders the invite control;
 // `member` must hide it.
 let mockAuthority: "owner" | "member" = "owner";
+// The group-key epoch per test (`null` = legacy roster, no epoch line).
+let mockGroupKeyEpoch: number | null = null;
 
 vi.mock("../../src/hooks/useRoster", () => ({
   useRoster: () => ({
     members: mockMembers,
     authority: mockAuthority,
+    groupKeyEpoch: mockGroupKeyEpoch,
     loading: false,
     error: null,
     reload: vi.fn(),
@@ -99,13 +104,75 @@ describe("MemberRosterPanel removal parking", () => {
     }
   });
 
-  it("states the disabled state instead of promising a removal flow", () => {
+  it("states the removal limits honestly and promises no recall", () => {
     render(<MemberRosterPanel />);
     try {
       const notice = screen.getByTestId("member-roster.remove-disabled");
-      expect(notice.textContent).toBe("sync.memberRoster.removeConfirm");
+      expect(notice.textContent).toBe("sync.memberRoster.removalLimits");
     } finally {
       cleanup();
+    }
+  });
+
+  it("renders no owner-only invite control for a member", () => {
+    mockAuthority = "member";
+    render(<MemberRosterPanel />);
+    try {
+      // A member session must not be shown an admin control the backend refuses
+      // with `NotOwner`.
+      expect(screen.queryByTestId("member-roster.invite-button")).toBeNull();
+    } finally {
+      cleanup();
+      mockAuthority = "owner";
+    }
+  });
+});
+
+describe("MemberRosterPanel key-generation state", () => {
+  it("shows the epoch and distinguishes a key change from an owner-confirmed relink", () => {
+    mockAuthority = "owner";
+    mockGroupKeyEpoch = 3;
+    mockMembers = [
+      {
+        ...mockMembers[0],
+        fingerprint_hex: "11".repeat(32),
+        display_name: "Changed",
+        continuity: "changed",
+      },
+      {
+        ...mockMembers[0],
+        fingerprint_hex: "22".repeat(32),
+        display_name: "Relinked",
+        continuity: "owner-confirmed",
+      },
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.epoch").textContent).toBe(
+        "sync.memberRoster.epoch",
+      );
+      // The two continuity states render as DIFFERENT elements: a key change is
+      // the danger-toned verify prompt, an owner-confirmed relink is neutral.
+      expect(screen.getByTestId("member-roster.key-changed")).toBeDefined();
+      expect(screen.getByTestId("member-roster.relink-confirmed")).toBeDefined();
+    } finally {
+      cleanup();
+      mockGroupKeyEpoch = null;
+      mockMembers = [
+        {
+          fingerprint_hex: "ab".repeat(32),
+          display_name: "Member One",
+          role: "member",
+          version: 1,
+          previous_fingerprint_hex: null,
+          joined_at: 1_700_000_000,
+          member_ed_pk_hex: "cd".repeat(32),
+          member_kem_ek_hex: "ef".repeat(32),
+          member_mldsa_vk_hex: "01".repeat(48),
+          continuity: null,
+        },
+      ];
+      mockAuthority = "owner";
     }
   });
 });

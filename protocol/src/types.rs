@@ -16,8 +16,8 @@ use zeroize::Zeroizing;
 
 /// Which on-disk cryptographic generation a vault is at (`protocol.md` §10.5).
 ///
-/// v0.1 (`MYV1` vault.meta, `MY01` notes, `MY?1` singletons) and v0.2 (`NTV5`,
-/// `NC05`, `MY?5`) domain-separate on three axes: the KEK derivation context
+/// v0.1 (`MYV1` vault.meta, `MY01` notes, `MY?1` singletons) and v0.2 (`NTV5`
+/// or `NTV6`, `NC05`, `MY?5`) domain-separate on three axes: the KEK derivation context
 /// (`derive_subkey` vs `derive_subkey_v0_2`), the AEAD AAD prefix
 /// (`"myne.v0.1|"` vs `"myne.v0.2|"`), and the blob magics. A migrated vault is
 /// wholly v0.2; before migration it is wholly v0.1. Every version-aware
@@ -27,7 +27,7 @@ use zeroize::Zeroizing;
 pub enum MetaVersion {
     /// The v0.1 generation (`MYV1` / `MY01` / `MY?1`).
     V0_1,
-    /// The migrated v0.2 generation (`NTV5` / `NC05` / `MY?5`).
+    /// The v0.2 crypto generation (`NTV5` or `NTV6` / `NC05` / `MY?5`).
     V0_2,
 }
 

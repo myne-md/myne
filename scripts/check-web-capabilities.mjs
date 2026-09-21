@@ -213,6 +213,7 @@ const CAPABILITY_BACKING = {
   memberSharing: [
     "plugin:sync|sync_person_unlock",
     "plugin:sync|sync_person_lock",
+    "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_invite_member",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",

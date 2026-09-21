@@ -614,6 +614,26 @@ only the 0x02 roster extension converges. The roster merge runs at the **caller*
 unlocked `root_key`; the merge function itself sees only opaque ciphertext, so it cannot open the
 envelopes and is handed the already-decrypted rosters.
 
+**The `NTV6` generation replaces that envelope with an owner-signed roster and a
+group-key epoch** (`decisions/protocol/0594`, `protocol.md` §9.3.2). A merge between
+two `NTV6` `vault.meta` blobs MUST accept a roster whose signed `group_key_epoch` is
+**strictly greater** than the local one, MUST **refuse an equal epoch** rather than
+tie-break (two conflicting owner-signed rosters at one epoch cannot both be
+canonical, and picking one would let the server choose), and MUST **refuse a lower
+epoch** as a rollback. A retired epoch is recorded by an owner-double-signed
+`myne.group-retirement v1|` record (`protocol.md` §9.3.4) that carries no timestamp,
+so the server can neither forge a retirement nor order one against a removed
+member's package stream. **Live propagation of a new epoch is not delivered by the
+local rotation model** in this branch: the removing device's `vault.meta` is ahead
+of its peers, and nothing here carries the new epoch to them (Grill 4).
+
+**Per-person private AI profiles ride a separate plane.** A `profiles/<profile-id>`
+blob (`MYY5`, `protocol.md` §9.28) is keyed from the person's own phrase and is
+**never** a member of the shared group manifest: its existence there would disclose
+one person's private AI use to the other members. The person-private sync plane
+(which authenticated session carries it) is Grill 4 work alongside person-scoped
+server auth; until then a profile is local to the device that wrote it.
+
 ---
 
 ## 11. Deletion & tombstone horizon-GC
