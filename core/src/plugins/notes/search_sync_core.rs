@@ -59,7 +59,7 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::search::persist::{decode_snapshot, encode_snapshot, reconcile};
 use crate::search::SearchIndexState;
 use crate::vault_io::{VaultIo, WriteOpts};
-use protocol::{derive_subkey, parse_vault_meta_any, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+use protocol::{parse_vault_meta_any, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -152,13 +152,14 @@ impl AttachmentDocs for NoAttachmentDocs {
 async fn account_number_hash(
     io: &dyn VaultIo,
     vault_dir: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], SearchSyncError> {
+) -> Result<(protocol::MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), SearchSyncError> {
     let bytes = io
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SearchSyncError::Io)?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     let meta = parse_vault_meta_any(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    Ok((version, meta.account_number_hash))
 }
 
 /// Load `vault.search`, reconcile it against the notes directory, and swap the
@@ -176,12 +177,12 @@ pub async fn hydrate_search_index_core(
     search: &SearchIndexState,
     attachments: &mut dyn AttachmentDocs,
 ) -> Result<(), SearchSyncError> {
-    let root_key = state
-        .peek_unlocked_root_key_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
-    let account_hash = account_number_hash(io, vault_dir).await?;
-    let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+    let (meta_version, account_hash) = account_number_hash(io, vault_dir).await?;
+    let search_index_key = shared.derive(meta_version, SubkeyRole::SearchIndexKey);
     // Through the IO seam, NOT `notes_dir_under` (myne#303): that helper's root
     // check is a `std::fs` `Path::is_dir`, which on wasm32 is the
     // unsupported-platform stub and answers `false` for every path — so on the
@@ -290,12 +291,12 @@ pub async fn persist_search_index_core(
 ) -> Result<(), SearchSyncError> {
     // The writer guard is held across the write below, so a concurrent lock
     // cannot zeroize the key underneath it.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
-    let account_hash = account_number_hash(io, vault_dir).await?;
-    let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+    let (meta_version, account_hash) = account_number_hash(io, vault_dir).await?;
+    let search_index_key = shared.derive(meta_version, SubkeyRole::SearchIndexKey);
     // Through the IO seam, NOT `notes_dir_under` (myne#303): that helper's root
     // check is a `std::fs` `Path::is_dir`, which on wasm32 is the
     // unsupported-platform stub and answers `false` for every path — so on the

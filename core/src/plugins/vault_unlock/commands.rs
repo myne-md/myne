@@ -41,9 +41,17 @@ use zeroize::Zeroizing;
 /// rewrite per `decisions.md` 2026-05-06 entry.
 pub(crate) struct DerivedKeys {
     pub(crate) root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// `Some` for an `NTV6` session, whose shared singletons are group-sealed;
+    /// `None` for a pre-B2B session.
+    pub(crate) group_key: Option<Zeroizing<[u8; AEAD_KEY_LEN]>>,
     pub(crate) items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub(crate) items_key_id: [u8; 16],
     pub(crate) vault_meta_bytes_hash: [u8; 32],
+}
+
+enum VaultMetaPreview {
+    Legacy(protocol::VaultMeta),
+    Ntv6(protocol::B2bVaultMeta),
 }
 
 /// Resolve `<app_data_dir>/vault/vault.meta` for the running app.
@@ -232,6 +240,10 @@ pub async fn unlock_from_host(
             state.evict_cached_label(prior).await;
             state.evict_cached_icon(prior).await;
         }
+        // The private AI profile key is per-(person, VAULT), unlike the
+        // vault-independent person identity: a switch must drop the prior
+        // vault's profile key + id so a later reader cannot target it.
+        let _ = state.take_person_profile().await;
     }
 
     // The last-unlock stamp used to live here, inline in the password path —
@@ -767,16 +779,39 @@ pub(crate) async fn recover_pending_rekey_on_unlock(
             };
             let version =
                 protocol::meta_version_of(&new_meta).unwrap_or(protocol::MetaVersion::V0_1);
-            let derived = if version == protocol::MetaVersion::V0_2 {
-                derive_items_key_v0_2(&root_key, &meta)
+            if new_meta.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+                // A group rotation wrote this journal: the committed meta is
+                // `NTV6`, whose `itemsKey` is group-sealed. Derive the group key
+                // first and install BOTH tiers, or the session keeps the retired
+                // keys and cannot read any note or shared singleton.
+                let Ok(b2b) = protocol::parse_vault_meta_ntv6(&new_meta) else {
+                    return;
+                };
+                let Ok(group) =
+                    protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
+                else {
+                    tracing::warn!(event = "rekey_recovery_key_derive_failed");
+                    return;
+                };
+                let group_key = protocol::GroupKey::new(*group);
+                let Ok(items_key) = protocol::unlock_items_key_ntv6(&b2b, &group_key) else {
+                    tracing::warn!(event = "rekey_recovery_key_derive_failed");
+                    return;
+                };
+                state.replace_items_key(id, items_key).await;
+                state.set_group_key(id, group).await;
             } else {
-                derive_items_key(&root_key, &meta)
-            };
-            let Ok(items_key) = derived else {
-                tracing::warn!(event = "rekey_recovery_key_derive_failed");
-                return;
-            };
-            state.replace_items_key(id, items_key).await;
+                let derived = if version == protocol::MetaVersion::V0_2 {
+                    derive_items_key_v0_2(&root_key, &meta)
+                } else {
+                    derive_items_key(&root_key, &meta)
+                };
+                let Ok(items_key) = derived else {
+                    tracing::warn!(event = "rekey_recovery_key_derive_failed");
+                    return;
+                };
+                state.replace_items_key(id, items_key).await;
+            }
             // Refresh the CAS anchor to the bytes recovery wrote, so the next
             // change-password does not read our own recovery as external
             // tampering.
@@ -881,6 +916,25 @@ pub async fn unlock_with_path(
         }
     };
 
+    // B2B migration recovery precedes the metadata read. Once its journal is
+    // durable, rolling forward may replace NTV5 with NTV6; reading first would
+    // derive a session from the old hierarchy and then publish group-sealed
+    // singleton state underneath it. A failed recovery blocks unlock and keeps
+    // the journal for an idempotent retry.
+    let vault_root = vault_path.parent().unwrap_or(vault_path).to_path_buf();
+    if let Err(error) =
+        crate::plugins::vault_migrate::b2b::recover_pending_b2b_migration(io, &vault_root).await
+    {
+        return match error {
+            crate::plugins::vault_migrate::b2b::B2bMigrationError::Io => {
+                Err(VaultUnlockError::IoError {
+                    io_error_kind: IoFailureKind::Other,
+                })
+            }
+            _ => Err(VaultUnlockError::InvalidVaultMeta),
+        };
+    }
+
     // The `vault.meta` read now goes through the IO seam and is awaited HERE,
     // outside the blocking closure (phase3-web-client task 17/12). Two reasons:
     // the seam's native arm already dispatches its own `std::fs` call through
@@ -916,7 +970,15 @@ pub async fn unlock_with_path(
         // failing the re-unlock BEFORE the magic-dispatch below ever runs. Only
         // `meta_preview.kdf_params` (the host memory-ceiling check) reads this
         // parse; the version-specific re-parse happens in the blocking closure.
-        protocol::parse_vault_meta_any(candidate).map(|meta| (meta, candidate.to_vec()))
+        if candidate.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+            protocol::parse_vault_meta_ntv6(candidate)
+                .map(VaultMetaPreview::Ntv6)
+                .map(|meta| (meta, candidate.to_vec()))
+        } else {
+            protocol::parse_vault_meta_any(candidate)
+                .map(VaultMetaPreview::Legacy)
+                .map(|meta| (meta, candidate.to_vec()))
+        }
     })
     .await
     .map_err(|outcome| match outcome {
@@ -966,7 +1028,6 @@ pub async fn unlock_with_path(
     // A staged meta this credential cannot open is a fabrication or the residue
     // of an abandoned migration. It is discarded and the local one answers, so a
     // hostile server costs one wasted Argon2id and `vault.meta` is never touched.
-    let vault_root = vault_path.parent().unwrap_or(vault_path).to_path_buf();
     let mut adopted: Option<Vec<u8>> = None;
     let mut derived: Option<DerivedKeys> = None;
 
@@ -1017,12 +1078,20 @@ pub async fn unlock_with_path(
     // failing must never surface as "wrong password" for this vault.
     let DerivedKeys {
         root_key,
+        group_key,
         items_key,
         items_key_id,
         vault_meta_bytes_hash,
     } = match derived {
         Some(keys) => keys,
-        None => derive_keys_from_meta_candidate(host, &meta_preview, bytes, password).await?,
+        None => match &meta_preview {
+            VaultMetaPreview::Legacy(meta) => {
+                derive_keys_from_meta_candidate(host, meta, bytes, password).await?
+            }
+            VaultMetaPreview::Ntv6(meta) => {
+                derive_keys_from_ntv6_candidate(host, meta, bytes, password).await?
+            }
+        },
     };
 
     // Proved. The credential opened it, so it becomes this vault's meta — and
@@ -1047,6 +1116,7 @@ pub async fn unlock_with_path(
             vault_id,
             UnlockedVault::owner(
                 root_key,
+                group_key,
                 items_key,
                 items_key_id,
                 now_ms,
@@ -1328,6 +1398,7 @@ pub async fn lock_from_host(
     // guarantee being false for a keypair the user never saw a lock button for.
     // `take_person_identity` moves the pair out, zeroizing it on drop.
     let _ = state.take_person_identity().await;
+    let _ = state.take_person_profile().await;
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -1724,16 +1795,19 @@ pub(crate) async fn vault_status_with_path(
             });
         }
     };
-    // A present vault is either v0.1 (`MYV1`) or a migrated v0.2 (`NTV5`). Both are
-    // well-formed, unlockable vaults — the boot probe must report `Exists` for
-    // NTV5, not `Corrupted`, or a just-migrated vault strands the user at the
-    // corrupted-recovery surface (§10.4.1; automerge-sync-migration #420). Try the
-    // v0.1 parser first (the common case), fall through to the v0.2 parser, and
-    // only report `Corrupted` when neither accepts the bytes.
+    // A present vault is v0.1 (`MYV1`), a migrated v0.2 (`NTV5`), or a B2B-migrated
+    // v0.2 (`NTV6`). All three are well-formed, unlockable vaults — the boot probe
+    // must report `Exists` for the later two, not `Corrupted`, or a just-migrated
+    // vault strands the user at the corrupted-recovery surface (§10.4.1;
+    // automerge-sync-migration #420). Try the v0.1 parser first (the common case),
+    // fall through to the v0.2 parsers, and only report `Corrupted` when none
+    // accepts the bytes.
     match protocol::parse_vault_meta(&bytes) {
         Ok(_) => Ok(VaultStatus::Exists),
         Err(e) => {
-            if protocol::parse_vault_meta_v0_2(&bytes).is_ok() {
+            if protocol::parse_vault_meta_v0_2(&bytes).is_ok()
+                || protocol::parse_vault_meta_ntv6(&bytes).is_ok()
+            {
                 return Ok(VaultStatus::Exists);
             }
             tracing::error!(
@@ -2252,6 +2326,7 @@ pub(crate) async fn derive_keys_from_meta_candidate(
             };
             Ok(DerivedKeys {
                 root_key,
+                group_key: None,
                 items_key,
                 items_key_id,
                 vault_meta_bytes_hash,
@@ -2270,6 +2345,44 @@ pub(crate) async fn derive_keys_from_meta_candidate(
             Err(VaultUnlockError::JoinFailure)
         }
     }
+}
+
+async fn derive_keys_from_ntv6_candidate(
+    host: &dyn HostCtx,
+    meta_preview: &protocol::B2bVaultMeta,
+    bytes: Vec<u8>,
+    password: Zeroizing<String>,
+) -> Result<DerivedKeys, VaultUnlockError> {
+    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
+        let required_kib = meta_preview.base.kdf_params.m_kib;
+        if required_kib > ceiling_kib {
+            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: required_kib / 1024,
+                available_mib: ceiling_kib / 1024,
+            });
+        }
+    }
+
+    let meta = meta_preview.clone();
+    crate::task::run_blocking(move || {
+        let root_key = derive_root_key_v0_2(&password, &meta.base)?;
+        let owner_key = protocol::OwnerKey::new(*root_key);
+        let group_bytes = protocol::unlock_group_key_ntv6(&meta, &owner_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+        let group_key = protocol::GroupKey::new(*group_bytes);
+        let items_key = protocol::unlock_items_key_ntv6(&meta, &group_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+
+        Ok(DerivedKeys {
+            root_key,
+            group_key: Some(group_bytes),
+            items_key,
+            items_key_id: meta.base.items_key_id,
+            vault_meta_bytes_hash: crate::vault_meta_hash::vault_meta_sha256(&bytes),
+        })
+    })
+    .await
+    .map_err(|_| VaultUnlockError::JoinFailure)?
 }
 
 #[cfg(test)]
@@ -2750,7 +2863,8 @@ mod tests {
             // The slot holds the STAGED generation's key, not the local one.
             let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(
-                *unlocked.root_key, staged_root,
+                **unlocked.owner_root_key().expect("owner"),
+                staged_root,
                 "unlock resolved the local meta — the staged one was not tried first"
             );
             // …and it is now this vault's meta, on disk.
@@ -2797,7 +2911,11 @@ mod tests {
             .expect("the local meta must still open the vault");
 
             let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(*unlocked.root_key, local_root, "the local vault must open");
+            assert_eq!(
+                **unlocked.owner_root_key().expect("owner"),
+                local_root,
+                "the local vault must open"
+            );
             assert_eq!(
                 std::fs::read(scratch.path()).expect("read meta"),
                 local_bytes.to_vec(),
@@ -3247,7 +3365,10 @@ mod tests {
 
             // Slot is occupied with the original root_key bytes.
             let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(*unlocked.root_key, original_root_key);
+            assert_eq!(
+                **unlocked.owner_root_key().expect("owner"),
+                original_root_key
+            );
         });
     }
 
@@ -3282,7 +3403,10 @@ mod tests {
             // The slot is keyed under the EXPLICIT id.
             assert_eq!(state.slot_kind(explicit).await, SlotKind::Unlocked);
             let unlocked = state.take(explicit).await.unwrap_unlocked();
-            assert_eq!(*unlocked.root_key, original_root_key);
+            assert_eq!(
+                **unlocked.owner_root_key().expect("owner"),
+                original_root_key
+            );
 
             // The path-derived legacy key has NO entry — the explicit id
             // overrode the fallback derivation.
@@ -3700,7 +3824,10 @@ mod tests {
             // come back from take(). The unlock attempt did NOT
             // overwrite or perturb it.
             let existing = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(*existing.root_key, [0x42u8; AEAD_KEY_LEN]);
+            assert_eq!(
+                **existing.owner_root_key().expect("owner"),
+                [0x42u8; AEAD_KEY_LEN]
+            );
             assert_eq!(*existing.items_key, [0x13u8; AEAD_KEY_LEN]);
             assert_eq!(existing.items_key_id, [0x99u8; 16]);
         });
@@ -4421,9 +4548,13 @@ mod tests {
             // The slot now carries the FRESH root_key from
             // vault.meta, NOT the prior fixture's 0x11 bytes.
             let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(*unlocked.root_key, original_root_key);
+            assert_eq!(
+                **unlocked.owner_root_key().expect("owner"),
+                original_root_key
+            );
             assert_ne!(
-                *unlocked.root_key, [0x11u8; AEAD_KEY_LEN],
+                **unlocked.owner_root_key().expect("owner"),
+                [0x11u8; AEAD_KEY_LEN],
                 "fresh unlock must overwrite the prior session's root_key"
             );
         });
@@ -4493,6 +4624,155 @@ mod tests {
 
             let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
             assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    /// Build a real `NTV6` metadata frame whose `group_key` wrap and
+    /// `itemsKey` wrap are sealed exactly as the owner migration seals them, so
+    /// the reopen path is exercised against production bytes rather than
+    /// filler. Returns the frame, its serialized bytes, and the plaintext keys.
+    fn ntv6_meta_fixture() -> (
+        protocol::B2bVaultMeta,
+        Vec<u8>,
+        [u8; AEAD_KEY_LEN],
+        [u8; AEAD_KEY_LEN],
+        [u8; 16],
+    ) {
+        let root_key = [7u8; AEAD_KEY_LEN];
+        let items_key = [9u8; AEAD_KEY_LEN];
+        let group_key_bytes = [11u8; AEAD_KEY_LEN];
+        let account_hash = [3u8; 16];
+        let items_key_id = [1u8; 16];
+        let mut base = protocol::parse_vault_meta_v0_2(
+            &protocol::encode_vault_meta_v0_2_raw(
+                &root_key,
+                &items_key,
+                &items_key_id,
+                "pw",
+                "abandon abandon abandon",
+                &account_hash,
+                &FAST_TEST_KDF,
+                &[2u8; protocol::ARGON2_SALT_LEN],
+                &[4u8; protocol::ARGON2_SALT_LEN],
+                &[5u8; protocol::AEAD_NONCE_LEN],
+                &[6u8; protocol::AEAD_NONCE_LEN],
+                &[8u8; protocol::AEAD_NONCE_LEN],
+            )
+            .expect("encode NTV5"),
+        )
+        .expect("parse NTV5");
+        let group_key = protocol::GroupKey::new(group_key_bytes);
+        let group_nonce = [12u8; protocol::AEAD_NONCE_LEN];
+        let items_nonce = [13u8; protocol::AEAD_NONCE_LEN];
+        let enc_group = protocol::aead_seal_ctx(
+            &protocol::derive_owner_subkey_v0_2(
+                &protocol::OwnerKey::new(root_key),
+                protocol::OwnerRole::GroupKeyWrap,
+            ),
+            &group_nonce,
+            &group_key_bytes,
+            &protocol::aad_vault_group_key_wrap_v0_2(&account_hash, 1),
+        )
+        .expect("seal group key");
+        let enc_items = protocol::aead_seal_ctx(
+            &protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::ItemsKeyWrap),
+            &items_nonce,
+            &items_key,
+            &protocol::aad_vault_items_key_wrap_v0_2(&items_key_id),
+        )
+        .expect("seal items key");
+        base.items_key_nonce = items_nonce;
+        base.enc_items_key.copy_from_slice(&enc_items);
+        let signed_roster_envelope = protocol::person_invite::seal_group_roster(
+            &group_key_bytes,
+            &account_hash,
+            1,
+            &[0xE6; protocol::AEAD_NONCE_LEN],
+            &protocol::person_invite::SignedGroupRoster {
+                payload: vec![0xC3; 32],
+                signature: protocol::person_key::PersonSigned {
+                    ed25519_sig: [0xD4; protocol::person_key::PERSON_ED25519_SIG_LEN],
+                    mldsa_sig: vec![0xE5; protocol::person_key::PERSON_MLDSA_SIG_LEN],
+                },
+            },
+        )
+        .expect("seal structurally valid roster envelope");
+        let meta = protocol::B2bVaultMeta {
+            base,
+            group_key_nonce: group_nonce,
+            enc_group_key: enc_group.try_into().expect("fixed group-key wrap"),
+            group_key_epoch: 1,
+            signed_roster_envelope,
+        };
+        let bytes = protocol::serialize_vault_meta_ntv6(&meta).expect("serialize NTV6");
+        (meta, bytes, root_key, items_key, items_key_id)
+    }
+
+    #[test]
+    fn vault_status_returns_exists_for_migrated_ntv6_meta() {
+        // A B2B-migrated vault must classify `Exists` at the boot probe. The
+        // v0.1 and NTV5 parsers both reject the NTV6 magic; without an explicit
+        // NTV6 arm the probe reports `Corrupted` and strands the owner at the
+        // corrupted-recovery surface immediately after the migration commits.
+        rt().block_on(async {
+            let (_, bytes, _, _, _) = ntv6_meta_fixture();
+            let scratch = ScratchVault::new("vault_status_ntv6_exists");
+            scratch.write_meta(&bytes);
+
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
+            assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    #[test]
+    fn owner_password_reopens_ntv6_through_group_key() {
+        rt().block_on(async {
+            let (meta, bytes, root_key, items_key, items_key_id) = ntv6_meta_fixture();
+            let temp = crate::test_support::ScopedTempDir::new("ntv6_owner_reopen")
+                .expect("create temporary vault root");
+            let host = crate::host::test_host::TestHost::new(temp.path());
+
+            let derived = derive_keys_from_ntv6_candidate(
+                &host,
+                &meta,
+                bytes,
+                Zeroizing::new("pw".to_owned()),
+            )
+            .await
+            .expect("owner password reopens NTV6");
+
+            assert_eq!(*derived.root_key, root_key);
+            assert_eq!(*derived.items_key, items_key);
+            assert_eq!(derived.items_key_id, items_key_id);
+        });
+    }
+
+    #[test]
+    fn owner_password_reopen_rejects_a_tampered_group_key_wrap() {
+        // The group-key wrap is the new tier the owner password now has to
+        // traverse. A tampered ciphertext must fail closed rather than fall
+        // back to the NTV5 itemsKey wrap.
+        rt().block_on(async {
+            let (mut meta, _, _, _, _) = ntv6_meta_fixture();
+            meta.enc_group_key[0] ^= 0xFF;
+            let bytes = protocol::serialize_vault_meta_ntv6(&meta).expect("serialize tampered");
+            let temp = crate::test_support::ScopedTempDir::new("ntv6_tamper")
+                .expect("create temporary vault root");
+            let host = crate::host::test_host::TestHost::new(temp.path());
+
+            let err = match derive_keys_from_ntv6_candidate(
+                &host,
+                &meta,
+                bytes,
+                Zeroizing::new("pw".to_owned()),
+            )
+            .await
+            {
+                Ok(_) => panic!("tampered group-key wrap must refuse"),
+                Err(e) => e,
+            };
+
+            assert!(matches!(err, VaultUnlockError::InvalidVaultMeta));
         });
     }
 

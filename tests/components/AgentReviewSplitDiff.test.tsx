@@ -57,6 +57,7 @@ function settleWith(edits: ProposedEdit[]) {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
+      memoryUpdated: 0,
     },
     currentRunEpoch(),
   );

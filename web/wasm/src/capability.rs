@@ -652,6 +652,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // the carrier itself is the blocker.
     ("plugin:sync|sync_person_unlock", Class::Unsupported),
     ("plugin:sync|sync_person_lock", Class::Unsupported),
+    ("plugin:sync|sync_start_b2b_migration", Class::Unsupported),
     ("plugin:sync|sync_invite_member", Class::Unsupported),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),

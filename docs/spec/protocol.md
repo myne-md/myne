@@ -281,7 +281,23 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 agent-personality-key"` | KEK for the agent-personality singleton (`vault.personality`, §9.27, `MYZ1`) | Active when the personality blob is written (`decisions.md` 2026-09-10, myne-md/myne#697). `root_key`-derived (itemsKey-independent), like prefs/search/themes. Written only while `ai_enabled` is on; user-edited only (the agent never writes personality, `decisions.md` 2026-09-10). |
 | `"myne.v0.1 agent-personality-sync-id"` | Reserved sync blob-id for `vault.personality` (Phase 2 sync; `sync-protocol.md` §10.2.7). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the personality singleton (`decisions.md` 2026-09-10, myne-md/myne#697). Like the chats/themes catalogs, it is a synced singleton outside the head manifest, so it needs a deterministic, device-independent 16-byte identifier: `agent_personality_sync_id = DeriveSubkey(root_key, "agent-personality-sync-id")[0..16]`. This derives an *identifier*, not key material: the singleton's KEK remains `agent-personality-key`. |
 | `"myne.v0.2 membership-key"` | KEK for the sealed vault membership field (`vault.meta` §9.3.1) | Active when the membership field is written (the account/vault split, `decisions.md` 2026-09-07). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. So a vault's account membership survives a later epoch-rotation `itemsKey` evolution. Derived under the **v0.2** context prefix because the field is `NTV5`-only. Distinct from the AAD role string `"membership-blob"` (§5.2). |
+| `"myne.v0.2 group-key-wrap"` | Owner KEK for the current shared `group_key` | Allocated by `decisions/protocol/0594`. This is `OwnerRole::GroupKeyWrap`: its derivation input is `root_key`, and it seals the owner's `group_key` copy. A typed owner/group registry split is mandatory, so this owner role cannot be derived from a member-held `group_key`. |
 | (future next-major contexts) | reserved | not derived in v0.1. |
+
+**The v0.2 B2B group tier is a parallel registry.** A shared `NTV6` vault seals
+its shared singleton material and its roster under roles derived from the shared
+`group_key` rather than `root_key`. The group roles are `itemsKey-wrap`,
+`prefs-key`, `search-index-key`, `attachments-catalog-key`, `session-state-key`,
+`personal-dictionary-key`, `vault-indices-key`, `attachment-text-key`,
+`catalog-sync-id`, `prefs-sync-id`, `custom-themes-key`, `themes-sync-id`,
+`graph-layout-key` and `group-roster-key` (the machine-readable mirror is the
+`GroupRole` registry in `protocol/src/subkey.rs`). They are derived from
+`group_key` under the v0.2 context prefix. `attachments-id-hmac` is registered in
+that enum but **RESERVED**: the content-addressed attachment id stays
+`root_key`-derived so it is stable across a migration (§9.9). The owner roles
+(`server-auth`, `membership-key`, `vault-head-mac`, and the AI
+embedding/chats/memory/personality KEKs and sync-ids) stay `root_key`-derived and
+MUST NOT be derivable from a member-held `group_key`.
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "`, and the next major version's context strings use its own prefix, which is not pre-allocated in v0.1.
 
@@ -463,6 +479,9 @@ AAD_agent_personality_blob =
 
 AAD_membership_blob =
   AAD_prefix || protocol_version (1 B) || "membership-blob" || account_number_hash (16 B)
+
+AAD_group_key_wrap =
+  AAD_prefix || protocol_version (1 B) || "group-key-wrap" || group_key_epoch (8 B) || account_number_hash (16 B)
 ```
 
 `AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
@@ -486,6 +505,14 @@ AAD_membership_blob =
 `AAD_person_wrap` is the AAD bound into the AEAD seal of a **per-recipient `itemsKey` wrap** (the PQ-hybrid envelope a vault owner produces for one member; `decisions/protocol/0592`). Role string `"person-wrap-items-key"` (2-B BE + 21 ASCII bytes) followed by the 32-byte canonical **recipient fingerprint** (the SAS value, `person_key.rs`) and the 16-byte `account_number_hash`. It follows the §5.2 convention every vault-scoped AAD follows (cf. `AAD_membership_blob`): without the vault binding a wrap ports across vaults at the AAD layer. Total AAD length: `10 + 1 + 23 + 32 + 16 = 82 bytes`.
 
 `AAD_person_keypair` is the AAD bound into the AEAD seal of a **person keypair envelope** (the sealed key carrier; `person_key.rs`). Role string `"person-keypair-blob"` (2-B BE + 19 ASCII bytes), stamped with the v0.2 prefix + version. It binds the role and **neither** a fingerprint **nor** `account_number_hash`: the fingerprint is a hash of the sealed material itself, so binding it would be circular, and the keypair is vault-independent by construction (one person, many vaults). Total AAD length: `10 + 1 + 21 = 32 bytes`.
+
+`AAD_group_key_wrap` is the AAD bound into the owner-held shared `group_key` wrap
+(`decisions/protocol/0594`). The role string `"group-key-wrap"` is
+length-prefixed UTF-8 (2-B big-endian length + 14 ASCII bytes), followed by the
+unsigned 8-B big-endian `group_key_epoch` and the vault's 16-byte
+`account_number_hash`. Binding both prevents an old epoch's wrap from being
+accepted as a current one and prevents a package from another vault being
+substituted. Total AAD length: `10 + 1 + 16 + 8 + 16 = 51 bytes`.
 
 `AAD_vault_invite` is the AAD bound into the AEAD seal of an **invite payload envelope** (`person_invite.rs`). Role string `"vault-invite-blob"` (2-B BE + 17 ASCII bytes). Total AAD length: `10 + 1 + 2 + 17 = 30 bytes`. The invite envelope is sync-wire-only (no §10.3 family; the frame rides the existing sync plane), so this role carries no magic and the envelope binds nothing else: the owner's public material and the wrapped key pieces live in the payload itself, and the vault binding arrives on the inner per-recipient `itemsKey` wrap whose own AAD carries `account_number_hash`. The role is deliberately **distinct** from `"person-wrap-items-key"` so the invite payload class and the `itemsKey`-wrap class never share an AEAD domain.
 
@@ -981,6 +1008,108 @@ reader consumes the field yet (it is forward-planted for grouping repair and rec
 one lands, it MUST treat the record as authoritative and the field as corroboration.
 
 The artefacts that leave the device under Phase-2 sync are exactly the **sync-taxonomy authoritative + identity members** (`sync-protocol.md` §9): `.myn` notes, `vault.prefs`, `vault.dictionary`, attachment blobs, the `vault.attachments` catalog, and `vault.meta` — **not** `snapshots/` (authoritative but deliberately local-only, §9.2 there) and **not** the rebuildable-cache / device-local families. Every synced artefact is opaque ciphertext + a small public header (magic, version, IDs, nonces, salts, account-hash). No plaintext note content, no plaintext titles, no plaintext recovery-phrase material is ever stored.
+
+#### 9.3.2 B2B vault-metadata generation allocation (`NTV6`)
+
+`NTV6` is allocated to the B2B vault-metadata generation
+(`decisions/protocol/0594`). Its header `protocol_version` byte is `0x02`; an
+`NTV5` reader MUST reject `NTV6` rather than treating it as an extension of the
+owner-only layout. The first 345 bytes retain the §9.3 field offsets, with magic
+`NTV6`, protocol byte `0x02`, and reserved byte `0x00`. In that prefix,
+`enc_items_key` is the CTX ciphertext of `itemsKey` under
+`derive_group_subkey_v0_2(group_key, GroupRole::ItemsKeyWrap)`, not under an
+owner-root-derived key. This changes only the key wrap; note and attachment
+content ciphertext does not change.
+
+All multi-byte integers are big-endian. The mandatory B2B suffix is:
+
+```
+Offset  Size       Field                         Description
+345     24         group_key_nonce               XChaCha20 nonce for the owner-wrapped group key
+369     64         enc_group_key                 32-byte group key ciphertext + 32-byte CTX tag
+433     8          group_key_epoch               Positive u64; zero is invalid
+441     4          signed_roster_envelope_len    u32 byte length, 1..65536
+445     variable   signed_roster_envelope        Canonical signed roster envelope (§9.3.3)
+```
+
+The frame length MUST equal `445 + signed_roster_envelope_len`; truncation and
+trailing bytes are invalid. Missing group-key, zero epoch, empty or over-cap
+roster, wrong magic, wrong protocol byte, and a nonzero reserved byte all fail as
+the same non-distinguishing invalid-metadata error before any decrypt operation.
+The codec treats the `signed_roster_envelope` as opaque bytes: it is the SEALED
+owner-signed roster (§9.3.3), and the reader unseals it under the group tier
+before verifying its canonical form and signatures.
+
+`NTV5` remains readable only by migration and recovery paths. A normal B2B open
+requires `NTV6`. The base-only reader (`parse_vault_meta_any`) accepts the `NTV6`
+base prefix and returns the v0.2 base fields, so every singleton/index/sync
+reader keeps working on a migrated vault; the `NTV6`-specific tail (owner-wrapped
+group key, epoch, sealed roster) goes through the strict `NTV6` parser, and a
+reader that does not implement `NTV6` MUST reject the magic. An `NTV6` writer
+MUST include every suffix field and MUST NOT encode epoch zero.
+
+The `NTV5` to `NTV6` transition is explicit. The client MUST start it only after
+the owner approves the first B2B sharing action and the owner's person identity
+is available; an ordinary owner unlock MUST NOT change the vault format. The
+migration stages every group-sealed singleton, durably records the target bytes,
+publishes and verifies those targets, and writes `NTV6` metadata last. Before the
+durable record, recovery rolls staged bytes back. After it, recovery rolls the
+whole batch forward or fails closed. Note and attachment content ciphertext and
+`content_nonce` bytes are not rewritten by this transition.
+
+#### 9.3.3 Signed group roster and recipient packages
+
+The `signed_roster_envelope` is an owner-authored canonical group roster. Its
+binary frame is `payload_len (u32-BE) || payload || ed25519_signature (64 B) ||
+ml_dsa_65_signature (3309 B)`. The frame is at most 65536 bytes and has strict
+trailing-byte rejection. Both signatures cover the whole literal signature
+class `"myne.group-roster v1|"` followed by the payload bytes, and both MUST
+verify. A signature from any other record class MUST fail.
+
+The payload is canonical JSON with `account_number_hash_hex`, positive
+`group_key_epoch`, `owner_fingerprint_hex`, and a `members` array strictly
+sorted by `fingerprint_hex`. Exactly one live owner row matches
+`owner_fingerprint_hex`. Each live member row carries `wrapped_group_key_hex`
+and the three public person-key halves; a tombstone carries no wrap. The row also
+records `previous_fingerprint_hex` and one continuity state: `current`,
+`changed`, or `owner-confirmed`. Public halves MUST reconstruct the row's
+fingerprint. A member verifies this roster from the pinned owner public half;
+neither `root_key` nor a root-derived membership key participates.
+
+Each live member has a separate recipient package. Its canonical JSON payload
+contains `account_number_hash_hex`, the positive `group_key_epoch`,
+`recipient_fingerprint_hex`, and `wrapped_group_key_hex`. The package uses the
+same binary signature frame, with signature class `"myne.group-package v1|"`.
+The wrapped key is the established PQ-hybrid person envelope over the 32-byte
+`group_key`. Before opening it, a reader MUST verify both owner signatures,
+require the expected vault and epoch, require the local person fingerprint, and
+require byte equality with that live row's wrap in the already-verified roster.
+An equal-epoch mismatch fails closed. A tombstoned recipient receives no package
+for a replacement epoch.
+
+#### 9.3.4 Group retirement records
+
+Removing a member retires the current group-key epoch and mints the next. The
+retired epoch is recorded by an owner-double-signed record whose payload is a
+FIXED 33 bytes (no JSON, and deliberately no timestamp):
+
+```
+offset  size  field               description
+0       8     retired_epoch       big-endian u64, > 0
+8       8     replacement_epoch   big-endian u64, MUST equal retired_epoch + 1
+16      1     namespace_kind      0x01 = group-key, 0x02 = content
+17      16    namespace_id        group-key kind: account_number_hash;
+                                  content kind: items_key_id
+```
+
+The record is framed with the same binary signature frame as the roster and
+package, under signature class `"myne.group-retirement v1|"`, and both Ed25519
+and ML-DSA-65 signatures MUST verify against the pinned owner public half. A
+`replacement_epoch` that skips or repeats is a structural rejection. A reader
+accepts a strictly-greater signed epoch only; an equal epoch fails closed. A
+server that can neither sign as the owner nor open the record cannot forge a
+retirement, and the absence of a timestamp means it cannot order one against a
+removed member's package stream.
 
 ### 9.4 What is in plaintext on disk and why
 
@@ -2847,6 +2976,59 @@ Implementations MUST reject `ciphertext_len > 262144 + 32` (256 KiB plaintext ca
 
 Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: the personality is the standing instruction set the agent's system turn is built from, and an unreadable blob read as absent would, on the next write, persist that absence over a real one. A read failure surfaces as an error naming the artifact.
 
+### 9.28 Per-person private AI profile (`profiles/<profile-id>`, `MYY5`)
+
+`MYY5` holds one sealed private AI profile per `(person, vault)` pair
+(`decisions/protocol/0594`). The profile is not group state: its KEK is derived
+from the person's OWN recovery phrase under the salt domain
+`"myne.v0.2 argon2id-person-vault-profile|"`, not from `group_key` or `root_key`.
+Its `profile-id` is
+`SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
+and names the file `profiles/<profile-id>`.
+
+The salt randomizer is the FIXED, non-secret `PERSON_VAULT_PROFILE_SALT_RANDOM`
+(all-zero), because the profile MUST open on every client from the phrase alone:
+a per-device random salt could not be reproduced. Separation comes from the salt
+domain prefix and the `profile_id`, which already binds the person-id hash and
+the vault.
+
+#### 9.28.1 On-disk layout
+
+```
+offset  size  field              description
+0       4     magic              ASCII "MYY5"
+4       1     protocol_version   0x01 (the singleton-family byte)
+5       1     format_version     0x01 = the initial opaque inner schema
+6       24    nonce              XChaCha20-Poly1305 nonce
+30      4     ciphertext_len     big-endian uint32, plaintext_len + 32
+34      M     ciphertext         AEAD ciphertext + 32-byte CTX tag
+```
+
+The inner plaintext is **opaque to this layer** (like `vault.workspace`, §9.7):
+the AI layer serializes the person's chat/memory/personality structure and the
+codec owns only the envelope. Implementations MUST reject
+`ciphertext_len > 16 MiB + 32`, and MUST reject a blob whose magic,
+`protocol_version` or `format_version` is not the expected value, or whose
+trailing bytes do not match `ciphertext_len` (§10.3.1 strict-trailing).
+
+#### 9.28.2 AAD
+
+`AAD = "myne.v0.2|" || 0x02 || u16_len("person-profile-blob") || "person-profile-blob"
+|| account_number_hash (16) || profile_id (16)`.
+
+Binding BOTH the vault and the `profile_id` is what makes a profile copied to
+another person or another vault fail AEAD verification rather than being silently
+served. **The `profile_id` is NOT stored in the header**: the reader derives it
+and binds it into the AAD.
+
+#### 9.28.3 Privacy and deletion
+
+The profile carries no provider credential and no egress-consent record: those
+stay device-local. Removal and scheduled deletion make **no recall guarantee** —
+a removed member's already-copied profile is not cryptographically erasable, and
+the deletion schedule is a policy input (retention owned by `myne-md/myne-ops#48`).
+The person-private sync plane is not defined here (Grill 4).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -2887,6 +3069,7 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 |---|---|---|---|---|
 | Per-note (`.myn`) | `MY01` | `NT05` | §9.2 | core |
 | Vault metadata (`vault.meta`) | `MYV1` | `NTV5` (allocated, v0.2) | §9.3 | core |
+| B2B vault metadata (`vault.meta`) | — | `NTV6` (allocated, v0.2 B2B) | §9.3.2 | myne-md/myne#712 |
 | Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` (allocated, v0.2) | §9.5 | MYND-160 |
 | Search index (`vault.search`) | `MYS1` | `MYS5` | §9.6 | MYND-29 |
 | Workspace state (`vault.workspace`) | `MYW1` | `MYW5` | §9.7 | MYND-166 |
@@ -2909,6 +3092,7 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Agent-memory catalog (`vault.agent-memory`) | `MYN1` | `MYN5` (allocated, v0.2) | §9.25 | myne-md/myne#697 |
 | Agent-memory entry blob (`memories/<id>`) | `MYX1` | `MYX5` (allocated, v0.2) | §9.26 | myne-md/myne#697 |
 | Agent-personality singleton (`vault.personality`) | `MYZ1` | `MYZ5` (allocated, v0.2) | §9.27 | myne-md/myne#697 |
+| Per-person private AI profile (`profiles/<profile-id>`) | — | `MYY5` (defined, v0.2 B2B) | §9.28 | myne-md/myne#712 |
 | CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5` and `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic**: it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only**: it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09, the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family). The three agent-layer rows (`MYN1`/`MYN5`, `MYX1`/`MYX5`, `MYZ1`/`MYZ5`) landed with `decisions.md` 2026-09-10 (myne-md/myne#697): `N` = *nMemory* is wrong to claim: `N` names nothing and is a free §10.3 letter, implementer-allocated like every family magic (the §9.20 `MYF1` precedent), as are `X` and `Z`; all three are **v0.1 families** (a v0.1 vault's agent-layer files carry `MYN1`/`MYX1`/`MYZ1`), so their `MY?5` rows are allocated in the same class as `MYM5`/`MYJ5`, and a v0.1→v0.2 migration re-seals them exactly as §10.4.1 re-seals the chats pair. Letters chosen from the free pool at allocation time (`M`-pool leftovers `N`/`X`/`Z` were all free; a later letter change would be a mechanical rename, not a format change, the §9.22 note).

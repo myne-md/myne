@@ -3695,6 +3695,13 @@
       "verifyAction": "Compare code",
       "yourDevices": "Your devices"
     },
+    "members": {
+      "title": "Members & Security",
+      "access": "Your access",
+      "epochLabel": "Group key epoch",
+      "people": "People",
+      "removalLimitsLabel": "Removal limits"
+    },
     "endpoint": {
       "connect": "Connect",
       "connected": "Connected",
@@ -3911,11 +3918,15 @@
       "hint": "Members of this vault. Each joins with their own identity and credentials.",
       "empty": "No members yet. Inviting someone is the next step.",
       "rotated": "Key rotated",
+      "keyChanged": "Key changed. Verify with the owner.",
+      "relinkConfirmed": "Relink confirmed by owner",
+      "epoch": "Group key epoch {{epoch}}",
       "ownerBadge": "Owner",
       "memberBadge": "Member",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Member removal is currently disabled until the roster sync follow-on ships. Invited members keep access to what they already synced, and nothing here removes them yet.",
+      "removalLimits": "Removing a member would stop their access to future changes only. It cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "inviteReady": "Invite ready for {{fingerprint}}…",
       "title": "Vault members",
       "personHint": "Unlock your member identity with your recovery phrase. It stays on this device until you lock the vault or close the app.",
