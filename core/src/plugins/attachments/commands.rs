@@ -19,7 +19,7 @@
 //! cross IPC. The import path first-line-`Zeroizing`-wraps the source
 //! bytes per the Plaintext-IPC pattern.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::compress::{self, CompressOutcome};
 use super::error::{
@@ -2004,7 +2004,7 @@ pub struct ServedAttachment {
     /// cannot wipe; wrapping the Rust-side copy would zero one of two copies and
     /// read as a guarantee that does not hold. Same reasoning the desktop serve
     /// path already applies to its response body, under the V8-leak-dominance
-    /// argument in `src-tauri/CLAUDE.md`.
+    /// argument in `src-tauri/AGENTS.md`.
     pub bytes: Vec<u8>,
 }
 

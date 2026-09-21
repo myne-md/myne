@@ -29,7 +29,7 @@
 //
 // Copy is asserted against `SYNC_INTEGRITY_ALERT` from
 // `src/lib/load-bearing-copy.ts`, by FULL-LITERAL equality — the repo's own
-// rule for load-bearing banner copy (`e2e/CLAUDE.md`), and not against a
+// rule for load-bearing banner copy (`e2e/AGENTS.md`), and not against a
 // literal duplicated into this file. A test carrying its own copy passes after
 // a copy collapse, which is precisely the failure that rule exists to prevent.
 // (This sentence is deliberately not an i18n key: it is a security disclosure

@@ -14,7 +14,7 @@
 //! Content dispatch is explicitly OUT of scope here (task 4 owns the
 //! request/reply payload shapes) — this module returns raw bytes only.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — a frame
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — a frame
 //! body may carry note plaintext (task 6/8's `show`/`new`); this module
 //! never logs a frame body, only the closed [`FrameError`] variant name and
 //! non-secret declared/observed byte counts.
@@ -177,7 +177,7 @@ impl Budget {
 /// [`MAX_FRAME_BODY`] is rejected before any body allocation; a truncated
 /// prefix or body is a typed error, never an `unwrap`/`expect`/index panic.
 /// The budget is a REQUIRED argument rather than an `Option` with a default,
-/// because a default here is the shape `CLAUDE.md` records under "a guard
+/// because a default here is the shape `AGENTS.md` records under "a guard
 /// parameter with a default value is an opt-in guard": the arm that never fires
 /// is the one a new call site silently takes, and the one call site that matters
 /// is the socket. Every caller states whether its reader has a peer to pace.

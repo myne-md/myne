@@ -14,7 +14,7 @@
 //                                   `key` (base64 → DER → SHA-256 → first 16
 //                                   bytes → hex nibble `0..f` mapped to `a..p`)
 //   2. `FIREFOX_EXTENSION_ID`   ==  the extension manifest's own gecko id
-//   3. all three constants      ==  the values the root `CLAUDE.md`
+//   3. all three constants      ==  the values the root `AGENTS.md`
 //                                   load-bearing-identifiers table publishes
 //   4. the generated manifests   reference the constants rather than literals
 //
@@ -54,7 +54,7 @@ const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
  *
  * Resolved from the repo root rather than from this script's own location, so
  * it is the same path whether this runs from the main checkout or from a
- * worktree under `.claude/worktrees/`.
+ * worktree under `.opencode/worktrees/`.
  *
  * `MYNE_CLIPPER_DIR` overrides it, and exists for one reason: the
  * companion-ABSENT branch is the branch that runs in CI and in a fresh clone,
@@ -69,7 +69,7 @@ const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
  * **A single hardcoded `../../../` was worktree-only, and it degraded into the
  * exact silence the paragraph above warns about.** Companions are cloned
  * NESTED, at `<repo>/myne-clipper` (`workspace/manifest.txt`). From a worktree
- * under `.claude/worktrees/<name>` that sits three levels up, which is the path
+ * under `.opencode/worktrees/<name>` that sits three levels up, which is the path
  * this used to hardcode, so the check verified the derivation from a worktree
  * and reported a shorter `ok` from the ordinary checkout, where it resolved
  * `<parent-of-repo>/../myne-clipper` and found nothing. Green either way, and
@@ -91,7 +91,7 @@ const COMPANION = process.env.MYNE_CLIPPER_DIR
 const COMPANION_MANIFEST = join(COMPANION, "src", "manifest.json");
 
 const MANIFEST_RS = "src-tauri/src/clipper/manifest.rs";
-const CLAUDE_MD = "CLAUDE.md";
+const AGENTS_MD = "AGENTS.md";
 
 const failures = [];
 const notes = [];
@@ -150,13 +150,13 @@ if (firefoxId !== null && !firefoxId.includes("@")) {
   );
 }
 
-// ── 2. The root CLAUDE.md table publishes these values ──────────────────────
+// ── 2. The root AGENTS.md table publishes these values ──────────────────────
 //
 // That table is normative prose — a reader takes the value from it — and it is
 // the one place the three appear together. A constant changed without the table
 // leaves a published identifier that is wrong, in a document whose whole purpose
 // is being the reference.
-const claudeMd = read(CLAUDE_MD);
+const claudeMd = read(AGENTS_MD);
 for (const [name, value] of [
   ["CHROMIUM_EXTENSION_ID", chromiumId],
   ["FIREFOX_EXTENSION_ID", firefoxId],
@@ -177,7 +177,7 @@ for (const [name, value] of [
   );
   if (!bounded.test(claudeMd)) {
     fail(
-      `${CLAUDE_MD}: the load-bearing-identifiers table does not carry ${name}'s ` +
+       `${AGENTS_MD}: the load-bearing-identifiers table does not carry ${name}'s ` +
         `current value "${value}". Changing one of these forces a re-pair on every ` +
         `distributed install, and the table is where that is published.`,
     );

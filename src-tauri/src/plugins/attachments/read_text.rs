@@ -9,7 +9,7 @@
 //!
 //! Secret-handling: the returned `text` is note-body-class plaintext — it is
 //! DENY-listed and MUST NOT be logged or placed in any tracing field; see
-//! `src-tauri/CLAUDE.md` "Plaintext IPC across the WebView boundary".
+//! `src-tauri/AGENTS.md` "Plaintext IPC across the WebView boundary".
 
 use crate::plugins::attachments::extract::{extract_docx_blocks, extract_xlsx_grid, DocxBlockKind};
 use crate::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};

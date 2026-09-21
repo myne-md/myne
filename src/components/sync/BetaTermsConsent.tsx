@@ -26,7 +26,7 @@
 // the asking, not the enforcement.
 //
 // Copy discipline: the four clauses come from `load-bearing-copy.ts` verbatim
-// and are never i18n'd (`src/CLAUDE.md`), because each is a bounded claim — a
+// and are never i18n'd (`src/AGENTS.md`), because each is a bounded claim — a
 // translation that softened "cannot be recovered" into "may be difficult to
 // recover" would be a good translation and a false statement. Only the chrome
 // around them is translated.

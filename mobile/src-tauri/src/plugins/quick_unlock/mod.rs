@@ -18,7 +18,7 @@
 //! prompt; the Keychain item is device-only (`WhenUnlockedThisDeviceOnly`), so
 //! a restored backup re-offers setup instead of silently resurrecting the gate.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" in the main repo.
+//! See: ../../AGENTS.md "Secret-handling logging discipline" in the main repo.
 
 // Re-exported for path-compatibility with any consumer referencing
 // `crate::plugins::quick_unlock::{attempt,error,pin,provider}` (mirrors the

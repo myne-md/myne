@@ -20,7 +20,7 @@
 // selection layer, because `EditorView` calls `docViewUpdate()` only under
 // `if (redrawn)`. A predicate test cannot see that, and neither can injecting
 // the defect the predicate checks for, because the defect was in the half that
-// ACTS rather than the half that decides. `CLAUDE.md` names this shape: "a
+// ACTS rather than the half that decides. `AGENTS.md` names this shape: "a
 // fixture that cannot hold the defective state is not a test".
 //
 // So the second describe below mounts a real `EditorView` and asserts the

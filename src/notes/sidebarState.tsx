@@ -942,7 +942,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
   // `startRename` is REQUIRED rather than defaulted, and myne#653 is why a
   // default here would be the wrong shape: it decides whether creating a note
   // takes focus away from that note, and a defaulted argument excuses the next
-  // create path from making the choice at all (`CLAUDE.md`, "a default is the
+  // create path from making the choice at all (`AGENTS.md`, "a default is the
   // arm that never fires"). The two callers answer it differently on the
   // merits, see each.
   const createWithMintAndStartRename = useCallback(

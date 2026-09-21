@@ -302,7 +302,7 @@ pub async fn drain_pending_shares<R: Runtime>(
     let sealed_files = queue::list_files(&sealed).len();
     // COUNTS ONLY — the two `%…display()` path fields that used to sit here
     // were a direct DENY-list violation (myne#389 item C): "full filesystem
-    // path" is on the list in `src-tauri/CLAUDE.md`, and `%` is the formatter
+    // path" is on the list in `src-tauri/AGENTS.md`, and `%` is the formatter
     // the closed-enum mapping rule forbids on a path-bearing value. Both paths
     // are backend-resolved (`<app_data_dir>/pending-shares/{staging,sealed}`),
     // so they carry the user's home directory — at INFO, the default level.
@@ -748,7 +748,7 @@ mod tests {
                 assert!(
                     !code.contains(forbidden),
                     "line {} contains `{forbidden}`: a filesystem path must never reach a \
-                     tracing record (DENY list, src-tauri/CLAUDE.md). Emit a count, a closed \
+                     tracing record (DENY list, src-tauri/AGENTS.md). Emit a count, a closed \
                      enum, or a static stage tag instead.\n  {code}",
                     i + 1,
                 );

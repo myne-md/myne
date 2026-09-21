@@ -13,7 +13,7 @@
 // VERIFICATION STATUS (Saved Views #5, 2026-06-15): authored to the harness
 // conventions but NOT yet run on this dev platform (macOS; the suite is
 // Linux/tauri-driver only — `pnpm test:e2e` self-skips off-platform). Definition
-// of done per e2e/CLAUDE.md is "green 3× in the container" (./scripts/e2e-local.sh)
+// of done per e2e/AGENTS.md is "green 3× in the container" (./scripts/e2e-local.sh)
 // and MUST be met before merge. Run ISOLATED per the full-suite-contamination
 // note (e2e-full-suite-contamination memory).
 //
@@ -57,7 +57,7 @@ async function cardTitles(s: Session): Promise<string[]> {
 // which is why the victim moved between runs and read as a loaded host.
 // `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
 // before any worker starts. Measured after the fix, `--retry=0`, warm
-// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+// container: 16 consecutive clean runs, which is the bar `e2e/AGENTS.md` sets.
 describeE2E("svc1 cards view renders live notes as image-less cards (MYND-275)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("opens a blank cards view as a tab and renders one card per note", async () => {

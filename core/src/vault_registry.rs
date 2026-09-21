@@ -41,7 +41,7 @@
 //!
 //! ## Logging discipline
 //!
-//! Per `src-tauri/CLAUDE.md` "Secret-handling logging discipline", a full
+//! Per `src-tauri/AGENTS.md` "Secret-handling logging discipline", a full
 //! filesystem path and a `VaultId` (a per-vault vault-stable correlation
 //! tag) are both DENY-listed. This module keeps `VaultId`s and paths off the
 //! tracing surface entirely — the only emitted signals are coarse counts and

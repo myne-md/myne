@@ -73,10 +73,10 @@ try {
 }
 skillBody = skillBody.replace(/^---[\s\S]*?---\s*/, '');
 
-// The skill text names the subagent tool "Agent" (its Claude Code name). Under
-// opencode the same capability is the `task` tool. This note translates the one
-// name so the adversarial pass does not degrade the way it degraded for a week
-// under Claude Code when the skill's own name was wrong: the reviewer must not
+// The skill text names the subagent tool "Agent" (the name it was written under).
+// Under opencode the same capability is the `task` tool. This note translates the
+// one name so the adversarial pass does not degrade the way it degraded for a week
+// when the skill's own name was wrong: the reviewer must not
 // conclude the harness forbids a subagent it never tried to launch.
 const prompt =
   skillBody +

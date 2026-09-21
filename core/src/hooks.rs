@@ -10,7 +10,7 @@
 //!
 //! Async methods return a hand-rolled `Pin<Box<dyn Future + Send>>` (the
 //! `async-trait` desugaring, written by hand) so the trait is object-safe
-//! WITHOUT pulling in the `async-trait` dependency (repo-root CLAUDE.md:
+//! WITHOUT pulling in the `async-trait` dependency (repo-root AGENTS.md:
 //! "Adding a dependency is a security decision"). Sync methods stay plain.
 //!
 //! Scope note: this is the note-CRUD + unlock/lock hook surface (the six
@@ -20,7 +20,7 @@
 //! `NoopHooks` no-op) if a shared core ever needs one.
 //!
 //! Secret-handling: `note_body` passed to [`VaultLifecycleHooks::index_note_attachments`]
-//! is plaintext — never log it (see `src-tauri/CLAUDE.md` "Secret-handling
+//! is plaintext — never log it (see `src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline").
 
 use std::future::Future;

@@ -19,7 +19,7 @@
 // pre-unlock `data-*` attribute for the same reason.
 //
 // The desktop client is URL-free, so there is no desktop scenario this could
-// duplicate. This is web-specific behaviour, which is what `e2e-web/CLAUDE.md`
+// duplicate. This is web-specific behaviour, which is what `e2e-web/AGENTS.md`
 // says belongs in this lane.
 //
 // # What is asserted

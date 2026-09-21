@@ -7,7 +7,7 @@
 //
 // Scaffold note (CI): this suite drives the real tauri-driver harness (Linux/CI,
 // `docs/dev/e2e.md`) — it is NOT runnable headless on macOS. The load-bearing
-// seams it attaches to are stable testids shipped WITH the flow (root CLAUDE.md
+// seams it attaches to are stable testids shipped WITH the flow (root AGENTS.md
 // "a flow ships with its E2E"): `notes.newTab.create-drawing` (the chooser button)
 // and `drawing.canvas` (the mounted Excalidraw surface). The canvas is an HTML5
 // `<canvas>`, so asserting drawn *content* (vs. its mount + persistence) needs the

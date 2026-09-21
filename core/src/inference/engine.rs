@@ -228,7 +228,7 @@ pub trait Engine: Send + Sync {
     /// the partial result generated so far is returned.
     ///
     /// The callback receives incremental text only; **no token, prompt, or
-    /// note-derived string is ever logged** (DENY-list, `src-tauri/CLAUDE.md`).
+    /// note-derived string is ever logged** (DENY-list, `src-tauri/AGENTS.md`).
     ///
     /// Default: a non-streaming fallback that computes the whole result and
     /// emits it once — correct for any engine that has no incremental path.
@@ -369,7 +369,7 @@ pub trait Engine: Send + Sync {
     /// this session", never to a wrong identity.
     ///
     /// Neither string is logged (both name the user's model choice, and the
-    /// DENY-list discipline in `src-tauri/CLAUDE.md` governs this whole tree).
+    /// DENY-list discipline in `src-tauri/AGENTS.md` governs this whole tree).
     fn served_model_identity(&self) -> Option<(String, String)> {
         None
     }

@@ -19,7 +19,7 @@
 //
 // It does not close anything. The caller owns the browser and the server, so
 // the `finally` that tears them down stays visible in the scenario rather than
-// hiding behind a helper — which is the shape `e2e/CLAUDE.md` asks for on the
+// hiding behind a helper — which is the shape `e2e/AGENTS.md` asks for on the
 // desktop side, for the reason a leaked driver is worse than a duplicated line.
 
 import { expect } from "vitest";

@@ -263,7 +263,7 @@ pub(crate) async fn vault_export_core(
     Ok(summary)
 }
 
-// see: ../../CLAUDE.md "Secret-handling logging discipline"
+// see: ../../AGENTS.md "Secret-handling logging discipline"
 
 #[cfg(test)]
 mod tests {

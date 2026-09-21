@@ -170,7 +170,7 @@ mod tests {
     /// true by construction. Meanwhile the TypeScript twin compares the Rust
     /// roster to `HIDING_MARKERS`, so the two rosters were held to each other
     /// and neither to the authority. A roster compared against a second copy of
-    /// itself, which root `CLAUDE.md` names as a recurring failure here
+    /// itself, which root `AGENTS.md` names as a recurring failure here
     /// (myne-md/myne#531 review round seven).
     ///
     /// Compared BOTH directions: a field added to `isLiveNote` and not here

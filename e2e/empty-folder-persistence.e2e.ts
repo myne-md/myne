@@ -179,7 +179,7 @@ describeE2E("ef1 an emptied folder stays (myne-md/myne#613)", () => {
         await lockAndReunlock(s, password);
         await s.waitForElement(folderRow());
 
-        // Folders are CLOSED unless opened (`src/CLAUDE.md`), so the note's row
+        // Folders are CLOSED unless opened (`src/AGENTS.md`), so the note's row
         // does not exist in the DOM until its folder is expanded. A single click
         // on a non-empty folder row toggles it.
         //
@@ -187,7 +187,7 @@ describeE2E("ef1 an emptied folder stays (myne-md/myne#613)", () => {
         // `clickUntilVisible`, which takes bare testids and cannot express an
         // attribute-scoped selector. A click that misses would otherwise leave
         // the wait below burning its whole budget on a row that is never coming,
-        // which is the permanent-state family `e2e/CLAUDE.md` records. Its 2 s
+        // which is the permanent-state family `e2e/AGENTS.md` records. Its 2 s
         // per-attempt window is what keeps a TOGGLE from oscillating.
         await clickUntilTrue(s, folderRow(), {
           done: async () => (await s.findElements(noteRow(noteId))).length > 0,

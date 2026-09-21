@@ -1,7 +1,7 @@
 //! `graph_layout` plugin IPC error enums.
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline" (no path
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline" (no path
 //! strings, no key material, no kernel-error display). The TS side treats
 //! both as opaque IPC rejections (the graph layout is a best-effort cache),
 //! so there is no TS error-type mirror.

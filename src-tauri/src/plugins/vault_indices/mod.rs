@@ -28,7 +28,7 @@
 //! `InlinedPlugin` so permissions resolve under the `vault-indices:`
 //! namespace.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 /// Budget-gated benchmark harness (MYND-31 Task 7) — test-only; see `bench.rs`.
 #[cfg(test)]

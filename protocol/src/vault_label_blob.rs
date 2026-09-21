@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn the_magic_is_the_allocated_one() {
         // A blob-family magic is a major-version-event constant (root
-        // `CLAUDE.md`). Pin the bytes so a rename has to argue with a test.
+        // `AGENTS.md`). Pin the bytes so a rename has to argue with a test.
         assert_eq!(VAULT_LABEL_BLOB_MAGIC, *b"MYL1");
         assert_eq!(VAULT_LABEL_BLOB_PROTOCOL_VERSION, 0x01);
         assert_eq!(VAULT_LABEL_BLOB_HEADER_LEN, 49);

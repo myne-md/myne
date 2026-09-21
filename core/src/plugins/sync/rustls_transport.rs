@@ -216,7 +216,7 @@ fn open_socket_via(proxy: &ProxyGate, host: &str, port: u16) -> Result<TcpStream
         }
         Err(denied) => {
             // The bare denial reason only — never the host, the port or the
-            // proxy port (`src-tauri/CLAUDE.md` secret-handling discipline; the
+            // proxy port (`src-tauri/AGENTS.md` secret-handling discipline; the
             // sync hostname is the thing Tor mode exists to keep off this
             // device's disk and resolver).
             tracing::warn!(

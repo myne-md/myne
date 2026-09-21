@@ -87,7 +87,7 @@ rewrite being an event. A cryptographic transparency log (Sigstore's Rekor is
 the obvious candidate) would raise that from "visible" to "verifiable by a third
 party", and is the natural next step — it is not here yet because it adds a
 dependency, and adding a dependency is a security decision in this repo
-(`CLAUDE.md`).
+(`AGENTS.md`).
 
 State the property you actually have. This one is: **a deploy cannot happen
 unless its hash was published first, and a published hash cannot change without

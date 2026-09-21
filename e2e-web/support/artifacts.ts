@@ -1,6 +1,6 @@
 // Failure artifacts, and what must never be in one (MYND-574 task 105).
 //
-// `e2e/CLAUDE.md`'s fourth non-negotiable is that **credentials never reach
+// `e2e/AGENTS.md`'s fourth non-negotiable is that **credentials never reach
 // failure output** — no password, no account number, no recovery phrase in a
 // screenshot, a log or a DOM dump. On the desktop lane that is largely honoured
 // by what the harness captures; here it needs to be enforced, for two reasons:

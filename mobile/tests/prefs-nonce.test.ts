@@ -71,7 +71,7 @@ import { usePrefs, DEFAULT_PREFS } from "../src/lib/use-prefs";
  * than like "you took the opt-out and owe an entry here". The hatch is
  * documented in both prefs modules and used in neither, so an empty set with a
  * reason is what keeps it usable at the cost of one reviewable line, the shape
- * CLAUDE.md praises for `ai-no-network-check.sh` check 4.
+ * AGENTS.md praises for `ai-no-network-check.sh` check 4.
  */
 const BUMPLESS = new Set<string>();
 

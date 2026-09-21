@@ -33,7 +33,7 @@
 //! rather than a failure: the store then writes nothing, and the picker falls
 //! back to the neutral label. Wiring the Linux secret service or the Windows
 //! credential store means adding a dependency, which is a security decision in
-//! its own right (root `CLAUDE.md`) and not something to slip in behind a
+//! its own right (root `AGENTS.md`) and not something to slip in behind a
 //! feature. What must never happen on those platforms is the other fallback,
 //! writing the name in plaintext, because it would look identical on screen
 //! while voiding the erase guarantee.

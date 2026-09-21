@@ -25,7 +25,7 @@
 //! write-capable plugins, v0.2 multi-window MUST NOT grant the mutating grants
 //! (`allow-themes-import` / `allow-themes-delete`) to any non-main window.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The `themes` command core (vault.themes read/import/export/delete) lives in
 // `myne-core` (shared with the mobile client). Re-exported so existing

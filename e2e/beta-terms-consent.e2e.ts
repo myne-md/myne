@@ -29,7 +29,7 @@
 // that have nothing to do with consent.
 //
 // The four clauses are asserted by FULL-LITERAL equality against `@myne/copy`
-// (e2e/CLAUDE.md): each is a bounded claim, and the failure this guards against
+// (e2e/AGENTS.md): each is a bounded claim, and the failure this guards against
 // is a well-meaning paraphrase that softens one of them.
 //
 // Green 3× consecutive in the Linux tauri-driver container (the e2e DoD),

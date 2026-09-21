@@ -86,7 +86,7 @@
 //!
 //! ## Logging discipline
 //!
-//! Per `src-tauri/CLAUDE.md` "Secret-handling logging discipline", full
+//! Per `src-tauri/AGENTS.md` "Secret-handling logging discipline", full
 //! filesystem paths and `VaultId`s are DENY-listed. This module keeps both
 //! off the tracing surface — only coarse static `stage` strings and the
 //! closed [`IoFailureKind`] reduction are emitted.

@@ -981,7 +981,14 @@ export function PaneView({
         //
         // `flushOutgoing` saves for whatever note the hook still holds, which at
         // this point is the previous one.
-        autosaveRef.current?.flushOutgoing();
+        // Flush the outgoing note, THEN refresh its row title: a title/H1 edit
+        // made just before the switch flushes here (not through the saved-status
+        // path), so without this its sidebar cache title stays stale and the row
+        // (and every view over it) reads "Untitled".
+        const outgoingId = prevId;
+        void autosaveRef.current?.flushOutgoing().then(() => {
+          if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
+        });
         autosaveRef.current?.acceptReloadedBody(doc);
         setLoading(false);
         // Anchor-driven open → land at the top and let the anchor effect take it
@@ -1014,7 +1021,14 @@ export function PaneView({
         if (cancelled) return;
         setContent(body);
         // Same ordering hazard as the cached-swap path above (myne#288).
-        autosaveRef.current?.flushOutgoing();
+        // Flush the outgoing note, THEN refresh its row title: a title/H1 edit
+        // made just before the switch flushes here (not through the saved-status
+        // path), so without this its sidebar cache title stays stale and the row
+        // (and every view over it) reads "Untitled".
+        const outgoingId = prevId;
+        void autosaveRef.current?.flushOutgoing().then(() => {
+          if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
+        });
         autosaveRef.current?.acceptReloadedBody(body);
         // myne-md/myne#600: a note read from disk has no view holding it yet, so
         // the loading gate rebuilds one and the body arrives through the value
@@ -1245,8 +1259,14 @@ export function PaneView({
     const at = autosave.status.at.getTime();
     if (at === lastRefreshedAt.current) return;
     lastRefreshedAt.current = at;
-    if (activeId === null) return;
-    void ctx.refreshOne(activeId).catch(() => {});
+    // Refresh the note the save was FOR, not the pane's current one: a title
+    // edit saved as the user switches notes must still reach the outgoing row's
+    // cache title, or that note shows "Untitled" in the sidebar and in any view
+    // (measured: three createNote calls back to back left saved-views-cards
+    // rendering three "Untitled" cards while every body was on disk).
+    const savedId = autosave.status.noteId ?? activeId;
+    if (savedId === null) return;
+    void ctx.refreshOne(savedId).catch(() => {});
   }, [autosave.status, ctx, activeId]);
 
   // Document statistics (MYND-339): whole-doc (debounced from content) +
@@ -1946,7 +1966,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           // most at risk, and it does so while telling the user the cover write
           // failed when the note write had already succeeded.
           //
-          // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
+          // Settle (`src/AGENTS.md`, "A backend write made OUTSIDE a pane's
           // autosave loop leaves that pane holding a stale buffer"). This call
           // site is the one that needs it most and had none: the target is a
           // note in a VIEW RESULT, so by definition it is not the note this

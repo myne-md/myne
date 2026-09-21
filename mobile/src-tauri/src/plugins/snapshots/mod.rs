@@ -16,7 +16,7 @@
 //! snapshots dir (list/prune return empty/0; preview/restore return
 //! `SnapshotNotFound` for any id).
 //!
-//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline".
 
 // Re-exported for path-compatibility with any consumer referencing

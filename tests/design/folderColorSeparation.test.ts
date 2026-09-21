@@ -37,7 +37,7 @@ import { join } from "node:path";
 const REPO_ROOT = process.cwd();
 
 // The sheet the app actually loads. `docs/design/colors_and_type.css` is a
-// SUBSET of it (src/CLAUDE.md): it carries no `:root[data-theme="amoled"]`
+// SUBSET of it (src/AGENTS.md): it carries no `:root[data-theme="amoled"]`
 // block at all, so reading the canon copy here would silently drop a third of
 // the matrix — the third with a pure-black background, which is the one most
 // likely to lose a dark swatch.

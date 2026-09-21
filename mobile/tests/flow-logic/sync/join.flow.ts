@@ -163,7 +163,7 @@ test.describe("sync join flow", () => {
     await page.getByTestId("sync.join.scan-qr").click();
 
     await expect(page.getByTestId("sync.join.error")).toHaveText(
-      "Scanning isn’t available on this device — enter your details below.",
+      "Scanning isn’t available on this device. Enter your details below.",
     );
     // Not the generic scan failure, which would read as "your camera didn't
     // work, try again" on a device where trying again can never work.

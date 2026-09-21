@@ -37,7 +37,7 @@
 //! desktop-only wiring (decrypt-to-get-folder, read `cli_excluded_folders`
 //! from `vault.prefs`) around that shared, pure predicate.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — this
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — this
 //! module never logs a note id, a folder name, or a body; the one `tracing`
 //! call site here carries a bounded outcome tag only.
 

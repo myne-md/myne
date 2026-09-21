@@ -74,7 +74,7 @@ pub struct PairedExtension {
     pub revoked: bool,
     /// Unix seconds when this pairing was issued (the in-app Accept time), or
     /// `None` for records persisted before this field existed. A user-meaningful
-    /// timestamp, so it lives INSIDE the encrypted blob (`CLAUDE.md` commitment).
+    /// timestamp, so it lives INSIDE the encrypted blob (`AGENTS.md` commitment).
     /// **Additive optional field** (§ 9.5.2): omitted from the canonical JSON
     /// when `None`, so pre-feature records stay byte-identical, and an old
     /// decoder ignoring the new key still validates the token (forward-compat).

@@ -35,7 +35,7 @@
 //! Only bare phase names are ever logged. arti's own stderr is classified and
 //! dropped, never mirrored: it names the hosts being connected to, which is
 //! precisely what Tor mode exists to keep out of observable places
-//! (`src-tauri/CLAUDE.md` secret-handling discipline).
+//! (`src-tauri/AGENTS.md` secret-handling discipline).
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
@@ -73,7 +73,7 @@ const REAP_TIMEOUT: Duration = Duration::from_secs(5);
 /// Why the sidecar could not be started.
 ///
 /// No `String` and no path: this reaches the UI (task 8), where a filesystem
-/// path would be a disclosure (`src-tauri/CLAUDE.md` DENY list). `Serialize` is
+/// path would be a disclosure (`src-tauri/AGENTS.md` DENY list). `Serialize` is
 /// what lets the task-6 toggle command report *why* a spawn failed without
 /// re-describing these four cases in a second enum; every variant is a unit, so
 /// the wire form is the bare variant name and there is no payload that could

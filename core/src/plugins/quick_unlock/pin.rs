@@ -7,7 +7,7 @@
 //! is what bounds offline brute-force of a low-entropy PIN. A minimum 6-digit
 //! PIN is enforced host-side by [`validate_pin`] before any KDF work.
 //!
-//! Secret-handling discipline (see `../../CLAUDE.md`): the PIN is carried in
+//! Secret-handling discipline (see `../../AGENTS.md`): the PIN is carried in
 //! `Zeroizing<String>` and never logged; the derived `wrap_key` is
 //! `Zeroizing<[u8; 32]>`.
 

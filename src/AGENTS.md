@@ -1,6 +1,6 @@
 # src/ — React UI (Tauri WebView)
 
-> Subdirectory CLAUDE.md. Loaded when Claude reads files here. See repo-root `CLAUDE.md` for project-wide context.
+> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for project-wide context.
 
 ## Stack
 
@@ -237,11 +237,11 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
 
 ## Test observability (E2E contract — SYNC-8)
 
-The real-IPC E2E suites (`e2e/`, tauri-driver — see `e2e/CLAUDE.md` +
+The real-IPC E2E suites (`e2e/`, tauri-driver — see `e2e/AGENTS.md` +
 `docs/dev/e2e.md`; and the deliberately thin browser lane `e2e-web/`)
 locate everything by `data-testid`. **A screen without testids is invisible to
 E2E — adding a user-facing flow means adding its testid pass in the same
-change.** Which lane owes a scenario is the root `CLAUDE.md`'s call, not this
+change.** Which lane owes a scenario is the root `AGENTS.md`'s call, not this
 file's: shared-tree flows go to `e2e/`, web-specific behaviour to `e2e-web/`.
 
 - Naming: `<screen>.<element>` (`unlock.password-input`, `picker.vault-row`,

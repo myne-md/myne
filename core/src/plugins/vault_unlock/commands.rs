@@ -11,7 +11,7 @@
 //! (PRD + task log) and the grilling session referenced from
 //! `super::mod.rs`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::{VaultStatusError, VaultUnlockError};
 use super::state::{Slot, SlotKind, UnlockedVault, VaultRuntimeState};
@@ -672,7 +672,7 @@ pub(crate) async fn apply_persisted_prefs(
 /// post-unlock prefs application path. Static-string only, no DENY-list
 /// payload leakage (variants are unit-like or carry closed-enum
 /// `IoFailureKind`). Mirrors `screen_capture_protection_error_kind`
-/// and `prefs_blob_error_kind` discipline from `src-tauri/CLAUDE.md`.
+/// and `prefs_blob_error_kind` discipline from `src-tauri/AGENTS.md`.
 fn prefs_read_error_kind(e: &crate::plugins::prefs::PrefsReadError) -> &'static str {
     use crate::plugins::prefs::PrefsReadError;
     match e {
@@ -1144,7 +1144,7 @@ pub async fn unlock_with_path(
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
-    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `src-tauri/AGENTS.md` "Secret-handling logging discipline".
     // `duration_ms` rounded down to 10ms granularity per
     // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry —
     // future-ready timing-channel resistance (Phase 1 A7 side-channel
@@ -1707,7 +1707,7 @@ pub async fn vault_status_from_host(
 /// grouped display form and the bare canonical body validate identically.
 ///
 /// **Nothing leaves the client.** The input is not logged (it is an account
-/// identifier, and `src-tauri/CLAUDE.md`'s DENY list covers it), not stored, and
+/// identifier, and `src-tauri/AGENTS.md`'s DENY list covers it), not stored, and
 /// not returned — only the verdict is.
 pub fn account_number_is_valid(input: &str) -> bool {
     protocol::parse_account_number(input.trim()).is_ok()
@@ -1922,7 +1922,7 @@ pub enum VaultSummaryStatus {
 ///   from the best-effort registry cache; `None` for a vault never unlocked
 ///   (or whose cache entry was just rebuilt).
 ///
-/// **Never emitted** (DENY-list, `src-tauri/CLAUDE.md`): the vault's
+/// **Never emitted** (DENY-list, `src-tauri/AGENTS.md`): the vault's
 /// `account_number_hash` bytes and its full filesystem path. The path lives
 /// on [`crate::vault_registry::DiscoveredVault::root`] and is dropped here.
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -2600,7 +2600,7 @@ mod tests {
     /// password reach any tracing sink. Drives the full `unlock_with_path`
     /// failure path (all instrumented call sites) with a distinctive marker
     /// password and asserts it never appears in captured logs — the runtime
-    /// proof of the `src-tauri/CLAUDE.md` DENY-list discipline (the
+    /// proof of the `src-tauri/AGENTS.md` DENY-list discipline (the
     /// reviewer-enforced "never log the password" rule, now machine-checked).
     #[test]
     #[tracing_test::traced_test]
@@ -3671,7 +3671,7 @@ mod tests {
         // legitimately carries, so the tamper became a no-op and the test
         // asserted that an UNTOUCHED meta parses (the failure that surfaced it:
         // `got Ok(Exists)`). That is the recorded version-constant hazard in
-        // `protocol/CLAUDE.md`; pick a value no major version claims.
+        // `protocol/AGENTS.md`; pick a value no major version claims.
         rt().block_on(async {
             let (mut bytes, _) = seed_vault_meta("pw");
             bytes[4] = 0xFF;

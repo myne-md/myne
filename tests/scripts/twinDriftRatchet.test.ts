@@ -9,11 +9,11 @@ import { EXAMINED_FLOOR, measure, ratchet } from "../../scripts/check-twin-drift
 
 // Injection suite for `scripts/check-twin-drift-ratchet.mjs`.
 //
-// Per `CLAUDE.md`: verifying a guard means BREAKING it. Each verdict is driven
+// Per `AGENTS.md`: verifying a guard means BREAKING it. Each verdict is driven
 // with synthetic pairs rather than against `src/` and `mobile/src/`, so a
 // crashed run cannot leave a production module corrupted.
 //
-// The half most of these suites skip is the WRITING path. CLAUDE.md records
+// The half most of these suites skip is the WRITING path. AGENTS.md records
 // `check-ipc-binding-callers.mjs` seeding every entry with a placeholder its own
 // reason check accepted, so `--record` produced a file that went green while
 // every entry in it said its reason was missing, and injecting the defect the

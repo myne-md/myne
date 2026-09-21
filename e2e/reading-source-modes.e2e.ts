@@ -15,7 +15,7 @@
 // VERIFICATION STATUS (editor-modes-trio, 2026-06-17): authored to the harness
 // conventions but NOT yet run on this dev platform (macOS; the suite is
 // Linux/tauri-driver only — `pnpm test:e2e` self-skips off-platform). Definition
-// of done per e2e/CLAUDE.md is "green 3× in the container"
+// of done per e2e/AGENTS.md is "green 3× in the container"
 // (./scripts/e2e-local.sh) and MUST be met before merge. Run ISOLATED per the
 // full-suite-contamination note (e2e-full-suite-contamination memory).
 

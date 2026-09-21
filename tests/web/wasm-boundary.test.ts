@@ -11,7 +11,7 @@
 //
 // So this file reads both sides and compares them. Deliberately a text scan
 // rather than a parser: the surface is three exports, and a Rust parser
-// dependency to check three names would be the wrong trade (root CLAUDE.md:
+// dependency to check three names would be the wrong trade (root AGENTS.md:
 // adding a dependency is a security decision).
 
 import { readFileSync } from "node:fs";

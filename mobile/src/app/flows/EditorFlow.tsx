@@ -186,7 +186,7 @@ const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
  *
  * Note plaintext is held in component-local state for the controlled textarea
  * and wiped on every exit path + on unmount (best-effort; the load-bearing
- * zeroize is Rust-side per `src-tauri/CLAUDE.md`).
+ * zeroize is Rust-side per `src-tauri/AGENTS.md`).
  */
 
 type Editing = { id: string | null };
@@ -1445,7 +1445,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // (`src/screens/Editor.tsx`). Without it React 19 dev runs this twice, both
   // runs read the pre-write `deliberate_folders`, and the second issues a
   // duplicate ADD write: a second full `vault.prefs` re-encrypt on every dev
-  // unlock. `src/CLAUDE.md`: "Effects run twice; design with idempotency."
+  // unlock. `src/AGENTS.md`: "Effects run twice; design with idempotency."
   const booted = useRef(false);
   useEffect(() => {
     if (booted.current) return;
@@ -3056,7 +3056,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // close the editor, so `editing` and `editorText` survive holding
             // PRE-apply bytes; `editorUnchanged(id)` then reads true, and the
             // next keystroke saves that stale buffer over the change the user
-            // just approved. `src/CLAUDE.md` states this as a rule ("the pane's
+            // just approved. `src/AGENTS.md` states this as a rule ("the pane's
             // next autosave writes that stale buffer back over the change"), the
             // desktop screen discharges it with `reloadOpenNote`, and this file
             // already carries the same pattern for `SnapshotsSheet.onRestored`.

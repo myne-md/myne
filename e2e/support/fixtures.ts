@@ -283,7 +283,7 @@ export function vaultMetaPath(appDataDir: string, vaultId: string): string {
 //
 // Positive controls complementing PS-1's negative residue scan: after an
 // import, the per-attachment blob and the catalog must carry their
-// load-bearing major-version magic (CLAUDE.md "Cryptographically load-bearing
+// load-bearing major-version magic (AGENTS.md "Cryptographically load-bearing
 // identifiers"; protocol.md §9.9 / §9.10). These helpers only READ the magic —
 // they never redefine it.
 

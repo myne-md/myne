@@ -32,7 +32,7 @@
 //! independently exposes `navigator.clipboard.readText()` to the `tauri://`
 //! origin is a separate, unverified question per platform.
 //
-// see: src-tauri/CLAUDE.md "Secret-handling logging discipline"
+// see: src-tauri/AGENTS.md "Secret-handling logging discipline"
 
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_clipboard_manager::ClipboardExt;

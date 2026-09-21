@@ -1,7 +1,7 @@
 // IPC wrappers for the `backup` Tauri plugin (MYND-32 export / MYND-218
 // restore; epic MYND-217). Signatures hand-mirror
 // `src-tauri/src/plugins/backup/{commands,restore}.rs` — no codegen canary
-// yet (see src/CLAUDE.md "Tauri command bindings").
+// yet (see src/AGENTS.md "Tauri command bindings").
 
 import { invoke } from "../platform/core";
 import { listen, type UnlistenFn } from "../platform/event";

@@ -12,7 +12,7 @@
 //
 // Driven via page-seat IPC (the generic-file-attachment precedent): the slash
 // `/record` UI + the inline player widget render are Vitest-DOM concerns per
-// `e2e/CLAUDE.md`. Here we prove the load-bearing chain — a recorded WAV is
+// `e2e/AGENTS.md`. Here we prove the load-bearing chain — a recorded WAV is
 // stored as an `audio/wav` attachment, survives a catalog re-read ("reopen"),
 // and its served content-type resolves to `audio/wav` (the player's source).
 // The production `data-testid`s for a future UI-driven path are already in
@@ -23,7 +23,7 @@
 // (unlock reads params from vault.meta).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge (it introduces the
 // `plugin:attachments|voice_record_*` IPC paths through the real ACL).
 

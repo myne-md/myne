@@ -23,7 +23,7 @@
 //! `_raw` functions trade footgun for byte-level determinism: the
 //! `myne-test-vectors/` companion repo and crate-internal tampering
 //! tests both depend on the deterministic surface. Production callers
-//! SHOULD use the non-`_raw` wrappers. See `protocol/CLAUDE.md`'s
+//! SHOULD use the non-`_raw` wrappers. See `protocol/AGENTS.md`'s
 //! `_raw` suffix convention paragraph for the project-wide footgun
 //! marker.
 //!
@@ -265,7 +265,7 @@ fn slice_into_array<const LEN: usize>(slab: &[u8; HEADER_PREFIX_LEN], offset: us
 /// 2. Never reuse `item_key_nonce` or `content_nonce` across distinct
 ///    encryptions under the same key. Nonce reuse is catastrophic and
 ///    is the caller's contract — `aead_seal_ctx` cannot detect it
-///    cross-call. See `protocol/CLAUDE.md` "Nonce reuse is
+///    cross-call. See `protocol/AGENTS.md` "Nonce reuse is
 ///    catastrophic" gotcha.
 ///
 /// Production callers SHOULD use Task 7's `encode_new_note`

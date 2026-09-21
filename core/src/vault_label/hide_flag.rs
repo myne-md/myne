@@ -80,7 +80,7 @@ pub struct HideVaultNamesConfig {
 /// Failure surface for reading or writing the flag file.
 ///
 /// Two variants and no `String`: this reaches the UI, and a path in an error
-/// message is a disclosure (`src-tauri/CLAUDE.md` DENY list). Mirrors
+/// message is a disclosure (`src-tauri/AGENTS.md` DENY list). Mirrors
 /// [`crate::plugins::sync::tor_config::TorConfigError`] exactly, because it is
 /// the same kind of file with the same two ways of going wrong.
 #[derive(Debug, Clone, Copy, Error, Serialize, PartialEq, Eq)]

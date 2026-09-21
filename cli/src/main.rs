@@ -243,7 +243,7 @@ fn main() {
         // dropped verb — `myne <note-id>` instead of `myne show <note-id>`.
         // That would put a vault-stable correlation tag into stderr, which is
         // the channel that ends up in `2>` redirects, CI logs and pasted
-        // support output (DENY list: note_id — src-tauri/CLAUDE.md
+        // support output (DENY list: note_id — src-tauri/AGENTS.md
         // "Secret-handling logging discipline"). The shell already shows the
         // user what they typed; `HELP` below shows what they could have.
         _ => {

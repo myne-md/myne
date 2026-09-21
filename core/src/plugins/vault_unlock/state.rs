@@ -48,7 +48,7 @@
 //! work, never across Argon2id. The `Semaphore` permit guards the long-
 //! lived critical section.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
@@ -1418,7 +1418,7 @@ impl VaultRuntimeState {
     /// already captured `new_bytes`. With the lock held throughout,
     /// `vault_lock`'s own write-lock acquire blocks for the duration
     /// of the rewrite (~ms scale), which is allowed by
-    /// `CLAUDE.md` "RwLock held only at start/end" — that rule
+    /// `AGENTS.md` "RwLock held only at start/end" — that rule
     /// targets long holds across Argon2id, not the rewrite-commit
     /// critical section.
     ///

@@ -1,7 +1,7 @@
 # e2e-web/ — the browser E2E lane
 
-> Subdirectory CLAUDE.md. Loaded when Claude reads files here. See repo-root
-> `CLAUDE.md` for project-wide context and `e2e/CLAUDE.md` for the **desktop**
+> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root
+> `AGENTS.md` for project-wide context and `e2e/AGENTS.md` for the **desktop**
 > lane, whose non-negotiables this lane inherits.
 
 ## What this lane is for, and what it is emphatically not for
@@ -30,7 +30,7 @@ scenario files today (`e2e/*.e2e.ts`) — against a browser would roughly double
 the pipeline's slowest step to re-assert identical source, and a second suite
 that duplicates the first decays into the one nobody fixes.
 
-## The non-negotiables, inherited from `e2e/CLAUDE.md`
+## The non-negotiables, inherited from `e2e/AGENTS.md`
 
 They apply here unchanged, and two of them bite differently in a browser:
 
@@ -159,7 +159,7 @@ so `pnpm web:build` exits non-zero and prints nothing the test run echoes. Read
 the build's last line (`emit-web-version: sha256:…`) before believing a green
 run, or pipe the build through something that fails loudly. Without it,
 "verified by breaking it" silently becomes "verified against the unbroken
-build", which is the exact non-evidence the root `CLAUDE.md` guard rules are
+build", which is the exact non-evidence the root `AGENTS.md` guard rules are
 about.
 
 Also: the lane needs `web/wasm/pkg`, which is a derived artefact and is NOT in

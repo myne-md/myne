@@ -17,7 +17,7 @@
 // returns `""` when no day is chosen, because a bare time is not a
 // `TaskInstant`.
 //
-// No new dependency: the grid is hand-rolled, per `CLAUDE.md`'s minimal
+// No new dependency: the grid is hand-rolled, per `AGENTS.md`'s minimal
 // direct-dependency commitment and the module header that first chose the
 // platform input for exactly that reason (a decision this change reverses, with
 // a `design-notes/` entry naming what changed since that measurement).

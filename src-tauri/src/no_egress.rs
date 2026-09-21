@@ -236,7 +236,7 @@ pub fn capability_process_spawn_permissions(json_text: &str) -> Vec<String> {
 /// Descriptions rather than identifiers, because the identifier of an in-app
 /// command says what the command is called, not what it does —
 /// `allow-sync-set-tor-routing` starts a Tor client and contains none of these.
-/// The ACL discipline (`src-tauri/CLAUDE.md`) already requires a permission
+/// The ACL discipline (`src-tauri/AGENTS.md`) already requires a permission
 /// description to state its native side effects, so this reads the one field
 /// that is obliged to be honest.
 ///

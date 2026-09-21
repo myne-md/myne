@@ -2,7 +2,7 @@
 //!
 //! Closed taxonomy, DENY-list clean (no path strings, no kernel-error
 //! display strings) — same discipline as `VaultDeleteError`. See
-//! `../../CLAUDE.md` "Secret-handling logging discipline".
+//! `../../AGENTS.md` "Secret-handling logging discipline".
 //!
 //! The rejection arms are the exact mirror of `vault_delete`'s
 //! `dispatch_empty_arm`: vault_delete owns "vault.meta present" (its
