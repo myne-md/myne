@@ -18,8 +18,36 @@ export const KEY = {
    *  and the one a user reaches for to erase text. Distinct from `DELETE`
    *  below, which is forward-delete. */
   BACKSPACE: String.fromCharCode(0xe003),
+  /**
+   * W3C `Enter`. **It does not activate a `<button>` in this lane**, and that
+   * is a property of the driver rather than of the app (myne-md/myne#728).
+   *
+   * Measured in this container, not reasoned: focus a button, press one key,
+   * then read `document.activeElement` and the button's own computed style.
+   *
+   *     U+E007 (Enter)   -> no click. The handler never runs.
+   *     U+E006 (Return)  -> no click.
+   *     U+E00D (Space)   -> clicks, and focus lands where the handler sends it.
+   *
+   * It cost an afternoon on `a11y-keyboard.e2e.ts` ak4, and the reason it is
+   * expensive is that the failure wears the shape of a product bug: every
+   * other assertion was green, the target was present, inside its region, not
+   * inert, and took focus when `.focus()` was called on it directly. The only
+   * tell was the button still carrying its focused-state style afterwards,
+   * meaning its `onClick` had never run.
+   *
+   * So drive a button with {@link KEY.SPACE} here, and SAY SO at the press:
+   * the finding does not generalise to users, because a real WebKitGTK window
+   * does activate a focused button on Enter. What fails is the driver's
+   * synthesis of it, so "Enter activates this control" stays a claim for the
+   * manual keyboard pass (`docs/dev/accessibility-checklist.md` section 1)
+   * rather than one this suite can make.
+   */
   ENTER: String.fromCharCode(0xe007),
   ESCAPE: String.fromCharCode(0xe00c),
+  /** W3C `Space`. The activation key that WORKS on a button here; see
+   *  {@link KEY.ENTER} for the measurement and for why a scenario using this
+   *  must say it is a statement about the driver. */
   SPACE: String.fromCharCode(0xe00d),
   SHIFT: String.fromCharCode(0xe008),
   CONTROL: String.fromCharCode(0xe009),
@@ -50,6 +78,24 @@ export const KEY = {
   /** W3C `ArrowLeft`. The same lane uses it to walk back from a line's end to a
    *  known interior column, which is a fact a click cannot give it. */
   ARROW_LEFT: String.fromCharCode(0xe012),
+  /**
+   * W3C `ArrowRight`, the sibling of ARROW_LEFT.
+   *
+   * No scenario in this lane presses it, and this comment previously claimed
+   * one did ("the sidebar tree uses the horizontal pair to expand and
+   * collapse a folder"). That is true of the APP and false of this suite:
+   * AK-2 presses only ArrowDown, and the folder expand/collapse path is
+   * covered in jsdom (`tests/a11y/folderTree.test.ts`) and by no real-render
+   * scenario. Corrected rather than deleted, for the reason {@link KEY.META}
+   * is also here while belonging to the other lane: this table documents the
+   * W3C code points, and a half-populated one is what sends the next author
+   * to an inline `String.fromCharCode`, which four files already do.
+   */
+  ARROW_RIGHT: String.fromCharCode(0xe014),
+  /** W3C `F6`, the three-region cycle (myne-md/myne#728). The function keys
+   *  run U+E031 (F1) upward, so F6 is U+E036; written through
+   *  `fromCharCode` like every other key here so the file stays pure ASCII. */
+  F6: String.fromCharCode(0xe036),
 } as const;
 
 /** Press a single key (optionally with Shift held) at the focused element. */
@@ -129,6 +175,14 @@ export function activeTestId(session: Session): Promise<string | null> {
   );
 }
 
+/**
+ * **`blur()` does not reset the Tab sequence** (myne-md/myne#728). The engine
+ * resumes from where the blurred element sat, so the next Tab is not the
+ * document's first stop and a walk that counts from an imagined start is
+ * counting from somewhere else. Anchor on a known element, assert the anchor
+ * with {@link activeSignature} or {@link activeTestId}, and only then walk;
+ * `a11y-keyboard.e2e.ts` ak4 and `saved-views-table-list.e2e.ts` svt3 both do.
+ */
 /** A stable focus signature: `testid:<id>` when the focused element carries a
  *  testid, else `<tag>#<id>`, else `(body)` — enough to detect movement and
  *  traps without needing every control to be testid'd. */

@@ -44,6 +44,7 @@ import {
   type PickedTree,
 } from "../../platform/filePicker";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { Button } from "../../components/primitives/Button";
@@ -133,6 +134,14 @@ export function ObsidianImportModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
+
   const [phase, setPhase] = useState<Phase>(initialSource === undefined ? "pick" : "setup");
   // The picked source, as the ONE type both pick shapes and both platforms
   // produce (phase3-web-client task 71). It used to be the path string
@@ -424,6 +433,7 @@ export function ObsidianImportModal({
 
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="importer-modal-title"

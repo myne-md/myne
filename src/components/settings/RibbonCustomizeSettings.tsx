@@ -271,7 +271,14 @@ export function RibbonCustomizeSettings() {
               autoFocus
               data-testid="settings.ribbon-customize.search"
             />
-            <div style={DROPDOWN_LIST_STYLE} role="listbox">
+            <div
+              style={DROPDOWN_LIST_STYLE}
+              role="listbox"
+              // Named (myne#728, task 4): the only unnamed listbox left in the
+              // tree. The input above it is named; the list of results was not,
+              // and the input's name does not carry down to it.
+              aria-label={t("settings.ribbonCustomize.searchResultsLabel")}
+            >
               {choices.map((id) => {
                 const action = byId.get(id);
                 if (action === undefined) return null;

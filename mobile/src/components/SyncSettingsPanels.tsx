@@ -48,6 +48,7 @@ import { Banner, Segmented } from "./index";
 // module used to re-spell it inline, and the copy was subtly weaker: no
 // `typeof window` guard, so it threw off-DOM instead of answering `false`.
 import { HAS_TAURI } from "../lib/app-window";
+import { tappable } from "../app/a11y/tappable";
 
 // ── Shared panel primitives (settings-card geometry) ─────────────────────────
 
@@ -98,7 +99,9 @@ function Row({
 }) {
   return (
     <div
-      onClick={onClick}
+      // A control only when it does something (myne#728), the same shape the
+      // Settings sheet's own Row uses.
+      {...(tappable({ onActivate: onClick }) ?? {})}
       data-testid={testId}
       style={{
         display: "flex",

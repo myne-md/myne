@@ -238,6 +238,15 @@ export class WikilinkChipWidget extends WidgetType {
     span.className = classes.join(" ");
     span.setAttribute("role", "link");
     span.textContent = this.display;
+    // A BROKEN link is a state, and it was carried by a CSS class alone
+    // (myne-md/myne#728, task 10): the chip is drawn differently and announces
+    // identically to a working one, so a screen-reader user follows a link to
+    // a note that does not exist with no warning that it will not resolve.
+    // The label restates the target rather than replacing it, so the name
+    // still starts with what the author wrote.
+    if (this.broken) {
+      span.setAttribute("aria-label", i18n.t("editor.a11y.brokenLink", { target: this.display }));
+    }
     return span;
   }
   ignoreEvent(): boolean {

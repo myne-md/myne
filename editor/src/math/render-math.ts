@@ -29,6 +29,21 @@ let load: Loader = async () => {
       const html = katex.renderToString(latex, {
         displayMode,
         throwOnError: true, // we catch + return so we control the fallback
+        // Stays `html` (myne-md/myne#728 considered `htmlAndMathml` and did
+        // not take it). KaTeX's MathML branch embeds the raw LaTeX source in
+        // an `<annotation>` element, which is inert text but which puts the
+        // literal strings `javascript:` and `data:text/html` into the rendered
+        // output for a hostile `\href{...}`. Nothing executes, and no anchor
+        // is produced (`trust` is off), but making that true would mean
+        // narrowing `tests/editor/math-trust.test.ts` from "no executable
+        // scheme appears anywhere in the output" to "none appears in an
+        // attribute", which is a weaker assertion on the one surface where note
+        // content reaches the DOM through `innerHTML`. The accessibility the
+        // MathML branch would have bought is bought instead at the widget
+        // (`decorations/math.ts`: `role="math"` named by the LaTeX source,
+        // with the visual layout hidden), which touches no sanitization
+        // surface. Revisit deliberately, with the threat model open, not as a
+        // side effect of an options tidy-up.
         output: "html",
       });
       return { html, error: null };

@@ -37,6 +37,11 @@ class EqSkinWidget extends WidgetType {
     const s = document.createElement("span");
     s.className = "cm-hl-eq";
     s.textContent = "==";
+    // Decorative (myne-md/myne#728, task 10). This is the `==` SYNTAX, drawn
+    // back in only while the cursor sits on the span; it says nothing about
+    // the note. Read aloud it is two equals signs interrupting the sentence
+    // the highlight is part of.
+    s.setAttribute("aria-hidden", "true");
     return s;
   }
 }

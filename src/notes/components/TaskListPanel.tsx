@@ -44,6 +44,7 @@ import { visibleDepths } from "../taskTree";
 import { taskRowKey } from "../taskWriteCore";
 import { TASK_ROW_HEIGHT, computeTaskWindow, flattenTaskList } from "../taskWindowing";
 import type { VaultTask } from "../taskIndex";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
 
 export type TaskListPanelProps = {
   tasks: readonly VaultTask[];
@@ -307,12 +308,10 @@ const BUILDER_APPLIED_STYLE: CSSProperties = {
 };
 
 const RESET_X_STYLE: CSSProperties = {
-  flex: "0 0 auto",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 20,
-  height: 20,
+  ...MIN_TARGET,
   padding: 0,
   border: "none",
   borderRadius: "var(--radius-1)",

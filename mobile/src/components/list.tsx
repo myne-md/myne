@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "./Icon";
+import { tappable } from "../app/a11y/tappable";
 
 /**
  * iOS grouped list — inset card (r:26) with 52px rows and hairline separators.
@@ -75,7 +76,13 @@ export function ListRow({
 }) {
   return (
     <div
-      onClick={onClick}
+      // A control only when it DOES something (myne#728). `tappable` returns
+      // null without an `onActivate`, so a static row carries no role rather
+      // than announcing an inert button. This primitive is what the vault
+      // picker's rows are made of, and the first version of the mobile sweep
+      // could not see it: it walked `src/app` only, so the shared rows in
+      // this tree were outside the denominator while the flows rendered them.
+      {...(tappable({ onActivate: onClick }) ?? {})}
       data-testid={testID}
       style={{
         display: "flex",

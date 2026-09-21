@@ -87,7 +87,15 @@ export function CommandPalette({
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <div onClick={requestClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }} />
+      {/* The scrim is a touch convenience, not a control (myne#728, task 16):
+          Escape is the keyboard way out, and announcing a full-screen button
+          called nothing in front of the palette would be worse than
+          announcing no button at all. */}
+      <div
+        role="presentation"
+        onClick={requestClose}
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }}
+      />
       <div
         ref={paletteRef}
         style={{

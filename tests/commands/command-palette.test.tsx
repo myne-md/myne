@@ -27,6 +27,7 @@ import { CommandPalette } from "../../src/components/CommandPalette";
 import type { CommandContext } from "../../src/commands";
 import { searchNotes } from "../../src/notes/searchNotes";
 import type { NoteSearchResult } from "../../src/types/note-search-result";
+import { runAxe, formatViolations } from "../a11y/axe-config";
 
 vi.mock("../../src/notes/searchNotes", async () => {
   const actual = await vi.importActual<
@@ -162,6 +163,46 @@ describe("CommandPalette UI", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("names its results listbox (myne#728)", () => {
+    // A listbox with no name announces as "list box" and nothing else, and the
+    // dialog's own name does not carry down to it. The results are commands
+    // AND notes, so the name says both.
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    expect(screen.getByRole("listbox", { name: "Commands and notes" })).toBeTruthy();
+  });
+
+  it("is a combobox whose active descendant tracks the highlight (myne#728)", () => {
+    // The input keeps focus while the arrows move a highlight inside the list,
+    // so `aria-activedescendant` is the only thing that conveys the move. The
+    // assertion is the PROPERTY: the id the input names must be the row that
+    // is visually selected, not merely "an attribute is present".
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    const input = screen.getByRole("combobox");
+    expect(input.getAttribute("aria-autocomplete")).toBe("list");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(input.getAttribute("aria-controls")).toBe(screen.getByRole("listbox").id);
+
+    const selectedId = (): string | null => input.getAttribute("aria-activedescendant");
+    const highlighted = (): HTMLElement | undefined =>
+      screen
+        .getAllByRole("option")
+        .find((el) => el.getAttribute("aria-selected") === "true");
+
+    expect(document.getElementById(selectedId() ?? "")).toBe(highlighted());
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(document.getElementById(selectedId() ?? "")).toBe(highlighted());
+  });
+
+  it("claims no popup when the query matches nothing (myne#728)", () => {
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "zzzzqqqq" } });
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect(input.getAttribute("aria-controls")).toBeNull();
+    expect(input.getAttribute("aria-activedescendant")).toBeNull();
+  });
+
   it("Esc closes the palette", () => {
     const onClose = vi.fn();
     render(<CommandPalette open onClose={onClose} ctx={buildCtx()} />);
@@ -295,26 +336,60 @@ describe("CommandPalette UI", () => {
     return pin;
   }
 
-  it("keyboard activation (click with detail 0) pins the command", () => {
+  it("pins the command on mousedown", () => {
     const pin = renderPaletteWithEmptyRail();
-    fireEvent.click(pin);
+    fireEvent.mouseDown(pin);
     expect(setRibbonItems).toHaveBeenCalledTimes(1);
     expect(setRibbonItems).toHaveBeenCalledWith(["vault.lock"]);
   });
 
-  it("a mouse click after mousedown does not toggle twice", () => {
+  it("does not toggle twice on the click that follows a mousedown", () => {
     const pin = renderPaletteWithEmptyRail();
     fireEvent.mouseDown(pin);
     expect(setRibbonItems).toHaveBeenCalledTimes(1);
-    // The click the browser fires after that mousedown carries detail 1.
     fireEvent.click(pin, { detail: 1 });
     expect(setRibbonItems).toHaveBeenCalledTimes(1);
+  });
+
+  it("nests no interactive control inside a role=option (myne#728)", async () => {
+    // The jsdom half of the finding the real-render gate made. Nothing here
+    // rendered the palette through axe before, which is why a
+    // `nested-interactive` on 19 nodes survived every push and surfaced only
+    // when the E2E baseline was deleted. A structural rule plus axe, so the
+    // next control added to a row fails in a second rather than at a release.
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    const nested = document.querySelectorAll(
+      '[role="option"] button, [role="option"] a, [role="option"] input, [role="option"] [tabindex]:not([tabindex="-1"])',
+    );
+    expect(nested, "a listbox option is children-presentational").toHaveLength(0);
+
+    const dialog = screen.getByTestId("palette.dialog");
+    const results = await runAxe(dialog);
+    expect(results.violations, formatViolations(results)).toEqual([]);
+  });
+
+  it("is a MOUSE affordance, out of the accessibility tree (myne#728)", () => {
+    // It used to be a `<button>` inside a `role="option"`, which is
+    // `nested-interactive`: `option` is children-presentational, so a
+    // focusable control inside it is invalid. The real-render axe gate
+    // reported 19 nodes once task 17 deleted the baseline that had been
+    // hiding the rule. There is no DOM shape that keeps a focusable control
+    // inside a listbox option, so the pin became decoration and the keyboard
+    // path is Settings, Appearance, Customize ribbon, which is a full
+    // keyboard-operable roster of the same pins.
+    const pin = renderPaletteWithEmptyRail();
+    expect(pin.tagName).toBe("SPAN");
+    expect(pin.getAttribute("aria-hidden")).toBe("true");
+    expect(pin.getAttribute("tabindex")).toBeNull();
+    // And it is still findable by a pointer user: the tooltip carries the
+    // name the `aria-label` used to.
+    expect(pin.getAttribute("title")).toBeTruthy();
   });
 
   it("a failed pin write surfaces an error instead of failing silently", async () => {
     setRibbonItems.mockRejectedValueOnce(new Error("locked"));
     const pin = renderPaletteWithEmptyRail();
-    fireEvent.click(pin);
+    fireEvent.mouseDown(pin);
     expect(await screen.findByTestId("palette.pin-error")).toBeTruthy();
     expect(screen.getByText("Could not pin the command.")).toBeTruthy();
   });

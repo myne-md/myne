@@ -35,6 +35,30 @@ import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
 import { StatusMark } from "../../components/Spinner";
 import { formatRelativeTime, useTick } from "./relativeTime";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
+
+/** Which sidebar section a row is rendered in (myne-md/myne#728). */
+export type NoteRowSection = "tree" | "favorites";
+
+/**
+ * Stable DOM id for a sidebar note row (myne-md/myne#728).
+ *
+ * The sidebar list is ONE Tab stop with the selection moving inside it, which
+ * is the composite-widget pattern: the container keeps focus and the
+ * focus-follows-selection effect finds the row by this id.
+ *
+ * Scoped by SECTION, and that is not decoration. A favourited note is
+ * rendered TWICE, once in the Favorites block and once in the tree, so an id
+ * built from the note alone put two elements in the document under one id:
+ * `getElementById` then answered with the Favorites copy, the focus effect's
+ * `tree.contains(row)` check failed against it, and focus never followed the
+ * selection for exactly the notes a user had pinned. It also gave those notes
+ * two Tab stops. Caught in review rather than by a test, which is why the
+ * spec below now covers it.
+ */
+export function noteRowDomId(noteId: string, section: NoteRowSection = "tree"): string {
+  return `note-row-${section}-${noteId}`;
+}
 
 export type NoteRowProps = {
   record: TitleRecord;
@@ -73,6 +97,17 @@ export type NoteRowProps = {
    *  replacing the leading dot) before the
    *  title. Undefined when the note has no color. */
   colorSlot?: string;
+  /** Which section renders this row (myne-md/myne#728). A favourited note
+   *  appears in BOTH, so the section scopes the row's DOM id and decides
+   *  which copy owns the Tab stop. */
+  section?: NoteRowSection;
+  /** Where the row sits in the sidebar tree, for assistive technology
+   *  (myne-md/myne#728). The tree is FLATTENED for virtualization, so there
+   *  are no `role="group"` containers to express nesting; ARIA's answer for
+   *  that case is these three, and only the flattener can compute them.
+   *  Absent in the isolated renders (tests, the Favorites-only harness), where
+   *  the attributes are simply omitted rather than guessed at. */
+  hierarchy?: { level: number; posInSet: number; setSize: number };
   /** Whether this row is part of the active multi-selection (MYND-367) — paints
    *  the same accent-soft fill as `selected` so the whole set reads as picked,
    *  and exposes `data-multiselected` for E2E. Orthogonal to `selected` (the
@@ -167,9 +202,7 @@ const starButtonStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  flexShrink: 0,
-  width: 22,
-  height: 22,
+  ...MIN_TARGET,
   padding: 0,
   background: "transparent",
   border: 0,
@@ -361,6 +394,8 @@ export function NoteRow(props: NoteRowProps) {
     colorSlot,
     showTimestamps = true,
     multiSelected = false,
+    hierarchy,
+    section = "tree",
     isIndexNote = false,
     indexConflict = false,
     unsynced = false,
@@ -485,11 +520,44 @@ export function NoteRow(props: NoteRowProps) {
       data-testid="notes.row"
       data-note-id={record.noteUuid}
       data-multiselected={multiSelected ? "true" : undefined}
-      role="button"
-      // `aria-selected` is not a permitted attribute on role="button"; use
-      // `aria-current` to convey the highlighted/active row in the list instead.
-      aria-current={highlighted ? "true" : undefined}
-      tabIndex={-1}
+      id={noteRowDomId(record.noteUuid, section)}
+      // `treeitem`, not `button` (myne-md/myne#728). The sidebar holds folders
+      // AND notes in one hierarchy, which is a tree; a row that called itself a
+      // button could not carry `aria-selected` at all (it is not a permitted
+      // attribute there, which is why this used to say `aria-current`), so the
+      // selection was conveyed by paint alone and a screen-reader user was told
+      // nothing about which note was open.
+      //
+      // The container's `role="tree"`, the `group` nesting and the folders'
+      // `aria-expanded` are the rest of this shape; the tree role landed with
+      // this change because a `treeitem` with no `tree` ancestor is itself a
+      // violation, so the two cannot be split across commits.
+      role="treeitem"
+      aria-selected={highlighted}
+      aria-level={hierarchy?.level}
+      aria-posinset={hierarchy?.posInSet}
+      aria-setsize={hierarchy?.setSize}
+      // Roving tabindex (myne-md/myne#728): the SELECTED row is the list's one
+      // Tab stop, every other row is -1, so a vault with hundreds of notes
+      // costs one Tab press rather than hundreds.
+      //
+      // Roving rather than the container's `aria-activedescendant`, and the
+      // reason is this list specifically: it is VIRTUALIZED, so the active row
+      // is unmounted as soon as it scrolls out of the window, and an
+      // `aria-activedescendant` naming an element that is not in the document
+      // is a dangling reference that announces nothing at all. A tabindex
+      // cannot dangle; it simply goes away with the row, and the container
+      // below carries the Tab stop whenever no row does.
+      //
+      // `selected`, not `highlighted`: `highlighted` includes the multi-select
+      // set, and a Tab stop per selected row would be exactly the problem this
+      // removes.
+      //
+      // And the TREE copy owns it, never the Favorites one. A favourited note
+      // is rendered in both places, so keying only on `selected` gave it two
+      // Tab stops, which is the same defect one row down from the one the
+      // roving tabindex exists to fix.
+      tabIndex={selected && section === "tree" ? 0 : -1}
     >
       <div style={rowContentStyle}>
         {renaming ? (

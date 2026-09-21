@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useTranslation } from "react-i18next";
 import { Toast } from "../Toast";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import {
   quarantineDelete,
   quarantineList,
@@ -427,6 +428,14 @@ function RecoveredPreviewModal({
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, { enabled: true });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, true);
+
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -441,6 +450,7 @@ function RecoveredPreviewModal({
 
   return (
     <div
+      ref={backdropRef}
       style={BACKDROP_STYLE}
       role="presentation"
       onClick={(e) => {

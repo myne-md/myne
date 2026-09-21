@@ -134,6 +134,34 @@ function diagramId(code: string): string {
 /** Live viewers by widget root, so `destroy` can unwind their listeners. */
 const viewers = new WeakMap<HTMLElement, MermaidViewer>();
 
+/**
+ * The accessible name for a rendered diagram: the diagram KIND as Mermaid
+ * itself names it (`flowchart`, `sequenceDiagram`, …), which is the first word
+ * of the source, or the generic word when the source starts with something
+ * else (a directive, a comment, a blank line).
+ *
+ * Deliberately not the whole source. A diagram body is tens of lines of edge
+ * declarations, and an `aria-label` is read as one unbroken run.
+ *
+ * The named case is its own catalog key rather than the generic word plus a
+ * hard-coded ": ". A separator is a translation decision, not punctuation:
+ * the spacing, the word order and whether a colon is the right mark at all
+ * differ by language, and a joiner frozen in code is one the 31 catalogs
+ * cannot reach.
+ */
+export function mermaidLabel(code: string): string {
+  const firstWord =
+    code
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line !== "" && !line.startsWith("%%"))
+      ?.split(/[\s({[]/)[0] ?? "";
+  const kind = /^[A-Za-z][A-Za-z-]*$/.test(firstWord) ? firstWord : null;
+  return kind === null
+    ? i18n.t("editor.a11y.diagram")
+    : i18n.t("editor.a11y.diagramNamed", { kind });
+}
+
 class MermaidWidget extends WidgetType {
   constructor(
     private readonly code: string,
@@ -192,6 +220,15 @@ class MermaidWidget extends WidgetType {
           this.fallback(root, card, error);
         } else {
           card.innerHTML = svg; // securityLevel:'strict' → sanitized SVG (SYNC-5)
+          // A named image, not an unnamed graphic (myne-md/myne#728, task 10).
+          // A rendered Mermaid SVG is a tree of shapes and text runs; walked by
+          // a screen reader it reads as the node labels in whatever order the
+          // renderer emitted them, with none of the edges that make it a
+          // diagram. `role="img"` collapses it to one object, and the name says
+          // what it is and which diagram, taken from the fence's first
+          // line, the closest thing to a title the source carries.
+          card.setAttribute("role", "img");
+          card.setAttribute("aria-label", mermaidLabel(this.code));
           giveNaturalSize(card);
           // The bounded, interactive viewer (myne-md/myne#708). Returns null on
           // an unreadable viewBox, in which case the card stays as drawn.

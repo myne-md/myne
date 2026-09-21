@@ -4,6 +4,7 @@ import { Icon, Sheet, VaultMark } from "../../../../components";
 import { vaultDisplayLabel } from "../../../../lib/vault-label";
 import { stableVaultNumber } from "../../../../lib/vault-list";
 import type { VaultSummary } from "../../../../types/vault-summary";
+import { tappable } from "../../../a11y/tappable";
 
 /** The sheet's footer actions (create / join) — one outlined row each. */
 const sheetAction: CSSProperties = {
@@ -63,7 +64,7 @@ export function VaultSwitcher({
               key={v.id}
               data-testid="switcher.vault-row"
               data-vault-id={v.id}
-              onClick={() => onSelect(v.id)}
+              {...tappable({ onActivate: () => onSelect(v.id) })}
               style={{
                 display: "flex",
                 alignItems: "center",

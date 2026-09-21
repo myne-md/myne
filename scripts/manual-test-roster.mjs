@@ -481,6 +481,78 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "a11y.wcag22-manual",
+    title: "WCAG 2.2 criteria no tool can measure, and the recorded screen-reader limits",
+    paths: [
+      "src/lib/regions.ts",
+      "src/lib/overlay-inert.ts",
+      "src/components/SkipToContent.tsx",
+      "src/components/primitives/targetSize.ts",
+      "editor/src/host/lib/roving-focus.ts",
+      "editor/src/accessible-name.ts",
+      "editor/src/fold-announce.ts",
+      "docs/dev/accessibility-checklist.md",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    automatedBy: [
+      // The parts that CAN be measured. Everything below is what is left.
+      "e2e/a11y-keyboard.e2e.ts",
+      "e2e/a11y-axe.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "The mobile screen-reader and external-keyboard pass: run every row of mobile/docs/dev/device-matrix.md section 12 under VoiceOver on iOS (12.1 to 12.6, 12.8 to 12.11) and write the result into that table with the device model, OS build and screen-reader version. The rows cover whether each tappable row is announced as a BUTTON named by its own text, whether the folder chevron's state is spoken (it is a CSS rotation, so state is the only cue), whether Space activates without scrolling the list, and whether the palette scrim is silent rather than an unnamed full-screen button.",
+        whyNotAutomated: "Neither CI lane builds for iOS: the desktop suite is a Linux container against WebKitGTK and the web lane is Chromium, so no harness in this repository launches an iOS runtime at all, and VoiceOver's spoken output is not exposed to WebDriver on any platform. `mobile/tests/a11y-tappable.test.tsx` holds the markup in both directions and markup is not the question here.",
+        clients: ["ios"],
+        estimateMin: 20,
+        tier: "core",
+      },
+      {
+        see: "Repeat that same section-12 pass under TalkBack on Android (row 12.7 is the parity row), including the external-keyboard rows 12.8 and 12.9 with a paired Bluetooth keyboard, and record the same details.",
+        whyNotAutomated: "Same absent runtime on the other platform: no CI lane builds for Android, and TalkBack's activation gesture and spoken output have no WebKitGTK or Chromium equivalent to stand in for them.",
+        clients: ["android"],
+        estimateMin: 20,
+        tier: "standard",
+      },
+      {
+        see: "Under VoiceOver on macOS, enter the note editor and confirm it is announced as a text area named for the note you opened. Then move through a note containing headings, a rendered formula and a Mermaid diagram, and WRITE DOWN what the reader says at each: the formula should read its LaTeX source, the diagram should announce as one image named for its kind, and the headings will read as styled text rather than a heading tree. Correct the recorded limitations in docs/dev/accessibility-checklist.md if any answer has changed.",
+        whyNotAutomated: "The subject is what a screen reader SAYS, and no screen reader runs in either lane: the desktop suite is a Linux container against WebKitGTK driven by WebDriver, which exposes the DOM and the accessibility tree but not VoiceOver's spoken output, and macOS has no tauri-driver support at all (SYNC-1). The heading limitation in particular is a property of CodeMirror's single contenteditable, which the DOM shows as correct markup.",
+        clients: ["desktop-macos"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "Repeat the editor pass above under NVDA on Windows, including browse mode and focus mode, and record the same three answers.",
+        whyNotAutomated: "tauri-driver support is Linux-only by decision (SYNC-1), so no scenario runs on Windows at all, and NVDA's browse-versus-focus mode has no WebKitGTK equivalent to stand in for it.",
+        clients: ["desktop-windows"],
+        estimateMin: 12,
+        tier: "standard",
+      },
+      {
+        see: "SC 2.4.11, the case code does not cover: open a note containing a task-query block near its top, open the in-note find bar with Mod-F, then Tab to the first task checkbox. Confirm the focus ring is fully visible rather than behind the find bar.",
+        whyNotAutomated: "The find bar is a CodeMirror panel whose height depends on its own wrapped content and on the replace row being open, and the scrolling around it is CodeMirror's rather than this code's, so no static scroll-padding was added and there is no measurement in the tree to compare against. Judging it needs a rendered layout plus an eye on where the ring lands.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 4,
+        tier: "core",
+      },
+      {
+        see: "SC 2.5.8 on the two controls left for measurement: with the real-render target-size run green, look at a dense task list and at a Settings switch, and confirm each is comfortably hittable with a finger on a touch screen and with a trackpad. Record which of the two, if either, the axe run flagged.",
+        whyNotAutomated: "Both are PAINTED controls whose box is what is drawn, so raising them changes the design rather than an invisible hit area, and both plausibly pass through 2.5.8's spacing exception instead. Whether the exception applies depends on the rendered geometry of a list whose row height varies with the timestamp setting, which is a layout fact no unit tier can compute.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 5,
+        tier: "standard",
+      },
+      {
+        see: "SC 3.2.6: confirm the app still offers no in-app help mechanism (a help page, an FAQ, a contact route, a chat). If one has been added since the last release, confirm it sits in the same relative position on every screen that offers it.",
+        whyNotAutomated: "The check is whether a NEW affordance is a help mechanism in WCAG's sense, which is a judgement about what a link is for rather than about markup. The code half (every outbound link classified, both directions) is automated in tests/a11y/redundantEntryAndHelp.test.ts; what it cannot decide is whether a newly classified link should have been called help.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 3,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "app.diagnostics",
     title: "Diagnostics and about information",
     paths: [
@@ -2919,6 +2991,10 @@ export const ROSTER = Object.freeze([
       "e2e/multi-cursor.e2e.ts",
       "e2e/find-replace.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
     ],
     manual: [
       {
@@ -5489,6 +5565,10 @@ export const ROSTER = Object.freeze([
       "e2e/archive.e2e.ts",
       "e2e/quick-picker-move-note.e2e.ts",
       "e2e/files-settings.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
       "e2e/drop-import.e2e.ts",
       "e2e/empty-folder-persistence.e2e.ts",
     ],
@@ -7158,6 +7238,10 @@ export const ROSTER = Object.freeze([
       "e2e/scroll-memory.e2e.ts",
       "e2e/tab-modes.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
       "e2e/navigation.e2e.ts",
       "e2e/editor-persistent-view.e2e.ts",
       "e2e/graph-tab.e2e.ts",

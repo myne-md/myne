@@ -43,6 +43,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
+import { KEY, activeTestId, pressKey } from "./support/keyboard";
 
 const IPC_TIMEOUT = 15_000;
 
@@ -282,6 +283,84 @@ describeE2E("svl1 list view renders sorted rows with a property meta line (MYND-
         // Row click → the note opens in the focused tab, replacing the view
         // host (shared click matrix, same as cards/table).
         await (await s.byTestId("view.list-row")).click();
+        await s.byTestId("editor.content");
+        await s.waitForGone(testIdSelector("editor.view-host"));
+      },
+    );
+  });
+});
+
+describeE2E("svt3 a view row opens from the keyboard (myne#728)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("Tab reaches a table row and an activation key opens its note", async () => {
+    // The jsdom tier (`tests/a11y/viewModeRows.test.tsx`) already pins the
+    // wiring: role, tabindex, the key handlers and the modifier matrix. What
+    // it cannot pin is the half that only a real layout engine decides -
+    // whether Tab actually REACHES a row. The rows sit inside a virtualized
+    // scroller, and before this change they carried `tabIndex={-1}`, which is
+    // legal markup that no Tab ever lands on. That is the failure this
+    // scenario exists for, and jsdom has no Tab order to ask.
+    let password = "";
+    await scenario(
+      "svt3-view-row-keyboard",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await setViewsEnabled(s, true);
+
+        await seedFrontmatterNotes(s, [
+          "---\ntitle: Keyboard Alpha\nstatus: urgent\n---\nkeyboard body alpha",
+          "---\ntitle: Keyboard Beta\nstatus: urgent\n---\nkeyboard body beta",
+        ]);
+        await createAllPagesView(s);
+        await rowMenuAction(s, "New view", "view-settings");
+        await s.byTestId("view-settings.modal");
+        await (await s.byTestId("view-settings.view-type-table")).click();
+        await (await s.byTestId("view-settings.save")).click();
+        await s.waitForGone(testIdSelector("view-settings.modal"));
+        await s.byTestId("view.table");
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("view.table-row")).length === 2 ? true : null),
+          { label: "two table rows over the two seeded notes" },
+        );
+
+        // Anchor the start point rather than assume it, the way AK-4 does.
+        // A first version called `document.body.focus()` and commented that
+        // the walk therefore started at the top of the document. That
+        // contradicts what this branch measured and recorded two files over:
+        // in WebKitGTK the engine resumes the Tab sequence from where the
+        // previously focused element sat, and blurring does not reset it
+        // (`e2e/AGENTS.md`, and the `_comment_361_to_366` note in
+        // `scripts/e2e-scenario-floor.json`). So the walk is anchored on a
+        // known element and the anchor is ASSERTED, which makes the 40-stop
+        // bound mean something: it is 40 stops from HERE.
+        await s.execute(
+          "var el = document.querySelector('[data-testid=\"view.table\"]');" +
+            "if (el) { el.setAttribute('tabindex', '-1'); el.focus(); }",
+        );
+        expect(
+          await activeTestId(s),
+          "the walk starts at the view host, not wherever the last click left focus",
+        ).toBe("view.table");
+
+        let reached = false;
+        for (let i = 0; i < 40 && !reached; i++) {
+          await pressKey(s, KEY.TAB);
+          reached = (await activeTestId(s)) === "view.table-row";
+        }
+        expect(reached, "Tab reaches a table row within 40 stops of the view host").toBe(
+          true,
+        );
+
+        // Space rather than Enter, and the reason is the harness rather than
+        // the app: WebKitGTK's Actions API does not deliver U+E007/U+E006 as
+        // an activation here (recorded in e2e/AGENTS.md). The handler reads
+        // `e.key` and treats the two identically, and the jsdom tier presses
+        // both, so this is a statement about what the DRIVER can send, not
+        // about what a user can press.
+        await pressKey(s, KEY.SPACE);
         await s.byTestId("editor.content");
         await s.waitForGone(testIdSelector("editor.view-host"));
       },

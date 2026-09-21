@@ -8,6 +8,7 @@
 import { type CSSProperties } from "react";
 import { Icon } from "./Icon";
 import type { IconName } from "../../lib/icons";
+import { MIN_TARGET } from "./targetSize";
 
 interface IconButtonProps {
   icon: IconName;
@@ -26,8 +27,7 @@ const ICON_BUTTON_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 22,
-  height: 22,
+  ...MIN_TARGET,
   padding: 0,
   color: "var(--fg-3)",
   background: "transparent",

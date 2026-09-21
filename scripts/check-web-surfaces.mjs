@@ -294,6 +294,14 @@ const V = {
   "src/lib/imperative-focus-trap.ts": ["ported", "Pure DOM."],
   "src/lib/imperative-modal.ts": ["ported", "Pure DOM."],
   "src/lib/io-banner.ts": ["ported", "Bounded IO-failure copy mapping."],
+  "src/lib/overlay-inert.ts": [
+    "ported",
+    "Pure DOM: the one owner that sets `inert` on the siblings of the topmost open overlay (myne#728). An attribute walk with no host call in it; the web client needs it for exactly the same reason the desktop does, since `aria-modal` alone is an assertion some assistive technology ignores.",
+  ],
+  "src/lib/regions.ts": [
+    "ported",
+    "Pure DOM: the three-region keyboard model is an attribute query plus a cycle rule, with no host call in it. The web client renders the same shell from the same `src/` tree, so it inherits the regions and F6 with no seam involved.",
+  ],
   "src/hooks/useBetaTermsGate.ts": [
     "ported",
     "Reads the device-local beta-terms acceptance through the platform seam (operations#15), so the hook itself is platform-free — desktop resolves it to a sync-plugin command, the browser to localStorage on the main thread.",
@@ -452,6 +460,10 @@ const V = {
   ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],
+  "src/hooks/useOverlayInert.ts": [
+    "ported",
+    "Pure DOM: the React binding for the shared overlay `inert` owner (myne#728). No host call, and the browser client renders the same overlays from the same `src/` tree.",
+  ],
   "src/hooks/useIdleAutoLock.ts": ["adapted", "Same signal difference as useActivityHeartbeat."],
   "src/hooks/useIsFullscreen.ts": [
     "adapted",
