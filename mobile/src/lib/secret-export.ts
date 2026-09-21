@@ -3,7 +3,7 @@
 // one place and the step components don't pull in Tauri plugin imports.
 
 import { invoke } from "../platform/core";
-import { documentDir, join } from "../platform/path";
+import { exportPath } from "../platform/path";
 import { devicePlatform } from "./prefs";
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
@@ -165,7 +165,7 @@ export async function saveSecretToDocuments(
   contents: string,
 ): Promise<SecretSaveOutcome | null> {
   try {
-    const path = await join(await documentDir(), filename);
+    const { path, dir, name } = await exportPath(filename);
     await invoke("plugin:secret-export|save_secret_text", { path, contents });
     // Offer the native destination chooser on top of the guaranteed Documents
     // write; additive, so a share cancel still leaves the file saved.
@@ -174,7 +174,7 @@ export async function saveSecretToDocuments(
     // the save. It can only cost the app the right to say where the file went,
     // which is what the third arm is.
     const kind = await savedFileDelivery();
-    return kind === "path" ? { kind, label: `Documents/${filename}` } : { kind };
+    return kind === "path" ? { kind, label: `${dir}/${name}` } : { kind };
   } catch (e) {
     logErrorKind(e, "secret-save-failed");
     return null;

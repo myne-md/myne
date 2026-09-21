@@ -1,78 +1,93 @@
 #!/usr/bin/env node
 // The mobile plaintext-export directory stays out of the platform's automatic
-// cloud backup — held together across FOUR files that no compiler compares
-// (myne-md/myne#491).
+// cloud backup, held together across files that no compiler compares
+// (myne-md/myne#491, redesigned for the chokepoint in myne-md/myne#517).
 //
 // The failure this prevents: the mobile client writes plaintext into a
-// device-visible directory in four places — the recovery phrase / account number
+// device-visible directory in four places, the recovery phrase / account number
 // (`secret-export.ts`), the whole-vault markdown tree (`export.ts`), a note's PDF
 // (`EditorFlow.tsx`) and an exported attachment (`editor-host.ts`). Both mobile
 // platforms back that directory up by default (iOS: `Documents/` in iCloud
 // Backup; Android: `getExternalFilesDir(DIRECTORY_DOCUMENTS)` in Auto Backup), so
-// a saved recovery phrase — which alone reconstructs the vault — was being copied
+// a saved recovery phrase, which alone reconstructs the vault, was being copied
 // to Apple and to Google. Nothing in the tree excluded it, and nothing said so:
 // every build was green, every test passed, and the only way to see it was to
 // restore a backup.
 //
-// The fix is a property of the DESTINATION, and it lives in two unrelated
-// languages plus a manifest, so it drifts silently in four distinct ways:
+// The drift classes, numbered as the rules below are:
 //
-//   1. A new export flow reaches for a SIBLING accessor — `downloadDir()`,
-//      `pictureDir()` — that neither exclusion covers. Compiles, ships, backed up.
-//   2. The Android rules exclude the path under `<cloud-backup>` but not
-//      `<device-transfer>` (or the API<=30 file falls behind the API-31+ one).
-//      Phone-to-phone transfer is a separate copy path that ignores the
-//      cloud-backup block, and `fullBackupContent` is what every pre-Android-12
-//      device reads. Either half alone leaves the phrase leaving the device.
-//   3. The `android-widgets` library manifest stops declaring the attributes, or
-//      points them at a resource that does not exist. Gradle resolves `@xml/...`
-//      at merge time, far from anything a reviewer of this change would run.
-//   4. `backup_exclude::init` is dropped from the mobile setup hook, or its
-//      `EXCLUDED_DIRS` stops matching the directories the TS side actually writes
-//      to. The iOS half then excludes nothing, or excludes the wrong directory,
-//      and reports success either way.
+//   0. The seam reaches for a path accessor again, a SIBLING (`downloadDir()`)
+//      that neither exclusion covers, or `documentDir()` itself, which is
+//      excluded and still bypasses the sanitizer and the ordering.
+//   2. The Android rules exclude under `<cloud-backup>` but not
+//      `<device-transfer>` (a separate copy path that ignores it), or the
+//      API<=30 file falls behind the API-31+ one (the only file every
+//      pre-Android-12 device reads). Either half alone leaks.
+//   3. The `android-widgets` manifest stops declaring the attributes or points
+//      at a missing resource. Gradle resolves `@xml/...` at merge time, far from
+//      anything a reviewer of this change would run.
+//   4. `backup_exclude::init` is dropped from the setup hook, or the `ExportDir`
+//      roster stops matching the directories the Android rules exclude. iOS then
+//      excludes nothing, or the wrong directory, and reports success either way.
+//   5. The chokepoint comes unwired: the seam stops calling it, the command
+//      stops going through `backup_exclude::ensure_export_dir`, the capability
+//      stops granting it, or the retired `core:path:` namespace comes back as
+//      the route around it.
 //
-// So this guard compares the four sides against ONE roster, in BOTH directions
-// (a recorded site that vanished is a stale roster, which is how a roster stops
-// describing anything).
+// The FIVE-SITE ACL lockstep found during this work is a sibling property and
+// lives in `scripts/check-mobile-plugin-acl.mjs`, over all 27 mobile plugin
+// permission directories rather than this one. Its header carries why that is a
+// separate file.
 //
-// SCOPE, deliberately narrower than `scripts/lib/shared-roots.mjs`: this walks
-// `mobile/src` alone and does NOT import the shared-roots roster, because the
-// property is mobile-specific. Desktop and web choose an export destination
-// through an OS save dialog and have no platform-backup exposure of this kind.
-// Stated here because that library's header requires a guard that scopes narrower
-// to say so, rather than leaving the omission to read as an oversight.
+// SCOPE, deliberately narrower than `scripts/lib/shared-roots.mjs`: mobile files
+// alone, because the property is mobile-specific. Desktop and web pick a
+// destination through an OS save dialog and have no platform-backup exposure of
+// this kind. Stated because that library's header requires a narrower-scoped
+// guard to say so rather than leave the omission reading as an oversight.
 //
-// WHAT THIS GUARD CANNOT SEE, so it is not mistaken for more than it is: it reads
-// the four COMMITTED files and proves they agree with each other. Whether iOS
-// honours `NSURLIsExcludedFromBackupKey` on a device, and whether Android's
-// backup service honours the merged rules, are `mobile/docs/dev/device-matrix.md`
-// §8 rows 8.9 and 8.10. The macOS half of the iOS call is covered by
-// `backup_exclude::tests::macos`, which is the largest automatic claim available.
+// WHAT THIS CANNOT SEE: it reads the COMMITTED files and proves they agree with
+// each other. Whether iOS honours `NSURLIsExcludedFromBackupKey` and whether
+// Android's backup service honours the merged rules are
+// `mobile/docs/dev/device-matrix.md` §8 rows 8.9 and 8.10, both unrun. The macOS
+// half of the iOS call is `backup_exclude::tests::macos`; the create-then-exclude
+// ORDER is `backup_exclude::tests::the_exclusion_is_applied_before_the_caller_holds_a_path`.
+// Those are the largest automatic claims available.
 //
 // NOT tracked, deliberately: `appDataDir()` / `appCacheDir()` /
 // `appLocalDataDir()`. Those are app-private and hold the AEAD-encrypted vault,
-// which is *meant* to be in a backup — that is a genuine safety net for a user
-// who does not sync, and it discloses nothing. This guard is about plaintext
-// leaving the device by a route the user never chose.
+// which is *meant* to be in a backup: a real safety net for a user who does not
+// sync, disclosing nothing. This guard is about plaintext leaving the device by
+// a route the user never chose.
 //
 // Zero dependencies, hand-runnable: node scripts/check-mobile-export-backup.mjs
 // Testable: `analyse(io)` takes its whole world as an argument, so
-// `tests/scripts/mobileExportBackup.test.ts` can inject each defect above and
-// assert the guard names it. A guard that has never failed is a guard nobody has
-// tested (root `AGENTS.md`).
+// `tests/scripts/mobileExportBackup.test.ts` injects each defect above, and each
+// defect in THIS FILE, and asserts the failure is named. A guard that has never
+// failed is a guard nobody has tested (root `AGENTS.md`).
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { dirname, join, resolve, relative } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { TS_FILES, walkFiles } from "./lib/surface-files.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// ── Paths of the four sides ────────────────────────────────────────────────
-export const TS_ROOT = "mobile/src";
+// ── Paths of the sides ─────────────────────────────────────────────────────
+/**
+ * The seam is a DIRECTORY and rule 0 reads every file in it, at every depth,
+ * because `check-platform-seam.mjs` exempts it that way
+ * (`rel === guard.seam || rel.startsWith(guard.seam + sep)`). Reading one FILE
+ * was a hole, a sibling of `path.ts` re-exporting `downloadDir` compiles and
+ * ships; reading one LEVEL was the same hole one directory down.
+ */
+export const SEAM_DIR = "mobile/src/platform";
+/** The one seam member that must exist, because rule 5 reads it by name. */
 export const PATH_SEAM = "mobile/src/platform/path.ts";
 export const RUST_MODULE = "mobile/src-tauri/src/backup_exclude.rs";
 export const RUST_SETUP = "mobile/src-tauri/src/lib.rs";
+export const PLUGIN_MODULE = "mobile/src-tauri/src/plugins/export_dir/mod.rs";
+export const BUILD_RS = "mobile/src-tauri/build.rs";
+export const CAPABILITIES = "mobile/src-tauri/capabilities/default.json";
 export const ANDROID_MANIFEST = "mobile/android-widgets/src/main/AndroidManifest.xml";
 export const ANDROID_RULES_MODERN =
   "mobile/android-widgets/src/main/res/xml/myne_backup_rules.xml";
@@ -90,64 +105,81 @@ export const ANDROID_RULES_LEGACY =
 export const ANDROID_MERGED_GLOB_ROOT =
   "mobile/src-tauri/gen/android/app/build/intermediates/merged_manifests";
 
+/** The plugin the chokepoint lives in, and its one command. */
+export const PLUGIN_NAME = "export-dir";
+export const COMMAND = "export_path";
 /**
- * `@tauri-apps/api/path` accessors that resolve to a DEVICE-VISIBLE directory —
- * one the platform backs up and the user can plausibly reach — mapped to the
- * directory name the Android backup rules and the iOS roster use.
- *
- * `null` means "no exclusion is wired for this accessor at all": using it is an
- * egress channel that nothing closes, so the guard fails and the author has to
- * either wire it on both platforms or argue for it in review.
- *
- * This map is a DENYLIST and denylists are incomplete by construction — it names
- * eight of the API's accessors and Tauri has more. Rule 0 is what makes the
- * coverage complete anyway: `mobile/src/platform/path.ts` is the ONE file under
- * `mobile/src` allowed to import `@tauri-apps/api/path` (`check-platform-seam.mjs`
- * enforces that), so its re-export list is the entire set of accessors the tree
- * can reach, and rule 0 fails on any name in it this map has not classified.
+ * The grant myne#517 dropped, matched as a NAMESPACE PREFIX. The literal
+ * `"core:path:default"` alone let `allow-join` plus `allow-resolve-directory`
+ * walk past, and those two reconstruct the route the wide grant gave while
+ * looking like the careful version.
  */
-export const TRACKED_ACCESSORS = {
-  documentDir: "Documents",
-  downloadDir: null,
-  pictureDir: null,
-  publicDir: null,
-  audioDir: null,
-  videoDir: null,
-  homeDir: null,
-  desktopDir: null,
+export const RETIRED_GRANT_PREFIX = "core:path:";
+
+/**
+ * Why a given `@tauri-apps/api/path` name is refused, as a hint for the failure
+ * message. Rule 0 refuses EVERY name, so nothing here decides the verdict; it
+ * decides the wording, and a reviewer reading the failure should see which
+ * argument is being made against the line they just wrote.
+ *
+ * Unlisted names get the general form, which is also the right answer for an
+ * accessor nobody has classified.
+ */
+/**
+ * Which Tauri path accessor each `ExportDir` NAME is allowed to resolve
+ * through: a reasoned allowlist of (name, resolver) pairs. One-directional,
+ * and only the `Documents` entry describes a variant that exists: a name the
+ * enum declares must pair with the accessor listed here, while an entry here
+ * that no variant uses is not flagged.
+ *
+ * The hole this closes was found in review round 6 and nothing on any side saw
+ * it. `name()` and `resolve()` are two independent match arms over the same
+ * variant, and the two halves of this property read DIFFERENT ones: the Android
+ * arm is name-driven (rule 2 requires `<exclude path="<name()>"/>`) while the
+ * iOS arm is path-driven (the Foundation flag goes on whatever `resolve()`
+ * returned). A variant whose `name()` says `Documents` while its `resolve()`
+ * hands back the pictures container therefore gets an Android rule excluding a
+ * directory the exports are not in, while the directory they ARE in is excluded
+ * by nothing, and the guard, the compiler and every Rust test stay green. The
+ * three things that look like they cover it do not:
+ * `tests::every_roster_name_maps_back_to_its_variant` round-trips `name()`
+ * through `from_name`, tying the name to the VARIANT rather than to the
+ * resolved path; `excluded_dirs_is_non_empty_and_unique` asserts non-empty,
+ * unique and separator-free; and `resolve` being an exhaustive match guarantees
+ * a resolver EXISTS, not that it resolves where the name claims.
+ *
+ * An ALLOWLIST rather than a derivation, and the limit is worth stating: this
+ * guard cannot execute Tauri's resolver, so it cannot prove the returned path's
+ * basename equals the name. What it can do is refuse a pairing no human has
+ * classified. A new pair is a decision, and it costs one entry here plus the
+ * reviewer's argument for it, which is the same shape as `EXTERNAL_GRANTS` and
+ * `UNGRANTED_PLUGINS` in the sibling guard.
+ */
+export const RESOLVER_FOR_DIR = {
+  Documents: "document_dir",
+  Downloads: "download_dir",
+  Pictures: "picture_dir",
+  Videos: "video_dir",
+  Music: "audio_dir",
+  Desktop: "desktop_dir",
+  Public: "public_dir",
 };
 
-/** Accessors that are not directory destinations and so need no exclusion. */
-export const NON_DESTINATION_EXPORTS = new Set(["join", "basename", "dirname", "extname", "sep"]);
-
-/**
- * The recorded roster: every device-visible-directory call site in `mobile/src`,
- * with why it is legitimate. A site absent here fails; a recorded site that no
- * longer exists fails too (a roster nobody prunes stops being a roster).
- */
-export const ROSTER = [
-  {
-    file: "mobile/src/lib/secret-export.ts",
-    accessor: "documentDir",
-    reason:
-      "recovery phrase / account number .txt — the TB3 user-initiated plaintext egress the creation flow offers (myne#491 is about exactly this file)",
-  },
-  {
-    file: "mobile/src/lib/export.ts",
-    accessor: "documentDir",
-    reason: "whole-vault plaintext markdown tree export destination",
-  },
-  {
-    file: "mobile/src/app/flows/EditorFlow.tsx",
-    accessor: "documentDir",
-    reason: "note → PDF export destination (mobile has no save dialog)",
-  },
-  {
-    file: "mobile/src/editor-host.ts",
-    accessor: "documentDir",
-    reason: "decrypted attachment export destination (mobile has no save dialog)",
-  },
-];
+export const ACCESSOR_HINT = {
+  documentDir: "that directory IS excluded, and that is not the same as safe",
+  downloadDir: "nothing excludes that directory on EITHER platform",
+  pictureDir: "nothing excludes that directory on EITHER platform",
+  publicDir: "nothing excludes that directory on EITHER platform",
+  audioDir: "nothing excludes that directory on EITHER platform",
+  videoDir: "nothing excludes that directory on EITHER platform",
+  homeDir: "nothing excludes that directory on EITHER platform",
+  desktopDir: "nothing excludes that directory on EITHER platform",
+  join: "it is path arithmetic, which is what turned a base directory and an untrusted name into a destination at four call sites",
+  basename: "it is path arithmetic rather than a destination",
+  dirname: "it is path arithmetic rather than a destination",
+  extname: "it is path arithmetic rather than a destination",
+  sep: "it is path arithmetic rather than a destination",
+};
 
 /**
  * Drop comments before any structural match.
@@ -156,16 +188,8 @@ export const ROSTER = [
  * rules files DOCUMENT the elements they contain, so `<device-transfer>` appears
  * in a comment above the real one. Without this, `blockBody()` anchored on the
  * comment's mention, ran its lazy body to the real closing tag, and swallowed the
- * `<cloud-backup>` block whole — so a `<device-transfer>` emptied of its
+ * `<cloud-backup>` block whole, so a `<device-transfer>` emptied of its
  * `<exclude>` still "contained" one and the guard passed.
- *
- * The TS half is the same hole one language over, and it cuts both ways: a
- * commented `downloadDir()` anywhere under `mobile/src` would fail the commit
- * against a call site that does not exist, and — worse — deleting the real
- * `documentDir()` call from a rostered file while a comment there still writes
- * `documentDir(` keeps the entry "found", so the stale-roster direction reports
- * nothing. This change adds multi-paragraph comments about exactly these
- * accessors to four rostered files, so the shape is live rather than theoretical.
  */
 export const stripXmlComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, "");
 
@@ -176,8 +200,13 @@ export const stripXmlComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, "");
  * inside a URL literal does not eat the rest of the line. Regex literals are NOT
  * handled: a `/.../ ` containing `//` or `/*` would confuse this, and none exists
  * in the tree. That is a stated limit rather than a hidden one, and the failure
- * mode is a false FAILURE (over-stripping loses a call site, so the roster's
- * stale-entry direction fires and names the file), never a silent pass.
+ * mode is a false FAILURE, never a silent pass.
+ *
+ * myne#517 deleted the call-site scan this also served and kept this function,
+ * deliberately. Rule 0 reads the seam, and the seam's comment is thirty lines
+ * explaining why it no longer imports `@tauri-apps/api/path`, naming
+ * `documentDir`, `downloadDir` and the module specifier itself. Without
+ * stripping, the inverted rule 0 fails on its own explanation.
  */
 export function stripTsComments(source) {
   let out = "";
@@ -220,6 +249,65 @@ export function stripTsComments(source) {
   return out;
 }
 
+/**
+ * Strip Rust comments, both the line kind and the block kind, stepping over
+ * double-quoted string literals.
+ *
+ * Line-ANCHORED for one review round, which left a TRAILING comment intact:
+ * `Downloads, // note` then failed the variant filter below, so the variant
+ * vanished from `variants`, from `inAll` and from `requiredDirs` at once, which
+ * hid a whole export directory from the entire guard on both platforms. New to
+ * the enum: the `&[&str]` roster it replaced was read as a slice body, where a
+ * trailing comment is harmless.
+ *
+ * Single-quoted literals are deliberately NOT handled, and the reason is
+ * specific to Rust: an apostrophe opens a lifetime far more often than a `char`,
+ * and this file is full of `&'static`, so treating it as a delimiter would
+ * swallow from `'static [ExportDir]` to the next one and take `ALL` with it.
+ * Stated cost: a char literal holding a double quote would open a string running
+ * to the next one. None exists in the file this reads, and the failure mode is
+ * over-stripping, which fails BY NAME rather than passing silently.
+ */
+export function stripRustComments(source) {
+  let out = "";
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (ch === "/" && next === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    if (ch === '"') {
+      out += ch;
+      i += 1;
+      while (i < source.length) {
+        if (source[i] === "\\") {
+          out += source.slice(i, i + 2);
+          i += 2;
+          continue;
+        }
+        out += source[i];
+        if (source[i] === '"') {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
 /** `<exclude domain="..." path="..."/>` entries inside one XML block. */
 export function excludedPaths(xml) {
   const dirs = new Set();
@@ -237,15 +325,28 @@ export function blockBody(xml, name) {
   return match ? match[1] : null;
 }
 
-/** Every `.ts`/`.tsx` file under `dir`, as absolute paths. */
-function walkTs(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) walkTs(full, out);
-    else if (/\.(ts|tsx)$/.test(entry.name)) out.push(full);
-  }
-  return out;
+/**
+ * Every file under `<root>/<dir>` matching `pattern`, recursively, as keys
+ * relative to `root` with forward slashes, or `[]` when the directory is absent.
+ *
+ * `walkFiles` rather than a walk of our own: that module's header states the
+ * rule ("a guard that needs a directory's files imports this") and carries the
+ * `withFileTypes` measurement and the symlink narrowing that come with it. Two
+ * things are added here and both are load-bearing. The slash normalisation,
+ * because rule 0 compares a walked path against `PATH_SEAM` by equality and a
+ * Windows `\` would make that miss silently, taking rule 5's seam check with it.
+ * And `[]` for an absent directory rather than `walkFiles`'s default throw,
+ * because rule 0 turns an empty seam into a NAMED failure ("a rule 0 that reads
+ * nothing is a rule 0 that passes everything") and rule 3b is opportunistic by
+ * design, so absence there is the ordinary case.
+ */
+function walk(root, dir, pattern) {
+  const found = walkFiles([join(root, dir)], {
+    relativeTo: root,
+    extensions: pattern,
+    missingIsNull: true,
+  });
+  return (found ?? []).map((file) => file.replaceAll("\\", "/"));
 }
 
 /** The default world: the real repository on disk. */
@@ -253,32 +354,18 @@ export function diskIo(root = repoRoot) {
   return {
     exists: (rel) => existsSync(join(root, rel)),
     read: (rel) => readFileSync(join(root, rel), "utf8"),
-    listTs: (rel) => {
-      const abs = join(root, rel);
-      if (!existsSync(abs)) return [];
-      return walkTs(abs).map((file) => relative(root, file).replaceAll("\\", "/"));
-    },
+    /**
+     * Every `.ts` / `.tsx` under the seam directory, RECURSIVELY: see `SEAM_DIR`
+     * for why one level was not enough. Sorted, so a failure list is stable.
+     */
+    listSeam: () => walk(root, SEAM_DIR, TS_FILES).sort(),
     /** Merged manifests, if an Android build has produced any. */
-    listMergedManifests: () => {
-      const abs = join(root, ANDROID_MERGED_GLOB_ROOT);
-      if (!existsSync(abs)) return [];
-      const found = [];
-      const walk = (dir) => {
-        for (const entry of readdirSync(dir, { withFileTypes: true })) {
-          const full = join(dir, entry.name);
-          if (entry.isDirectory()) walk(full);
-          else if (entry.name === "AndroidManifest.xml")
-            found.push(relative(root, full).replaceAll("\\", "/"));
-        }
-      };
-      walk(abs);
-      return found;
-    },
+    listMergedManifests: () => walk(root, ANDROID_MERGED_GLOB_ROOT, /^AndroidManifest\.xml$/),
   };
 }
 
 /**
- * Run every rule against `io` and return `{ failures, requiredDirs, callSites }`.
+ * Run every rule against `io` and return `{ failures, requiredDirs, ... }`.
  *
  * Takes its whole world as an argument so a spec can hand it synthetic files.
  * That is the only way the break tests this guard's header describes can live
@@ -296,103 +383,310 @@ export function analyse(io) {
     return io.read(rel);
   };
 
-  // ── 0. The seam's export list is the complete set of reachable accessors ──
+  // ── 0. The seam reaches no path accessor (the INVERTED rule) ───────────────
   // `check-platform-seam.mjs` makes `mobile/src/platform/` the only place under
-  // `mobile/src` allowed to import `@tauri-apps/*`, so this one line decides
-  // which path accessors the whole tree can call. Classifying it here is what
-  // turns TRACKED_ACCESSORS from an incomplete denylist into complete coverage:
-  // adding `downloadDir` to the seam fails HERE, at the file the author edits,
-  // rather than at whichever consumer first calls it unaliased.
-  const seam = readOrFail(PATH_SEAM, "the mobile path seam is missing — this guard is looking at the wrong tree");
-  if (seam !== null) {
-    const reexport = stripTsComments(seam).match(
-      /export\s*\{([^}]*)\}\s*from\s*["']@tauri-apps\/api\/path["']/,
+  // `mobile/src` allowed to import `@tauri-apps/*`, and it PERMITS that
+  // DIRECTORY to import `@tauri-apps/api/path`. So the directory, not one file
+  // in it, decides whether the WebView can name a destination at all, and after
+  // myne#517 the answer is no. Adding an accessor back fails HERE, at the file
+  // the author edits, rather than at whichever consumer first calls it.
+  const seamFiles = io.listSeam();
+  if (seamFiles.length === 0) {
+    fail(
+      `${SEAM_DIR}: no .ts/.tsx files found, so rule 0 read nothing. This guard is looking at the ` +
+        `wrong tree, and a rule 0 that reads nothing is a rule 0 that passes everything.`,
     );
-    if (!reexport) {
-      fail(
-        `${PATH_SEAM}: no \`export { … } from "@tauri-apps/api/path"\` found. This guard reads ` +
-          `that list to know which path accessors the mobile tree can reach at all; if the seam ` +
-          `now re-exports some other way, teach the guard the new shape rather than removing it.`,
-      );
-    } else {
-      for (const raw of reexport[1].split(",")) {
-        // `documentDir as docDir` re-exports under a new name; the local name is
-        // what a consumer calls, and it is what the scan below would look for.
-        const name = raw.trim().split(/\s+as\s+/).pop()?.trim();
-        if (!name || NON_DESTINATION_EXPORTS.has(name)) continue;
-        if (!(name in TRACKED_ACCESSORS)) {
-          fail(
-            `${PATH_SEAM}: re-exports \`${name}\`, which this guard has never classified. ` +
-              `Every path accessor the mobile tree can reach must be a key of TRACKED_ACCESSORS ` +
-              `(mapped to the directory its exclusion covers, or null if none is wired) or listed ` +
-              `in NON_DESTINATION_EXPORTS. An unclassified accessor is a destination nothing ` +
-              `excludes from platform backup.`,
-          );
-          continue;
-        }
-        if (TRACKED_ACCESSORS[name] === null) {
-          fail(
-            `${PATH_SEAM}: re-exports \`${name}\`, and nothing excludes that directory from ` +
-              `platform backup on EITHER platform. Anything plaintext written there is carried ` +
-              `to iCloud / Google Drive. Wire it into ${RUST_MODULE}'s EXCLUDED_DIRS and both ` +
-              `Android rules files, map it in TRACKED_ACCESSORS, then roster its call sites.`,
-          );
-        }
-      }
-    }
+  }
+  if (!io.exists(PATH_SEAM)) {
+    fail(`${PATH_SEAM}: the mobile path seam is missing, this guard is looking at the wrong tree`);
   }
 
-  // ── 1. The TS call sites match the roster, both directions ─────────────────
-  const tsFiles = io.listTs(TS_ROOT);
-  if (tsFiles.length === 0) {
-    fail(`${TS_ROOT}: no .ts/.tsx files found — this guard is looking at the wrong tree`);
-  }
-
-  const accessorRe = new RegExp(`\\b(${Object.keys(TRACKED_ACCESSORS).join("|")})\\s*\\(`, "g");
-  /** Call sites found on disk, as `file\0accessor` keys. */
-  const found = new Set();
-  for (const file of tsFiles) {
+  /** The stripped source of `path.ts`, which rule 5 reads again. */
+  let pathSeamSource = null;
+  for (const file of seamFiles) {
     const source = stripTsComments(io.read(file));
-    for (const match of source.matchAll(accessorRe)) found.add(`${file}\0${match[1]}`);
-  }
+    if (file === PATH_SEAM) pathSeamSource = source;
+    if (!source.includes("@tauri-apps/api/path")) continue;
 
-  const rosterKeys = new Set(ROSTER.map((entry) => `${entry.file}\0${entry.accessor}`));
-
-  for (const key of found) {
-    if (rosterKeys.has(key)) continue;
-    const [file, accessor] = key.split("\0");
-    const dir = TRACKED_ACCESSORS[accessor];
-    fail(
-      `${file}: calls \`${accessor}()\`, which is not on this guard's roster. ` +
-        (dir === null
-          ? `Nothing excludes that directory from platform backup on EITHER platform — ` +
-            `anything plaintext written there is carried to iCloud / Google Drive. ` +
-            `Wire it into ${RUST_MODULE}'s EXCLUDED_DIRS and both Android rules files, ` +
-            `then add it to ROSTER with a reason.`
-          : `Add it to ROSTER with a reason (the "${dir}" exclusion already covers it).`),
+    const named = source.match(
+      /(?:import|export)\s*\{([^}]*)\}\s*from\s*["']@tauri-apps\/api\/path["']/,
     );
-  }
-
-  for (const entry of ROSTER) {
-    if (found.has(`${entry.file}\0${entry.accessor}`)) continue;
-    fail(
-      `ROSTER records \`${entry.accessor}()\` in ${entry.file}, but no such call exists. ` +
-        `Remove the stale entry — a roster nobody prunes stops describing the tree.`,
-    );
-  }
-
-  /** The directory names the tree actually writes into, from the roster. */
-  const requiredDirs = new Set();
-  for (const entry of ROSTER) {
-    const dir = TRACKED_ACCESSORS[entry.accessor];
-    if (dir === null || dir === undefined) {
+    if (!named) {
       fail(
-        `ROSTER records \`${entry.accessor}()\` in ${entry.file}, but TRACKED_ACCESSORS maps it ` +
-          `to no directory — so no exclusion covers it. Map it and wire both platforms.`,
+        `${file}: reaches \`@tauri-apps/api/path\` in a shape this guard cannot read. ` +
+          `Since myne#517 this seam calls \`plugin:${PLUGIN_NAME}|${COMMAND}\` and imports no ` +
+          `path accessor at all; if that has genuinely changed, teach the guard the new shape ` +
+          `rather than removing it. Silence here is a guard that has stopped checking.`,
       );
       continue;
     }
-    requiredDirs.add(dir);
+    for (const raw of named[1].split(",")) {
+      // `documentDir as docDir` binds under a new name; the local name is
+      // what a consumer calls, and it is what a reader of this file sees.
+      const name = raw.trim().split(/\s+as\s+/).pop()?.trim();
+      if (!name) continue;
+      const hint = ACCESSOR_HINT[name] ?? "it is an accessor this guard has never classified";
+      fail(
+        `${file}: re-exports \`${name}\`, and ${hint}. The seam has no reason to reach ` +
+          `\`@tauri-apps/api/path\` at all since myne#517: the host answers "where does an ` +
+          `export go", in the same call that creates the directory, applies the platform backup ` +
+          `exclusion and sanitizes the filename. A path the WebView composes for itself has had ` +
+          `none of those three applied to it, and anything plaintext written to a directory ` +
+          `nothing excludes is carried to iCloud / Google Drive.`,
+      );
+    }
+  }
+
+  // ── 4. The iOS roster: a type, and the directories it names ────────────────
+  // Moved ahead of the Android rules because it is now the SOURCE of the
+  // directory names those rules are compared against. Before myne#517 that
+  // roster was a hand-kept list in this file, cross-checked against the TS call
+  // sites; the call sites are gone, so the enum in the Rust module is the one
+  // place a directory is named and everything else is compared to it.
+  const requiredDirs = new Set();
+  const rust = readOrFail(RUST_MODULE, "missing, iOS excludes nothing");
+  if (rust !== null) {
+    const source = stripRustComments(rust);
+    const enumBlock = source.match(/pub enum ExportDir\s*\{([\s\S]*?)\n\}/);
+    const allDecl = source.match(/ALL:\s*&'static\s*\[ExportDir\]\s*=\s*&\[([^\]]*)\]/);
+    const nameFn = source.match(
+      /fn name\(self\)\s*->\s*&'static str\s*\{([\s\S]*?)\n {4}\}/,
+    );
+    // Everything from `fn resolve<` to the first 4-space-indented close, which
+    // is the end of the fn. Rule 4b-ii reads its arms.
+    const resolveFn = source.match(/fn resolve<[\s\S]*?\n {4}\}/);
+
+    if (!enumBlock) {
+      fail(
+        `${RUST_MODULE}: could not find \`pub enum ExportDir { … }\`, did it get renamed? ` +
+          `This guard reads the variant list to know which directories the iOS side excludes; ` +
+          `reporting ok on an input it could not read is the one answer that is never right.`,
+      );
+    }
+    if (!allDecl) {
+      fail(`${RUST_MODULE}: could not find \`ALL: &'static [ExportDir] = &[…]\`, did it get renamed?`);
+    }
+    if (!nameFn) {
+      fail(`${RUST_MODULE}: could not find \`fn name(self) -> &'static str\`, did it get renamed?`);
+    }
+
+    if (enumBlock && allDecl && nameFn) {
+      // A line this filter does not recognise FAILS rather than being dropped.
+      // The trailing-comment bypass was a dropped line, and a filter that
+      // silently discards what it cannot parse will lose the next shape too
+      // (`Downloads = 1,`, a `cfg` attribute on a variant, a tuple variant).
+      // Blank lines and attributes are the only legitimate non-variants.
+      const variants = new Set();
+      for (const raw of enumBlock[1].split("\n")) {
+        const line = raw.trim();
+        if (line === "" || line.startsWith("#[")) continue;
+        if (!/^[A-Z][A-Za-z0-9]*,?$/.test(line)) {
+          fail(
+            `${RUST_MODULE}: \`enum ExportDir\` holds a line this guard cannot parse as a ` +
+              `variant: ${JSON.stringify(line)}. It would be DROPPED, and a dropped variant is ` +
+              `absent from the roster, from \`ALL\` and from the directory names rules 2 and 3 ` +
+              `hold the Android XML to, all at once. Teach the guard the shape rather than ` +
+              `leaving it to be discarded.`,
+          );
+          continue;
+        }
+        variants.add(line.replace(/,$/, ""));
+      }
+      const inAll = new Set([...allDecl[1].matchAll(/ExportDir::([A-Za-z0-9]+)/g)].map((m) => m[1]));
+      const named = new Map(
+        [...nameFn[1].matchAll(/ExportDir::([A-Za-z0-9]+)\s*=>\s*"([^"]*)"/g)].map((m) => [
+          m[1],
+          m[2],
+        ]),
+      );
+
+      // 4a. The one hole the enum opens that the old `&[&str]` did not have.
+      // `resolve()` and `name()` are exhaustive matches, so a variant cannot
+      // exist without a resolver or a name and the compiler says so. `ALL` is a
+      // hand-written slice, so a variant can be fully wired and still never be
+      // walked by `init`.
+      for (const variant of variants) {
+        if (!inAll.has(variant)) {
+          fail(
+            `${RUST_MODULE}: \`ExportDir::${variant}\` is declared and is absent from ` +
+              `\`ExportDir::ALL\`, so \`backup_exclude::init\` never excludes it at startup. ` +
+              `Every match on it is exhaustive and the compiler is satisfied; this is the one ` +
+              `part of the roster a type cannot hold.`,
+          );
+        }
+      }
+      // 4b. The directory NAMES, which are what the Android XML and rule 2 below
+      // address. A variant with no `name()` arm at all is E0004, so that case
+      // cannot reach this guard; what this guard reads is a `_ =>` catch-all,
+      // which compiles and answers for every future variant at once.
+      if (/_\s*=>/.test(nameFn[1])) {
+        fail(
+          `${RUST_MODULE}: \`name()\` has a \`_ =>\` catch-all, so a new variant silently ` +
+            `inherits some other directory's name instead of failing to compile.`,
+        );
+      }
+
+      // 4b-i. The directory names, read from TWO rosters that must agree.
+      //
+      // `named` is the one the COMPILER guarantees: `name()` is an exhaustive
+      // `match self`, so every variant has an arm or the crate does not build,
+      // and the one way to satisfy that without naming each variant is the
+      // `_ =>` catch-all the check directly above refuses. The enum body is a
+      // regex over source lines, which is a weaker claim about the same set.
+      //
+      // What this replaces is `if (dir && inAll.has(variant))`, where `dir` was
+      // `named.get(variant)` and the `&&` was doing two silent drops. An arm
+      // this guard cannot READ leaves the variant out of `named`: a block body
+      // `ExportDir::X => { "X" }`, a named constant instead of a string literal,
+      // an `A | B => "x"` alternation. The empty name leaves it falsy. Either
+      // way the directory left `requiredDirs`, which is the set rules 2 and 3
+      // hold the Android XML to, so the XML stopped having to exclude it, on a
+      // green run, with nothing naming it. That is the defect the enum-body
+      // parser eleven lines up refuses to permit on its own side, left open on
+      // this one, and closing one arm of the `&&` while leaving the other is how
+      // a blind spot moves one token over rather than going away.
+      //
+      // So both drops FAIL by name, and the roster stays the INTERSECTION rather
+      // than becoming `named` outright. That last part is not a detail and the
+      // spec is what said so: driving the set off `named` alone made an EMPTY
+      // enum body still produce a roster, which walked straight past the vacuity
+      // floor below, the one check that exists for "rules 2 and 3 compared
+      // nothing". An intersection can only ever shrink toward that floor, never
+      // fabricate a roster, so the two hold each other rather than trading
+      // places.
+      for (const variant of named.keys()) {
+        if (!variants.has(variant)) {
+          fail(
+            `${RUST_MODULE}: \`name()\` has an arm for \`ExportDir::${variant}\`, which the ` +
+              `enum-body parse did not see as a variant. The two readings of the roster ` +
+              `disagree, and rules 2 and 3 compare the Android XML against what they share.`,
+          );
+        }
+      }
+      for (const variant of variants) {
+        const dir = named.get(variant);
+        if (dir === undefined) {
+          fail(
+            `${RUST_MODULE}: \`ExportDir::${variant}\` is declared and this guard could not ` +
+              `read its \`name()\` arm. \`name()\` is exhaustive, so the arm exists and is ` +
+              `written in a shape this guard does not match (a block body \`=> { "…" }\`, a ` +
+              `named constant instead of a literal, or an \`A | B => "…"\` alternation). The ` +
+              `directory would be absent from the set rules 2 and 3 hold the Android XML to, ` +
+              `so nothing would require the XML to exclude it. Teach the guard the shape ` +
+              `rather than leaving the name to be dropped.`,
+          );
+          continue;
+        }
+        if (dir === "") {
+          fail(
+            `${RUST_MODULE}: \`ExportDir::${variant}\`'s \`name()\` arm is the empty string, ` +
+              `so it names no directory for rules 2 and 3 to require of the Android XML.`,
+          );
+          continue;
+        }
+        if (inAll.has(variant)) requiredDirs.add(dir);
+      }
+
+      // 4b-ii. `name()` and `resolve()` must agree, which nothing tied before.
+      // See `RESOLVER_FOR_DIR` for the failure and why this is an allowlist
+      // rather than a derivation. Read for every variant in the intersection,
+      // so a disagreement fails even when both arms are individually valid.
+      if (!resolveFn) {
+        fail(
+          `${RUST_MODULE}: could not find \`fn resolve<…>\`, so nothing checks that a ` +
+            `directory's NAME (what the Android rules exclude) and the accessor it resolves ` +
+            `through (what the iOS flag is applied to) describe the same directory.`,
+        );
+      } else {
+        const resolvers = new Map(
+          [...resolveFn[0].matchAll(/ExportDir::([A-Za-z0-9]+)\s*=>\s*resolver\.([a-z_]+)\(\)/g)].map(
+            (m) => [m[1], m[2]],
+          ),
+        );
+        for (const variant of variants) {
+          const dir = named.get(variant);
+          if (dir === undefined || dir === "") continue; // 4b-i already failed it.
+          const resolver = resolvers.get(variant);
+          if (resolver === undefined) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` has no \`resolve()\` arm this guard ` +
+                `can read (expected \`ExportDir::${variant} => resolver.<accessor>()\`). Without ` +
+                `it nothing checks that the directory the Android rules exclude by NAME is the ` +
+                `one the iOS flag is applied to.`,
+            );
+            continue;
+          }
+          const expected = RESOLVER_FOR_DIR[dir];
+          if (expected === undefined) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` names directory "${dir}", which is not ` +
+                `in RESOLVER_FOR_DIR, so this guard cannot say which accessor it should resolve ` +
+                `through. Classify the pair there with the reason it is correct.`,
+            );
+          } else if (expected !== resolver) {
+            fail(
+              `${RUST_MODULE}: \`ExportDir::${variant}\` names directory "${dir}" but resolves ` +
+                `through \`resolver.${resolver}()\`, where RESOLVER_FOR_DIR expects ` +
+                `\`resolver.${expected}()\`. The Android rules exclude by NAME and the iOS flag ` +
+                `is applied to the RESOLVED path, so these two disagreeing means the XML ` +
+                `excludes a directory the exports are not written to, while the one they are ` +
+                `written to is excluded by nothing.`,
+            );
+          }
+        }
+      }
+
+      // 4c. The command's destination is one of the directories startup
+      // excludes. The command applies the exclusion itself, so this is not what
+      // keeps the export safe on iOS, it is what keeps the ANDROID rules,
+      // which are declarative and keyed on these names, pointed at the
+      // directory the exports actually land in.
+      const destination = source.match(
+        /const EXPORT_DESTINATION:\s*ExportDir\s*=\s*ExportDir::([A-Za-z0-9]+)/,
+      );
+      // Two checks, not one: the const says WHICH directory, and this says the
+      // resolver actually uses it. Reading only the const would pass a tree
+      // where `ensure_export_dir` had gone back to naming a variant inline,
+      // which is the state that let the command's `path` and its `dir` label
+      // come from two independent mentions.
+      // Latently loose and tight on today's tree, said out loud rather than
+      // left to be discovered: neither end is anchored, so `fn
+      // ensure_export_dir_v2` satisfies the left and a longer const name would
+      // satisfy the right. Nothing in the file defines either today, and the
+      // lazy span between them cannot cross the function because no other
+      // `ensure(app, EXPORT_DESTINATION)` exists. Anchor both if a second
+      // resolver or a second const ever lands.
+      if (!/fn ensure_export_dir[\s\S]*?ensure\(app,\s*EXPORT_DESTINATION\)/.test(source)) {
+        fail(
+          `${RUST_MODULE}: \`ensure_export_dir\` does not resolve \`EXPORT_DESTINATION\`. That ` +
+            `const is the ONE place the export directory is chosen, and the plugin's \`dir\` label ` +
+            `reads it too; a variant named inline here means the path and the label can disagree.`,
+        );
+      }
+      if (!destination) {
+        fail(
+          `${RUST_MODULE}: could not find \`const EXPORT_DESTINATION: ExportDir = ExportDir::…\`, ` +
+            `so the guard cannot say which directory the exports land in. That const is what ` +
+            `\`plugin:${PLUGIN_NAME}|${COMMAND}\` resolves.`,
+        );
+      }
+      // Deliberately NOT also checking that `EXPORT_DESTINATION` is in `ALL`:
+      // 4a already fails on any declared variant absent from `ALL`, so that arm
+      // produced two messages for one defect and there is no reachable input
+      // where it fires alone.
+    }
+  }
+
+  // The vacuity floor, and it is inside the guard rather than only in its spec:
+  // rules 2 and 3 iterate `requiredDirs`, so an empty set makes both of them
+  // pass over any Android file at all, including an empty one.
+  if (requiredDirs.size === 0) {
+    fail(
+      `${RUST_MODULE}: the directory roster came back EMPTY, so the Android rules and the ` +
+        `manifest were compared against nothing and rules 2 and 3 below checked no directory. ` +
+        `A guard that passes because it read nothing is the failure this whole file exists to ` +
+        `prevent, one file over.`,
+    );
   }
 
   // ── 2. The Android rules exclude every required dir, in every block ─────────
@@ -404,13 +698,13 @@ export function analyse(io) {
       // BOTH blocks, not one: device transfer is a separate copy path that
       // ignores the cloud-backup block entirely.
       blocks: ["cloud-backup", "device-transfer"],
-      missing: "missing — Android 12+ has no backup exclusion",
+      missing: "missing, Android 12+ has no backup exclusion",
       why: "Plaintext exports leave the device by that path.",
     },
     {
       file: ANDROID_RULES_LEGACY,
       blocks: ["full-backup-content"],
-      missing: "missing — every Android <= 11 device backs the exports up",
+      missing: "missing, every Android <= 11 device backs the exports up",
       why:
         "android:dataExtractionRules is ignored below API 31, so this file is the only " +
         "exclusion pre-Android-12 devices read.",
@@ -424,7 +718,7 @@ export function analyse(io) {
     for (const name of blocks) {
       const body = blockBody(xml, name);
       if (body === null) {
-        fail(`${file}: no <${name}> block — that copy path is unguarded`);
+        fail(`${file}: no <${name}> block, that copy path is unguarded`);
         continue;
       }
       const excluded = excludedPaths(body);
@@ -445,7 +739,7 @@ export function analyse(io) {
   ];
   const manifestRaw = readOrFail(
     ANDROID_MANIFEST,
-    "missing — nothing points Android at the backup rules",
+    "missing, nothing points Android at the backup rules",
   );
   if (manifestRaw !== null) {
     const manifest = stripXmlComments(manifestRaw);
@@ -453,7 +747,7 @@ export function analyse(io) {
       const match = manifest.match(new RegExp(`${attr}\\s*=\\s*"@xml/([A-Za-z0-9_]+)"`));
       if (!match) {
         fail(
-          `${ANDROID_MANIFEST}: no \`${attr}\` on <application> — ${api} devices fall back ` +
+          `${ANDROID_MANIFEST}: no \`${attr}\` on <application>, ${api} devices fall back ` +
             `to backing everything up, including the plaintext export directory.`,
         );
         continue;
@@ -489,53 +783,24 @@ export function analyse(io) {
       } else if (match[1] !== resource) {
         fail(
           `${file}: the MERGED manifest's \`${attr}\` is "@xml/${match[1]}", not ` +
-            `"@xml/${resource}" — something outranked the library value.`,
+            `"@xml/${resource}", something outranked the library value.`,
         );
       }
     }
   }
 
-  // ── 4. The iOS side: wired, and excluding the same directories ─────────────
-  const rust = readOrFail(RUST_MODULE, "missing — iOS excludes nothing");
-  if (rust !== null) {
-    const decl = rust.match(/EXCLUDED_DIRS\s*:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]/);
-    if (!decl) {
-      fail(`${RUST_MODULE}: could not find \`EXCLUDED_DIRS: &[&str] = &[…]\` — did it get renamed?`);
-    } else {
-      const iosDirs = new Set([...decl[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]));
-      // Both directions: a directory the TS tree writes to and iOS does not
-      // exclude is the bug; a directory iOS excludes that nothing writes to means
-      // the two sides have drifted and one of them is describing a tree that is
-      // no longer there.
-      for (const dir of requiredDirs) {
-        if (!iosDirs.has(dir)) {
-          fail(
-            `${RUST_MODULE}: EXCLUDED_DIRS omits "${dir}", which mobile/src writes plaintext to. ` +
-              `iCloud Backup carries it.`,
-          );
-        }
-      }
-      for (const dir of iosDirs) {
-        if (!requiredDirs.has(dir)) {
-          fail(
-            `${RUST_MODULE}: EXCLUDED_DIRS carries "${dir}", which no rostered call site writes to. ` +
-              `Either the roster is stale or the iOS side is excluding the wrong directory.`,
-          );
-        }
-      }
-    }
-    // Whether each EXCLUDED_DIRS entry has a resolver arm behind it is NOT
-    // checked here on purpose: that is `backup_exclude::tests::every_excluded_dir_has_a_resolver`,
-    // which fails `cargo test` on every platform. A text guard reading Rust
-    // control flow would be the weaker of the two checks and the one that rots.
-  }
-
+  // ── 4d. The startup entry point is still wired ─────────────────────────────
+  // Kept even though the command now applies the exclusion on every export.
+  // `init` carries the startup REPAIR of a container restored from an older
+  // backup, which no export-time call can do, and it is what makes
+  // `device-matrix.md` row 8.9 runnable as written.
   const setup = readOrFail(RUST_SETUP, "missing");
   if (setup !== null) {
     if (!/\bbackup_exclude::init\s*\(/.test(setup)) {
       fail(
         `${RUST_SETUP}: no \`backup_exclude::init(...)\` call. The module compiles, the guard's ` +
-          `other checks pass, and iOS excludes nothing — the shipped-inert shape.`,
+          `other checks pass, and the startup repair of a restored container silently stops ` +
+          `happening, the shipped-inert shape.`,
       );
     }
     if (!/^\s*mod backup_exclude;/m.test(setup)) {
@@ -543,27 +808,147 @@ export function analyse(io) {
     }
   }
 
-  return { failures, requiredDirs, callSites: ROSTER.length, mergedManifests: merged.length };
+  // ── 5. The chokepoint is wired, and the route around it stays shut ────────
+  // Narrowed deliberately. The five-site ACL lockstep this rule used to carry
+  // moved to `scripts/check-mobile-plugin-acl.mjs`, where it covers all 27
+  // mobile plugin permission directories instead of this one. What stays here
+  // is the part about the export path.
+  const invokeLiteral = `plugin:${PLUGIN_NAME}|${COMMAND}`;
+  // Bounded, not `includes`. A substring match accepts
+  // `plugin:export-dir|export_pathh`, which is a command that does not exist and
+  // an export flow that fails at runtime, and the guard said ok.
+  const invokeRe = new RegExp(`plugin:${PLUGIN_NAME}\\|${COMMAND}(?![A-Za-z0-9_])`);
+  if (pathSeamSource !== null && !invokeRe.test(pathSeamSource)) {
+    fail(
+      `${PATH_SEAM}: does not invoke \`${invokeLiteral}\`. The seam is the only route from an ` +
+        `export flow to a destination; if it stopped calling the chokepoint, it is composing one ` +
+        `some other way.`,
+    );
+  }
+
+  const plugin = readOrFail(
+    PLUGIN_MODULE,
+    `missing, the ${PLUGIN_NAME} chokepoint has no implementation`,
+  );
+  if (plugin !== null) {
+    const source = stripRustComments(plugin);
+    // Bounded, for the same reason the invoke literal above is: an unanchored
+    // `includes` is satisfied by any name this one PREFIXES, so renaming the
+    // call to `ensure_export_dir_unchecked` left the guard printing ok on a
+    // tree where the function it names is not called. Deleting the call outright
+    // is the injection that does NOT find this; renaming it is the one that does.
+    if (!/backup_exclude::ensure_export_dir(?![A-Za-z0-9_])/.test(source)) {
+      fail(
+        `${PLUGIN_MODULE}: does not call \`backup_exclude::ensure_export_dir\`. That function IS ` +
+          `the resolve + create + exclude body; a command that resolves the directory some other ` +
+          `way returns a path nothing excluded.`,
+      );
+    }
+    if (!new RegExp(`fn ${COMMAND}\\b`).test(source)) {
+      fail(`${PLUGIN_MODULE}: no \`fn ${COMMAND}\`, the command this whole namespace exists for.`);
+    }
+    // These two did NOT travel to `check-mobile-plugin-acl.mjs` and belong here:
+    // that guard reads the ACL files, and these are the Rust half of the same
+    // command being reachable at all.
+    if (!new RegExp(`generate_handler!\\[[^\\]]*\\b${COMMAND}\\b`).test(source)) {
+      fail(
+        `${PLUGIN_MODULE}: \`${COMMAND}\` is not in \`generate_handler!\`, so it is not ` +
+          `registered and every invoke is refused at runtime however the ACL reads.`,
+      );
+    }
+    if (!new RegExp(`Builder::<R>::new\\("${PLUGIN_NAME}"\\)`).test(source)) {
+      fail(
+        `${PLUGIN_MODULE}: the plugin is not built as \`"${PLUGIN_NAME}"\`, so its commands do ` +
+          `not answer to the \`${invokeLiteral}\` form the ACL authorizes.`,
+      );
+    }
+  }
+
+  // C11: `build.rs` must declare the plugin AND list the command. The ACL guard
+  // requires every DECLARED command to be allowed; it cannot require a command
+  // to be declared, because naming one there is optional in general. For this
+  // chokepoint it is not optional, and this is where that is said.
+  const buildRs = readOrFail(BUILD_RS, "missing");
+  if (buildRs !== null) {
+    const declaredHere = buildRs.match(
+      new RegExp(`"${PLUGIN_NAME}",\\s*tauri_build::InlinedPlugin::new\\(\\)[\\s\\S]*?\\)`),
+    );
+    if (!declaredHere) {
+      fail(
+        `${BUILD_RS}: no \`InlinedPlugin\` declared for "${PLUGIN_NAME}". Without it the ` +
+          `permissions under \`permissions/${PLUGIN_NAME}/\` flatten into \`__app-acl__\` and ` +
+          `never match the \`${invokeLiteral}\` authorize form.`,
+      );
+    } else if (!new RegExp(`"${COMMAND}"`).test(declaredHere[0])) {
+      fail(`${BUILD_RS}: the "${PLUGIN_NAME}" InlinedPlugin does not list \`${COMMAND}\`.`);
+    }
+  }
+
+  const capabilities = readOrFail(CAPABILITIES, "missing");
+  if (capabilities !== null) {
+    if (!new RegExp(`"${PLUGIN_NAME}:default"`).test(capabilities)) {
+      fail(
+        `${CAPABILITIES}: does not grant \`"${PLUGIN_NAME}:default"\`, so the main window cannot ` +
+          `call the chokepoint. Whether that grant RESOLVES to a real permission set is ` +
+          `\`scripts/check-mobile-plugin-acl.mjs\`.`,
+      );
+    }
+    // The other direction of the narrowing myne#517 bought, and it is a ratchet.
+    for (const match of capabilities.matchAll(
+      new RegExp(`"(${RETIRED_GRANT_PREFIX}[^"]*)"`, "g"),
+    )) {
+      fail(
+        `${CAPABILITIES}: grants \`"${match[1]}"\` again. myne#517 dropped the whole ` +
+          `\`${RETIRED_GRANT_PREFIX}\` namespace: nothing under \`mobile/src\` and no ` +
+          `\`@tauri-apps/*\` package it imports calls \`plugin:path|*\`. If a consumer genuinely ` +
+          `needs it, name the consumer in review rather than re-adding the grant, because it is ` +
+          `also the route around \`${invokeLiteral}\`.`,
+      );
+    }
+  }
+
+  if (setup !== null && !/\bplugins::export_dir::init\s*\(/.test(setup)) {
+    fail(
+      `${RUST_SETUP}: no \`plugins::export_dir::init()\` registration. The plugin compiles, the ` +
+        `ACL grants it, and the command answers to nothing.`,
+    );
+  }
+
+  return {
+    failures,
+    requiredDirs,
+    mergedManifests: merged.length,
+  };
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────
 // Only when run directly, so importing this module for a spec has no side effect.
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const { failures, requiredDirs, callSites, mergedManifests } = analyse(diskIo());
+  const { failures, requiredDirs, mergedManifests } = analyse(diskIo());
   if (failures.length > 0) {
     console.error("mobile export-backup exclusion: FAILED");
     for (const message of failures) console.error(`  - ${message}`);
     console.error(
       "\n  Why this is a gate: a saved recovery phrase alone reconstructs the vault, so a copy\n" +
         "  of it in iCloud or Google Drive is a complete break of the zero-knowledge posture,\n" +
-        "  reached without any adversary doing anything. See docs/decisions/security/0506-*.",
+        "  reached without any adversary doing anything. See docs/decisions/security/0506-* and\n" +
+        "  docs/decisions/security/0595-*.",
     );
     process.exit(1);
   }
   console.log(
-    `mobile export-backup exclusion: ok (${callSites} export call sites, ` +
+    `mobile export-backup exclusion: ok (chokepoint plugin:${PLUGIN_NAME}|${COMMAND}, ` +
       `excluded dirs: ${[...requiredDirs].join(", ")}` +
-      (mergedManifests > 0 ? `; ${mergedManifests} merged manifest(s) checked` : "") +
+      // Says when it compared NOTHING, not only when it compared something. Rule
+      // 3b is opportunistic (`gen/android` is git-ignored, so it is absent in a
+      // fresh clone and in CI), and printing the count only when non-zero made a
+      // run that skipped merger precedence byte-identical to one that checked
+      // it. A silent skip reads as a pass, which is the failure this repository
+      // records by name elsewhere.
+      (mergedManifests > 0
+        ? `; ${mergedManifests} merged manifest(s) checked`
+        : `; NO merged manifest present, so rule 3b compared nothing (run an Android build to ` +
+          `check manifest-merger precedence)`) +
       `)`,
   );
 }

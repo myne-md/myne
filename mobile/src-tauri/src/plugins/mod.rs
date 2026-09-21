@@ -24,6 +24,14 @@ pub mod agent;
 pub mod attachments;
 pub mod captures;
 pub mod export;
+// The one destination a plaintext export may name (myne-md/myne#517), a NEW
+// local mobile plugin, not a `myne-core` re-export: it wraps
+// `crate::backup_exclude`, which is iOS/Android-specific and has no desktop
+// counterpart (the desktop client picks its destination through an OS save
+// dialog and has no platform-backup exposure of this kind). `export_path`
+// resolves + creates + backup-excludes the export directory and sanitizes the
+// filename, so the WebView composes no path of its own.
+pub mod export_dir;
 // Knowledge-graph layout cache (MYG1, §9.19): a thin re-export wrapper over
 // `myne_core::plugins::graph_layout` — read/write of the encrypted
 // `vault.graph` node-position cache (Class 3, never synced/backed up).
