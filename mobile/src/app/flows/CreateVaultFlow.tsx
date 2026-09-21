@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -277,6 +277,10 @@ function AckRow({
   last?: boolean;
 }) {
   const { t } = useTranslation();
+  // `useId`, not a constant: this component renders once per acknowledgement
+  // on the same screen, and two labels sharing a DOM id would point every
+  // `aria-labelledby` at whichever rendered first.
+  const ackLabelId = useId();
   return (
     <div
       style={{
@@ -291,12 +295,20 @@ function AckRow({
         type="button"
         onClick={onToggle}
         aria-pressed={checked}
+        // Named by the sentence beside it (myne#728, task 16). The button
+        // contains only a `Checkbox` glyph, so before this it was an
+        // `aria-pressed` toggle with NO accessible name: a screen reader read
+        // "pressed, button" and the user had to guess what they were agreeing
+        // to. The text is not made a second control, because this one already
+        // is one; its own onClick stays as a mouse/touch convenience.
+        aria-labelledby={ackLabelId}
         style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flex: "none" }}
       >
         <Checkbox checked={checked} />
       </button>
       <div style={{ flex: 1 }}>
         <div
+          id={ackLabelId}
           onClick={onToggle}
           style={{ fontSize: 15, lineHeight: 1.45, color: "var(--fg-1)", cursor: "pointer" }}
         >
@@ -444,6 +456,7 @@ export function CreateVaultFlow({
 
   // OB-05 account
   const [saved, setSaved] = useState(false);
+  const savedAckLabelId = useId();
   // Feedback for the "Save to file" (recovery phrase / account number) actions.
   const [fileMsg, setFileMsg] = useState<string | null>(null);
   // The copy outcome gets its OWN state, not `fileMsg`.
@@ -921,11 +934,19 @@ export function CreateVaultFlow({
               type="button"
               onClick={() => setSaved((v) => !v)}
               aria-pressed={saved}
+              // Same unnamed-toggle fix as the shared `Check` row above
+              // (myne#728, task 16): the button holds a glyph, the sentence
+              // beside it is the name.
+              aria-labelledby={savedAckLabelId}
               style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flex: "none" }}
             >
               <Checkbox checked={saved} />
             </button>
-            <div onClick={() => setSaved((v) => !v)} style={{ flex: 1, fontSize: 15, lineHeight: 1.45, color: "var(--fg-1)", cursor: "pointer" }}>
+            <div
+              id={savedAckLabelId}
+              onClick={() => setSaved((v) => !v)}
+              style={{ flex: 1, fontSize: 15, lineHeight: 1.45, color: "var(--fg-1)", cursor: "pointer" }}
+            >
               {t("createVault.accountSavedAck")}
             </div>
           </div>

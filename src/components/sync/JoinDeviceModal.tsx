@@ -9,6 +9,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
@@ -120,6 +121,14 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const betaTerms = useBetaTermsGate();
   const { t } = useTranslation();
   const baseId = useId();
+  // The rest of the page goes INERT while this is open (myne-md/myne#728,
+  // review). This one is mounted globally by `App.tsx` over whatever screen
+  // the user was on, and unlike its nine siblings it has no focus trap
+  // either, so before this the background was reachable by Tab, by a screen
+  // reader's virtual cursor AND by a click. `inert` closes all three at once,
+  // which is why it is worth having even where a trap is still owed.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, true);
   const [url, setUrl] = useState("");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -416,6 +425,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
 
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby={`${baseId}-title`}

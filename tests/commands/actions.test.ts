@@ -125,6 +125,12 @@ describe("Command palette action registry", () => {
       "editor.toggle-typewriter",
       "editor.toggle-vim-mode",
       "editor.unfold-all",
+      // The three-region keyboard model (myne#728): the editor body's keyboard
+      // exit, plus a direct command per region.
+      "focus.cycle-region",
+      "focus.editor",
+      "focus.right-panel",
+      "focus.sidebar",
       "folder.new",
       "graph.show",
       "nav.back",

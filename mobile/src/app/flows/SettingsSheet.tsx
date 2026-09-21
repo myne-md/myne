@@ -94,6 +94,7 @@ import { consentIsDeviceScoped, providerLabelOf } from "@myne/copy";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
+import { tappable } from "../a11y/tappable";
 
 /**
  * Settings sheet — the wired counterpart to the static workspace `11 · Settings`
@@ -227,7 +228,10 @@ function Row({
 }) {
   return (
     <div
-      onClick={onClick}
+      // A row is a real control only when it DOES something (myne#728, task
+      // 16). `tappable` returns null without an `onActivate`, so a static row
+      // carries no role at all rather than announcing a button that is inert.
+      {...(tappable({ onActivate: onClick }) ?? {})}
       data-testid={testId}
       style={{
         display: "flex",
@@ -746,9 +750,13 @@ function CustomThemesBlock({
                 data-theme-name={entry.name}
                 data-selected={on ? "true" : "false"}
                 // The row IS the apply control — a tap applies the theme,
-                // matching every other tappable row in this sheet (plain div +
-                // onClick), so the block still carries no button.
-                onClick={() => onPick(entry)}
+                // matching every other tappable row in this sheet. Since
+                // myne#728 task 16 that means a real one: `tappable` gives it
+                // the role, the Tab stop and the Enter/Space handling a
+                // screen reader and an external keyboard need, and `pressed`
+                // is what says WHICH theme is the applied one (`aria-selected`
+                // is not valid on a button).
+                {...tappable({ onActivate: () => onPick(entry), pressed: on })}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -2276,7 +2284,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                   return (
                     <div
                       key={c.key}
-                      onClick={() => void pickTheme(c.key)}
+                      {...tappable({ onActivate: () => void pickTheme(c.key), pressed: on })}
                       style={{
                         flex: 1,
                         textAlign: "center",

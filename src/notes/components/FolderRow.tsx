@@ -243,6 +243,12 @@ function FolderIcon({ open, colorSlot }: { open: boolean; colorSlot?: string }) 
 export type FolderRowProps = {
   node: FolderNode;
   depth: number;
+  /** Where this folder sits in the tree, for assistive technology
+   *  (myne-md/myne#728). The sidebar tree is FLATTENED for virtualization, so
+   *  there are no `role="group"` containers to express nesting and ARIA's
+   *  substitute is these three. Absent in an isolated render, where the
+   *  attributes are omitted rather than guessed. */
+  hierarchy?: { level: number; posInSet: number; setSize: number };
   collapsed: boolean;
   empty: boolean;
   /** Active drag-drop target highlight (a note is being dragged onto it). */
@@ -301,6 +307,7 @@ export type FolderRowProps = {
 export function FolderRow({
   node,
   depth,
+  hierarchy,
   collapsed,
   empty,
   dropTarget = false,
@@ -454,8 +461,21 @@ export function FolderRow({
       }}
       role="treeitem"
       aria-expanded={empty ? undefined : expanded}
+      aria-level={hierarchy?.level}
+      aria-posinset={hierarchy?.posInSet}
+      aria-setsize={hierarchy?.setSize}
+      // Roving tabindex (myne-md/myne#728): a folder row is focusable, so
+      // arrow navigation inside the tree can land on it and Left/Right can
+      // collapse or expand it. Never 0: the note rows own the list's single
+      // Tab stop, and the tree container owns it when no row does.
+      tabIndex={-1}
       data-testid="notes.folder-row"
       data-folder-path={node.path}
+      // The toggle is keyed by `node.key`, not by the path (a folded key), and
+      // the tree's keyboard handler needs the value the toggle wants rather
+      // than a value it would have to re-derive.
+      data-folder-key={node.key}
+      data-folder-empty={empty ? "true" : undefined}
       title={node.path}
     >
       {reorderPlace && (

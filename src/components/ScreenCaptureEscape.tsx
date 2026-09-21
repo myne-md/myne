@@ -58,6 +58,7 @@
 // any renamed binary, and here it would fail open ON PRIVACY, since a process
 // pretending to be a screen reader would turn the protection off.
 
+import { KEEP_REACHABLE_ATTR } from "../lib/overlay-inert";
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useScreenCaptureOverride } from "../hooks/useScreenCaptureOverride";
@@ -205,6 +206,16 @@ export function ScreenCaptureEscape() {
         variant="secondary"
         type="button"
         data-testid="screen-capture-escape.trigger"
+        // Stays reachable while an overlay owns the page (myne-md/myne#728).
+        // This button is a SIBLING of every overlay `App.tsx` mounts, so the
+        // inert owner would otherwise take it out of the tab order and the
+        // accessibility tree whenever one opened - including the PRE-UNLOCK
+        // `JoinDeviceModal`, which is one of the three surfaces the comment
+        // above this component cites as sitting behind a black rectangle on
+        // Windows. `threat-model.md` section 6 makes the reachability
+        // normative: "reachable from a keyboard-focusable control on every
+        // pre-unlock screen".
+        {...{ [KEEP_REACHABLE_ATTR]: "" }}
         // SYNC-7 pre-unlock leak budget: two literal values about a
         // device-local setting the user themselves set, already spoken by this
         // button's own label. Nothing vault-derived, nothing account-derived,

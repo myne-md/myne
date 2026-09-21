@@ -192,9 +192,13 @@ describe("buildFavoriteRows + pruneFavorites (Favorites — MYND-183)", () => {
 
   it("renders favorites in order with section-qualified keys at depth 0", () => {
     const rows = buildFavoriteRows(["b", "a"], cache);
+    // The three `aria-*` fields joined every row in myne#728: the sidebar tree
+    // is flattened for virtualization, so there are no `role="group"`
+    // containers and ARIA's substitute is level/posinset/setsize. Favorites is
+    // its own flat section, hence level 1 throughout.
     expect(rows).toEqual([
-      { kind: "note", key: "fav-b", id: "b", depth: 0 },
-      { kind: "note", key: "fav-a", id: "a", depth: 0 },
+      { kind: "note", key: "fav-b", id: "b", depth: 0, level: 1, posInSet: 1, setSize: 2 },
+      { kind: "note", key: "fav-a", id: "a", depth: 0, level: 1, posInSet: 2, setSize: 2 },
     ]);
   });
 

@@ -494,11 +494,11 @@ Six feature-level dependency admissions landed with their `decisions.md` entries
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |
 |---|---|---|---|---|---|
-| `axe-core` | ^4.12.1 (**devDependency**) | The WCAG 2.1 AA rule engine behind both accessibility tiers — the Vitest/jsdom structural pass (`tests/a11y/axe-config.ts`) and the real-render E2E pass (`e2e/support/axe.ts`, `e2e/a11y-axe.e2e.ts`) | **Zero** | MPL-2.0 | `decisions.md` 2026-06-25 (accessibility + keyboard-only release gate), which names it "test-scope devDependency, never bundled" |
+| `axe-core` | ^4.12.1 (**devDependency**) | The WCAG 2.2 AA rule engine behind both accessibility tiers — the Vitest/jsdom structural pass (`tests/a11y/axe-config.ts`) and the real-render E2E pass (`e2e/support/axe.ts`, `e2e/a11y-axe.e2e.ts`) | **Zero** | MPL-2.0 | `decisions.md` 2026-06-25 (accessibility + keyboard-only release gate), which names it "test-scope devDependency, never bundled"; bar raised to 2.2 AA by `decisions/ui/0599` |
 
 - **It cannot reach a shipped artefact.** Dev-only, imported from `tests/` and `e2e/` alone; the E2E tier reads the UMD source off disk and injects it into the page under test at run time, so nothing about it is bundled.
 - **"The bar" Q1 (hand-roll?):** no — the maintained WCAG rule corpus *is* the dependency. The decision entry is explicit that axe covers only ~30–40% of WCAG and that the rest is a manual checklist, so the dep is never asked to carry more than it can.
-- **One config, two tiers:** `WCAG_AA_TAGS` is shared so the jsdom pass and the real-render pass cannot drift on rule scope; `color-contrast` is disabled explicitly in jsdom (no layout/paint) rather than left to auto-detection.
+- **One config, two tiers:** `WCAG_AA_TAGS` is shared so the jsdom pass and the real-render pass cannot drift on rule scope; the rules that need real layout are disabled explicitly in jsdom rather than left to auto-detection, as the named `LAYOUT_ONLY_RULES` constant, which holds BOTH `color-contrast` and `target-size` (SC 2.5.8, which arrived with the 2.2 tag set). An incomplete result that quietly becomes a pass is indistinguishable from a rule that ran, which is why the list is explicit and named rather than two conditionals.
 
 ### CLI terminal access (MYND-490) — `cli/Cargo.toml`, `src-tauri/Cargo.toml`
 
