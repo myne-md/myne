@@ -61,7 +61,7 @@ use crate::types::MetaVersion;
 use alloc::vec::Vec;
 use hkdf::Hkdf;
 use sha2::Sha256;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Domain-separation prefix for every Myne v0.1 HKDF context string.
 ///
@@ -81,6 +81,9 @@ const HKDF_PREFIX_V0_1: &[u8] = b"myne.v0.1 ";
 /// bound `info`. Allocated by the `automerge-sync-migration` epic
 /// (`decisions.md` 2026-08-09 format-commitment entry).
 const HKDF_PREFIX_V0_2: &[u8] = b"myne.v0.2 ";
+
+/// Registered owner-only role that wraps the current shared group key.
+const ROLE_STR_GROUP_KEY_WRAP: &[u8] = b"group-key-wrap";
 
 /// Registered role string for the singleton v0.1 `itemsKey` wrap.
 const ROLE_STR_ITEMS_KEY_WRAP: &[u8] = b"itemsKey-wrap";
@@ -251,6 +254,15 @@ const ROLE_STR_CHATS_KEY: &[u8] = b"chats-key";
 /// `"graph-layout-blob"`.
 const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 
+/// Registered role string for the group-tier KEK that seals the owner-signed
+/// group roster inside an `NTV6` `vault.meta` (myne-md/myne#712, `protocol.md`
+/// §9.3.3). GROUP-tier only: a member holds the group key and must be able to
+/// read the roster, while an owner-root-tier key must not open it. The roster
+/// carries user-authored display names and the collaboration graph, so it is
+/// sealed rather than appended in the clear. DISTINCT from the AAD role string
+/// `"group-roster-blob"`.
+const ROLE_STR_GROUP_ROSTER_KEY: &[u8] = b"group-roster-key";
+
 /// Registered role string for the v0.2 vault membership field KEK (encrypts the
 /// sealed account id in `vault.meta` §9.3.1, the account/vault split,
 /// `decisions.md` 2026-09-07). Load-bearing: drift silently changes the KEK.
@@ -316,6 +328,207 @@ const ROLE_STR_AGENT_PERSONALITY_KEY: &[u8] = b"agent-personality-key";
 /// silently splits the singleton into a second sync record on every existing
 /// account.
 const ROLE_STR_AGENT_PERSONALITY_SYNC_ID: &[u8] = b"agent-personality-sync-id";
+
+/// Owner-only root material. A member-held [`GroupKey`] cannot be supplied to
+/// [`derive_owner_subkey_v0_2`] without an explicit, review-visible conversion.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct OwnerKey([u8; 32]);
+
+impl OwnerKey {
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+}
+
+/// Shared member-held root material for the current group-key epoch.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct GroupKey([u8; 32]);
+
+impl GroupKey {
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+}
+
+/// Roles derived exclusively from [`OwnerKey`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum OwnerRole {
+    GroupKeyWrap,
+    ServerAuth,
+    MembershipKey,
+    VaultHeadMac,
+    AiEmbeddingsKey,
+    ChatsCatalogKey,
+    ChatsCatalogSyncId,
+    ChatsKey,
+    AgentMemoryCatalogKey,
+    AgentMemoryCatalogSyncId,
+    AgentMemoryKey,
+    AgentPersonalityKey,
+    AgentPersonalitySyncId,
+}
+
+impl OwnerRole {
+    pub const ALL: [Self; 13] = [
+        Self::GroupKeyWrap,
+        Self::ServerAuth,
+        Self::MembershipKey,
+        Self::VaultHeadMac,
+        Self::AiEmbeddingsKey,
+        Self::ChatsCatalogKey,
+        Self::ChatsCatalogSyncId,
+        Self::ChatsKey,
+        Self::AgentMemoryCatalogKey,
+        Self::AgentMemoryCatalogSyncId,
+        Self::AgentMemoryKey,
+        Self::AgentPersonalityKey,
+        Self::AgentPersonalitySyncId,
+    ];
+
+    fn role_str(self) -> &'static [u8] {
+        match self {
+            Self::GroupKeyWrap => ROLE_STR_GROUP_KEY_WRAP,
+            Self::ServerAuth => ROLE_STR_SERVER_AUTH,
+            Self::MembershipKey => ROLE_STR_MEMBERSHIP_KEY,
+            Self::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
+            Self::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
+            Self::ChatsCatalogKey => ROLE_STR_CHATS_CATALOG_KEY,
+            Self::ChatsCatalogSyncId => ROLE_STR_CHATS_CATALOG_SYNC_ID,
+            Self::ChatsKey => ROLE_STR_CHATS_KEY,
+            Self::AgentMemoryCatalogKey => ROLE_STR_AGENT_MEMORY_CATALOG_KEY,
+            Self::AgentMemoryCatalogSyncId => ROLE_STR_AGENT_MEMORY_CATALOG_SYNC_ID,
+            Self::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
+            Self::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
+            Self::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
+        }
+    }
+}
+
+/// Roles derived exclusively from [`GroupKey`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum GroupRole {
+    ItemsKeyWrap,
+    PrefsKey,
+    SearchIndexKey,
+    AttachmentsCatalogKey,
+    /// RESERVED, deliberately unused. The content-addressed attachment-id is
+    /// keyed under the OWNER `root_key` and must stay stable across a B2B
+    /// migration (spec §9.9): the migration reseals the catalog under the group
+    /// tier but never rewrites attachment filenames, catalog keys or note
+    /// `![[att:…]]` references, so a group-derived id would orphan every
+    /// existing blob and duplicate every re-import. `SubkeyRole::shared_group_role`
+    /// therefore refuses to map `AttachmentsIdHmac` here, and no reader derives
+    /// this role. It stays registered so a future design that DOES rewrite ids
+    /// (a member-authored import scheme) can adopt it without re-cutting the
+    /// registry.
+    AttachmentsIdHmac,
+    SessionStateKey,
+    PersonalDictKey,
+    VaultIndicesKey,
+    AttachmentTextKey,
+    CatalogSyncId,
+    PrefsSyncId,
+    CustomThemesKey,
+    ThemesSyncId,
+    GraphLayoutKey,
+    /// KEK for the sealed owner-signed group roster in an `NTV6` `vault.meta`.
+    GroupRosterKey,
+}
+
+impl GroupRole {
+    pub const ALL: [Self; 15] = [
+        Self::ItemsKeyWrap,
+        Self::PrefsKey,
+        Self::SearchIndexKey,
+        Self::AttachmentsCatalogKey,
+        Self::AttachmentsIdHmac,
+        Self::SessionStateKey,
+        Self::PersonalDictKey,
+        Self::VaultIndicesKey,
+        Self::AttachmentTextKey,
+        Self::CatalogSyncId,
+        Self::PrefsSyncId,
+        Self::CustomThemesKey,
+        Self::ThemesSyncId,
+        Self::GraphLayoutKey,
+        Self::GroupRosterKey,
+    ];
+
+    fn role_str(self) -> &'static [u8] {
+        match self {
+            Self::ItemsKeyWrap => ROLE_STR_ITEMS_KEY_WRAP,
+            Self::PrefsKey => ROLE_STR_PREFS_KEY,
+            Self::SearchIndexKey => ROLE_STR_SEARCH_INDEX_KEY,
+            Self::AttachmentsCatalogKey => ROLE_STR_ATTACHMENTS_CATALOG_KEY,
+            Self::AttachmentsIdHmac => ROLE_STR_ATTACHMENTS_ID_HMAC,
+            Self::SessionStateKey => ROLE_STR_SESSION_STATE_KEY,
+            Self::PersonalDictKey => ROLE_STR_PERSONAL_DICT_KEY,
+            Self::VaultIndicesKey => ROLE_STR_VAULT_INDICES_KEY,
+            Self::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
+            Self::CatalogSyncId => ROLE_STR_CATALOG_SYNC_ID,
+            Self::PrefsSyncId => ROLE_STR_PREFS_SYNC_ID,
+            Self::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
+            Self::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
+            Self::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
+            Self::GroupRosterKey => ROLE_STR_GROUP_ROSTER_KEY,
+        }
+    }
+}
+
+impl SubkeyRole {
+    /// The [`GroupRole`] counterpart of a SHARED singleton role.
+    ///
+    /// A pre-B2B session seals its shared singletons under the owner's
+    /// root-tier key (`derive_subkey_versioned`); an `NTV6` session seals the
+    /// same blobs under the group key (`derive_group_subkey_v0_2`). The blob
+    /// codecs, their AAD role strings and their framing are IDENTICAL either
+    /// way, so the only thing a reader needs to switch is which registry names
+    /// the KEK.
+    ///
+    /// `None` for an owner-only role: the SCRAM secret, the membership key, the
+    /// vault-head MAC, the attachment id-HMAC, the AI embedding index and the
+    /// chats / agent-memory / agent-personality singletons stay root-derived. A
+    /// `None` here is a refusal, not a fallback: passing such a role to the
+    /// group tier would derive a key no writer ever produced.
+    ///
+    /// `AttachmentsIdHmac` is the one that looks shared but is not. Spec §9.9
+    /// keys the content-addressed attachment-id under `root_key` and requires it
+    /// to be stable within a vault; a B2B migration reseals the CATALOG under
+    /// the group tier but never rewrites attachment filenames, catalog keys or
+    /// note `![[att:…]]` references, so a group-derived id would orphan every
+    /// existing blob and duplicate every re-import. It therefore refuses here,
+    /// and the import path derives it from the owner root explicitly.
+    pub fn shared_group_role(self) -> Option<GroupRole> {
+        match self {
+            Self::ItemsKeyWrap => Some(GroupRole::ItemsKeyWrap),
+            Self::PrefsKey => Some(GroupRole::PrefsKey),
+            Self::SearchIndexKey => Some(GroupRole::SearchIndexKey),
+            Self::AttachmentsCatalogKey => Some(GroupRole::AttachmentsCatalogKey),
+            Self::SessionStateKey => Some(GroupRole::SessionStateKey),
+            Self::PersonalDictKey => Some(GroupRole::PersonalDictKey),
+            Self::VaultIndicesKey => Some(GroupRole::VaultIndicesKey),
+            Self::AttachmentTextKey => Some(GroupRole::AttachmentTextKey),
+            Self::CatalogSyncId => Some(GroupRole::CatalogSyncId),
+            Self::PrefsSyncId => Some(GroupRole::PrefsSyncId),
+            Self::CustomThemesKey => Some(GroupRole::CustomThemesKey),
+            Self::ThemesSyncId => Some(GroupRole::ThemesSyncId),
+            Self::GraphLayoutKey => Some(GroupRole::GraphLayoutKey),
+            Self::VaultHeadMac
+            | Self::ServerAuth
+            | Self::AttachmentsIdHmac
+            | Self::AiEmbeddingsKey
+            | Self::ChatsCatalogKey
+            | Self::ChatsCatalogSyncId
+            | Self::ChatsKey
+            | Self::MembershipKey
+            | Self::AgentMemoryCatalogKey
+            | Self::AgentMemoryCatalogSyncId
+            | Self::AgentMemoryKey
+            | Self::AgentPersonalityKey
+            | Self::AgentPersonalitySyncId => None,
+        }
+    }
+}
 
 /// Identifies which subkey is being derived from `root_key`.
 ///
@@ -634,6 +847,23 @@ pub fn derive_subkey_v0_2(root_key: &[u8; 32], role: SubkeyRole) -> Zeroizing<[u
     info.extend_from_slice(HKDF_PREFIX_V0_2);
     info.extend_from_slice(role_bytes);
     derive_with_context(root_key, &info)
+}
+
+/// Derive an owner-only v0.2 subkey from typed owner material.
+pub fn derive_owner_subkey_v0_2(owner_key: &OwnerKey, role: OwnerRole) -> Zeroizing<[u8; 32]> {
+    derive_v0_2_typed(&owner_key.0, role.role_str())
+}
+
+/// Derive a shared v0.2 subkey from typed group material.
+pub fn derive_group_subkey_v0_2(group_key: &GroupKey, role: GroupRole) -> Zeroizing<[u8; 32]> {
+    derive_v0_2_typed(&group_key.0, role.role_str())
+}
+
+fn derive_v0_2_typed(key: &[u8; 32], role: &[u8]) -> Zeroizing<[u8; 32]> {
+    let mut info = Vec::with_capacity(HKDF_PREFIX_V0_2.len() + role.len());
+    info.extend_from_slice(HKDF_PREFIX_V0_2);
+    info.extend_from_slice(role);
+    derive_with_context(key, &info)
 }
 
 /// Derive a subkey under the generation named by `version` — [`derive_subkey`]
@@ -1705,5 +1935,73 @@ mod tests {
 
         std::fs::write("/tmp/myne_hkdf_sha256_v0_2_vectors.json", dump.as_bytes())
             .expect("write hkdf v0.2 vectors dump");
+    }
+
+    #[test]
+    fn owner_and_group_derivation_are_type_and_domain_separated() {
+        let owner_root = OwnerKey::new([0x11; 32]);
+        let group_key = GroupKey::new([0x11; 32]);
+
+        let owner_wrap = derive_owner_subkey_v0_2(&owner_root, OwnerRole::GroupKeyWrap);
+        let group_wrap = derive_group_subkey_v0_2(&group_key, GroupRole::ItemsKeyWrap);
+
+        assert_ne!(*owner_wrap, *group_wrap);
+    }
+
+    #[test]
+    fn typed_role_registries_are_exhaustive_and_disjoint() {
+        fn owner_role_index(role: OwnerRole) -> usize {
+            match role {
+                OwnerRole::GroupKeyWrap => 0,
+                OwnerRole::ServerAuth => 1,
+                OwnerRole::MembershipKey => 2,
+                OwnerRole::VaultHeadMac => 3,
+                OwnerRole::AiEmbeddingsKey => 4,
+                OwnerRole::ChatsCatalogKey => 5,
+                OwnerRole::ChatsCatalogSyncId => 6,
+                OwnerRole::ChatsKey => 7,
+                OwnerRole::AgentMemoryCatalogKey => 8,
+                OwnerRole::AgentMemoryCatalogSyncId => 9,
+                OwnerRole::AgentMemoryKey => 10,
+                OwnerRole::AgentPersonalityKey => 11,
+                OwnerRole::AgentPersonalitySyncId => 12,
+            }
+        }
+
+        fn group_role_index(role: GroupRole) -> usize {
+            match role {
+                GroupRole::ItemsKeyWrap => 0,
+                GroupRole::PrefsKey => 1,
+                GroupRole::SearchIndexKey => 2,
+                GroupRole::AttachmentsCatalogKey => 3,
+                GroupRole::AttachmentsIdHmac => 4,
+                GroupRole::SessionStateKey => 5,
+                GroupRole::PersonalDictKey => 6,
+                GroupRole::VaultIndicesKey => 7,
+                GroupRole::AttachmentTextKey => 8,
+                GroupRole::CatalogSyncId => 9,
+                GroupRole::PrefsSyncId => 10,
+                GroupRole::CustomThemesKey => 11,
+                GroupRole::ThemesSyncId => 12,
+                GroupRole::GraphLayoutKey => 13,
+                GroupRole::GroupRosterKey => 14,
+            }
+        }
+
+        let mut owner_seen = [false; OwnerRole::ALL.len()];
+        for role in OwnerRole::ALL {
+            let index = owner_role_index(role);
+            assert!(!owner_seen[index]);
+            owner_seen[index] = true;
+        }
+        assert!(owner_seen.into_iter().all(core::convert::identity));
+
+        let mut group_seen = [false; GroupRole::ALL.len()];
+        for role in GroupRole::ALL {
+            let index = group_role_index(role);
+            assert!(!group_seen[index]);
+            group_seen[index] = true;
+        }
+        assert!(group_seen.into_iter().all(core::convert::identity));
     }
 }

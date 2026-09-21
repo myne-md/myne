@@ -370,15 +370,28 @@ pub async fn run_active_cycle_from_host(
         return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
     };
     // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
-    // the cycle needs the itemsKey material alongside root_key. Cloned out of
+    // the cycle needs the itemsKey material alongside the OWNER root key (the
+    // SCRAM secret and the vault-head MAC are owner-tier roles). Cloned out of
     // the slot and the guard dropped immediately (holding the read guard across
-    // the network cycle would block lock/auto-lock).
-    let Some((items_key, items_key_id, root_key)) = state
-        .hold_unlocked_attachment_material()
-        .await
-        .map(|(_guard, items_key, items_key_id, root_key)| (items_key, items_key_id, root_key))
-    else {
-        return CycleOutcome::NotReady; // vault locked
+    // the network cycle would block lock/auto-lock). A member-held slot has no
+    // root key, so it is `NotReady` here until member server auth lands.
+    let Some((items_key, items_key_id, root_key, shared)) = ({
+        let slot = state.slot_read_active().await;
+        match &*slot {
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+                uv.owner_root_key().map(|root| {
+                    (
+                        uv.items_key.clone(),
+                        uv.items_key_id,
+                        zeroize::Zeroizing::new(**root),
+                        uv.shared_singleton_key(),
+                    )
+                })
+            }
+            _ => None,
+        }
+    }) else {
+        return CycleOutcome::NotReady; // vault locked (or member-held)
     };
     // The AAD identity, sourced from `vault.meta` rather than from the enrolment
     // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
@@ -471,6 +484,7 @@ pub async fn run_active_cycle_from_host(
             io,
             transport.as_ref(),
             &root_key,
+            &shared,
             account_number_hash,
             device_id,
             &token_hex,

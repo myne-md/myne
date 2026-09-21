@@ -61,10 +61,10 @@ async fn serve<R: Runtime>(
         None => return server_error(),
     };
     let keys = match state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return forbidden(),
     };

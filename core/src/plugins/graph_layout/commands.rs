@@ -18,8 +18,8 @@ use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 use protocol::{
-    decode_graph_layout_blob, derive_subkey, encode_graph_layout_blob, parse_vault_meta_any,
-    GraphLayoutBlobError, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_graph_layout_blob, encode_graph_layout_blob, parse_vault_meta_any, GraphLayoutBlobError,
+    SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -63,7 +63,7 @@ async fn read_account_number_hash<E>(
     io: &dyn VaultIo,
     meta_path: &Path,
     on_parse_err: impl FnOnce() -> E,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], E>
+) -> Result<(protocol::MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), E>
 where
     E: From<crate::io_failure_kind::IoFailureKind>,
 {
@@ -73,7 +73,8 @@ where
     // `read_candidates` yields one element there, so this is the same read
     // followed by the same parse.
     match crate::singleton::open_newest(io, meta_path, |candidate| {
-        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
+        let version = protocol::meta_version_of(candidate).unwrap_or(protocol::MetaVersion::V0_1);
+        parse_vault_meta_any(candidate).map(|m| (version, m.account_number_hash))
     })
     .await
     {
@@ -201,16 +202,17 @@ pub async fn graph_layout_read_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Option<String>, GraphLayoutReadError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(GraphLayoutReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
-        GraphLayoutReadError::InvalidVaultMeta
-    })
-    .await?;
-    let graph_layout_key = derive_subkey(&root_key, SubkeyRole::GraphLayoutKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
+            GraphLayoutReadError::InvalidVaultMeta
+        })
+        .await?;
+    let graph_layout_key = shared.derive(meta_version, SubkeyRole::GraphLayoutKey);
 
     Ok(read_or_none(
         io,
@@ -266,16 +268,17 @@ pub async fn graph_layout_write_with_dir(
 ) -> Result<(), GraphLayoutWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(GraphLayoutWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
-        GraphLayoutWriteError::InvalidVaultMeta
-    })
-    .await?;
-    let graph_layout_key = derive_subkey(&root_key, SubkeyRole::GraphLayoutKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
+            GraphLayoutWriteError::InvalidVaultMeta
+        })
+        .await?;
+    let graph_layout_key = shared.derive(meta_version, SubkeyRole::GraphLayoutKey);
 
     let blob_bytes =
         encode_graph_layout_blob(&graph_layout_key, &account_number_hash, payload.as_bytes())

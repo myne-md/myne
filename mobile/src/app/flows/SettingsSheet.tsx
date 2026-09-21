@@ -6,7 +6,13 @@ import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
 import { remindersReachTheOs } from "../../lib/reminders";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
-import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
+import {
+  SyncHubPanel,
+  SyncEndpointPanel,
+  SyncEnrollPanel,
+  SyncDevicesPanel,
+  SyncMembersPanel,
+} from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
@@ -1217,7 +1223,8 @@ type Panel =
   | "sync-endpoint"
   | "sync-enroll"
   | "sync-approve"
-  | "sync-devices";
+  | "sync-devices"
+  | "sync-members";
 
 /**
  * Format-bar layout editor (MYND-555) — reorder + show/hide the editor's
@@ -1383,6 +1390,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   "sync-enroll": "sync",
   "sync-approve": "sync-devices",
   "sync-devices": "sync",
+  "sync-members": "sync",
 };
 
 /** Stack depth per panel — drives the slide direction of the panel transition
@@ -1405,6 +1413,7 @@ const PANEL_DEPTH: Record<Panel, number> = {
   "sync-endpoint": 2,
   "sync-enroll": 2,
   "sync-devices": 2,
+  "sync-members": 2,
   "sync-approve": 3,
 };
 
@@ -1428,6 +1437,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   "sync-endpoint": "sync.join.serverLabel",
   "sync-enroll": "sync.enroll.submit",
   "sync-devices": "sync.devices.yourDevices",
+  "sync-members": "sync.members.title",
   "sync-approve": "settings.panelTitle.approveDevice",
 };
 
@@ -2636,6 +2646,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             onOpenEndpoint={() => setPanel("sync-endpoint")}
             onOpenEnroll={() => setPanel("sync-enroll")}
             onOpenDevices={() => setPanel("sync-devices")}
+            onOpenMembers={() => setPanel("sync-members")}
           />
         )}
 
@@ -2644,6 +2655,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         {panel === "sync-enroll" && <SyncEnrollPanel onEnrolled={() => setPanel("sync")} />}
 
         {panel === "sync-devices" && <SyncDevicesPanel />}
+
+        {panel === "sync-members" && <SyncMembersPanel />}
 
         {panel === "about" && (
           <div style={{ marginTop: 4 }}>

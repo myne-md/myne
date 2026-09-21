@@ -33,6 +33,9 @@ export interface RosterMemberView {
   member_ed_pk_hex: string;
   member_kem_ek_hex: string;
   member_mldsa_vk_hex: string;
+  /** Identity-continuity state on an `NTV6` vault (`current` | `changed` |
+   *  `owner-confirmed`); `null` for a legacy `NTV5`/`MYV1` roster. */
+  continuity: "current" | "changed" | "owner-confirmed" | null;
 }
 
 /** The invite command's serializable result. */
@@ -53,6 +56,24 @@ export async function personUnlock(phrase: string): Promise<PersonIdentityView> 
 /** Drop the backend-held person identity. `forget` also erases the sealed file. */
 export async function personLock(forget = false): Promise<void> {
   return invoke("plugin:sync|sync_person_lock", { forget });
+}
+
+/** The explicit owner-approved NTV5 to NTV6 migration's result. */
+export interface B2bMigrationView {
+  group_key_epoch: number;
+  singletons_migrated: number;
+}
+
+/**
+ * Start the explicit owner-approved migration that turns an `NTV5` vault into a
+ * shared `NTV6` one. Called from the FIRST B2B action (the invite), after the
+ * person identity is unlocked; an ordinary unlock never migrates. Idempotent: an
+ * already-migrated vault reports its epoch and rewrites nothing.
+ */
+export async function startB2bMigration(ownerDisplayName: string): Promise<B2bMigrationView> {
+  return invoke<B2bMigrationView>("plugin:sync|sync_start_b2b_migration", {
+    ownerDisplayName,
+  });
 }
 
 /** Invite one member to the unlocked vault. */
@@ -79,6 +100,9 @@ export async function inviteMember(input: {
 export interface RosterListView {
   members: RosterMemberView[];
   authority: VaultAuthority;
+  /** The current group-key epoch on an `NTV6` vault; `null` for a legacy
+   *  roster that has no group tier. */
+  group_key_epoch: number | null;
 }
 
 /** List the unlocked vault's B2B roster (non-tombstoned rows) and authority. */

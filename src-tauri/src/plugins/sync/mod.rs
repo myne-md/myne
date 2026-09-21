@@ -50,6 +50,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_now,
             commands::sync_person_unlock,
             commands::sync_person_lock,
+            commands::sync_start_b2b_migration,
             commands::sync_invite_member,
             commands::sync_list_roster,
             commands::sync_remove_member,
