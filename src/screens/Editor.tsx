@@ -55,6 +55,8 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { topRightFloatsShown as topRightFloats } from "../notes/topRightFloats";
+import { requestGraphViewFilter } from "../notes/graphViewFilter";
 import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
@@ -359,6 +361,14 @@ const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
   { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
   { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
 ];
+
+// There is deliberately NO left cluster and NO graph launcher here any more.
+// myne-md/myne#396 asked for a bottom-left launcher and this branch shipped one;
+// using it settled the question the other way. A launcher pinned to a corner is
+// a second, uncustomizable place for a command that the LEFT RIBBON already
+// hosts on the user's own terms (myne-md/myne#699), and the graph also has a
+// shortcut and a palette entry. So `graph.show` declares ribbon metadata and the
+// bottom bar carries utilities only. #396 closes as superseded by the ribbon.
 
 /** reading-source-modes (MYND-299): short i18n keys for the BottomBar view-mode
  *  switcher labels (resolved with t() at the render consumer to stay reactive). */
@@ -1173,6 +1183,24 @@ function EditorChrome({
   const leftToggleX =
     HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
   const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
+  // Is anything FLOATED in the top-right corner? Two things can be, the
+  // note-actions "…" menu and the right-sidebar toggle, and they share one
+  // condition, because both act on the OPEN NOTE: a non-note tab (the graph, the
+  // task list, a saved view) has no note for either to act on, and the
+  // attachments view replaces the pane entirely (myne-md/myne#656 review).
+  //
+  // It is one constant because three consumers must agree about it: the tab
+  // strip's right clearance, the toggle's own render, and the "…" menu's. They
+  // were two copies before, and the copy the clearance used did not know about
+  // the note-tab condition, so on the graph tab the strip reserved room for two
+  // controls that were not there and its caret floated a control's width off the
+  // right edge (myne-md/myne#727).
+  const topRightFloatsShown = topRightFloats({
+    centerView,
+    focusedTabKind: ws.focusedLeaf.activeTab?.kind,
+    pendingNewTabPaneId: ws.pendingNewTabPaneId,
+    focusedPaneId: ws.focusedPaneId,
+  });
 
   // Reveal the Saved Views surface (MYND-274) - the "Views" section lives in the
   // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
@@ -2347,7 +2375,16 @@ function EditorChrome({
             focusedPaneId={ws.focusedPaneId}
             onReadout={onReadout}
             leftInset={leftCollapsed ? leftClearance : 0}
-            rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
+            // The clearance is reserved for the two controls that FLOAT in the
+            // top-right corner, so it is only owed when they are there. On a
+            // non-note tab (the graph, the task list, a saved view) neither is
+            // rendered, there is no note for either to act on, and reserving
+            // their room anyway left the tab strip's caret sitting a control's
+            // width off the right edge with empty space beside it
+            // (myne-md/myne#727). The strip's padding already transitions on the
+            // sidebar's own curve, so the caret slides rather than jumping when
+            // the focused tab changes kind.
+            rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
           />
         )}
         {centerView !== "attachments" &&
@@ -2406,16 +2443,10 @@ function EditorChrome({
         />
       </div>
       {/* The right panel (backlinks / outline / …) is about the OPEN note, so its
-          toggle only shows while a note is actually open - not on the new-tab
-          chooser or the attachments view. Mirror PaneView's `inNewTabState`
-          (`pendingNewTab || activeTab === null`) for the FOCUSED pane, so an open
-          "+ New tab" over existing tabs still hides it. */}
-      {centerView !== "attachments" &&
-        // Backlinks / outline are about the OPEN NOTE, so the toggle is hidden
-        // on a non-note tab (the Tasks tab, the graph, a saved view): there is
-        // no note for a right sidebar to describe (myne-md/myne#656 review).
-        ws.focusedLeaf.activeTab?.kind === "note" &&
-        ws.pendingNewTabPaneId !== ws.focusedPaneId && (
+          toggle only shows while a note is actually open. One constant, shared
+          with the tab strip's clearance and the "…" menu, see
+          `topRightFloatsShown`. */}
+      {topRightFloatsShown && (
         <div
           style={{
             position: "absolute",
@@ -2434,7 +2465,6 @@ function EditorChrome({
       )}
       <BottomBar
         onOpenSettings={() => openSettings()}
-        onShowGraph={() => ws.openGraph()}
         onShowTags={() => {
           setTagsSeed(null);
           setTagsOpen(true);
@@ -2754,9 +2784,19 @@ function EditorChrome({
             noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
           );
         }}
+        topRightFloatsShown={topRightFloatsShown}
         onShowGraph={() => {
           setPaletteOpen(false);
           ws.openGraph();
+        }}
+        onShowIsolatedGraph={() => {
+          // The pane's filter is LOCAL state, so the request has to travel out
+          // of band: `openGraph` opens the tab and this hands it the view it
+          // should open ON (task 14). Order does not matter, the request
+          // waits for the pane if the pane is not up yet.
+          setPaletteOpen(false);
+          ws.openGraph();
+          requestGraphViewFilter({ kind: "orphans" });
         }}
         onShowTasks={() => {
           setPaletteOpen(false);
@@ -3136,7 +3176,12 @@ type CommandPaletteHostProps = {
   onExportNotePdf: () => void;
   onExportNoteHtml: () => void;
   onExportNoteTxt: () => void;
+  /** Whether the note-actions "…" menu is shown, the SAME fact the tab strip's
+   *  right clearance and the right-sidebar toggle use. Handed down rather than
+   *  recomputed so the three cannot drift. */
+  topRightFloatsShown: boolean;
   onShowGraph: () => void;
+  onShowIsolatedGraph: () => void;
   onShowTags: () => void;
   onShowViews: () => void;
   onImportObsidian: () => void;
@@ -3174,7 +3219,6 @@ function CommandPaletteHost({
   open,
   onClose,
   onReopen,
-  centerView,
   setToast,
   onOpenSettings,
   onRestoreBackup,
@@ -3186,7 +3230,9 @@ function CommandPaletteHost({
   onExportNotePdf,
   onExportNoteHtml,
   onExportNoteTxt,
+  topRightFloatsShown,
   onShowGraph,
+  onShowIsolatedGraph,
   onShowTags,
   onShowViews,
   onImportObsidian,
@@ -3661,6 +3707,7 @@ function CommandPaletteHost({
         applyNoteCover(null, null);
       },
       onShowGraph,
+      onShowIsolatedGraph,
       onShowTags,
       onShowViews,
       onImportObsidian,
@@ -3710,6 +3757,7 @@ function CommandPaletteHost({
       onExportNoteHtml,
       onExportNoteTxt,
       onShowGraph,
+      onShowIsolatedGraph,
       onShowTags,
       onShowViews,
       onImportObsidian,
@@ -3769,10 +3817,7 @@ function CommandPaletteHost({
   // in the focused pane, mirroring the right-sidebar toggle's own gate (which
   // lives in `EditorChrome`), so the two float side by side; `centerView` is
   // the one gate input `EditorChrome` owns, threaded in as a prop.
-  const showNoteActions =
-    centerView !== "attachments" &&
-    paletteWs.focusedLeaf.activeTab?.kind === "note" &&
-    paletteWs.pendingNewTabPaneId !== paletteWs.focusedPaneId;
+  const showNoteActions = topRightFloatsShown;
   // The note the "…" menu acts on (the focused-pane note the other items use).
   // Its template flag flips the convert item between promote and demote - the
   // dead `convertNoteToTemplate` wire (nothing called it) and the modal-only
@@ -4978,7 +5023,6 @@ interface BottomBarProps {
   onOpenSettings?: () => void;
   /** Open the whole-vault graph (the persistent wedge-first-class affordance,
    *  SYNC-7) - parallel to the settings gear. */
-  onShowGraph?: () => void;
   /** Open the tag browser (persistent affordance, SYNC-7 refinement, MYND-46). */
   onShowTags?: () => void;
   /** Reveal the Saved Views surface (persistent affordance, SYNC-7, MYND-274). */
@@ -5048,7 +5092,6 @@ interface BottomBarProps {
 function BottomBar({
   onLockFlushed,
   onOpenSettings,
-  onShowGraph,
   onShowTags,
   onShowViews,
   saveStatus,
@@ -5199,32 +5242,9 @@ function BottomBar({
           </button>
         </Tooltip>
       ) : null,
-    graph: () =>
-      onShowGraph ? (
-        <Tooltip label={t("editor.chrome.bottomBar.graphTitle")}>
-          <button
-            type="button"
-            data-testid="editor.graph-button"
-            onClick={onShowGraph}
-            aria-label={t("editor.chrome.bottomBar.showGraph")}
-            {...hoverSurface()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
-              transition: HOVER_TRANSITION,
-            }}
-          >
-            <Icon name="share-2" size={14} />
-          </button>
-        </Tooltip>
-      ) : null,
+    // There is no `graph` renderer: the graph affordance left the bottom bar
+    // when the left ribbon shipped (myne-md/myne#727, superseding #396). The
+    // command keeps its shortcut, its palette entry and its ribbon metadata.
     settings: () => (
       <Tooltip label={t("editor.chrome.bottomBar.settingsTitle")}>
         <button
@@ -5372,7 +5392,17 @@ function BottomBar({
         padding: "0 12px",
       }}
     >
-      <div style={{ flex: 1 }} />
+      {/* The flexible spacer. It carries a testid because it is the only
+          reliably EMPTY region of the bar: a right-click here is the list menu,
+          whereas a right-click anywhere else may land on an affordance and open
+          that item's own menu instead. `alignSelf: stretch` is not decoration:
+          the bar centres its children, so an empty div collapses to zero height
+          and a zero-height element has no addressable centre for a pointer
+          action. */}
+      <div
+        data-testid="editor.bar-spacer"
+        style={{ flex: 1, alignSelf: "stretch" }}
+      />
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
         {/* Preview-companion toggle is pinned (contextual, not a BAR_ITEMS id):
             it is never reorderable and anchors at the start of the right

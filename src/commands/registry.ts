@@ -106,6 +106,11 @@ export type CommandContext = {
   onRemoveNoteCover: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
+  /** Open the graph view on the ISOLATED notes, the notes with no links in or
+   *  out (myne-md/myne#727, task 14). Its own entry rather than a chip in the
+   *  pane header: a view nobody opens daily belongs in the palette, and the
+   *  pane header has to hold the controls for the view you are already in. */
+  onShowIsolatedGraph: () => void;
   /** Open (or reveal) the vault-wide task list (MYND-616). */
   onShowTasks: () => void;
   /** Open the tag browser (modal carve-out: tree + multi-select filter) (MYND-46). */

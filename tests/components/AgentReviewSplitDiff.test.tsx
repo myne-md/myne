@@ -57,6 +57,12 @@ function settleWith(edits: ProposedEdit[]) {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
+      // Inherited from develop, where `settleStep`'s parameter type gained this
+      // field and this fixture was not updated. It reddens
+      // `check-test-typecheck.mjs`, a blocking ratchet, for every branch cut
+      // from develop, so it is fixed here rather than left for the next person
+      // (myne-md/myne#727).
+      memoryUpdated: 0,
     },
     currentRunEpoch(),
   );

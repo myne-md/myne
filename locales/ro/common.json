@@ -1969,8 +1969,7 @@
         "reset": "Revino la valorile implicite",
         "showArrows": "Arată săgețile de direcție",
         "title": "Setări grafic"
-      },
-      "tagPlaceholder": "Etichetă…"
+      }
     },
     "import": {
       "base": {

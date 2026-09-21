@@ -173,20 +173,34 @@ export function graphLayoutFingerprint(
 }
 
 /** The cold layout of {@link GRAPH_CONTRACT_NOTES} under the default forces,
- *  with an empty seed. Regenerate deliberately if the forces or the tick budget
- *  change — a diff here means every existing layout moves. */
+ *  with an empty seed. Regenerate deliberately if the forces, the seed ring or
+ *  the run contract change, a diff here means every existing layout moves.
+ *
+ *  Regenerated six times, all for myne-md/myne#727. First for the run
+ *  contract (the kernel used to stop after a fixed tick budget and now stops
+ *  when it has cooled), again for the curation pass that tightened the defaults
+ *  and pulled the seed ring in from the box's rim to a quarter of it, again for
+ *  the collide force that opens gaps between clusters (task 19), and again when
+ *  that floor was corrected to reserve the radius the client can actually DRAW
+ *  rather than one the kernel invented, and once more when the size-strength
+ *  control's ceiling moved and the tag node gained its own degree dose, and once
+ *  more for the second spacing pass (a longer default link distance and a wider
+ *  collision padding).
+ *  The reason the value is still pinned at all is that both clients run this one
+ *  kernel, and a coordinate here moving is the cheapest possible signal that the
+ *  shared implementation stopped being shared. */
 export const GRAPH_CONTRACT_LAYOUT_FINGERPRINT =
-  "n-alpha:837.685896041578,252.59004517910725|" +
-  "n-archived:739.8887235161133,260.2663750907585|" +
-  "n-beta:792.0719671360154,298.99863845430923|" +
-  "n-fence:830.5289814871309,351.364501182955|" +
-  "n-folder-linker:480.9719359426908,511.205687044647|" +
-  "n-ghost:624.9981736187366,886.3784122364578|" +
-  "n-linker:176.53312848654602,489.5369931848552|" +
-  "n-orphan:112.86554254530718,836.6797711202418|" +
-  "n-personal-report:144.6774245203641,545.6521779675257|" +
-  "n-projects-index:521.1379308128686,560.8889131555088|" +
-  "n-work-report:238.6258848097196,506.4350233046903";
+  "n-alpha:481.5002925511994,559.0636321826742|" +
+  "n-archived:427.38304736989795,489.6532188577761|" +
+  "n-beta:471.62768731531804,510.71745764799766|" +
+  "n-fence:435.2809799454578,543.8411884991574|" +
+  "n-folder-linker:452.19275368952714,434.84763358147296|" +
+  "n-ghost:569.3914986240536,465.5572011671957|" +
+  "n-linker:572.5014077871687,536.9301610466176|" +
+  "n-orphan:525.2094950866635,420.1060312364619|" +
+  "n-personal-report:537.4370922967516,571.339253662553|" +
+  "n-projects-index:495.08261614761494,458.077224454557|" +
+  "n-work-report:532.394599622275,509.86516324480976";
 
 export const GRAPH_CONTRACT_EXPECTATION: GraphModelSummary = {
   nodes: [

@@ -1969,8 +1969,7 @@
         "reset": "Repor as predefinições",
         "showArrows": "Mostrar setas de direção",
         "title": "Definições do gráfico"
-      },
-      "tagPlaceholder": "Etiqueta…"
+      }
     },
     "import": {
       "base": {

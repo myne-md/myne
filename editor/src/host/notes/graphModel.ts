@@ -150,8 +150,91 @@ export function resolveEdges(
   }));
 }
 
-/** A graph node — one note. `title` is the render label (null = untitled). */
-export type GraphNode = { id: string; title: string | null };
+/**
+ * What a graph node IS (myne-md/myne#727).
+ *
+ * OPTIONAL, and that is load-bearing rather than lazy: every notes-only builder
+ * here (`buildGraphModel`, `inducedNeighborhood`, `subgraphModel`,
+ * `isolatedModel`) keeps producing `{id,title}` byte-identically, so the
+ * cross-client contract fixture and the pinned layout fingerprint are untouched
+ * by the tag-node work. An absent `kind` means "note"; only a tag node carries
+ * one, which makes `kind === "tag"` the single test every consumer needs.
+ */
+export type GraphNodeKind = "note" | "tag";
+
+/** A graph node, one note, or (whole-vault view only) one tag. `title` is the
+ *  render label (null = untitled). */
+export type GraphNode = {
+  id: string;
+  title: string | null;
+  kind?: GraphNodeKind;
+};
+
+/**
+ * The prefix that makes a tag node's id unmistakably NOT a note UUID
+ * (myne-md/myne#727). A UUID can never contain a colon, so no note id can
+ * collide with a tag node's, and the whole "is this a note or a tag" question
+ * is answerable from the id alone by every consumer, the renderer, the list,
+ * the click handler and a test.
+ */
+export const TAG_NODE_ID_PREFIX = "tag:";
+
+/** The node id for the tag whose folded key is `tagKey`. */
+export function tagNodeId(tagKey: string): string {
+  return `${TAG_NODE_ID_PREFIX}${tagKey}`;
+}
+
+/** The folded tag key a tag node id names, or `null` if `id` is not one. */
+export function tagKeyFromNodeId(id: string): string | null {
+  return id.startsWith(TAG_NODE_ID_PREFIX)
+    ? id.slice(TAG_NODE_ID_PREFIX.length)
+    : null;
+}
+
+/** One tag and the notes carrying it, the input {@link withTagNodes} needs to
+ *  turn a tag into a node. `key` is the FOLDED tag key (the same form
+ *  `vaultIndices.byTag` and the color-group evaluator compare against), and
+ *  `display` is what the label shows after the `#`. */
+export type TagMembership = {
+  key: string;
+  display: string;
+  members: ReadonlySet<string>;
+};
+
+/**
+ * Add one node per tag, with an edge from the tag node to each note carrying it
+ * (myne-md/myne#727), the "a coloured tag in the middle with its notes around
+ * it" shape. Pure, and a no-op when there are no tags, so the notes-only paths
+ * are unaffected.
+ *
+ * The tag node's title is `#<display>` and its colour is not decided here: it
+ * is a render-time layer exactly like every other colour, and the caller puts
+ * the tag node's id into the same `nodeColors` map it paints notes from.
+ *
+ * Two bounds, both deliberate. A tag whose members are all absent from `model`
+ * contributes NO node, an empty hub floating in space claims a cluster that is
+ * not in this view. And members are sorted, so the edge list is byte-stable
+ * across Set iteration order, which is what lets a test assert it.
+ */
+export function withTagNodes(
+  model: GraphModel,
+  tags: ReadonlyArray<TagMembership>,
+): GraphModel {
+  if (tags.length === 0) return model;
+  const live = new Set(model.nodes.map((n) => n.id));
+  const nodes: GraphNode[] = [...model.nodes];
+  const edges: GraphEdge[] = [...model.edges];
+  for (const tag of tags) {
+    const members = [...tag.members].filter((id) => live.has(id)).sort();
+    if (members.length === 0) continue;
+    const id = tagNodeId(tag.key);
+    nodes.push({ id, title: `#${tag.display}`, kind: "tag" });
+    for (const member of members) {
+      edges.push({ source: id, target: member, weight: 1 });
+    }
+  }
+  return { nodes, edges };
+}
 
 /** A weighted directed graph edge: `weight` = how many resolved occurrences
  *  collapsed into this source→target pair. */

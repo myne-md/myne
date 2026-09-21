@@ -1898,8 +1898,7 @@
         "reset": "기본값으로 재설정",
         "showArrows": "방향 화살표 표시",
         "title": "그래프 설정"
-      },
-      "tagPlaceholder": "태그…"
+      }
     },
     "import": {
       "base": {

@@ -1898,8 +1898,7 @@
         "reset": "Kembalikan ke bawaan",
         "showArrows": "Tampilkan panah arah",
         "title": "Pengaturan grafik"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {

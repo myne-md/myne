@@ -2696,6 +2696,7 @@ export const ROSTER = Object.freeze([
       "src/notes/components/GraphView.tsx",
       "src/notes/components/GraphCanvas.tsx",
       "src/notes/components/GraphSettingsPanel.tsx",
+      "src/notes/components/GraphList.tsx",
       "src/notes/components/ColorGroupEditor.tsx",
       "src/notes/graphModel.ts",
       "src/notes/graphAdapter.ts",
@@ -2717,13 +2718,14 @@ export const ROSTER = Object.freeze([
       "e2e/graph-settings.e2e.ts",
       "e2e/graph-color-groups.e2e.ts",
       "e2e/graph-layout-persistence.e2e.ts",
+      "e2e/graph-list.e2e.ts",
     ],
     manual: [
       {
-        see: "In the graph tab, zoom with a two-finger trackpad pinch on macOS, with the mouse wheel on Windows and Linux, and with a two-finger pinch on a phone and a tablet. Confirm each zooms smoothly around the pointer or pinch centre rather than jumping, that dragging the background pans one-to-one with the pointer, and that a trackpad two-finger scroll behaves consistently with the platform's convention rather than doing the opposite of the wheel.",
-        whyNotAutomated: "A trackpad pinch arrives as a wheel event with ctrlKey synthesised by the OS gesture engine and a touch pinch as a two-point touchmove; neither has a WebDriver input source the harness can drive, and \"smoothly rather than jumping\" is perceptual.",
+        see: "In the graph tab, zoom with a two-finger trackpad pinch on macOS, with the mouse wheel on Windows and Linux, and with a two-finger pinch on a phone and a tablet. Confirm each zooms smoothly around the pointer or pinch centre rather than jumping, that dragging the background pans one-to-one with the pointer, and that a trackpad two-finger scroll behaves consistently with the platform's convention rather than doing the opposite of the wheel. Then, on the SAME sitting: drag a connected note away from its cluster and release it without touching anything, and confirm its neighbours moved with it while the pointer was down and that it is pulled back toward them afterwards rather than staying where it was dropped. On the POINTER clients (macOS, Windows, Linux and the web client) hover a hub note and confirm the hub, its neighbours and the links between them stay bright while the rest of the graph fades, and that the highlight clears when the pointer leaves. Touch clients have no hover at all, so on iOS and Android confirm instead that the graph renders and pans without a stuck highlight. Open the graph on a vault of a few hundred notes and confirm the layout settles over about a second rather than appearing fully formed, and that framing it moves the camera rather than cutting to it.",
+        whyNotAutomated: "A trackpad pinch arrives as a wheel event with ctrlKey synthesised by the OS gesture engine and a touch pinch as a two-point touchmove; neither has a WebDriver input source the harness can drive, and \"smoothly rather than jumping\" is perceptual. The added checks are the same class: whether motion read as physical, whether a fade made structure legible and whether a settle looked like settling are judgements about a real display, and the container draws through WebKitGTK software rendering with no frame observation, reading DOM attributes and canvas pixels rather than time.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
-        estimateMin: 12,
+        estimateMin: 16,
         tier: "standard",
       },
       {

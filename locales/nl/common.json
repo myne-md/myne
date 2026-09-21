@@ -1898,8 +1898,7 @@
         "reset": "Terugzetten naar standaard",
         "showArrows": "Richtingspijlen tonen",
         "title": "Grafiekinstellingen"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {

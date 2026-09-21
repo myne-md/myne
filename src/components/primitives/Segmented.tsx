@@ -14,18 +14,26 @@
 
 import {
   Fragment,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
+import { Icon } from "./Icon";
 import { hoverSurface } from "./hoverSurface";
+import type { IconName } from "../../lib/icons";
 
 export interface SegmentedOption {
   /** The wire value (also the `data-value` and the `${testId}-${value}` tail). */
   value: string;
   /** The segment caption. */
   label: string;
+  /** Optional glyph before the caption. A segment whose two options are a
+   *  picture and a list is found faster by its icons than by two short words,
+   *  and the caption is what keeps it guessable, so this is additive rather
+   *  than a replacement (myne-md/myne#727). */
+  icon?: IconName;
 }
 
 interface SegmentedProps {
@@ -73,6 +81,10 @@ const THUMB_STYLE: CSSProperties = {
 const SEGMENT_STYLE: CSSProperties = {
   position: "relative",
   zIndex: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "var(--space-1)",
   border: 0,
   background: "transparent",
   padding: "6px 16px",
@@ -109,22 +121,56 @@ export function Segmented({
   optionAriaLabel,
   testId,
 }: SegmentedProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const segmentRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [thumb, setThumb] = useState<{ left: number; width: number }>({
     left: 0,
     width: 0,
   });
 
-  // Measure the active segment's box pre-paint so the fill lands without a
-  // first-render flash; re-measure whenever the selection (or option set) moves.
-  useLayoutEffect(() => {
+  const measure = () => {
     const idx = options.findIndex((o) => o.value === value);
     const el = segmentRefs.current[idx];
     if (el) setThumb({ left: el.offsetLeft, width: el.offsetWidth });
+  };
+
+  // Measure the active segment's box pre-paint so the fill lands without a
+  // first-render flash; re-measure whenever the selection (or option set) moves.
+  useLayoutEffect(measure, [value, options]);
+
+  // …and re-measure when the BOX changes, which the layout effect cannot see.
+  //
+  // A caller whose container mounts HIDDEN measures 0: a pane that is not the
+  // active tab, a collapsed sidebar, a modal that is mounted closed. Nothing
+  // then re-runs the layout effect, because neither the value nor the option set
+  // moved, so the thumb stays zero-width while the SELECTED label keeps
+  // `--accent-on` (`#0b0b09` in the dark themes): the active segment renders
+  // invisible, on a dark panel, with no error anywhere (myne-md/myne#727). The
+  // same discipline as `useScrollEdges`: observe the element, fall back to the
+  // window, and feature-detect `ResizeObserver` because it is absent in jsdom
+  // and an unguarded constructor throws during render.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (root === null) return;
+    const ro =
+      typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    ro?.observe(root);
+    if (ro === null && typeof window !== "undefined") {
+      window.addEventListener("resize", measure);
+    }
+    measure();
+    return () => {
+      ro?.disconnect();
+      if (ro === null && typeof window !== "undefined") {
+        window.removeEventListener("resize", measure);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, options]);
 
   return (
     <div
+      ref={rootRef}
       role="radiogroup"
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
@@ -159,6 +205,7 @@ export function Segmented({
               {...(selected ? {} : hoverSurface())}
               style={selected ? SEGMENT_SELECTED_STYLE : SEGMENT_STYLE}
             >
+              {o.icon !== undefined && <Icon name={o.icon} size={12} />}
               {o.label}
             </button>
           </Fragment>

@@ -1,13 +1,16 @@
 // Bottom-bar-reorder suite (drag-to-reorder + the right-click "move" a11y
-// fallback). The editor's BottomBar lets the user rearrange its right-cluster
-// items; the chosen order persists per-vault in vault.prefs
-// (`bar_items_order`). This pins the user-facing contract through the REAL
-// editor UI via the context-menu move path (WebDriver cannot synthesize a
-// native HTML5 drag reliably; the move action is the same persistence seam):
+// fallback). The editor's BottomBar lets the user rearrange its items; the
+// chosen order persists per-vault in vault.prefs (`bar_items_order`). This pins
+// the user-facing contract through the REAL editor UI via the context-menu move
+// path (WebDriver cannot synthesize a native HTML5 drag reliably; the move
+// action is the same persistence seam):
 //
-//   br1 — right-clicking a bar item opens a per-item menu with "Move right";
-//         invoking it reorders the item past its neighbour, the new order
-//         SURVIVES a lock → unlock round-trip (disk-persisted, not transient).
+//   br1, the bottom bar carries NO graph affordance (myne-md/myne#727, which
+//         supersedes #396's bottom-left launcher: a corner-pinned launcher is a
+//         second, uncustomizable place for a command the left ribbon already
+//         hosts), the graph is still reachable from the palette, and a
+//         reorder of the bar's own items still SURVIVES a lock → unlock
+//         round-trip (disk-persisted, not transient).
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
@@ -18,11 +21,12 @@ import {
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
+  runPaletteAction,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
-/** The right-cluster bar item ids in current DOM (display) order. */
+/** The bar item ids in current DOM (display) order. */
 async function barOrder(session: Session): Promise<string[]> {
   const els = await session.byTestIdAll("editor.bar-item");
   const ids = await Promise.all(els.map((e) => e.attribute("data-bar-item-id")));
@@ -51,9 +55,9 @@ async function moveBarItem(
   ).click();
 }
 
-describeE2E("br1 bottom-bar item reorder persists (bottom-bar customization)", () => {
+describeE2E("br1 bottom-bar reorder, and no graph launcher in the bar", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("right-click 'Move right' reorders the Graph affordance past Settings and the order survives lock→unlock", async () => {
+  it("the bar has no graph affordance, the palette still opens the graph, and a reorder persists", async () => {
     let password = "";
     await scenario(
       "br1-bottom-bar-reorder",
@@ -64,25 +68,37 @@ describeE2E("br1 bottom-bar item reorder persists (bottom-bar customization)", (
         await dismissImporterOffer(s);
         await createNote(s, "br1notealfa7k2m9qx4w8e5rj0aa");
 
-        // Baseline: Graph sits before Settings in the canonical default order.
-        await s.byTestId("editor.graph-button");
+        // The launcher is GONE from the bar. This is the assertion the whole
+        // scenario exists for: #396 asked for a bottom-left launcher, this
+        // branch shipped one, and using it settled the question the other way.
+        await s.byTestId("editor.bottom-bar");
+        expect((await s.byTestIdAll("editor.graph-button")).length).toBe(0);
         const before = await barOrder(s);
-        expect(before).toContain("graph");
-        expect(before).toContain("settings");
-        expect(before.indexOf("graph")).toBeLessThan(before.indexOf("settings"));
+        expect(before).not.toContain("graph");
+        expect(before).toContain("tags");
+        expect(before).toContain("views");
 
-        // Move Graph one step right → it swaps past Settings.
-        await moveBarItem(s, "graph", "right");
+        // ... and the graph is still reachable, through the palette, which is
+        // where a command nobody opens daily belongs. The ribbon can host it
+        // too: `graph.show` carries ribbon metadata in `commands/actions.ts`.
+        await runPaletteAction(s, "graph.show", "graph");
+        await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
+
+        // The bar's own reorder contract is unchanged: Tags one step right
+        // swaps it past Views. The bar is chrome, so it is present whichever
+        // tab is active, which is why this needs no tab switching.
+        await moveBarItem(s, "tags", "right");
         await s.waitUntil(
           async () => {
             const o = await barOrder(s);
-            return o.indexOf("graph") > o.indexOf("settings") ? true : null;
+            return o.indexOf("tags") > o.indexOf("views") ? true : null;
           },
-          { label: "graph moves past settings after move-right" },
+          { label: "tags moves past views after move-right" },
         );
 
         // Persistence: lock → unlock mounts a fresh editor that reads
-        // bar_items_order from disk; Graph stays after Settings.
+        // bar_items_order from disk; Tags stays after Views, and the graph
+        // launcher does not reappear.
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input");
         await unlockToEditor(s, password);
@@ -92,7 +108,9 @@ describeE2E("br1 bottom-bar item reorder persists (bottom-bar customization)", (
         await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.bottom-bar");
         const after = await barOrder(s);
-        expect(after.indexOf("graph")).toBeGreaterThan(after.indexOf("settings"));
+        expect(after.indexOf("tags")).toBeGreaterThan(after.indexOf("views"));
+        expect(after).not.toContain("graph");
+        expect((await s.byTestIdAll("editor.graph-button")).length).toBe(0);
       },
     );
   });

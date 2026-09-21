@@ -28,10 +28,16 @@ export {
   inducedNeighborhood,
   isolatedModel,
   subgraphModel,
+  tagKeyFromNodeId,
+  tagNodeId,
+  TAG_NODE_ID_PREFIX,
+  withTagNodes,
   type GraphDirection,
   type GraphEdge,
   type GraphModel,
   type GraphNode,
+  type GraphNodeKind,
+  type TagMembership,
 } from "./graphModel";
 
 /**
