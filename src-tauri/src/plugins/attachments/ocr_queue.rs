@@ -46,7 +46,7 @@ use myne_core::plugins::attachments::scheme_core::{decode_attachment_plaintext, 
 use myne_core::plugins::attachments::text_cache;
 use myne_core::plugins::attachments::{ExtractStatus, ExtractedText, SourceFormat};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
-use protocol::{derive_subkey, SubkeyRole};
+use protocol::SubkeyRole;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -131,6 +131,15 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
     else {
         return;
     };
+    // The `attachments-text` cache is a shared singleton role, so its KEK comes
+    // from the session's shared tier (root-tier before a B2B migration,
+    // group-tier after). A stale root-tier cache is unreadable under the group
+    // tier, which is fine: §10.4.1 md.2 makes it rebuildable, and the miss
+    // simply re-extracts.
+    let meta_version = std::fs::read(vault_dir.join("vault.meta"))
+        .ok()
+        .and_then(|b| protocol::meta_version_of(&b))
+        .unwrap_or(protocol::MetaVersion::V0_1);
 
     let candidates = collect_candidates(&vault_dir, state, &account_number_hash).await;
     if candidates.is_empty() {
@@ -147,7 +156,7 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
     for c in candidates {
         // Re-check the lock before every attachment: a lock must take effect
         // within one item, not at the end of the backlog.
-        let Some((items_key, items_key_id, root_key)) =
+        let Some((items_key, items_key_id, shared)) =
             state.peek_unlocked_attachment_material().await
         else {
             tracing::info!(event = "ocr_backlog_stopped", reason = "locked", done);
@@ -156,7 +165,7 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
             emit_progress(app, 0, done);
             return;
         };
-        let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+        let attachment_text_key = shared.derive(meta_version, SubkeyRole::AttachmentTextKey);
 
         let Some(id) = hex_decode_id(&c.id_hex) else {
             continue;
@@ -173,7 +182,7 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         let keys = ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         };
         let Candidate {
             id_hex,
@@ -261,22 +270,22 @@ async fn collect_candidates(
     state: &VaultRuntimeState,
     account_number_hash: &[u8; 16],
 ) -> Vec<Candidate> {
-    let Some((_, _, root_key)) = state.peek_unlocked_attachment_material().await else {
+    let Some((_, _, shared)) = state.peek_unlocked_attachment_material().await else {
         return Vec::new();
     };
-    // `AttachmentTextKey` stays on the v0.1 context on purpose: `attachments-text`
-    // is a rebuildable cache the migration DROPS rather than re-seals (§10.4.1
-    // md.2), so its KEK never crosses a generation boundary. The CATALOG does get
-    // re-sealed, so its key is version-scoped (myne-md/myne#433) — and getting it
-    // wrong is silent, because `read_catalog` degrades to an empty catalog and
-    // this function then simply queues nothing, forever.
-    let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    // Both the `attachments-text` cache and the CATALOG are shared singleton
+    // roles, so both derive through the session's shared tier. The catalog is
+    // re-sealed by the B2B migration; the text cache is a rebuildable cache the
+    // migration drops (§10.4.1 md.2), so a stale root-tier cache simply misses
+    // and re-extracts. Getting the catalog key wrong is silent, because
+    // `read_catalog` degrades to an empty catalog and this function then queues
+    // nothing, forever.
     let version = std::fs::read(vault_dir.join("vault.meta"))
         .ok()
         .and_then(|b| protocol::meta_version_of(&b))
         .unwrap_or(protocol::MetaVersion::V0_1);
-    let catalog_key =
-        protocol::derive_subkey_versioned(version, &root_key, SubkeyRole::AttachmentsCatalogKey);
+    let attachment_text_key = shared.derive(version, SubkeyRole::AttachmentTextKey);
+    let catalog_key = shared.derive(version, SubkeyRole::AttachmentsCatalogKey);
     let Ok(catalog) = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,

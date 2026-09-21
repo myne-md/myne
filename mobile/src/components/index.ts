@@ -28,6 +28,7 @@ export {
   SyncEnrollPanel,
   type SyncEnrollPanelProps,
   SyncDevicesPanel,
+  SyncMembersPanel,
 } from "./SyncSettingsPanels";
 export {
   ExactAlarmBlock,
