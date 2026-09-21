@@ -56,7 +56,7 @@ export interface TagSuggestionInput {
   excludedFolders: readonly string[];
   /** Debounce override. Not wired to any surface — it exists so this hook's own
    *  specs need not wait out a real idle interval (the E2E lane cannot reach it:
-   *  `e2e/CLAUDE.md`'s zero-test-hooks rule). */
+   *  `e2e/AGENTS.md`'s zero-test-hooks rule). */
   debounceMs?: number;
 }
 

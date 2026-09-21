@@ -75,12 +75,12 @@ async function waitForGraphBlob(s: Session, path: string): Promise<void> {
 //    asynchronously behind the app's only `React.lazy` boundary, so reading
 //    `data-node-count` straight afterwards reads a pane that has not built yet.
 //    It is the "a helper that verifies nothing hides behind the helper that
-//    comes after it" family `e2e/CLAUDE.md` records, and the harness already had
+//    comes after it" family `e2e/AGENTS.md` records, and the harness already had
 //    the answer: every read below now waits for the attribute it is about to
 //    assert on.
 //
 // Measured after both: 15 consecutive clean runs at `--retry=0` in a warm
-// container, which is the bar `e2e/CLAUDE.md` sets for releasing a quarantined
+// container, which is the bar `e2e/AGENTS.md` sets for releasing a quarantined
 // spec.
 describeE2E("gp1 graph layout persists across a lock/re-unlock remount", () => {
   // Vault-count precondition: 1 (weak KDF).

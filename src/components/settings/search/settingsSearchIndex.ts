@@ -105,7 +105,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "privacy.screen-capture",
     // NO `capability`, and that is the asymmetry with the override entry
     // below. `PrivacyPanel` renders THIS row unconditionally, so tagging it
-    // was the inverse of the rule `src/CLAUDE.md` states: search filtered it
+    // was the inverse of the rule `src/AGENTS.md` states: search filtered it
     // out on web while the panel rendered it, which is a setting a user can
     // see and cannot find. The prose in this file and in
     // `check-web-surfaces.mjs` said the two rows matched; correcting the
@@ -692,7 +692,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     // The remote-provider block (myne#415). `developerGated` AND `capability`
     // both apply: they are independent gates and neither implies the other
-    // (`src/CLAUDE.md`) - the whole AI panel is behind Developer mode, and it
+    // (`src/AGENTS.md`) - the whole AI panel is behind Developer mode, and it
     // is absent entirely where the platform has no local-AI capability.
     id: "ai.provider",
     capability: "localAi",

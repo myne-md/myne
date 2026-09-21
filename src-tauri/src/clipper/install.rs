@@ -49,7 +49,7 @@
 //! ## Not a crypto site
 //!
 //! The manifest carries no secret — a host name, a binary path, public extension
-//! IDs; it is config, not key material. Per `src-tauri/CLAUDE.md`
+//! IDs; it is config, not key material. Per `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline" we still keep full paths out of logs (a
 //! host path can leak the OS username): logs carry a `stage` tag + browser label +
 //! the closed `io_failure_kind` only.

@@ -3,11 +3,11 @@
 //
 // # Why this needs a script when the desktop convention does not have one
 //
-// `src/CLAUDE.md` states the rule flatly — "a screen without testids is
+// `src/AGENTS.md` states the rule flatly — "a screen without testids is
 // invisible to E2E" — and 489 `data-testid` attributes in `src/` are held to it
 // by **review alone**. That works while every screen has an owner who reviews
 // it. The web client's screens do not: tasks 61/59/74/105/106 CONSUME testids
-// (`byTestId` is the only sanctioned selector in `e2e/CLAUDE.md`), while the
+// (`byTestId` is the only sanctioned selector in `e2e/AGENTS.md`), while the
 // tasks that BUILT these screens never mention `data-*` at all. An unowned
 // convention is not a convention; it is a gap with a policy written next to it.
 //
@@ -226,7 +226,7 @@ export function dynamicDataAttrs(source) {
     obj.push(m[1]);
   }
   // `data-testid` has its own rule below, and a curated-prop component taking an
-  // explicit `testId` (`src/CLAUDE.md`, "Test observability") is the sanctioned
+  // explicit `testId` (`src/AGENTS.md`, "Test observability") is the sanctioned
   // shape rather than a leak. Reporting it here would say the wrong thing about
   // it, in a message about the account number.
   //
@@ -286,7 +286,7 @@ export function preUnlockScope(roots) {
  * Dynamic `data-*` attributes a pre-unlock screen may carry.
  *
  * The rule is not "no runtime values" — a repeated row needs a discriminator,
- * and `src/CLAUDE.md` asks for exactly that shape. The rule is that each one is
+ * and `src/AGENTS.md` asks for exactly that shape. The rule is that each one is
  * a DECISION: the attribute is named here, its value is a closed set the code
  * controls, and adding a new one means reading this comment. What must never
  * appear is a value the USER typed, and on these screens the user types an
@@ -340,7 +340,7 @@ function main() {
     if (/data-testid=\{/.test(cleanSrc) || interpolatedTestIdObjectForm(cleanSrc).length > 0) {
       problems.push(
         `${f}: data-testid is interpolated. Use a stable name plus a discriminator ` +
-          `attribute (src/CLAUDE.md, "Test observability").`,
+          `attribute (src/AGENTS.md, "Test observability").`,
       );
     }
 
@@ -373,7 +373,7 @@ function main() {
     // every file that exemption applies to.
     //
     // Narrowed to the CURATED-PROP shape rather than banned outright, because
-    // `src/CLAUDE.md` ("Test observability") asks for exactly that shape:
+    // `src/AGENTS.md` ("Test observability") asks for exactly that shape:
     // `PasswordInput`, `DestructiveBanner` and `BlockingProgressStep` all take an
     // explicit `testId` / `testIdPrefix` so their caller names them, and all
     // three are composed by a pre-unlock screen. A value that comes from a prop

@@ -3326,6 +3326,14 @@ function CommandPaletteHost({
           // No template → a blank note titled with the period.
           id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
         }
+        // A note created HERE is not yet in the sidebar cache, and bridge A only
+        // opens a selection that is live (`ctx.cache.has(selectedId)`), so
+        // `ctx.open` alone leaves the pane on the empty note-switcher: the note
+        // is on disk and `note_list` sees it, but no tab ever opens. Register it
+        // first (the same step `createAndStartRename` performs via its optimistic
+        // create); `refreshOne` is a no-op cost for the already-cached `open`
+        // branch above.
+        await ctx.refreshOne(id);
         await ctx.open(id);
       } catch (err) {
         // The user is TOLD. A DEV-only console.warn is an empty catch in a
@@ -3918,7 +3926,7 @@ function CommandPaletteHost({
     // Re-subscribes when the focused note changes, which is what the vim `:q`
     // listener below does too. The alternative (an empty dep list plus a ref
     // mutated during render to keep the handler fresh) is the React-19 shape
-    // `src/CLAUDE.md` warns about, and buys nothing here.
+    // `src/AGENTS.md` warns about, and buys nothing here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
 

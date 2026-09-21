@@ -364,7 +364,7 @@ pub fn rewrite_html_attachment_srcs(html: &str, final_names: &HashMap<String, St
 /// common safe set (alphanumerics, `-._~`, plus `.`/`-` already covered)
 /// passes through so a plain `photo.png` is emitted as-is. Zero new
 /// dependency (the crate has no percent-encoding crate; adding one is a
-/// TB9 decision — `src-tauri/CLAUDE.md`).
+/// TB9 decision — `src-tauri/AGENTS.md`).
 fn percent_encode_path(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for b in name.bytes() {

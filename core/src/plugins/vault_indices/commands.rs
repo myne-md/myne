@@ -12,7 +12,7 @@
 //! `Slot::Unlocked` because the index is plaintext-derived RAM that only
 //! exists while a vault is open.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};

@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
+import { unfoldAll } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
 import {
@@ -496,6 +497,15 @@ export function CMEditor(props: CMEditorProps) {
       buildState: (doc: string) => makeState(doc),
       applyState: (state: EditorState) => {
         view.setState(state);
+        // Folds are EPHEMERAL per note (MYND-300): "folds reset on note
+        // switch (no persistence)". The MYND-534 persistent-view cache stores a
+        // whole `EditorState`, and CM6's fold plugin keeps its collapsed ranges
+        // in that state's field, so restoring a cached state re-collapsed a
+        // heading the user had left folded - the exact non-persistence the
+        // contract forbids, and the assertion `heading-list-folding` hlf2 makes.
+        // Drop the cached fold field so every swap-in starts unfolded, while the
+        // rest of the state (undo history, selection, scroll) is preserved.
+        unfoldAll(view);
         reapplyCompartments(view);
       },
     });

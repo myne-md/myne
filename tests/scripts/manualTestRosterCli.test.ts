@@ -14,7 +14,7 @@
 //      `null` over it.
 //
 // A recorded regression with no regression test is a fix that can be undone in
-// silence, which is the thing the root CLAUDE.md calls the same non-evidence as
+// silence, which is the thing the root AGENTS.md calls the same non-evidence as
 // running a guard green. So these spawn the real script against the real tree
 // and mutate one input at a time, restoring in `finally` whatever they touched.
 

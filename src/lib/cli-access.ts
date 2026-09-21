@@ -15,7 +15,7 @@
 //     does not edit shell profiles, so Settings shows the one `export PATH=…`
 //     line instead (`cli_bridge/path_shim.rs` rule 3).
 //
-// Signature parity (no codegen — see src/CLAUDE.md "Tauri command bindings"):
+// Signature parity (no codegen — see src/AGENTS.md "Tauri command bindings"):
 // keep this in step with `cli_bridge::plugin::CliAccessState`.
 //
 // Desktop-only. The `cliAccess` capability is absent on web and the block that

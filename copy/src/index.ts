@@ -6,7 +6,7 @@
 // (`mobile/src/…`), so the literals are byte-identical across clients by
 // construction — cross-client paraphrase is impossible. E2E asserts them by
 // FULL-literal equality; changing any is a `docs/decisions.md` event, never a
-// copy edit. Never i18n these (see `src/CLAUDE.md` "Do NOT i18n load-bearing copy").
+// copy edit. Never i18n these (see `src/AGENTS.md` "Do NOT i18n load-bearing copy").
 
 // Device removal honesty (MYND-425). "Remove device" revokes a per-device sync
 // token — it stops the server from serving that device — but it does NOT

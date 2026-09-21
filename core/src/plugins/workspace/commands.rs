@@ -13,7 +13,7 @@
 //!
 //! The descriptor is the client's serialized pane-tree (note IDs + layout +
 //! cursor offsets) — AS3-Sensitive. It crosses IPC as a `String`; the
-//! Zeroizing-wrap + drop discipline (`src-tauri/CLAUDE.md` "Secret-handling
+//! Zeroizing-wrap + drop discipline (`src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline", Plaintext-IPC pattern) applies.
 //!
 //! # What the port changed, and what it deliberately did not

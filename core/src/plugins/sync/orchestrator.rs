@@ -774,7 +774,7 @@ fn read_singleton_nonce(bytes: &[u8], base: &[u8; 4], later: &[&[u8; 4]]) -> Opt
 /// them.
 ///
 /// `family` is a static label for the skip log. Nothing else is logged: the
-/// nonces themselves are DENY-listed (`src-tauri/CLAUDE.md`), and the blob id
+/// nonces themselves are DENY-listed (`src-tauri/AGENTS.md`), and the blob id
 /// is a vault-stable correlation tag.
 fn verified_singleton_download(
     transport: &dyn SyncTransport,

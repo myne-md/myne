@@ -7,7 +7,7 @@
 //! The web E2E lane arranges at-rest state by writing fixture bytes into OPFS
 //! before the app boots — the browser analogue of the desktop lane's byte
 //! surgery on a seeded vault directory, and the reason neither lane needs a
-//! production test hook (`e2e-web/CLAUDE.md`, non-negotiable 2).
+//! production test hook (`e2e-web/AGENTS.md`, non-negotiable 2).
 //!
 //! For that to prove anything, the bytes have to be **what the writer actually
 //! writes**. A fixture hand-assembled in TypeScript would encode a second
@@ -58,7 +58,7 @@
 //! files, so seeding needs neither — it is `createSyncAccessHandle`, which is
 //! worker-only in every engine and therefore the same code path on all three.
 //! That is what makes these fixtures usable on the seat that cannot be
-//! automated in CI (`e2e-web/CLAUDE.md`: the Safari row is a manual gate).
+//! automated in CI (`e2e-web/AGENTS.md`: the Safari row is a manual gate).
 
 use crate::double_buffer::{write_next_faulting, Fault};
 use crate::vault_io::{IoResult, VaultIo};

@@ -37,7 +37,7 @@
 // myne-md/myne#579. Two consequences worth carrying: a green push pipeline was
 // never evidence about any of this, and the repair had to re-decide what ag6
 // asserts, since its own name described a two-mode composer that no longer
-// exists. That is the whole class `e2e/CLAUDE.md` calls "a helper that waits for
+// exists. That is the whole class `e2e/AGENTS.md` calls "a helper that waits for
 // a surface without opening it", one layer on: here the helper opened the
 // surface correctly and then drove a control the surface had stopped rendering.
 //

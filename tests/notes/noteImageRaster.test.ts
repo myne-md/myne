@@ -290,7 +290,7 @@ describe("the happy path still reaches the writer, so the negatives are not vacu
 // Found while writing the bullets above, and fixed in the same change because it
 // is the same function: the card background was read from `--paper-1`, which
 // **is not a token**. `src/styles/tokens.css` defines `--paper`, `--paper-2` and
-// `--paper-3`, and `src/CLAUDE.md` states outright that "`var(--paper-1)`
+// `--paper-3`, and `src/AGENTS.md` states outright that "`var(--paper-1)`
 // resolves to nothing". So `cssVar` always fell through to its hardcoded cream
 // literal and every exported card came out light — on dark and on AMOLED too —
 // while this function's own doc comment promised the background "comes from the

@@ -28,7 +28,7 @@
 //! already owns the live incremental updates (Task 4 `upsert`/`remove`), so
 //! the whole notes↔search bridge sits here.
 //!
-//! DENY-list discipline (see ../../CLAUDE.md "Secret-handling logging
+//! DENY-list discipline (see ../../AGENTS.md "Secret-handling logging
 //! discipline"): note_ids, nonces, account_number_hash, plaintext, and path
 //! strings never reach a `tracing` argument — only stage tags + bounded
 //! counts.

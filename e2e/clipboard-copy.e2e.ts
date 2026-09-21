@@ -136,7 +136,7 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // Use "Save as file" instead.` and named the silent path as the recovery.
       //
       // The native save dialog is not driveable by WebDriver, so the sanctioned
-      // page-seat interception is used (`e2e/CLAUDE.md`, "Page-seat dialog
+      // page-seat interception is used (`e2e/AGENTS.md`, "Page-seat dialog
       // interception"; `note-export.e2e.ts` ne3 is the template): the ONE IPC
       // URL for `plugin:dialog|save` gets a synthetic ok-Response carrying a
       // known path, every other URL reaches the native fetch, and everything

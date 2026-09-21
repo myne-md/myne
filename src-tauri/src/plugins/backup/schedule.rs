@@ -9,7 +9,7 @@
 //! status) is preserved by the store's read-modify-write, so a UI save can
 //! never clobber the pruning ledger or the elapsed-check clock.
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline" —
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging discipline" —
 //! the target folder is a full filesystem path (DENY-listed) and the vault id
 //! is a vault-stable correlation tag (DENY-listed); neither is ever emitted.
 

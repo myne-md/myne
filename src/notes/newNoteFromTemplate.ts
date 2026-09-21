@@ -60,7 +60,7 @@ export function buildRenderContext(
   title: string,
   // REQUIRED, and that is the correction rather than an inconvenience. This
   // read `period?: {...}` with a `?? now` fallback below, which is the shape the
-  // root `CLAUDE.md` records under "a guard parameter with a default value is an
+  // root `AGENTS.md` records under "a guard parameter with a default value is an
   // opt-in guard": a future weekly or monthly create path that omits it renders
   // both period tokens as TODAY, with no type error, no failing test and a
   // plausible-looking title. Requiring it makes the compiler name every call
@@ -107,7 +107,7 @@ export function extractTemplateBody(plaintext: string): string {
  * name is not a valid entry into this flow (`{{title}}` is only meaningful with a
  * real title). Rejects with whatever `noteRead` / `noteCreate` propagate.
  *
- * `now` is REQUIRED, and deliberately so (`CLAUDE.md`, "A guard parameter with a
+ * `now` is REQUIRED, and deliberately so (`AGENTS.md`, "A guard parameter with a
  * default value is an opt-in guard"). It used to default to `new Date()`, which
  * meant a test could pass a fixed instant and prove the rendering while the two
  * production call sites went on reading the wall clock, unchecked — and one of

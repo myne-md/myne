@@ -2786,7 +2786,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               </div>
             ) : (
               <>
-                {/* Observability only (`src/CLAUDE.md` "Test observability"): the
+                {/* Observability only (`src/AGENTS.md` "Test observability"): the
                     PIN path is what must SURVIVE on a platform with no biometric
                     provider, so a scenario asserting the biometric toggle's
                     absence needs a stable handle on the thing that stayed.

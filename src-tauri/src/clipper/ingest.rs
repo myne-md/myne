@@ -57,7 +57,7 @@
 //! not ingest images itself — it authorizes the frame and forwards the
 //! envelope (bytes included; the WebView synthesizes per-image display names).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the frame body
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the frame body
 //! (and the envelope it decodes to) is the same secret class as `password`;
 //! this module logs only bounded outcome labels, never a body / URL / token.
 
@@ -377,7 +377,7 @@ fn ingest_pair_begin(
 /// minted scoped token (`paired`) or a closed reason (`pairing_rejected` /
 /// timeout) back. It shows NO new dialog and is NOT rate-limited (it does not
 /// raise a dialog — it awaits the one phase 1 raised). The minted token NEVER
-/// reaches a log (see ../../CLAUDE.md secret-handling DENY list).
+/// reaches a log (see ../../AGENTS.md secret-handling DENY list).
 fn ingest_pair_await(envelope: &HandoffEnvelope, pairing: &dyn PairingDispatcher) -> IngestOutcome {
     // Same shape guard as phase 1 — the id keys the pending session to await.
     if envelope.extension_id.is_empty() || envelope.extension_id.len() > MAX_EXTENSION_ID_LEN {

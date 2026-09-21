@@ -6,7 +6,7 @@
 //! lifting — the mel front end + the decode loop — lives in [`super::whisper`];
 //! this file is model load + lazy-cache + the [`Engine`] impl.
 //!
-//! DENY-list logging (`src-tauri/CLAUDE.md`, normative for mobile too): the PCM
+//! DENY-list logging (`src-tauri/AGENTS.md`, normative for mobile too): the PCM
 //! (AS1 decrypted audio) and the transcript (note-class) are NEVER logged, nor is
 //! the model path; a candle error `Display` can embed the path, so it goes to
 //! DEBUG only. Success logs `elapsed_ms` / `out_chars` (a count) — no content.

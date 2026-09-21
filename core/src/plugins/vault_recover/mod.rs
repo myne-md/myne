@@ -8,7 +8,7 @@
 //! [`crate::hooks::VaultLifecycleHooks`] seam. The `tauri::Builder` `init()`
 //! wiring stays in each client crate.
 //!
-//! See: ../../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod account_number_select;
 pub mod commands;

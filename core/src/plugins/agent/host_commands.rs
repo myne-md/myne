@@ -13,7 +13,7 @@
 //! What stays per client is the thin `#[tauri::command]` layer: the `State<'_,
 //! …>` list genuinely differs (desktop resolves a vector store, mobile does
 //! not), and that layer is the one place a client's own wiring belongs. This is
-//! the three-layer command shape `core/CLAUDE.md` describes, applied to a plugin
+//! the three-layer command shape `core/AGENTS.md` describes, applied to a plugin
 //! that had not adopted it.
 //!
 //! **The guards are here rather than in the wrappers on purpose.**
@@ -25,7 +25,7 @@
 //!
 //! Behind `tauri-ipc`, because everything on this path takes an `AppHandle`.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 #![cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 
 use crate::host::tauri_host::TauriHost;
@@ -547,7 +547,7 @@ pub struct AgentStepResult {
 
 /// Refuse unless AI is switched on, read from the vault's own prefs.
 ///
-/// The WebView hiding the tab is not a gate: `src-tauri/CLAUDE.md` treats the
+/// The WebView hiding the tab is not a gate: `src-tauri/AGENTS.md` treats the
 /// ACL surface as reachable by a compromised or dev-tools-driven page (TB6), and
 /// every sibling generation surface re-reads this host-side before touching a
 /// model. Without it, agent mode is the one AI surface whose opt-in lives only

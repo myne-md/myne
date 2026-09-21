@@ -7,7 +7,7 @@
 //! web nor the mobile client grows a command surface. The core lives HERE
 //! because it reuses this plugin's derivation steps verbatim rather than
 //! re-deriving keys a second way, which is the discipline
-//! `protocol/CLAUDE.md` states for subkeys and which applies just as much to
+//! `protocol/AGENTS.md` states for subkeys and which applies just as much to
 //! the wrap-open path above them.
 //!
 //! ## Why this is not an unlock
@@ -67,7 +67,7 @@ pub enum SourceCredential {
 impl SourceCredential {
     /// Build from the raw IPC pair, wrapping on the way in.
     ///
-    /// `src-tauri/CLAUDE.md`'s Zeroizing pattern says the wrap happens on the
+    /// `src-tauri/AGENTS.md`'s Zeroizing pattern says the wrap happens on the
     /// first non-doc statement, and names exactly the paths that make it
     /// matter: "Every early-return path (slot guard, permit guard, IO failure,
     /// parse failure) drops the wrapper and zeroes the bytes." `open()` has
@@ -579,7 +579,7 @@ pub async fn list_note_ids(
 /// is silent on a migrated vault rather than loud.
 ///
 /// The plaintext crosses IPC, which is the Plaintext-IPC pattern
-/// (`src-tauri/CLAUDE.md`): one note's body at a time, wrapped while it is on
+/// (`src-tauri/AGENTS.md`): one note's body at a time, wrapped while it is on
 /// this side, never written to disk.
 pub async fn read_note(
     source_id: VaultId,

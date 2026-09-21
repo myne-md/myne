@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn salt_prefixes_match_spec_verbatim() {
-        // Spec § 3.1 — load-bearing identifiers (CLAUDE.md "Cryptographically
+        // Spec § 3.1 — load-bearing identifiers (AGENTS.md "Cryptographically
         // load-bearing identifiers"). Any drift silently invalidates every
         // vault on disk.
         assert_eq!(SALT_PREFIX_PASSWORD, b"myne.v0.1 argon2id-password|");

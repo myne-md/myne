@@ -131,7 +131,7 @@
 //! override pair in `plugins::screen_capture`
 //! (`screen-capture:allow-screen-capture-override-{get,set}`).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline". The
+//! See: ../../AGENTS.md "Secret-handling logging discipline". The
 //! warn-on-failure path uses a closed-enum kind helper, never `?e`
 //! Debug-formats the underlying `tauri::Error`.
 
@@ -750,7 +750,7 @@ impl<R: tauri::Runtime> RaisableWindow for TauriRaise<'_, R> {
 /// `tracing` event fields only — but is the single signal a support-
 /// flow log reader uses to attribute a `screen_capture_protection_*`
 /// event to its call path. Per the secret-handling logging discipline
-/// (`src-tauri/CLAUDE.md`), `site` is a `&'static str` constant; the
+/// (`src-tauri/AGENTS.md`), `site` is a `&'static str` constant; the
 /// caller cannot inject dynamic strings here.
 pub(crate) fn apply_inner<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
@@ -787,7 +787,7 @@ pub(crate) fn apply_inner<R: tauri::Runtime>(
 ///
 /// `tauri::Error` is an open enum that transitively wraps `std::io::Error`
 /// and `String` payloads; emitting it via `?e` / `%e` would risk kernel
-/// path leakage per the DENY list in `src-tauri/CLAUDE.md`. The wildcard
+/// path leakage per the DENY list in `src-tauri/AGENTS.md`. The wildcard
 /// arm collapses unrecognized variants to a single tag — if log readers
 /// see `"other_tauri_error"` trending in user-shared logs, that signals
 /// a new variant worth promoting to its own arm.
@@ -1212,7 +1212,7 @@ mod tests {
             }
         }
 
-        // BOTH trees. `src-tauri/CLAUDE.md` "Where the code actually lives"
+        // BOTH trees. `src-tauri/AGENTS.md` "Where the code actually lives"
         // puts the plugin bodies in `core/` and names screen-capture apply as
         // one of the side effects a shared core reaches through
         // `VaultLifecycleHooks`, so a fifth re-show site added there would be

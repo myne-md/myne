@@ -37,6 +37,25 @@ export async function pageSeatInvoke(
   );
 }
 
+/** Signal that a note was written OUT OF BAND, so every open pane re-reads it.
+ *
+ *  A page-seat `note_update`/`note_create` is not the pane's own autosave loop,
+ *  and the app's stated contract (`src/AGENTS.md`, "A backend write made OUTSIDE
+ *  a pane's autosave loop leaves that pane holding a stale buffer, and nothing
+ *  bumps the reload for you") is that such a writer owes `reloadOpenNote()`.
+ *  `Editor.tsx` turns this DOM event into exactly that call. Without it a pane
+ *  that already cached the note's (empty) EditorState via the MYND-534
+ *  persistent-view cache restores the STALE buffer on revisit and the write is
+ *  invisible even though it is on disk - which is what made `scroll-memory`
+ *  read an empty editor for a note `note_read` returned in full. The event name
+ *  is the app's own `TASK_WRITE_EVENT` (`src/notes/taskWriteCore.ts`). */
+export async function notifyNoteWritten(session: Session, noteId: string): Promise<void> {
+  await session.execute(
+    "window.dispatchEvent(new CustomEvent(arguments[0], { detail: { noteId: arguments[1] } }));",
+    ["myne-task-written", noteId],
+  );
+}
+
 /** Page-seat IPC that unwraps the result (throws on `err`, returns `ok`). */
 export async function ipcOk(
   session: Session,
@@ -269,7 +288,7 @@ export async function openPalette(session: Session): Promise<void> {
  * That helper re-fires the chord until the input exists, because a wait with
  * nothing to re-fire is a wait that can never recover. What followed was one
  * `sendKeys` and one `waitForElement`, which has exactly the failure
- * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the whole budget spent on a
+ * `e2e/AGENTS.md` records for `clickNewMenuItem`: the whole budget spent on a
  * row that a re-fire would have produced in a second.
  *
  * Two things can go wrong after the palette is up, and neither gets better with
@@ -885,7 +904,7 @@ export async function clickBySelector(
       }
       return true;
     },
-    // 45 s, and the number needs its argument because `e2e/CLAUDE.md` records a
+    // 45 s, and the number needs its argument because `e2e/AGENTS.md` records a
     // budget rise that fixed nothing: raising `DEFAULT_TIMEOUT_MS` 20 s -> 45 s
     // for the `clickNewMenuItem` flake only made each occurrence twice as
     // expensive, because that wait was STUCK with nothing to re-fire. This one
@@ -1364,7 +1383,44 @@ export async function nameNewNote(session: Session, title: string): Promise<void
       // Every note created since myne#653 carries `title: ""`, so "empty" is
       // exactly "this is the freshly created note" and needs no extra signal.
       if ((await field.property<string>("value")) !== "") return null;
-      await field.replaceText(`${title}\uE007`);
+      // Prefer an ATOMIC DOM-set over typing: the title field lives in a
+      // CodeMirror widget that is destroyed and rebuilt several times while a
+      // fresh note settles, so a keystroke stream can lose most of its
+      // characters (observed: "Klasör Notu" read back as "u"). The
+      // React-native-setter + `input`/`change` events are the standard
+      // controlled-input path and are immune to a mid-stream widget rebuild.
+      // Fall back to keystrokes only if the field is not there to set.
+      const domSet = await session
+        .execute<boolean>(
+          "var el=document.querySelector(arguments[0]); if(!el) return false;" +
+            "el.focus();" +
+            "var d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');" +
+            "d.set.call(el, arguments[1]);" +
+            "el.dispatchEvent(new Event('input',{bubbles:true}));" +
+            "return true;",
+          [TITLE_FIELD, title],
+        )
+        .catch(() => false);
+      if (domSet) {
+        // Let the widget settle, then fire the commit EXPLICITLY.
+        //
+        // A programmatic `value` set does not raise the input's "dirty value
+        // flag", so `blur()` - and therefore the widget's `change` listener that
+        // writes `title:` - never fires on its own: the field reads back
+        // correctly while the note keeps `title: ""` (measured: every created
+        // note read back empty on disk). Fire `change` directly, after a beat so
+        // the widget's cached frontmatter range is current.
+        await new Promise((r) => setTimeout(r, 120));
+        await session.execute(
+          "var el=document.querySelector(arguments[0]); if(!el) return false;" +
+            "el.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "el.blur();" +
+            "return true;",
+          [TITLE_FIELD],
+        );
+      } else {
+        await field.replaceText(`${title}\uE007`);
+      }
       // Re-find rather than reusing `field`: committing re-renders the widget,
       // so the handle that accepted the keys may already be detached.
       const settled = await session.waitForElement(TITLE_FIELD);
@@ -1383,7 +1439,17 @@ export async function nameNewNote(session: Session, title: string): Promise<void
       // helper that fails on a driver artefact blocks the specs from ever
       // reaching their own subject, which is what the strict form did across
       // 25 files.
-      const norm = (v: string): string => v.normalize("NFC").toLowerCase();
+      // Non-ASCII is ALSO dropped by the driver, not just case-folded: typing
+      // "Klasör Notu" reads back "klasr notu" (the ö is simply absent). So the
+      // comparison strips non-ASCII from BOTH sides; a title with a diacritic
+      // is compared on its ASCII skeleton, which is what the driver can
+      // actually deliver. The spec's own assertion against the sidebar/card/
+      // tab is where the real title is checked (see the header above).
+      const norm = (v: string): string =>
+        v
+          .normalize("NFC")
+          .toLowerCase()
+          .replace(/[^\x00-\x7f]/g, "");
       return norm(seen) === norm(title) || null;
     },
     {
@@ -1398,6 +1464,24 @@ export async function nameNewNote(session: Session, title: string): Promise<void
 export async function createNote(session: Session, title: string): Promise<void> {
   await clickNewMenuItem(session, "notes.create");
   await nameNewNote(session, title);
+  // Best-effort: let the name reach the SIDEBAR before returning. The title is
+  // committed by the frontmatter-title input and reaches the row's cache through
+  // autosave (or, on a switch, through PaneView's flush-then-refresh), either of
+  // which is milliseconds behind. A caller that acts immediately - a view opened
+  // over "the notes" - otherwise reads the cache before the last note's title
+  // lands and sees an "Untitled" card. Non-throwing: a note legitimately created
+  // inside a folder has no top-level row, and that is the caller's business.
+  await session
+    .waitUntil(
+      async () => {
+        for (const row of await session.byTestIdAll("notes.row")) {
+          if ((await row.textContent()).includes(title)) return true;
+        }
+        return null;
+      },
+      { label: `a sidebar row titled ${title}`, timeoutMs: 8_000 },
+    )
+    .catch(() => {});
 }
 
 /** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676).
@@ -1573,6 +1657,37 @@ export async function typeIntoEditor(
   // breaks so real cm-lines are created; `landed` still compares newline-free
   // (textContent omits block boundaries either way).
   const keys = text.replace(/\n/g, String.fromCharCode(0xe007));
+  // Structural markdown races CM6's bracket auto-close under a fast sendKeys:
+  // typing "[" inserts its closing "]"; if the caret has not settled before the
+  // next character arrives, the payload's own "]" lands as a duplicate and the
+  // structure the scenario is about (a task checkbox, a `[due:: …]` field, a
+  // wikilink) never parses. The INPUT METHOD is the defect, not the scenario,
+  // which is the class e2e/AGENTS.md records for the embed family. For a
+  // single-line payload carrying brackets or non-ASCII, insert the whole string
+  // in ONE DOM input event instead: CM6 sees a single insertion and never runs
+  // the bracket-close keymap. Multi-line payloads keep the keystroke path (they
+  // need real Enter keypresses), and plain single-line ASCII keeps it too, since
+  // that is exactly what the probe above proves works.
+  const structural = /[[\]{}()]/.test(text) || /[^\x00-\x7f]/.test(text);
+  if (structural && !text.includes("\n")) {
+    const inserted = await session
+      .execute<boolean>(
+        "const el = document.querySelector('.cm-content'); if (!el) return false; el.focus(); return document.execCommand('insertText', false, arguments[0]);",
+        [text],
+      )
+      .catch(() => false);
+    if (inserted) {
+      try {
+        await session.waitUntil(landed, {
+          label: "typed text landed in the document (dom insert)",
+          timeoutMs: 5_000,
+        });
+        return;
+      } catch {
+        // DOM insert did not land the payload; fall through to keystrokes.
+      }
+    }
+  }
   await content.sendKeys(keys);
   try {
     await session.waitUntil(landed, {
@@ -1660,7 +1775,7 @@ export async function typeIntoEditor(
  * write note content, for the reason `sync-replication.e2e.ts` states in one
  * line: "deterministic note_update IPC, no flaky editor typing".
  * `cards-cover-picker` and `editor-scroll-slack` do the same. It is production
- * IPC through the page seat, which `e2e/CLAUDE.md` sanctions explicitly, and it
+ * IPC through the page seat, which `e2e/AGENTS.md` sanctions explicitly, and it
  * is NOT a test hook.
  *
  * **What this gives up, stated rather than glossed:** the scenarios no longer

@@ -12,7 +12,7 @@
 //!
 //! `memory:default` bundles the six allow-* permissions, main-window-only.
 //!
-//! See: `src-tauri/CLAUDE.md` (main repo) "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` (main repo) "Secret-handling logging discipline".
 
 // The memory command core and its `error` enums live in `myne-core` (shared
 // with the desktop + web clients). Re-exported so

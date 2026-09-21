@@ -80,7 +80,7 @@ the Apple/desktop arms:
    implement it on `ShareIntent` in this plugin, and register it as managed `dyn` state
    — that keeps `core` from taking a direct build dependency on the plugin (cleaner layering).
 4. Must be **off the main thread** — `run_mobile_plugin` deadlocks on the main thread
-   (`mobile/CLAUDE.md`). The `seal_share` / `drain_pending_shares` commands run in
+   (`mobile/AGENTS.md`). The `seal_share` / `drain_pending_shares` commands run in
    Tauri's async command context (not the main thread), so this is already satisfied.
 5. Off-target arms (`#[cfg(not(target_os = "android"))]` / desktop) keep returning
    `HardwareUnavailable` unchanged.

@@ -16,7 +16,7 @@
 //!
 //! Logging discipline: `Display` of a raw `io::Error` is **never**
 //! emitted via tracing. Always reduce to `IoFailureKind` first. See
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 use serde::Serialize;
 

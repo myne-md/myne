@@ -68,7 +68,7 @@ pub enum HistoryRole {
 /// that has a consumer: nothing in the tree serializes one.
 ///
 /// `text` is `Zeroizing` because this is plaintext arriving over IPC, which
-/// `src-tauri/CLAUDE.md` requires be wrapped at the first statement. Without it
+/// `src-tauri/AGENTS.md` requires be wrapped at the first statement. Without it
 /// the caller's `Vec<HistoryTurn>` drops at the end of `agent_start` leaving
 /// every turn's bytes on the heap, while the copies `seed_messages` made into
 /// `Content::UntrustedNote` wipe correctly. The wrap here rather than at the
@@ -85,7 +85,7 @@ pub struct HistoryTurn {
 /// same reasoning as `protocol::prefs`'s bridge for `ai_provider_key`.
 ///
 /// Hand-rolled rather than reached for by enabling `zeroize/serde`, which
-/// `src-tauri/CLAUDE.md` rejects by name: that feature wraps the `Deserialize`
+/// `src-tauri/AGENTS.md` rejects by name: that feature wraps the `Deserialize`
 /// impl with zeroize-on-drop semantics without touching serde's own parsing
 /// intermediates, so it buys dependency surface (TB9 is an audit anchor) for a
 /// property it does not deliver. What these lines deliver is the part that is

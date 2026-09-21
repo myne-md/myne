@@ -26,7 +26,7 @@
 //! command that is declared and permitted but unregistered compiles, passes
 //! clippy, renders its UI and is dead at runtime.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 pub mod adapters;
 pub mod commands;
@@ -162,7 +162,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod acl_tests {
     /// **An ACL entry does not wire a command, and nothing checks that it
-    /// does** (`src-tauri/CLAUDE.md`). An agent command with its
+    /// does** (`src-tauri/AGENTS.md`). An agent command with its
     /// `[[permission]]` block, its `[default]` bundle listing and a frontend
     /// caller, but missing from `generate_handler!`, compiles, passes clippy,
     /// renders its UI and is **dead at runtime**: the invoke rejects.

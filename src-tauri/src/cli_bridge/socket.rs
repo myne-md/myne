@@ -725,7 +725,7 @@ mod tests {
     }
 
     // A fixed `NoteLister` double — no `AppHandle` / `tauri::test` harness
-    // needed (core/CLAUDE.md's stated reason: the TB9 Cargo.lock
+    // needed (core/AGENTS.md's stated reason: the TB9 Cargo.lock
     // discipline). Most transport-level tests below never invoke `list`, so
     // the fixed outcome is never observed; it exists to satisfy `spawn`'s
     // signature.

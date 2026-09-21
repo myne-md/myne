@@ -18,7 +18,7 @@
 // The desktop lane cannot do this: `POST /window/rect` there resizes the app
 // window, but the desktop suite has no 400→2560 sweep and WebKitGTK's window
 // manager under xvfb does not honour arbitrary rects reliably. This is
-// web-specific behaviour by the `e2e-web/CLAUDE.md` rule, and it is where the
+// web-specific behaviour by the `e2e-web/AGENTS.md` rule, and it is where the
 // browser lane earns its keep.
 //
 // # What breaks without it

@@ -221,7 +221,7 @@ describeE2E("lt1 links tab — incoming + outgoing sections (MYND-604)", () => {
 //
 // It could not be covered, because `UnlinkedMentionsSection.tsx` carried **no
 // testid at all** — the whole surface was invisible to this lane. The testid
-// pass landed with this scenario (`src/CLAUDE.md`: production code may gain
+// pass landed with this scenario (`src/AGENTS.md`: production code may gain
 // `data-testid` / `data-*` observability attributes, and a flow without them is
 // invisible to E2E).
 //

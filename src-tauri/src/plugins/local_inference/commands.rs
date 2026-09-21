@@ -5,7 +5,7 @@
 //! [`infer_with_engine`] / [`embed_with_engine`]. The cores hold the
 //! Plaintext-IPC discipline in exactly one place:
 //!   - the prompt/text is `Zeroizing`-wrapped on the first statement, so every
-//!     early-return path zeroes the bytes (`src-tauri/CLAUDE.md` "Plaintext IPC
+//!     early-return path zeroes the bytes (`src-tauri/AGENTS.md` "Plaintext IPC
 //!     across the WebView boundary");
 //!   - the model call runs under `spawn_blocking` (CPU-bound; keeps the async
 //!     command `Send`), the engine reached ONLY via the `Engine` trait;

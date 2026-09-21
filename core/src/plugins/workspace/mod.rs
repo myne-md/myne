@@ -29,7 +29,7 @@
 //! per-client: each host registers the same three commands under its own
 //! capability grant.
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

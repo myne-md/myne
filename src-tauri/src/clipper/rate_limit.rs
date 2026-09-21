@@ -32,7 +32,7 @@
 //! that bypass while `check` locks only for the brief decision (never across a
 //! connection's blocking dispatch), so per-connection concurrency is preserved.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — the
 //! limiter holds only counts + timestamps, never any note content.
 
 use std::time::{Duration, Instant};

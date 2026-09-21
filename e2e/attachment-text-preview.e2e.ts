@@ -38,7 +38,7 @@
 // ⚠ PLATFORM: the harness drives the production binary via tauri-driver and is
 // Linux-only — authored to the conventions but MUST be run green 3× in the
 // container (`./scripts/e2e-local.sh`) before merge; not executed on the
-// authoring machine (macOS). See e2e/CLAUDE.md "definition of done".
+// authoring machine (macOS). See e2e/AGENTS.md "definition of done".
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -89,7 +89,7 @@ async function importTxt(s: Session): Promise<string> {
 // which is why the victim moved between runs and read as a loaded host.
 // `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
 // before any worker starts. Measured after the fix, `--retry=0`, warm
-// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+// container: 16 consecutive clean runs, which is the bar `e2e/AGENTS.md` sets.
 describeE2E("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("a form-C .txt embed renders the decrypted text inline, non-editable", async () => {

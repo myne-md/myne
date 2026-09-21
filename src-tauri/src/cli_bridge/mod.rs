@@ -90,7 +90,7 @@
 //! nothing just confirmed. Every other gate in this module is fail-closed —
 //! this one is too.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — this
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — this
 //! module and its submodules touch no note content, no note id, no folder
 //! name and no filesystem path in any log line; this module's own logging
 //! stays inside the ALLOW list: bounded stage/event tags only. That is no

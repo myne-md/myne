@@ -19,7 +19,7 @@
 // is part of its meaning — most of the toggles migrated onto this component
 // had no description association at all before.
 //
-// Observability (src/CLAUDE.md "Test observability"): `testId` lands on the
+// Observability (src/AGENTS.md "Test observability"): `testId` lands on the
 // block root and `anchorId` on the same element as `data-setting-anchor`, the
 // settings-search scroll target. Pass testids as literal strings from the
 // panel — `tests/settings-search-index.test.ts` greps the panel sources for

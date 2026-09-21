@@ -9,11 +9,11 @@
 //!
 //! A plain `std::sync::Mutex` (not `tokio::sync::Mutex`): every method locks,
 //! mutates and drops the guard without an `.await` in between, so it never holds
-//! the lock across a suspension point (`src-tauri/CLAUDE.md` "Gotchas"). Poison is
+//! the lock across a suspension point (`src-tauri/AGENTS.md` "Gotchas"). Poison is
 //! recovered rather than propagated as a panic.
 //!
 //! Holds only labels and note ids (both already cross IPC in the shipped notes
-//! commands), never plaintext or key material. See `src-tauri/CLAUDE.md`
+//! commands), never plaintext or key material. See `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline".
 
 use std::collections::HashMap;

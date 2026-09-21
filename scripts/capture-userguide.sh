@@ -54,7 +54,7 @@ RUN_FLAGS=(
   # Per-member node_modules volumes, matching the three e2e runners. Without
   # them the container's `pnpm install` rewrites each bind-mounted workspace
   # member's symlinks and breaks the HOST install — the documented failure mode
-  # (e2e/CLAUDE.md). This script had never carried them; it got away with it
+  # (e2e/AGENTS.md). This script had never carried them; it got away with it
   # only because a capture run happens rarely.
   "${E2E_MEMBER_NM_VOLUMES[@]}"
   -w /work

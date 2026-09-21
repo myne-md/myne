@@ -16,7 +16,7 @@
 //! The command logic is identical to the desktop plugin — the only divergence is
 //! the `vault_sweep` path (mobile references `myne_core::vault_sweep` directly).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

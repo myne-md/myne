@@ -24,7 +24,7 @@
 //! posture as `vault_indices`. The slot-gate reject reuses
 //! [`super::error::AttachmentRefsError`].
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::AttachmentRefsError;
 use super::reconcile::AttachmentRefsState;

@@ -20,7 +20,7 @@
 //! side-load only. The runtime resolution mirrors `core/src/paths.rs`
 //! (`*_from_base(base)` pure core for tests + a thin `<R>(app)` wrapper).
 //!
-//! Logging: DENY-list clean (`src-tauri/CLAUDE.md`) — [`ModelStoreError`]
+//! Logging: DENY-list clean (`src-tauri/AGENTS.md`) — [`ModelStoreError`]
 //! reduces every IO failure to the closed [`IoFailureKind`] (no raw
 //! `io::Error` `Display`, which can leak OS paths) and carries no path in any
 //! variant. The recorded model path is device-local config, not a secret.

@@ -1975,7 +1975,7 @@ The gate over the [declared payload](#declared-payload): it may shrink freely an
 
 **It is not a promise to users.** It bounds drift between releases; it says nothing about what the download will be next year. Three structural assertions keep the number honest: a Git-LFS **pointer** where a blob was expected fails by name (a smudge-skipped checkout would otherwise report a tiny payload and pass forever), a missing declared path fails rather than counting zero, and the bundled-model set is compared against a recorded set **in both directions** — an addition is a decision, and a silent removal of `models/ocr` would break OCR-backed search.
 
-Used in: `scripts/check-desktop-payload-budget.mjs`, `CLAUDE.md` (guard table)
+Used in: `scripts/check-desktop-payload-budget.mjs`, `AGENTS.md` (guard table)
 
 ---
 
@@ -2209,7 +2209,7 @@ The `protected-branch` lefthook `pre-push` command carried by every `myne-md` re
 
 **Hygiene, not enforcement**, which is the hook's own wording rather than a hedge added here. `--no-verify`, `LEFTHOOK=0` and `LEFTHOOK_EXCLUDE=protected-branch` each bypass it, and it exists only in clones where `lefthook install` has been run, so a fresh clone, the jailed runner and `myne-bot` are uncovered. Two hatches are sanctioned instead: `MYNE_ALLOW_PROTECTED_PUSH=1` for a one-off, and `git config myne.allowProtectedPush true` for a repository whose normal workflow genuinely is a direct push ([myne-range](#myne-range), `homebrew-tap`, `myne-branding`). Both parse a VALUE (`1`, `true`, `yes`, `on`, case-insensitively) and refuse anything else, so they agree on what "allow" means and `=0` keeps the guard on rather than switching it off. The flag is read with `git config --local` deliberately, since a plain `--get` reads the merged cascade and one `--global` setting would switch the guard off in all eleven clones at once. A `min_version` at the top of each `lefthook.yml` is what stops an older binary from silently dropping `use_stdin` and leaving the guard green and inert.
 
-Used in: `lefthook.yml` (every `myne-md` repo); root `CLAUDE.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
+Used in: `lefthook.yml` (every `myne-md` repo); root `AGENTS.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
 
 ### **per-account quota** &nbsp; 📦 *Product*
 
@@ -3036,7 +3036,7 @@ Used in: `client-core/src/stage-decision.ts`, `src/lib/stage.ts`, `mobile/src/li
 
 ### **token parity** &nbsp; 🛠️ *Tooling*
 
-Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/CLAUDE.md` warns by name does not exist.
+Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/AGENTS.md` warns by name does not exist.
 
 Used in: `scripts/check-token-parity.mjs`, `client-core/src/tokens.css`, `decisions.md` 2026-09-02 (myne-md/myne#478)
 
@@ -3062,7 +3062,7 @@ Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inv
 
 The verdict for a twin whose shared answer already lives in `myne-core` or a `@myne/*` package, leaving each side as per-client wiring over it. Its divergence is correct and permanent, so it is neither a bug nor a screen. The canonical shape is a Tauri plugin shim where both sides carry `pub use myne_core::plugins::<flow>` and keep only the plugin builder and its capability grant; `src-tauri/src/plugins/vault_delete/mod.rs` at 52 lines against mobile's 53 is the worked example. The verdict says nothing about whether the two capability grants MATCH; that comparison has not been run.
 
-Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+Used in: `scripts/check-twin-inventory.mjs`, `core/AGENTS.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
 ### **Target vault** &nbsp; 📦 *Product*
 

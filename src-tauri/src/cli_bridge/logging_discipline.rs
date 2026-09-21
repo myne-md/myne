@@ -1,7 +1,7 @@
 //! Test-only: the desktop half of the CLI door's logging discipline
 //! (cli-thin-client task 13; MYND-490).
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline". This
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline". This
 //! module is the machine-checked half of the claim `mod.rs` makes in prose —
 //! that nothing in `cli_bridge` puts note content, a note id, a folder name
 //! or a filesystem path into a log line. Note ids and folder names are
@@ -390,7 +390,7 @@ const SOURCES: &[(&str, &str)] = &[
 /// Field names any `tracing` record in this directory may carry.
 ///
 /// **Adding a name here is a deliberate act.** Check the value it will carry
-/// against the DENY list in `src-tauri/CLAUDE.md` first: note content, note
+/// against the DENY list in `src-tauri/AGENTS.md` first: note content, note
 /// ids, folder names, filesystem paths and raw `io::Error` Display are all
 /// forbidden, and a field like `note_id` or `path` can never be allowlisted.
 const ALLOWED_FIELDS: &[&str] = &[
@@ -620,7 +620,7 @@ fn every_tracing_call_site_carries_only_allowlisted_fields_and_bounded_values() 
             assert!(
                 !invocation.contains('%'),
                 "{name}: `%` Display-formatting is forbidden in this directory \
-                 (src-tauri/CLAUDE.md, closed-enum mapping rule): {invocation:?}"
+                 (src-tauri/AGENTS.md, closed-enum mapping rule): {invocation:?}"
             );
             for arg in top_level_args(&invocation) {
                 // A bare message string is the one positional argument
@@ -639,14 +639,14 @@ fn every_tracing_call_site_carries_only_allowlisted_fields_and_bounded_values() 
                 assert!(
                     ALLOWED_FIELDS.contains(&field),
                     "{name}: `{field}` is not an allowlisted tracing field. Check the \
-                     value it carries against the DENY list in src-tauri/CLAUDE.md \
+                     value it carries against the DENY list in src-tauri/AGENTS.md \
                      before adding it to ALLOWED_FIELDS."
                 );
                 assert!(
                     value.starts_with('"') || ALLOWED_VALUES.contains(&value),
                     "{name}: `{field} = {value}` is not a string literal and not an \
                      allowlisted bounded expression. Reduce it to a closed enum or a \
-                     `&'static str` label first (src-tauri/CLAUDE.md)."
+                     `&'static str` label first (src-tauri/AGENTS.md)."
                 );
             }
         }

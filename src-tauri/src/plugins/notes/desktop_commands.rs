@@ -21,7 +21,7 @@
 //! - **attachment-reference scan**: `collect_referenced_attachment_ids` +
 //!   `ReferencedScanError` moved to `myne_core::plugins::attachments::ref_scan`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::export_naming::{
     rewrite_embeds_to_final_names, rewrite_html_attachment_srcs, sanitize_export_component,
@@ -233,7 +233,7 @@ pub(crate) async fn note_export_with_dir(
         // temp name, so a pre-existing user file shaped like a temp
         // sibling is never truncated (115-F1). The temp lives at the
         // user-chosen export destination, never inside the vault (TB3
-        // egress exception; `src-tauri/CLAUDE.md` "Atomic file
+        // egress exception; `src-tauri/AGENTS.md` "Atomic file
         // writes"). A returned error drops the partial temp on the way
         // out. `replace=false` rejects a pre-existing target BEFORE the
         // temp is created, so the existing file stays untouched.

@@ -2,7 +2,7 @@
 //
 // Kept free of React so it is trivially unit-testable; mirrors the
 // "pure transitions exported for tests" discipline of `sidebarState.tsx`
-// + `stage.ts`. Because no JS test runner is wired yet (see CLAUDE.md),
+// + `stage.ts`. Because no JS test runner is wired yet (see AGENTS.md),
 // the invariants are guarded by a DEV-only self-verify harness that runs
 // once per module load (same shape as `stage.ts::verifyTransitionTable`).
 // When a runner lands, `verifyClampInvariants` converts directly to a

@@ -16,7 +16,7 @@
 //! `#[tauri::command]` wrappers resolve the active vault dir. Any failure on read
 //! collapses to the empty theme store (fall-back-to-empty, § 9.21.4).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::ThemesError;
 use crate::host::HostCtx;

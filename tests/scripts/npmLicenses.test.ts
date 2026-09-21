@@ -2,7 +2,7 @@
 //
 // The gate had none, and that is most of how #515 happened: it failed on every
 // CI run for months while nothing exercised the paths it takes when it cannot
-// evaluate. Root `CLAUDE.md`: "Verifying a guard means breaking it, not running
+// evaluate. Root `AGENTS.md`: "Verifying a guard means breaking it, not running
 // it. Inject the exact defect the guard now claims to catch, watch it name that
 // defect, then restore."
 //

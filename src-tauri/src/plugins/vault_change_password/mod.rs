@@ -20,7 +20,7 @@
 //!   gating, tracing pattern, test posture)
 //! - Tasks: `myne-agents/features/vault-change-password/tasks.md`
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The vault-change-password command core + `error` moved to `myne-core`
 // (shared with the mobile client). The backup-preempt / force-relock teardown /

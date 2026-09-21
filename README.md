@@ -103,7 +103,7 @@ The full project spans several repos under the [`myne-md`](https://github.com/my
 | [`myne-ops`](https://github.com/myne-md/myne-ops) | Internal operations and infrastructure |
 | [`myne-agents`](https://github.com/myne-md/myne-agents) | Internal tooling and agent definitions |
 
-Each companion is a separate GitHub repo with its own license and CLAUDE.md. Never commit changes to them through this repo.
+Each companion is a separate GitHub repo with its own license and AGENTS.md. Never commit changes to them through this repo.
 
 ## Security
 

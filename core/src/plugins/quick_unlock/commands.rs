@@ -25,7 +25,7 @@
 //! `#[tauri::command]` wrappers resolve the active vault dir + build the PIN
 //! provider. (The macOS biometric provider + its command branch land in task 7.)
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — `root_key`,
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — `root_key`,
 //! `items_key`, `wrap_key`, and the PIN are never logged.
 
 use std::path::{Path, PathBuf};

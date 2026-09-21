@@ -92,7 +92,7 @@ pub trait Engine: Send + Sync {
     /// the partial result generated so far is returned.
     ///
     /// The callback receives incremental text only; **no token, prompt, or
-    /// note-derived string is ever logged** (DENY-list, `src-tauri/CLAUDE.md`).
+    /// note-derived string is ever logged** (DENY-list, `src-tauri/AGENTS.md`).
     ///
     /// Default: a non-streaming fallback that computes the whole result and
     /// emits it once — correct for any engine that has no incremental path.
