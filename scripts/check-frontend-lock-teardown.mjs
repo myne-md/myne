@@ -314,7 +314,7 @@ export const TEARDOWN_CALLS = [
     // Every leaving path, and this one holds the decrypted CONTENT rather than a
     // shape derived from it, so it is the stronger case of the entry above. It
     // sat unlisted while `resetDecodedAspects` was argued onto the roster from
-    // the same file, which is the false-exhaustiveness shape the root CLAUDE.md
+    // the same file, which is the false-exhaustiveness shape the root AGENTS.md
     // records for the `itemsKey-wrap` row: a roster that reads complete while
     // the larger store beside it is missing. The in-flight map is cleared with
     // the cache so a read crossing a lock cannot resolve into the next
@@ -325,6 +325,24 @@ export const TEARDOWN_CALLS = [
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
         "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
+    },
+  },
+  {
+    call: "resetMermaidZoom",
+    declaredIn: "editor/src/attachments/session-caches.ts",
+    holds:
+      "the session zoom percentage per rendered mermaid diagram, keyed by a hash of the diagram source",
+    // Same paths as `resetPreviewCache`, and for the same class of reason: a
+    // percentage is not plaintext, but the key is a fingerprint of note content,
+    // so the map enumerates the diagrams this vault holds. Left uncleared it
+    // would also restore the PREVIOUS vault's scale onto a diagram whose source
+    // hash happened to collide. myne-md/myne#708.
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    skips: {
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-render on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
     },
   },
   {
@@ -398,7 +416,7 @@ export const TEARDOWN_CALLS = [
  * string literal would still fool it; the two call sites here contain none, the
  * over-capture assertion at the call site bounds the damage, and a
  * comment-and-string-aware walk is the thing this repo has already been burned
- * by writing twice (root `CLAUDE.md`, the `'` problem in both directions). */
+ * by writing twice (root `AGENTS.md`, the `'` problem in both directions). */
 export function bodyOf(src, at) {
   // The body's opening brace is the first `{` whose preceding non-whitespace
   // character is `)` or `>`. That covers all four shapes these files use:

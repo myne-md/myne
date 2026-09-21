@@ -137,6 +137,9 @@ pub const ROLE_STR_CUSTOM_THEMES_BLOB: &[u8] = b"custom-themes-blob";
 /// Exported for the same reason as `ROLE_STR_CUSTOM_THEMES_BLOB` above.
 pub const ROLE_STR_PERSONAL_DICT_BLOB: &[u8] = b"personal-dictionary-blob";
 
+/// Registered AAD role for the owner-held shared group-key wrap.
+pub const GROUP_KEY_WRAP_AAD_ROLE: &[u8] = b"group-key-wrap";
+
 /// Build the AAD bound into the AEAD wrap of `root_key` under the
 /// password-derived wrap key (spec § 3.1).
 ///
@@ -224,6 +227,27 @@ pub fn aad_vault_items_key_wrap_v0_2(items_key_id: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the v0.2 AAD for the owner's wrapped shared group key.
+pub fn aad_vault_group_key_wrap_v0_2(
+    account_number_hash: &[u8; 16],
+    group_key_epoch: u64,
+) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + GROUP_KEY_WRAP_AAD_ROLE.len()
+            + 8
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, GROUP_KEY_WRAP_AAD_ROLE);
+    aad.extend_from_slice(&group_key_epoch.to_be_bytes());
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Generic **v0.1** KEK-singleton blob AAD — the uniform pattern every single-KEK
 /// blob family (§9.5–§9.21) follows: `"myne.v0.1|" || 0x01 || u16_len(role) ||
 /// role || account_number_hash`. The per-family builders ([`aad_prefs_blob`],
@@ -255,6 +279,62 @@ pub fn aad_singleton_blob_v0_2(role: &[u8], account_number_hash: &[u8; 16]) -> V
     aad
 }
 
+/// Build the v0.2 AAD for a per-person private AI profile (`MYY5`, §9.28).
+///
+/// Layout: `"myne.v0.2|" || 0x02 || u16_len("person-profile-blob") || role ||
+/// account_number_hash (16) || profile_id (16)`.
+///
+/// Binds BOTH the vault (`account_number_hash`) and the `(person, vault)`
+/// profile id, so a profile sealed for one person in one vault cannot be
+/// replayed as the same person's profile in another vault, nor as another
+/// person's profile in the same vault. The KEK is person-private (derived from
+/// the person's phrase), so neither the group key nor `root_key` can open it.
+pub fn aad_person_profile_blob(account_number_hash: &[u8; 16], profile_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PERSON_PROFILE_BLOB: &[u8] = b"person-profile-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_PERSON_PROFILE_BLOB.len()
+            + account_number_hash.len()
+            + profile_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_PROFILE_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad.extend_from_slice(profile_id);
+    aad
+}
+
+/// Build the v0.2 AAD for the sealed owner-signed group roster in an `NTV6`
+/// `vault.meta` (`protocol.md` §9.3.3).
+///
+/// Layout: `"myne.v0.2|" || 0x02 || u16_len("group-roster-blob") || role ||
+/// account_number_hash (16) || group_key_epoch (8, big-endian)`.
+///
+/// Binding the vault AND the epoch keeps a roster sealed for one vault/epoch
+/// from being replayed into another: the reader derives the same epoch from the
+/// `vault.meta` it is opening, so a roster moved to a different epoch fails AEAD
+/// verification rather than being silently served.
+pub fn aad_group_roster_blob(account_number_hash: &[u8; 16], group_key_epoch: u64) -> Vec<u8> {
+    const ROLE_STR_GROUP_ROSTER_BLOB: &[u8] = b"group-roster-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_GROUP_ROSTER_BLOB.len()
+            + account_number_hash.len()
+            + 8,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_GROUP_ROSTER_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad.extend_from_slice(&group_key_epoch.to_be_bytes());
+    aad
+}
+
 /// Build the AAD bound into the AEAD wrap of a per-note `item_key`
 /// under the singleton v0.1 `itemsKey` (spec § 5.2 + § 6.2).
 ///
@@ -270,7 +350,7 @@ pub fn aad_singleton_blob_v0_2(role: &[u8], account_number_hash: &[u8; 16]) -> V
 /// Distinct from [`aad_vault_items_key_wrap`] (no note_uuid). The
 /// `vault_`/`note_` prefix retires the one-letter
 /// `items_key`/`item_key` near-collision footgun — see
-/// `protocol/CLAUDE.md` for the naming-discipline rationale.
+/// `protocol/AGENTS.md` for the naming-discipline rationale.
 pub fn aad_note_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
     let mut aad =
         Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + items_key_id.len() + note_uuid.len());
@@ -3086,7 +3166,7 @@ mod tests {
     /// place to update. The v0.1 file's exclusion note has the same shape.
     ///
     /// `kdf_params` is the v0.1 canonical block on purpose. v0.2's own KDF is
-    /// **not allocated yet** (repo-root `CLAUDE.md`: only the AAD prefix, the
+    /// **not allocated yet** (repo-root `AGENTS.md`: only the AAD prefix, the
     /// HKDF context prefix, the `0x02` version byte and the `NC05` magic are
     /// pinned so far), so what these two cases pin is the *framing* — where the
     /// param block sits and that it is bound at all — not a v0.2 parameter
@@ -3419,5 +3499,15 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write aad-construction v0.2 vectors dump");
+    }
+
+    #[test]
+    fn group_key_wrap_aad_binds_vault_and_epoch() {
+        let account_a = [0x11; 16];
+        let account_b = [0x22; 16];
+
+        let current = aad_vault_group_key_wrap_v0_2(&account_a, 7);
+        assert_ne!(current, aad_vault_group_key_wrap_v0_2(&account_b, 7));
+        assert_ne!(current, aad_vault_group_key_wrap_v0_2(&account_a, 8));
     }
 }

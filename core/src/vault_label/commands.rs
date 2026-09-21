@@ -114,7 +114,7 @@ pub struct KeychainStatusView {
 }
 
 /// Failure surface for the command pair. No `String` and no path
-/// (`src-tauri/CLAUDE.md` DENY list), and **no variant can carry a label**.
+/// (`src-tauri/AGENTS.md` DENY list), and **no variant can carry a label**.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum HideVaultNamesError {

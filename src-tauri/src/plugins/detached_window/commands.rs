@@ -15,7 +15,7 @@
 //! SYNC-5), single-instance routing + move (task 5 / #681), persistence (task 6),
 //! lock-teardown wiring (#679).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline": stage
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging discipline": stage
 //! tags + closed error kinds; never the note id or a path.
 
 use super::state::DetachedWindowRegistry;
@@ -183,7 +183,7 @@ pub async fn detached_window_open<R: Runtime>(
             if let Some(reg) = close_app.try_state::<DetachedWindowRegistry>() {
                 reg.remove(&close_label);
             }
-            // Note id only, never plaintext (see: src-tauri/CLAUDE.md
+            // Note id only, never plaintext (see: src-tauri/AGENTS.md
             // "Secret-handling logging discipline" for what may cross a channel).
             let _ = close_app.emit(DETACHED_CLOSED_EVENT, &close_note_id);
             tracing::info!(event = "detached_window_closed");

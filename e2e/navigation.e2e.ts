@@ -59,7 +59,7 @@ async function expectNavDisabled(
 // contention. `e2e/support/global-setup.ts` now pays that build once per vitest
 // invocation, before any worker starts; this scenario went from 167–178 s to
 // 6.9 s in the same container, and cleared the 15×-at-`--retry=0` bar
-// `e2e/CLAUDE.md` sets for releasing a quarantined spec.
+// `e2e/AGENTS.md` sets for releasing a quarantined spec.
 describeE2E("nav1 back/forward steps through opened notes (MYND-260)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("steps back to earlier notes and forward again; ends greyed-out at edges", async () => {

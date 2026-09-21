@@ -17,7 +17,7 @@
 // sibling of `tor-routing.json`, `vault-names.json` and the rest of that
 // family) and gets its own commands, reachable pre-unlock.
 //
-// Signature parity (no codegen, see src/CLAUDE.md "Tauri command bindings"):
+// Signature parity (no codegen, see src/AGENTS.md "Tauri command bindings"):
 // keep this in step with `src-tauri/src/plugins/screen_capture/commands.rs`.
 //
 // Desktop-only. The `screenCaptureProtection` capability is absent on web. A

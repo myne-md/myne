@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! `agent` plugin core error taxonomy.
 //!
-//! One closed, `serde::Serialize` enum, DENY-list clean per `src-tauri/CLAUDE.md`
+//! One closed, `serde::Serialize` enum, DENY-list clean per `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline": no note ids in a `Display` string, no
 //! paths, no plaintext. `note_id` appears as a structured field only where the
 //! frontend already holds the id it sent, never inside prose.
@@ -291,7 +291,7 @@ impl AgentError {
     /// Mirrors `EngineError::kind` and exists for the same reason: several
     /// variants carry a `note_id`, so a `Debug` format of this value in a log
     /// line would put a note identifier on disk. The DENY list in
-    /// `src-tauri/CLAUDE.md` names `note_id` explicitly. A caller logs this;
+    /// `src-tauri/AGENTS.md` names `note_id` explicitly. A caller logs this;
     /// there is nothing else here safe to print.
     pub fn kind(&self) -> &'static str {
         match self {

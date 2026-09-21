@@ -10,7 +10,7 @@
 // The aspect picker is the app's custom `SearchableSelect` (driver-operable via
 // the `${testId}-option[data-value=…]` row — same pattern as the filter builder
 // and settings dropdowns). The cover-image field is a plain text Input driven by
-// `replaceText` (the W3C-clear-bypasses-React caveat, per e2e/CLAUDE.md).
+// `replaceText` (the W3C-clear-bypasses-React caveat, per e2e/AGENTS.md).
 //
 // SCOPE NOTE (no silent cap): this scenario exercises the cover-image property
 // and aspect-ratio controls. The card-size control is a `<input type="range">`
@@ -20,7 +20,7 @@
 //
 // VERIFICATION STATUS (2026-06-15): authored to the harness conventions but NOT
 // yet run on this dev platform (macOS; the suite is Linux/tauri-driver only —
-// `pnpm test:e2e` self-skips off-platform). Definition of done per e2e/CLAUDE.md
+// `pnpm test:e2e` self-skips off-platform). Definition of done per e2e/AGENTS.md
 // is "green 3× in the container" (./scripts/e2e-local.sh) and MUST be met before
 // merge. Run ISOLATED per the full-suite-contamination note.
 

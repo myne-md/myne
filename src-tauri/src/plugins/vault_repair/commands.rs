@@ -25,7 +25,7 @@
 //!   is still recoverable from the medium is the exact combination this
 //!   feature argues is not an erase.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::VaultRepairError;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};

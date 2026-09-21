@@ -20,7 +20,7 @@
 //! sibling blob).
 //!
 //! Secret-handling: a vector / `content_nonce` / `note_id` is plaintext-derived
-//! — never log one (see `src-tauri/CLAUDE.md` "Secret-handling logging
+//! — never log one (see `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline").
 
 // Wired into hydrate/persist (tasks 4/5) as the first callers; keep the pure
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn a_superseded_snapshot_is_refused_at_the_envelope_not_at_postcard() {
         // The version bump, verified by BREAKING it rather than by running it
-        // (repo-root CLAUDE.md). The claim under test is the exact one in
+        // (repo-root AGENTS.md). The claim under test is the exact one in
         // §9.17.2: postcard is non-self-describing, so a `0x01` payload can
         // decode under a `0x02` reader into a GARBAGE identity — and a garbage
         // identity that happens to compare EQUAL serves semantically wrong

@@ -30,7 +30,7 @@ type ExportState =
   | { step: "error"; message: string };
 
 // Modal anatomy shared with DeleteAttachmentDialog: padded body + a
-// right-aligned footer row, all tokens (src/CLAUDE.md "Design tokens").
+// right-aligned footer row, all tokens (src/AGENTS.md "Design tokens").
 const BODY_STYLE: CSSProperties = {
   padding: "var(--space-4) var(--space-5)",
   fontFamily: "var(--font-sans)",

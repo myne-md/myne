@@ -2,7 +2,7 @@
 // tasks 1+2). Compose `myneFolding()` into `myneExtensions()`.
 //
 // Three pieces, all from the already-pinned `@codemirror/language@6.12.3` (NO
-// new dependency — adding one is a security decision per CLAUDE.md):
+// new dependency — adding one is a security decision per AGENTS.md):
 //   1. `codeFolding()` — the fold state machine + the collapsed-range
 //      placeholder. We supply a custom `placeholderDOM` so the folded line shows
 //      a clear, clickable Myne-styled placeholder (data-testid for E2E).

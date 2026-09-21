@@ -62,7 +62,7 @@
 //   4. **`_raw` callers.** `encode_*_raw(` — the caller-supplied-nonce encoders
 //      — may not be called outside `protocol/src`, `e2e/fixture-gen/` and
 //      `#[cfg(test)]` regions. Nonce reuse is catastrophic and is the caller's
-//      contract (`protocol/CLAUDE.md`); the `_raw` suffix is a reminder, not a
+//      contract (`protocol/AGENTS.md`); the `_raw` suffix is a reminder, not a
 //      mechanism.
 //
 //      This rule stays even once the `_raw` encoders move behind a non-default
@@ -156,7 +156,7 @@
 //
 // Zero dependencies, node built-ins only — same shape as
 // `check-platform-seam.mjs` / `check-core-io-seam.mjs` / `check-prefs-nonce.mjs`
-// (root CLAUDE.md: adding a dependency is a security decision).
+// (root AGENTS.md: adding a dependency is a security decision).
 //
 // Run by hand: node scripts/check-crypto-registries.mjs
 // Wired into: lefthook `pre-commit`, CI `pnpm-build`.
@@ -166,7 +166,7 @@ import { join, relative, resolve } from "node:path";
 import { RUST_CLIENT_TREES } from "./lib/shared-roots.mjs";
 
 // `--root <dir>` points the scan at a synthetic tree, which is how this
-// guard's own tests inject each defect it claims to catch (root CLAUDE.md:
+// guard's own tests inject each defect it claims to catch (root AGENTS.md:
 // "verifying a guard means breaking it, not running it"). A guard verified only
 // by mutating the real checkout by hand is verified by evidence that expires
 // the moment somebody forgets to restore.
@@ -747,7 +747,7 @@ function comparesMagic(s, tokens) {
  *  declaration exemption still holds was therefore comparing the guard against a
  *  second copy of itself: injecting `return true` into `comparesMagic`, which
  *  disables the exemption outright, left all ten cases green. That is the exact
- *  non-evidence pattern root CLAUDE.md records.
+ *  non-evidence pattern root AGENTS.md records.
  *
  *  The stale-entry check at the report section already skips under `FIXTURE_RUN`
  *  for the mirror-image reason (a fixture tree cannot satisfy entries about the

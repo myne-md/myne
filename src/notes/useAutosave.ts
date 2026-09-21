@@ -40,7 +40,12 @@ export type SaveStatus =
   | { status: "clean" }
   | { status: "editing" }
   | { status: "saving" }
-  | { status: "saved"; at: Date }
+  /** `noteId` is the note the save was FOR, which is not always the pane's
+   *  current note: a save that settles after the user switched notes still
+   *  belongs to the outgoing one, and the sidebar refresh-after-save (title/H1
+   *  -> row label) must target it rather than whatever is open now. Omitted on
+   *  the no-save "reverted to clean" arm. */
+  | { status: "saved"; at: Date; noteId?: string | null }
   | { status: "error"; error: unknown }
   /** A `BaseMismatch` rejection is being resolved (conflict copy + reload —
    *  the `onBaseMismatch` handler is in flight). Transient; ends `clean`
@@ -53,11 +58,13 @@ export type UseAutosaveReturn = {
   retry: () => void;
   /** Flush any pending save synchronously (awaitable). No-op when clean. */
   flushIfDirty: () => Promise<void>;
-  /** Best-effort, fire-and-forget save of the buffer for whatever note the hook
-   *  currently holds — for a caller that is about to stop being that note's
-   *  editor (myne#288). Hashless, and it touches no hook state, because the
-   *  caller is about to reset that state for a DIFFERENT note. */
-  flushOutgoing: () => void;
+  /** Best-effort save of the buffer for whatever note the hook currently holds
+   *  — for a caller that is about to stop being that note's editor (myne#288).
+   *  Hashless, and it touches no hook state, because the caller is about to
+   *  reset that state for a DIFFERENT note. It RESOLVES once the bytes are down
+   *  (still never rejects), so a caller can refresh the OUTGOING note's sidebar
+   *  row title after the flush. */
+  flushOutgoing: () => Promise<void>;
   /** Adopt an externally-reloaded body as loaded content (not a user edit).
    *  Caller must ensure the buffer is clean first. See the impl docstring. */
   acceptReloadedBody: (reloadedBody: string) => void;
@@ -259,19 +266,25 @@ export function useAutosave(
    * caller is about to reset them for a different note, and a late async write
    * into them would be a write about the wrong note.
    */
-  const flushOutgoing = useCallback((): void => {
-    if (inFlightRef.current !== null) return;
+  const flushOutgoing = useCallback((): Promise<void> => {
+    if (inFlightRef.current !== null) return Promise.resolve();
     // Prefer the switch snapshot: once a different note has rendered through
     // this hook, `latestBodyRef` is already the incoming note's body and writing
     // it under the outgoing id would corrupt the outgoing note.
     const pending = outgoingRef.current;
     const id = pending?.id ?? noteIdRef.current;
     const text = pending?.body ?? latestBodyRef.current;
-    if (id === null || (pending === null && !dirtyRef.current)) return;
+    if (id === null || (pending === null && !dirtyRef.current)) return Promise.resolve();
     outgoingRef.current = null;
-    void saveImplRef.current(id, text).catch(() => {
+    // Returns the save so a caller can refresh the OUTGOING note's sidebar cache
+    // once the bytes are down (title/H1 edits must reach the row label even
+    // though the user has already switched away). Still best-effort: a failed
+    // save resolves, because a switch must never be blocked by it.
+    return saveImplRef.current(id, text).then(
+      () => undefined,
+      () => undefined,
       /* best-effort — a switch must never be blocked by a failed save */
-    });
+    );
   }, []);
   /** Set true by `fireSave`'s error arm, cleared at the top of every attempt and
    *  at every point the pane stops holding the note that attempt was for.
@@ -435,7 +448,7 @@ export function useAutosave(
         // caused the refusal is saved on the next cycle.
         savedBodyRef.current = patchedBody;
         dirtyRef.current = false;
-        setStatus({ status: "saved", at: new Date() });
+        setStatus({ status: "saved", at: new Date(), noteId: id });
         // MYND-31: live re-index from the just-saved body (decrypt-free —
         // the body is already in V8). Best-effort, fire-and-forget so a
         // VaultIndices hiccup never affects the save status.

@@ -7,7 +7,7 @@
 //!
 //! Slot discipline + `spawn_blocking` + DENY-list-clean tracing mirror the
 //! `notes` commands. Decode failures collapse to the single non-distinguishing
-//! `CannotDecrypt` (`protocol.md` §6.4). See `src-tauri/CLAUDE.md`
+//! `CannotDecrypt` (`protocol.md` §6.4). See `src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline" (the Plaintext-IPC pattern applies to
 //! `snapshot_preview`'s returned plaintext).
 

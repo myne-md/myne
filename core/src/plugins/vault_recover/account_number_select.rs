@@ -40,7 +40,7 @@
 //!
 //! ## Logging discipline
 //!
-//! `account_number_hash` bytes are DENY-listed (`src-tauri/CLAUDE.md`
+//! `account_number_hash` bytes are DENY-listed (`src-tauri/AGENTS.md`
 //! "Secret-handling logging discipline"). This module NEVER emits them — nor
 //! the parsed canonical, nor any per-vault hash, nor the `VaultId`, nor a path
 //! — via `tracing`/IPC/format. The only signal it could emit is a coarse

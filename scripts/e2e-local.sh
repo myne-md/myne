@@ -102,7 +102,7 @@ E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
 # the only way to reach a `describeE2E.flaky` spec from here; `MYNE_E2E_AI=1`
 # needs the `local-inference-stub` build as well (see `e2e-ai-buildrun.sh`).
 E2E_ENV="$E2E_ENV MYNE_E2E_QUARANTINE=${MYNE_E2E_QUARANTINE:-0} MYNE_E2E_AI=${MYNE_E2E_AI:-0}"
-# `MYNE_E2E_RETRIES=0` is how `e2e/CLAUDE.md` says to hunt flake, and no runner
+# `MYNE_E2E_RETRIES=0` is how `e2e/AGENTS.md` says to hunt flake, and no runner
 # used to offer it: with the config's default of 2, a failing attempt is erased
 # from the report and the flake rate reads as zero however bad it is.
 RETRY_FLAG=""

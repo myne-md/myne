@@ -42,7 +42,7 @@
 //! is none.
 //!
 //! Errors are closed, `Serialize`, and carry no `String` and no path — a path in
-//! an error message is a disclosure (`src-tauri/CLAUDE.md` DENY list).
+//! an error message is a disclosure (`src-tauri/AGENTS.md` DENY list).
 
 // No production consumer until task 4 wires the get/set IPC commands. Annotated
 // at module level, with the task that consumes it named, rather than left to a

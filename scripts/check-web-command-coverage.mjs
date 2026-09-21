@@ -37,7 +37,7 @@
 //
 // Same reason as `check-platform-seam.mjs` and `check-core-task-seam.mjs`: the
 // property spans two languages, so no single compiler or test runner sees both
-// halves. Zero dependencies, node built-ins only (root CLAUDE.md: adding a
+// halves. Zero dependencies, node built-ins only (root AGENTS.md: adding a
 // dependency is a security decision).
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

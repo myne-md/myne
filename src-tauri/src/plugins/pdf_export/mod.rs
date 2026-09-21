@@ -30,7 +30,7 @@
 //! InlinedPlugin::commands` lock-stepped — adding a command without
 //! the matching `commands.allow` entry is a security regression).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" — stage tags + closed kinds + coarse duration; never
 //! the HTML payload, title, note id, or any path.
 

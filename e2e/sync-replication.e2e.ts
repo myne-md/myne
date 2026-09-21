@@ -263,7 +263,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // Push A's note to the server. The sync trigger is a backend command
         // (no UI value); drive it via the sanctioned page-seat IPC instead of the
         // flaky settings-panel button (production IPC, no test hook — see
-        // e2e/CLAUDE.md).
+        // e2e/AGENTS.md).
         await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 20_000);
 
         // --- B: join the account (account# + password) → waits on the approval gate ---

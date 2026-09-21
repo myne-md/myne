@@ -14,7 +14,7 @@ This repository is one of several under [`myne-md`](https://github.com/myne-md):
 
 What exists in this repo today:
 
-- `CLAUDE.md` — stack-direction notes, trade-off analysis, and architectural commitments carried over from the main project.
+- `AGENTS.md` — stack-direction notes, trade-off analysis, and architectural commitments carried over from the main project.
 - `lefthook.yml` — baseline pre-commit hooks (whitespace check, EOF-newline check, secret-pattern guard).
 - `LICENSE` — AGPL-3.0.
 - **A UI-only build of the full mobile design** (see below). The application *shell* — screens, theming, device chrome — is implemented; **no logic is wired** (no crypto, no vault, no sync, no Tauri commands).
@@ -64,7 +64,7 @@ The goal is maximum reuse of the audited main-repo codebase rather than a second
 - **One UI codebase.** The main repo's React screens are meant to carry over, with per-platform differences kept to layout/CSS rather than a parallel UI.
 - **One trust-boundary discipline.** The capability-ACL model used on desktop extends to mobile, scoped per platform (iOS and Android entitlements differ).
 
-The concrete framework choice (Tauri 2 Mobile vs. the React Native direction recorded in the main repo's earlier plan) is not yet final — it is to be re-verified and recorded in the main repo's `docs/decisions.md` before Phase 3 work begins. See `CLAUDE.md` for the current reasoning and the open trade-offs.
+The concrete framework choice (Tauri 2 Mobile vs. the React Native direction recorded in the main repo's earlier plan) is not yet final — it is to be re-verified and recorded in the main repo's `docs/decisions.md` before Phase 3 work begins. See `AGENTS.md` for the current reasoning and the open trade-offs.
 
 Open questions that mobile must answer before it ships, all already flagged in the threat model and decisions log:
 

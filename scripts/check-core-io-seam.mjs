@@ -23,7 +23,7 @@
 //
 // Deliberately a grep-shaped script with zero dependencies, node built-ins only
 // — the same pattern as `check-platform-seam.mjs`, `check-core-task-seam.mjs`
-// and lefthook's secret-scan (root CLAUDE.md: adding a dependency is a security
+// and lefthook's secret-scan (root AGENTS.md: adding a dependency is a security
 // decision).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -178,7 +178,7 @@ const SKIP_DIRS = new Set(["target"]);
 // believing the output.
 //
 // Verified in BOTH directions, because a fix checked only by "the tree is green
-// afterwards" is the non-evidence `CLAUDE.md` names: `protocol::prefs::foo(`
+// afterwards" is the non-evidence `AGENTS.md` names: `protocol::prefs::foo(`
 // must stop matching, AND a bare `std::fs::read(` must still be caught.
 export const FS_CALL =
   /(?<![A-Za-z0-9_])(?:std::)?fs::[a-z_]+\s*\(|\bFile::(?:open|create)\b|\bOpenOptions::new\b|\bcrate::atomic_write::atomic_write[a-z_]*\s*\(/;
@@ -265,7 +265,7 @@ for (const file of files) {
       // item whole. The merge-base guard had this hole too, so it is not a
       // regression, but the #274 note above claims the `;` shape is covered and
       // a guard whose stated coverage exceeds its real coverage is the thing
-      // root CLAUDE.md says costs more than no guard.
+      // root AGENTS.md says costs more than no guard.
       const code = line.replace(/\/\/.*$/, "");
       if (!sawBrace && /;\s*$/.test(code) && !/^\s*#\[/.test(line)) {
         skipping = false;

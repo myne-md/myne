@@ -28,7 +28,7 @@
 //! - on the writer side, refuses to emit a reply larger than
 //!   [`MAX_HOST_TO_EXT_REPLY`] (the ACK/confirm channel stays tiny).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — frame
+//! See: ../../AGENTS.md "Secret-handling logging discipline" — frame
 //! bodies carry note plaintext (the same secret class as `password`);
 //! this module never logs a frame body, only the closed [`FrameError`]
 //! variant name and the (non-secret) declared/observed lengths.

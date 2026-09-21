@@ -10,7 +10,7 @@
 //!   under a new master password (recovery-side bytes preserved per
 //!   `recovery-flow.md` §4.4; atomic write per §4.2).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::super::vault_unlock::state::{
     RecoveringMaterial, SlotKind, UnlockedVault, VaultRuntimeState,
@@ -278,9 +278,21 @@ pub(crate) async fn recover_with_phrase_with_path(
 
             let items_key_id = meta.items_key_id;
             let root_key = derive_root_key_from_phrase(version, &phrase, &meta)?;
-            // items_key derivation drops `root_key` on early-return;
-            // the slot stays empty (no half-state).
-            let items_key = derive_items_key(version, &root_key, &meta)?;
+            // An `NTV6` vault seals `itemsKey` under the GROUP tier, so the
+            // root-tier derive fails there; recover the group key first.
+            // items_key derivation drops `root_key` on early-return; the slot
+            // stays empty (no half-state).
+            let items_key = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+                    .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                let g = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
+                    .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                let gk = protocol::GroupKey::new(*g);
+                protocol::unlock_items_key_ntv6(&b2b, &gk)
+                    .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?
+            } else {
+                derive_items_key(version, &root_key, &meta)?
+            };
             Ok(DerivedKeys {
                 root_key,
                 items_key,
@@ -323,7 +335,7 @@ pub(crate) async fn recover_with_phrase_with_path(
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
-    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `src-tauri/AGENTS.md` "Secret-handling logging discipline".
     // `duration_ms` rounded down to 10ms granularity per
     // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry.
     tracing::info!(
@@ -661,15 +673,29 @@ pub(crate) async fn complete_recovery_with_path(
             //     uses the same security parameters the vault was
             //     created under (parameter upgrade is a separate Phase
             //     2+ feature decision).
-            let new_bytes = protocol::rewrite_vault_meta_password_side_versioned(
-                version,
-                &parsed,
-                &root_key_snapshot,
-                new_password.as_str(),
-                &fresh_salt,
-                &fresh_nonce,
-            )
-            .map_err(|e| {
+            let rewrite = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+                // An `NTV6` rewrite must carry the B2B tail; the versioned v0.2
+                // rewrite would re-serialize as `NTV5` and drop it.
+                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+                    .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                protocol::rewrite_vault_meta_password_side_ntv6(
+                    &b2b,
+                    &root_key_snapshot,
+                    new_password.as_str(),
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            } else {
+                protocol::rewrite_vault_meta_password_side_versioned(
+                    version,
+                    &parsed,
+                    &root_key_snapshot,
+                    new_password.as_str(),
+                    &fresh_salt,
+                    &fresh_nonce,
+                )
+            };
+            let new_bytes = rewrite.map_err(|e| {
                 tracing::error!(
                     stage = "vault_meta_rewrite",
                     error_kind = "InvalidVaultMeta",
@@ -772,11 +798,24 @@ pub(crate) async fn complete_recovery_with_path(
     // millisecond reading, because `Instant::now()` panics on wasm32. This path
     // is decided absent on web, but it shares the `UnlockedVault` type.
     let now_ms = host.monotonic_millis();
+    // An `NTV6` vault's session carries the group tier, so the shared
+    // singletons derive from the group key rather than the root key.
+    let group_key = if new_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        let b2b = protocol::parse_vault_meta_ntv6(&new_bytes)
+            .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+        Some(
+            protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*recovering.root_key))
+                .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?,
+        )
+    } else {
+        None
+    };
     state
         .set_unlocked(
             vault_id,
             UnlockedVault::owner(
                 recovering.root_key,
+                group_key,
                 recovering.items_key,
                 recovering.items_key_id,
                 now_ms,
@@ -787,7 +826,7 @@ pub(crate) async fn complete_recovery_with_path(
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
-    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `src-tauri/AGENTS.md` "Secret-handling logging discipline".
     // `duration_ms` rounded down to 10ms granularity per
     // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry.
     // Event name `vault_recovery_completed` follows the project-wide
@@ -848,7 +887,7 @@ pub(crate) async fn complete_recovery_with_path(
 /// `vault.meta` the unchanged recovery pipeline subsequently reads.
 ///
 /// **Logging discipline.** `account_number_hash` bytes are DENY-listed
-/// (`src-tauri/CLAUDE.md`). This command emits NONE of them — nor the parsed
+/// (`src-tauri/AGENTS.md`). This command emits NONE of them — nor the parsed
 /// account-number, nor any per-vault hash, nor the resolved `VaultId`, nor a
 /// path — via `tracing`/IPC/format. It returns a bare `Option<String>`.
 pub async fn resolve_vault_by_account_number_from_host(
@@ -1483,7 +1522,10 @@ mod tests {
             let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Unlocked(uv) => {
-                    assert_eq!(*uv.root_key, [0x42u8; AEAD_KEY_LEN]);
+                    assert_eq!(
+                        **uv.owner_root_key().expect("owner"),
+                        [0x42u8; AEAD_KEY_LEN]
+                    );
                 }
                 _ => panic!("existing Unlocked slot was perturbed"),
             }

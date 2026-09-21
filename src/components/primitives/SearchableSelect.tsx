@@ -18,7 +18,7 @@
 // refocuses the trigger). role="listbox" (+ aria-multiselectable in multi mode),
 // role="option" + aria-selected for assistive tech. Generic over the value type.
 //
-// Observability (src/CLAUDE.md "Test observability"): pass `testId` and the
+// Observability (src/AGENTS.md "Test observability"): pass `testId` and the
 // primitive derives `${testId}` (trigger), `${testId}-menu`, `${testId}-search`,
 // and `${testId}-option` (each carrying `data-value` + `data-active`), so E2E
 // can drive and read the control without the checkbox `checked` property a

@@ -256,7 +256,7 @@
     "BSD-family kernel. It does not: serve_connection is private, its own test",
     "module already calls private items, so a test can set O_NONBLOCK on the",
     "accepted stream itself and fail on every Unix including the Linux container",
-    "every gate runs in. CLAUDE.md states the rule one-directionally: if a machine",
+    "every gate runs in. AGENTS.md states the rule one-directionally: if a machine",
     "can honestly judge it, it is not a manual item, it is a scenario you owe. The",
     "reason named a real mechanism and was simply wrong about it, which the",
     "guard's phrase denylist cannot catch, so the correction lives here.",

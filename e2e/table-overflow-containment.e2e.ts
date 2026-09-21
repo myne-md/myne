@@ -105,7 +105,7 @@ describeE2E("tof1 a wide table scrolls in its own box (myne-md/myne#555)", () =>
         // with `typeIntoEditor` and the widget never mounted: `.cm-table-scroll`
         // timed out at 15 s, three runs in a row. CodeMirror's own input
         // handling is in the way (the embed scenarios learned the same thing
-        // about `[`, and `e2e/CLAUDE.md` records four rounds of it), and this
+        // about `[`, and `e2e/AGENTS.md` records four rounds of it), and this
         // scenario is about LAYOUT — whether a user can type a table is a
         // different claim, covered where typing is the subject.
         //

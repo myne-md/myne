@@ -26,7 +26,7 @@
 //! `InlinedPlugin` declaration the permissions flatten into `__app-acl__` and
 //! never match the `plugin:workspace|<cmd>` authorize form.
 //!
-//! See: main repo `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: main repo `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 // The command core and its error enums are `myne-core`'s (myne-md/myne#479).
 //

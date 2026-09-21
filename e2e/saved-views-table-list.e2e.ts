@@ -28,7 +28,7 @@
 // VERIFICATION STATUS (2026-07-17): VERIFIED — green 3× consecutive in the
 // container against a fresh production build (1× e2e-buildrun.sh + 2×
 // e2e-one.sh, isolated per the full-suite-contamination note), meeting the
-// e2e/CLAUDE.md definition of done. The suite self-skips off-platform
+// e2e/AGENTS.md definition of done. The suite self-skips off-platform
 // (macOS dev host).
 
 import { expect, it } from "vitest";

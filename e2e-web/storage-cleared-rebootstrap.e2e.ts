@@ -45,7 +45,7 @@
 // # What is NOT asserted, and why
 //
 // "The vault returns" and "the fingerprint compare is presented again" both
-// need a sync server, which this lane does not have — `e2e-web/CLAUDE.md` lists
+// need a sync server, which this lane does not have — `e2e-web/AGENTS.md` lists
 // first-sync as outstanding for that reason. What is here is everything up to
 // that boundary: the storage is really empty, the app boots, and it asks for
 // the account. The rest belongs with the sync fixture when one exists.

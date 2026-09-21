@@ -19,6 +19,7 @@ import { clearChatHistoryPersistForLock } from "./chatHistory";
 // attachment-widget subtree into the eager bundle graph.
 import { resetDecodedAspects } from "@myne/editor/attachments/decoded-aspect";
 import {
+  resetMermaidZoom,
   resetPreviewCache,
   resetTranscripts,
 } from "@myne/editor/attachments/session-caches";
@@ -83,6 +84,9 @@ export async function lockVault(): Promise<void> {
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  // The remembered mermaid diagram zoom (myne-md/myne#708), same leg and the same
+  // reason as the preview cache: a content-hash key isolates vault content.
+  resetMermaidZoom();
   // The ambient date/time DISPLAY store, which is module scope in
   // `@myne/editor` and read by every surface that prints a date. It holds the
   // reader's chosen formats and their TIME ZONE, all derived from decrypted

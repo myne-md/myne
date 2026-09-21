@@ -31,7 +31,7 @@
 //!
 //! Logging: nothing here logs. No prompt, note body, embedding or model output
 //! reaches an error value or a panic message — the [`EngineError`] variants are
-//! unit and content-free by construction (`src-tauri/CLAUDE.md` DENY list).
+//! unit and content-free by construction (`src-tauri/AGENTS.md` DENY list).
 
 // No production constructor yet: #188's registry is what selects a backend, and
 // the settings row that supplies a model name is task 8. Annotated here with the

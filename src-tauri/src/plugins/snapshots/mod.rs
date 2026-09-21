@@ -27,7 +27,7 @@
 //! so `generate_handler!` finds each command's hidden `__cmd__` items (a bare
 //! `pub use` of the `#[tauri::command]` fns would drop them).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 #[allow(unused_imports)]
 pub use myne_core::plugins::snapshots::{commands, error};

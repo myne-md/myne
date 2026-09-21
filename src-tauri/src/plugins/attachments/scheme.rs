@@ -35,7 +35,7 @@
 //! - **Content-type re-sniff** — the served `Content-Type` is derived
 //!   from the bytes, allowlist-fenced (in `scheme_core::build_response`).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::plugins::attachments::scheme_core::{
     bad_request, build_response, extract_id, forbidden, server_error, ServeKeys,
@@ -156,10 +156,10 @@ async fn serve<R: Runtime>(
         None => return server_error(),
     };
     let keys = match state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => {
             tracing::debug!(stage = "scheme_slot_check", status = 403);

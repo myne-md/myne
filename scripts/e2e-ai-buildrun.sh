@@ -12,7 +12,7 @@
 #   ./scripts/e2e-ai-buildrun.sh agent-run agent-run agent-run   # the 3x gate
 #
 # Repeating a spec runs it that many times in the SAME warm container, which is
-# how `e2e/CLAUDE.md` says to prove the 3x-consecutive gate: a fresh container
+# how `e2e/AGENTS.md` says to prove the 3x-consecutive gate: a fresh container
 # per run re-provisions the pinned toolchain and flakes the boot, so a loop of
 # single runs measures the harness rather than the scenario.
 set -euo pipefail

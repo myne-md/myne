@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // MYND-226 — RepairResidueBanner phase machine + copy literals,
-// **downgraded from E2E** per the e2e/CLAUDE.md unreachable-state rule:
+// **downgraded from E2E** per the e2e/AGENTS.md unreachable-state rule:
 // the banner mounts only on Welcome (0 vaults), but the residue state it
 // was built for (MYND-159: a partial-fail `vault_delete` leaving files
 // next to a deleted `vault.meta`) is no longer reachable through the

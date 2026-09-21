@@ -12,10 +12,10 @@
 //! produced image is deliberate, user-initiated content leaving the vault — same
 //! posture as the `.md` / `.pdf` exports. The atomic temp sibling lives at the
 //! USER destination (via `atomic_write_unclobbered`), never inside the vault
-//! (`src-tauri/CLAUDE.md` "Atomic file writes", 2026-06-11 amendment).
+//! (`src-tauri/AGENTS.md` "Atomic file writes", 2026-06-11 amendment).
 //!
 //! Logging: stage tags + closed error kinds only; never the image bytes or any
-//! path (`src-tauri/CLAUDE.md` "Secret-handling logging discipline").
+//! path (`src-tauri/AGENTS.md` "Secret-handling logging discipline").
 
 use std::path::Path;
 

@@ -91,7 +91,7 @@ function hostTriple(fail) {
 /**
  * Cargo's target directory. Read from `cargo metadata` rather than assumed to be
  * `<repo>/target`: this repo's contributors set `build.target-dir` globally (see
- * `src-tauri/CLAUDE.md` "Gotchas" — the shared-target staleness note), so a
+ * `src-tauri/AGENTS.md` "Gotchas" — the shared-target staleness note), so a
  * hardcoded path would stage a stale binary or none at all.
  */
 function targetDir(fail) {

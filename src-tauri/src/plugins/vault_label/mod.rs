@@ -32,7 +32,7 @@
 //! None touches vault content, none takes or returns a label, and the only value
 //! that crosses in either direction is a boolean.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 // The command bodies and their error enum live in `myne-core` (shared with the
 // mobile client, whose ACL mirror is its own change). Re-exported so

@@ -133,7 +133,7 @@ Four distinct SHA-256 inputs exist on the combined protocol's head / manifest / 
 
 Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own `"myne.v0.1|vault-manifest|"` prefix, §4.2.1; the bootstrap fingerprint under its own `"myne.v0.1 vault-head-fingerprint"` domain string — which begins with the HKDF-style context prefix `"myne.v0.1 "`, **trailing space**, not the AAD prefix `"myne.v0.1|"`, so a fingerprint digest input can never be read as a `head_mac_input`; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. In particular the fingerprint hashes `head_id` **under a domain**, never bare: displaying a truncation of `head_id` itself would make the displayed code a re-encoding of the identifier it is supposed to attest. Implementations MUST NOT feed bare, prefix-free data into any of these.
 
-**On the manifest prefix's shape.** `"myne.v0.1|vault-manifest|"` is the AAD prefix `"myne.v0.1|"` **extended by a role segment** (`vault-manifest|`), which is the one place in this document where a role string appears inside a hashed message — the second note under §3.2 argues *against* one for the head. The two are consistent, and the asymmetry is the point: the head is the message that owns the bare `"myne.v0.1|"` domain, so the byte immediately following that prefix is a `protocol_version` byte (`0x01`) and never ASCII `v` (`0x76`). A `manifest_canonical` and a `head_mac_input` therefore diverge at the first byte after the shared 10-byte prefix, and neither can be read as the other without any type field to distinguish them. The head needs no role tag because its key is purpose-specific and its version bytes already say "head" inside the `myne.v0.1` domain; the manifest, which is hashed under no key at all, has only its prefix to do that work — so it carries one. `"myne.v0.1|vault-manifest|"` is load-bearing in the sense of the root `CLAUDE.md` identifier table: drift changes every `manifest_hash`, therefore every `head_mac`, therefore every `head_id`.
+**On the manifest prefix's shape.** `"myne.v0.1|vault-manifest|"` is the AAD prefix `"myne.v0.1|"` **extended by a role segment** (`vault-manifest|`), which is the one place in this document where a role string appears inside a hashed message — the second note under §3.2 argues *against* one for the head. The two are consistent, and the asymmetry is the point: the head is the message that owns the bare `"myne.v0.1|"` domain, so the byte immediately following that prefix is a `protocol_version` byte (`0x01`) and never ASCII `v` (`0x76`). A `manifest_canonical` and a `head_mac_input` therefore diverge at the first byte after the shared 10-byte prefix, and neither can be read as the other without any type field to distinguish them. The head needs no role tag because its key is purpose-specific and its version bytes already say "head" inside the `myne.v0.1` domain; the manifest, which is hashed under no key at all, has only its prefix to do that work — so it carries one. `"myne.v0.1|vault-manifest|"` is load-bearing in the sense of the root `AGENTS.md` identifier table: drift changes every `manifest_hash`, therefore every `head_mac`, therefore every `head_id`.
 
 ### 3.6 `head_format_version` (forward hook)
 
@@ -613,6 +613,26 @@ single membership field: the 0x00/0x01 single-account half keeps the device-loca
 only the 0x02 roster extension converges. The roster merge runs at the **caller** that holds the
 unlocked `root_key`; the merge function itself sees only opaque ciphertext, so it cannot open the
 envelopes and is handed the already-decrypted rosters.
+
+**The `NTV6` generation replaces that envelope with an owner-signed roster and a
+group-key epoch** (`decisions/protocol/0594`, `protocol.md` §9.3.2). A merge between
+two `NTV6` `vault.meta` blobs MUST accept a roster whose signed `group_key_epoch` is
+**strictly greater** than the local one, MUST **refuse an equal epoch** rather than
+tie-break (two conflicting owner-signed rosters at one epoch cannot both be
+canonical, and picking one would let the server choose), and MUST **refuse a lower
+epoch** as a rollback. A retired epoch is recorded by an owner-double-signed
+`myne.group-retirement v1|` record (`protocol.md` §9.3.4) that carries no timestamp,
+so the server can neither forge a retirement nor order one against a removed
+member's package stream. **Live propagation of a new epoch is not delivered by the
+local rotation model** in this branch: the removing device's `vault.meta` is ahead
+of its peers, and nothing here carries the new epoch to them (Grill 4).
+
+**Per-person private AI profiles ride a separate plane.** A `profiles/<profile-id>`
+blob (`MYY5`, `protocol.md` §9.28) is keyed from the person's own phrase and is
+**never** a member of the shared group manifest: its existence there would disclose
+one person's private AI use to the other members. The person-private sync plane
+(which authenticated session carries it) is Grill 4 work alongside person-scoped
+server auth; until then a profile is local to the device that wrote it.
 
 ---
 

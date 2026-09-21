@@ -13,7 +13,7 @@
 //! `graph-layout:default` bundles `allow-graph-layout-read` +
 //! `allow-graph-layout-write`, main-window-only.
 //!
-//! See: `src-tauri/CLAUDE.md` (main repo) "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` (main repo) "Secret-handling logging discipline".
 
 // The `graph_layout` command core and its `error` enums live in `myne-core`
 // (shared with the desktop client — the `prefs`/`snapshots` extraction

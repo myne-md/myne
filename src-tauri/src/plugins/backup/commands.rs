@@ -19,7 +19,7 @@
 //! rename. A `.myne-backup` file exists at the destination only if it
 //! verified; every failure path removes the temp.
 //!
-//! Logging: `// see: ../../CLAUDE.md "Secret-handling logging discipline"` —
+//! Logging: `// see: ../../AGENTS.md "Secret-handling logging discipline"` —
 //! no paths, no vault ids, closed `IoFailureKind` only.
 
 use crate::backup_container::{
@@ -470,7 +470,7 @@ pub(crate) mod test_seam {
     }
 }
 
-// see: ../../CLAUDE.md "Secret-handling logging discipline"
+// see: ../../AGENTS.md "Secret-handling logging discipline"
 
 #[cfg(test)]
 mod tests {

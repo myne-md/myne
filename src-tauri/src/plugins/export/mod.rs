@@ -35,7 +35,7 @@
 //! command without the matching `commands.allow` entry is a security
 //! regression).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" — counts-only events, no paths/titles/ids.
 
 // Platform-agnostic plugin core, re-exported so `crate::plugins::export::…`

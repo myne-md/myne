@@ -468,7 +468,7 @@ async fn drive_inner(
     // there are, which is exactly where the saving is worth most. A required
     // parameter rather than one defaulted here: a default is evaluated at the
     // call, so the site that forgets to thread it is the site running
-    // unguarded, which `CLAUDE.md` records as its own class of bug.
+    // unguarded, which `AGENTS.md` records as its own class of bug.
     // Stays `None` until some request reports that it went off-device, which is
     // what keeps "nothing was transmitted" and "a transmission carried nothing"
     // separable at the surface.

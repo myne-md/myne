@@ -20,7 +20,7 @@
 // `--_paper-amoled: #000000` is one line of CSS, and asserting it says nothing
 // about what any element PAINTS. A surface can carry its own literal, inherit a
 // different token, sit under a translucent overlay, or be an inline style that
-// outranks every stylesheet — root `CLAUDE.md`'s token-adoption ratchet exists
+// outranks every stylesheet — root `AGENTS.md`'s token-adoption ratchet exists
 // because that last one is common. So this reads computed backgrounds off real
 // elements in the running app.
 //

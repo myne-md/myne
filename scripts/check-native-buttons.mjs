@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Guard: no `<button>` ships wearing the browser's own chrome.
 //
-// The failure this prevents: Myne styles inline (`src/CLAUDE.md` — no Tailwind,
+// The failure this prevents: Myne styles inline (`src/AGENTS.md` — no Tailwind,
 // no CSS Modules, no styled-components), and `src/styles/tokens.css` carries NO
 // base `button {}` rule — its only global button rule is the `:focus-visible`
 // ring. So a `<button>` written with neither `className` nor `style` is not

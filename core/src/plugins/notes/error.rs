@@ -16,7 +16,7 @@
 //! - `protocol.md` §6.2 + `decisions.md` 2026-05-07 (Note UUIDv7
 //!   backend-gen) — `NoteCreateError::NoteAlreadyExists` is a defensive
 //!   canary: backend-generated UUIDv7 is unique by construction;
-//!   `src-tauri/CLAUDE.md` "Defensive guards" makes the exists-check
+//!   `src-tauri/AGENTS.md` "Defensive guards" makes the exists-check
 //!   mandatory anyway. Production never reaches this variant in normal
 //!   flow.
 //! - `decisions.md` 2026-04-26 unlock-error-discipline — the single
@@ -31,7 +31,7 @@
 //!   structural-corruption / foreign-writer-suspicion category, the
 //!   not-reading kin of `InvalidVaultMeta`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use serde::Serialize;
@@ -55,7 +55,7 @@ pub enum NoteCreateError {
     /// `<vault>/notes/<note_id>.myn` already exists. Backend-generated
     /// UUIDv7 makes a real collision astronomically improbable; this
     /// variant is the canary the `atomic_write(replace=false)` helper
-    /// guarantees per `src-tauri/CLAUDE.md` "Defensive guards".
+    /// guarantees per `src-tauri/AGENTS.md` "Defensive guards".
     /// **Not user-facing in normal flow.**
     #[error("note already exists")]
     NoteAlreadyExists,
@@ -331,7 +331,7 @@ impl From<std::io::Error> for NoteUpdateError {
 /// pre-rename (`note_txn::write_batch_transactional`); there is no
 /// per-item partial-success surface — that is the §8.3 guarantee. The
 /// failure tag never names *which* note failed (no `note_id` crosses
-/// the boundary as a distinguisher; `src-tauri/CLAUDE.md`
+/// the boundary as a distinguisher; `src-tauri/AGENTS.md`
 /// secret-handling discipline).
 ///
 /// The one variant that is **not** "the vault is unchanged" is
@@ -529,7 +529,7 @@ impl From<std::io::Error> for NoteDeleteError {
 /// - `myne-agents/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4d —
 ///   variant set rationale + naming mirror.
 ///
-/// See: ../../CLAUDE.md "Secret-handling logging discipline".
+/// See: ../../AGENTS.md "Secret-handling logging discipline".
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum NoteListError {

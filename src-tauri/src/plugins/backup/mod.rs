@@ -10,7 +10,7 @@
 //! `build.rs InlinedPlugin::commands` lock-stepped — adding a command
 //! without the matching `commands.allow` entry is a security regression).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

@@ -31,6 +31,7 @@ import {
   clickNoteRow,
   createNote,
   dismissImporterOffer,
+  notifyNoteWritten,
   pageSeatInvoke,
   selectedNoteId,
   unlockToEditor,
@@ -140,6 +141,9 @@ async function writeBody(s: Session, noteId: string, body: string): Promise<void
     IPC_TIMEOUT,
   );
   expect(r.err, "note_update should accept the long body").toBeUndefined();
+  // The write is out of band (page-seat IPC, not the pane's autosave loop), so
+  // the open pane owes a reload - see the helper's header.
+  await notifyNoteWritten(s, noteId);
 }
 
 describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
@@ -172,6 +176,10 @@ describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
 
         // Open the long note and scroll into it.
         await clickNoteRow(s, longId);
+        // The stale cache was cleared by the write's reload signal, but the
+        // note is only now the ACTIVE one; bump once more so the reload effect
+        // re-reads THIS note from disk rather than restoring a cached state.
+        await notifyNoteWritten(s, longId);
         await waitScrollable(s);
         const parked = await scrollTo(s, 1200);
         expect(parked, "the pane should have scrolled").toBeGreaterThan(400);
@@ -189,6 +197,10 @@ describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
           { label: "the short note is open and at the top", timeoutMs: 20_000 },
         );
         await clickNoteRow(s, longId);
+        // The stale cache was cleared by the write's reload signal, but the
+        // note is only now the ACTIVE one; bump once more so the reload effect
+        // re-reads THIS note from disk rather than restoring a cached state.
+        await notifyNoteWritten(s, longId);
         await waitScrollable(s);
 
         // Back near where the reader was. A generous floor rather than pixel
@@ -255,6 +267,10 @@ describeE2E("sm2 a split keeps the reading position it was split from (myne#600)
         await writeBody(s, shortId, "# Other note\n\nshort.");
 
         await clickNoteRow(s, longId);
+        // The stale cache was cleared by the write's reload signal, but the
+        // note is only now the ACTIVE one; bump once more so the reload effect
+        // re-reads THIS note from disk rather than restoring a cached state.
+        await notifyNoteWritten(s, longId);
         await waitScrollable(s);
         const parked = await scrollTo(s, 1200);
         expect(parked, "the pane should have scrolled").toBeGreaterThan(400);

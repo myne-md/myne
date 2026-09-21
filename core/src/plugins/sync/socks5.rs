@@ -26,7 +26,7 @@
 //!
 //! SOCKS5's client half is a fixed-shape greeting, a request and a reply. It is
 //! hand-rolled here for the same reason the HTTP/1.1 codec next door is:
-//! adding a dependency is a security decision (root `CLAUDE.md`), and a crate
+//! adding a dependency is a security decision (root `AGENTS.md`), and a crate
 //! that speaks the whole protocol — server side, authentication methods, UDP
 //! `ASSOCIATE`, `BIND` — is a much larger surface than the ~60 bytes of framing
 //! this path actually needs.

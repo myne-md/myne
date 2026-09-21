@@ -13,7 +13,7 @@
 // me?" — still before anything is committed.
 //
 // Every element carries a `data-testid`: the importer UI previously had NONE, which is
-// why no import flow could be E2E-driven at all (`src/CLAUDE.md`).
+// why no import flow could be E2E-driven at all (`src/AGENTS.md`).
 
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";

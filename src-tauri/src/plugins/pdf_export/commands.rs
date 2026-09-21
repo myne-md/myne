@@ -29,9 +29,9 @@
 //! plaintext leaving the vault — same posture as the `.md` exports
 //! (SYNC-4 spec package). The capture temp sibling lives at the
 //! user-chosen destination, never inside the vault
-//! (`src-tauri/CLAUDE.md` "Atomic file writes", 2026-06-11 amendment).
+//! (`src-tauri/AGENTS.md` "Atomic file writes", 2026-06-11 amendment).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline" — stage tags + closed error kinds + coarse duration
 //! only; never the HTML payload, the note title, or any path.
 
@@ -97,7 +97,7 @@ pub async fn pdf_export_render<R: Runtime>(
 ) -> Result<(), PdfExportError> {
     // First statements: bound the plaintext projection's — and the
     // plaintext-derived title's — lifetime to Zeroizing wrappers
-    // (src-tauri/CLAUDE.md Plaintext-IPC pattern; 255-F4).
+    // (src-tauri/AGENTS.md Plaintext-IPC pattern; 255-F4).
     let html = Zeroizing::new(html);
     let title = title.map(Zeroizing::new);
     render_with_state(

@@ -17,7 +17,7 @@
 // fresh per open, like FilterBuilder), and hands the parent a patch on Save.
 // Omit-when-default discipline mirrors the Rust `skip_serializing_if = "None"`.
 //
-// Observability (src/CLAUDE.md "Test observability"): every control carries a
+// Observability (src/AGENTS.md "Test observability"): every control carries a
 // `view-settings.*` testid so the real-IPC E2E can drive and read it.
 
 import { useMemo, useState, type CSSProperties } from "react";

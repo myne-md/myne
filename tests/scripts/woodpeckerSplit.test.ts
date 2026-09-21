@@ -1,6 +1,6 @@
 // The workflow-split guard's own spec (myne-md/myne#579).
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it. Inject
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it. Inject
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." Every case below is an injection, and the guard shipped for one
 // review round with two of them passing, so this file is the record that they no

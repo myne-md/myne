@@ -182,7 +182,7 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
       padding: SELECTION_CARD_PADDING,
       // `--paper`, not `--paper-1`: there is no `--paper-1` token
       // (`client-core/src/tokens.css` names the light end of the surface ramp
-      // plain `--paper`, and `src/CLAUDE.md` says so), so the old name resolved
+      // plain `--paper`, and `src/AGENTS.md` says so), so the old name resolved
       // to nothing and every exported card carried the hardcoded fallback
       // whatever theme was active — contradicting this function's own "come
       // from the ACTIVE theme" contract on dark and AMOLED. The fallback is the

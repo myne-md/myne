@@ -25,7 +25,7 @@
 // The in-editor file-card RENDER (its `attachment-card*` testids + overflow
 // menu) is intentionally NOT forced into E2E: surfacing it needs the editor's
 // catalog to reflect an IPC-side import, which is not robustly reachable through
-// real UI here. Per `e2e/CLAUDE.md` that state is a Vitest-DOM concern; the
+// real UI here. Per `e2e/AGENTS.md` that state is a Vitest-DOM concern; the
 // production testids are in place (`attachment-card`, `attachment-card.export`
 // /`.rename`/`.remove`/`.reveal`) for when a UI-driving path lands.
 //
@@ -34,7 +34,7 @@
 // fixtures (unlock reads params from vault.meta).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge (it introduces the
 // `plugin:attachments|attachment_export` IPC path through the real ACL).
 

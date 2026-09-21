@@ -10,7 +10,7 @@
 //! stdin and the socket reply, then asserts:
 //!
 //! - **stderr** never contains a sentinel. It is the diagnostic channel, the
-//!   one that ends up in logs and pasted transcripts (src-tauri/CLAUDE.md
+//!   one that ends up in logs and pasted transcripts (src-tauri/AGENTS.md
 //!   "Secret-handling logging discipline").
 //! - the **`--json` error object** never contains one either. `error.kind` and
 //!   `error.message` are diagnostics, not payload.

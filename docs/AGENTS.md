@@ -1,6 +1,6 @@
 # docs/ — Specifications, threat model, decisions log
 
-> Subdirectory CLAUDE.md. Loaded when Claude reads files here. See repo-root `CLAUDE.md` for cryptographically load-bearing identifiers (the table that lives there is normative).
+> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for cryptographically load-bearing identifiers (the table that lives there is normative).
 
 ## What lives here
 
@@ -94,11 +94,11 @@ v0.1 and a later major version are **forward-incompatible by design**. No extens
 
 ### Cryptographically load-bearing identifiers
 
-The table in repo-root `CLAUDE.md` lists strings/bytes bound into AEAD tags or magic-byte checks (AAD prefix `"myne.v0.1|"`, magic `MY01`/`MYV1`, etc.). **Changing any of these is a major-version event.** When editing `protocol.md`, do not casually revise these values — they're load-bearing in code and across other-language implementations.
+The table in repo-root `AGENTS.md` lists strings/bytes bound into AEAD tags or magic-byte checks (AAD prefix `"myne.v0.1|"`, magic `MY01`/`MYV1`, etc.). **Changing any of these is a major-version event.** When editing `protocol.md`, do not casually revise these values — they're load-bearing in code and across other-language implementations.
 
 ## Companion: `myne-test-vectors`
 
-Specs in `protocol.md` are the human-readable contract; vectors in the `myne-test-vectors/` companion are the machine-readable contract. When you add a new primitive or change a byte layout, you owe a vector update — see `myne-test-vectors/CLAUDE.md`.
+Specs in `protocol.md` are the human-readable contract; vectors in the `myne-test-vectors/` companion are the machine-readable contract. When you add a new primitive or change a byte layout, you owe a vector update — see `myne-test-vectors/AGENTS.md`.
 
 ## License
 

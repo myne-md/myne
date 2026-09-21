@@ -2,7 +2,7 @@
 //!
 //! Closed taxonomy mirroring `SnapshotError` — DENY-list clean (no path
 //! strings, no vault identifiers, no kernel-error display strings). See
-//! `src-tauri/CLAUDE.md` "Secret-handling logging discipline". Hand-mirrored
+//! `src-tauri/AGENTS.md` "Secret-handling logging discipline". Hand-mirrored
 //! on the TS side (task 6 of `backup-export-engine`).
 
 use crate::backup_container::BackupContainerError;

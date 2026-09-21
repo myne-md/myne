@@ -24,7 +24,7 @@
 //! Which guards apply per command is the same split desktop documents, because
 //! these are the same guard functions.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

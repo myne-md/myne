@@ -165,7 +165,7 @@ pub fn grade(reply: &str) -> AttemptVerdict {
 /// **Counts only, and that is what makes it safe to send anywhere.** Both
 /// fields are small integers the host chose; nothing here is derived from a
 /// reply, so this crosses IPC without joining any of the lists in
-/// `src-tauri/CLAUDE.md`.
+/// `src-tauri/AGENTS.md`.
 ///
 /// `of` is the threshold's ALLOWANCE rather than a promise: since the early exit
 /// below, a run that settles at 2 of 3 simply stops, and "2 of 3" then reads as

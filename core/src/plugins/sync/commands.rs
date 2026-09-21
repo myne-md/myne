@@ -500,8 +500,9 @@ pub async fn sync_person_unlock<R: Runtime>(
     // whatever it is handed, and a phrase that does not decode as BIP-39
     // simply derives a different (unusable) identity rather than erroring.
     let normalized = protocol::normalize_user_phrase(&phrase);
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
     let pair = crate::account::person_identity::unlock_person_identity(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &host,
         &crate::vault_io::StdVaultIo,
         normalized.as_str(),
     )
@@ -519,7 +520,44 @@ pub async fn sync_person_unlock<R: Runtime>(
         fingerprint_hex: crate::account::person_identity::hex_lower(pair.fingerprint()),
     };
     state.inner().set_person_identity(pair).await;
+    // Derive the per-(person, vault) private AI profile key for the ACTIVE
+    // vault, if one is unlocked. Best-effort: a locked vault leaves no profile
+    // key and the profile is simply unavailable until the next person unlock
+    // with a vault open. The phrase never leaves this scope (it is zeroized
+    // when `normalized`/`phrase` drop).
+    if let Some((profile_id, profile_key)) =
+        derive_person_profile_key(&host, state.inner(), normalized.as_str()).await
+    {
+        state
+            .inner()
+            .set_person_profile(profile_id, profile_key)
+            .await;
+    }
     Ok(view)
+}
+
+/// Derive the deterministic `(profile_id, profile_key)` for the ACTIVE vault
+/// from the person's normalized phrase. `None` when no vault is unlocked or its
+/// `vault.meta` cannot be read; the caller treats that as "no profile yet".
+async fn derive_person_profile_key(
+    host: &dyn crate::host::HostCtx,
+    state: &VaultRuntimeState,
+    phrase_normalized: &str,
+) -> Option<([u8; 16], zeroize::Zeroizing<[u8; protocol::AEAD_KEY_LEN]>)> {
+    use crate::vault_io::VaultIo as _;
+    let base = host.app_data_dir().ok()?;
+    let root = crate::paths::active_vault_root_from_base(&base, state.active_vault_id().await);
+    let bytes = crate::vault_io::StdVaultIo
+        .read(&root.join("vault.meta"))
+        .await
+        .ok()?;
+    let meta = protocol::parse_vault_meta_any(&bytes).ok()?;
+    let person_id = protocol::person_id_hash(phrase_normalized);
+    let profile_id = protocol::person_profile_id(&person_id, &meta.account_number_hash);
+    let key =
+        protocol::derive_person_vault_profile_key(phrase_normalized, &profile_id, &meta.kdf_params)
+            .ok()?;
+    Some((profile_id, key))
 }
 
 /// **Drop the backend-held person identity** (lock-equivalent). The pair
@@ -538,6 +576,7 @@ pub async fn sync_person_lock<R: Runtime>(
     forget: Option<bool>,
 ) -> Result<(), SyncDeviceError> {
     let _ = state.inner().take_person_identity().await;
+    let _ = state.inner().take_person_profile().await;
     if forget.unwrap_or(false) {
         let host = crate::host::tauri_host::TauriHost::new(app.clone());
         crate::account::person_identity::delete_sealed_file(&host, &crate::vault_io::StdVaultIo)
@@ -571,6 +610,146 @@ fn require_owner(
     }
 }
 
+/// The outcome of an explicit owner-approved B2B migration, as the frontend
+/// sees it. Carries no key material: the `group_key` stays backend-side.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct B2bMigrationView {
+    /// The group-key epoch the committed `NTV6` metadata carries.
+    pub group_key_epoch: u64,
+    /// How many shared singletons were resealed under the group tier.
+    pub singletons_migrated: usize,
+}
+
+/// **Start the explicit owner-approved NTV5 to NTV6 migration** (B2B,
+/// myne-md/myne#712 task 5).
+///
+/// This is the one production caller of
+/// [`crate::plugins::vault_migrate::b2b::migrate_owner_vault_to_ntv6`], and the
+/// only place an ordinary owner vault changes on-disk format. An ordinary unlock
+/// never migrates; this runs only when the user has explicitly begun the first
+/// B2B sharing action AND the owner person identity is unlocked
+/// (`sync_person_unlock`), so `root_key`, the vault, and the person all have to
+/// be present at once.
+///
+/// Owner-only: a member session has no `root_key` to wrap the group key under.
+/// The caller holds the auth permit across the whole journaled migration, so a
+/// concurrent `change_password` cannot interleave the `vault.meta` rewrite.
+///
+/// Idempotent: a vault already carrying `NTV6` reports its existing epoch
+/// without rewriting anything.
+#[tauri::command]
+pub async fn sync_start_b2b_migration<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    owner_display_name: String,
+) -> Result<B2bMigrationView, SyncDeviceError> {
+    start_b2b_migration_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+        &owner_display_name,
+    )
+    .await
+}
+
+/// Host-taking core for [`sync_start_b2b_migration`], so tests drive the whole
+/// journaled migration under a temp vault with no Tauri runtime.
+pub async fn start_b2b_migration_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+    owner_display_name: &str,
+) -> Result<B2bMigrationView, SyncDeviceError> {
+    use crate::plugins::vault_migrate::b2b::{self, B2bMigrationError};
+
+    // Peek the slot, then DROP the guard before any await (the tokio RwLock
+    // deadlock shape documented on `sync_invite_member`).
+    let (root_key, items_key, authority) = {
+        let slot = state.slot_read_active().await;
+        match &*slot {
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+                let authority = uv.authority();
+                let root_key = uv
+                    .owner_root_key()
+                    .map(|k| zeroize::Zeroizing::new(**k))
+                    .ok_or(SyncDeviceError::NotOwner)?;
+                (root_key, zeroize::Zeroizing::new(*uv.items_key), authority)
+            }
+            _ => return Err(SyncDeviceError::NotEnrolled),
+        }
+    };
+    require_owner(authority)?;
+    let owner = state
+        .clone_person_identity()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+
+    // The whole-blob `vault.meta` rewrite is a lifecycle mutation: hold the
+    // permit across the migration so a concurrent `change_password` cannot land
+    // between the read and the commit (both blobs would stay AEAD-valid and the
+    // revert would be silent).
+    let _permit = state
+        .auth_permits()
+        .try_acquire()
+        .map_err(|_| SyncDeviceError::Transport)?;
+
+    let vault_id = state.active_vault_id().await;
+    let root = crate::paths::active_vault_root_from_base(
+        &host
+            .app_data_dir()
+            .map_err(|_| SyncDeviceError::Transport)?,
+        vault_id,
+    );
+    let meta_path = root.join("vault.meta");
+    let meta_bytes = io
+        .read(&meta_path)
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    let old_hash = crate::vault_meta_hash::vault_meta_sha256(&meta_bytes);
+
+    match b2b::migrate_owner_vault_to_ntv6(
+        io,
+        &root,
+        &root_key,
+        &items_key,
+        &owner,
+        owner_display_name,
+    )
+    .await
+    {
+        Ok(out) => {
+            if let Some(id) = vault_id {
+                state
+                    .refresh_meta_hash_if(id, old_hash, out.new_meta_hash)
+                    .await;
+                // The on-disk singletons are now group-sealed, so the running
+                // session must read them through the group tier too. Without
+                // this the next prefs/search/workspace read would derive the
+                // old root-tier KEK and fail to open a blob this same call just
+                // resealed.
+                state.set_group_key(id, out.group_key).await;
+            }
+            Ok(B2bMigrationView {
+                group_key_epoch: 1,
+                singletons_migrated: out.singletons_migrated,
+            })
+        }
+        Err(B2bMigrationError::AlreadyMigrated) => {
+            // Already NTV6: report the committed epoch and rewrite nothing.
+            let epoch = protocol::parse_vault_meta_ntv6(&meta_bytes)
+                .map(|meta| meta.group_key_epoch)
+                .map_err(|_| SyncDeviceError::BadRequest)?;
+            Ok(B2bMigrationView {
+                group_key_epoch: epoch,
+                singletons_migrated: 0,
+            })
+        }
+        // A v0.1 (`MYV1`) vault has to reach v0.2 before it can carry B2B
+        // metadata; every other failure is IO, CSPRNG, or a malformed base.
+        Err(_) => Err(SyncDeviceError::BadRequest),
+    }
+}
+
 /// **Invite a member to the unlocked vault** (B2B identity substrate,
 /// myne-md/myne#698 task 5-6 command core).
 ///
@@ -599,14 +778,22 @@ pub async fn sync_invite_member<R: Runtime>(
     // `slots.read()` across `active_vault_id()`'s own `slots.read()` is the
     // tokio RwLock deadlock shape (a queued writer blocks the second acquire
     // while the first stays held).
-    let (root_key, items_key, authority) = {
+    let (root_key, items_key, authority, group_key) = {
         let slot = state.inner().slot_read_active().await;
         match &*slot {
-            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => (
-                zeroize::Zeroizing::new(*uv.root_key),
-                zeroize::Zeroizing::new(*uv.items_key),
-                uv.authority,
-            ),
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+                let authority = uv.authority();
+                let root_key = uv
+                    .owner_root_key()
+                    .map(|k| zeroize::Zeroizing::new(**k))
+                    .ok_or(SyncDeviceError::NotOwner)?;
+                (
+                    root_key,
+                    zeroize::Zeroizing::new(*uv.items_key),
+                    authority,
+                    uv.group_key.clone(),
+                )
+            }
             _ => return Err(SyncDeviceError::NotEnrolled),
         }
     };
@@ -658,6 +845,25 @@ pub async fn sync_invite_member<R: Runtime>(
         .read(&meta_path)
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
+        return Err(SyncDeviceError::MigrationRequired);
+    }
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        // The `NTV6` invite writes the owner-signed roster, and the member's
+        // grant is a group-key package rather than an `itemsKey` wrap.
+        return write_ntv6_invite(
+            state.inner(),
+            &io,
+            &root,
+            &meta_path,
+            &meta_bytes,
+            &owner,
+            &member_public,
+            group_key.as_deref(),
+            &_permit,
+        )
+        .await;
+    }
     let version = protocol::meta_version_of(&meta_bytes).unwrap_or(protocol::MetaVersion::V0_1);
     let mut meta =
         protocol::parse_vault_meta_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
@@ -747,6 +953,139 @@ pub async fn sync_invite_member<R: Runtime>(
         // is what the member needs to accept, so the command hands it back
         // instead of dropping it: without this the invite cannot leave the
         // device and the feature is inert in one direction.
+        invite_wire,
+    })
+}
+
+/// **Invite a member to an `NTV6` vault** (B2B, myne-md/myne#712).
+///
+/// The `NTV6` grant is a GROUP-key package, not an `itemsKey` wrap: the member
+/// receives the current epoch's `group_key`, which is what opens the vault's
+/// shared content. This opens the sealed owner-signed roster, appends the new
+/// live member row (with the package's wrap), re-signs and re-seals it at the
+/// SAME epoch, and writes `vault.meta`. The epoch only advances on a removal.
+///
+/// The member-accept path and the wire that carries the package are Grill 4; the
+/// frame is returned in `invite_wire` so the caller can relay it.
+#[allow(clippy::too_many_arguments)]
+async fn write_ntv6_invite(
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+    root: &std::path::Path,
+    meta_path: &std::path::Path,
+    meta_bytes: &[u8],
+    owner: &protocol::person_key::PersonKeyPair,
+    member_public: &protocol::person_key::PersonPublicHalf,
+    group_key: Option<&[u8; 32]>,
+    _permit: &tokio::sync::SemaphorePermit<'_>,
+) -> Result<InviteCommandView, SyncDeviceError> {
+    use protocol::person_invite as pi;
+    let b2b =
+        protocol::parse_vault_meta_ntv6(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let account_number_hash = b2b.base.account_number_hash;
+    let group_key = group_key.ok_or(SyncDeviceError::NotOwner)?;
+    let epoch = b2b.group_key_epoch;
+    let current = pi::open_group_roster(
+        group_key,
+        &account_number_hash,
+        epoch,
+        &b2b.signed_roster_envelope,
+    )
+    .ok_or(SyncDeviceError::BadRequest)?;
+    let roster = pi::verify_group_roster(&owner.public_half(), &current, &account_number_hash)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let member_fp = crate::account::person_identity::hex_lower(member_public.fingerprint());
+    if roster
+        .members
+        .iter()
+        .any(|m| m.fingerprint_hex == member_fp && m.state == pi::GroupMemberState::Live)
+    {
+        // Already a live member: re-inviting would duplicate the row.
+        return Err(SyncDeviceError::BadRequest);
+    }
+
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let package = pi::create_group_package(
+        owner,
+        member_public,
+        group_key,
+        &account_number_hash,
+        epoch,
+        &mut rng,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+    let package_payload = pi::verify_group_package(&owner.public_half(), &package)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    let mut members = roster.members;
+    members.push(pi::GroupRosterMember {
+        fingerprint_hex: member_fp.clone(),
+        // The member's chosen name is not known at invite time; the UI shows the
+        // fingerprint, so an empty name is honest rather than a placeholder.
+        display_name: String::new(),
+        role: pi::GroupRosterRole::Member,
+        state: pi::GroupMemberState::Live,
+        wrapped_group_key_hex: Some(package_payload.wrapped_group_key_hex),
+        member_kem_ek_hex: crate::account::person_identity::hex_lower(member_public.kem_ek()),
+        member_ed_pk_hex: crate::account::person_identity::hex_lower(member_public.ed_pk()),
+        member_mldsa_vk_hex: crate::account::person_identity::hex_lower(member_public.mldsa_vk()),
+        previous_fingerprint_hex: None,
+        continuity: pi::GroupKeyContinuity::Current,
+    });
+    let new_roster = pi::GroupRosterPayload {
+        account_number_hash_hex: crate::account::person_identity::hex_lower(&account_number_hash),
+        group_key_epoch: epoch,
+        owner_fingerprint_hex: roster.owner_fingerprint_hex,
+        members,
+    };
+    let signed = pi::sign_group_roster(owner, &new_roster, &mut rng)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut roster_nonce).map_err(|_| SyncDeviceError::Transport)?;
+    let sealed = pi::seal_group_roster(
+        group_key,
+        &account_number_hash,
+        epoch,
+        &roster_nonce,
+        &signed,
+    )
+    .ok_or(SyncDeviceError::BadRequest)?;
+    let new_meta = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+        base: b2b.base,
+        group_key_nonce: b2b.group_key_nonce,
+        enc_group_key: b2b.enc_group_key,
+        group_key_epoch: epoch,
+        signed_roster_envelope: sealed,
+    })
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    let old_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes);
+    io.write(meta_path, &new_meta, crate::vault_io::WriteOpts::default())
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    if let Some(id) = state.active_vault_id().await {
+        state
+            .refresh_meta_hash_if(
+                id,
+                old_hash,
+                crate::vault_meta_hash::vault_meta_sha256(&new_meta),
+            )
+            .await;
+    }
+    let _ = crate::plugins::sync::state::mark_vault_meta_dirty(io, root).await;
+
+    let invite_wire = pi::encode_signed_group_package(&package)
+        .map(|frame| crate::account::person_identity::hex_lower(&frame))
+        .ok_or(SyncDeviceError::BadRequest)?;
+    Ok(InviteCommandView {
+        owner_fingerprint_hex: crate::account::person_identity::hex_lower(owner.fingerprint()),
+        member_fingerprint_hex: member_fp,
+        owner_ed25519_pk_hex: crate::account::person_identity::hex_lower(
+            owner.public_half().ed_pk(),
+        ),
+        owner_mldsa_vk_hex: crate::account::person_identity::hex_lower(
+            owner.public_half().mldsa_vk(),
+        ),
         invite_wire,
     })
 }
@@ -872,10 +1211,12 @@ pub async fn sync_list_roster<R: Runtime>(
     let host = crate::host::tauri_host::TauriHost::new(app.clone());
     let io = crate::vault_io::StdVaultIo;
     let slot = state.inner().slot_read_active().await;
-    let (root_key, authority) = match &*slot {
-        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
-            (uv.root_key.clone(), uv.authority)
-        }
+    let (root_key, authority, group_key) = match &*slot {
+        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => (
+            uv.root_key.clone().ok_or(SyncDeviceError::NotOwner)?,
+            uv.authority(),
+            uv.group_key.clone(),
+        ),
         _ => return Err(SyncDeviceError::NotEnrolled),
     };
     drop(slot);
@@ -892,6 +1233,47 @@ pub async fn sync_list_roster<R: Runtime>(
         .read(&root.join("vault.meta"))
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
+    // The `NTV6` generation carries the owner-signed roster, not the legacy
+    // membership envelope. Verify it under the pinned owner public half (the
+    // held person identity on the owner's device; a member's pinned owner key is
+    // Grill 4) and surface the group-key epoch + per-row continuity so the UI can
+    // show the key-generation state.
+    if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        let b2b =
+            protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+        // The roster is sealed under the group tier; open it first, then verify
+        // the owner signature.
+        let group_key = group_key.ok_or(SyncDeviceError::NotOwner)?;
+        let envelope = protocol::person_invite::open_group_roster(
+            &group_key,
+            &b2b.base.account_number_hash,
+            b2b.group_key_epoch,
+            &b2b.signed_roster_envelope,
+        )
+        .ok_or(SyncDeviceError::BadRequest)?;
+        let owner = state
+            .inner()
+            .clone_person_identity()
+            .await
+            .ok_or(SyncDeviceError::NotOwner)?;
+        let roster = protocol::person_invite::verify_group_roster(
+            &owner.public_half(),
+            &envelope,
+            &b2b.base.account_number_hash,
+        )
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+        return Ok(RosterListView {
+            members: roster
+                .members
+                .into_iter()
+                .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
+                .map(RosterMemberView::from_group_member)
+                .collect(),
+            authority,
+            group_key_epoch: Some(roster.group_key_epoch),
+        });
+    }
+
     let meta = protocol::parse_vault_meta_any(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let hash = meta.account_number_hash;
     let roster = match meta.membership.as_ref().and_then(|m| m.roster.as_ref()) {
@@ -914,6 +1296,7 @@ pub async fn sync_list_roster<R: Runtime>(
             .map(RosterMemberView::from_entry)
             .collect(),
         authority,
+        group_key_epoch: None,
     })
 }
 
@@ -923,6 +1306,9 @@ pub async fn sync_list_roster<R: Runtime>(
 pub struct RosterListView {
     pub members: Vec<RosterMemberView>,
     pub authority: crate::plugins::vault_unlock::state::VaultAuthority,
+    /// The current group-key epoch on an `NTV6` vault; `None` for a legacy
+    /// `NTV5`/`MYV1` roster that has no group tier.
+    pub group_key_epoch: Option<u64>,
 }
 
 /// One roster row as the UI consumes it.
@@ -941,9 +1327,43 @@ pub struct RosterMemberView {
     pub member_kem_ek_hex: String,
     /// The member's ML-DSA verifying key (lowercase hex).
     pub member_mldsa_vk_hex: String,
+    /// The row's identity-continuity state on an `NTV6` vault (`current`,
+    /// `changed` or `owner-confirmed`); `None` for a legacy roster. The UI uses
+    /// it to distinguish a cryptographic key change from an owner-confirmed
+    /// relink.
+    pub continuity: Option<String>,
 }
 
 impl RosterMemberView {
+    /// Map one `NTV6` signed-roster row to the UI shape. `version`/`joined_at`
+    /// are the legacy NTV5 roster's fields and carry no `NTV6` meaning, so they
+    /// are zero; the `NTV6` row's own state is `continuity`.
+    fn from_group_member(m: protocol::person_invite::GroupRosterMember) -> Self {
+        let continuity = match m.continuity {
+            protocol::person_invite::GroupKeyContinuity::Current => "current",
+            protocol::person_invite::GroupKeyContinuity::Changed => "changed",
+            protocol::person_invite::GroupKeyContinuity::OwnerConfirmed => "owner-confirmed",
+        }
+        .to_string();
+        Self {
+            fingerprint_hex: m.fingerprint_hex,
+            display_name: m.display_name,
+            role: match m.role {
+                protocol::person_invite::GroupRosterRole::Owner => super::roster::RosterRole::Owner,
+                protocol::person_invite::GroupRosterRole::Member => {
+                    super::roster::RosterRole::Member
+                }
+            },
+            version: 0,
+            previous_fingerprint_hex: m.previous_fingerprint_hex,
+            joined_at: 0,
+            member_ed_pk_hex: m.member_ed_pk_hex,
+            member_kem_ek_hex: m.member_kem_ek_hex,
+            member_mldsa_vk_hex: m.member_mldsa_vk_hex,
+            continuity: Some(continuity),
+        }
+    }
+
     fn from_entry(e: super::roster::RosterMemberEntry) -> Self {
         Self {
             fingerprint_hex: e.fingerprint_hex,
@@ -955,6 +1375,7 @@ impl RosterMemberView {
             member_ed_pk_hex: e.member_ed_pk_hex,
             member_kem_ek_hex: e.member_kem_ek_hex,
             member_mldsa_vk_hex: e.member_mldsa_vk_hex,
+            continuity: None,
         }
     }
 }
@@ -985,7 +1406,7 @@ pub async fn sync_remove_member<R: Runtime>(
     let authority = {
         let slot = state.inner().slot_read_active().await;
         match &*slot {
-            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => uv.authority,
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => uv.authority(),
             _ => return Err(SyncDeviceError::NotEnrolled),
         }
     };
@@ -1109,7 +1530,7 @@ pub async fn sync_pending_conflicts<R: Runtime>(
 /// Decrypt a staged conflicting remote revision to its plaintext body, so the
 /// notes layer can materialize it as a keep-both copy. The body is the user's
 /// note plaintext (same secret class as `note_read`) — never logged. See the
-/// repo `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+/// repo `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 #[tauri::command]
 pub async fn sync_take_conflict<R: Runtime>(
     app: AppHandle<R>,
@@ -2033,5 +2454,156 @@ mod tests {
         };
         let view = super::RosterMemberView::from_entry(entry);
         assert_eq!(view.role, RosterRole::Owner);
+    }
+
+    // ── Explicit owner-approved NTV5 → NTV6 migration (myne-md/myne#712) ─────
+
+    use crate::plugins::vault_unlock::state::UnlockedVault;
+    use crate::test_support::{block_on, FAST_TEST_KDF};
+    use crate::vault_io::StdVaultIo;
+    use protocol::person_key::PersonKeyPair;
+
+    const MIG_ROOT: [u8; 32] = [7u8; 32];
+    const MIG_ITEMS: [u8; 32] = [9u8; 32];
+    const MIG_ACCOUNT: [u8; 16] = [3u8; 16];
+    const MIG_ITEMS_ID: [u8; 16] = [1u8; 16];
+
+    fn migration_owner_pair() -> PersonKeyPair {
+        let mut kem = [0u8; protocol::person_key::PERSON_DK_SEED_LEN];
+        kem[..32].copy_from_slice(&[0x21; 32]);
+        kem[32..].copy_from_slice(&[0x22; 32]);
+        PersonKeyPair::generate_raw(&kem, &[0x23; 32], &[0x24; 32])
+    }
+
+    /// An `NTV5` `vault.meta` at `<base>/vaults/<id>/`, plus an owner-held slot
+    /// for that id. Returns the id and the bytes the anchor should carry.
+    fn seed_ntv5_owner_vault(base: &std::path::Path) -> (crate::vault_id::VaultId, Vec<u8>) {
+        let id = crate::vault_id::VaultId::mint();
+        let root = crate::paths::vault_root_for_id_from_base(base, id);
+        std::fs::create_dir_all(&root).expect("create vault dir");
+        let bytes = protocol::encode_vault_meta_v0_2_raw(
+            &MIG_ROOT,
+            &MIG_ITEMS,
+            &MIG_ITEMS_ID,
+            "pw",
+            "abandon abandon abandon",
+            &MIG_ACCOUNT,
+            &FAST_TEST_KDF,
+            &[2u8; protocol::ARGON2_SALT_LEN],
+            &[4u8; protocol::ARGON2_SALT_LEN],
+            &[5u8; protocol::AEAD_NONCE_LEN],
+            &[6u8; protocol::AEAD_NONCE_LEN],
+            &[8u8; protocol::AEAD_NONCE_LEN],
+        )
+        .expect("encode NTV5")
+        .to_vec();
+        std::fs::write(root.join("vault.meta"), &bytes).expect("write vault.meta");
+        (id, bytes)
+    }
+
+    async fn unlock_owner(state: &VaultRuntimeState, id: crate::vault_id::VaultId, bytes: &[u8]) {
+        state
+            .set_unlocked(
+                id,
+                UnlockedVault::owner(
+                    zeroize::Zeroizing::new(MIG_ROOT),
+                    None,
+                    zeroize::Zeroizing::new(MIG_ITEMS),
+                    MIG_ITEMS_ID,
+                    0,
+                    crate::vault_meta_hash::vault_meta_sha256(bytes),
+                ),
+            )
+            .await;
+    }
+
+    #[test]
+    fn start_b2b_migration_requires_a_held_person_identity() {
+        block_on(async {
+            let dir = ScopedTempDir::new("b2b-mig-no-person").expect("tempdir");
+            let host = crate::host::test_host::TestHost::new(dir.path());
+            let state = VaultRuntimeState::default();
+            let (id, bytes) = seed_ntv5_owner_vault(&dir.path().join("data"));
+            unlock_owner(&state, id, &bytes).await;
+
+            let err = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
+                .await
+                .expect_err("no person identity must refuse");
+
+            assert_eq!(err, SyncDeviceError::NotEnrolled);
+        });
+    }
+
+    #[test]
+    fn start_b2b_migration_refuses_a_member_authority() {
+        block_on(async {
+            let dir = ScopedTempDir::new("b2b-mig-member").expect("tempdir");
+            let host = crate::host::test_host::TestHost::new(dir.path());
+            let state = VaultRuntimeState::default();
+            let (id, bytes) = seed_ntv5_owner_vault(&dir.path().join("data"));
+            state
+                .set_unlocked(
+                    id,
+                    UnlockedVault::member(
+                        zeroize::Zeroizing::new([0x5Au8; 32]),
+                        zeroize::Zeroizing::new(MIG_ITEMS),
+                        MIG_ITEMS_ID,
+                        0,
+                        crate::vault_meta_hash::vault_meta_sha256(&bytes),
+                    ),
+                )
+                .await;
+            state.set_person_identity(migration_owner_pair()).await;
+
+            let err = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
+                .await
+                .expect_err("member authority must refuse");
+
+            assert_eq!(err, SyncDeviceError::NotOwner);
+        });
+    }
+
+    #[test]
+    fn start_b2b_migration_commits_ntv6_and_refreshes_the_anchor() {
+        block_on(async {
+            let dir = ScopedTempDir::new("b2b-mig-ok").expect("tempdir");
+            let host = crate::host::test_host::TestHost::new(dir.path());
+            let state = VaultRuntimeState::default();
+            let (id, bytes) = seed_ntv5_owner_vault(&dir.path().join("data"));
+            unlock_owner(&state, id, &bytes).await;
+            state.set_person_identity(migration_owner_pair()).await;
+
+            let view = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
+                .await
+                .expect("explicit owner migration commits");
+            assert_eq!(view.group_key_epoch, 1);
+
+            // The on-disk meta is now NTV6, and the slot anchor tracks it, so a
+            // later change-password does not read the migration's own write as
+            // external tampering.
+            let root = crate::paths::vault_root_for_id_from_base(&dir.path().join("data"), id);
+            let on_disk = std::fs::read(root.join("vault.meta")).expect("read committed meta");
+            assert_eq!(
+                on_disk.get(..4),
+                Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+            );
+            let expected = crate::vault_meta_hash::vault_meta_sha256(&on_disk);
+            let (_, anchor) = state
+                .peek_unlocked_root_key_and_hash_clone()
+                .await
+                .expect("slot still unlocked");
+            assert_eq!(
+                anchor, expected,
+                "slot anchor must track the committed meta"
+            );
+
+            // Idempotent second call reports the committed epoch and rewrites
+            // nothing.
+            let again = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
+                .await
+                .expect("already-migrated is a success");
+            assert_eq!(again.group_key_epoch, 1);
+            assert_eq!(again.singletons_migrated, 0);
+        });
     }
 }

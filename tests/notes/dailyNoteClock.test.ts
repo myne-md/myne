@@ -23,7 +23,7 @@
 // # The defaulted-parameter fix that came with this file
 //
 // `createNoteFromTemplate`'s `now` used to default to `new Date()`. That is the
-// exact shape `CLAUDE.md` names: a test could pin the instant and prove the
+// exact shape `AGENTS.md` names: a test could pin the instant and prove the
 // rendering while both production call sites went on reading the wall clock,
 // excused in advance. Worse, the daily-notes branch had ALREADY resolved the
 // note's title from a different `new Date()` a few statements earlier, so a call
@@ -285,7 +285,7 @@ describe("a template's tokens render at instantiation, not at authoring", () => 
 
 describe("createNoteFromTemplate cannot read the wall clock behind a caller's back", () => {
   it("declares `now` as required, not defaulted", () => {
-    // `CLAUDE.md`: "A guard parameter with a default value is an opt-in guard,
+    // `AGENTS.md`: "A guard parameter with a default value is an opt-in guard,
     // and the default is the arm that never fires." A source assertion rather
     // than a type one because the failure is invisible to `tsc`: re-adding
     // `= new Date()` compiles, satisfies every call site, and silently excuses
@@ -299,7 +299,7 @@ describe("createNoteFromTemplate cannot read the wall clock behind a caller's ba
     expect(
       /now:\s*Date\s*=/.test(sig),
       "`now` has a default again, which excuses every production call site " +
-        "from passing one — the shape CLAUDE.md names",
+        "from passing one — the shape AGENTS.md names",
     ).toBe(false);
   });
 

@@ -171,7 +171,7 @@ pub(super) fn compress_for_import(bytes: &[u8], content_type: &str) -> CompressO
 /// wraps it — are **not** `Zeroizing`, and that is the honest shape rather than
 /// a slip (the same statement `commands.rs` makes about its own buffers). Two
 /// reasons: they are pixels the WebView already holds in a V8 heap this crate
-/// cannot reach (`src-tauri/CLAUDE.md`, "Secret-handling logging discipline"),
+/// cannot reach (`src-tauri/AGENTS.md`, "Secret-handling logging discipline"),
 /// so the retention window is dominated by a copy outside this process; and
 /// `image` allocates and reallocates internally, so wrapping the handles this
 /// function holds would zero the last buffer while leaving the growth chain

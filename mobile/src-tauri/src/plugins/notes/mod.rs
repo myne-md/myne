@@ -11,7 +11,7 @@
 //! are not carried over on mobile (search runs TS-side); the `.myn`
 //! encrypt/write/read/update/delete cores are verbatim from desktop.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" in the main repo.
+//! See: ../../AGENTS.md "Secret-handling logging discipline" in the main repo.
 
 // The platform-agnostic CRUD command core (`commands`), the `NoteId` identifier
 // (`note_id`), the title-extraction helpers (`title_extract`), and the error

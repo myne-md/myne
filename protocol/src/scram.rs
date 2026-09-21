@@ -23,7 +23,7 @@
 //! **Memory hygiene.** `secret` is `DeriveSubkey(root_key, ServerAuth)`, so
 //! `SaltedPassword`, `ClientKey` and every value below them are `root_key`-
 //! descended key material and follow this crate's `zeroize` discipline
-//! (`protocol/CLAUDE.md`, "Memory hygiene"): the intermediates are `Zeroizing`
+//! (`protocol/AGENTS.md`, "Memory hygiene"): the intermediates are `Zeroizing`
 //! and [`ScramClientOutput`] is `ZeroizeOnDrop` with a redacted [`Debug`].
 //! **Best-effort, not a guarantee** — `Zeroizing::new(f(…))` wipes the slot it
 //! is moved into, not the by-value return slot the callee wrote; the `pbkdf2`
@@ -69,7 +69,7 @@ pub struct ScramClientOutput {
 /// `proof_is_deterministic` test asserts with `assert_eq!`, which requires it —
 /// but the derive would print all
 /// four secret fields verbatim, a leak channel through `tracing::debug!`, panic
-/// messages, or test-failure output (the `src-tauri/CLAUDE.md` secret-handling
+/// messages, or test-failure output (the `src-tauri/AGENTS.md` secret-handling
 /// DENY list forbids exactly this). Nothing formats the type today; this is the
 /// latent channel closed, not an active leak fixed.
 ///
