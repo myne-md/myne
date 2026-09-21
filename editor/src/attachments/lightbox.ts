@@ -21,7 +21,7 @@ import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
 import { canExportAttachment } from "@myne/editor/host/lib/attachments";
 import { exportAttachment } from "./fileCardActions";
-import { mountImageZoom, type ImageZoomController } from "./image-zoom-controller";
+import { mountZoom, type ZoomPanController } from "./image-zoom-controller";
 import { ZOOM_STEP } from "./image-zoom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -129,7 +129,7 @@ let activeClose: (() => void) | null = null;
 let activePdfCleanup: (() => void) | null = null;
 // Zoom/pan controller for an open image lightbox (removes its listeners). Null
 // for PDF mode / when nothing is open (MYND-594).
-let activeImageZoom: ImageZoomController | null = null;
+let activeImageZoom: ZoomPanController | null = null;
 
 /** Tear down any open lightbox (Esc / backdrop click / replace / test cleanup). */
 export function dismissAttachmentLightbox(): void {
@@ -205,15 +205,23 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     // (MYND-594); the buttons drive the same API. Build the controls FIRST so
     // `controls.setPercent` is passed straight into the controller: a cached
     // image reports `complete` synchronously, so the controller can initialise
-    // (and emit its first percentage) DURING `mountImageZoom` — a later-assigned
+    // (and emit its first percentage) DURING `mountZoom` — a later-assigned
     // setter would drop that initial readout.
-    let zoomRef: ImageZoomController | null = null;
+    let zoomRef: ZoomPanController | null = null;
     const controls = buildZoomControls({
       onZoomOut: () => zoomRef?.zoomOut(),
       onZoomIn: () => zoomRef?.zoomIn(),
       onReset: () => zoomRef?.reset(),
     });
-    const zoom = mountImageZoom(backdrop, img, controls.setPercent);
+    const zoom = mountZoom({
+      stage: backdrop,
+      element: img,
+      onPercent: controls.setPercent,
+      rest: "contain",
+      wheel: "always",
+      doubleClick: true,
+      keyboard: true,
+    });
     zoomRef = zoom;
     activeImageZoom = zoom;
     backdrop.appendChild(controls.el);
