@@ -11,20 +11,20 @@
 // passwords/phrases, which never appear in any assert below.
 //
 // PLATFORM: the harness drives the production binary via tauri-driver and is
-// Linux-only. Authored to the conventions; it MUST be run green 3x in the
-// container (`./scripts/e2e-buildrun.sh e2e/mermaid-viewer.e2e.ts` repeated)
-// before merge, and it has NOT been executed on the authoring machine (macOS).
-// See e2e/AGENTS.md "definition of done".
+// Linux-only. See e2e/AGENTS.md "definition of done".
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { createNote, dismissImporterOffer, unlockToEditor, waitForSaved } from "./support/flows";
-import { type Session } from "./support/webdriver";
+import {
+  createNote,
+  dismissImporterOffer,
+  seedEmbedIntoNote,
+  unlockToEditor,
+} from "./support/flows";
 
 const EDITOR = '[data-testid="editor.content"]';
 const CM_CONTENT = `${EDITOR} .cm-content`;
-const BACKSPACE = "\uE003"; // W3C key codepoint (Backspace)
 
 // Mermaid lazy-loads on the first diagram; a generous budget for the dynamic
 // import plus the render.
@@ -45,25 +45,6 @@ const DIAGRAM = [
   "```",
 ].join("\n");
 
-/** Establish the CM key pipeline (probe char then deleted), then send the raw
- *  source. Same shape as math.e2e.ts's `typeRaw`: the probe types on every poll
- *  of its `waitUntil`, so one Backspace per probe is required. */
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  let probes = 0;
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      probes += 1;
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  for (let i = 0; i < probes; i += 1) await content.sendKeys(BACKSPACE);
-  await content.sendKeys(text);
-}
-
 const CONTROL_TESTIDS = [
   "editor.mermaid.zoom-in",
   "editor.mermaid.zoom-out",
@@ -75,6 +56,28 @@ const CONTROL_TESTIDS = [
   "editor.mermaid.edit",
   "editor.mermaid.expand",
 ];
+
+// The fence is WRITTEN through the real `note_update` IPC and the note reopened
+// (`seedEmbedIntoNote`), never typed. The keystroke path is unusable here and
+// each reason hides the next, all measured in the container:
+//
+//   - A literal `\n` in `sendKeys` is delivered as U+000A, which WebKit's driver
+//     does not translate into an Enter keypress, so CM6 stays on ONE line and no
+//     `FencedCode` node is ever built (the reason `typeIntoEditor` rewrites `\n`).
+//   - Replacing `\n` with the W3C ENTER key closes the fence but breaks it a
+//     different way: CM6's `insertNewlineAndIndent` copies the current line's
+//     leading whitespace onto the new line, the diagram's own indentation adds
+//     to it, and the closing fence lands well past CommonMark's three spaces, so
+//     it is not a closing fence and the block never closes.
+//   - One DOM `insertText` for the whole payload drops the body, leaving an
+//     empty fence.
+//
+// `seedEmbedIntoNote` is the same route the embed scenarios took, for the same
+// class of reason, and is production IPC through the page seat rather than a
+// test hook. What it gives up, stated: these scenarios no longer prove a user
+// can TYPE a diagram. They never meant to; typing is covered where it is the
+// subject, and what is pinned here is that the viewer builds and survives the
+// AEAD round-trip.
 
 describeE2E("mv1 a diagram opens in a bounded viewer with the control bar (#708)", () => {
   // Vault-count precondition: 1 (weak KDF).
@@ -88,7 +91,7 @@ describeE2E("mv1 a diagram opens in a bounded viewer with the control bar (#708)
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Diyagram");
-        await typeRaw(s, DIAGRAM);
+        await seedEmbedIntoNote(s, DIAGRAM);
 
         // The viewer replaced the static card: a clipped viewport holding the
         // live SVG, not a natural-size image with a scrollbar.
@@ -126,11 +129,10 @@ describeE2E("mv2 the diagram source survives the AEAD round-trip (#708, §6 C1)"
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Kalıcı Diyagram");
-        await typeRaw(s, DIAGRAM);
+        await seedEmbedIntoNote(s, DIAGRAM);
         await s.waitForElement(`${EDITOR} .cm-mermaid-viewport`, {
           timeoutMs: MERMAID_TIMEOUT,
         });
-        await waitForSaved(s);
 
         // Lock (flushes the MY01 blob) -> unlock -> reopen the note.
         await (await s.byTestId("editor.lock-cta")).click();
