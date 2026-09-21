@@ -10,7 +10,7 @@
 // capabilities/default.json) — the stdio native-messaging host is a SEPARATE,
 // capability-ACL-exempt ingress; these three are ordinary WebView→Rust IPC.
 //
-// Signature parity (no codegen — see src/CLAUDE.md "Tauri command bindings"):
+// Signature parity (no codegen — see src/AGENTS.md "Tauri command bindings"):
 // keep these in step with `plugins::clipper_pairing::commands`.
 
 import { invoke } from "../platform/core";

@@ -20,7 +20,7 @@
 //! ambient requests. Registering the remote engine as the local arm would route
 //! them off-device, which is the exact thing the refusal exists to stop.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

@@ -329,7 +329,7 @@ export async function runNoteExportFlow({
       // no way to reveal it. Omitting the key omits the action.
     });
     // Attachments are deliberately NOT bundled here. Doing it would mean a zip,
-    // which means a zip writer, which is a dependency decision (root CLAUDE.md:
+    // which means a zip writer, which is a dependency decision (root AGENTS.md:
     // "Adding a dependency is a security decision") — recorded on task 48 rather
     // than made silently inside an export flow. The markdown keeps its
     // `![[att:…]]` embeds, which is the inert degrade this flow already

@@ -491,7 +491,7 @@ export function AccountBootstrap({
         kind === "AccountMismatch"
           ? t("accountBootstrap.accountMismatch")
           : // The load-bearing literal, rendered verbatim in every locale, NOT an
-            // i18n key (`src/CLAUDE.md`: "Do NOT i18n load-bearing copy"). Its
+            // i18n key (`src/AGENTS.md`: "Do NOT i18n load-bearing copy"). Its
             // exact wording is the privacy property — one message for a wrong
             // account number and a wrong password, because both fail at the same
             // AEAD-open step and two messages would make the pair an account

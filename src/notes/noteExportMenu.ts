@@ -11,7 +11,7 @@
 // `pdfExport` capability, and the command palette gates the same action through
 // its own `ACTION_CAPABILITY` table, so on a host without PDF export the "…"
 // menu was the one surface still offering it. A menu that offers what the
-// platform cannot do is the failure `src/CLAUDE.md` names under the platform
+// platform cannot do is the failure `src/AGENTS.md` names under the platform
 // seam: omit the affordance, never show it broken.
 //
 // Two exports rather than one, because the two surfaces differ in exactly one

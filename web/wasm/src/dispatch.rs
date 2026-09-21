@@ -838,7 +838,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
-        // The Editor's mount-time reality check (`src/CLAUDE.md`, the Q5β-1
+        // The Editor's mount-time reality check (`src/AGENTS.md`, the Q5β-1
         // belt-and-suspenders guard): React's Stage machine says `editor`, and
         // this asks the Rust side whether the slot is actually populated. It
         // has to be answered rather than left unported — the guard treats an

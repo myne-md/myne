@@ -35,7 +35,7 @@ const BOOTSTRAP_MARKER: &str = "Sufficiently bootstrapped";
 /// Deliberately narrow, and a predicate rather than a classifier: the host does
 /// not mirror arti's log stream into its own. arti logs connection targets at
 /// `info`, and re-emitting them would put the very hostnames Tor exists to hide
-/// into Myne's log sink (`src-tauri/CLAUDE.md` secret-handling discipline).
+/// into Myne's log sink (`src-tauri/AGENTS.md` secret-handling discipline).
 /// Every other line is read and dropped.
 pub fn is_bootstrap_line(line: &str) -> bool {
     line.contains(BOOTSTRAP_MARKER)

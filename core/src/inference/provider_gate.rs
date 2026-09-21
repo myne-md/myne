@@ -47,7 +47,7 @@
 //! turned it on".
 //!
 //! Logging: nothing here logs. The key is never read into a log line, an error,
-//! or a panic message (`src-tauri/CLAUDE.md` DENY list) — this module answers
+//! or a panic message (`src-tauri/AGENTS.md` DENY list) — this module answers
 //! with a decision, and the key travels only inside the `Ok` arm.
 
 // Consumed by the remote request path, which lands with the engine wiring.

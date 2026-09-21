@@ -77,7 +77,7 @@ describe("dynamicDataAttrs: the two things it must NOT report", () => {
 
   it("leaves `data-testid` to its own check", () => {
     // A curated-prop component taking an explicit `testId` is the sanctioned
-    // shape (`src/CLAUDE.md`, "Test observability"), and the interpolated-testid
+    // shape (`src/AGENTS.md`, "Test observability"), and the interpolated-testid
     // rule two checks down owns it. Reporting it here would say the wrong thing
     // about it, in a message about the account number.
     expect(dynamicDataAttrs("<div data-testid={testId} />")).toEqual([]);

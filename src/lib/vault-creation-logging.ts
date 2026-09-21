@@ -1,6 +1,6 @@
 // Logging discipline for the vault-creation flow.
 //
-// Per CLAUDE.md and the PRD, the only acceptable log shape is
+// Per AGENTS.md and the PRD, the only acceptable log shape is
 // `console.error("[vault-creation]", error.kind)` — password / phrase /
 // account number / session token / vault path must never reach the log
 // stream as strings. These helpers centralize the pattern so every call

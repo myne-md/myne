@@ -129,7 +129,7 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # transitive surface to the shared lockfile.
 async-trait = "0.1"
 # `tracing` for structured ops-side logging (stage tags + bounded
-# variant-name fields only; see src-tauri/CLAUDE.md
+# variant-name fields only; see src-tauri/AGENTS.md
 # "Secret-handling logging discipline").
 tracing = "0.1"
 # `tracing-subscriber` installs the actual log sink so `tracing::*!` events

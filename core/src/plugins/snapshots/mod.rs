@@ -28,7 +28,7 @@
 //! `hooks::VaultLifecycleHooks` seam — mobile installs `NoopHooks`, so mobile
 //! never auto-creates snapshots yet (a documented follow-up).
 //!
-//! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

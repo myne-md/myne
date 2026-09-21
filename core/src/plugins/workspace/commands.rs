@@ -13,7 +13,7 @@
 //!
 //! The descriptor is the client's serialized pane-tree (note IDs + layout +
 //! cursor offsets) — AS3-Sensitive. It crosses IPC as a `String`; the
-//! Zeroizing-wrap + drop discipline (`src-tauri/CLAUDE.md` "Secret-handling
+//! Zeroizing-wrap + drop discipline (`src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline", Plaintext-IPC pattern) applies.
 //!
 //! # What the port changed, and what it deliberately did not
@@ -30,7 +30,7 @@ use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 use protocol::{
-    decode_workspace_blob, derive_subkey, encode_workspace_blob, parse_vault_meta_any, SubkeyRole,
+    decode_workspace_blob, encode_workspace_blob, parse_vault_meta_any, SubkeyRole,
     WorkspaceBlobError, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
@@ -69,7 +69,7 @@ async fn read_account_number_hash<E>(
     io: &dyn VaultIo,
     meta_path: &Path,
     on_parse_err: impl FnOnce() -> E,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], E>
+) -> Result<(protocol::MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), E>
 where
     E: From<crate::io_failure_kind::IoFailureKind>,
 {
@@ -77,7 +77,8 @@ where
     // "read it" means "the newest copy that PARSES". Native is unchanged by
     // construction: `read_candidates` yields one element there.
     match crate::singleton::open_newest(io, meta_path, |candidate| {
-        parse_vault_meta_any(candidate).map(|m| m.account_number_hash)
+        let version = protocol::meta_version_of(candidate).unwrap_or(protocol::MetaVersion::V0_1);
+        parse_vault_meta_any(candidate).map(|m| (version, m.account_number_hash))
     })
     .await
     {
@@ -205,16 +206,17 @@ pub async fn workspace_read_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Option<String>, WorkspaceReadError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(WorkspaceReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
-        WorkspaceReadError::InvalidVaultMeta
-    })
-    .await?;
-    let session_state_key = derive_subkey(&root_key, SubkeyRole::SessionStateKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
+            WorkspaceReadError::InvalidVaultMeta
+        })
+        .await?;
+    let session_state_key = shared.derive(meta_version, SubkeyRole::SessionStateKey);
 
     Ok(read_or_none(
         io,
@@ -268,16 +270,17 @@ pub async fn workspace_write_with_dir(
 ) -> Result<(), WorkspaceWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(WorkspaceWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
-        WorkspaceWriteError::InvalidVaultMeta
-    })
-    .await?;
-    let session_state_key = derive_subkey(&root_key, SubkeyRole::SessionStateKey);
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
+            WorkspaceWriteError::InvalidVaultMeta
+        })
+        .await?;
+    let session_state_key = shared.derive(meta_version, SubkeyRole::SessionStateKey);
 
     let blob_bytes = encode_workspace_blob(
         &session_state_key,

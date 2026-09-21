@@ -17,7 +17,7 @@
 // views, so the entry is HIDDEN by default and sv1 must enable it via Settings →
 // Editor before the flyout steps. sv2 pins that toggle's visibility contract on
 // its own. These steps are unverified against real WebKit. Definition of done
-// per e2e/CLAUDE.md is "green 3× in the container" (./scripts/e2e-local.sh) and
+// per e2e/AGENTS.md is "green 3× in the container" (./scripts/e2e-local.sh) and
 // MUST be met before merge. The ".base import" leg is omitted (its action is
 // disabled until the importer lands, MYND-276). Run ISOLATED per the
 // full-suite-contamination note (e2e-full-suite-contamination memory).

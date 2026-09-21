@@ -35,7 +35,7 @@
 //
 // None. Paths are note ids and vault-internal names, and every error value here
 // crosses into a page whose console is readable by devtools and by any extension
-// with devtools access (`src-tauri/CLAUDE.md`, secret-handling logging
+// with devtools access (`src-tauri/AGENTS.md`, secret-handling logging
 // discipline). Errors are reduced to a bounded kind before they leave.
 
 /**

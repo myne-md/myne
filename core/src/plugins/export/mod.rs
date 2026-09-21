@@ -31,7 +31,7 @@
 //! TB3 egress: deliberate, user-initiated plaintext leaving the vault —
 //! covered by the SYNC-4 spec package landed with MYND-115.
 //!
-//! Logging: see the desktop crate's `src-tauri/CLAUDE.md` "Secret-handling
+//! Logging: see the desktop crate's `src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline" — counts-only events, no paths/titles/ids.
 
 pub mod commands;

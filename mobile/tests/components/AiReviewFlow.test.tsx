@@ -81,7 +81,7 @@ function seed(edits: ProposedEdit[]) {
     },
     // The store's CURRENT epoch. Required rather than defaulted, by design: a
     // default would compare the epoch to itself and pass unconditionally, which
-    // is the opt-in-guard shape the root CLAUDE.md records.
+    // is the opt-in-guard shape the root AGENTS.md records.
     currentRunEpoch(),
   );
 }

@@ -120,7 +120,7 @@ async function bannerPosture(session: Session): Promise<string | null> {
 // which is why the victim moved between runs and read as a loaded host.
 // `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
 // before any worker starts. Measured after the fix, `--retry=0`, warm
-// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+// container: 16 consecutive clean runs, which is the bar `e2e/AGENTS.md` sets.
 describeE2E("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)", () => {
   it("drives inactive → connecting → active → fail-closed → inactive from the real toggle", async () => {
     let password = "";

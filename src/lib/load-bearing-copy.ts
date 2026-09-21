@@ -345,7 +345,7 @@ export const CONNECTED_EXTENSIONS_REPAIR_HINT =
 // operator) are acknowledged, and no absolute "fully private / never leaves
 // anywhere" claim is made (PRODUCT.md:41,80). E2E asserts by FULL-literal
 // equality; changing any of it is a decisions.md event, not a copy edit.
-// Rendered verbatim in every locale (never i18n'd, per src/CLAUDE.md).
+// Rendered verbatim in every locale (never i18n'd, per src/AGENTS.md).
 //
 // **The shape changed on 2026-08-09 and the reason is worth reading before
 // editing.** It used to be two flat constants asserting "runs entirely on your
@@ -465,7 +465,7 @@ export function aiTrustDisclosure(state: AiTrustState): string {
 // claim one of them is getting wrong. `@myne/copy` exists for exactly the class
 // of string that must be byte-identical across clients by construction.
 //
-// They stay outside i18n for the same reason they always did (`src/CLAUDE.md`):
+// They stay outside i18n for the same reason they always did (`src/AGENTS.md`):
 // the exact wording is what `docs/threat-model.md` bounds, and a translation is
 // a re-derivation nobody reviewed. Only the chrome around them is translated.
 export {

@@ -9,7 +9,7 @@
 # reaches vault content: the only values crossing are the account label (the
 # user's own text) and vault ids. Adding a command here without a matching
 # entry in `src-tauri/src/plugins/account/mod.rs`'s `generate_handler!` ships
-# it dead (root CLAUDE.md: an ACL entry does not wire a command, and nothing
+# it dead (root AGENTS.md: an ACL entry does not wire a command, and nothing
 # checks that it does).
 #
 # On Android `myne_core::vault_label::key::platform_keychain` has no backend, so

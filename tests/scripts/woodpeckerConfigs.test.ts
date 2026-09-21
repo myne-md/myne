@@ -1,6 +1,6 @@
 // The Woodpecker config roster's own spec (myne-md/myne#579).
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it. Inject
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it. Inject
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." Every case below is an injection against a temporary fixture
 // tree, which is why `woodpeckerConfigPaths`/`readWoodpeckerConfigs` take a

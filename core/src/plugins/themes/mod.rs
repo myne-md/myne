@@ -50,7 +50,7 @@
 //! wiring stays in each client crate (the desktop integration that swaps the old
 //! device-local plugin for this one is the remaining follow-on).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 pub mod commands;
 pub mod error;

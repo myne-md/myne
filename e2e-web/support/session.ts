@@ -76,7 +76,7 @@ export interface BrowserSessionOptions {
    *
    * Every other scenario must leave this unset. Profile isolation between
    * SUCCESSIVE scenarios in one slot is what stops test 2 opening test 1's
-   * vault (see the two-isolations note in `e2e-web/CLAUDE.md`), and reusing a
+   * vault (see the two-isolations note in `e2e-web/AGENTS.md`), and reusing a
    * profile is opting out of it deliberately, for one scenario, on purpose.
    */
   readonly profileDir?: string;

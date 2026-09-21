@@ -141,7 +141,7 @@ pub async fn remove_member_from_host(
     let slot = state.slot_read_active().await;
     let (root_key, items_key_id, old_items_key, old_meta_hash) = match &*slot {
         Slot::Unlocked(uv) => (
-            Zeroizing::new(*uv.root_key),
+            Zeroizing::new(**uv.owner_root_key().ok_or(MemberRemovalError::VaultLocked)?),
             uv.items_key_id,
             Zeroizing::new(*uv.items_key),
             uv.vault_meta_bytes_hash,
@@ -201,110 +201,14 @@ pub async fn remove_member_from_host(
     let _notes_guard = crate::plugins::notes::commands::notes_write_mutex()
         .lock()
         .await;
-    let mut staged: Vec<(PathBuf, Vec<u8>)> = Vec::new();
-
-    let notes_dir = vault_root.join("notes");
-    for entry in read_dir_or_absent(io, &notes_dir).await? {
-        if entry.is_dir {
-            continue;
-        }
-        let Some(uuid_hex) = entry.name.strip_suffix(".myn") else {
-            continue;
-        };
-        let note_uuid = parse_uuid(uuid_hex).ok_or(MemberRemovalError::InvalidVaultMeta)?;
-        let path = notes_dir.join(&entry.name);
-        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = rekey_note(
-            &blob,
-            &note_uuid,
-            &items_key_id,
-            &old_items_key,
-            &new_items_key,
-        )?;
-        staged.push((path, rekeyed));
-    }
-
-    let attachments_dir = vault_root.join("attachments");
-    for entry in read_dir_or_absent(io, &attachments_dir).await? {
-        if entry.is_dir {
-            continue;
-        }
-        let Some(attachment_id) = parse_hex_32(&entry.name) else {
-            continue;
-        };
-        let path = attachments_dir.join(&entry.name);
-        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = protocol::person_rekey::rekey_attachment_blob(
-            &blob,
-            &attachment_id,
-            &items_key_id,
-            &old_items_key,
-            &new_items_key,
-            &fresh_nonce()?,
-        )
-        .map_err(|_| MemberRemovalError::CannotDecrypt)?;
-        staged.push((path, rekeyed));
-    }
-
-    // Snapshots hold byte-verbatim `MY01`/`NC05` note blobs sealed under the
-    // SAME `itemsKey` (`snapshot_store.rs`), so they must be re-wrapped in the
-    // same pass: leaving them would destroy version history on the new key and
-    // leave the removed member able to decrypt it. The note uuid is the first
-    // half of `<note-uuid>__<snapshot-uuid>.myn`.
-    let snapshots_dir = vault_root.join("snapshots");
-    for entry in read_dir_or_absent(io, &snapshots_dir).await? {
-        if entry.is_dir {
-            continue;
-        }
-        let Some((note_uuid_str, _)) = crate::snapshot_store::parse_snapshot_filename(&entry.name)
-        else {
-            continue;
-        };
-        let note_uuid = parse_uuid(&note_uuid_str).ok_or(MemberRemovalError::InvalidVaultMeta)?;
-        let path = snapshots_dir.join(&entry.name);
-        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = rekey_note(
-            &blob,
-            &note_uuid,
-            &items_key_id,
-            &old_items_key,
-            &new_items_key,
-        )?;
-        staged.push((path, rekeyed));
-    }
-
-    // `conflicts/<id>.myn` (staged keep-both revisions) and
-    // `quarantine/<uuid>.myn` (dropped-note ciphertext) hold full note blobs
-    // sealed under the SAME `itemsKey`, and both are decrypted with the slot's
-    // key, so they MUST be re-wrapped in the same pass: leaving them would make
-    // a user's quarantined and conflicted revisions undecryptable the moment a
-    // member is removed. Both reuse `rekey_note_blob`; the note uuid is the file
-    // stem in each.
-    for dir_name in ["conflicts", "quarantine"] {
-        let dir = vault_root.join(dir_name);
-        for entry in read_dir_or_absent(io, &dir).await? {
-            if entry.is_dir {
-                continue;
-            }
-            // The quarantine writer names a duplicate `<uuid>-<n>.myn` (or plain
-            // `<uuid>.myn`); use the engine's own suffix-tolerant parser so an
-            // engine-written name never aborts the removal with
-            // `InvalidVaultMeta` naming the meta rather than the file.
-            let note_uuid = super::conflict::parse_quarantine_file_name(&entry.name)
-                .or_else(|| entry.name.strip_suffix(".myn").and_then(parse_uuid))
-                .ok_or(MemberRemovalError::InvalidVaultMeta)?;
-            let path = dir.join(&entry.name);
-            let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-            let rekeyed = rekey_note(
-                &blob,
-                &note_uuid,
-                &items_key_id,
-                &old_items_key,
-                &new_items_key,
-            )?;
-            staged.push((path, rekeyed));
-        }
-    }
+    let mut staged = rekey_content_blobs(
+        io,
+        &vault_root,
+        &items_key_id,
+        &old_items_key,
+        &new_items_key,
+    )
+    .await?;
 
     let items_wrap_key =
         protocol::derive_subkey_versioned(version, &root_key, protocol::SubkeyRole::ItemsKeyWrap);
@@ -427,6 +331,354 @@ pub async fn remove_member_from_host(
     Ok(())
 }
 
+/// Re-key every content blob sealed under the vault `itemsKey`: notes,
+/// attachments, snapshots, conflicts and quarantine. Content ciphertext is
+/// byte-identical; only each per-entry wrap and its nonce change. The caller
+/// holds the notes write mutex across this walk and the commit.
+async fn rekey_content_blobs(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    items_key_id: &[u8; 16],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+) -> Result<Vec<(PathBuf, Vec<u8>)>, MemberRemovalError> {
+    let mut staged: Vec<(PathBuf, Vec<u8>)> = Vec::new();
+
+    let notes_dir = vault_root.join("notes");
+    for entry in read_dir_or_absent(io, &notes_dir).await? {
+        if entry.is_dir {
+            continue;
+        }
+        let Some(uuid_hex) = entry.name.strip_suffix(".myn") else {
+            continue;
+        };
+        let note_uuid = parse_uuid(uuid_hex).ok_or(MemberRemovalError::InvalidVaultMeta)?;
+        let path = notes_dir.join(&entry.name);
+        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
+        let rekeyed = rekey_note(
+            &blob,
+            &note_uuid,
+            items_key_id,
+            old_items_key,
+            new_items_key,
+        )?;
+        staged.push((path, rekeyed));
+    }
+
+    let attachments_dir = vault_root.join("attachments");
+    for entry in read_dir_or_absent(io, &attachments_dir).await? {
+        if entry.is_dir {
+            continue;
+        }
+        let Some(attachment_id) = parse_hex_32(&entry.name) else {
+            continue;
+        };
+        let path = attachments_dir.join(&entry.name);
+        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
+        let rekeyed = protocol::person_rekey::rekey_attachment_blob(
+            &blob,
+            &attachment_id,
+            items_key_id,
+            old_items_key,
+            new_items_key,
+            &fresh_nonce()?,
+        )
+        .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+        staged.push((path, rekeyed));
+    }
+
+    // Snapshots hold byte-verbatim note blobs sealed under the SAME `itemsKey`,
+    // so they must be re-wrapped in the same pass: leaving them would destroy
+    // version history on the new key and leave the removed member able to
+    // decrypt it. The note uuid is the first half of
+    // `<note-uuid>__<snapshot-uuid>.myn`.
+    let snapshots_dir = vault_root.join("snapshots");
+    for entry in read_dir_or_absent(io, &snapshots_dir).await? {
+        if entry.is_dir {
+            continue;
+        }
+        let Some((note_uuid_str, _)) = crate::snapshot_store::parse_snapshot_filename(&entry.name)
+        else {
+            continue;
+        };
+        let note_uuid = parse_uuid(&note_uuid_str).ok_or(MemberRemovalError::InvalidVaultMeta)?;
+        let path = snapshots_dir.join(&entry.name);
+        let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
+        let rekeyed = rekey_note(
+            &blob,
+            &note_uuid,
+            items_key_id,
+            old_items_key,
+            new_items_key,
+        )?;
+        staged.push((path, rekeyed));
+    }
+
+    // `conflicts/<id>.myn` and `quarantine/<uuid>.myn` hold full note blobs
+    // sealed under the SAME `itemsKey`, decrypted with the slot's key, so they
+    // MUST be re-wrapped in the same pass: leaving them would make a user's
+    // quarantined and conflicted revisions undecryptable the moment a member is
+    // removed.
+    for dir_name in ["conflicts", "quarantine"] {
+        let dir = vault_root.join(dir_name);
+        for entry in read_dir_or_absent(io, &dir).await? {
+            if entry.is_dir {
+                continue;
+            }
+            // The quarantine writer names a duplicate `<uuid>-<n>.myn` (or plain
+            // `<uuid>.myn`); use the engine's own suffix-tolerant parser so an
+            // engine-written name never aborts the removal with
+            // `InvalidVaultMeta` naming the meta rather than the file.
+            let note_uuid = super::conflict::parse_quarantine_file_name(&entry.name)
+                .or_else(|| entry.name.strip_suffix(".myn").and_then(parse_uuid))
+                .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+            let path = dir.join(&entry.name);
+            let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
+            let rekeyed = rekey_note(
+                &blob,
+                &note_uuid,
+                items_key_id,
+                old_items_key,
+                new_items_key,
+            )?;
+            staged.push((path, rekeyed));
+        }
+    }
+
+    Ok(staged)
+}
+
+/// The outcome of one local canonical group rotation. The retirement records are
+/// returned rather than persisted: they are sync-plane records whose transport
+/// and retention are Grill 4's, and this model deliberately writes none of them
+/// into the vault.
+pub struct GroupRotationOutput {
+    pub new_epoch: u64,
+    pub retirements: Vec<protocol::person_invite::SignedGroupRetirement>,
+}
+
+/// **The local canonical group rotation** (B2B, myne-md/myne#712 task 7).
+///
+/// Rotates an `NTV6` vault's shared authority when a member is removed, without
+/// any peer propagation (that is Grill 4's wire work). One pass:
+///
+/// 1. verify the current signed roster under the pinned owner identity;
+/// 2. mint a fresh random `group_key` (epoch + 1) and a fresh `itemsKey`;
+/// 3. re-wrap every content blob's per-entry key under the new `itemsKey` —
+///    content ciphertext and every identifier byte-identical;
+/// 4. re-seal the shared singletons from the OLD group key to the NEW one;
+/// 5. rebuild the signed roster: the removed row becomes a tombstone, every
+///    remaining live member gets a fresh package at the new epoch (the removed
+///    member gets none), and emit the two owner-signed retirement records;
+/// 6. re-seal `vault.meta` (`enc_group_key` under the owner root tier,
+///    `enc_items_key` under the new group tier) at the new epoch;
+/// 7. commit via the rekey journal (meta LAST) and swap the live session's
+///    group tier + `itemsKey` so it keeps reading.
+///
+/// The legacy NTV5 `remove_member_from_host` stays parked; this is the canonical
+/// local model it is replaced by.
+pub async fn rotate_group_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    owner: &protocol::person_key::PersonKeyPair,
+    removed_fingerprint_hex: &str,
+) -> Result<GroupRotationOutput, MemberRemovalError> {
+    use protocol::person_invite::{rotate_group_roster, verify_group_roster};
+
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => return Err(MemberRemovalError::Busy),
+    };
+
+    let (root_key, items_key_id, old_items_key, old_group_key, old_meta_hash) = {
+        let slot = state.slot_read_active().await;
+        match &*slot {
+            Slot::Unlocked(uv) => {
+                let root =
+                    Zeroizing::new(**uv.owner_root_key().ok_or(MemberRemovalError::VaultLocked)?);
+                let group = Zeroizing::new(
+                    **uv.group_key
+                        .as_ref()
+                        .ok_or(MemberRemovalError::InvalidVaultMeta)?,
+                );
+                (
+                    root,
+                    uv.items_key_id,
+                    Zeroizing::new(*uv.items_key),
+                    group,
+                    uv.vault_meta_bytes_hash,
+                )
+            }
+            _ => return Err(MemberRemovalError::VaultLocked),
+        }
+    };
+
+    let vault_root = active_vault_root(host, state).await?;
+    let meta_path = vault_root.join("vault.meta");
+    let meta_bytes = io
+        .read(&meta_path)
+        .await
+        .map_err(|_| MemberRemovalError::Io)?;
+    if meta_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return Err(MemberRemovalError::InvalidVaultMeta);
+    }
+    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+        .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    let account_number_hash = b2b_meta.base.account_number_hash;
+
+    // (1) The current roster is sealed under the OLD group key at the current
+    // epoch; open it, then verify the owner signature.
+    let current_envelope = protocol::person_invite::open_group_roster(
+        &old_group_key,
+        &account_number_hash,
+        b2b_meta.group_key_epoch,
+        &b2b_meta.signed_roster_envelope,
+    )
+    .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    let current_roster = verify_group_roster(
+        &owner.public_half(),
+        &current_envelope,
+        &account_number_hash,
+    )
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+
+    // (2) Fresh keys + nonces.
+    let new_group_key = Zeroizing::new(random_key()?);
+    let new_items_key = Zeroizing::new(random_key()?);
+    let mut group_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    let mut items_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut group_key_nonce).map_err(|_| MemberRemovalError::Io)?;
+    getrandom::getrandom(&mut items_key_nonce).map_err(|_| MemberRemovalError::Io)?;
+
+    // (3)/(4) One notes-mutex hold across the walk, the build and the commit.
+    let _notes_guard = crate::plugins::notes::commands::notes_write_mutex()
+        .lock()
+        .await;
+    let mut staged = rekey_content_blobs(
+        io,
+        &vault_root,
+        &items_key_id,
+        &old_items_key,
+        &new_items_key,
+    )
+    .await?;
+
+    let old_group = protocol::GroupKey::new(*old_group_key);
+    let new_group = protocol::GroupKey::new(*new_group_key);
+    for filename in crate::plugins::vault_migrate::b2b::SHARED_SINGLETONS {
+        let path = vault_root.join(filename);
+        let blob = match io.read(&path).await {
+            Ok(bytes) => bytes,
+            Err(crate::io_failure_kind::IoFailureKind::NotFound) => continue,
+            Err(_) => return Err(MemberRemovalError::Io),
+        };
+        let resealed = crate::plugins::vault_migrate::b2b::reseal_shared_singleton(
+            filename,
+            &blob,
+            crate::plugins::vault_migrate::b2b::SingletonOldTier::Group(&old_group),
+            &new_group,
+            &account_number_hash,
+        )
+        .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+        staged.push((path, resealed));
+    }
+
+    // (5) New signed roster, remaining-member packages, retirement records.
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let rotated = rotate_group_roster(
+        owner,
+        &current_roster,
+        removed_fingerprint_hex,
+        &new_group_key,
+        &account_number_hash,
+        &items_key_id,
+        &mut rng,
+    )
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+
+    // (6) Re-seal the NTV6 metadata at the new epoch.
+    let mut base = b2b_meta.base;
+    let enc_items = protocol::aead_seal_ctx(
+        &protocol::derive_group_subkey_v0_2(&new_group, protocol::GroupRole::ItemsKeyWrap),
+        &items_key_nonce,
+        &new_items_key[..],
+        &protocol::aad_vault_items_key_wrap_v0_2(&items_key_id),
+    )
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    base.items_key_nonce = items_key_nonce;
+    base.enc_items_key
+        .copy_from_slice(&enc_items[..protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN]);
+    let enc_group = protocol::aead_seal_ctx(
+        &protocol::derive_owner_subkey_v0_2(
+            &protocol::OwnerKey::new(*root_key),
+            protocol::OwnerRole::GroupKeyWrap,
+        ),
+        &group_key_nonce,
+        &new_group_key[..],
+        &protocol::aad_vault_group_key_wrap_v0_2(&account_number_hash, rotated.new_epoch),
+    )
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    let mut enc_group_key = [0u8; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_group_key.copy_from_slice(&enc_group[..protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN]);
+    let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut roster_nonce).map_err(|_| MemberRemovalError::Io)?;
+    let signed_roster_envelope = protocol::person_invite::seal_group_roster(
+        &new_group_key,
+        &account_number_hash,
+        rotated.new_epoch,
+        &roster_nonce,
+        &rotated.signed_roster,
+    )
+    .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    let new_meta_bytes = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+        base,
+        group_key_nonce,
+        enc_group_key,
+        group_key_epoch: rotated.new_epoch,
+        signed_roster_envelope,
+    })
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+
+    // (7) Journaled commit: stage, journal, publish, meta LAST.
+    stage_all(io, &staged).await?;
+    write_journal(io, &vault_root.join(REKEY_JOURNAL), &new_meta_bytes).await?;
+    publish_all(io, &staged).await?;
+    io.write(&meta_path, &new_meta_bytes, WriteOpts::default())
+        .await
+        .map_err(|_| MemberRemovalError::Io)?;
+    let _ = io.remove_file(&vault_root.join(REKEY_JOURNAL)).await;
+    // Release notes BEFORE touching the slot (`slot→notes` order).
+    drop(_notes_guard);
+
+    // (8) The running session moves to the new tiers.
+    let id = state
+        .active_vault_id()
+        .await
+        .ok_or(MemberRemovalError::VaultLocked)?;
+    state.replace_items_key(id, new_items_key).await;
+    state.set_group_key(id, new_group_key).await;
+
+    // (9) Mark the meta dirty so sync pushes the rotation, and refresh the CAS
+    // anchor so the next change-password is not read as external tampering.
+    if let Err(first) = crate::plugins::sync::state::mark_vault_meta_dirty(io, &vault_root).await {
+        if let Err(e) = crate::plugins::sync::state::mark_vault_meta_dirty(io, &vault_root).await {
+            tracing::warn!(stage = "group_rotation", first_error = ?first, error = ?e, "meta-dirty marker write failed twice");
+        }
+    }
+    let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
+    sha2::Digest::update(&mut hasher, &new_meta_bytes);
+    let new_hash: [u8; 32] = sha2::Digest::finalize(hasher).into();
+    state
+        .refresh_meta_hash_if(id, old_meta_hash, new_hash)
+        .await;
+
+    Ok(GroupRotationOutput {
+        new_epoch: rotated.new_epoch,
+        retirements: rotated.retirements,
+    })
+}
+
 /// Recover an interrupted rekey. Runs at unlock, before any other read.
 ///
 /// A journal present means the commit point was reached: republish every staged
@@ -452,8 +704,14 @@ pub async fn recover_pending_rekey(
     };
 
     let mut failed = false;
-    for dir in REKEY_DIRS {
-        let dir = vault_root.join(dir);
+    // The vault root is scanned too: the group rotation stages the SHARED
+    // SINGLETONS (`vault.prefs`, `vault.search`, …) as root-level
+    // `<name>.rekeytmp`, and a recovery that only walked `REKEY_DIRS` would
+    // leave a committed rotation's singletons unpublished — a crash there reads
+    // as a vault whose settings silently reverted.
+    let scan_dirs = core::iter::once(vault_root.to_path_buf())
+        .chain(REKEY_DIRS.iter().map(|name| vault_root.join(name)));
+    for dir in scan_dirs {
         let entries = match io.read_dir(&dir).await {
             Ok(e) => e,
             Err(crate::io_failure_kind::IoFailureKind::NotFound) => continue,
@@ -814,6 +1072,299 @@ mod tests {
             std::fs::read(root.join("vault.meta")).expect("meta written"),
             b"new-meta"
         );
+    }
+
+    // ── Local canonical group rotation (myne-md/myne#712 task 7) ─────────────
+
+    use crate::plugins::vault_unlock::state::UnlockedVault;
+    use crate::test_support::{block_on, ScopedTempDir, FAST_TEST_KDF};
+    use crate::vault_io::StdVaultIo;
+    use protocol::person_invite::{
+        GroupKeyContinuity, GroupMemberState, GroupRosterMember, GroupRosterPayload,
+        GroupRosterRole,
+    };
+    use protocol::person_key::PersonKeyPair;
+
+    const ROT_ACCT: [u8; 16] = [0x44; 16];
+    const ROT_ITEMS_ID: [u8; 16] = [0x07; 16];
+    const ROT_ROOT: [u8; 32] = [0x11; 32];
+
+    fn rot_pair(seed: u8) -> PersonKeyPair {
+        let mut kem = [0u8; protocol::person_key::PERSON_DK_SEED_LEN];
+        kem[..32].copy_from_slice(&[seed; 32]);
+        kem[32..].copy_from_slice(&[seed ^ 0x5A; 32]);
+        PersonKeyPair::generate_raw(
+            &kem,
+            &[seed.wrapping_add(1); 32],
+            &[seed.wrapping_add(2); 32],
+        )
+    }
+
+    fn rot_hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn rot_row(
+        pair: &PersonKeyPair,
+        role: GroupRosterRole,
+        state: GroupMemberState,
+        wrapped: Option<String>,
+    ) -> GroupRosterMember {
+        let public = pair.public_half();
+        GroupRosterMember {
+            fingerprint_hex: rot_hex(pair.fingerprint()),
+            display_name: if role == GroupRosterRole::Owner {
+                "Owner".into()
+            } else {
+                "Member".into()
+            },
+            role,
+            state,
+            wrapped_group_key_hex: wrapped,
+            member_kem_ek_hex: rot_hex(public.kem_ek()),
+            member_ed_pk_hex: rot_hex(public.ed_pk()),
+            member_mldsa_vk_hex: rot_hex(public.mldsa_vk()),
+            previous_fingerprint_hex: None,
+            continuity: GroupKeyContinuity::Current,
+        }
+    }
+
+    /// Build a real `NTV6` vault at `<base>/data/vaults/<id>/` with one note
+    /// sealed under the epoch-1 group-derived `itemsKey` and a roster of owner +
+    /// one member, plus the matching owner-held slot.
+    async fn seed_ntv6_group_vault(
+        base: &std::path::Path,
+        owner: &PersonKeyPair,
+        member: &PersonKeyPair,
+    ) -> (
+        crate::vault_id::VaultId,
+        PathBuf,
+        [u8; 32],
+        [u8; 32],
+        VaultRuntimeState,
+    ) {
+        let items_key = [0x31u8; 32];
+        let group_key_old = [0x41u8; 32];
+        let group_old = protocol::GroupKey::new(group_key_old);
+
+        let mut base_meta = protocol::parse_vault_meta_v0_2(
+            &protocol::encode_vault_meta_v0_2_raw(
+                &ROT_ROOT,
+                &items_key,
+                &ROT_ITEMS_ID,
+                "pw",
+                "abandon abandon abandon",
+                &ROT_ACCT,
+                &FAST_TEST_KDF,
+                &[1u8; 16],
+                &[2u8; 16],
+                &[3u8; 24],
+                &[4u8; 24],
+                &[5u8; 24],
+            )
+            .expect("encode NTV5"),
+        )
+        .expect("parse NTV5");
+        let items_nonce = [6u8; 24];
+        let enc_items = protocol::aead_seal_ctx(
+            &protocol::derive_group_subkey_v0_2(&group_old, protocol::GroupRole::ItemsKeyWrap),
+            &items_nonce,
+            &items_key,
+            &protocol::aad_vault_items_key_wrap_v0_2(&ROT_ITEMS_ID),
+        )
+        .expect("seal items");
+        base_meta.items_key_nonce = items_nonce;
+        base_meta
+            .enc_items_key
+            .copy_from_slice(&enc_items[..protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN]);
+
+        let group_nonce = [7u8; 24];
+        let enc_group = protocol::aead_seal_ctx(
+            &protocol::derive_owner_subkey_v0_2(
+                &protocol::OwnerKey::new(ROT_ROOT),
+                protocol::OwnerRole::GroupKeyWrap,
+            ),
+            &group_nonce,
+            &group_key_old,
+            &protocol::aad_vault_group_key_wrap_v0_2(&ROT_ACCT, 1),
+        )
+        .expect("seal group");
+
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let package = protocol::person_invite::create_group_package(
+            owner,
+            &member.public_half(),
+            &group_key_old,
+            &ROT_ACCT,
+            1,
+            &mut rng,
+        )
+        .expect("package");
+        let package_payload =
+            protocol::person_invite::verify_group_package(&owner.public_half(), &package)
+                .expect("verify package");
+        let roster = GroupRosterPayload {
+            account_number_hash_hex: rot_hex(&ROT_ACCT),
+            group_key_epoch: 1,
+            owner_fingerprint_hex: rot_hex(owner.fingerprint()),
+            members: vec![
+                rot_row(
+                    member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    Some(package_payload.wrapped_group_key_hex),
+                ),
+                rot_row(owner, GroupRosterRole::Owner, GroupMemberState::Live, None),
+            ],
+        };
+        let signed_roster =
+            protocol::person_invite::sign_group_roster(owner, &roster, &mut rng).expect("sign");
+        let meta = protocol::B2bVaultMeta {
+            base: base_meta,
+            group_key_nonce: group_nonce,
+            enc_group_key: enc_group.try_into().expect("64B"),
+            group_key_epoch: 1,
+            signed_roster_envelope: protocol::person_invite::seal_group_roster(
+                &group_key_old,
+                &ROT_ACCT,
+                1,
+                &[0xE7; protocol::AEAD_NONCE_LEN],
+                &signed_roster,
+            )
+            .expect("seal roster"),
+        };
+        let meta_bytes = protocol::serialize_vault_meta_ntv6(&meta).expect("serialize NTV6");
+
+        let id = crate::vault_id::VaultId::mint();
+        // `TestHost::new(base)` resolves app_data_dir to `<base>/data`, so the
+        // vault lives under it (mirroring the production layout).
+        let root = crate::paths::vault_root_for_id_from_base(&base.join("data"), id);
+        std::fs::create_dir_all(root.join("notes")).expect("notes dir");
+        std::fs::write(root.join("vault.meta"), &meta_bytes).expect("meta");
+
+        let note_uuid = [0xAAu8; 16];
+        let note = protocol::encode_new_note_blob_raw(
+            &items_key,
+            &ROT_ITEMS_ID,
+            &note_uuid,
+            &[0x55u8; 32],
+            &[8u8; 24],
+            &[9u8; 24],
+            b"rotated-body",
+        )
+        .expect("note blob");
+        let note_path = root.join("notes").join(format!(
+            "{}.myn",
+            uuid::Uuid::from_bytes(note_uuid).hyphenated()
+        ));
+        std::fs::write(&note_path, &note).expect("write note");
+
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(
+                id,
+                UnlockedVault::owner(
+                    zeroize::Zeroizing::new(ROT_ROOT),
+                    Some(zeroize::Zeroizing::new(group_key_old)),
+                    zeroize::Zeroizing::new(items_key),
+                    ROT_ITEMS_ID,
+                    0,
+                    crate::vault_meta_hash::vault_meta_sha256(&meta_bytes),
+                ),
+            )
+            .await;
+        (id, root, items_key, group_key_old, state)
+    }
+
+    #[test]
+    fn group_rotation_tombstones_the_member_and_rewraps_content_under_the_new_key() {
+        block_on(async {
+            let owner = rot_pair(0x10);
+            let member = rot_pair(0x20);
+            let base = ScopedTempDir::new("group-rotation").expect("tempdir");
+            let (id, root, _old_items, _old_group, state) =
+                seed_ntv6_group_vault(base.path(), &owner, &member).await;
+            let host = crate::host::test_host::TestHost::new(base.path());
+
+            let out = rotate_group_from_host(
+                &host,
+                &StdVaultIo,
+                &state,
+                &owner,
+                &rot_hex(member.fingerprint()),
+            )
+            .await
+            .expect("rotation commits");
+
+            assert_eq!(out.new_epoch, 2);
+            assert_eq!(out.retirements.len(), 2);
+            for record in &out.retirements {
+                let payload =
+                    protocol::person_invite::verify_group_retirement(&owner.public_half(), record)
+                        .expect("retirement verifies");
+                assert_eq!(payload.retired_epoch, 1);
+                assert_eq!(payload.replacement_epoch, 2);
+            }
+
+            // On-disk meta is NTV6 at epoch 2, member tombstoned, no wrap.
+            let meta_bytes = std::fs::read(root.join("vault.meta")).expect("meta");
+            assert_eq!(
+                meta_bytes.get(..4),
+                Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+            );
+            let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes).expect("parse NTV6");
+            assert_eq!(b2b.group_key_epoch, 2);
+            let rotated_group =
+                protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(ROT_ROOT))
+                    .expect("group reopens");
+            let envelope = protocol::person_invite::open_group_roster(
+                &rotated_group,
+                &ROT_ACCT,
+                b2b.group_key_epoch,
+                &b2b.signed_roster_envelope,
+            )
+            .expect("open sealed roster");
+            let roster = protocol::person_invite::verify_group_roster(
+                &owner.public_half(),
+                &envelope,
+                &ROT_ACCT,
+            )
+            .expect("verify roster");
+            let removed = roster
+                .members
+                .iter()
+                .find(|m| m.fingerprint_hex == rot_hex(member.fingerprint()))
+                .expect("removed row");
+            assert_eq!(removed.state, GroupMemberState::Tombstone);
+            assert!(removed.wrapped_group_key_hex.is_none());
+
+            // The note is re-wrapped under the NEW itemsKey and still opens with
+            // its original uuid and byte-identical plaintext.
+            let note_uuid = [0xAAu8; 16];
+            let note_path = root.join("notes").join(format!(
+                "{}.myn",
+                uuid::Uuid::from_bytes(note_uuid).hyphenated()
+            ));
+            let blob = std::fs::read(&note_path).expect("note");
+            let new_root = protocol::unlock_root_key_v0_2_password(&b2b.base, "pw", &ROT_ACCT)
+                .expect("root reopens");
+            let group = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*new_root))
+                .expect("group reopens");
+            let group_key = protocol::GroupKey::new(*group);
+            let new_items =
+                protocol::unlock_items_key_ntv6(&b2b, &group_key).expect("items reopens");
+            let decoded = crate::plugins::notes::decode::decode_note_any(
+                &blob,
+                &note_uuid,
+                &new_items,
+                &ROT_ITEMS_ID,
+            )
+            .expect("note opens under the rotated key");
+            assert_eq!(&decoded[..], b"rotated-body");
+
+            // The running session moved to the new tiers.
+            assert_eq!(state.active_vault_id().await, Some(id));
+        });
     }
 
     #[cfg(any(test, feature = "test-support"))]

@@ -9,7 +9,7 @@
 //     the `[default]` roster that names it, and `generate_handler!`), plus the
 //     capability grant. Miss any of them and the command fails CLOSED at
 //     runtime, on a device, which is the most expensive place to find out.
-//     `src-tauri/CLAUDE.md` records that dropping an identifier from a
+//     `src-tauri/AGENTS.md` records that dropping an identifier from a
 //     `[default]` bundle compiles clean, so nothing but this test sees it.
 //  2. **The three-state keychain status.** A rejected PROBE is `"unknown"`,
 //     never `"unavailable"`. The backend reports unavailability as a VALUE, so a
@@ -380,7 +380,7 @@ describe("the vault-label ACL is mirrored, not half-mirrored", () => {
   });
 
   it("names every identifier in the [default] roster", () => {
-    // The trap `src-tauri/CLAUDE.md` records: a `[[permission]]` block that no
+    // The trap `src-tauri/AGENTS.md` records: a `[[permission]]` block that no
     // `[default]` entry names grants nothing, and dropping one from the bundle
     // compiles clean on both sides.
     const toml = read("../src-tauri/permissions/vault-label/default.toml");
@@ -513,7 +513,7 @@ describe("Vault N is the vault's number, not the row's", () => {
 
   it("resolves at call time, so a language switch reaches an already-imported module", async () => {
     // A module-level constant would freeze the boot language forever
-    // (`src/CLAUDE.md`, "Module-level data ... resolve with `t()` at the
+    // (`src/AGENTS.md`, "Module-level data ... resolve with `t()` at the
     // render/usage consumer"), and the freeze is invisible until someone
     // changes language mid-session.
     const i18n = (await import("@myne/i18n")).default;

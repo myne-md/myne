@@ -150,7 +150,7 @@ echo "== cargo build -p myne-web-wasm --target wasm32-unknown-unknown (${PROFILE
 #
 # The path is read rather than assembled from a guessed target directory because
 # `CARGO_TARGET_DIR` is commonly set to a shared directory in this project (root
-# CLAUDE.md gotchas: "Cargo shared-target collision"). A hardcoded `target/…`
+# AGENTS.md gotchas: "Cargo shared-target collision"). A hardcoded `target/…`
 # path silently picks up a STALE `.wasm` from an earlier build — a mistake
 # already made once in `scripts/wasm-csprng-check.sh`, and the reason that script
 # now reads the path the same way.

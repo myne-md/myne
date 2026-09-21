@@ -107,3 +107,23 @@ export function resetTranscripts(): void {
   transcriptStore.clear();
   generation += 1;
 }
+
+/** Session zoom percentages for rendered mermaid diagrams, keyed by a hash of
+ *  the diagram source. Owned by `decorations/mermaid-viewer.ts`, which writes
+ *  the percentage on every committed view change (myne-md/myne#708).
+ *
+ *  A percentage is not plaintext, but the KEY is a fingerprint of note content,
+ *  so the map enumerates the diagrams a vault holds. That is the same category
+ *  as the note-id list `resetRecentNotes` clears, so it is cleared on the same
+ *  paths rather than left to the next mount. `session-caches.ts` is its home for
+ *  the reason this file's header gives: it is a leaf with no imports, and the
+ *  teardown call must not drag the mermaid renderer into the eager bundle. */
+export const mermaidZoomStore = new Map<string, number>();
+
+/** Forget every remembered diagram zoom. Called on both vault-leaving paths and
+ *  asserted there by `scripts/check-frontend-lock-teardown.mjs`, exactly as
+ *  {@link resetPreviewCache} is. No generation bump: a percentage is restored
+ *  synchronously at widget build, so there is no in-flight write to drop. */
+export function resetMermaidZoom(): void {
+  mermaidZoomStore.clear();
+}

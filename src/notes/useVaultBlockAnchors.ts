@@ -11,20 +11,32 @@
 // settles; a query failure leaves the last set (or empty) rather than throwing.
 // Rebuilds on the SYNC-5 index nonce so a note whose anchors changed refreshes.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { VaultBlockAnchor as EditorVaultBlockAnchor } from "../editor/wikilink/vault-block-anchors";
+import {
+  joinVaultBlockAnchors,
+  type VaultBlockAnchor,
+} from "@myne/editor/host/notes/blockAnchors";
 import { useIndexNonce } from "./indexNonce";
+import { useResolverNotes } from "./resolverNotes";
 import { vaultBlockAnchors } from "./vaultIndices";
 
 /**
- * The vault-wide imported block-anchor set, refetched when the SYNC-5 index
- * nonce changes (a note create/edit/delete bumps it). Empty until the first
- * async query settles. Maps the Rust `VaultBlockAnchor` (noteId/noteTitle/
- * noteFolder) onto the editor facet shape (noteUuid/title/folder).
+ * The vault-wide imported block-anchor set. Refetched when the SYNC-5 index
+ * nonce changes (a note create/edit/delete bumps it); rejoined when the resident
+ * note-set changes, since a rename changes a row's emitted path without touching
+ * the index. Empty until the first async query settles.
+ *
+ * It JOINS rather than maps (myne-md/myne#452). The Rust dump is trash-blind, so
+ * the join is what keeps trashed, template and conflict-copy notes out of a
+ * picker whose rows are deep links, and it takes each row's title and folder
+ * from the resident note rather than from the row, which is the copy a rename
+ * updates.
  */
 export function useVaultBlockAnchors(): readonly EditorVaultBlockAnchor[] {
+  const notes = useResolverNotes();
   const indexNonce = useIndexNonce();
-  const [anchors, setAnchors] = useState<readonly EditorVaultBlockAnchor[]>([]);
+  const [rows, setRows] = useState<readonly VaultBlockAnchor[]>([]);
   // Guard so a query that resolves after a newer one is dropped.
   const fetchSeq = useRef(0);
 
@@ -32,25 +44,26 @@ export function useVaultBlockAnchors(): readonly EditorVaultBlockAnchor[] {
     const seq = ++fetchSeq.current;
     let cancelled = false;
     void (async () => {
-      let rows;
+      let fetched: VaultBlockAnchor[];
       try {
-        rows = await vaultBlockAnchors();
+        fetched = await vaultBlockAnchors();
       } catch {
         return; // best-effort — leave the prior set
       }
-      const mapped: EditorVaultBlockAnchor[] = rows.map((r) => ({
-        noteUuid: r.noteId,
-        title: r.noteTitle,
-        folder: r.noteFolder,
-        blockId: r.blockId,
-        preview: r.preview,
-      }));
-      if (!cancelled && seq === fetchSeq.current) setAnchors(mapped);
+      if (!cancelled && seq === fetchSeq.current) setRows(fetched);
     })();
     return () => {
       cancelled = true;
     };
   }, [indexNonce]);
 
-  return anchors;
+  // myne-md/myne#452: this used to MAP the rows straight onto the facet shape,
+  // which shipped the trash-blind index verbatim into the picker: `[[^^` listed
+  // anchors in trashed, template and conflict-copy notes, and selecting one
+  // emitted a deep link INTO a trashed note. `useVaultHeadings` beside this file
+  // has always joined for exactly that reason, and the join is shared now, so
+  // both pickers and both clients answer it once. Rejoined when the resident
+  // note-set changes, since a rename changes a row's emitted path without
+  // touching the index.
+  return useMemo(() => joinVaultBlockAnchors(rows, notes), [rows, notes]);
 }

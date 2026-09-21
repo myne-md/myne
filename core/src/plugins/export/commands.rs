@@ -200,7 +200,7 @@ pub(crate) async fn vault_export_core(
         .map_err(|_| VaultExportError::AuthOperationInProgress)?;
     hooks.reset_cancel();
 
-    let Some((items_key, items_key_id, root_key)) = state.peek_unlocked_attachment_material().await
+    let Some((items_key, items_key_id, shared)) = state.peek_unlocked_attachment_material().await
     else {
         tracing::debug!(
             stage = "slot_check",
@@ -224,7 +224,8 @@ pub(crate) async fn vault_export_core(
         scope,
         items_key: items_key.clone(),
         items_key_id,
-        root_key,
+        root_key: shared.owner_root_bytes(),
+        group_key: shared.group_bytes(),
         version,
         trashed: myne_format::export_walk::TrashedMode::Exclude,
         best_effort: false,
@@ -262,7 +263,7 @@ pub(crate) async fn vault_export_core(
     Ok(summary)
 }
 
-// see: ../../CLAUDE.md "Secret-handling logging discipline"
+// see: ../../AGENTS.md "Secret-handling logging discipline"
 
 #[cfg(test)]
 mod tests {

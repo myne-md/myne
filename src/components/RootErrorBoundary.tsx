@@ -14,7 +14,7 @@ interface RootErrorBoundaryState {
  * lands on the unlock screen).
  *
  * Deliberately logs NOTHING: a render error's message / component stack can
- * embed note plaintext (DENY-list, `src-tauri/CLAUDE.md` "Secret-handling
+ * embed note plaintext (DENY-list, `src-tauri/AGENTS.md` "Secret-handling
  * logging discipline"). The user-facing fail-closed UI is the recovery path.
  */
 export class RootErrorBoundary extends React.Component<

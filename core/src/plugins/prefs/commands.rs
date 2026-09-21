@@ -9,16 +9,16 @@
 //!   side-effect SECOND** so a disk failure leaves the UI / disk
 //!   consistent (MYND-160 grill Q5.2).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::{PrefsReadError, PrefsWriteError};
 use super::set_mutation::{apply_set_mutation, SetMutation};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_prefs_blob, derive_subkey_versioned, encode_prefs_blob_versioned, meta_version_of,
-    parse_vault_meta_any, ColorGroup, EditorLayout, MetaVersion, PrefsBlobError, PrefsView,
-    SavedView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_prefs_blob, encode_prefs_blob_versioned, meta_version_of, parse_vault_meta_any,
+    ColorGroup, EditorLayout, MetaVersion, PrefsBlobError, PrefsView, SavedView, SubkeyRole,
+    ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -305,14 +305,14 @@ async fn update_prefs_with_dir(
     }
 
     // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
     let (meta_version, account_number_hash) =
         read_account_number_hash_for_write(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(meta_version, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     // REFUSE rather than write over a read that degraded (test-audit #40).
@@ -489,14 +489,14 @@ pub async fn prefs_read_with_dir_reporting_origin(
 ) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(PrefsReadError::SlotNotUnlocked)?;
 
     let (meta_version, account_number_hash) =
         read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(meta_version, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)
@@ -541,7 +541,7 @@ pub async fn record_last_backup_at_with_dir(
 /// revocation is durable.
 ///
 /// Logs the record COUNT only — a token value + an extension id are vault-stable
-/// correlation tags (see ../../CLAUDE.md "Secret-handling logging discipline").
+/// correlation tags (see ../../AGENTS.md "Secret-handling logging discipline").
 /// The token VALUES never reach the log surface.
 pub async fn persist_paired_extensions_with_dir(
     vault_dir: &Path,
@@ -1385,7 +1385,7 @@ pub async fn set_ai_provider_consent<R: Runtime>(
 /// back.
 ///
 /// Wrapped in `Zeroizing` on the first non-doc statement, like every other
-/// secret that arrives over IPC (`src-tauri/CLAUDE.md`). Never logged.
+/// secret that arrives over IPC (`src-tauri/AGENTS.md`). Never logged.
 pub async fn set_ai_provider_key_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -2237,7 +2237,7 @@ pub async fn set_deliberate_folders_with_dir(
     .await?;
 
     // Folder COUNT only — never the paths (folder structure is AS3
-    // Sensitive; see ../../CLAUDE.md "Secret-handling logging discipline").
+    // Sensitive; see ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(
         event = "prefs_written",
         field = "deliberate_folders",
@@ -2320,7 +2320,7 @@ pub async fn set_archived_folders_with_dir(
     .await?;
 
     // Folder COUNT only — never the paths (folder structure is AS3
-    // Sensitive; see the `set_deliberate_folders` note + ../../CLAUDE.md).
+    // Sensitive; see the `set_deliberate_folders` note + ../../AGENTS.md).
     tracing::info!(
         event = "prefs_written",
         field = "archived_folders",
@@ -2762,7 +2762,7 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     .await?;
 
     // Folder COUNT only — never the paths (AS3 Sensitive; see the
-    // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
+    // `set_deliberate_folders` note + ../../AGENTS.md logging discipline).
     tracing::info!(
         event = "prefs_written",
         field = "ai_excluded_folders",
@@ -2903,7 +2903,7 @@ pub(crate) async fn set_cli_excluded_folders_with_dir(
     .await?;
 
     // Folder COUNT only — never the paths (AS3 Sensitive; see the
-    // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
+    // `set_deliberate_folders` note + ../../AGENTS.md logging discipline).
     tracing::info!(
         event = "prefs_written",
         field = "cli_excluded_folders",
@@ -3035,7 +3035,7 @@ pub(crate) async fn set_item_order_with_dir(
 ) -> Result<(), PrefsWriteError> {
     // COUNTS only, computed before the value is moved into the closure — never
     // the container paths / item IDs (note_id is a per-note vault-stable
-    // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
+    // correlation tag, folder paths are AS3 Sensitive; see ../../AGENTS.md
     // "Secret-handling logging discipline").
     let containers = order.len();
     let items: usize = order.values().map(Vec::len).sum();
@@ -3136,7 +3136,7 @@ pub(crate) async fn set_hidden_bar_items_with_dir(
 /// over-cap save fails `PrefsEncodeFailed` and leaves the on-disk prefs
 /// untouched (story 13). Logs the view COUNT only — a view's name / filter /
 /// referenced property is AS3-Sensitive and never reaches the log surface (see
-/// ../../CLAUDE.md "Secret-handling logging discipline").
+/// ../../AGENTS.md "Secret-handling logging discipline").
 pub async fn upsert_saved_view_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -3962,7 +3962,7 @@ pub(crate) async fn set_daily_folder_with_dir(
     .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
-    // ../../CLAUDE.md "Secret-handling logging discipline").
+    // ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "daily_folder");
     Ok(())
 }
@@ -4026,7 +4026,7 @@ pub(crate) async fn set_daily_template_with_dir(
     .await?;
 
     // Field name + set/cleared only — never the UUID (note_id is a vault-stable
-    // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
+    // correlation tag; see ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "daily_template", cleared);
     Ok(())
 }
@@ -4296,7 +4296,7 @@ pub(crate) async fn set_periodic_note_setting_with_dir(
     // excluded) rather than a closed list, deliberately, so a build shipping a
     // fourth period needs no change here. Neither is user text, and the VALUE
     // (a folder path, AS3 Sensitive) is never logged. See
-    // src-tauri/CLAUDE.md "Secret-handling logging discipline".
+    // src-tauri/AGENTS.md "Secret-handling logging discipline".
     tracing::info!(
         event = "prefs_written",
         field = "periodic_notes",
@@ -4381,7 +4381,7 @@ pub(crate) async fn set_new_note_location_with_dir(
     .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
-    // ../../CLAUDE.md "Secret-handling logging discipline").
+    // ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "new_note_location");
     Ok(())
 }
@@ -4873,7 +4873,7 @@ pub(crate) async fn set_favorites_with_dir(
     .await?;
 
     // COUNT only — never the note IDs (note_id is a per-note vault-stable
-    // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
+    // correlation tag; see ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "favorites", count,);
     Ok(())
 }
@@ -5041,7 +5041,7 @@ pub(crate) async fn set_editor_layout_with_dir(
 /// Static label for the theme preference, for non-secret structured
 /// logging. `theme` is an AS3-low cosmetic UI preference (light / dark /
 /// amoled / system), so the value itself is safe to emit (unlike the
-/// DENY-listed secret material in ../../CLAUDE.md "Secret-handling logging
+/// DENY-listed secret material in ../../AGENTS.md "Secret-handling logging
 /// discipline").
 fn theme_label(theme: Option<ThemeChoice>) -> &'static str {
     match theme {
@@ -5269,7 +5269,7 @@ pub(crate) async fn set_item_colors_with_dir(
     .await?;
 
     // Entry COUNT only — never the keys (note IDs / folder paths are AS3
-    // correlation tags; see ../../CLAUDE.md "Secret-handling logging discipline").
+    // correlation tags; see ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "item_colors", count,);
     Ok(())
 }
@@ -5619,7 +5619,7 @@ pub(crate) async fn vault_set_label_with_dir(
     }
 
     // Field name + set/cleared only — NEVER the label value (it is the user's
-    // own input, treated as AS3-sensitive; see ../../CLAUDE.md "Secret-handling
+    // own input, treated as AS3-sensitive; see ../../AGENTS.md "Secret-handling
     // logging discipline").
     tracing::info!(event = "prefs_written", field = "label", cleared);
     Ok(())

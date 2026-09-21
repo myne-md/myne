@@ -9,7 +9,7 @@
 //! point, the main-window-label fence, the slot peek, and the active-vault-dir
 //! resolution — mirroring the desktop `scheme.rs`.
 //!
-//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the main repo's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline".
 
 use myne_core::plugins::attachments::scheme_core::{
@@ -61,10 +61,10 @@ async fn serve<R: Runtime>(
         None => return server_error(),
     };
     let keys = match state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return forbidden(),
     };

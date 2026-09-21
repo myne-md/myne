@@ -715,7 +715,7 @@ describe("AiPanel — what is answering right now", () => {
     const caption = screen.getByTestId("ai.active-provider");
     expect(caption.tagName).toBe("P");
     // A `SettingRow` would owe a `settingsSearchIndex.ts` entry in the same
-    // change (src/CLAUDE.md); a caption does not, and this is what keeps that
+    // change (src/AGENTS.md); a caption does not, and this is what keeps that
     // claim true rather than remembered.
     expect(caption.closest("[data-setting-row]")).toBeNull();
   });

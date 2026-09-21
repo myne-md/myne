@@ -5,7 +5,7 @@
 //
 // Deliberately ZERO external dependencies (no Glance/Compose): the widgets are
 // static launchers built on framework RemoteViews, and adding a dependency is
-// a security decision (main repo CLAUDE.md).
+// a security decision (main repo AGENTS.md).
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")

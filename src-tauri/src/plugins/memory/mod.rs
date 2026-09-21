@@ -12,7 +12,7 @@
 //!
 //! `memory:default` bundles the six allow-* permissions, main-window-only.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The memory command core and its `error` enums live in `myne-core` (shared
 // with the web + mobile clients). Re-exported so

@@ -10,7 +10,7 @@
 // window, its focus, a tab drag across the window boundary, geometry restore onto
 // a specific monitor, and a second WebView reacting to a cross-window delete.
 // Those are multi-window and multi-monitor behaviours the single-session Linux
-// WebKitGTK harness cannot reliably judge (this directory's CLAUDE.md documents
+// WebKitGTK harness cannot reliably judge (this directory's AGENTS.md documents
 // the pitfalls at length, and `POST /window/rect` is silently ignored under
 // xvfb), so `check-manual-test-roster.mjs`'s own rule classes them as MANUAL and
 // they are the `editor.detached-window-pop-out` roster verdict. What a machine

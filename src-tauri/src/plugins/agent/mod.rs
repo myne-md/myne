@@ -47,7 +47,7 @@
 //! clippy, renders its UI and is dead at runtime; the three-way ACL guard test
 //! is what catches that.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
 pub mod adapters;
 pub mod commands;
@@ -138,7 +138,7 @@ mod acl_registration_guard {
     use super::AGENT_CAPABILITY;
 
     /// **An ACL entry does not wire a command, and nothing checks that it
-    /// does** (`src-tauri/CLAUDE.md`). An agent command with its
+    /// does** (`src-tauri/AGENTS.md`). An agent command with its
     /// `[[permission]]` block, its `[default]` bundle listing and a frontend
     /// caller, but missing from `generate_handler!`, compiles, passes clippy,
     /// renders its UI and is **dead at runtime**: the invoke rejects.

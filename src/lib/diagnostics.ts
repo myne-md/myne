@@ -22,7 +22,7 @@
 // * **No note id, account number or account hash.** Nothing that identifies the
 //   user or their content, in a block whose whole purpose is to be pasted
 //   somewhere else.
-// * **No filesystem or OPFS path.** On the DENY list (`src-tauri/CLAUDE.md`) for
+// * **No filesystem or OPFS path.** On the DENY list (`src-tauri/AGENTS.md`) for
 //   the same reason it is everywhere else.
 // * **No fine-grained timestamp.** A millisecond stamp on a pasted block is a
 //   usage record; the build channel and version already answer "which build".

@@ -3,7 +3,7 @@
 // A text grep over the capability JSON is fooled by its own description prose (which names
 // `prefs:allow-set-*` to say it is withheld), so the grant/deny shape is asserted STRUCTURALLY:
 // parse the JSON and inspect the `permissions` array. Both directions are checked, per the
-// repo-root CLAUDE.md guard discipline: the split-pane editor surface is present, and every
+// repo-root AGENTS.md guard discipline: the split-pane editor surface is present, and every
 // privileged surface a detached window must not hold (prefs setters per decision 0136,
 // vault-lifecycle, egress/management, window/webview create) is absent.
 

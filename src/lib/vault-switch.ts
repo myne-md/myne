@@ -39,6 +39,7 @@ import { resetScrollMemory } from "../notes/scrollMemory";
 import { resetRecentNotes } from "../notes/recentNotes";
 import { resetDecodedAspects } from "../editor/attachments/decoded-aspect";
 import {
+  resetMermaidZoom,
   resetPreviewCache,
   resetTranscripts,
 } from "../editor/attachments/session-caches";
@@ -153,6 +154,10 @@ export async function leaveActiveVault(deps: {
   // an unmount.
   resetPreviewCache();
   resetTranscripts();
+  // And the remembered mermaid diagram zoom (myne-md/myne#708): keyed by a hash
+  // of the diagram source, so it enumerates this vault's diagrams and would
+  // otherwise restore the PREVIOUS vault's scale onto one here.
+  resetMermaidZoom();
   // And the ambient date/time display store. Asserted on this path as well
   // as on the lock, because a vault CHANGE is the case where the resident
   // value is the PREVIOUS vault's zone and formats rather than this one's.

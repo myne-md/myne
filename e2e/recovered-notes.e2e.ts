@@ -26,7 +26,7 @@
 // (SYNC-13 applies to credentials, which never reach any assert below).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per the
-// e2e/CLAUDE.md definition of done it must go green 3× consecutive via
+// e2e/AGENTS.md definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge; it introduces the recovered-notes
 // testid pass (`sync.recovered-row` / `sync.recovered-preview` /
 // `sync.recovered-preview-body` / `sync.recovered-restore` /

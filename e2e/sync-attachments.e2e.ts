@@ -12,7 +12,7 @@
 //      B's body and leaves B's library empty — and nothing resurrects it.
 //
 // Attachment import/delete are driven via the sanctioned page-seat IPC
-// (production commands, no test hook — e2e/CLAUDE.md): the import UX is a
+// (production commands, no test hook — e2e/AGENTS.md): the import UX is a
 // native file picker WebDriver cannot drive, and the deterministic IPC keeps
 // the scenario byte-precise about WHAT replicated.
 

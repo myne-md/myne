@@ -8,7 +8,7 @@
 // consumes `applyWasCleanAndComplete` and drops the run when it holds, so the
 // observable contract is "the run is gone" or "the run is still here", and a
 // test that asked the predicate afterwards would be asking an emptied store.
-// Assertion on the state rather than on a return value is also what `CLAUDE.md`
+// Assertion on the state rather than on a return value is also what `AGENTS.md`
 // asks for wherever both are available.
 //
 // **An APPLY is the only thing that closes the review, and several cases here

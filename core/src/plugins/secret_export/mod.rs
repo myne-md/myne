@@ -23,7 +23,7 @@
 //! The `tauri::Builder` `init()` wiring (register the one command) stays in each
 //! client crate.
 //!
-//! See: the desktop crate's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! See: the desktop crate's `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline".
 
 pub mod commands;

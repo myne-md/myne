@@ -106,7 +106,7 @@ if cargo tree -p protocol -e normal --target wasm32-unknown-unknown 2>/dev/null 
   echo "  FAIL: wasm-bindgen reached protocol's shipped wasm graph."
   echo "        The crate is #![no_std] and deliberately has no build-tool dependency; the"
   echo "        entropy backend is the embedder-registered 'custom' hook, not getrandom's"
-  echo "        'js' feature. Changing that is a dependency decision (root CLAUDE.md)."
+  echo "        'js' feature. Changing that is a dependency decision (root AGENTS.md)."
   fail=1
 else
   echo "  ok"

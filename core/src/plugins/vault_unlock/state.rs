@@ -48,7 +48,7 @@
 //! work, never across Argon2id. The `Semaphore` permit guards the long-
 //! lived critical section.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
@@ -197,6 +197,19 @@ pub struct VaultRuntimeState {
     /// person unlocked this process". The pair zeroizes on drop
     /// (`ZeroizeOnDrop`), and `take` moves it out so no clone lingers.
     person_identity: RwLock<Option<protocol::PersonKeyPair>>,
+
+    /// Backend-held per-`(person, vault)` private AI profile key (`MYY5`,
+    /// myne-md/myne#712 task 8). Derived at `sync_person_unlock` from the
+    /// person's phrase AND the ACTIVE vault's account-number hash, so unlike the
+    /// person keypair it is VAULT-scoped: a vault switch without a fresh person
+    /// unlock leaves no key for the new vault. Dropped with the person identity
+    /// and at every vault-leaving path. The key zeroizes on drop.
+    person_profile_key: RwLock<Option<Zeroizing<[u8; AEAD_KEY_LEN]>>>,
+
+    /// The non-secret deterministic profile id that goes with
+    /// [`Self::person_profile_key`] (the `profiles/<id>` filename component and
+    /// the AAD binding). Held bare: it is a hash of public inputs.
+    person_profile_id: RwLock<Option<[u8; 16]>>,
 }
 
 impl Default for VaultRuntimeState {
@@ -211,6 +224,8 @@ impl Default for VaultRuntimeState {
             icon_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
             person_identity: RwLock::new(None),
+            person_profile_key: RwLock::new(None),
+            person_profile_id: RwLock::new(None),
         }
     }
 }
@@ -253,6 +268,38 @@ impl VaultRuntimeState {
         self.person_identity.read().await.clone()
     }
 
+    /// Install the per-`(person, vault)` private AI profile key + id derived at
+    /// person unlock.
+    pub async fn set_person_profile(
+        &self,
+        profile_id: [u8; 16],
+        profile_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    ) {
+        *self.person_profile_key.write().await = Some(profile_key);
+        *self.person_profile_id.write().await = Some(profile_id);
+    }
+
+    /// Drop the held private-profile key, zeroizing it.
+    pub async fn take_person_profile(&self) -> Option<([u8; 16], Zeroizing<[u8; AEAD_KEY_LEN]>)> {
+        let id = self.person_profile_id.write().await.take();
+        let key = self.person_profile_key.write().await.take();
+        match (id, key) {
+            (Some(id), Some(key)) => Some((id, key)),
+            _ => None,
+        }
+    }
+
+    /// Clone the held private-profile key + id for one command. The clone lives
+    /// only for the call.
+    pub async fn clone_person_profile(&self) -> Option<([u8; 16], Zeroizing<[u8; AEAD_KEY_LEN]>)> {
+        let id = *self.person_profile_id.read().await;
+        let key = self.person_profile_key.read().await;
+        match (id, key.as_ref()) {
+            (Some(id), Some(key)) => Some((id, key.clone())),
+            _ => None,
+        }
+    }
+
     /// Swap the unlocked slot's `itemsKey` for a freshly rotated one
     /// (member removal, myne-md/myne#698). `root_key` is untouched: the
     /// rekey rotates the content-encryption key only. A no-op when the
@@ -265,6 +312,18 @@ impl VaultRuntimeState {
         let mut slots = self.slots.write().await;
         if let Some(Slot::Unlocked(uv)) = slots.get_mut(&id) {
             uv.items_key = new_items_key;
+        }
+    }
+
+    /// Install the group tier on the unlocked slot for `id`. Called by the
+    /// explicit `NTV5` to `NTV6` migration commit so the running session's
+    /// shared singletons (reseaned under the group key on disk) are read
+    /// through the same tier that sealed them. A no-op when the vault is not
+    /// the unlocked one.
+    pub async fn set_group_key(&self, id: VaultId, group_key: Zeroizing<[u8; AEAD_KEY_LEN]>) {
+        let mut slots = self.slots.write().await;
+        if let Some(Slot::Unlocked(uv)) = slots.get_mut(&id) {
+            uv.set_group_key(group_key);
         }
     }
 
@@ -1180,7 +1239,28 @@ impl VaultRuntimeState {
                 _ => None,
             })
             .min_by_key(|(id, _)| **id)
-            .map(|(_, uv)| (Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash))
+            .and_then(|(_, uv)| {
+                uv.owner_root_key()
+                    .map(|root| (Zeroizing::new(**root), uv.vault_meta_bytes_hash))
+            })
+    }
+
+    /// Read-lock peek that returns a CLONE of the [`SharedSingletonKey`] the
+    /// session's shared singletons are sealed under, or `None` when nothing is
+    /// unlocked. This is the shared-tier twin of
+    /// [`Self::peek_unlocked_root_key_clone`]: a pre-B2B session answers
+    /// `OwnerRoot`, an `NTV6` session answers `Group`, and the caller derives
+    /// the KEK through [`SharedSingletonKey::derive`] either way.
+    pub async fn peek_unlocked_shared_singleton_key(&self) -> Option<SharedSingletonKey> {
+        let slots = self.slots.read().await;
+        slots
+            .iter()
+            .filter_map(|(id, slot)| match slot {
+                Slot::Unlocked(uv) => Some((id, uv)),
+                _ => None,
+            })
+            .min_by_key(|(id, _)| **id)
+            .map(|(_, uv)| uv.shared_singleton_key())
     }
 
     /// Read-lock peek that returns a CLONE of just the `root_key` from
@@ -1207,7 +1287,7 @@ impl VaultRuntimeState {
                 _ => None,
             })
             .min_by_key(|(id, _)| **id)
-            .map(|(_, uv)| Zeroizing::new(*uv.root_key))
+            .and_then(|(_, uv)| uv.owner_root_key().map(|root| Zeroizing::new(**root)))
     }
 
     /// Read-lock peek that returns CLONES of `(items_key, items_key_id,
@@ -1223,11 +1303,7 @@ impl VaultRuntimeState {
     /// slot read-lock is acquired exactly once per import.
     pub async fn peek_unlocked_attachment_material(
         &self,
-    ) -> Option<(
-        Zeroizing<[u8; AEAD_KEY_LEN]>,
-        [u8; 16],
-        Zeroizing<[u8; AEAD_KEY_LEN]>,
-    )> {
+    ) -> Option<(Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 16], SharedSingletonKey)> {
         // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
         // entry. Sub-feature 4 threads an explicit `vault_id` here.
         let slots = self.slots.read().await;
@@ -1235,7 +1311,7 @@ impl VaultRuntimeState {
             Slot::Unlocked(uv) => Some((
                 uv.items_key.clone(),
                 uv.items_key_id,
-                Zeroizing::new(*uv.root_key),
+                uv.shared_singleton_key(),
             )),
             _ => None,
         })
@@ -1267,10 +1343,26 @@ impl VaultRuntimeState {
     ) -> Option<(SlotReadGuard<'_>, Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 32])> {
         let guard = self.slot_read_active().await;
         let (root_key, hash) = match &*guard {
-            Slot::Unlocked(uv) => (Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash),
+            Slot::Unlocked(uv) => (
+                Zeroizing::new(**uv.owner_root_key()?),
+                uv.vault_meta_bytes_hash,
+            ),
             _ => return None,
         };
         Some((guard, root_key, hash))
+    }
+
+    /// Guard-holding sibling of [`Self::peek_unlocked_shared_singleton_key`] —
+    /// see [`Self::hold_unlocked_root_key_and_hash`] for the discipline.
+    pub async fn hold_unlocked_shared_singleton_material(
+        &self,
+    ) -> Option<(SlotReadGuard<'_>, SharedSingletonKey, [u8; 32])> {
+        let guard = self.slot_read_active().await;
+        let (shared, hash) = match &*guard {
+            Slot::Unlocked(uv) => (uv.shared_singleton_key(), uv.vault_meta_bytes_hash),
+            _ => return None,
+        };
+        Some((guard, shared, hash))
     }
 
     /// Guard-holding sibling of [`Self::peek_unlocked_root_key_clone`] —
@@ -1280,7 +1372,7 @@ impl VaultRuntimeState {
     ) -> Option<(SlotReadGuard<'_>, Zeroizing<[u8; AEAD_KEY_LEN]>)> {
         let guard = self.slot_read_active().await;
         let root_key = match &*guard {
-            Slot::Unlocked(uv) => Zeroizing::new(*uv.root_key),
+            Slot::Unlocked(uv) => Zeroizing::new(**uv.owner_root_key()?),
             _ => return None,
         };
         Some((guard, root_key))
@@ -1295,18 +1387,18 @@ impl VaultRuntimeState {
         SlotReadGuard<'_>,
         Zeroizing<[u8; AEAD_KEY_LEN]>,
         [u8; 16],
-        Zeroizing<[u8; AEAD_KEY_LEN]>,
+        SharedSingletonKey,
     )> {
         let guard = self.slot_read_active().await;
-        let (items_key, items_key_id, root_key) = match &*guard {
+        let (items_key, items_key_id, shared) = match &*guard {
             Slot::Unlocked(uv) => (
                 uv.items_key.clone(),
                 uv.items_key_id,
-                Zeroizing::new(*uv.root_key),
+                uv.shared_singleton_key(),
             ),
             _ => return None,
         };
-        Some((guard, items_key, items_key_id, root_key))
+        Some((guard, items_key, items_key_id, shared))
     }
 
     /// Atomically commit a `vault.meta` rewrite while holding the
@@ -1326,7 +1418,7 @@ impl VaultRuntimeState {
     /// already captured `new_bytes`. With the lock held throughout,
     /// `vault_lock`'s own write-lock acquire blocks for the duration
     /// of the rewrite (~ms scale), which is allowed by
-    /// `CLAUDE.md` "RwLock held only at start/end" — that rule
+    /// `AGENTS.md` "RwLock held only at start/end" — that rule
     /// targets long holds across Argon2id, not the rewrite-commit
     /// critical section.
     ///
@@ -1745,36 +1837,160 @@ pub enum VaultAuthority {
     Member,
 }
 
+/// The key material a session derives SHARED singleton KEKs from.
+///
+/// A pre-B2B session seals its shared singletons under the owner's root-tier
+/// key (`SubkeyRole`); an `NTV6` session seals the same blobs under the group
+/// key (`GroupRole`). The codecs, their AAD role strings and their framing are
+/// identical either way, so this is the ONE place the two derivations differ.
+///
+/// [`Self::derive`] is the only way out of this type. That is load-bearing: it
+/// means a reader cannot hand a shared-tier key to `derive_subkey_versioned` by
+/// mistake, because the accessors return this enum rather than a bare
+/// `Zeroizing<[u8; 32]>`. A missed conversion is a compile error, not a vault
+/// whose prefs silently fail to open after migration.
+pub enum SharedSingletonKey {
+    /// Pre-B2B: derive through `SubkeyRole` off the owner root key.
+    OwnerRoot(Zeroizing<[u8; AEAD_KEY_LEN]>),
+    /// `NTV6`: derive through `GroupRole` off the current group key.
+    Group(Zeroizing<[u8; AEAD_KEY_LEN]>),
+}
+
+impl SharedSingletonKey {
+    /// Derive the shared singleton KEK for `role`. `version` selects the
+    /// root-tier generation and is ignored on the group arm (the group tier is
+    /// always v0.2). An owner-only `role` on the group arm is a programming
+    /// error and panics rather than deriving a key no writer ever produced.
+    pub fn derive(
+        &self,
+        version: protocol::MetaVersion,
+        role: protocol::SubkeyRole,
+    ) -> Zeroizing<[u8; AEAD_KEY_LEN]> {
+        match self {
+            Self::OwnerRoot(root) => protocol::derive_subkey_versioned(version, root, role),
+            Self::Group(group) => {
+                let group_role = role
+                    .shared_group_role()
+                    .expect("owner-only role requested from the group singleton tier");
+                protocol::derive_group_subkey_v0_2(&protocol::GroupKey::new(**group), group_role)
+            }
+        }
+    }
+
+    /// The raw group key when this session is group-held, else `None`. For a
+    /// consumer outside this crate that must reproduce the group derivation
+    /// itself (the export walk, which has no dependency on `myne-core`).
+    pub fn group_bytes(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
+        match self {
+            Self::Group(group) => Some(group.clone()),
+            Self::OwnerRoot(_) => None,
+        }
+    }
+
+    /// The raw owner root key when this session is root-held, else `None`. The
+    /// export walk's twin of [`Self::group_bytes`].
+    pub fn owner_root_bytes(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
+        match self {
+            Self::OwnerRoot(root) => Some(root.clone()),
+            Self::Group(_) => None,
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub struct UnlockedVault {
-    pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// Owner-tier credential. `Some` only for an owner session; a member
+    /// session is `None` by construction, so no member-held slot can carry a
+    /// root key or a root-derived owner credential.
+    pub root_key: Option<Zeroizing<[u8; AEAD_KEY_LEN]>>,
+    /// Current group-key epoch material. `Some` for an `NTV6` session (owner or
+    /// member); `None` for a pre-B2B session, whose shared singletons are
+    /// root-sealed.
+    pub group_key: Option<Zeroizing<[u8; AEAD_KEY_LEN]>>,
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
     pub unlocked_at: u64,
     pub vault_meta_bytes_hash: [u8; 32],
-    pub authority: VaultAuthority,
 }
 
 impl UnlockedVault {
-    /// Build an owner-held unlocked slot. All three populating paths
-    /// (password unlock, recovery promotion, quick-unlock) are owner paths
-    /// and build through this constructor, so the authority is `Owner` by
-    /// construction rather than by per-site repetition.
+    /// Build an owner-held unlocked slot. Every populating path today is an
+    /// owner path and builds through this constructor. `group_key` is `Some`
+    /// for an `NTV6` session and `None` for a pre-B2B one.
     pub fn owner(
         root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+        group_key: Option<Zeroizing<[u8; AEAD_KEY_LEN]>>,
         items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
         items_key_id: [u8; 16],
         unlocked_at: u64,
         vault_meta_bytes_hash: [u8; 32],
     ) -> Self {
         Self {
-            root_key,
+            root_key: Some(root_key),
+            group_key,
             items_key,
             items_key_id,
             unlocked_at,
             vault_meta_bytes_hash,
-            authority: VaultAuthority::Owner,
         }
+    }
+
+    /// Build a member-held unlocked slot: the group tier and the vault's
+    /// `itemsKey`, and NO root key, which is what makes "a member cannot run an
+    /// owner-only command" a property of the type rather than of a check.
+    pub fn member(
+        group_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+        items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+        items_key_id: [u8; 16],
+        unlocked_at: u64,
+        vault_meta_bytes_hash: [u8; 32],
+    ) -> Self {
+        Self {
+            root_key: None,
+            group_key: Some(group_key),
+            items_key,
+            items_key_id,
+            unlocked_at,
+            vault_meta_bytes_hash,
+        }
+    }
+
+    /// Whether this session holds the vault as its administrator or as an
+    /// invited participant. Derived from the tier rather than stored, so the
+    /// two cannot disagree.
+    pub fn authority(&self) -> VaultAuthority {
+        if self.root_key.is_some() {
+            VaultAuthority::Owner
+        } else {
+            VaultAuthority::Member
+        }
+    }
+
+    /// Owner-tier root key, or `None` for a member session.
+    pub fn owner_root_key(&self) -> Option<&Zeroizing<[u8; AEAD_KEY_LEN]>> {
+        self.root_key.as_ref()
+    }
+
+    /// The key this session derives shared singleton KEKs from. A group-held
+    /// session always has a group key, so the `expect` is unreachable for a
+    /// well-formed slot.
+    pub fn shared_singleton_key(&self) -> SharedSingletonKey {
+        match &self.group_key {
+            Some(group) => SharedSingletonKey::Group(group.clone()),
+            None => SharedSingletonKey::OwnerRoot(
+                self.root_key
+                    .clone()
+                    .expect("a group-less unlocked slot is owner-held"),
+            ),
+        }
+    }
+
+    /// Install the group tier on an already-unlocked session — the commit step
+    /// of the explicit `NTV5` to `NTV6` migration, after which this session's
+    /// shared singletons are group-sealed and must derive through the group
+    /// tier rather than the root tier.
+    pub fn set_group_key(&mut self, group_key: Zeroizing<[u8; AEAD_KEY_LEN]>) {
+        self.group_key = Some(group_key);
     }
 }
 
@@ -1864,6 +2080,7 @@ pub fn fixture_unlocked_with_keys(
     // future accept command, not by a fixture.
     UnlockedVault::owner(
         Zeroizing::new([root_byte; AEAD_KEY_LEN]),
+        None,
         Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         [items_id_byte; 16],
         0,
@@ -1907,17 +2124,38 @@ mod tests {
         // this constructor, so asserting it lands `Owner` pins all three.
         let uv = UnlockedVault::owner(
             Zeroizing::new([7u8; AEAD_KEY_LEN]),
+            None,
             Zeroizing::new([9u8; AEAD_KEY_LEN]),
             [1u8; 16],
             0,
             [0xFF; 32],
         );
-        assert_eq!(uv.authority, VaultAuthority::Owner);
+        assert_eq!(uv.authority(), VaultAuthority::Owner);
         assert_ne!(
             VaultAuthority::Member,
             VaultAuthority::Owner,
             "member is a distinct authority for the future accept path"
         );
+    }
+
+    #[test]
+    fn person_profile_key_is_installed_cloned_and_dropped() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            assert!(state.clone_person_profile().await.is_none());
+            state
+                .set_person_profile([0x11; 16], Zeroizing::new([0x22; AEAD_KEY_LEN]))
+                .await;
+            let (id, key) = state.clone_person_profile().await.expect("installed");
+            assert_eq!(id, [0x11; 16]);
+            assert_eq!(*key, [0x22; AEAD_KEY_LEN]);
+            let (taken_id, _) = state.take_person_profile().await.expect("taken");
+            assert_eq!(taken_id, [0x11; 16]);
+            assert!(
+                state.clone_person_profile().await.is_none(),
+                "the profile key is gone after take"
+            );
+        });
     }
 
     /// Build a current-thread tokio runtime for a single test.
@@ -2218,7 +2456,7 @@ mod tests {
             let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Unlocked(uv) => {
-                    assert_eq!(*uv.root_key, [7u8; AEAD_KEY_LEN]);
+                    assert_eq!(**uv.owner_root_key().expect("owner"), [7u8; AEAD_KEY_LEN]);
                     assert_eq!(*uv.items_key, [9u8; AEAD_KEY_LEN]);
                     assert_eq!(uv.items_key_id, [1u8; 16]);
                 }
@@ -2530,7 +2768,10 @@ mod tests {
             // the Recovering entry's are its own (0xAA) — independent storage.
             let unlocked = state.slot_read(id_unlocked).await;
             match &*unlocked {
-                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x11u8; AEAD_KEY_LEN]),
+                Slot::Unlocked(uv) => assert_eq!(
+                    **uv.owner_root_key().expect("owner"),
+                    [0x11u8; AEAD_KEY_LEN]
+                ),
                 other => panic!("expected Unlocked, got {:?}", slot_label(other)),
             }
             drop(unlocked);
@@ -2619,7 +2860,10 @@ mod tests {
             // And B's bytes are the ones we set (not A's — no aliasing).
             let unlocked = state.slot_read(id_b).await;
             match &*unlocked {
-                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x21u8; AEAD_KEY_LEN]),
+                Slot::Unlocked(uv) => assert_eq!(
+                    **uv.owner_root_key().expect("owner"),
+                    [0x21u8; AEAD_KEY_LEN]
+                ),
                 other => panic!("expected Unlocked, got {:?}", slot_label(other)),
             }
         });
@@ -2723,7 +2967,10 @@ mod tests {
                 .set_unlocked_locking_others(id_b, fixture_unlocked_with_keys(0xB1, 0xB2, 0xB3))
                 .await;
             match prior_switch {
-                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0xA1u8; AEAD_KEY_LEN]),
+                Slot::Unlocked(uv) => assert_eq!(
+                    **uv.owner_root_key().expect("owner"),
+                    [0xA1u8; AEAD_KEY_LEN]
+                ),
                 other => panic!(
                     "expected the locked prior A as Slot::Unlocked, got {:?}",
                     slot_label(&other)
@@ -2936,7 +3183,10 @@ mod tests {
             // Unlocked entry, not the Recovering one, that reaches the editor.
             let editor_view = state.slot_read_active().await;
             match &*editor_view {
-                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x11u8; AEAD_KEY_LEN]),
+                Slot::Unlocked(uv) => assert_eq!(
+                    **uv.owner_root_key().expect("owner"),
+                    [0x11u8; AEAD_KEY_LEN]
+                ),
                 other => panic!(
                     "editor must see the Unlocked vault, got {:?}",
                     slot_label(other)
@@ -3038,9 +3288,9 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             let mut a = fixture_unlocked();
-            a.root_key = Zeroizing::new([1u8; AEAD_KEY_LEN]);
+            a.root_key = Some(Zeroizing::new([1u8; AEAD_KEY_LEN]));
             let mut b = fixture_unlocked();
-            b.root_key = Zeroizing::new([2u8; AEAD_KEY_LEN]);
+            b.root_key = Some(Zeroizing::new([2u8; AEAD_KEY_LEN]));
 
             assert!(matches!(
                 state.set_unlocked(test_vault_id(), a).await,
@@ -3048,7 +3298,9 @@ mod tests {
             ));
             let prior = state.set_unlocked(test_vault_id(), b).await;
             match prior {
-                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [1u8; AEAD_KEY_LEN]),
+                Slot::Unlocked(uv) => {
+                    assert_eq!(**uv.owner_root_key().expect("owner"), [1u8; AEAD_KEY_LEN])
+                }
                 other => panic!(
                     "expected prior Slot::Unlocked, got {:?}",
                     slot_label(&other)
@@ -3120,6 +3372,7 @@ mod tests {
             // the A8f closure body's promotion step, which builds Owner).
             let promoted = UnlockedVault::owner(
                 recovering.root_key,
+                None,
                 recovering.items_key,
                 recovering.items_key_id,
                 0,

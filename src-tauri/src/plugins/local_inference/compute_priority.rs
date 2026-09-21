@@ -25,7 +25,7 @@
 //! than a priority rule. The integration proof of both claims is task 11.
 //!
 //! Content-free: this module holds one counter and never sees a prompt, note
-//! body, or transcript (DENY-list, `src-tauri/CLAUDE.md`).
+//! body, or transcript (DENY-list, `src-tauri/AGENTS.md`).
 
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicUsize, Ordering};

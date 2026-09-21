@@ -23,7 +23,7 @@
 //!
 //! * **every escape alphabet**, not one example each — CSS `\` escapes in hex
 //!   and identifier form, HTML entities, percent-encoding, unicode escapes;
-//! * **the `$` family**, which `CLAUDE.md` records as a live foot-gun: a
+//! * **the `$` family**, which `AGENTS.md` records as a live foot-gun: a
 //!   `String.replace` replacement STRING expands `$1`, `$&`, `` $` `` and `$$`,
 //!   so a value filtered clean of quotes can still expand to a captured group
 //!   whose own quote closes the attribute it is interpolated into. That is not
@@ -99,7 +99,7 @@ fn hostile_corpus() -> Vec<(&'static str, &'static str)> {
         ("clamp", "clamp(1px, 2px, 3px)"),
         ("gradient", "linear-gradient(red, blue)"),
         ("counter", "counter(x)"),
-        // ── the `$` family (CLAUDE.md's replacement-string foot-gun) ──
+        // ── the `$` family (AGENTS.md's replacement-string foot-gun) ──
         ("dollar group", "$1"),
         ("dollar group with payload", "$1 onload=alert(1)"),
         ("dollar ampersand", "$&"),
@@ -308,7 +308,7 @@ fn an_interior_control_character_is_refused_by_the_grammar() {
 /// cannot be made to accept a second declaration, so a value it cannot parse is
 /// simply dropped. Of the stripped set, `;` and `}` are not members, so nothing
 /// that terminates a declaration can ride in this way. The marketplace preview
-/// renderer is the other sink and interpolates textually; `CLAUDE.md` records
+/// renderer is the other sink and interpolates textually; `AGENTS.md` records
 /// that it was already moved to a replacer function for the related `$1`
 /// foot-gun.
 ///

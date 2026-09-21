@@ -39,7 +39,7 @@
 //! can observe — the tests here and in `super::socket` assert exact ages, and
 //! that only works when the instance under test is the test's own.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — this
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — this
 //! module holds one timestamp. It never sees a note id, a folder name, a
 //! path or a body, and it logs nothing at all.
 

@@ -3,7 +3,7 @@
 //! only** — the desktop infer/embed/chat/semantic-search commands are out of
 //! scope on mobile.
 //!
-//! Discipline (`src-tauri/CLAUDE.md`, normative here too): the decrypted WAV, the
+//! Discipline (`src-tauri/AGENTS.md`, normative here too): the decrypted WAV, the
 //! derived PCM, and the transcript are `Zeroizing`/never-logged; the model call
 //! runs under `spawn_blocking` (CPU-bound, keeps the async command `Send`), the
 //! engine reached ONLY through the `Engine` trait; the `transcription_enabled`
@@ -68,10 +68,10 @@ pub async fn transcribe<R: Runtime>(
 
     // Resolve the unlocked slot's key material + the active vault dir.
     let keys = match vault_state.peek_unlocked_attachment_material().await {
-        Some((items_key, items_key_id, root_key)) => ServeKeys {
+        Some((items_key, items_key_id, shared)) => ServeKeys {
             items_key,
             items_key_id,
-            root_key,
+            shared,
         },
         None => return Err(EngineError::NotReady),
     };
@@ -107,7 +107,7 @@ pub async fn transcribe<R: Runtime>(
         // a cache-write miss must not discard the transcript the user has.
         persist_transcript_cache(
             &vault_dir,
-            &keys.root_key,
+            &keys.shared,
             &attachment_id,
             &transcript,
             &app_for_cache,
@@ -129,8 +129,12 @@ pub async fn transcribe<R: Runtime>(
 /// attachment-text cache). `None` on IO / parse failure. Used, never logged.
 fn read_account_number_hash(
     vault_dir: &Path,
-) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
+) -> Option<(
+    protocol::MetaVersion,
+    [u8; protocol::VAULT_META_ACCOUNT_HASH_LEN],
+)> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     // Either generation (myne-md/myne#433), which this twin did not get until
     // myne-md/myne#479. `parse_vault_meta` hard-rejects the `NTV5` magic, and
     // this reader answers `None` rather than erroring, so on a MIGRATED vault
@@ -139,7 +143,7 @@ fn read_account_number_hash(
     // That is the exact silent shape `scripts/check-version-routing.mjs`
     // exists to catch, and its `ROOTS` had never included this tree.
     protocol::parse_vault_meta_any(&bytes)
-        .map(|m| m.account_number_hash)
+        .map(|m| (version, m.account_number_hash))
         .ok()
 }
 
@@ -150,7 +154,7 @@ fn read_account_number_hash(
 /// Best-effort; DENY-list: no transcript / hash / path is logged.
 fn persist_transcript_cache<R: Runtime>(
     vault_dir: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     attachment_id_hex: &str,
     transcript: &str,
     app: &AppHandle<R>,
@@ -160,12 +164,11 @@ fn persist_transcript_cache<R: Runtime>(
     else {
         return;
     };
-    let Some(account_number_hash) = read_account_number_hash(vault_dir) else {
+    let Some((version, account_number_hash)) = read_account_number_hash(vault_dir) else {
         return;
     };
     let model_hash = super::model_store::transcription_model_hash_for(app);
-    let attachment_text_key =
-        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let attachment_text_key = shared.derive(version, protocol::SubkeyRole::AttachmentTextKey);
     let _ = myne_core::plugins::attachments::text_cache::write_transcript(
         vault_dir,
         &attachment_text_key,
@@ -187,14 +190,14 @@ pub async fn read_transcript<R: Runtime>(
     app: AppHandle<R>,
     vault_state: State<'_, VaultRuntimeState>,
 ) -> Result<Option<String>, EngineError> {
-    let Some(root_key) = vault_state.peek_unlocked_root_key_clone().await else {
+    let Some(shared) = vault_state.peek_unlocked_shared_singleton_key().await else {
         return Err(EngineError::NotReady);
     };
     let active_id = vault_state.active_vault_id().await;
     let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
         .map_err(|_| EngineError::TranscriptionFailed)?;
     let transcript = tokio::task::spawn_blocking(move || -> Option<String> {
-        read_cached_transcript(&vault_dir, &root_key, &attachment_id)
+        read_cached_transcript(&vault_dir, &shared, &attachment_id)
     })
     .await
     .map_err(|_| EngineError::TranscriptionFailed)?;
@@ -205,14 +208,13 @@ pub async fn read_transcript<R: Runtime>(
 /// `None` on any miss. Sync (runs in `spawn_blocking`); never logged.
 fn read_cached_transcript(
     vault_dir: &Path,
-    root_key: &[u8; 32],
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     attachment_id_hex: &str,
 ) -> Option<String> {
     let attachment_id =
         myne_core::plugins::attachments::commands::hex_decode_id(attachment_id_hex)?;
-    let account_number_hash = read_account_number_hash(vault_dir)?;
-    let attachment_text_key =
-        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let (version, account_number_hash) = read_account_number_hash(vault_dir)?;
+    let attachment_text_key = shared.derive(version, protocol::SubkeyRole::AttachmentTextKey);
     let extracted = myne_core::plugins::attachments::text_cache::read_extracted(
         vault_dir,
         &attachment_text_key,

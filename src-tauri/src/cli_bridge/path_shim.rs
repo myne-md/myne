@@ -39,7 +39,7 @@
 //! production today (Tauri bundles have no uninstall hook that runs our code),
 //! so it is the tested opt-out seam a "remove from PATH" affordance would use.
 //!
-//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — the shim
+//! See: src-tauri/AGENTS.md "Secret-handling logging discipline" — the shim
 //! path and the sidecar path are full filesystem paths (DENY list), so this
 //! module logs bounded outcome labels and a boolean only, never a path.
 

@@ -78,7 +78,7 @@ export type WorkerResponse =
  * panic message can carry a path, a note id, or a fragment of plaintext, and
  * this value reaches the page — where it can be read by devtools, by any
  * extension with devtools access, and by whoever the user screenshots it to
- * (`src-tauri/CLAUDE.md`, secret-handling logging discipline). `where` is
+ * (`src-tauri/AGENTS.md`, secret-handling logging discipline). `where` is
  * `file:line`, which is bounded by construction.
  */
 export class WorkerFatalError extends Error {
@@ -125,7 +125,7 @@ export const FATAL_CODES = {
    *
    * A fatal startup outcome rather than a warning, and deliberately so. Every
    * AEAD nonce and every fresh key in the product draws from that source
-   * (`protocol/CLAUDE.md`: *"Nonce reuse is catastrophic … there is no
+   * (`protocol/AGENTS.md`: *"Nonce reuse is catastrophic … there is no
    * counter-mode fallback"*), so a vault that opened without it would encrypt
    * its next write with a nonce this client cannot vouch for. Refusing before
    * the unlock screen is the only correct answer.

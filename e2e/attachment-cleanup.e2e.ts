@@ -24,7 +24,7 @@
 // KDF: weak generator fixtures (unlock reads params from vault.meta).
 //
 // ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
 // `./scripts/e2e-local.sh` before merge; it also introduces the first
 // command-palette + attachments-library driving (new testids
 // `palette.input` / `palette.option` / `attachments.clean-unused-cta` /

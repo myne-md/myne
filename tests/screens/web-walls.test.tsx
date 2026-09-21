@@ -51,7 +51,7 @@ describe("no-account / no-sync walls", () => {
       cleanup();
       render(<WebNoAccount wall={wall} />);
       // One selector, and the VARIANT read off a discriminator attribute (task
-      // 100) — the shape `src/CLAUDE.md` asks for, and the shape that lets the
+      // 100) — the shape `src/AGENTS.md` asks for, and the shape that lets the
       // testid guard reject an interpolated `data-*` on a pre-unlock screen.
       const body = screen.getByTestId("web.wall");
       expect(body.getAttribute("data-wall")).toBe(wall);

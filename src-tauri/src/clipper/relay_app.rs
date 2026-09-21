@@ -54,7 +54,7 @@
 //! status path is a `Slot` read. There is no HTTP client, no socket dial beyond
 //! the LOCAL Unix socket, no URL dereference anywhere on the ingest path.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};

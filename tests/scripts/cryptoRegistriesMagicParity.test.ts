@@ -1,7 +1,7 @@
 // Injection tests for `check-crypto-registries.mjs` rule 5 (magic-generation
 // parity), added with myne-md/myne#638.
 //
-// Root `CLAUDE.md`: "Verifying a guard means breaking it, not running it."
+// Root `AGENTS.md`: "Verifying a guard means breaking it, not running it."
 // Every case below builds a synthetic tree, runs the real guard over it with
 // `--root`, and asserts on what it says. Hand-mutating the checkout proves the
 // same thing once and then expires, and the two guard fixes that motivated this
@@ -226,7 +226,7 @@ pub fn decode(blob: &[u8]) -> bool {
     // the source spelling moved, `fam.base.re` would match nothing, the loop
     // would `continue`, and the note family's parity check would silently stop
     // existing while the guard printed ok. That is the same silent-pass shape
-    // the whole rule exists to remove, so it gets the injection root CLAUDE.md
+    // the whole rule exists to remove, so it gets the injection root AGENTS.md
     // asks for: put the defect in, watch it named, take it out.
     const root = fixture({
       "core/src/note_reader.rs":

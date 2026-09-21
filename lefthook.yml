@@ -20,7 +20,7 @@ pre-commit:
 
     spdx-header:
       # Every protocol/ source file MUST carry the AGPL-3.0 SPDX header on line 1
-      # (root CLAUDE.md "License" + protocol/CLAUDE.md). This is the machine-readable
+      # (root AGENTS.md "License" + protocol/AGENTS.md). This is the machine-readable
       # anchor of the file-level licensing claim; drift here is a normative violation.
       # Fix: add `// SPDX-License-Identifier: AGPL-3.0` as the first line.
       run: |
@@ -668,7 +668,7 @@ pre-commit:
     secret-scan:
       # Two tiers, because the one-tier version this replaces missed the secret
       # that actually got committed in the agent-tooling companion: a
-      # PLANE_API_KEY in .claude-plugin/plugin.json matched none of PEM / AKIA /
+      # PLANE_API_KEY in a committed JSON manifest matched none of PEM / AKIA /
       # aws_secret_access_key and sat in the tree for months. A guard whose only
       # real test it failed is worth rewriting rather than trusting. The `run:`
       # block below is kept byte-identical to the agent-tooling copy so the two
@@ -680,7 +680,7 @@ pre-commit:
       #            the tier that catches the Plane-shaped key, and the tier that
       #            no threshold can make precise. Measured, not assumed: this
       #            repo deliberately ships high-entropy test needles
-      #            (e2e/CLAUDE.md requires the plaintext-residue markers be
+      #            (e2e/AGENTS.md requires the plaintext-residue markers be
       #            single alnum tokens >=24 chars, tokenizer-survivable) and
       #            they are indistinguishable from an API key by length, digit
       #            count and character variety alike. So tier 2 carries an
@@ -742,7 +742,7 @@ pre-commit:
         exit $fail
 
 pre-push:
-  # Heavier checks — matches CLAUDE.md's "Common commands" baseline.
+  # Heavier checks — matches AGENTS.md's "Common commands" baseline.
   # Local pre-push net; Woodpecker CI (.woodpecker/) is the remote gate.
   parallel: false
   # A target directory of the hook's OWN, and the reason is a real failure that
@@ -755,7 +755,7 @@ pre-push:
   # `cargo test` run in another terminal while a push is in flight shares
   # `target/`, and two cargos in one directory produce exactly this shape:
   # long waits on the build lock, and ghost failures against a tree that is
-  # clean (see the repo-root CLAUDE.md gotcha on shared-target collisions). It
+  # clean (see the repo-root AGENTS.md gotcha on shared-target collisions). It
   # is most likely precisely when someone is iterating — which is when they push.
   #
   # `target/pre-push` costs one more build directory and one cold build the

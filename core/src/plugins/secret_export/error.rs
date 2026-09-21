@@ -1,7 +1,7 @@
 //! `secret-export` plugin IPC error enum.
 //!
 //! Closed taxonomy — DENY-list clean (no path strings, no secret material, no
-//! kernel-error display strings). See `src-tauri/CLAUDE.md` "Secret-handling
+//! kernel-error display strings). See `src-tauri/AGENTS.md` "Secret-handling
 //! logging discipline". Hand-mirrored on the TS side (`secret-export.ts` only
 //! logs a static `fs-write-failed` kind, never the error payload).
 

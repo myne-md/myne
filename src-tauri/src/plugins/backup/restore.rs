@@ -24,7 +24,7 @@
 //! touches nothing; staging failures remove the staged dir; a crashed
 //! commit leaves only an invisible staging dir for the sweep.
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+//! Logging: see `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
 use crate::backup_container::{
     extract_all_members, extract_member, read_and_verify_container_hooked,
@@ -407,7 +407,7 @@ pub(crate) fn sweep_stale_staging(vaults_dir: &Path) {
     }
 }
 
-// see: ../../CLAUDE.md "Secret-handling logging discipline"
+// see: ../../AGENTS.md "Secret-handling logging discipline"
 
 #[cfg(test)]
 mod tests {

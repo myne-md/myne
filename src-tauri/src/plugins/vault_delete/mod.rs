@@ -27,7 +27,7 @@
 //! - Tasks: `agent-tooling/features/backend-vault-delete/tasks.md`
 //! - decisions.md: 2026-05-26 entries (a) crypto-erase claim, (b) Slot precondition matrix + R3, (c) partial-fail posture + v0.2 vault_repair (Plane MYND-159), (d) VaultArtifactsPresent rename
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // The vault-delete command core + `error` moved to `myne-core` (shared with the
 // mobile client). The backup-preempt + delete-proceeded teardown side-effects

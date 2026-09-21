@@ -42,7 +42,7 @@
  *
  * English only. The translated strings are Weblate's and a key-by-key
  * vocabulary assertion over 31 catalogs would fail on every legitimate
- * translation of "Ctrl". English is the source of truth (`src/CLAUDE.md`), so
+ * translation of "Ctrl". English is the source of truth (`src/AGENTS.md`), so
  * this is where the two lists have to agree; a translation that drops a chord
  * is a translation bug, on the manual-reading lane where `cli.door` already
  * lives.

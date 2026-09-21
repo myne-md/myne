@@ -98,7 +98,7 @@ struct LoadedGen {
 
 /// The four `stage` labels one Qwen2-GGUF load emits. Carried as a struct of
 /// `&'static str` rather than formatted per role, because a `stage` must stay a
-/// bounded static string (DENY-list, `src-tauri/CLAUDE.md`) — this is what lets
+/// bounded static string (DENY-list, `src-tauri/AGENTS.md`) — this is what lets
 /// the generation and tag roles share [`CandleEngine::load_qwen2_gguf`] while
 /// still logging distinguishable stages.
 struct GgufLoadStages {
@@ -559,7 +559,7 @@ impl CandleEngine {
 /// Log a FORMAT/parse-stage failure (candle / tokenizer / serde) and map to a
 /// bounded [`EngineError`]. The candle error `Display` CAN embed the model file
 /// path (candle's `Error::WithPath` wraps IO failures), which is DENY-listed
-/// (full filesystem path leakage, `src-tauri/CLAUDE.md`). So the ERROR-level line
+/// (full filesystem path leakage, `src-tauri/AGENTS.md`). So the ERROR-level line
 /// carries only the bounded `stage` string; the fuller message — the load-bearing
 /// format diagnostic (e.g. a Qwen2.5-vs-Qwen2 tensor mismatch), which may include
 /// the path — is emitted at DEBUG, opt-in behind `RUST_LOG=myne::ai=debug`.
@@ -574,7 +574,7 @@ pub(super) fn fmt_stage_fail(
 }
 
 /// Log an IO-stage failure via the bounded [`crate::io_failure_kind`] enum — NEVER
-/// the raw `io::Error` / path (DENY-list, `src-tauri/CLAUDE.md`) — and map to a
+/// the raw `io::Error` / path (DENY-list, `src-tauri/AGENTS.md`) — and map to a
 /// bounded [`EngineError`].
 fn io_stage_fail(stage: &'static str, e: &std::io::Error, kind: EngineError) -> EngineError {
     let io_failure_kind = crate::io_failure_kind::from_io_error_kind(e.kind());

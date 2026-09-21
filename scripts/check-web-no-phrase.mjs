@@ -117,7 +117,7 @@ const MARKERS = [
 // reason they duplicate a component. Landing the surface and not the needle made
 // all three citations false at once, and the guard went on printing ok over a
 // bundle it was not looking for the new grid in. Found in review on
-// myne-md/myne#636; it is the same shape `CLAUDE.md` records three times over,
+// myne-md/myne#636; it is the same shape `AGENTS.md` records three times over,
 // a check passing on an input it could not see.
 
 // #273: every served byte, fail-closed on an unclassified extension. This read

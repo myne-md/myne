@@ -18,7 +18,7 @@
 //! and the byte names which of the other two doors it is.
 //!
 //! Content only, never a secret: one ASCII byte, no note ids, no folder
-//! names, no paths (see src-tauri/CLAUDE.md "Secret-handling logging
+//! names, no paths (see src-tauri/AGENTS.md "Secret-handling logging
 //! discipline" — the DENY list this file's shape never touches). Best
 //! effort: a hard-kill leaves a stale marker behind, which is an
 //! advisory-only wrong message (never a security boundary — the actual

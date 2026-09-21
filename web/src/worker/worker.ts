@@ -16,7 +16,7 @@
 //
 // No `console.*` of any command payload, argument, or error value. Those carry
 // note bodies, note ids and filesystem paths — the DENY list in
-// `src-tauri/CLAUDE.md`'s secret-handling logging discipline applies verbatim,
+// `src-tauri/AGENTS.md`'s secret-handling logging discipline applies verbatim,
 // and it applies harder here: the browser console is readable by devtools, by
 // any extension with devtools access, and is what a user screenshots into a bug
 // report. Task 82 owns the diagnostic sink that makes bounded logging possible;
@@ -180,7 +180,7 @@ function fromEnvelope(id: number, envelope: unknown): WorkerResponse {
  * this far — but a registration that links and then throws (no secure context,
  * a hostile `crypto` object) would otherwise first surface as a failed write,
  * long after the user typed a password. Every nonce in the product comes from
- * that source (`protocol/CLAUDE.md`: "Nonce reuse is catastrophic … there is no
+ * that source (`protocol/AGENTS.md`: "Nonce reuse is catastrophic … there is no
  * counter-mode fallback"), so a vault must not be openable without it.
  */
 async function start(): Promise<void> {

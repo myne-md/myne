@@ -199,7 +199,7 @@ class PropertiesWidget extends WidgetType {
     input.setAttribute("aria-label", i18n.t("editor.frontmatter.titleAriaLabel"));
     // myne#653: this is now where a note gets its name, since creating one no
     // longer opens the sidebar's inline rename. It had no testid, so the E2E
-    // suite had nothing to type into (`src/CLAUDE.md`: "A screen without
+    // suite had nothing to type into (`src/AGENTS.md`: "A screen without
     // testids is invisible to E2E").
     input.setAttribute("data-testid", TITLE_FIELD_TESTID);
 

@@ -11,7 +11,7 @@
 //! `myne-core`. Mobile registers the core `attachment_import` command instead,
 //! which is extraction-free (no cache written).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use myne_core::plugins::attachments::commands::{
     attachment_import_with_dir_ext, ImportSource, ImportedAttachment,

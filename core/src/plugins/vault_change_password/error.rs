@@ -13,7 +13,7 @@
 //! variants on `VaultUnlockError`, `VaultRecoveryError`, and (where
 //! applicable) `AppError`.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::io_failure_kind::IoFailureKind;
 use serde::Serialize;

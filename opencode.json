@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
-    ".claude/skills/adhd/SKILL.md",
-    ".claude/skills/diverge/SKILL.md"
+    ".opencode/skills/adhd/SKILL.md",
+    ".opencode/skills/diverge/SKILL.md"
   ],
   "permission": {
     "bash": {

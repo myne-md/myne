@@ -20,7 +20,7 @@
 //!   so there is no key to strand and the call is a no-op that costs
 //!   nothing to keep symmetric.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::VaultRepairError;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};

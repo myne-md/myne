@@ -13,7 +13,7 @@
 // ENVIRONMENT the app runs in — the same levers a user's OS pulls. It may never
 // be used to reach into the app, read its state, or force it into a state the
 // UI cannot produce. That would be a test hook wearing a protocol's name, and
-// `e2e/CLAUDE.md`'s "zero test hooks" rule is about the property, not the
+// `e2e/AGENTS.md`'s "zero test hooks" rule is about the property, not the
 // spelling.
 //
 // # Chromium only, and said out loud rather than skipped

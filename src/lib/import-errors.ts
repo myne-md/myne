@@ -10,7 +10,7 @@
 //
 // Two consumers with different needs, hence two functions: the engine wants a
 // stable REASON CODE to record per file, and the UI wants an i18n key to
-// render. Per `src/CLAUDE.md`, the key is returned and resolved at the call
+// render. Per `src/AGENTS.md`, the key is returned and resolved at the call
 // site — never a `t()` frozen at module level, which would capture the boot
 // language.
 

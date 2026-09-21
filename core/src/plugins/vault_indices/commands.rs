@@ -12,7 +12,7 @@
 //! `Slot::Unlocked` because the index is plaintext-derived RAM that only
 //! exists while a vault is open.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
@@ -22,9 +22,7 @@ use super::state::{
 };
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
-use protocol::{
-    derive_subkey, parse_vault_meta_any, SubkeyRole, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
-};
+use protocol::{parse_vault_meta_any, SubkeyRole, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN};
 use std::path::Path;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -546,13 +544,20 @@ pub async fn vault_indices_remove(
 async fn read_account_number_hash(
     io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN], VaultIndicesError> {
+) -> Result<
+    (
+        protocol::MetaVersion,
+        [u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN],
+    ),
+    VaultIndicesError,
+> {
     let bytes = io
         .read(vault_meta_path)
         .await
         .map_err(|_| VaultIndicesError::InvalidVaultMeta)?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     let meta = parse_vault_meta_any(&bytes).map_err(|_| VaultIndicesError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    Ok((version, meta.account_number_hash))
 }
 
 // The decryption-free on-disk nonce scan (`scan_on_disk_manifest`) is shared
@@ -576,14 +581,15 @@ pub async fn vault_indices_persist_from_host(
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), VaultIndicesError> {
     // SYNC-6 writer-guard held across the atomic_write below (MYND-32 pattern).
-    let (_slots_guard, root_key, _vmh) = runtime
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = runtime
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(VaultIndicesError::SlotNotUnlocked)?;
     let active_id = runtime.active_vault_id().await;
     let vault_dir = crate::paths::active_vault_root_from_host(host, active_id)
         .map_err(|_| VaultIndicesError::PersistIo)?;
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     // `notes_dir_under` both validates and CREATES; through the seam so the
     // wasm arm can do the same. `<vault>/notes` existing is the precondition —
     // an index persist for a vault with no notes dir is a no-op waiting to
@@ -593,7 +599,7 @@ pub async fn vault_indices_persist_from_host(
         .await
         .map_err(|_| VaultIndicesError::PersistIo)?;
 
-    let vault_indices_key = derive_subkey(&root_key, SubkeyRole::VaultIndicesKey);
+    let vault_indices_key = shared.derive(meta_version, SubkeyRole::VaultIndicesKey);
     let manifest = crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir).await;
     let records = indices.snapshot();
 
@@ -654,19 +660,20 @@ pub async fn vault_indices_hydrate_from_host(
     indices: &VaultIndicesState,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<Vec<String>, VaultIndicesError> {
-    let (root_key, _vmh) = runtime
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = runtime
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(VaultIndicesError::SlotNotUnlocked)?;
     let active_id = runtime.active_vault_id().await;
     let vault_dir = crate::paths::active_vault_root_from_host(host, active_id)
         .map_err(|_| VaultIndicesError::PersistIo)?;
-    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
+    let (meta_version, account_number_hash) =
+        read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let notes_dir = vault_dir.join("notes");
     io.create_dir_all(&notes_dir)
         .await
         .map_err(|_| VaultIndicesError::PersistIo)?;
-    let vault_indices_key = derive_subkey(&root_key, SubkeyRole::VaultIndicesKey);
+    let vault_indices_key = shared.derive(meta_version, SubkeyRole::VaultIndicesKey);
 
     // Decryption-free staleness scan of the current notes dir, through the seam.
     let on_disk = crate::note_nonce::scan_on_disk_manifest_io(io, &notes_dir).await;

@@ -10,7 +10,7 @@
 #     into the product build or CI.
 #   * `libfuzzer-sys` / `arbitrary` never enter the shipped binary's
 #     dependency graph — "adding a dependency is a security decision"
-#     (root CLAUDE.md) stays intact.
+#     (root AGENTS.md) stays intact.
 #
 # Run recipes live in README.md.
 

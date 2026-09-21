@@ -13,7 +13,7 @@
 // hook plus the two panes it collapses — by `e2e/window-resize-collapse.e2e.ts`.
 //
 // This paragraph used to say the trigger "is a window resize, which the
-// tauri-driver harness has no primitive to drive", citing the e2e/CLAUDE.md
+// tauri-driver harness has no primitive to drive", citing the e2e/AGENTS.md
 // "states unreachable through real UI" downgrade (MYND-192). That was wrong,
 // and wrong in a way that costs features rather than coverage: W3C WebDriver
 // has had `POST /window/rect` all along, nothing in this suite had happened to

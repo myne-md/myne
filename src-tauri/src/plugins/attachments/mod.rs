@@ -45,7 +45,7 @@
 //! word); `build.rs` declares it as an `InlinedPlugin` so permissions
 //! resolve under the `attachments:` namespace.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 // Platform-agnostic plugin core, re-exported so `crate::plugins::attachments::…`
 // paths keep resolving (hooks.rs, notes, export, search_sync, clipper,

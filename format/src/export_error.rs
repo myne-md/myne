@@ -11,7 +11,7 @@
 //! `commands::vault_export_error_kind` — a new variant compile-fails
 //! its match).
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+//! See: ../../AGENTS.md "Secret-handling logging discipline".
 
 use crate::io_failure_kind::IoFailureKind;
 use serde::Serialize;

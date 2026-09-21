@@ -1165,6 +1165,71 @@ The visualization of `[[wikilink]]` relationships between notes as a force-direc
 
 Used in: `vision.md` Phase 1 Scope
 
+### **group key** &nbsp; 🗝️ *Key/identifier*
+
+A random 32-byte shared content authority for a B2B vault. It opens the current
+group content epoch but never opens the owner-only `root_key` authority. Removing
+a member retires its epoch and generates a fresh group key for the remaining
+members; it cannot revoke ciphertext the removed member already copied.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §3.4
+
+### **group-key epoch** &nbsp; 🗝️ *Key/identifier*
+
+The monotonically increasing generation number of a B2B vault's [group
+key](#group-key), starting at 1. Removing a member retires the current epoch and
+mints the next (`epoch + 1`); a reader accepts a strictly-greater owner-signed
+epoch only and refuses an EQUAL epoch rather than tie-breaking, so two
+conflicting rosters at one epoch cannot both be canonical. The epoch is carried
+in the owner-signed roster and bound into the group-key-wrap AAD.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.2
+
+### **group package** &nbsp; 🗝️ *Key/identifier*
+
+One live member's owner-signed recipient record for a group-key epoch: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`recipient_fingerprint_hex`, `wrapped_group_key_hex`) under the signature class
+`"myne.group-package v1|"`, where the wrapped key is the PQ-hybrid person
+envelope over the 32-byte `group_key`. A reader verifies both owner signatures,
+requires the expected vault, epoch and local fingerprint, and requires byte
+equality with that member's live row in the already-verified roster.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+### **group roster** &nbsp; 🗝️ *Key/identifier*
+
+The owner-authored, owner-double-signed membership list of an `NTV6` vault: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`owner_fingerprint_hex`, and `members` strictly sorted by fingerprint) under the
+signature class `"myne.group-roster v1|"`. It lives SEALED (under the group tier,
+§9.3.3) in the `NTV6` `vault.meta`, so the sync server reads neither the member
+fingerprints nor the display names. A member verifies it from the pinned owner
+public half; neither `root_key` nor a root-derived membership key participates.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+
+### **roster continuity** &nbsp; 📋 *Protocol*
+
+A live roster row's identity-continuity state in an `NTV6` group roster:
+`current` (no prior identity), `changed` (the row's fingerprint superseded a
+previous one and the owner has not vouched for it) or `owner-confirmed` (the
+owner re-confirmed the transition). The UI renders `changed` and
+`owner-confirmed` differently on purpose. Distinct from the fork-consistency
+"continuity guarantee" sense of continuity used by the version vector.
+
+### **group retirement record** &nbsp; 🗝️ *Key/identifier*
+
+An owner-double-signed (`"myne.group-retirement v1|"`) fixed 33-byte record that
+names the namespace a retired group-key epoch applied to (group-key or content),
+the retired epoch and its immediate replacement (`retired + 1`). It carries NO
+timestamp, so a removed member's package stream cannot be ordered by it, and
+both signature halves are mandatory, so an untrusted server cannot forge a
+retirement.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.4
+
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
 Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), **pnpm** (the desktop and web clients share one `pnpm-lock.yaml`; pnpm is canonical, never npm or yarn), Go modules (server), and the wasm build's pinned toolchain + crate graph. Updates require explicit review.
@@ -1176,6 +1241,14 @@ Used in: `threat-model.md` §6, §7
 The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialized full head record INCLUDING its head_mac)`. Hashing over the MAC (not just the pre-MAC content) makes the hash-DAG bind **authentication**, not merely content. A head's parent links (`prev_head_hash[]`) are the `head_id`s of its parents — one parent = linear extension, two = a legitimate concurrent-push merge (byte-sorted lexicographically for encoding determinism). Domain-separated from the [vault-head manifest](#vault-head-manifest) hash and the §5.1 [CTX commitment](#ctx-commitment) by a distinct leading prefix, so no SHA-256 input is reinterpretable as another's. Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head)
+
+### **heading record** &nbsp; 📦 *Product*
+
+The per-note record set the structured index ([`vault.indices`](#vaultindices) / [`MYI1`](#myi1), `spec/protocol.md` §9.8.2) holds for each heading in a note body: `{text, level}` and nothing else. The source for the vault-wide `[[##` picker, replacing a read-and-reparse of every note body on each index change. Sibling of the [line-task projection](#line-task-projection) and the [block anchor](#block-anchor) records in the same payload, and the cheapest of the three: the client fills it from the parse an index update already runs, so it costs no extra pass.
+
+Two deliberate omissions. The **byte offsets** a heading scanner also produces are not stored: they serve heading folding, which runs against the open note's own parse, and a vault-wide copy of them would go stale. And a row carries **no note title or folder**, unlike a block-anchor row, because the consumer must join against the resident note-set regardless, to drop trashed and template notes, and that join already holds both. The index itself is trash-blind.
+
+Used in: `spec/protocol.md` §9.8.2; `decisions.md` 2026-09-19 (0594)
 
 ### **HKDF (HKDF-SHA-256)** &nbsp; 🔐 *Primitive*
 
@@ -1935,7 +2008,7 @@ The gate over the [declared payload](#declared-payload): it may shrink freely an
 
 **It is not a promise to users.** It bounds drift between releases; it says nothing about what the download will be next year. Three structural assertions keep the number honest: a Git-LFS **pointer** where a blob was expected fails by name (a smudge-skipped checkout would otherwise report a tiny payload and pass forever), a missing declared path fails rather than counting zero, and the bundled-model set is compared against a recorded set **in both directions** — an addition is a decision, and a silent removal of `models/ocr` would break OCR-backed search.
 
-Used in: `scripts/check-desktop-payload-budget.mjs`, `CLAUDE.md` (guard table)
+Used in: `scripts/check-desktop-payload-budget.mjs`, `AGENTS.md` (guard table)
 
 ---
 
@@ -1981,6 +2054,31 @@ value the invite flow compares. Distinct from a [device_id](#device_id-vv-actor)
 a person is who they are regardless of which devices they hold.
 
 Used in: `design-notes/protocol/0592`; `myne-md/myne#698`.
+
+
+### **person key transition** &nbsp; 🗝️ *Key/identifier*
+
+The frozen signature class `"myne.person-key-transition v1|"` for a visible
+person-key continuity transition (myne-md/myne#712, `decisions/protocol/0594`).
+ALLOCATED, no frame is shipped yet: the class is declared so a later
+identity-re-roll feature cannot choose its own. Do not emit it.
+
+### **person private profile** &nbsp; 📋 *Protocol*
+
+A sealed `MYY5` record at `profiles/<profile-id>` scoped to one person and one
+vault for private AI material (chat history, agent memory, personality
+directive). It is not shared group state: the KEK is derived from the person's
+OWN recovery phrase under the salt domain
+`"myne.v0.2 argon2id-person-vault-profile|"` with a fixed (non-secret) salt
+randomizer, so it opens on every client from the phrase alone and neither the
+group key nor the owner `root_key` can read it. The `profile-id` is
+`SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
+and is bound into the AAD with `account_number_hash`, so a profile moved to
+another person or vault fails verification. Provider choice, credential and
+egress consent are deliberately NOT in this blob (device-local). Removal and
+scheduled deletion make no recall guarantee.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.28
 
 
 
@@ -2144,7 +2242,7 @@ The `protected-branch` lefthook `pre-push` command carried by every `myne-md` re
 
 **Hygiene, not enforcement**, which is the hook's own wording rather than a hedge added here. `--no-verify`, `LEFTHOOK=0` and `LEFTHOOK_EXCLUDE=protected-branch` each bypass it, and it exists only in clones where `lefthook install` has been run, so a fresh clone, the jailed runner and `myne-bot` are uncovered. Two hatches are sanctioned instead: `MYNE_ALLOW_PROTECTED_PUSH=1` for a one-off, and `git config myne.allowProtectedPush true` for a repository whose normal workflow genuinely is a direct push ([internal-service](#internal-service), `homebrew-tap`, `myne-branding`). Both parse a VALUE (`1`, `true`, `yes`, `on`, case-insensitively) and refuse anything else, so they agree on what "allow" means and `=0` keeps the guard on rather than switching it off. The flag is read with `git config --local` deliberately, since a plain `--get` reads the merged cascade and one `--global` setting would switch the guard off in all eleven clones at once. A `min_version` at the top of each `lefthook.yml` is what stops an older binary from silently dropping `use_stdin` and leaving the guard green and inert.
 
-Used in: `lefthook.yml` (every `myne-md` repo); root `CLAUDE.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
+Used in: `lefthook.yml` (every `myne-md` repo); root `AGENTS.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
 
 ### **per-account quota** &nbsp; 📦 *Product*
 
@@ -2971,7 +3069,7 @@ Used in: `client-core/src/stage-decision.ts`, `src/lib/stage.ts`, `mobile/src/li
 
 ### **token parity** &nbsp; 🛠️ *Tooling*
 
-Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/CLAUDE.md` warns by name does not exist.
+Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/AGENTS.md` warns by name does not exist.
 
 Used in: `scripts/check-token-parity.mjs`, `client-core/src/tokens.css`, `decisions.md` 2026-09-02 (myne-md/myne#478)
 
@@ -2997,7 +3095,7 @@ Used in: `scripts/check-twin-inventory.mjs`, `decisions.md` 2026-08-15 (twin inv
 
 The verdict for a twin whose shared answer already lives in `myne-core` or a `@myne/*` package, leaving each side as per-client wiring over it. Its divergence is correct and permanent, so it is neither a bug nor a screen. The canonical shape is a Tauri plugin shim where both sides carry `pub use myne_core::plugins::<flow>` and keep only the plugin builder and its capability grant; `src-tauri/src/plugins/vault_delete/mod.rs` at 52 lines against mobile's 53 is the worked example. The verdict says nothing about whether the two capability grants MATCH; that comparison has not been run.
 
-Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
+Used in: `scripts/check-twin-inventory.mjs`, `core/AGENTS.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
 ### **Target vault** &nbsp; 📦 *Product*
 
@@ -3338,7 +3436,7 @@ Vault-level singleton encrypted blob ([`MYG1`](#myg1), `spec/protocol.md` §9.19
 
 ### **vault.indices** &nbsp; 📦 *Product*
 
-Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records** (MYND-31 design; persistence landed by MYND-271). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
+Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records**, plus three per-note record kinds the entry used to omit: the imported **[block anchor](#block-anchor) records** behind the `[[^^` picker (MYND-382), the **[line-task projection](#line-task-projection)** (MYND-612), and the **[heading records](#heading-record)** behind the `[[##` picker (myne#216) (MYND-31 design; persistence landed by MYND-271, and `spec/protocol.md` §9.8.2 is the normative enumeration). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
 
 Used in: `spec/protocol.md` §9.8; `decisions.md` 2026-06-14 (MYND-271)
 
