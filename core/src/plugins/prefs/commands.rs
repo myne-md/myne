@@ -16,9 +16,9 @@ use super::set_mutation::{apply_set_mutation, SetMutation};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_prefs_blob, derive_subkey_versioned, encode_prefs_blob_versioned, meta_version_of,
-    parse_vault_meta_any, ColorGroup, EditorLayout, MetaVersion, PrefsBlobError, PrefsView,
-    SavedView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_prefs_blob, encode_prefs_blob_versioned, meta_version_of, parse_vault_meta_any,
+    ColorGroup, EditorLayout, MetaVersion, PrefsBlobError, PrefsView, SavedView, SubkeyRole,
+    ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -305,14 +305,14 @@ async fn update_prefs_with_dir(
     }
 
     // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
     let (meta_version, account_number_hash) =
         read_account_number_hash_for_write(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(meta_version, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     // REFUSE rather than write over a read that degraded (test-audit #40).
@@ -489,14 +489,14 @@ pub async fn prefs_read_with_dir_reporting_origin(
 ) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(PrefsReadError::SlotNotUnlocked)?;
 
     let (meta_version, account_number_hash) =
         read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
-    let prefs_key = derive_subkey_versioned(meta_version, &root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared.derive(meta_version, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
     Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)

@@ -1140,6 +1140,71 @@ The visualization of `[[wikilink]]` relationships between notes as a force-direc
 
 Used in: `vision.md` Phase 1 Scope
 
+### **group key** &nbsp; 🗝️ *Key/identifier*
+
+A random 32-byte shared content authority for a B2B vault. It opens the current
+group content epoch but never opens the owner-only `root_key` authority. Removing
+a member retires its epoch and generates a fresh group key for the remaining
+members; it cannot revoke ciphertext the removed member already copied.
+
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §3.4
+
+### **group-key epoch** &nbsp; 🗝️ *Key/identifier*
+
+The monotonically increasing generation number of a B2B vault's [group
+key](#group-key), starting at 1. Removing a member retires the current epoch and
+mints the next (`epoch + 1`); a reader accepts a strictly-greater owner-signed
+epoch only and refuses an EQUAL epoch rather than tie-breaking, so two
+conflicting rosters at one epoch cannot both be canonical. The epoch is carried
+in the owner-signed roster and bound into the group-key-wrap AAD.
+
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.2
+
+### **group package** &nbsp; 🗝️ *Key/identifier*
+
+One live member's owner-signed recipient record for a group-key epoch: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`recipient_fingerprint_hex`, `wrapped_group_key_hex`) under the signature class
+`"myne.group-package v1|"`, where the wrapped key is the PQ-hybrid person
+envelope over the 32-byte `group_key`. A reader verifies both owner signatures,
+requires the expected vault, epoch and local fingerprint, and requires byte
+equality with that member's live row in the already-verified roster.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+### **group roster** &nbsp; 🗝️ *Key/identifier*
+
+The owner-authored, owner-double-signed membership list of an `NTV6` vault: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`owner_fingerprint_hex`, and `members` strictly sorted by fingerprint) under the
+signature class `"myne.group-roster v1|"`. It lives SEALED (under the group tier,
+§9.3.3) in the `NTV6` `vault.meta`, so the sync server reads neither the member
+fingerprints nor the display names. A member verifies it from the pinned owner
+public half; neither `root_key` nor a root-derived membership key participates.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+
+### **roster continuity** &nbsp; 📋 *Protocol*
+
+A live roster row's identity-continuity state in an `NTV6` group roster:
+`current` (no prior identity), `changed` (the row's fingerprint superseded a
+previous one and the owner has not vouched for it) or `owner-confirmed` (the
+owner re-confirmed the transition). The UI renders `changed` and
+`owner-confirmed` differently on purpose. Distinct from the fork-consistency
+"continuity guarantee" sense of continuity used by the version vector.
+
+### **group retirement record** &nbsp; 🗝️ *Key/identifier*
+
+An owner-double-signed (`"myne.group-retirement v1|"`) fixed 33-byte record that
+names the namespace a retired group-key epoch applied to (group-key or content),
+the retired epoch and its immediate replacement (`retired + 1`). It carries NO
+timestamp, so a removed member's package stream cannot be ordered by it, and
+both signature halves are mandatory, so an untrusted server cannot forge a
+retirement.
+
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.4
+
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
 Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), **pnpm** (the desktop and web clients share one `pnpm-lock.yaml`; pnpm is canonical, never npm or yarn), Go modules (server), and the wasm build's pinned toolchain + crate graph. Updates require explicit review.
@@ -1956,6 +2021,31 @@ value the invite flow compares. Distinct from a [device_id](#device_id-vv-actor)
 a person is who they are regardless of which devices they hold.
 
 Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
+
+
+### **person key transition** &nbsp; 🗝️ *Key/identifier*
+
+The frozen signature class `"myne.person-key-transition v1|"` for a visible
+person-key continuity transition (myne-md/myne#712, `decisions/protocol/0594`).
+ALLOCATED, no frame is shipped yet: the class is declared so a later
+identity-re-roll feature cannot choose its own. Do not emit it.
+
+### **person private profile** &nbsp; 📋 *Protocol*
+
+A sealed `MYY5` record at `profiles/<profile-id>` scoped to one person and one
+vault for private AI material (chat history, agent memory, personality
+directive). It is not shared group state: the KEK is derived from the person's
+OWN recovery phrase under the salt domain
+`"myne.v0.2 argon2id-person-vault-profile|"` with a fixed (non-secret) salt
+randomizer, so it opens on every client from the phrase alone and neither the
+group key nor the owner `root_key` can read it. The `profile-id` is
+`SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
+and is bound into the AAD with `account_number_hash`, so a profile moved to
+another person or vault fails verification. Provider choice, credential and
+egress consent are deliberately NOT in this blob (device-local). Removal and
+scheduled deletion make no recall guarantee.
+
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.28
 
 
 
