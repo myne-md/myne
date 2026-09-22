@@ -21,6 +21,7 @@ import {
   syncAccountStatus,
   useEnroll,
   useDevices,
+  useMembers,
   type EnrollCredentialKind,
   type DeviceEntry,
   type PinSource,
@@ -47,6 +48,7 @@ import { Banner, Segmented } from "./index";
 // module used to re-spell it inline, and the copy was subtly weaker: no
 // `typeof window` guard, so it threw off-DOM instead of answering `false`.
 import { HAS_TAURI } from "../lib/app-window";
+import { tappable } from "../app/a11y/tappable";
 
 // ── Shared panel primitives (settings-card geometry) ─────────────────────────
 
@@ -97,7 +99,9 @@ function Row({
 }) {
   return (
     <div
-      onClick={onClick}
+      // A control only when it does something (myne#728), the same shape the
+      // Settings sheet's own Row uses.
+      {...(tappable({ onActivate: onClick }) ?? {})}
       data-testid={testId}
       style={{
         display: "flex",
@@ -216,10 +220,11 @@ export interface SyncHubPanelProps {
   onOpenEndpoint: () => void;
   onOpenEnroll: () => void;
   onOpenDevices: () => void;
+  onOpenMembers: () => void;
 }
 
 /** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
-export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices }: SyncHubPanelProps) {
+export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
@@ -341,6 +346,10 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
         )}
         <Row first={!showAdd} onClick={onOpenDevices} testId="sync.settings.devices">
           <span style={rowLabel}>{t("sync.devices.yourDevices")}</span>
+          <RowChevron />
+        </Row>
+        <Row onClick={onOpenMembers} testId="sync.settings.members">
+          <span style={rowLabel}>{t("sync.members.title")}</span>
           <RowChevron />
         </Row>
       </Group>
@@ -1202,3 +1211,120 @@ export function SyncDevicesPanel() {
     </div>
   );
 }
+
+/**
+ * Members & Security (B2B, myne-md/myne#712 task 9). READ-ONLY on mobile: it
+ * lists the shared vault's members with their authority and the current
+ * group-key epoch, and states the removal limits honestly. The invite and
+ * removal flows need the person-identity phrase prompt, which stays desktop-first
+ * until the member wire lands, so this panel never renders an owner-only control
+ * a phone cannot use. Plain English by mobile convention (no i18n). Styling goes
+ * through the shared primitives + tokens, never inline literals.
+ */
+export function SyncMembersPanel() {
+  const { t } = useTranslation();
+  const { members, authority, groupKeyEpoch, error } = useMembers();
+
+  return (
+    <div style={MEMBERS_WRAP}>
+      <SectionLabel mt={0}>{t("sync.members.title")}</SectionLabel>
+      <Group>
+        <Row first testId="sync.members.authority">
+          <span style={rowLabel}>{t("sync.members.access")}</span>
+          <span style={MEMBERS_VALUE}>
+            {authority === "owner"
+              ? t("sync.memberRoster.ownerBadge")
+              : t("sync.memberRoster.memberBadge")}
+          </span>
+        </Row>
+        {groupKeyEpoch !== null ? (
+          <Row testId="sync.members.epoch">
+            <span style={rowLabel}>{t("sync.members.epochLabel")}</span>
+            <span style={MEMBERS_VALUE}>{groupKeyEpoch}</span>
+          </Row>
+        ) : null}
+      </Group>
+
+      <SectionLabel>{t("sync.members.people")}</SectionLabel>
+      <Group>
+        {error ? (
+          <Row first testId="sync.members.error">
+            <span style={MEMBERS_ERROR}>{t("sync.memberRoster.error")}</span>
+          </Row>
+        ) : members.length === 0 ? (
+          <Row first testId="sync.members.empty">
+            <span style={MEMBERS_MUTED}>{t("sync.memberRoster.empty")}</span>
+          </Row>
+        ) : (
+          members.map((m, i) => (
+            <Row key={m.fingerprint_hex} first={i === 0} testId="sync.members.row">
+              <div style={MEMBERS_STACK}>
+                <span style={MEMBERS_VALUE}>{m.display_name}</span>
+                <span style={MEMBERS_FINGERPRINT}>{m.fingerprint_hex.slice(0, 16)}</span>
+              </div>
+              <div style={MEMBERS_STACK}>
+                <span style={MEMBERS_MUTED}>
+                  {m.role === "owner"
+                    ? t("sync.memberRoster.ownerBadge")
+                    : t("sync.memberRoster.memberBadge")}
+                </span>
+                {m.continuity === "changed" ? (
+                  <span style={MEMBERS_ERROR}>{t("sync.memberRoster.keyChanged")}</span>
+                ) : null}
+                {m.continuity === "owner-confirmed" ? (
+                  <span style={MEMBERS_MUTED}>{t("sync.memberRoster.relinkConfirmed")}</span>
+                ) : null}
+                {(m.continuity === "current" || m.continuity === null) &&
+                m.previous_fingerprint_hex ? (
+                  <span style={MEMBERS_MUTED}>{t("sync.memberRoster.rotated")}</span>
+                ) : null}
+              </div>
+            </Row>
+          ))
+        )}
+      </Group>
+
+      <SectionLabel>{t("sync.members.removalLimitsLabel")}</SectionLabel>
+      <p style={MEMBERS_NOTICE}>{t("sync.memberRoster.removalLimits")}</p>
+    </div>
+  );
+}
+
+const MEMBERS_WRAP: CSSProperties = {
+  padding: "0 var(--space-4) var(--space-6)",
+};
+
+const MEMBERS_STACK: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  minWidth: 0,
+};
+
+const MEMBERS_VALUE: CSSProperties = {
+  color: "var(--fg-1)",
+  fontSize: "var(--text-sm)",
+};
+
+const MEMBERS_MUTED: CSSProperties = {
+  color: "var(--fg-2)",
+  fontSize: "var(--text-sm)",
+};
+
+const MEMBERS_ERROR: CSSProperties = {
+  color: "var(--danger)",
+  fontSize: "var(--text-sm)",
+};
+
+const MEMBERS_FINGERPRINT: CSSProperties = {
+  color: "var(--fg-3)",
+  fontSize: "var(--text-xs)",
+  fontFamily: "var(--font-mono)",
+};
+
+const MEMBERS_NOTICE: CSSProperties = {
+  color: "var(--fg-2)",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.5,
+  marginTop: "var(--space-2)",
+};

@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 import type { SavedView } from "../../../../lib/prefs";
+import { tappable } from "../../../a11y/tappable";
 
 /** The Filter sheet — the single home for the note-list scopes that would
  *  otherwise be scattered: status (live / Archive / Trash), saved Views, and
@@ -33,7 +34,7 @@ export function FilterSheet({
   const label: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)", padding: "16px 4px 8px" };
   const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
     <div
-      onClick={onClick}
+      {...tappable({ onActivate: onClick, pressed: on })}
       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", borderTop: first ? undefined : "1px solid var(--line-1)", cursor: "pointer", color: on ? "var(--accent)" : "var(--fg-1)", fontWeight: on ? 600 : 400, fontSize: 16 }}
     >
       {content}
@@ -73,7 +74,7 @@ export function FilterSheet({
               <>
                 <div style={label}>{t("editor.chrome.barItems.tags")}</div>
                 {group(
-                  <div onClick={() => { onOpenTags(); close(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", cursor: "pointer", fontSize: 16, color: "var(--fg-1)" }}>
+                  <div {...tappable({ onActivate: () => { onOpenTags(); close(); } })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", cursor: "pointer", fontSize: 16, color: "var(--fg-1)" }}>
                     <span>{t("commands.actions.showTags.label")}<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
                     <svg width="8" height="13" viewBox="0 0 8 14" style={{ flex: "none" }}><path d="M1 1l6 6-6 6" stroke="var(--line-2)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>,

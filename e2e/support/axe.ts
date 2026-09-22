@@ -3,7 +3,8 @@
 // The Vitest tier (tests/a11y/) runs axe in jsdom — fast, but jsdom can't
 // compute layout/paint, so its `color-contrast` rule is disabled there. THIS
 // tier injects the axe-core source into the real WebKit WebView and runs the
-// FULL WCAG 2.1 AA rule set INCLUDING contrast — the authoritative check.
+// FULL WCAG 2.2 AA rule set INCLUDING contrast and target-size (the two rules
+// jsdom cannot evaluate). This is the authoritative check.
 //
 // Rule scope is imported from the shared config so the two tiers never drift.
 
@@ -27,8 +28,8 @@ export interface AxeViolation {
 }
 
 /**
- * Inject axe into the page and run the WCAG 2.1 AA rule set (contrast
- * included) against `contextSelector` (default: the whole document).
+ * Inject axe into the page and run the WCAG 2.2 AA rule set (contrast and
+ * target-size included) against `contextSelector` (default: the whole document).
  * Returns the violations — empty array means the screen passed.
  */
 export async function runAxeInPage(

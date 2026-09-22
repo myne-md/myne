@@ -34,6 +34,7 @@ permissions = [
     "allow-sync-list-roster",
     "allow-sync-person-unlock",
     "allow-sync-person-lock",
+    "allow-sync-start-b2b-migration",
     "allow-sync-remove-member",
     "allow-sync-list-devices",
     "allow-sync-account-status",
@@ -113,6 +114,11 @@ commands.allow = ["sync_person_unlock"]
 identifier = "allow-sync-person-lock"
 description = "Allow invoking sync:sync_person_lock (B2B: drop the backend-held person identity; it zeroizes on drop)."
 commands.allow = ["sync_person_lock"]
+
+[[permission]]
+identifier = "allow-sync-start-b2b-migration"
+description = "Allow invoking sync:sync_start_b2b_migration (B2B: the one explicit owner-approved NTV5 to NTV6 migration. Runs the journaled rewrite of vault.meta + the shared singletons under a fresh group key. Requires an unlocked active vault held as owner PLUS a held person identity; holds the auth permit across the migration. An ordinary unlock never runs it)."
+commands.allow = ["sync_start_b2b_migration"]
 
 [[permission]]
 identifier = "allow-sync-invite-member"

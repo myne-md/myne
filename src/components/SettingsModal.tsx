@@ -46,6 +46,7 @@ import {
 } from "./primitives/hoverSurface";
 import type { IconName } from "../lib/icons";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useOverlayInert } from "../hooks/useOverlayInert";
 import { SettingsSearch } from "./settings/search/SettingsSearch";
 import { SettingsSearchResults } from "./settings/search/SettingsSearchResults";
 import { searchSettings } from "./settings/search/searchSettings";
@@ -496,6 +497,13 @@ export function SettingsModal({
   // strip the rail's arrow-key nav + in-flight dismiss gating). MYND-93.
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, { enabled: open });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
     account: null,
     privacy: null,
@@ -716,6 +724,7 @@ export function SettingsModal({
 
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"

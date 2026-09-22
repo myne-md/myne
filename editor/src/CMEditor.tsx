@@ -23,6 +23,7 @@ import {
   reconfigureEditorKeymap,
 } from "./extensions";
 import { reconfigureNoteId } from "./note-identity";
+import { reconfigureEditorTitle } from "./accessible-name";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import type { RecentNotesSource } from "./wikilink/recent-notes";
@@ -256,6 +257,17 @@ export type CMEditorProps = {
    *  a new mount site would silently get pre-#520 focus-guessing and nothing
    *  would say so. Required, `tsc` names it. */
   noteId: string | null;
+  /** myne-md/myne#728: the note's TITLE, which names the editor body for
+   *  assistive technology (the content element is a `contenteditable` with
+   *  `role="textbox"` and had no name at all).
+   *
+   *  Optional, unlike `noteId` above, and the asymmetry is deliberate: a host
+   *  that says nothing gets the untitled wording, which is a correct name for a
+   *  note whose title is unknown, so the failure mode of forgetting it is a
+   *  vaguer announcement rather than an unnamed control. Live-reconfigured on
+   *  change, because a rename must not keep announcing the old name until the
+   *  pane is rebuilt. */
+  noteTitle?: string | null;
   /** Mount the floating selection toolbar that appears over a text selection
    *  (MYND-559). Default TRUE - desktop's formatting surface, unchanged. A host
    *  that renders its own bar via {@link onReady} passes `false` so the two don't
@@ -284,7 +296,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, revealLine = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, revealLine = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, noteTitle = null, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -312,6 +324,7 @@ export function CMEditor(props: CMEditorProps) {
   const aiEnabledRef = useRef(aiEnabled);
   const transcriptionEnabledRef = useRef(transcriptionEnabled);
   const noteIdRef = useRef(noteId);
+  const noteTitleRef = useRef(noteTitle);
   const vimModeRef = useRef(vimMode);
   const keymapOverridesRef = useRef(keymapOverrides);
   const drawingIoRef = useRef(drawingIo);
@@ -385,6 +398,7 @@ export function CMEditor(props: CMEditorProps) {
             aiEnabled: aiEnabledRef.current,
             transcriptionEnabled: transcriptionEnabledRef.current,
             noteId: noteIdRef.current,
+            noteTitle: noteTitleRef.current,
             keymapOverrides: keymapOverridesRef.current,
             // Mount-read like `selectionToolbar` below, and for the same kind of
             // reason: this is a function that answers on demand, so the value it
@@ -439,6 +453,7 @@ export function CMEditor(props: CMEditorProps) {
           reconfigureAi(aiEnabledRef.current),
           reconfigureTranscription(transcriptionEnabledRef.current),
           reconfigureNoteId(noteIdRef.current),
+          reconfigureEditorTitle(noteTitleRef.current),
           // #184: the editor keymap is a Compartment too, seeded from overrides
           // at mount; `setState` resets it to that seed, so re-push the CURRENT
           // overrides or a customised keymap silently reverts to defaults.
@@ -757,6 +772,20 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureNoteId(noteId) });
   }, [noteId]);
+
+  // The editor body's accessible name (myne-md/myne#728). Same equality-guarded
+  // shape as `noteId` above and for the same cost reason, with one extra
+  // trigger: the title changes WITHOUT the note changing, on every rename and
+  // on every first-heading edit in a note that takes its title from its body.
+  // A name that only refreshed on a note swap would announce the old title for
+  // the rest of the session.
+  useEffect(() => {
+    if (noteTitleRef.current === noteTitle) return;
+    noteTitleRef.current = noteTitle;
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureEditorTitle(noteTitle) });
+  }, [noteTitle]);
 
   // MYND-305 deep-link scroll (SYNC-5). Keyed on BOTH the request nonce and
   // `value`: the click sets the request, but the target note's body arrives

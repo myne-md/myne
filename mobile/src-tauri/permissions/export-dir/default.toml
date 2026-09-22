@@ -1,0 +1,51 @@
+# Permissions for the mobile `export-dir` Tauri plugin (myne-md/myne#517).
+# Picked up under the `export-dir:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Referenced by `capabilities/default.json`
+# as `export-dir:default`.
+#
+# ONE command, and the count is the point rather than an accident. This plugin
+# exists so that naming a plaintext export destination is a single answer the
+# host gives, instead of four call sites composing one out of
+# `plugin:path|resolve_directory` + `plugin:path|join`. The lockstep sentence
+# `build.rs` carries points AT this file; stated from this side it is the
+# mirror: a command listed in `build.rs`'s `InlinedPlugin::commands` with no
+# `[[permission]]` here is a security bug, and so is the reverse, a permission
+# here for a command `generate_handler!` does not register. The inverse holds
+# too: a second command in this namespace would be a second way to name a
+# destination, which is the shape the plugin was created to remove.
+#
+# What this grant REPLACES is wider than what it adds. `core:path:default` was
+# dropped from `capabilities/default.json` in the same change: with the seam no
+# longer re-exporting `documentDir` / `join`, nothing under `mobile/src` and no
+# `@tauri-apps/*` package it imports calls `plugin:path|*`, so eight path
+# commands left the WebView's reach and one arrived. TB3 least privilege, and
+# `docs/threat-model.md` TB3 records the narrowing.
+#
+# Not slot-gated: the command reveals no vault content and touches no vault key.
+#
+# What WRITES into the path it returns is three commands plus one event, and
+# they do NOT validate alike. An earlier draft of this comment said each of the
+# three "re-validates its destination as untrusted", and that is true of two:
+# `secret-export:save_secret_text` refuses any destination under app-data, and
+# `export:vault_export_markdown` carries `forbidden_roots` for app-data and the
+# vault directory. `attachments:attachment_export` checks only that the parent
+# directory exists and that the destination is not itself a directory, with no
+# app-data or vault-root check at all. The fourth writer is not a command: the
+# note PDF arrives as a `core:event` payload that `pdf_export::present` writes
+# unvalidated.
+#
+# The asymmetry is pre-existing and is not this grant's to close. It is written
+# down because this file sits next to the `secret-export` case that genuinely
+# does refuse the vault tree, and a reader who assumes all three behave alike
+# gets the wrong answer about the one that does not.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the mobile export-dir plugin, the single resolve + create + backup-exclude + sanitize call that names a plaintext export destination."
+permissions = ["allow-export-path"]
+
+[[permission]]
+identifier = "allow-export-path"
+description = "Allow invoking export-dir:export_path (resolve the app's export directory, create it, apply the platform backup exclusion, sanitize the supplied name to a bare basename, and return the absolute destination plus the directory's display name plus the basename used; fails closed when the exclusion does not read back as set, so no export lands in a directory iCloud Backup would copy. That fail-closed arm is iOS-only: on Android the exclusion is declarative, carried by the committed android-widgets manifest attributes, so there is no runtime read-back to fail)."
+commands.allow = ["export_path"]

@@ -16,9 +16,8 @@ use super::dictionary::PersonalDictionaryData;
 use super::state::SpellState;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_dictionary_blob, derive_subkey_versioned, encode_dictionary_blob_versioned,
-    meta_version_of, parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN,
-    VAULT_META_ACCOUNT_HASH_LEN,
+    decode_dictionary_blob, encode_dictionary_blob_versioned, meta_version_of,
+    parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
@@ -147,13 +146,13 @@ pub(crate) async fn persist_dictionary_with_dir(
     state: &VaultRuntimeState,
     data: &PersonalDictionaryData,
 ) -> Result<(), SpellSyncError> {
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(SpellSyncError::SlotNotUnlocked)?;
     let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
-        derive_subkey_versioned(version, &root_key, SubkeyRole::PersonalDictKey);
+        shared.derive(version, SubkeyRole::PersonalDictKey);
     persist_payload_to_dir(version, vault_dir, &dict_key, &account_number_hash, data)
 }
 
@@ -166,13 +165,13 @@ pub(crate) async fn hydrate_dictionary_with_dir(
     state: &VaultRuntimeState,
     spell: &SpellState,
 ) -> Result<(), SpellSyncError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
         .await
         .ok_or(SpellSyncError::SlotNotUnlocked)?;
     let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
-        derive_subkey_versioned(version, &root_key, SubkeyRole::PersonalDictKey);
+        shared.derive(version, SubkeyRole::PersonalDictKey);
     let data = hydrate_payload_from_dir(vault_dir, &dict_key, &account_number_hash)?;
     spell.hydrate_words(data);
     Ok(())

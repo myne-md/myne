@@ -2,9 +2,12 @@
 //
 // # Why this is not "the desktop a11y suite, again"
 //
-// `e2e/a11y-axe.e2e.ts` already runs the WCAG 2.1 AA rule set over the shared
-// screens — welcome, unlock, the editor, settings, the palette — and both
-// clients render that same source. Re-running it here would be the dual-driving
+// `e2e/a11y-axe.e2e.ts` already runs the WCAG 2.2 AA rule set over the shared
+// screens (welcome, unlock, the editor, settings, the palette), and both
+// clients render that same source. The shared `tests/a11y/axe-config.ts` this
+// lane imports raised the bar to 2.2 AA (myne-md/myne#728), so `target-size`
+// now applies to the web-only screens below too: that is inherited
+// deliberately, and a target-size finding there is in scope for the gate. Re-running it here would be the dual-driving
 // this lane exists to avoid (`e2e-web/AGENTS.md`).
 //
 // What it cannot cover is the set of screens that exist **only** on web:

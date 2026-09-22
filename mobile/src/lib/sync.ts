@@ -383,3 +383,68 @@ export function useDevices(): DevicesHook {
 
   return { devices, pending, error, busy, refresh, approve, remove, resetLocal };
 }
+
+// ── Member roster (B2B, myne-md/myne#712 task 9) ─────────────────────────────
+
+/** One vault member as the UI consumes it (mirrors the Rust `RosterMemberView`). */
+export interface RosterMemberView {
+  fingerprint_hex: string;
+  display_name: string;
+  role: "owner" | "member";
+  previous_fingerprint_hex: string | null;
+  /** `current` | `changed` | `owner-confirmed`, or `null` on a legacy roster. */
+  continuity: "current" | "changed" | "owner-confirmed" | null;
+}
+
+export interface RosterListView {
+  members: RosterMemberView[];
+  authority: "owner" | "member";
+  /** The current group-key epoch on an `NTV6` vault; `null` for a legacy roster. */
+  group_key_epoch: number | null;
+}
+
+export interface MembersHook {
+  members: RosterMemberView[];
+  authority: "owner" | "member";
+  groupKeyEpoch: number | null;
+  error: string | null;
+}
+
+/**
+ * Read the unlocked vault's member roster + the caller's authority. Read-only on
+ * mobile: the invite and removal flows need the person-identity prompt, which is
+ * desktop-first until the member wire lands, and a member is never shown an
+ * owner-only control here.
+ */
+export function useMembers(): MembersHook {
+  const [members, setMembers] = useState<RosterMemberView[]>([]);
+  const [authority, setAuthority] = useState<"owner" | "member">("member");
+  const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    invoke<RosterListView>("plugin:sync|sync_list_roster")
+      .then((view) => {
+        if (!cancelled) {
+          setMembers(view.members);
+          setAuthority(view.authority);
+          setGroupKeyEpoch(view.group_key_epoch);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setMembers([]);
+          setAuthority("member");
+          setGroupKeyEpoch(null);
+          setError(errKind(e));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { members, authority, groupKeyEpoch, error };
+}

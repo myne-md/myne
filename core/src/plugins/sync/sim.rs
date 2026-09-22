@@ -416,6 +416,9 @@ impl Device {
             &crate::vault_io::StdVaultIo,
             self.transport.as_ref(),
             &self.acct.root_key,
+            &crate::plugins::vault_unlock::state::SharedSingletonKey::OwnerRoot(
+                zeroize::Zeroizing::new(self.acct.root_key),
+            ),
             self.acct.account_hash,
             self.device_id,
             &self.token,

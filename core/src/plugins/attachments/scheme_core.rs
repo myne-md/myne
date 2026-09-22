@@ -24,14 +24,16 @@ use std::path::Path;
 use tauri::http;
 use zeroize::Zeroizing;
 
-/// Material cloned out of the unlocked slot for one serve. `items_key` +
-/// `root_key` are `Zeroizing` (wipe on drop); `items_key_id` is the
+/// Material cloned out of the unlocked slot for one serve. `items_key` is
+/// `Zeroizing` (wipes on drop) and `shared` is the session's shared singleton
+/// tier (the catalog / extracted-text KEKs derive from it, root-tier for a
+/// pre-B2B vault and group-tier for an `NTV6` one); `items_key_id` is the
 /// non-secret singleton UUIDv7. Fields are `pub` so each host's `serve` can
 /// construct it from `state.peek_unlocked_attachment_material()`.
 pub struct ServeKeys {
     pub items_key: Zeroizing<[u8; 32]>,
     pub items_key_id: [u8; 16],
-    pub root_key: Zeroizing<[u8; 32]>,
+    pub shared: crate::plugins::vault_unlock::state::SharedSingletonKey,
 }
 
 /// Testable core: given the vault dir, the unlocked-slot key material,
@@ -57,11 +59,9 @@ pub fn build_response(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> http:
             Some(pair) => pair,
             None => return server_error(),
         };
-    let catalog_key = protocol::derive_subkey_versioned(
-        meta_version,
-        &keys.root_key,
-        protocol::SubkeyRole::AttachmentsCatalogKey,
-    );
+    let catalog_key = keys
+        .shared
+        .derive(meta_version, protocol::SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
@@ -199,11 +199,9 @@ pub fn decode_attachment_plaintext(
     };
     let (meta_version, account_number_hash) =
         read_account_number_hash(&vault_dir.join("vault.meta")).ok_or(DecodeError::ServerError)?;
-    let catalog_key = protocol::derive_subkey_versioned(
-        meta_version,
-        &keys.root_key,
-        protocol::SubkeyRole::AttachmentsCatalogKey,
-    );
+    let catalog_key = keys
+        .shared
+        .derive(meta_version, protocol::SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
@@ -390,7 +388,9 @@ mod tests {
         ServeKeys {
             items_key: Zeroizing::new([SEED_ITEMS; 32]),
             items_key_id: [SEED_ITEMS_ID; 16],
-            root_key: Zeroizing::new([SEED_ROOT; 32]),
+            shared: crate::plugins::vault_unlock::state::SharedSingletonKey::OwnerRoot(
+                Zeroizing::new([SEED_ROOT; 32]),
+            ),
         }
     }
 

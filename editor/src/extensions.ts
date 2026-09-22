@@ -82,6 +82,8 @@ import { slashMenuExtension } from "./slash/plugin";
 import { aiSlashEnabledFacet } from "./slash/aiSlash";
 import { transcriptionEnabledFacet } from "./attachments/transcription-gate";
 import { noteIdExtension } from "./note-identity";
+import { editorAccessibleNameExtension } from "./accessible-name";
+import { foldAnnounceExtension } from "./fold-announce";
 import { ghostTextExtension } from "./ai/ghostText";
 
 // AI surface (slash AI commands + inline ghost-text) lives in a CM6 Compartment
@@ -236,6 +238,13 @@ export function myneExtensions(opts?: {
    *  from focus. Absent → `null`, which every consumer reads as "fall back to
    *  the focused note". */
   noteId?: string | null;
+  /** myne-md/myne#728: the TITLE of the note this view holds, used to name the
+   *  editor body for assistive technology. The content element is a
+   *  `contenteditable` with `role="textbox"` and had no name at all, which axe
+   *  reports as `aria-input-field-name`. Absent → the untitled wording, never
+   *  no name. Live-reconfigurable (`reconfigureEditorTitle`), because a rename
+   *  must not keep announcing the old name until the pane is rebuilt. */
+  noteTitle?: string | null;
   /** myne-md/myne#601: how to ask the host which notes were touched most
    *  recently, newest first, for the `[[` picker's tiebreak. A SOURCE rather
    *  than a snapshot, installed once here: the order has one owner on the host
@@ -370,6 +379,10 @@ export function myneExtensions(opts?: {
     aiCompartment.of(aiSurface(opts?.aiEnabled ?? false)),
     transcriptionCompartment.of(transcriptionSurface(opts?.transcriptionEnabled ?? true)),
     noteIdExtension(opts?.noteId ?? null),
+    editorAccessibleNameExtension(opts?.noteTitle ?? null),
+    // Say out loud that a section collapsed (myne#728): visually obvious,
+    // and otherwise completely silent.
+    foldAnnounceExtension(),
     // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
     // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
     wikilinkPickerExtension(),

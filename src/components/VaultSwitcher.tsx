@@ -338,6 +338,13 @@ export function VaultSwitcher({
   // caption + loader on that exact row while `switching` is true.
   const [pendingId, setPendingId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The menu element and the chip that opens it (myne-md/myne#728). The menu
+  // was a keyboard DEAD END: a keyboard user could open it (the chip is a
+  // button) and then reach nothing, because focus stayed on the chip and the
+  // rows carried no key handling at all. `ContextMenu` had already solved the
+  // same problem; this is the same shape.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLButtonElement>(null);
   // Re-render on the shared 30s tick so the last-unlock captions stay current.
   useTick();
 
@@ -407,6 +414,68 @@ export function VaultSwitcher({
       window.clearTimeout(id);
     };
   }, [open]);
+
+  // Move focus INTO the menu when it opens, and back to the chip when it
+  // closes. Both halves matter: without the first the menu cannot be reached,
+  // and without the second Escape leaves focus on `<body>`, so the next Tab
+  // starts from the top of the document rather than from where the user was.
+  //
+  // Keyed on `mounted` rather than `open`, because the menu outlives `open` by
+  // one closing transition and the element does not exist yet on the render
+  // where `open` first flips.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && mounted) {
+      // Only on the TRANSITION into the menu, not on every re-run
+      // (myne#728, review). `vaults` is in the dep list below for a real
+      // reason, but it also changes identity on each `listVaults()` refresh
+      // and on every `VAULT_PREFS_CHANGED_EVENT`, so without this guard a
+      // refresh landing while the menu is open re-ran the entry branch and
+      // threw focus back to the first item, discarding wherever the arrow
+      // keys had taken it. The reachable case is the `[open]`-triggered
+      // `listVaults()` resolving a beat after the user's first ArrowDown.
+      //
+      // `wasOpen` already tracks exactly that transition for the closing
+      // half, so the entry half reads the same flag rather than adding a
+      // second piece of state.
+      if (!wasOpen.current) {
+        const first = menuRef.current?.querySelector<HTMLElement>(
+          '[role^="menuitem"]',
+        );
+        // Only mark the transition as handled when focus was actually placed.
+        // The guard above is `!wasOpen.current`; setting it with a null
+        // `menuRef` (the menu is not rendered until `vaults` resolves) would
+        // spend the transition and no later render would re-enter, leaving the
+        // menu a keyboard dead end on exactly the slow path the comment below
+        // names.
+        if (first) {
+          first.focus();
+          wasOpen.current = true;
+        }
+      }
+      return;
+    }
+    if (!open && wasOpen.current) {
+      wasOpen.current = false;
+      // Only when focus is still inside the menu. A close caused by clicking
+      // somewhere else must not yank focus back to the chip.
+      const active = document.activeElement;
+      if (active === null || menuRef.current?.contains(active) === true) {
+        chipRef.current?.focus();
+      }
+    }
+    // `vaults` is in the list because the MENU's render is gated on it
+    // (`mounted && vaults !== null` below), not just on `mounted`. Opening the
+    // chip before `listVaults()` resolves left `menuRef.current` null, so
+    // nothing was focused, `wasOpen` was set anyway, and no later render
+    // re-ran this: the keyboard dead end this effect exists to remove
+    // survived exactly on the slow path where it matters most.
+    //
+    // That fix and the transition guard above are two halves of one rule:
+    // re-run on a late `vaults`, but only ACT if focus has not been placed
+    // yet. `wasOpen` is now set only when the focus call actually happened,
+    // so the late-resolve case still reaches the menu.
+  }, [open, mounted, vaults]);
 
   // Anchor the fixed-position menu under the chip. Measured before paint
   // (useLayoutEffect) when opening, so the menu never flashes at the wrong
@@ -501,7 +570,16 @@ export function VaultSwitcher({
       <button
         type="button"
         disabled={switching}
+        ref={chipRef}
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          // Down / Up open the menu from the chip and land on an item, which
+          // is the menu-button pattern and the other half of "reachable".
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         onMouseEnter={(e) => {
           if (!open) e.currentTarget.style.background = "var(--paper-3)";
         }}
@@ -527,7 +605,47 @@ export function VaultSwitcher({
 
       {mounted && vaults !== null && (
         <div
+          ref={menuRef}
           role="menu"
+          aria-label={t("vaultSwitcher.switchVaultLabel")}
+          onKeyDown={(e) => {
+            // Arrow / Home / End cycle the rows. Same rule as `ContextMenu`,
+            // which is the in-tree precedent for a keyboard-operable menu.
+            //
+            // Tab is deliberately NOT trapped: a menu is not a dialog, and the
+            // menu-button pattern has Tab close it and move on. Trapping here
+            // would leave a user who pressed Tab stuck in a popover with no
+            // visible way out, which is worse than the dead end being fixed.
+            const node = menuRef.current;
+            if (node === null) return;
+            if (e.key === "Tab") {
+              // Move focus to the chip BEFORE unmounting the menu, then let
+              // the browser's own Tab continue from there. Closing first
+              // detached the focused element mid-keypress, so the default
+              // ran from nowhere and focus landed on `<body>`: the close
+              // effect could not rescue it either, because by then the menu
+              // ref was null and neither of its restore conditions held.
+              // That is the very outcome the effect's comment says it exists
+              // to prevent.
+              chipRef.current?.focus();
+              setOpen(false);
+              return;
+            }
+            const items = Array.from(
+              node.querySelectorAll<HTMLElement>('[role^="menuitem"]'),
+            );
+            if (items.length === 0) return;
+            const cur = items.findIndex((el) => el === document.activeElement);
+            let next: number;
+            if (e.key === "ArrowDown") next = cur < 0 ? 0 : (cur + 1) % items.length;
+            else if (e.key === "ArrowUp")
+              next = cur < 0 ? items.length - 1 : (cur - 1 + items.length) % items.length;
+            else if (e.key === "Home") next = 0;
+            else if (e.key === "End") next = items.length - 1;
+            else return;
+            e.preventDefault();
+            items[next]?.focus();
+          }}
           style={{
             ...MENU_STYLE,
             left: menuPos.left,

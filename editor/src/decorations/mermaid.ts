@@ -31,6 +31,7 @@ import {
   linesRevealed,
 } from "./cursor-aware";
 import { loadMermaidRenderer, type MermaidRenderer } from "../mermaid/render-mermaid";
+import { buildMermaidViewer, type MermaidViewer } from "./mermaid-viewer";
 import i18n from "@myne/editor/i18n";
 
 /**
@@ -130,6 +131,37 @@ function diagramId(code: string): string {
   return "mmd-" + Math.abs(h).toString(36);
 }
 
+/** Live viewers by widget root, so `destroy` can unwind their listeners. */
+const viewers = new WeakMap<HTMLElement, MermaidViewer>();
+
+/**
+ * The accessible name for a rendered diagram: the diagram KIND as Mermaid
+ * itself names it (`flowchart`, `sequenceDiagram`, …), which is the first word
+ * of the source, or the generic word when the source starts with something
+ * else (a directive, a comment, a blank line).
+ *
+ * Deliberately not the whole source. A diagram body is tens of lines of edge
+ * declarations, and an `aria-label` is read as one unbroken run.
+ *
+ * The named case is its own catalog key rather than the generic word plus a
+ * hard-coded ": ". A separator is a translation decision, not punctuation:
+ * the spacing, the word order and whether a colon is the right mark at all
+ * differ by language, and a joiner frozen in code is one the 31 catalogs
+ * cannot reach.
+ */
+export function mermaidLabel(code: string): string {
+  const firstWord =
+    code
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line !== "" && !line.startsWith("%%"))
+      ?.split(/[\s({[]/)[0] ?? "";
+  const kind = /^[A-Za-z][A-Za-z-]*$/.test(firstWord) ? firstWord : null;
+  return kind === null
+    ? i18n.t("editor.a11y.diagram")
+    : i18n.t("editor.a11y.diagramNamed", { kind });
+}
+
 class MermaidWidget extends WidgetType {
   constructor(
     private readonly code: string,
@@ -171,13 +203,16 @@ class MermaidWidget extends WidgetType {
     card.textContent = i18n.t("editor.mermaid.rendering");
     root.appendChild(card);
 
-    // Click-to-edit: atomic block widget, so place the cursor at the fence source
-    // on click (reveals raw ```mermaid for editing), like the math/table widgets.
-    root.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      view.dispatch({ selection: { anchor: this.from }, userEvent: "select.pointer" });
+    // Reveal the raw ```mermaid fence and put the caret on it. The viewer's
+    // control bar and a double-click on the diagram both call this (the widget
+    // no longer owns `mousedown`, which pan needs).
+    const onEdit = () => {
+      view.dispatch({
+        selection: { anchor: this.from },
+        userEvent: "select.pointer",
+      });
       view.focus();
-    });
+    };
 
     void this.renderer(diagramId(this.code), this.code)
       .then(({ svg, error }) => {
@@ -185,7 +220,35 @@ class MermaidWidget extends WidgetType {
           this.fallback(root, card, error);
         } else {
           card.innerHTML = svg; // securityLevel:'strict' → sanitized SVG (SYNC-5)
+          // A named image, not an unnamed graphic (myne-md/myne#728, task 10).
+          // A rendered Mermaid SVG is a tree of shapes and text runs; walked by
+          // a screen reader it reads as the node labels in whatever order the
+          // renderer emitted them, with none of the edges that make it a
+          // diagram. `role="img"` collapses it to one object, and the name says
+          // what it is and which diagram, taken from the fence's first
+          // line, the closest thing to a title the source carries.
+          //
+          // The role goes on the SVG ROOT, not on the CARD. The interactive
+          // viewer (`buildMermaidViewer`, myne-md/myne#708) appends a
+          // `role="group"` viewport and zoom/pan/expand/edit buttons as
+          // descendants of the card, and `role="img"` makes every descendant
+          // PRESENTATIONAL, so a card-level role silently dropped those controls
+          // out of the accessibility tree and left invalid nested content. On
+          // the SVG, the controls are siblings of the image and stay reachable.
+          const svgEl = card.querySelector("svg");
+          const labelled = svgEl ?? card;
+          labelled.setAttribute("role", "img");
+          labelled.setAttribute("aria-label", mermaidLabel(this.code));
           giveNaturalSize(card);
+          // The bounded, interactive viewer (myne-md/myne#708). Returns null on
+          // an unreadable viewBox, in which case the card stays as drawn.
+          const viewer = buildMermaidViewer({
+            view,
+            card,
+            code: this.code,
+            onEdit,
+          });
+          if (viewer !== null) viewers.set(root, viewer);
         }
         // The SVG/fallback changes the block's height AFTER CM first measured the
         // "Rendering…" placeholder; without a re-measure the height map is stale
@@ -208,8 +271,20 @@ class MermaidWidget extends WidgetType {
       });
     return root;
   }
-  ignoreEvent(event: Event): boolean {
-    return event.type !== "mousedown"; // own the click; ignore the rest
+  /** Unwind the viewer's listeners when CodeMirror drops the widget. Without
+   *  this every recycled diagram would leak a window resize listener and a
+   *  pointer-capture set. */
+  destroy(dom: HTMLElement): void {
+    const viewer = viewers.get(dom);
+    if (viewer !== undefined) {
+      viewer.destroy();
+      viewers.delete(dom);
+    }
+  }
+  /** Own every event. The widget handles pan/zoom/edit itself and CodeMirror
+   *  must not also act on them (the drawing embed does the same). */
+  ignoreEvent(): boolean {
+    return true;
   }
 }
 

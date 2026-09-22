@@ -87,7 +87,7 @@ pub fn read_catalog(
 /// export staging closures keep their existing `match` arms verbatim.
 pub fn load_catalog_for_export(
     vault_root: &Path,
-    root_key: &[u8; 32],
+    shared: &myne_core::plugins::vault_unlock::state::SharedSingletonKey,
 ) -> Result<AttachmentsCatalog, CatalogLoadError> {
     let account_number_hash = match read_account_number_hash(&vault_root.join("vault.meta")) {
         Ok(Some(h)) => h,
@@ -106,8 +106,7 @@ pub fn load_catalog_for_export(
         .ok()
         .and_then(|b| protocol::meta_version_of(&b))
         .unwrap_or(protocol::MetaVersion::V0_1);
-    let catalog_key =
-        protocol::derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_key = shared.derive(version, SubkeyRole::AttachmentsCatalogKey);
     read_catalog(
         &vault_root.join("vault.attachments"),
         &catalog_key,

@@ -545,7 +545,7 @@ pub(crate) async fn note_export_attachments_with_root(
     // clones all three out of `Slot::Unlocked` under the read guard,
     // which is held across `spawn_blocking` for `vault_lock` fair
     // queueing (the `note_read` / `attachment_import` pattern).
-    let Some((slot_guard, items_key, items_key_id, root_key)) =
+    let Some((slot_guard, items_key, items_key_id, shared)) =
         state.hold_unlocked_attachment_material().await
     else {
         tracing::debug!(
@@ -643,7 +643,7 @@ pub(crate) async fn note_export_attachments_with_root(
                 use crate::plugins::attachments::blocking_reads::load_catalog_for_export;
                 use crate::plugins::attachments::commands::{hex_decode_id, CatalogLoadError};
                 let catalog =
-                    load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
+                    load_catalog_for_export(&vault_root, &shared).map_err(|e| match e {
                         CatalogLoadError::InvalidVaultMeta => {
                             tracing::error!(
                                 stage = "read_meta",
@@ -1025,7 +1025,7 @@ pub(crate) async fn note_export_html_attachments_with_root(
     // attachment decrypt needs `items_key` (the markdown sibling's
     // pattern). The NOTE itself is NOT re-read here: the HTML body was
     // composed WebView-side and carries the only refs we honor.
-    let Some((slot_guard, items_key, items_key_id, root_key)) =
+    let Some((slot_guard, items_key, items_key_id, shared)) =
         state.hold_unlocked_attachment_material().await
     else {
         tracing::debug!(
@@ -1064,7 +1064,7 @@ pub(crate) async fn note_export_html_attachments_with_root(
                 use crate::plugins::attachments::blocking_reads::load_catalog_for_export;
                 use crate::plugins::attachments::commands::{hex_decode_id, CatalogLoadError};
                 let catalog =
-                    load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
+                    load_catalog_for_export(&vault_root, &shared).map_err(|e| match e {
                         CatalogLoadError::InvalidVaultMeta => {
                             tracing::error!(
                                 stage = "read_meta",

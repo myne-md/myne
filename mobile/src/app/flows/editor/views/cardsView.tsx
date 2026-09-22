@@ -23,6 +23,7 @@ import {
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
 import { MobileGroupHeading, MobileViewEmpty } from "./viewChrome";
 import type { MobileOpenHandler } from "./MobileViewRenderHost";
+import { tappable } from "../../../a11y/tappable";
 
 const HEADING_STYLE: CSSProperties = {
   padding: "16px 20px 8px",
@@ -112,7 +113,7 @@ export function MobileCardsView({
               key={item.key}
               data-testid="view.card"
               data-note-id={row.noteId}
-              onClick={() => onOpen(row.noteId)}
+              {...tappable({ onActivate: () => onOpen(row.noteId) })}
               style={CARD_STYLE}
             >
               {coverId !== null && (

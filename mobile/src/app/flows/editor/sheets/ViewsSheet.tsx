@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 import type { SavedView } from "../../../../lib/prefs";
+import { tappable } from "../../../a11y/tappable";
 
 /** The Views sheet — browse the saved views, activate one (tap), edit it, or
  *  create a new one. Reached from the "Views" tile under the Notes heading. */
@@ -50,10 +51,29 @@ export function ViewsSheet({
                   return (
                     <div
                       key={v.id}
-                      onClick={() => { onPick(v.id); close(); }}
+                      // NOT the control, because the row contains one: the
+                      // Edit button below is a descendant, and a control
+                      // inside a control is `nested-interactive` with the
+                      // outer name swallowing the inner label (myne#728).
+                      // The text block is the control instead, the same shape
+                      // the note row uses. Found by this pass's own nesting
+                      // rule rather than by eye.
+                      onClick={() => {
+                        onPick(v.id);
+                        close();
+                      }}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderTop: i === 0 ? undefined : "1px solid var(--line-1)", cursor: "pointer" }}
                     >
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        {...tappable({
+                          onActivate: () => {
+                            onPick(v.id);
+                            close();
+                          },
+                          pressed: active,
+                        })}
+                        style={{ flex: 1, minWidth: 0 }}
+                      >
                         <div style={{ fontSize: 16, fontWeight: active ? 600 : 400, color: active ? "var(--accent)" : "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
                         <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 2 }}>{typeLabel[v.view_type] ?? v.view_type}</div>
                       </div>

@@ -437,6 +437,17 @@ pub enum SyncDeviceError {
     NotConfigured,
     /// No per-device token stored — this device is not enrolled.
     NotEnrolled,
+    /// The explicit owner-approved NTV5 to NTV6 migration must commit before
+    /// an invite can be created.
+    MigrationRequired,
+    /// The vault IS migrated (`NTV6`), but invite creation needs the group-key
+    /// session tier the migration introduces: an `NTV6` invite wraps the shared
+    /// `group_key` into a signed recipient package, not the `itemsKey` into the
+    /// legacy membership roster, and the slot does not yet carry the group tier.
+    /// Split out of `BadRequest` because the vault is valid and the user did
+    /// nothing wrong: a migrated owner who invites must see the state, not
+    /// "bad request".
+    GroupRosterInviteUnavailable,
     /// The server rejected the token (revoked / invalid).
     Unauthenticated,
     /// The named device is not on the account.

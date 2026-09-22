@@ -481,6 +481,78 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "a11y.wcag22-manual",
+    title: "WCAG 2.2 criteria no tool can measure, and the recorded screen-reader limits",
+    paths: [
+      "src/lib/regions.ts",
+      "src/lib/overlay-inert.ts",
+      "src/components/SkipToContent.tsx",
+      "src/components/primitives/targetSize.ts",
+      "editor/src/host/lib/roving-focus.ts",
+      "editor/src/accessible-name.ts",
+      "editor/src/fold-announce.ts",
+      "docs/dev/accessibility-checklist.md",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    automatedBy: [
+      // The parts that CAN be measured. Everything below is what is left.
+      "e2e/a11y-keyboard.e2e.ts",
+      "e2e/a11y-axe.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "The mobile screen-reader and external-keyboard pass: run every row of mobile/docs/dev/device-matrix.md section 12 under VoiceOver on iOS (12.1 to 12.6, 12.8 to 12.11) and write the result into that table with the device model, OS build and screen-reader version. The rows cover whether each tappable row is announced as a BUTTON named by its own text, whether the folder chevron's state is spoken (it is a CSS rotation, so state is the only cue), whether Space activates without scrolling the list, and whether the palette scrim is silent rather than an unnamed full-screen button.",
+        whyNotAutomated: "Neither CI lane builds for iOS: the desktop suite is a Linux container against WebKitGTK and the web lane is Chromium, so no harness in this repository launches an iOS runtime at all, and VoiceOver's spoken output is not exposed to WebDriver on any platform. `mobile/tests/a11y-tappable.test.tsx` holds the markup in both directions and markup is not the question here.",
+        clients: ["ios"],
+        estimateMin: 20,
+        tier: "core",
+      },
+      {
+        see: "Repeat that same section-12 pass under TalkBack on Android (row 12.7 is the parity row), including the external-keyboard rows 12.8 and 12.9 with a paired Bluetooth keyboard, and record the same details.",
+        whyNotAutomated: "Same absent runtime on the other platform: no CI lane builds for Android, and TalkBack's activation gesture and spoken output have no WebKitGTK or Chromium equivalent to stand in for them.",
+        clients: ["android"],
+        estimateMin: 20,
+        tier: "standard",
+      },
+      {
+        see: "Under VoiceOver on macOS, enter the note editor and confirm it is announced as a text area named for the note you opened. Then move through a note containing headings, a rendered formula and a Mermaid diagram, and WRITE DOWN what the reader says at each: the formula should read its LaTeX source, the diagram should announce as one image named for its kind, and the headings will read as styled text rather than a heading tree. Correct the recorded limitations in docs/dev/accessibility-checklist.md if any answer has changed.",
+        whyNotAutomated: "The subject is what a screen reader SAYS, and no screen reader runs in either lane: the desktop suite is a Linux container against WebKitGTK driven by WebDriver, which exposes the DOM and the accessibility tree but not VoiceOver's spoken output, and macOS has no tauri-driver support at all (SYNC-1). The heading limitation in particular is a property of CodeMirror's single contenteditable, which the DOM shows as correct markup.",
+        clients: ["desktop-macos"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "Repeat the editor pass above under NVDA on Windows, including browse mode and focus mode, and record the same three answers.",
+        whyNotAutomated: "tauri-driver support is Linux-only by decision (SYNC-1), so no scenario runs on Windows at all, and NVDA's browse-versus-focus mode has no WebKitGTK equivalent to stand in for it.",
+        clients: ["desktop-windows"],
+        estimateMin: 12,
+        tier: "standard",
+      },
+      {
+        see: "SC 2.4.11, the case code does not cover: open a note containing a task-query block near its top, open the in-note find bar with Mod-F, then Tab to the first task checkbox. Confirm the focus ring is fully visible rather than behind the find bar.",
+        whyNotAutomated: "The find bar is a CodeMirror panel whose height depends on its own wrapped content and on the replace row being open, and the scrolling around it is CodeMirror's rather than this code's, so no static scroll-padding was added and there is no measurement in the tree to compare against. Judging it needs a rendered layout plus an eye on where the ring lands.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 4,
+        tier: "core",
+      },
+      {
+        see: "SC 2.5.8 on the two controls left for measurement: with the real-render target-size run green, look at a dense task list and at a Settings switch, and confirm each is comfortably hittable with a finger on a touch screen and with a trackpad. Record which of the two, if either, the axe run flagged.",
+        whyNotAutomated: "Both are PAINTED controls whose box is what is drawn, so raising them changes the design rather than an invisible hit area, and both plausibly pass through 2.5.8's spacing exception instead. Whether the exception applies depends on the rendered geometry of a list whose row height varies with the timestamp setting, which is a layout fact no unit tier can compute.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 5,
+        tier: "standard",
+      },
+      {
+        see: "SC 3.2.6: confirm the app still offers no in-app help mechanism (a help page, an FAQ, a contact route, a chat). If one has been added since the last release, confirm it sits in the same relative position on every screen that offers it.",
+        whyNotAutomated: "The check is whether a NEW affordance is a help mechanism in WCAG's sense, which is a judgement about what a link is for rather than about markup. The code half (every outbound link classified, both directions) is automated in tests/a11y/redundantEntryAndHelp.test.ts; what it cannot decide is whether a newly classified link should have been called help.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 3,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "app.diagnostics",
     title: "Diagnostics and about information",
     paths: [
@@ -1965,10 +2037,11 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
       "e2e/math.e2e.ts",
+      "e2e/mermaid-viewer.e2e.ts",
     ],
     manual: [
       {
-        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note scrolls inside its own card rather than shrinking or dragging the note sideways, and the whole card is legible against the editor background in light, dark and AMOLED. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
+        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note opens fitted inside a clipped viewer rather than dragging the note sideways, the whole card is legible against the editor background in light, dark and AMOLED, drag pans a zoomed diagram, Ctrl/Cmd + wheel zooms while a plain wheel still scrolls the note, and on a phone a two-finger pinch zooms and the control bar is reachable without hover.",
         whyNotAutomated: "Mermaid lays out by measuring text with getBBox against the live engine's font metrics, which differ between WebKitGTK, WKWebView, Android WebView and WebView2; render-mermaid.ts states in its own header that jsdom cannot run the render, and there is no Mermaid scenario in any E2E lane.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 6,
@@ -2374,10 +2447,13 @@ export const ROSTER = Object.freeze([
     title: "Wikilinks and link autocomplete",
     paths: [
       "editor/src/wikilink/",
+      "editor/src/host/notes/vaultHeadings.ts",
+      "editor/src/host/notes/blockAnchors.ts",
       "src/notes/resolveWikilink.ts",
       "src/notes/renameWikilinks.ts",
       "src/notes/renamePreflight.ts",
       "src/notes/useVaultBlockAnchors.ts",
+      "src/notes/useVaultHeadings.ts",
       "src/notes/linkMention.ts",
       "src/notes/decorationRewrite.ts",
     ],
@@ -2402,6 +2478,20 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "No harness drives a handset, and the popup's placement is decided against the visual viewport that the OS keyboard shrinks.",
         clients: ["ios", "android"],
         estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        see: "On a real phone, in a vault holding several notes with headings, type [[## inside a note. Confirm the picker lists headings from OTHER notes rather than only the open one, that a trashed note's headings are absent, and that tapping a row inserts a link carrying the owning note's current title. Then lock the vault from the picker's own screen, unlock, and type [[## again: the list must come back rather than staying empty for the rest of the session.",
+        whyNotAutomated: "The heading set is read over IPC behind a Slot::Unlocked gate, so the lock-and-return leg needs the real backend refusing a real read, which no mock reproduces; and the surface is WKWebView on iOS and Android System WebView, neither of which any harness here drives.",
+        clients: ["ios", "android"],
+        estimateMin: 7,
+        tier: "standard",
+      },
+      {
+        see: "On a real phone, open a vault holding notes imported from Obsidian that carry ^block-id markers, and type [[^^ inside a note. Confirm the picker lists anchors from other notes with a readable preview line, that anchors in trashed notes are absent, and that tapping one inserts a [[Note^id]] link that resolves when tapped. Then switch to a second vault WITHOUT relaunching and confirm the first vault's note titles and preview text are nowhere in the picker.",
+        whyNotAutomated: "The preview lines and note titles are vault plaintext held in WebView memory, so the cross-vault leg is only observable on a device that has both vaults enrolled and a real keychain unlock between them; the surface is WKWebView on iOS and Android System WebView, neither of which any harness here drives.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
         tier: "standard",
       },
     ],
@@ -2442,6 +2532,9 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/secret-export.ts",
       "mobile/src/lib/export.ts",
       "mobile/src-tauri/src/plugins/secret_export/",
+      "mobile/src-tauri/src/plugins/export_dir/",
+      "mobile/src-tauri/permissions/export-dir/default.toml",
+      "mobile/src-tauri/capabilities/default.json",
     ],
     clients: ["ios", "android"],
     automatedBy: [
@@ -2449,8 +2542,8 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a real iPhone, export the recovery phrase to a file. From a Mac with the device connected, download the app container (Xcode → Window → Devices and Simulators → Download Container) and run `xattr -l` on the export directory inside it: `com.apple.metadata:com_apple_backup_excludeItem` must be present on the directory itself. Confirm the exported file is inside that directory and not somewhere else in the container. Then observe the BACKUP rather than the flag, which is the half nothing else covers: take an encrypted local backup of the device in Finder, and confirm the export directory and the exported file are absent from it, either by restoring the backup to a spare device or by inspecting the backup's file manifest. The xattr read is the precondition; the backup is the observation.",
-        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is a macOS unit test that sets the flag on a temp directory and reads it back, which establishes that the shipped Foundation call works and says nothing about iOS honouring it, and docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
+        see: "On a real iPhone, export the recovery phrase to a file. From a Mac with the device connected, download the app container (Xcode → Window → Devices and Simulators → Download Container) and run `xattr -l` on the export directory inside it: `com.apple.metadata:com_apple_backup_excludeItem` must be present on the directory itself. Confirm the exported file is inside that directory and not somewhere else in the container. Then observe the BACKUP rather than the flag, which is the half nothing else covers: take an encrypted local backup of the device in Finder, and confirm the export directory and the exported file are absent from it, either by restoring the backup to a spare device or by inspecting the backup's file manifest. The xattr read is the precondition; the backup is the observation. Since myne-md/myne#517 there is a cheaper precondition available BEFORE the export, and it is worth doing first because it separates the two halves of the mechanism: launch the app and read the xattr with nothing exported yet, which exercises the startup call alone (this is device-matrix row 8.9); then export and read it again, which exercises the command. If the first read is clean and the second is not, the startup hook is the half that broke.",
+        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is two unit tests that between them establish the shipped Foundation call works and that the exclusion is applied to the directory before any caller holds a path to it, and neither says anything about iOS honouring the flag, and docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
         clients: ["ios"],
         estimateMin: 8,
         tier: "core",
@@ -2900,6 +2993,10 @@ export const ROSTER = Object.freeze([
       "e2e/multi-cursor.e2e.ts",
       "e2e/find-replace.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
     ],
     manual: [
       {
@@ -5470,6 +5567,10 @@ export const ROSTER = Object.freeze([
       "e2e/archive.e2e.ts",
       "e2e/quick-picker-move-note.e2e.ts",
       "e2e/files-settings.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
       "e2e/drop-import.e2e.ts",
       "e2e/empty-folder-persistence.e2e.ts",
     ],
@@ -7139,6 +7240,10 @@ export const ROSTER = Object.freeze([
       "e2e/scroll-memory.e2e.ts",
       "e2e/tab-modes.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
+      // myne-md/myne#728 task 18: region traversal, the sidebar tree's single
+      // Tab stop and announcement, the tab strip's tabs/tabpanel pairing, the
+      // skip link's ordering, and `inert` while a modal is open.
+      "e2e/a11y-keyboard.e2e.ts",
       "e2e/navigation.e2e.ts",
       "e2e/editor-persistent-view.e2e.ts",
       "e2e/graph-tab.e2e.ts",

@@ -22,6 +22,7 @@ import {
 } from "react";
 import { Icon } from "./Icon";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { ornamentRole } from "@myne/ornaments";
 
 interface ModalShellProps {
@@ -149,6 +150,14 @@ export function ModalShell({
   // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, { enabled: open });
+  // And make the rest of the page INERT while it is open (myne-md/myne#728).
+  // The trap contains Tab; it does not stop a screen reader's virtual cursor
+  // from reading the page behind the dialog, and `aria-modal` is an assertion
+  // some assistive technology ignores. The BACKDROP is registered, not the
+  // card: the backdrop is the whole overlay, and inerting the card's own
+  // siblings would inert the backdrop it sits in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
 
   if (!open) return null;
 
@@ -172,6 +181,7 @@ export function ModalShell({
 
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelId}

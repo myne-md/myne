@@ -82,6 +82,20 @@ All request/response bodies are JSON. Every pre-auth request body is capped (`Ma
 | `POST /auth/scram/final` | `handshake_id`, `client_final` (SCRAM client-final-message), `device_id_hex`, `path` (`"password"` \| `"recovery"`) | `{"approved": bool, "token_hex"?, "server_signature_b64"}` | Verify the client proof, apply the approval gate, and either issue a per-device token (`approved: true`, `token_hex` present) or report pending (`approved: false`, no `token_hex`, `server_signature_b64` still returned so the client can verify the server). A failed proof burns the one-shot handshake and returns `401 unauthenticated` (no online-guessing reuse). |
 | `GET /vault.meta` | (device-registry bootstrap) | opaque `vault.meta` bytes (`protocol.md` §9.3) | A **joining** device fetches the account's `vault.meta` **before** it has a session, to derive `root_key` from `{account# + password/phrase}` and bootstrap — necessarily so, since the SCRAM secret is derived FROM `root_key`, making an authed-only variant circular. The blob is opaque and AEAD-sealed — the server serves bytes it cannot read. **What the fetcher gets is a different question from what the server learns, and is the one that matters here:** these bytes are the complete offline password-cracking target (Argon2id salt, cost parameters, both wrapped `root_key` copies), so possession of an account number is sufficient to obtain it, from anywhere, with no device. `threat-model.md` §7 records that exposure and §5 states it in plain language; `account-number.md` §7's "treat account numbers like cash" is the handling rule it implies. Bounded as pre-auth per §5.2. |
 
+**B2B additions the server cannot act on (normative).** An `NTV6` `vault.meta`
+(`protocol.md` §9.3.2) carries an owner-wrapped group key, a group-key epoch and
+an owner-double-signed roster; the server stores it as the same opaque bytes it
+stores an `NTV5` blob and **cannot forge, reorder or roll back a roster or a
+retirement record** (it has neither `root_key` nor the owner person key). A
+retirement record (`myne.group-retirement v1|`, `protocol.md` §9.3.4) carries no
+timestamp, so the server cannot order one against a removed member's package
+stream. A per-person private AI profile (`profiles/<profile-id>`, `MYY5`) is an
+opaque blob on the id-generic plane: the server stores it, cannot read it, and
+sees only an id it cannot invert to a person. **The person-private sync plane is
+not built in this branch** (Grill 4, alongside person-scoped server auth); the
+server's contract above is what the plane will have to satisfy, not a description
+of a shipped route.
+
 **Accepted `iterations` window (normative).** `iterations` is the one handshake parameter the client does not choose: the server supplies it on every `/auth/scram/init`, and `/auth/register` — an unauthenticated first write — is where it is first persisted. Both sides MUST bound it.
 
 - The accepted window is **`4096 ≤ iterations ≤ 600000`**. `4096` is the RFC 5802 floor and the value a v0.1 client registers.

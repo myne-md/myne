@@ -255,6 +255,22 @@
   --radius-3: 10px;
   --radius-pill: 999px;
 
+  /* -- Minimum pointer-target size (WCAG 2.2 SC 2.5.8) ---------------- */
+  /* 24 CSS pixels, the AA floor. A token rather than a literal per control,
+     because the controls that breach it are the DENSE chrome and they are
+     dense by design: the tab strip's buttons, the sidebar row affordances,
+     the settings rail's rebind buttons. Each was sized independently, at 16,
+     18, 20 or 22, so raising them one at a time would be nine judgements
+     nobody could later re-derive. One name, one value, one argument.
+
+     Applied as a MINIMUM, never as a fixed size: a control that is already
+     larger keeps its size, and the ones below it grow to the floor without
+     the surrounding layout being re-laid out around a new fixed box. The
+     spacing scale has no 24 of its own (--space-5 is 24px but means SPACING,
+     and a target floor that moved when the spacing scale was retuned would
+     be a coincidence rather than a rule). */
+  --target-min: 24px;
+
   /* -- Note cover banner ---------------------------------------------- */
   /* Fixed height, not an aspect ratio. A split pane changes width a lot, and a
      ratio would give one note two very different banners while moving where the

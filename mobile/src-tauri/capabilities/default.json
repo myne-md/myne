@@ -1,10 +1,9 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "default",
-  "description": "Default capability for the main mobile window. Narrow by design — widen only with a named, scoped permission per command (security-load-bearing, TB6). Mirrors the desktop vault + notes + prefs plugin grants, trimmed to the mobile surface. NOTE on `core` (myne-md/myne#384): the three `core:*:default` entries are enumerated rather than taken as the `core:default` bundle, which resolves to 92 command grants where 40 are reachable from this app's `@tauri-apps/api` surface. Resolved against THIS tree's `gen/schemas/acl-manifests.json`, not copied from desktop — the runtime arithmetic differs even where the manifest does not (`core:menu` and `core:tray` are `#[cfg(desktop)]` and never registered here, while `core:app`'s `register_listener`/`remove_listener` pair IS live on Android and iOS as the plugin base class). Both were dropped anyway: nothing in `src/` calls `addPluginListener`, and neither plugin JS package this app imports does either. Add a sub-namespace back only with a named consumer.",
+  "description": "Default capability for the main mobile window. Narrow by design — widen only with a named, scoped permission per command (security-load-bearing, TB3). Mirrors the desktop vault + notes + prefs plugin grants, trimmed to the mobile surface. NOTE on `core` (myne-md/myne#384): the `core:*:default` entries are enumerated rather than taken as the `core:default` bundle, which resolves to 92 command grants where 40 are reachable from this app's `@tauri-apps/api` surface. Resolved against THIS tree's `gen/schemas/acl-manifests.json`, not copied from desktop — the runtime arithmetic differs even where the manifest does not (`core:menu` and `core:tray` are `#[cfg(desktop)]` and never registered here, while `core:app`'s `register_listener`/`remove_listener` pair IS live on Android and iOS as the plugin base class). Both were dropped anyway: nothing in `src/` calls `addPluginListener`, and neither plugin JS package this app imports does either. Add a sub-namespace back only with a named consumer. `core:path` left the same way (myne-md/myne#517): the mobile path seam no longer re-exports `documentDir` / `join`, so nothing under `mobile/src` and no `@tauri-apps/*` package it imports reaches `plugin:path|*`, and the one destination an export may name now comes from `export-dir:default`, which is a single command in place of eight.",
   "windows": ["main"],
   "permissions": [
-    "core:path:default",
     "core:event:default",
     "core:window:default",
     "opener:default",
@@ -34,6 +33,7 @@
     "attachments:default",
     "export:default",
     "secret-export:default",
+    "export-dir:default",
     "sync:default",
     "qr-scan:default",
     "reminders:default",

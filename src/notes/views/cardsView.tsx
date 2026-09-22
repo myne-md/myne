@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -199,6 +200,16 @@ const CARD_INTERACTIVE_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
+/** The card's inner CONTROL (myne-md/myne#728). It carries the column layout
+ *  the card itself used to carry, so wrapping the content changed no pixel:
+ *  the article keeps the padding, border and background, the wrapper keeps the
+ *  flow. */
+const CARD_CONTENT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+
 const CARD_IMAGE_STYLE: CSSProperties = {
   display: "block",
   width: "100%",
@@ -292,6 +303,7 @@ function CardArticle({
   onClick,
   onAuxClick,
   onContextMenu,
+  onKeyDown,
   onSetCover,
 }: {
   row: ViewRow;
@@ -302,26 +314,86 @@ function CardArticle({
   onClick?: (e: ReactMouseEvent) => void;
   onAuxClick?: (e: ReactMouseEvent) => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
+  onKeyDown?: (e: ReactKeyboardEvent) => void;
   onSetCover?: SetCoverHandler;
 }) {
   const { t } = useTranslation();
-  const [hovering, setHovering] = useState(false);
-  const showCoverButton = onSetCover !== undefined && hovering;
+  // "Revealed" rather than "hovering" (myne-md/myne#728): the Set cover button
+  // was gated on hover alone, and it is the ONLY entry point the feature has
+  // (`onSetCover` reaches no menu), so setting a cover was a mouse-only
+  // capability rather than a mouse shortcut for something a keyboard could also
+  // do. Focus reveals it too. React's onFocus/onBlur are the delegated
+  // focusin/focusout pair, so they fire for the descendant that actually takes
+  // focus.
+  const [revealed, setRevealed] = useState(false);
+  const showCoverButton = onSetCover !== undefined && revealed;
   const baseStyle = interactive ? CARD_INTERACTIVE_STYLE : CARD_STYLE;
+  const reveal = onSetCover !== undefined ? () => setRevealed(true) : undefined;
+  const unreveal = onSetCover !== undefined ? () => setRevealed(false) : undefined;
 
   return (
+    // NOT the control, and that is the second answer rather than the first.
+    // The card CONTAINS one (the Set cover button), so `role="button"` here
+    // makes the pair `nested-interactive` and swallows that button's label
+    // into the card's own name. The content block below is the control
+    // instead, the same shape the mobile note row uses. The card keeps its
+    // click as a mouse convenience, which costs nothing because the real
+    // control covers the whole of its content.
     <article
       data-testid="view.card"
       data-note-id={row.noteId}
       style={onSetCover !== undefined ? { ...baseStyle, position: "relative" } : baseStyle}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? -1 : undefined}
       onClick={onClick}
       onAuxClick={onAuxClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={onSetCover !== undefined ? () => setHovering(true) : undefined}
-      onMouseLeave={onSetCover !== undefined ? () => setHovering(false) : undefined}
+      onMouseEnter={reveal}
+      onMouseLeave={unreveal}
+      onFocus={reveal}
+      // Hide only when focus leaves the CARD, not when it moves inside it. The
+      // Set-cover button is a descendant, so the focusout from the content block
+      // into that button bubbles here: an unconditional `unreveal` unmounted the
+      // button during the very Tab that was reaching it, which made the
+      // focus-revealed path (the whole reason it renders after the block) not
+      // work by keyboard.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          unreveal?.();
+        }
+      }}
     >
+      <div
+        data-testid="view.card-open"
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        onKeyDown={onKeyDown}
+        style={CARD_CONTENT_STYLE}
+      >
+        {coverId !== null && (
+          <img
+            data-testid="view.card-image"
+            src={attachmentUrl(coverId)}
+            alt=""
+            style={imageStyle}
+          />
+        )}
+        <div style={CARD_TITLE_STYLE}>{row.title ?? t("notes.views.cards.untitled")}</div>
+        {columns.map((col) => {
+          const prop = row.values[col];
+          if (!hasDisplayableValue(prop)) return null; // skip empty
+          return (
+            <div key={col} style={CARD_PROP_STYLE}>
+              <PropertyValue prop={prop} />
+            </div>
+          );
+        })}
+      </div>
+      {/* AFTER the content block in DOM order, though it paints at the
+          card's top-right (myne-md/myne#728, review). It is revealed BY focus
+          on that block, so rendering it first put it before the only element
+          that can reveal it: forward Tab went straight past to the next card,
+          and the control was reachable only by Shift+Tab back into a button
+          that had not existed a moment earlier. Visual position is the
+          absolute positioning's job; this is the reading order. */}
       {showCoverButton && (
         <button
           type="button"
@@ -343,24 +415,6 @@ function CardArticle({
             : t("notes.views.cards.setCover")}
         </button>
       )}
-      {coverId !== null && (
-        <img
-          data-testid="view.card-image"
-          src={attachmentUrl(coverId)}
-          alt=""
-          style={imageStyle}
-        />
-      )}
-      <div style={CARD_TITLE_STYLE}>{row.title ?? t("notes.views.cards.untitled")}</div>
-      {columns.map((col) => {
-        const prop = row.values[col];
-        if (!hasDisplayableValue(prop)) return null; // skip empty
-        return (
-          <div key={col} style={CARD_PROP_STYLE}>
-            <PropertyValue prop={prop} />
-          </div>
-        );
-      })}
     </article>
   );
 }
@@ -392,6 +446,15 @@ export function CardsView({
       e.preventDefault(); // middle-click → new tab
       onOpenNote?.(noteId, { newTab: true, toSide: false });
     }
+  };
+  // The keyboard half of that matrix (myne-md/myne#728): the card was a
+  // `role="button"` with `tabIndex={-1}` and no key handler, so a keyboard
+  // could neither reach a card nor open one. Same modifiers as the click.
+  const handleCardKey = (noteId: string) => (e: ReactKeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    // Space on a focused card would otherwise page the gallery's scroller.
+    e.preventDefault();
+    onOpenNote?.(noteId, { newTab: e.metaKey || e.ctrlKey, toSide: e.altKey });
   };
   const handleCardContextMenu = (noteId: string) => (e: ReactMouseEvent) => {
     if (onCardContextMenu === undefined) return;
@@ -489,6 +552,7 @@ export function CardsView({
         onContextMenu={
           onCardContextMenu ? handleCardContextMenu(row.noteId) : undefined
         }
+        onKeyDown={onOpenNote ? handleCardKey(row.noteId) : undefined}
         onSetCover={onSetCover}
       />
     );
