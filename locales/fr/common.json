@@ -160,7 +160,9 @@
       "runSummaryOffDevice_many": "environ {{count}} de caractères de vos notes ont été envoyés au fournisseur",
       "runSummaryOffDevice_other": "environ {{count}} caractères de vos notes ont été envoyés au fournisseur",
       "runSummaryOnDevice": "rien n'a quitté cet appareil",
-      "appendFlag": "ajouté à la fin"
+      "appendFlag": "ajouté à la fin",
+      "diffCurrent": "Dans la note actuelle",
+      "diffProposed": "Après ce changement"
     },
     "undo": {
       "offer_one": "La dernière exécution a modifié {{count}} note.",
@@ -300,7 +302,8 @@
       "usedInCount_one": "Utilisée dans {{count}} note",
       "usedInCount_many": "Utilisée dans {{count}} de notes",
       "usedInCount_other": "Utilisée dans {{count}} notes",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Aperçu de {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Audio : {{filename}}",
@@ -351,7 +354,8 @@
         "joinFailure": "La sauvegarde a échoué de façon inattendue. Aucun fichier n'a été laissé.",
         "memberTooLarge": "Un fichier de ce coffre-fort dépasse la taille autorisée par le format de sauvegarde.",
         "vaultNotFound": "Aucun coffre-fort à sauvegarder.",
-        "verifyFailed": "La sauvegarde écrite n'a pas pu être vérifiée, elle a donc été supprimée. Réessayez, sur un autre support si le problème persiste."
+        "verifyFailed": "La sauvegarde écrite n'a pas pu être vérifiée, elle a donc été supprimée. Réessayez, sur un autre support si le problème persiste.",
+        "unknown": "La sauvegarde a échoué pour une raison que Myne n'a pas pu identifier. Ne vous fiez à aucun fichier à la destination ; réessayez."
       },
       "restore": {
         "authOperationInProgress": "Une autre opération sur le coffre-fort est en cours. Attendez qu'elle se termine, puis réessayez.",
@@ -364,7 +368,8 @@
         "joinFailure": "La restauration a échoué de façon inattendue. Rien n'a été modifié.",
         "missingVaultMeta": "Cette sauvegarde ne contient pas ses métadonnées de coffre-fort et ne peut pas être restaurée.",
         "notABackupFile": "Ce fichier n'est pas une sauvegarde Myne.",
-        "vaultAlreadyExists": "Un coffre-fort issu de cette sauvegarde existe déjà sur cet appareil."
+        "vaultAlreadyExists": "Un coffre-fort issu de cette sauvegarde existe déjà sur cet appareil.",
+        "unknown": "La restauration a échoué pour une raison que Myne n'a pas pu identifier. Réessayez, et vérifiez le fichier de sauvegarde si l'erreur se répète."
       }
     },
     "export": {
@@ -409,7 +414,11 @@
     "searchPlaceholder": "Rechercher des notes ou exécuter une commande. Essayez tag: · path: · task:",
     "sectionCommands": "Commandes",
     "sectionNotes": "Notes",
-    "untitledNote": "Sans titre"
+    "untitledNote": "Sans titre",
+    "resultsLabel": "Commandes et notes",
+    "pin": "Épingler au ruban gauche",
+    "unpin": "Détacher du ruban gauche",
+    "pinError": "Impossible d'épingler la commande."
   },
   "commands": {
     "actions": {
@@ -700,6 +709,24 @@
       },
       "openThisMonthNote": {
         "label": "Ouvrir la note de ce mois"
+      },
+      "focusSidebarRegion": {
+        "label": "Focus sur la barre latérale des notes"
+      },
+      "focusEditorRegion": {
+        "label": "Focus sur l'éditeur"
+      },
+      "focusRightPanelRegion": {
+        "label": "Focus sur le panneau de droite"
+      },
+      "cycleRegion": {
+        "label": "Faire défiler le focus entre les zones"
+      },
+      "openInNewWindow": {
+        "label": "Ouvrir la note dans une nouvelle fenêtre"
+      },
+      "showIsolatedGraph": {
+        "label": "Ouvrir le graphe isolé"
       }
     },
     "hotkeys": {
@@ -740,7 +767,11 @@
         "toggleSourceMode": "Activer le mode source",
         "toggleTaskList": "Activer la liste de tâches",
         "undo": "Annuler",
-        "unfoldAll": "Tout déplier"
+        "unfoldAll": "Tout déplier",
+        "cycleRegion": "Faire défiler le focus entre les zones",
+        "focusEditorRegion": "Focus sur l'éditeur",
+        "focusRightPanelRegion": "Focus sur le panneau de droite",
+        "focusSidebarRegion": "Focus sur la barre latérale des notes"
       }
     },
     "rebind": {
@@ -768,7 +799,8 @@
       "loadingLabel": "Chargement"
     },
     "back": "Retour",
-    "continue": "Continuer"
+    "continue": "Continuer",
+    "skipToContent": "Aller au contenu"
   },
   "deviceRevoked": {
     "cta": "Recommencer",
@@ -1136,7 +1168,10 @@
             "newNotes_other": "{{count}} nouvelles notes.",
             "proposed_one": "{{count}} modification proposée.",
             "proposed_many": "{{count}} de modifications proposées.",
-            "proposed_other": "{{count}} modifications proposées."
+            "proposed_other": "{{count}} modifications proposées.",
+            "memoryUpdated_one": "Mémoire mise à jour avec une entrée.",
+            "memoryUpdated_other": "Mémoire mise à jour avec {{count}} entrées.",
+            "memoryUpdated_many": "Mémoire mise à jour avec {{count}} entrées."
           },
           "askPlaceholder": "Posez une question sur vos notes…",
           "askSubmit": "Demander",
@@ -1168,18 +1203,31 @@
           "thinking": "L'IA réfléchit…",
           "truncated": "Résumé des {{count}} premiers caractères.",
           "you": "Vous",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historique",
+          "historyCancel": "Annuler",
+          "historyDelete": "Supprimer",
+          "historyDeleteBody": "Cette action supprime la conversation de tous les appareils lors de leur prochaine connexion. Elle est irréversible.",
+          "historyEmpty": "Aucune conversation pour le moment. Les nouvelles discussions apparaissent ici.",
+          "historyError": "Impossible de charger les conversations. Réessayez.",
+          "historyLoading": "Chargement…",
+          "historyProposalAfter": "Après",
+          "historyProposalBefore": "Avant",
+          "historyProposalNewNote": "Nouvelle note",
+          "historyRename": "Renommer",
+          "historyTitle": "Historique des discussions",
+          "historyDeleteTitle": "Supprimer la conversation",
+          "persistWarning": "L'enregistrement dans le coffre a échoué. Vos messages sont toujours ici et seront réessayés.",
+          "memory": "Mémoire",
+          "memoryPopoverTitle": "Ce dont l'assistant se souvient",
+          "memoryPopoverEmpty": "Rien de mémorisé pour l'instant.",
+          "memoryPopoverDelete": "Supprimer",
+          "memoryPopoverDeleted": "Entrée retirée partout.",
+          "memoryPopoverDeleteFailed": "Impossible de supprimer l'entrée.",
+          "memoryPopoverEntryFailed": "Impossible de lire cette entrée. Elle est toujours stockée ; supprimez-la ici ou corrigez-la dans les Réglages.",
+          "memoryPopoverLoadFailed": "Impossible de charger les souvenirs. Rien n'a changé.",
+          "memoryPopoverRetry": "Réessayer",
+          "memoryPopoverSettings": "Gérer dans les Réglages",
+          "memoryPopoverClose": "Fermer"
         },
         "allHidden": "Tous les onglets sont masqués. Clic droit pour les restaurer.",
         "outline": {
@@ -1194,7 +1242,8 @@
           "outline": "Plan",
           "tasks": "Tâches",
           "unlinked": "Mentions non liées"
-        }
+        },
+        "tabStripLabel": "Panneau de droite"
       },
       "sidebarToggle": {
         "hideBacklinks": "Masquer la barre des rétroliens",
@@ -1224,6 +1273,11 @@
         "saveCurrentAs": "Enregistrer l'actuel sous…",
         "switchLabel": "Changer d'espace de travail",
         "toggleTitle": "Espace de travail : {{name}}"
+      },
+      "region": {
+        "editor": "Éditeur",
+        "rightPanel": "Panneau de droite",
+        "sidebar": "Barre latérale des notes"
       }
     },
     "noteActions": {
@@ -1237,7 +1291,8 @@
       "turnedIntoTemplate": "Transformée en modèle",
       "convertedToNote": "Convertie en note",
       "versionHistory": "Historique des versions",
-      "trash": "Déplacer vers la corbeille"
+      "trash": "Déplacer vers la corbeille",
+      "openInNewWindow": "Ouvrir dans une nouvelle fenêtre"
     },
     "codeBlock": {
       "copyCode": "Copier le code",
@@ -1297,7 +1352,21 @@
     },
     "mermaid": {
       "rendering": "Rendu du diagramme…",
-      "renderFailed": "Ce diagramme n'a pas pu être affiché : {{reason}}"
+      "renderFailed": "Ce diagramme n'a pas pu être affiché : {{reason}}",
+      "viewerLabel": "Visionneuse de diagrammes",
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "reset": "Réinitialiser le zoom pour ajuster",
+      "panUp": "Déplacer vers le haut",
+      "panDown": "Déplacer vers le bas",
+      "panLeft": "Déplacer vers la gauche",
+      "panRight": "Déplacer vers la droite",
+      "edit": "Modifier la source du diagramme",
+      "editText": "Modifier",
+      "expand": "Déplier le diagramme",
+      "expandText": "Déplier",
+      "expandClose": "Fermer le diagramme déplié",
+      "expandCloseText": "Fermer"
     },
     "slash": {
       "aiContinue": "Continuer la rédaction (IA)",
@@ -1372,7 +1441,20 @@
         "remind": "Rappel"
       },
       "timeLabel": "Heure (facultatif)",
-      "invalidRemind": "Myne ne peut pas lire cette date, vous ne recevrez donc aucun rappel."
+      "invalidRemind": "Myne ne peut pas lire cette date, vous ne recevrez donc aucun rappel.",
+      "addTime": "Ajouter une heure",
+      "clear": "Effacer",
+      "dateGrid": "Choisir une date",
+      "dateNext": "Mois suivant",
+      "datePrev": "Mois précédent",
+      "today": "Aujourd'hui",
+      "tomorrow": "Demain",
+      "selectField": "Sélectionner un champ à ajouter",
+      "noDate": "Aucune date",
+      "removeTime": "Retirer l'heure",
+      "timeHour": "Heure",
+      "timeMeridiem": "AM ou PM",
+      "timeMinute": "Minute"
     },
     "toolbar": {
       "apply": "Appliquer",
@@ -1622,6 +1704,30 @@
         "weekly": "Impossible d'ouvrir la note de cette semaine.",
         "monthly": "Impossible d'ouvrir la note de ce mois."
       }
+    },
+    "a11y": {
+      "noteBody": "Corps de la note : {{title}}",
+      "untitledNoteBody": "Corps de la note, note sans titre",
+      "sectionFolded_one": "Section repliée",
+      "sectionFolded_other": "{{count}} sections repliées",
+      "sectionUnfolded_one": "Section dépliée",
+      "sectionUnfolded_other": "{{count}} sections dépliées",
+      "diagram": "Diagramme",
+      "diagramNamed": "Diagramme : {{kind}}",
+      "brokenLink": "{{target}}, lien cassé",
+      "sectionFolded_many": "{{count}} sections repliées",
+      "sectionUnfolded_many": "{{count}} sections dépliées"
+    },
+    "ribbon": {
+      "customize": "Personnaliser le ruban…",
+      "label": "Ruban gauche",
+      "unpin": "Détacher du ruban",
+      "runFailed": "Impossible d'exécuter la commande du ruban."
+    },
+    "detachedDeleted": {
+      "title": "Cette note a été supprimée ailleurs",
+      "body": "Elle a été supprimée depuis une autre fenêtre ou synchronisée depuis un autre appareil. Toute modification non enregistrée dans cette fenêtre a été conservée sous forme de copie séparée.",
+      "close": "Fermer la fenêtre"
     }
   },
   "export": {
@@ -1940,7 +2046,15 @@
         "heading": "Groupes de couleurs",
         "moveDown": "Descendre la règle",
         "moveUp": "Monter la règle",
-        "namePlaceholder": "Règle sans titre"
+        "namePlaceholder": "Règle sans titre",
+        "rowLabel": "{{name}}, groupe {{index}} sur {{total}}. Alt plus la flèche haut ou bas le réordonne.",
+        "editRuleButton": "Modifier",
+        "derivedMakeEditable": "Rendre ces groupes modifiables",
+        "derivedMakeEditableFailed": "Ces groupes n'ont pas pu être enregistrés. Réessayez.",
+        "derivedNote_one": "Le graphe est coloré par étiquette : {{count}} groupe, dérivé de vos étiquettes. Il n'est pas enregistré tant que vous ne le rendez pas modifiable.",
+        "derivedNote_other": "Le graphe est coloré par étiquette : {{count}} groupes, dérivés de vos étiquettes. Ils ne sont pas enregistrés tant que vous ne les rendez pas modifiables.",
+        "newRuleTitle": "Nouveau groupe de couleurs",
+        "derivedNote_many": "Le graphe est coloré par étiquette : {{count}} groupes, dérivés de vos étiquettes. Ils ne sont pas enregistrés tant que vous ne les rendez pas modifiables."
       },
       "depthToggleTitle": "Changer la profondeur du voisinage (1 ↔ 2 sauts)",
       "filterAll": "Toutes",
@@ -1969,7 +2083,23 @@
         "reset": "Rétablir les valeurs par défaut",
         "showArrows": "Afficher les flèches de direction",
         "title": "Paramètres du graphe"
-      }
+      },
+      "canvasLabel": "Graphe de connaissances de {{count}} notes",
+      "filterSelectAriaLabel": "Filtrer le graphe",
+      "listLinkCount_one": "{{count}} lien",
+      "listLinkCount_other": "{{count}} liens",
+      "listLinksFrom": "Lié depuis : {{titles}}",
+      "listLinksTo": "Lie vers : {{titles}}",
+      "relayout": "Réorganiser",
+      "relayoutTitle": "Réorganiser le graphe depuis zéro",
+      "showingCount_one": "{{count}} note affichée",
+      "showingCount_other": "{{count}} notes affichées",
+      "untitledNote": "Note sans titre",
+      "viewGraph": "Graphe",
+      "viewList": "Liste",
+      "viewToggleAriaLabel": "Choisir l'image du graphe ou la liste de ses notes",
+      "listLinkCount_many": "{{count}} liens",
+      "showingCount_many": "{{count}} notes affichées"
     },
     "import": {
       "base": {
@@ -2247,7 +2377,10 @@
       "importedWithSkips_many": "{{count}} de notes importées · {{skipped}} ignorée(s)",
       "importedWithSkips_other": "{{count}} notes importées · {{skipped}} ignorée(s)",
       "importNoMarkdown": "Aucun fichier Markdown parmi les éléments déposés",
-      "moveFolderTo": "Déplacer le dossier vers…"
+      "moveFolderTo": "Déplacer le dossier vers…",
+      "treeLabel": "Notes et dossiers",
+      "selectionAnnouncement": "{{title}} sélectionnée",
+      "untitled": "Sans titre"
     },
     "newFromTemplate": {
       "back": "Retour",
@@ -2302,7 +2435,8 @@
       "taskBadgeTitle": "Note de tâche",
       "unsyncedLabel": "Pas encore sur le serveur",
       "unsyncedTitle": "Les dernières modifications de cette note ne se trouvent que sur cet appareil",
-      "untitled": "Sans titre"
+      "untitled": "Sans titre",
+      "untitledDrawing": "Dessin sans titre"
     },
     "savedView": {
       "defaultName": "Vue filtrée"
@@ -2371,7 +2505,10 @@
       "pinned": "Épinglé",
       "pinnedTitle": "Épinglé : détachez pour fermer",
       "unpin": "Détacher",
-      "untitled": "Sans titre"
+      "untitled": "Sans titre",
+      "closeTabMenuItem": "Fermer l'onglet",
+      "moveLeft": "Déplacer à gauche",
+      "moveRight": "Déplacer à droite"
     },
     "tagBrowser": {
       "cancel": "Annuler",
@@ -3162,7 +3299,7 @@
         "whenLabel": "Quand cela quitte votre appareil",
         "whoLabel": "Qui le reçoit",
         "connectionLabel": "Comment cela circule",
-        "excludedLabel": ""
+        "excludedLabel": "Dossiers exclus"
       },
       "disclosureToggle": "Comment ça marche ?",
       "enableHelper": "Exécute un modèle que vous fournissez. L'endroit où il s'exécute, et le fait que vos notes quittent ou non cet appareil, dépendent du fournisseur que vous indiquez ci-dessous. Expérimental, désactivé par défaut.",
@@ -3196,7 +3333,8 @@
         "unauthorized": "Le fournisseur a rejeté votre clé API. Remplacez-la : elle est peut-être erronée, révoquée, ou liée à un autre compte.",
         "unreachable": "Impossible de joindre le fournisseur. Vérifiez votre connexion réseau.",
         "featureOff": "L'IA est désactivée sur cet appareil. Rien n'a été envoyé. Activez-la dans Réglages, section IA.",
-        "consentMissing": "Vous n'avez pas accepté d'envoyer des notes à ce fournisseur depuis cet appareil. Rien n'a été envoyé. Choisissez à nouveau le fournisseur dans Réglages, section IA, et lisez ce qui sera envoyé."
+        "consentMissing": "Vous n'avez pas accepté d'envoyer des notes à ce fournisseur depuis cet appareil. Rien n'a été envoyé. Choisissez à nouveau le fournisseur dans Réglages, section IA, et lisez ce qui sera envoyé.",
+        "emptyGrant": "Tout ce que cette exécution pouvait lire est dans des dossiers que l'IA ne voit jamais. Rien n'a été envoyé. Changez-le dans Réglages, IA, Dossiers exclus."
       },
       "modelChoose": "Choisir un fichier…",
       "modelEmbeddingLabel": "Modèle de recherche : recherche sémantique et questions-réponses",
@@ -3485,7 +3623,8 @@
         "text": "Texte et affichage",
         "editing": "Édition",
         "writing": "Rédaction",
-        "features": "Fonctionnalités"
+        "features": "Fonctionnalités",
+        "tasks": "Tâches"
       },
       "preview": {
         "heading": "Portez ce vieux whisky",
@@ -3497,7 +3636,20 @@
       "defaultView": "Vue par défaut",
       "typewriter": "Défilement machine à écrire",
       "typewriterSubtitle": "Maintenir le curseur centré verticalement",
-      "enableArchiving": "Activer l'archivage"
+      "enableArchiving": "Activer l'archivage",
+      "taskChipColor": {
+        "accent": "Accent",
+        "danger": "Rouge",
+        "help": "La couleur de l'icône et du libellé d'une pastille de tâche, sur chaque surface de tâches de cet appareil.",
+        "label": "Couleur de la pastille de tâche",
+        "muted": "Atténué",
+        "sample": "1 août",
+        "theme": "Thème"
+      },
+      "taskChipIconOnly": {
+        "help": "Afficher une priorité par son icône seule, au lieu du mot.",
+        "label": "Priorité icône seule"
+      }
     },
     "search": {
       "placeholder": "Rechercher dans les paramètres…",
@@ -3577,7 +3729,11 @@
         "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone",
         "periodicNotes": "notes périodiques hebdomadaire mensuel semaine mois dossier modèle format",
         "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête",
-        "screenCaptureOverride": "capture écran dérogation autoriser désactiver loupe bureau à distance accessibilité déverrouillage écran noir override screen capture"
+        "screenCaptureOverride": "capture écran dérogation autoriser désactiver loupe bureau à distance accessibilité déverrouillage écran noir override screen capture",
+        "aiMemory": "mémoire souvenirs faits assistant apprend personnalité voix préférences",
+        "ribbon": "ruban gauche rail épingler épingles commande commandes personnaliser réordonner détacher barre d'outils raccourcis",
+        "folderNotes": "dossier note index folder_index page d'accueil double clic lien dossier projets off interrupteur désactiver",
+        "syncMembers": "membres, partage, inviter, équipe, collaboration, coffre"
       }
     },
     "dateTime": {
@@ -3594,6 +3750,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ne connaît pas ce fuseau horaire. Utilisez un nom comme Europe/Berlin.",
       "errorSave": "Impossible d'enregistrer ce paramètre."
+    },
+    "folderNotes": {
+      "label": "Notes de dossier",
+      "helper": "Permettre à une note de servir d'index à son dossier : elle s'ouvre au double-clic sur le dossier, et les liens de dossier comme [[Projets/]] y pointent. Désactivé par défaut. Le désactiver masque les boutons qui créent des notes de dossier et affiche celles déjà présentes comme des notes ordinaires ; rien sur le disque n'est modifié, donc le réactiver les restaure à l'identique.",
+      "errorSaveSetting": "Impossible d'enregistrer ce réglage."
+    },
+    "ribbonCustomize": {
+      "add": "Ajouter",
+      "empty": "Aucune commande sur le ruban pour l'instant. Utilisez Ajouter pour en épingler une.",
+      "errorSave": "Impossible d'enregistrer le réglage du ruban.",
+      "helper": "Les commandes du ruban gauche, dans l'ordre. Glissez pour réordonner, ajoutez-en depuis la liste des commandes, ou retirez avec ×. Le rail masque les commandes indisponibles dans l'état actuel.",
+      "label": "Ruban gauche",
+      "remove": "Retirer {{name}} du ruban",
+      "position": "{{name}}, {{index}} sur {{total}}",
+      "searchEmpty": "Aucune commande correspondante.",
+      "searchPlaceholder": "Rechercher des commandes…",
+      "searchResultsLabel": "Commandes correspondantes",
+      "showHelper": "Afficher le ruban gauche sur cet appareil.",
+      "showLabel": "Afficher le ruban gauche"
+    },
+    "memory": {
+      "heading": "Ce dont l'assistant se souvient",
+      "helper": "Faits appris par l'IA en travaillant avec vous. Elle les écrit elle-même (au plus un par exécution) ; vous voyez et pouvez corriger chacun. Les entrées se synchronisent avec vos autres appareils et restent chiffrées.",
+      "empty": "Rien de mémorisé pour l'instant. Les entrées apparaissent ici quand l'assistant apprend quelque chose pendant une exécution.",
+      "editLabel": "Modifier",
+      "deleteLabel": "Supprimer",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "cancelLabel": "Annuler",
+      "saveFailed": "Impossible d'enregistrer l'entrée.",
+      "deleteFailed": "Impossible de supprimer l'entrée.",
+      "entryUnreadable": "Impossible de lire cette entrée. Elle est toujours stockée ; supprimez-la ici ou corrigez-la dans les Réglages.",
+      "heldForReview": "Retenue pour examen : cette entrée a déclenché le scan d'injection et n'est pas utilisée par l'assistant tant que vous ne la modifiez pas ou ne la supprimez pas.",
+      "savedToast": "Mémoire mise à jour.",
+      "deletedToast": "Entrée retirée partout.",
+      "clearedToast": "Toutes les entrées de mémoire retirées.",
+      "clearAllLabel": "Effacer toute la mémoire",
+      "clearConfirm": "Retirer vraiment toutes les entrées ? Cette action est irréversible.",
+      "updatedAt": "Mis à jour {{val}}",
+      "personalityLabel": "Vos préférences de voix",
+      "personalityHelper": "Une instruction par ligne. Elles façonnent la façon dont l'assistant écrit à chaque exécution : ton, longueur, langue. Enregistrées dans le coffre et synchronisées.",
+      "personalityPlaceholder": "Gardez les réponses courtes, avec la conclusion d'abord.",
+      "personalitySaveLabel": "Enregistrer les préférences de voix",
+      "personalitySavedToast": "Préférences de voix mises à jour.",
+      "personalitySaveFailed": "Impossible d'enregistrer les préférences de voix.",
+      "loadFailed": "Impossible de charger les souvenirs ou les préférences de voix. Rien n'a changé.",
+      "retryLabel": "Réessayer"
     }
   },
   "storageLost": {
@@ -3945,6 +4148,53 @@
       "connecting": "Connexion à Tor. La synchronisation est suspendue jusqu'à ce que la connexion soit prête. Rien n'est envoyé directement.",
       "settingsHint": "Paramètres → Réseau",
       "unavailable": "Tor est indisponible, la synchronisation est donc suspendue. Rien n'est envoyé directement. Désactivez le routage Tor pour synchroniser sans lui."
+    },
+    "members": {
+      "title": "Membres et sécurité",
+      "access": "Votre accès",
+      "epochLabel": "Époque de la clé de groupe",
+      "people": "Personnes",
+      "removalLimitsLabel": "Limites de retrait"
+    },
+    "memberRoster": {
+      "loading": "Chargement des membres…",
+      "error": "Impossible de lire la liste du coffre.",
+      "hint": "Membres de ce coffre. Chacun rejoint avec sa propre identification et ses propres identifiants.",
+      "empty": "Aucun membre pour l'instant. Inviter quelqu'un est la prochaine étape.",
+      "rotated": "Clé rotée",
+      "keyChanged": "Clé modifiée. Vérifiez avec le propriétaire.",
+      "relinkConfirmed": "Reliement confirmé par le propriétaire",
+      "epoch": "Époque de la clé de groupe {{epoch}}",
+      "ownerBadge": "Propriétaire",
+      "memberBadge": "Membre",
+      "invite": "Inviter un membre",
+      "remove": "Retirer",
+      "removeConfirm": "Retirer {{name}} ? Une fois la rotation de clé terminée, il perd l'accès aux modifications futures. Cela ne peut rien effacer de ce qu'il a déjà copié, et ne rappelle rien de son appareil ni de son fournisseur d'IA.",
+      "removalLimits": "Retirer un membre n'arrêterait que son accès aux modifications futures. Cela ne peut rien effacer de ce qu'il a déjà copié, et ne rappelle rien de son appareil ni de son fournisseur d'IA.",
+      "inviteReady": "Invitation prête pour {{fingerprint}}…",
+      "invitationsHeading": "Invitations que vous avez envoyées",
+      "invitationClaimed": "Acceptée",
+      "invitationPending": "Pas encore acceptée",
+      "invitationsFailed": "Impossible de charger vos invitations.",
+      "title": "Membres du coffre",
+      "personHint": "Déverrouillez votre identité de membre avec votre phrase de récupération. Elle reste sur cet appareil jusqu'à ce que vous verrouilliez le coffre ou fermiez l'application.",
+      "personUnlock": "Déverrouiller l'identité de membre",
+      "personReady": "Identité de membre déverrouillée.",
+      "ownerCodeHint": "Partagez ce code à la personne que vous invitez pour qu'elle puisse vérifier que le coffre vous appartient. Il ne contient que des informations publiques.",
+      "personLock": "Verrouiller l'identité de membre",
+      "personError": "Cette phrase n'a pas ouvert d'identité de membre.",
+      "inviteHint": "Collez le code d'identité du membre invité (depuis sa page d'identité).",
+      "inviteCodeLabel": "Code d'identité de membre",
+      "inspect": "Vérifier l'empreinte",
+      "sasHint": "Lisez cette empreinte à la personne que vous invitez, ou laissez-la vous la lire. Elle doit correspondre des deux côtés avant de continuer.",
+      "sasConfirm": "J'ai confirmé cette empreinte avec la personne hors de l'application",
+      "inviteCodeInvalid": "Ce n'est pas un code d'identité de membre valide.",
+      "kemLabel": "Clé publique ML-KEM",
+      "edLabel": "Clé publique Ed25519",
+      "mldsaLabel": "Clé publique ML-DSA",
+      "untitledVault": "Coffre sans titre",
+      "inviteFailed": "L'invitation n'a pas pu être créée.",
+      "removeFailed": "Le membre n'a pas pu être retiré."
     }
   },
   "tasks": {
@@ -3968,7 +4218,8 @@
       "filter": "Rien ici pour l'instant. Essayez un autre filtre.",
       "rebuilding": "Lecture de vos notes…",
       "scope": "Aucune tâche dans ce dossier ou sous cette étiquette. Essayez d'élargir la portée.",
-      "vault": "Aucune tâche pour l'instant. Écrivez « - [ ] » sur une ligne dans n'importe quelle note pour en créer une."
+      "vault": "Aucune tâche pour l'instant. Écrivez « - [ ] » sur une ligne dans n'importe quelle note pour en créer une.",
+      "search": "Aucune tâche ne correspond à « {{query}} »."
     },
     "filter": {
       "all": "Toutes",
@@ -4001,7 +4252,74 @@
       "allFolders": "Tous les dossiers",
       "label": "Restreindre par"
     },
-    "title": "Tâches"
+    "title": "Tâches",
+    "axis": {
+      "due": "Échéance",
+      "folder": "Dossier",
+      "note": "Note",
+      "priority": "Priorité",
+      "sort": "Trier",
+      "status": "Statut",
+      "tag": "Étiquette"
+    },
+    "due": {
+      "any": "N'importe quelle date",
+      "later": "Plus tard",
+      "none": "Aucune date",
+      "overdue": "En retard",
+      "today": "Aujourd'hui",
+      "upcoming": "À venir"
+    },
+    "filters": {
+      "button": "Filtres",
+      "clearAll": "Tout effacer",
+      "selectHint": "Sélectionnez un filtre à appliquer",
+      "title": "Filtres"
+    },
+    "priority": {
+      "high": "Élevée",
+      "highest": "Maximale",
+      "low": "Faible",
+      "lowest": "Minimale",
+      "medium": "Moyenne"
+    },
+    "section": {
+      "done": "Terminées",
+      "later": "Plus tard",
+      "none": "Aucune date",
+      "overdue": "En retard",
+      "today": "Aujourd'hui",
+      "upcoming": "À venir"
+    },
+    "sort": {
+      "due": "Date d'échéance",
+      "dueDesc": "Date d'échéance, plus récente d'abord",
+      "note": "Note",
+      "priority": "Priorité"
+    },
+    "status": {
+      "all": "Toutes",
+      "done": "Terminées",
+      "undone": "Ouvertes"
+    },
+    "view": {
+      "allFolders": "Tous les dossiers",
+      "allNotes": "Toutes les notes",
+      "anyPriority": "N'importe quelle priorité",
+      "anyTag": "N'importe quelle étiquette",
+      "dueLabel": "Filtrer par date d'échéance",
+      "folderLabel": "Filtrer par dossier",
+      "noteLabel": "Filtrer par note",
+      "priorityLabel": "Filtrer par priorité",
+      "sortLabel": "Trier dans les sections",
+      "statusLabel": "Filtrer par achèvement",
+      "tagLabel": "Filtrer par étiquette",
+      "untitled": "Sans titre"
+    },
+    "search": {
+      "label": "Rechercher des tâches",
+      "placeholder": "Rechercher des tâches…"
+    }
   },
   "templates": {
     "manager": {
@@ -4117,7 +4435,11 @@
     "deleteConfirmTitle": "Supprimer ce coffre-fort ?",
     "deletePartialError": "Certains fichiers n'ont pas pu être supprimés. Le coffre-fort n'est plus utilisable. Continuez pour tout recommencer.",
     "failClosedEyebrow": "Impossible d'ouvrir le coffre-fort",
-    "restoreHint": "Restaurez depuis une sauvegarde pour continuer."
+    "restoreHint": "Restaurez depuis une sauvegarde pour continuer.",
+    "memberHint": "Ce coffre est partagé avec vous. Déverrouillez-le avec votre propre phrase de récupération.",
+    "memberPhraseLabel": "Phrase de récupération",
+    "memberSubmit": "Déverrouiller",
+    "memberError": "Cette phrase n'a pas ouvert ce coffre partagé."
   },
   "vault": {
     "ioBanner": {
@@ -4330,7 +4652,18 @@
     "openedRelative": "ouvert {{rel}}",
     "restoreFromBackup": "Restaurer depuis une sauvegarde",
     "subline": "Vous avez plusieurs coffres-forts sur cet appareil. Choisissez-en un à déverrouiller.",
-    "vaultFallback": "Coffre-fort {{n}}"
+    "vaultFallback": "Coffre-fort {{n}}",
+    "accountFallback": "Compte",
+    "moveToAccount": "Déplacer vers le compte…",
+    "moveToNewAccount": "Déplacer vers un nouveau compte",
+    "renameAccount": "Renommer le compte",
+    "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
+    "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
+    "labelTooLong": "Ce nom est trop long. Gardez-le sous 512 caractères.",
+    "renameCancel": "Annuler",
+    "renamePlaceholder": "Nom du compte",
+    "renameSave": "Renommer",
+    "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4375,7 +4708,16 @@
       "or": "ou",
       "title": "Choisir un coffre-fort à récupérer",
       "useAccountNumber": "Utiliser le numéro de compte",
-      "vaultFallback": "Coffre-fort {{index}}"
+      "vaultFallback": "Coffre-fort {{index}}",
+      "accountFallback": "Compte",
+      "accountsError": "Impossible de charger le regroupement des comptes. Les coffres sont listés sans regroupement ; rien ne change pour la récupération."
+    },
+    "siblingNotice": {
+      "body_one": "Ce compte contient encore {{count}} coffre. Récupérez-le aussi pour que rien ne reste derrière.",
+      "body_other": "Ce compte contient encore {{count}} coffres. Récupérez-les aussi pour que rien ne reste derrière.",
+      "recoverAnother": "Récupérer un autre coffre",
+      "unknown": "Impossible de vérifier si ce compte contient d'autres coffres. Si vous avez plus d'un coffre, récupérez chacun avec sa propre phrase.",
+      "body_many": "Ce compte contient encore {{count}} coffres. Récupérez-les aussi pour que rien ne reste derrière."
     }
   },
   "vaultSwitcher": {
@@ -4427,12 +4769,14 @@
     "residueBanner": "Fichiers résiduels d'une suppression interrompue ({{n}}). Nettoyez-les avant de créer un coffre-fort.",
     "cleanUpFiles": "Nettoyer les fichiers résiduels",
     "create": "Créer un coffre-fort",
-    "connect": "Me connecter à mon compte"
+    "connect": "Me connecter à mon compte",
+    "identityCta": "Créer une identité seulement"
   },
   "wikiGraph": {
     "emptyTitle": "Aucun lien pour l'instant",
     "emptyBodyBefore": "Reliez des notes en écrivant ",
-    "emptyBodyAfter": " dans votre texte. Les notes liées apparaissent ici sous forme de graphe."
+    "emptyBodyAfter": " dans votre texte. Les notes liées apparaissent ici sous forme de graphe.",
+    "canvasLabel": "Graphe de connaissances de {{count}} notes"
   },
   "markdown": {
     "attachmentFallback": "pièce jointe",
@@ -4510,7 +4854,18 @@
     "openedYearsAgo_one": "ouvert il y a {{count}} an",
     "openedYearsAgo_many": "ouvert il y a {{count}} d'années",
     "openedYearsAgo_other": "ouvert il y a {{count}} ans",
-    "corruptedBadge": "Corrompu"
+    "corruptedBadge": "Corrompu",
+    "accountFallback": "Compte",
+    "renameAccount": "Renommer le compte",
+    "moveToNewAccount": "Déplacer vers un nouveau compte",
+    "moveToAccount": "Déplacer vers le compte…",
+    "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
+    "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
+    "labelTooLong": "Ce nom est trop long. Gardez-le sous 512 caractères.",
+    "renameCancel": "Annuler",
+    "renamePlaceholder": "Nom du compte",
+    "renameSave": "Renommer",
+    "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé."
   },
   "join": {
     "transportError": "Impossible de joindre ce serveur de synchronisation. Vérifiez l'adresse et votre connexion, puis réessayez.",
@@ -4645,5 +5000,38 @@
     "restoreTrigger": "Activer la protection contre la capture d'écran",
     "saveFailed": "Cela n'a pas pu être enregistré, rien n'a donc changé. Réessayez, ou démarrez Myne avec --disable-screen-capture-protection.",
     "savedForNextLaunch": "Enregistré. Cette session garde la protection désactivée, car elle a été démarrée avec --disable-screen-capture-protection ; la protection reviendra la prochaine fois que vous ouvrirez Myne sans cette option."
+  },
+  "identitySetup": {
+    "createCta": "Créer une identité",
+    "doneCta": "Terminé",
+    "error": "Impossible de configurer l'identité. Vérifiez qu'un serveur de synchronisation est configuré, puis réessayez.",
+    "intro": "Une identité permet aux gens d'adresser une invitation à votre nom avant que vous ne possédiez un coffre. Elle ne crée aucun coffre et ne stocke aucune note.",
+    "pending": "Cet appareil attend l'approbation d'un autre appareil du compte.",
+    "phraseWarning": "Notez ces 24 mots et gardez-les en sécurité. C'est la seule fois où ils sont affichés ; c'est le seul moyen de récupérer cette identité.",
+    "recoverCta": "Récupérer une identité",
+    "recoverIntro": "Vous avez déjà une identité ? Saisissez sa phrase de récupération de 24 mots.",
+    "recovered": "Identité récupérée.",
+    "title": "Identité seulement"
+  },
+  "identityHome": {
+    "createVaultCta": "Créer un coffre",
+    "invitesError": "Impossible de charger les invitations. Vérifiez votre connexion et le serveur de synchronisation.",
+    "invitesHeading": "Invitations",
+    "invitesLoading": "Recherche d'invitations…",
+    "noInvites": "Aucune invitation pour l'instant.",
+    "subtitle": "Vous avez une identité sur cet appareil, donc les gens peuvent vous inviter dans un coffre. Vous n'avez pas besoin d'en créer un pour être invité.",
+    "accept": "Accepter",
+    "acceptHint": "Collez le code d'identité du propriétaire (il le partage quand il vous invite).",
+    "acceptOwnerCodeLabel": "Code d'identité du propriétaire",
+    "acceptInspect": "Vérifier l'empreinte",
+    "acceptSasHint": "Lisez cette empreinte au propriétaire du coffre, ou laissez-la vous la lire. Elle doit correspondre des deux côtés avant de continuer.",
+    "acceptConfirm": "J'ai confirmé cette empreinte avec le propriétaire hors de l'application",
+    "acceptSubmit": "Accepter et déverrouiller",
+    "acceptPhraseLabel": "Votre phrase de récupération",
+    "acceptError": "L'invitation n'a pas pu être acceptée.",
+    "acceptInvalid": "Ce n'est pas un code d'identité de propriétaire valide.",
+    "shareCodeHeading": "Votre code d'invitation",
+    "shareCodeHint": "Partagez ce code avec quiconque vous invite. Il ne contient que des informations publiques (votre id d'identité et clés publiques), jamais votre phrase.",
+    "title": "Votre identité"
   }
 }

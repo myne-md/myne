@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
       "runSummaryOffDevice_other": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
       "runSummaryOnDevice": "ingenting forlot denne enheten",
-      "appendFlag": "legges til på slutten"
+      "appendFlag": "legges til på slutten",
+      "diffCurrent": "I noten nå",
+      "diffProposed": "Etter denne endringen"
     },
     "undo": {
       "offer_one": "Den siste kjøringen endret {{count}} notat.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "Brukt i {{count}} notat",
       "usedInCount_other": "Brukt i {{count}} notater",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Forhåndsvis {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Lyd: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Sikkerhetskopiering mislyktes uventet. Ingen fil ble igjen.",
         "memberTooLarge": "En fil i dette hvelvet er større enn sikkerhetskopiformatet tillater.",
         "vaultNotFound": "Fant ingen hvelv å sikkerhetskopiere.",
-        "verifyFailed": "Den skrevne sikkerhetskopien lot seg ikke verifisere og ble forkastet. Prøv igjen, på et annet medium hvis det gjentar seg."
+        "verifyFailed": "Den skrevne sikkerhetskopien lot seg ikke verifisere og ble forkastet. Prøv igjen, på et annet medium hvis det gjentar seg.",
+        "unknown": "Sikkerhetskopien feilet av en grunn Myne ikke kunne identifisere. Regn ikke med noen fil på destinasjonen; prøv igjen."
       },
       "restore": {
         "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
@@ -334,7 +338,8 @@
         "joinFailure": "Gjenoppretting mislyktes uventet. Ingenting ble endret.",
         "missingVaultMeta": "Denne sikkerhetskopien mangler hvelvets metadata og kan ikke gjenopprettes.",
         "notABackupFile": "Denne filen er ikke en Myne-sikkerhetskopi.",
-        "vaultAlreadyExists": "Et hvelv fra denne sikkerhetskopien finnes allerede på denne enheten."
+        "vaultAlreadyExists": "Et hvelv fra denne sikkerhetskopien finnes allerede på denne enheten.",
+        "unknown": "Gjenopprettingen feilet av en grunn Myne ikke kunne identifisere. Prøv igjen, og sjekk sikkerhetskopifilen hvis det gjentar seg."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Søk i notater eller kjør en kommando. Prøv tag: · path: · task:",
     "sectionCommands": "Kommandoer",
     "sectionNotes": "Notater",
-    "untitledNote": "Uten tittel"
+    "untitledNote": "Uten tittel",
+    "resultsLabel": "Kommandoer og notater",
+    "pin": "Fest til venstre linje",
+    "unpin": "Løsne fra venstre linje",
+    "pinError": "Kommandoen kunne ikke festes."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Åpne denne månedens notat"
+      },
+      "focusSidebarRegion": {
+        "label": "Fokuser på notatsidepanel"
+      },
+      "focusEditorRegion": {
+        "label": "Fokuser på redigeringsprogram"
+      },
+      "focusRightPanelRegion": {
+        "label": "Fokuser på høyre panel"
+      },
+      "cycleRegion": {
+        "label": "Bytt fokus mellom områder"
+      },
+      "openInNewWindow": {
+        "label": "Åpne notat i nytt vindu"
+      },
+      "showIsolatedGraph": {
+        "label": "Åpne isolert graf"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Slå kildemodus av/på",
         "toggleTaskList": "Slå oppgaveliste av/på",
         "undo": "Angre",
-        "unfoldAll": "Fold ut alle"
+        "unfoldAll": "Fold ut alle",
+        "cycleRegion": "Bytt fokus mellom områder",
+        "focusEditorRegion": "Fokuser på redigeringsprogram",
+        "focusRightPanelRegion": "Fokuser på høyre panel",
+        "focusSidebarRegion": "Fokuser på notatsidepanel"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Laster"
     },
     "back": "Tilbake",
-    "continue": "Fortsett"
+    "continue": "Fortsett",
+    "skipToContent": "Hopp til innhold"
   },
   "deviceRevoked": {
     "cta": "Start på nytt",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} nytt notat.",
             "newNotes_other": "{{count}} nye notater.",
             "proposed_one": "Foreslo {{count}} endring.",
-            "proposed_other": "Foreslo {{count}} endringer."
+            "proposed_other": "Foreslo {{count}} endringer.",
+            "memoryUpdated_one": "Hukommelse oppdatert med én oppføring.",
+            "memoryUpdated_other": "Hukommelse oppdatert med {{count}} oppføringer."
           },
           "askPlaceholder": "Still et spørsmål om notatene dine…",
           "askSubmit": "Spør",
@@ -1119,18 +1153,31 @@
           "thinking": "AI tenker…",
           "truncated": "Oppsummerte de første {{count}} tegnene.",
           "you": "Du",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historikk",
+          "historyCancel": "Avbryt",
+          "historyDelete": "Slett",
+          "historyDeleteBody": "Dette sletter samtalen fra hver enhet neste gang den kobler til. Dette kan ikke angres.",
+          "historyEmpty": "Ingen samtaler ennå. Nye chatter vises her.",
+          "historyError": "Kunne ikke laste samtaler. Prøv igjen.",
+          "historyLoading": "Laster…",
+          "historyProposalAfter": "Etter",
+          "historyProposalBefore": "Før",
+          "historyProposalNewNote": "Nytt notat",
+          "historyRename": "Gi nytt navn",
+          "historyTitle": "Chathistorikk",
+          "historyDeleteTitle": "Slett samtale",
+          "persistWarning": "Lagring til vaulten feilet. Meldingene dine er fortsatt her og vil bli forsøkt på nytt.",
+          "memory": "Hukommelse",
+          "memoryPopoverTitle": "Hva assistenten husker",
+          "memoryPopoverEmpty": "Ingenting husket ennå.",
+          "memoryPopoverDelete": "Slett",
+          "memoryPopoverDeleted": "Oppføring fjernet overalt.",
+          "memoryPopoverDeleteFailed": "Oppføringen kunne ikke slettes.",
+          "memoryPopoverEntryFailed": "Kunne ikke lese denne oppføringen. Den er fortsatt lagret; slett den her eller rett den i Innstillinger.",
+          "memoryPopoverLoadFailed": "Kunne ikke laste minner. Ingenting ble endret.",
+          "memoryPopoverRetry": "Prøv igjen",
+          "memoryPopoverSettings": "Administrer i Innstillinger",
+          "memoryPopoverClose": "Lukk"
         },
         "allHidden": "Alle faner er skjult. Høyreklikk for å gjenopprette.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Disposisjon",
           "tasks": "Oppgaver",
           "unlinked": "Ukoblede omtaler"
-        }
+        },
+        "tabStripLabel": "Høyre panel"
       },
       "sidebarToggle": {
         "hideBacklinks": "Skjul tilbakekoblingsfelt",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Lagre gjeldende som…",
         "switchLabel": "Bytt arbeidsområde",
         "toggleTitle": "Arbeidsområde: {{name}}"
+      },
+      "region": {
+        "editor": "Redigeringsprogram",
+        "rightPanel": "Høyre panel",
+        "sidebar": "Notatsidepanel"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "Gjort om til mal",
       "convertedToNote": "Konvertert til notat",
       "versionHistory": "Versjonshistorikk",
-      "trash": "Flytt til papirkurven"
+      "trash": "Flytt til papirkurven",
+      "openInNewWindow": "Åpne i nytt vindu"
     },
     "codeBlock": {
       "copyCode": "Kopier kode",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Tegner diagram…",
-      "renderFailed": "Dette diagrammet kunne ikke tegnes: {{reason}}"
+      "renderFailed": "Dette diagrammet kunne ikke tegnes: {{reason}}",
+      "viewerLabel": "Diagramviser",
+      "zoomIn": "Zoom inn",
+      "zoomOut": "Zoom ut",
+      "reset": "Nullstill zoom til å passe",
+      "panUp": "Forskøv opp",
+      "panDown": "Forskøv ned",
+      "panLeft": "Forskøv venstre",
+      "panRight": "Forskøv høyre",
+      "edit": "Rediger diagramkilde",
+      "editText": "Rediger",
+      "expand": "Utvid diagram",
+      "expandText": "Utvid",
+      "expandClose": "Lukk utvidet diagram",
+      "expandCloseText": "Lukk"
     },
     "slash": {
       "aiContinue": "Fortsett å skrive (AI)",
@@ -1323,7 +1391,20 @@
         "remind": "Påminnelse"
       },
       "timeLabel": "Klokkeslett (valgfritt)",
-      "invalidRemind": "Myne kan ikke lese denne datoen, så du får ingen påminnelse."
+      "invalidRemind": "Myne kan ikke lese denne datoen, så du får ingen påminnelse.",
+      "addTime": "Legg til tid",
+      "clear": "Tøm",
+      "dateGrid": "Velg en dato",
+      "dateNext": "Neste måned",
+      "datePrev": "Forrige måned",
+      "today": "I dag",
+      "tomorrow": "I morgen",
+      "selectField": "Velg et felt å legge til",
+      "noDate": "Ingen dato",
+      "removeTime": "Fjern tid",
+      "timeHour": "Time",
+      "timeMeridiem": "AM eller PM",
+      "timeMinute": "Minutt"
     },
     "toolbar": {
       "apply": "Bruk",
@@ -1564,6 +1645,28 @@
         "weekly": "Denne ukens notat kunne ikke åpnes.",
         "monthly": "Denne månedens notat kunne ikke åpnes."
       }
+    },
+    "a11y": {
+      "noteBody": "Notatkropp: {{title}}",
+      "untitledNoteBody": "Notatkropp, notat uten tittel",
+      "sectionFolded_one": "Seksjon brettet",
+      "sectionFolded_other": "{{count}} seksjoner brettet",
+      "sectionUnfolded_one": "Seksjon utbrettet",
+      "sectionUnfolded_other": "{{count}} seksjoner utbrettet",
+      "diagram": "Diagram",
+      "diagramNamed": "Diagram: {{kind}}",
+      "brokenLink": "{{target}}, ødelagt lenke"
+    },
+    "ribbon": {
+      "customize": "Tilpass linje…",
+      "label": "Venstre linje",
+      "unpin": "Løsne fra linje",
+      "runFailed": "Linjekommandoen kunne ikke kjøres."
+    },
+    "detachedDeleted": {
+      "title": "Dette notatet ble slettet et annet sted",
+      "body": "Det ble slettet fra et annet vindu eller synkronisert fra en annen enhed. Alle ulagrede endringer i dette vinduet ble beholdt som en separat kopi.",
+      "close": "Lukk vindu"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Fargegrupper",
         "moveDown": "Flytt regel ned",
         "moveUp": "Flytt regel opp",
-        "namePlaceholder": "Regel uten tittel"
+        "namePlaceholder": "Regel uten tittel",
+        "rowLabel": "{{name}}, gruppe {{index}} av {{total}}. Alt pluss opp- eller nedpilen ordner den på nytt.",
+        "editRuleButton": "Rediger",
+        "derivedMakeEditable": "Gjør disse redigerbare",
+        "derivedMakeEditableFailed": "Disse gruppene kunne ikke lagres. Prøv igjen.",
+        "derivedNote_one": "Grafen farges etter tag: {{count}} gruppe, avledet av taggene dine. Den lagres ikke før du gjør den redigerbar.",
+        "derivedNote_other": "Grafen farges etter tag: {{count}} grupper, avledet av taggene dine. De lagres ikke før du gjør dem redigerbare.",
+        "newRuleTitle": "Ny fargegruppe"
       },
       "depthToggleTitle": "Bytt nabolagsdybde (1 ↔ 2 hopp)",
       "filterAll": "Alle",
@@ -1898,7 +2008,21 @@
         "reset": "Tilbakestill til standard",
         "showArrows": "Vis retningspiler",
         "title": "Grafinnstillinger"
-      }
+      },
+      "canvasLabel": "Kunnskapsgraf over {{count}} notater",
+      "filterSelectAriaLabel": "Filtrer grafen",
+      "listLinkCount_one": "{{count}} lenke",
+      "listLinkCount_other": "{{count}} lenker",
+      "listLinksFrom": "Lenket fra: {{titles}}",
+      "listLinksTo": "Lenker til: {{titles}}",
+      "relayout": "Omorganiser oppsett",
+      "relayoutTitle": "Legg grafen opp på nytt fra bunnen",
+      "showingCount_one": "Viser {{count}} notat",
+      "showingCount_other": "Viser {{count}} notater",
+      "untitledNote": "Notat uten tittel",
+      "viewGraph": "Graf",
+      "viewList": "Liste",
+      "viewToggleAriaLabel": "Velg grafbildet eller en liste over notatene dens"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "Importerte {{count}} notat · {{skipped}} hoppet over",
       "importedWithSkips_other": "Importerte {{count}} notater · {{skipped}} hoppet over",
       "importNoMarkdown": "Ingen markdown-filer i det du slapp",
-      "moveFolderTo": "Flytt mappe til…"
+      "moveFolderTo": "Flytt mappe til…",
+      "treeLabel": "Notater og mapper",
+      "selectionAnnouncement": "Valgt {{title}}",
+      "untitled": "Uten tittel"
     },
     "newFromTemplate": {
       "back": "Tilbake",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Oppgavenotat",
       "unsyncedLabel": "Ikke på serveren ennå",
       "unsyncedTitle": "De siste endringene i dette notatet finnes bare på denne enheten",
-      "untitled": "Uten tittel"
+      "untitled": "Uten tittel",
+      "untitledDrawing": "Tegning uten tittel"
     },
     "savedView": {
       "defaultName": "Filtrert visning"
@@ -2284,7 +2412,10 @@
       "pinned": "Festet",
       "pinnedTitle": "Festet: løsne for å lukke",
       "unpin": "Løsne",
-      "untitled": "Uten tittel"
+      "untitled": "Uten tittel",
+      "closeTabMenuItem": "Lukk fane",
+      "moveLeft": "Flytt til venstre",
+      "moveRight": "Flytt til høyre"
     },
     "tagBrowser": {
       "cancel": "Avbryt",
@@ -3057,7 +3188,7 @@
         "whenLabel": "Når det forlater den",
         "whoLabel": "Hvem som mottar det",
         "connectionLabel": "Hvordan det reiser",
-        "excludedLabel": ""
+        "excludedLabel": "Utelatte mapper"
       },
       "disclosureToggle": "Hvordan fungerer dette?",
       "enableHelper": "Kjører en modell du oppgir. Hvor den kjører, og om notatene dine forlater denne enheten, avhenger begge deler av leverandøren du oppgir nedenfor. Eksperimentell, av som standard.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Leverandøren avviste API-nøkkelen din. Bytt den ut: den kan være feil, tilbakekalt eller for en annen konto.",
         "unreachable": "Kunne ikke nå leverandøren. Sjekk nettverkstilkoblingen din.",
         "featureOff": "KI er slått av på denne enheten. Ingenting ble sendt. Slå det på under Innstillinger, i KI.",
-        "consentMissing": "Du har ikke samtykket til å sende notater til denne leverandøren fra denne enheten. Ingenting ble sendt. Velg leverandøren på nytt under Innstillinger, i KI, og les hva som sendes."
+        "consentMissing": "Du har ikke samtykket til å sende notater til denne leverandøren fra denne enheten. Ingenting ble sendt. Velg leverandøren på nytt under Innstillinger, i KI, og les hva som sendes.",
+        "emptyGrant": "Alt denne kjøringen kunne lese er i mapper AI aldri ser. Ingenting ble sendt. Endre det i Innstillinger, AI, Utelatte mapper."
       },
       "modelChoose": "Velg fil…",
       "modelEmbeddingLabel": "Søkemodell: semantisk søk og spørsmål og svar",
@@ -3374,7 +3506,8 @@
         "text": "Tekst og visning",
         "editing": "Redigering",
         "writing": "Skriving",
-        "features": "Funksjoner"
+        "features": "Funksjoner",
+        "tasks": "Oppgaver"
       },
       "preview": {
         "heading": "Høvdingens kjære squaw",
@@ -3386,7 +3519,20 @@
       "defaultView": "Standardvisning",
       "typewriter": "Skrivemaskinrulling",
       "typewriterSubtitle": "Hold markøren vertikalt sentrert",
-      "enableArchiving": "Aktiver arkivering"
+      "enableArchiving": "Aktiver arkivering",
+      "taskChipColor": {
+        "accent": "Aksent",
+        "danger": "Rød",
+        "help": "Fargen på en oppgavechips ikon og etikett, på alle oppgaveflater på denne enheten.",
+        "label": "Oppgavechipfarge",
+        "muted": "Dempet",
+        "sample": "1. aug.",
+        "theme": "Tema"
+      },
+      "taskChipIconOnly": {
+        "help": "Vis en prioritet kun som ikonet dens, i stedet for ordet.",
+        "label": "Kun ikon-prioritet"
+      }
     },
     "search": {
       "placeholder": "Søk i innstillinger…",
@@ -3466,7 +3612,11 @@
         "timezone": "tidssone sone tz utc iana region i dag timezone time zone",
         "periodicNotes": "periodiske notater ukentlig månedlig uke måned mappe mal format",
         "aiHistoryBudget": "samtale historikk kontekst hukommelse budsjett tegn agent chat forespørsel",
-        "screenCaptureOverride": "skjermopptak overstyring tillat deaktiver skjermforstørrer fjernskrivebord tilgjengelighet opplåsing opplåsingsskjerm svart skjerm screen capture remote desktop"
+        "screenCaptureOverride": "skjermopptak overstyring tillat deaktiver skjermforstørrer fjernskrivebord tilgjengelighet opplåsing opplåsingsskjerm svart skjerm screen capture remote desktop",
+        "aiMemory": "hukommelse huskede fakta assistent lærer personlighet stemmepreferanser",
+        "ribbon": "venstre linje skinne fest pin kommando kommandoer tilpass ordne løsne verktøylinje snarveier",
+        "folderNotes": "mappe notat indeks folder_index landingsside dobbeltklikk mappelenke prosjekter av skru av deaktiver",
+        "syncMembers": "medlemmer, del, inviter, team, samarbeid, vault"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kjenner ikke den tidssonen. Bruk et navn som Europe/Berlin.",
       "errorSave": "Kunne ikke lagre den innstillingen."
+    },
+    "folderNotes": {
+      "label": "Mappenotater",
+      "helper": "La et notat fungere som mappens indeks: det åpnes når du dobbeltklikker på mappen, og mappelenker som [[Projects/]] peker til det. Av som standard. Å slå det av skjuler knappene som oppretter mappenotater og viser eventuelle du allerede har som vanlige notater; det endrer ingenting på disken, så å slå det på igjen gjenoppretter dem nøyaktig.",
+      "errorSaveSetting": "Denne innstillingen kunne ikke lagres."
+    },
+    "ribbonCustomize": {
+      "add": "Legg til",
+      "empty": "Ingen kommandoer på linjen ennå. Bruk Legg til for å feste en.",
+      "errorSave": "Linjeinnstillingen kunne ikke lagres.",
+      "helper": "Kommandoene på den venstre linjen, i rekkefølge. Dra for å ordne på nytt, legg til flere fra kommandolisten, eller fjern med ×. Skinnen skjuler kommandoer som ikke er tilgjengelige i gjeldende tilstand.",
+      "label": "Venstre linje",
+      "remove": "Fjern {{name}} fra linjen",
+      "position": "{{name}}, {{index}} av {{total}}",
+      "searchEmpty": "Ingen samsvarende kommandoer.",
+      "searchPlaceholder": "Søk etter kommandoer…",
+      "searchResultsLabel": "Samsvarende kommandoer",
+      "showHelper": "Vis den venstre linjen på denne enheten.",
+      "showLabel": "Vis venstre linje"
+    },
+    "memory": {
+      "heading": "Hva assistenten husker",
+      "helper": "Fakta AI lærte av å jobbe med deg. Den skriver dem selv (minst én per kjøring); du ser og kan rette hver enkelt. Oppføringer synkroniseres til dine andre enheter og forblir krypterte.",
+      "empty": "Ingenting husket ennå. Oppføringer vises her når assistenten lærer noe under en kjøring.",
+      "editLabel": "Rediger",
+      "deleteLabel": "Slett",
+      "save": "Lagre",
+      "cancel": "Avbryt",
+      "cancelLabel": "Avbryt",
+      "saveFailed": "Oppføringen kunne ikke lagres.",
+      "deleteFailed": "Oppføringen kunne ikke slettes.",
+      "entryUnreadable": "Kunne ikke lese denne oppføringen. Den er fortsatt lagret; slett den her eller rett den i Innstillinger.",
+      "heldForReview": "Venter på gjennomgang: denne oppføringen utløste injeksjonsskanning og brukes ikke av assistenten før du redigerer eller sletter den.",
+      "savedToast": "Hukommelse oppdatert.",
+      "deletedToast": "Oppføring fjernet overalt.",
+      "clearedToast": "Alle hukommelsesoppføringer fjernet.",
+      "clearAllLabel": "Tøm all hukommelse",
+      "clearConfirm": "Fjern virkelig hver oppføring? Dette kan ikke angres.",
+      "updatedAt": "Oppdatert {{val}}",
+      "personalityLabel": "Dine stemmepreferanser",
+      "personalityHelper": "Én instruksjon per linje. Disse former hvordan assistenten skriver i hver kjøring: tone, lengde, språk. Lagres i vaulten og synkroniseres.",
+      "personalityPlaceholder": "Hold svarene korte, med konklusjonen først.",
+      "personalitySaveLabel": "Lagre stemmepreferanser",
+      "personalitySavedToast": "Stemmepreferanser oppdatert.",
+      "personalitySaveFailed": "Stemmepreferansene kunne ikke lagres.",
+      "loadFailed": "Kunne ikke laste minner eller stemmepreferanser. Ingenting ble endret.",
+      "retryLabel": "Prøv igjen"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Kobler til Tor. Synkroniseringen er satt på pause til tilkoblingen er klar. Ingenting sendes direkte.",
       "settingsHint": "Innstillinger → Nettverk",
       "unavailable": "Tor er utilgjengelig, så synkroniseringen er satt på pause. Ingenting sendes direkte. Slå av Tor-ruting for å synkronisere uten."
+    },
+    "members": {
+      "title": "Medlemmer og sikkerhet",
+      "access": "Din tilgang",
+      "epochLabel": "Gruppenøkkel-epoch",
+      "people": "Personer",
+      "removalLimitsLabel": "Fjernelsesgrenser"
+    },
+    "memberRoster": {
+      "loading": "Laster medlemmer…",
+      "error": "Kunne ikke lese vault-medlemslisten.",
+      "hint": "Medlemmer av denne vaulten. Hver blir med med egen identitet og legitimasjon.",
+      "empty": "Ingen medlemmer ennå. Å invitere noen er neste steg.",
+      "rotated": "Nøkkel rotert",
+      "keyChanged": "Nøkkel endret. Verifiser med eieren.",
+      "relinkConfirmed": "Kobling på nytt bekreftet av eier",
+      "epoch": "Gruppenøkkel-epoch {{epoch}}",
+      "ownerBadge": "Eier",
+      "memberBadge": "Medlem",
+      "invite": "Inviter medlem",
+      "remove": "Fjern",
+      "removeConfirm": "Fjern {{name}}? Når nøkkelrotasjonen er fullført, mister de tilgang til fremtidige endringer. Dette kan ikke slette noe de allerede har kopiert, og det henter ikke innhold tilbake fra enheten deres eller AI-leverandøren deres.",
+      "removalLimits": "Å fjerne et medlem stopper bare tilgangen deres til fremtidige endringer. Det kan ikke slette noe de allerede har kopiert, og det henter ikke innhold tilbake fra enheten deres eller AI-leverandøren deres.",
+      "inviteReady": "Invitasjon klar for {{fingerprint}}…",
+      "invitationsHeading": "Invitasjoner du har sendt",
+      "invitationClaimed": "Godtatt",
+      "invitationPending": "Ikke godtatt ennå",
+      "invitationsFailed": "Kunne ikke laste invitasjonene dine.",
+      "title": "Vault-medlemmer",
+      "personHint": "Lås opp medlemsidentiteten din med gjenopprettingsfrasen. Den forblir på denne enheten til du låser vaulten eller lukker appen.",
+      "personUnlock": "Lås opp medlemsidentitet",
+      "personReady": "Medlemsidentitet låst opp.",
+      "ownerCodeHint": "Del denne koden med personen du inviterer, så de kan verifisere at vaulten er din. Den inneholder bare offentlig informasjon.",
+      "personLock": "Lås medlemsidentitet",
+      "personError": "Den frasen åpnet ikke en medlemsidentitet.",
+      "inviteHint": "Lim inn den inviterte medlemmets identitetskode (fra identitetshjemmet deres).",
+      "inviteCodeLabel": "Medlemsidentitetskode",
+      "inspect": "Sjekk fingeravtrykk",
+      "sasHint": "Les dette fingeravtrykket til personen du inviterer, eller la dem lese det for deg. Det må samsvare på begge sider før du fortsetter.",
+      "sasConfirm": "Jeg bekreftet dette fingeravtrykket med personen utenfor kanalen",
+      "inviteCodeInvalid": "Det er ikke en gyldig medlemsidentitetskode.",
+      "kemLabel": "ML-KEM offentlig nøkkel",
+      "edLabel": "Ed25519 offentlig nøkkel",
+      "mldsaLabel": "ML-DSA offentlig nøkkel",
+      "untitledVault": "Vault uten tittel",
+      "inviteFailed": "Invitasjonen kunne ikke opprettes.",
+      "removeFailed": "Medlemmet kunne ikke fjernes."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Ingenting her akkurat nå. Prøv et annet filter.",
       "rebuilding": "Leser notatene dine…",
       "scope": "Ingen oppgaver i denne mappen eller etiketten. Prøv å utvide omfanget.",
-      "vault": "Ingen oppgaver ennå. Skriv «- [ ]» på en linje i et notat for å lage en."
+      "vault": "Ingen oppgaver ennå. Skriv «- [ ]» på en linje i et notat for å lage en.",
+      "search": "Ingen oppgaver samsvarer med «{{query}}»."
     },
     "filter": {
       "all": "Alle",
@@ -3881,7 +4126,74 @@
       "allFolders": "Alle mapper",
       "label": "Avgrens etter"
     },
-    "title": "Oppgaver"
+    "title": "Oppgaver",
+    "axis": {
+      "due": "Forfall",
+      "folder": "Mappe",
+      "note": "Notat",
+      "priority": "Prioritet",
+      "sort": "Sorter",
+      "status": "Status",
+      "tag": "Tagg"
+    },
+    "due": {
+      "any": "Enhver dato",
+      "later": "Senere",
+      "none": "Ingen dato",
+      "overdue": "Forfalt",
+      "today": "I dag",
+      "upcoming": "Kommende"
+    },
+    "filters": {
+      "button": "Filtre",
+      "clearAll": "Tøm alle",
+      "selectHint": "Velg et filter å bruke",
+      "title": "Filtre"
+    },
+    "priority": {
+      "high": "Høy",
+      "highest": "Høyest",
+      "low": "Lav",
+      "lowest": "Lavest",
+      "medium": "Middels"
+    },
+    "section": {
+      "done": "Ferdig",
+      "later": "Senere",
+      "none": "Ingen dato",
+      "overdue": "Forfalt",
+      "today": "I dag",
+      "upcoming": "Kommende"
+    },
+    "sort": {
+      "due": "Forfallsdato",
+      "dueDesc": "Forfallsdato, senest først",
+      "note": "Notat",
+      "priority": "Prioritet"
+    },
+    "status": {
+      "all": "Alle",
+      "done": "Ferdig",
+      "undone": "Åpen"
+    },
+    "view": {
+      "allFolders": "Alle mapper",
+      "allNotes": "Alle notater",
+      "anyPriority": "Enhver prioritet",
+      "anyTag": "Enhver tagg",
+      "dueLabel": "Filtrer etter forfallsdato",
+      "folderLabel": "Filtrer etter mappe",
+      "noteLabel": "Filtrer etter notat",
+      "priorityLabel": "Filtrer etter prioritet",
+      "sortLabel": "Sorter innen seksjoner",
+      "statusLabel": "Filtrer etter fullføring",
+      "tagLabel": "Filtrer etter tagg",
+      "untitled": "Uten tittel"
+    },
+    "search": {
+      "label": "Søk i oppgaver",
+      "placeholder": "Søk i oppgaver…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Slette dette hvelvet?",
     "deletePartialError": "Noen filer kunne ikke fjernes. Hvelvet er ikke lenger brukbart. Fortsett for å starte på nytt.",
     "failClosedEyebrow": "Kan ikke åpne hvelv",
-    "restoreHint": "Gjenopprett fra en sikkerhetskopi for å fortsette."
+    "restoreHint": "Gjenopprett fra en sikkerhetskopi for å fortsette.",
+    "memberHint": "Denne vaulten deles med deg. Lås den opp med din egen gjenopprettingsfrase.",
+    "memberPhraseLabel": "Gjenopprettingsfrase",
+    "memberSubmit": "Lås opp",
+    "memberError": "Den frasen åpnet ikke denne delte vaulten."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "åpnet {{rel}}",
     "restoreFromBackup": "Gjenopprett fra sikkerhetskopi",
     "subline": "Du har mer enn ett hvelv på denne enheten. Velg ett for å låse opp.",
-    "vaultFallback": "Hvelv {{n}}"
+    "vaultFallback": "Hvelv {{n}}",
+    "accountFallback": "Konto",
+    "moveToAccount": "Flytt til konto…",
+    "moveToNewAccount": "Flytt til ny konto",
+    "renameAccount": "Gi konto nytt navn",
+    "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
+    "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
+    "labelTooLong": "Det navnet er for langt. Hold det under 512 tegn.",
+    "renameCancel": "Avbryt",
+    "renamePlaceholder": "Kontonavn",
+    "renameSave": "Gi nytt navn",
+    "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "eller",
       "title": "Velg et hvelv å gjenopprette",
       "useAccountNumber": "Bruk kontonummer",
-      "vaultFallback": "Hvelv {{index}}"
+      "vaultFallback": "Hvelv {{index}}",
+      "accountFallback": "Konto",
+      "accountsError": "Kunne ikke laste kontogrupperingen. Vault-er er listet uten gruppering; ingenting om gjenoppretting endres."
+    },
+    "siblingNotice": {
+      "body_one": "Denne kontoen har {{count}} vault til. Gjenopprette den også, så ingenting blir igjen.",
+      "body_other": "Denne kontoen har {{count}} vault-er til. Gjenopprette dem også, så ingenting blir igjen.",
+      "recoverAnother": "Gjenopprett en annen vault",
+      "unknown": "Kunne ikke sjekke om denne kontoen har andre vault-er. Hvis du har mer enn én vault, gjenopprett hver med sin egen frase."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Gjenværende filer fra en avbrutt sletting ({{n}}). Rydd dem opp før du oppretter et hvelv.",
     "cleanUpFiles": "Rydd opp gjenværende filer",
     "create": "Opprett et hvelv",
-    "connect": "Koble til kontoen min"
+    "connect": "Koble til kontoen min",
+    "identityCta": "Opprett bare en identitet"
   },
   "wikiGraph": {
     "emptyTitle": "Ingen lenker ennå",
     "emptyBodyBefore": "Koble notater sammen ved å skrive ",
-    "emptyBodyAfter": " i teksten din. Koblede notater vises her som en graf."
+    "emptyBodyAfter": " i teksten din. Koblede notater vises her som en graf.",
+    "canvasLabel": "Kunnskapsgraf over {{count}} notater"
   },
   "markdown": {
     "attachmentFallback": "vedlegg",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "åpnet i fjor",
     "openedYearsAgo_one": "åpnet for {{count}} år siden",
     "openedYearsAgo_other": "åpnet for {{count}} år siden",
-    "corruptedBadge": "Skadet"
+    "corruptedBadge": "Skadet",
+    "accountFallback": "Konto",
+    "renameAccount": "Gi konto nytt navn",
+    "moveToNewAccount": "Flytt til ny konto",
+    "moveToAccount": "Flytt til konto…",
+    "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
+    "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
+    "labelTooLong": "Det navnet er for langt. Hold det under 512 tegn.",
+    "renameCancel": "Avbryt",
+    "renamePlaceholder": "Kontonavn",
+    "renameSave": "Gi nytt navn",
+    "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret."
   },
   "join": {
     "transportError": "Kunne ikke nå den synkroniseringsserveren. Sjekk adressen og tilkoblingen din, og prøv igjen.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Slå på beskyttelse mot skjermopptak",
     "saveFailed": "Det kunne ikke lagres, så ingenting ble endret. Prøv igjen, eller start Myne med --disable-screen-capture-protection.",
     "savedForNextLaunch": "Lagret. Denne økten har fortsatt beskyttelsen av fordi den ble startet med --disable-screen-capture-protection, så den kommer tilbake neste gang du åpner Myne uten det flagget."
+  },
+  "identitySetup": {
+    "createCta": "Opprett en identitet",
+    "doneCta": "Ferdig",
+    "error": "Identiteten kunne ikke opprettes. Sjekk at en synkroniseringsserver er konfigurert, og prøv igjen.",
+    "intro": "En identitet lar folk adressere en invitasjon til deg før du eier noen vault. Den oppretter ingen vault og lagrer ingen notater.",
+    "pending": "Denne enheten venter på at en annen enhet på kontoen skal godkjenne den.",
+    "phraseWarning": "Skriv disse 24 ordene ned og oppbevar dem trygt. Dette er eneste gang de vises; de er den eneste måten å gjenopprette denne identiteten på.",
+    "recoverCta": "Gjenopprett en identitet",
+    "recoverIntro": "Har du allerede en identitet? Skriv inn 24-ords gjenopprettingsfrasen dens.",
+    "recovered": "Identitet gjenopprettet.",
+    "title": "Kun identitet"
+  },
+  "identityHome": {
+    "createVaultCta": "Opprett en vault",
+    "invitesError": "Kunne ikke laste invitasjoner. Sjekk tilkoblingen og synkroniseringsserveren.",
+    "invitesHeading": "Invitasjoner",
+    "invitesLoading": "Sjekker etter invitasjoner…",
+    "noInvites": "Ingen invitasjoner ennå.",
+    "subtitle": "Du har en identitet på denne enheten, så folk kan invitere deg til en vault. Du trenger ikke opprette en for å bli invitert.",
+    "accept": "Godta",
+    "acceptHint": "Lim inn eierens identitetskode (de deler den når de inviterer deg).",
+    "acceptOwnerCodeLabel": "Eierens identitetskode",
+    "acceptInspect": "Sjekk fingeravtrykk",
+    "acceptSasHint": "Les dette fingeravtrykket til vault-eieren, eller la dem lese det for deg. Det må samsvare på begge sider før du fortsetter.",
+    "acceptConfirm": "Jeg bekreftet dette fingeravtrykket med eieren utenfor kanalen",
+    "acceptSubmit": "Godta og lås opp",
+    "acceptPhraseLabel": "Din gjenopprettingsfrase",
+    "acceptError": "Invitasjonen kunne ikke godtas.",
+    "acceptInvalid": "Det er ikke en gyldig eieridentitetskode.",
+    "shareCodeHeading": "Invitasjonskoden din",
+    "shareCodeHint": "Del denne koden med hvem som helst som inviterer deg. Den inneholder bare offentlig informasjon (identitets-ID-en og offentlige nøkler), aldri frasen din.",
+    "title": "Din identitet"
   }
 }

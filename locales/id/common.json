@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
       "runSummaryOffDevice_other": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
       "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini",
-      "appendFlag": "ditambahkan di akhir"
+      "appendFlag": "ditambahkan di akhir",
+      "diffCurrent": "Di catatan sekarang",
+      "diffProposed": "Setelah perubahan ini"
     },
     "undo": {
       "offer_one": "Proses terakhir mengubah {{count}} catatan.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "Digunakan di {{count}} catatan",
       "usedInCount_other": "Digunakan di {{count}} catatan",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Pratinjau {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Pencadangan gagal tak terduga. Tidak ada berkas yang tertinggal.",
         "memberTooLarge": "Sebuah berkas di brankas ini lebih besar dari yang diizinkan format cadangan.",
         "vaultNotFound": "Tidak ada brankas yang ditemukan untuk dicadangkan.",
-        "verifyFailed": "Cadangan yang ditulis gagal terverifikasi, sehingga dibuang. Coba lagi, gunakan media berbeda jika terulang."
+        "verifyFailed": "Cadangan yang ditulis gagal terverifikasi, sehingga dibuang. Coba lagi, gunakan media berbeda jika terulang.",
+        "unknown": "Pencadangan gagal karena alasan yang tidak dapat diidentifikasi Myne. Jangan mengandalkan file apa pun di tujuan; coba lagi."
       },
       "restore": {
         "authOperationInProgress": "Operasi brankas lain sedang berlangsung. Tunggu hingga selesai, lalu coba lagi.",
@@ -334,7 +338,8 @@
         "joinFailure": "Pemulihan gagal tak terduga. Tidak ada yang diubah.",
         "missingVaultMeta": "Cadangan ini tidak memiliki metadata brankasnya dan tidak dapat dipulihkan.",
         "notABackupFile": "Berkas ini bukan cadangan Myne.",
-        "vaultAlreadyExists": "Brankas dari cadangan ini sudah ada di perangkat ini."
+        "vaultAlreadyExists": "Brankas dari cadangan ini sudah ada di perangkat ini.",
+        "unknown": "Pemulihan gagal karena alasan yang tidak dapat diidentifikasi Myne. Coba lagi, dan periksa file cadangan jika terulang."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Cari catatan atau jalankan perintah. Coba tag: · path: · task:",
     "sectionCommands": "Perintah",
     "sectionNotes": "Catatan",
-    "untitledNote": "Tanpa judul"
+    "untitledNote": "Tanpa judul",
+    "resultsLabel": "Perintah dan catatan",
+    "pin": "Sematkan ke pita kiri",
+    "unpin": "Lepas dari pita kiri",
+    "pinError": "Perintah tidak dapat disematkan."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Buka catatan bulan ini"
+      },
+      "focusSidebarRegion": {
+        "label": "Fokus ke bilah sisi catatan"
+      },
+      "focusEditorRegion": {
+        "label": "Fokus ke editor"
+      },
+      "focusRightPanelRegion": {
+        "label": "Fokus ke panel kanan"
+      },
+      "cycleRegion": {
+        "label": "Ganti fokus antar wilayah"
+      },
+      "openInNewWindow": {
+        "label": "Buka catatan di jendela baru"
+      },
+      "showIsolatedGraph": {
+        "label": "Buka graf terisolasi"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Alihkan mode sumber",
         "toggleTaskList": "Alihkan daftar tugas",
         "undo": "Urungkan",
-        "unfoldAll": "Buka semua lipatan"
+        "unfoldAll": "Buka semua lipatan",
+        "cycleRegion": "Ganti fokus antar wilayah",
+        "focusEditorRegion": "Fokus ke editor",
+        "focusRightPanelRegion": "Fokus ke panel kanan",
+        "focusSidebarRegion": "Fokus ke bilah sisi catatan"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Memuat"
     },
     "back": "Kembali",
-    "continue": "Lanjutkan"
+    "continue": "Lanjutkan",
+    "skipToContent": "Langsung ke konten"
   },
   "deviceRevoked": {
     "cta": "Mulai dari awal",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} catatan baru.",
             "newNotes_other": "{{count}} catatan baru.",
             "proposed_one": "Mengusulkan {{count}} perubahan.",
-            "proposed_other": "Mengusulkan {{count}} perubahan."
+            "proposed_other": "Mengusulkan {{count}} perubahan.",
+            "memoryUpdated_one": "Memori diperbarui dengan satu entri.",
+            "memoryUpdated_other": "Memori diperbarui dengan {{count}} entri."
           },
           "askPlaceholder": "Ajukan pertanyaan tentang catatan Anda…",
           "askSubmit": "Tanya",
@@ -1119,18 +1153,31 @@
           "thinking": "AI sedang berpikir…",
           "truncated": "Meringkas {{count}} karakter pertama.",
           "you": "Anda",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Riwayat",
+          "historyCancel": "Batal",
+          "historyDelete": "Hapus",
+          "historyDeleteBody": "Ini menghapus percakapan dari setiap perangkat saat terhubung berikutnya. Tindakan ini tidak dapat dibatalkan.",
+          "historyEmpty": "Belum ada percakapan. Obrolan baru muncul di sini.",
+          "historyError": "Tidak dapat memuat percakapan. Coba lagi.",
+          "historyLoading": "Memuat…",
+          "historyProposalAfter": "Setelah",
+          "historyProposalBefore": "Sebelum",
+          "historyProposalNewNote": "Catatan baru",
+          "historyRename": "Ganti nama",
+          "historyTitle": "Riwayat obrolan",
+          "historyDeleteTitle": "Hapus percakapan",
+          "persistWarning": "Penyimpanan ke brankas gagal. Pesan Anda masih di sini dan akan dicoba lagi.",
+          "memory": "Memori",
+          "memoryPopoverTitle": "Apa yang diingat asisten",
+          "memoryPopoverEmpty": "Belum ada yang diingat.",
+          "memoryPopoverDelete": "Hapus",
+          "memoryPopoverDeleted": "Entri dihapus di mana-mana.",
+          "memoryPopoverDeleteFailed": "Entri tidak dapat dihapus.",
+          "memoryPopoverEntryFailed": "Tidak dapat membaca entri ini. Entri masih tersimpan; hapus di sini atau perbaiki di Pengaturan.",
+          "memoryPopoverLoadFailed": "Tidak dapat memuat memori. Tidak ada yang diubah.",
+          "memoryPopoverRetry": "Coba lagi",
+          "memoryPopoverSettings": "Kelola di Pengaturan",
+          "memoryPopoverClose": "Tutup"
         },
         "allHidden": "Semua tab tersembunyi. Klik kanan untuk memulihkan.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Kerangka",
           "tasks": "Tugas",
           "unlinked": "Sebutan tak tertaut"
-        }
+        },
+        "tabStripLabel": "Panel kanan"
       },
       "sidebarToggle": {
         "hideBacklinks": "Sembunyikan bilah sisi backlink",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Simpan yang ini sebagai…",
         "switchLabel": "Ganti ruang kerja",
         "toggleTitle": "Ruang kerja: {{name}}"
+      },
+      "region": {
+        "editor": "Editor",
+        "rightPanel": "Panel kanan",
+        "sidebar": "Bilah sisi catatan"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "Dijadikan templat",
       "convertedToNote": "Diubah menjadi catatan",
       "versionHistory": "Riwayat versi",
-      "trash": "Pindahkan ke Sampah"
+      "trash": "Pindahkan ke Sampah",
+      "openInNewWindow": "Buka di jendela baru"
     },
     "codeBlock": {
       "copyCode": "Salin kode",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Merender diagram…",
-      "renderFailed": "Diagram ini tidak dapat ditampilkan: {{reason}}"
+      "renderFailed": "Diagram ini tidak dapat ditampilkan: {{reason}}",
+      "viewerLabel": "Penampil diagram",
+      "zoomIn": "Perbesar",
+      "zoomOut": "Perkecil",
+      "reset": "Setel ulang zoom agar pas",
+      "panUp": "Geser ke atas",
+      "panDown": "Geser ke bawah",
+      "panLeft": "Geser ke kiri",
+      "panRight": "Geser ke kanan",
+      "edit": "Edit sumber diagram",
+      "editText": "Edit",
+      "expand": "Perluas diagram",
+      "expandText": "Perluas",
+      "expandClose": "Tutup diagram yang diperluas",
+      "expandCloseText": "Tutup"
     },
     "slash": {
       "aiContinue": "Lanjutkan menulis (AI)",
@@ -1323,7 +1391,20 @@
         "remind": "Pengingat"
       },
       "timeLabel": "Waktu (opsional)",
-      "invalidRemind": "Myne tidak dapat membaca tanggal ini, jadi Anda tidak akan diingatkan."
+      "invalidRemind": "Myne tidak dapat membaca tanggal ini, jadi Anda tidak akan diingatkan.",
+      "addTime": "Tambah waktu",
+      "clear": "Bersihkan",
+      "dateGrid": "Pilih tanggal",
+      "dateNext": "Bulan berikutnya",
+      "datePrev": "Bulan sebelumnya",
+      "today": "Hari ini",
+      "tomorrow": "Besok",
+      "selectField": "Pilih kolom untuk ditambahkan",
+      "noDate": "Tanpa tanggal",
+      "removeTime": "Hapus waktu",
+      "timeHour": "Jam",
+      "timeMeridiem": "AM atau PM",
+      "timeMinute": "Menit"
     },
     "toolbar": {
       "apply": "Terapkan",
@@ -1564,6 +1645,28 @@
         "weekly": "Catatan minggu ini tidak dapat dibuka.",
         "monthly": "Catatan bulan ini tidak dapat dibuka."
       }
+    },
+    "a11y": {
+      "noteBody": "Isi catatan: {{title}}",
+      "untitledNoteBody": "Isi catatan, catatan tanpa judul",
+      "sectionFolded_one": "Bagian dilipat",
+      "sectionFolded_other": "{{count}} bagian dilipat",
+      "sectionUnfolded_one": "Bagian dibuka",
+      "sectionUnfolded_other": "{{count}} bagian dibuka",
+      "diagram": "Diagram",
+      "diagramNamed": "Diagram: {{kind}}",
+      "brokenLink": "{{target}}, tautan rusak"
+    },
+    "ribbon": {
+      "customize": "Sesuaikan pita…",
+      "label": "Pita kiri",
+      "unpin": "Lepas dari pita",
+      "runFailed": "Perintah pita tidak dapat dijalankan."
+    },
+    "detachedDeleted": {
+      "title": "Catatan ini dihapus di tempat lain",
+      "body": "Catatan dihapus dari jendela lain atau disinkronkan dari perangkat lain. Perubahan yang belum disimpan di jendela ini disimpan sebagai salinan terpisah.",
+      "close": "Tutup jendela"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Grup warna",
         "moveDown": "Turunkan aturan",
         "moveUp": "Naikkan aturan",
-        "namePlaceholder": "Aturan tanpa judul"
+        "namePlaceholder": "Aturan tanpa judul",
+        "rowLabel": "{{name}}, grup {{index}} dari {{total}}. Alt plus panah atas atau bawah menyusun ulang.",
+        "editRuleButton": "Edit",
+        "derivedMakeEditable": "Buat bisa disunting",
+        "derivedMakeEditableFailed": "Grup tersebut tidak dapat disimpan. Coba lagi.",
+        "derivedNote_one": "Graf diwarnai berdasarkan tag: {{count}} grup, diturunkan dari tag Anda. Tidak disimpan sampai Anda membuatnya bisa disunting.",
+        "derivedNote_other": "Graf diwarnai berdasarkan tag: {{count}} grup, diturunkan dari tag Anda. Tidak disimpan sampai Anda membuatnya bisa disunting.",
+        "newRuleTitle": "Grup warna baru"
       },
       "depthToggleTitle": "Alihkan kedalaman sekitar (1 ↔ 2 lompatan)",
       "filterAll": "Semua",
@@ -1898,7 +2008,21 @@
         "reset": "Kembalikan ke bawaan",
         "showArrows": "Tampilkan panah arah",
         "title": "Pengaturan grafik"
-      }
+      },
+      "canvasLabel": "Graf pengetahuan berisi {{count}} catatan",
+      "filterSelectAriaLabel": "Saring graf",
+      "listLinkCount_one": "{{count}} tautan",
+      "listLinkCount_other": "{{count}} tautan",
+      "listLinksFrom": "Tautan dari: {{titles}}",
+      "listLinksTo": "Tautan ke: {{titles}}",
+      "relayout": "Susun ulang tata letak",
+      "relayoutTitle": "Susun ulang graf dari awal",
+      "showingCount_one": "Menampilkan {{count}} catatan",
+      "showingCount_other": "Menampilkan {{count}} catatan",
+      "untitledNote": "Catatan tanpa judul",
+      "viewGraph": "Graf",
+      "viewList": "Daftar",
+      "viewToggleAriaLabel": "Pilih gambar graf atau daftar catatannya"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "{{count}} diimpor · {{skipped}} dilewati",
       "importedWithSkips_other": "{{count}} diimpor · {{skipped}} dilewati",
       "importNoMarkdown": "Tidak ada berkas markdown yang dijatuhkan",
-      "moveFolderTo": "Pindahkan folder ke…"
+      "moveFolderTo": "Pindahkan folder ke…",
+      "treeLabel": "Catatan dan folder",
+      "selectionAnnouncement": "Dipilih {{title}}",
+      "untitled": "Tanpa judul"
     },
     "newFromTemplate": {
       "back": "Kembali",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Catatan tugas",
       "unsyncedLabel": "Belum ada di server",
       "unsyncedTitle": "Perubahan terbaru catatan ini hanya ada di perangkat ini",
-      "untitled": "Tanpa judul"
+      "untitled": "Tanpa judul",
+      "untitledDrawing": "Gambar tanpa judul"
     },
     "savedView": {
       "defaultName": "Tampilan tersaring"
@@ -2284,7 +2412,10 @@
       "pinned": "Disematkan",
       "pinnedTitle": "Disematkan: lepas sematan untuk menutup",
       "unpin": "Lepas sematan",
-      "untitled": "Tanpa judul"
+      "untitled": "Tanpa judul",
+      "closeTabMenuItem": "Tutup tab",
+      "moveLeft": "Geser ke kiri",
+      "moveRight": "Geser ke kanan"
     },
     "tagBrowser": {
       "cancel": "Batal",
@@ -3057,7 +3188,7 @@
         "whenLabel": "Kapan itu keluar",
         "whoLabel": "Siapa yang menerimanya",
         "connectionLabel": "Bagaimana ia dikirim",
-        "excludedLabel": ""
+        "excludedLabel": "Folder dikecualikan"
       },
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan. Di mana model itu berjalan, dan apakah catatan Anda keluar dari perangkat ini, bergantung pada penyedia yang Anda sebutkan di bawah. Eksperimental, mati secara bawaan.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Penyedia menolak kunci API Anda. Gantilah: kunci itu mungkin salah, sudah dicabut, atau milik akun lain.",
         "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda.",
         "featureOff": "AI dimatikan di perangkat ini. Tidak ada yang dikirim. Nyalakan di Pengaturan, bagian AI.",
-        "consentMissing": "Anda belum menyetujui pengiriman catatan ke penyedia ini dari perangkat ini. Tidak ada yang dikirim. Pilih kembali penyedia di Pengaturan, bagian AI, dan baca apa yang akan dikirim."
+        "consentMissing": "Anda belum menyetujui pengiriman catatan ke penyedia ini dari perangkat ini. Tidak ada yang dikirim. Pilih kembali penyedia di Pengaturan, bagian AI, dan baca apa yang akan dikirim.",
+        "emptyGrant": "Semua yang dapat dibaca proses ini ada di folder yang tidak pernah dilihat AI. Tidak ada yang dikirim. Ubah di Pengaturan, AI, Folder dikecualikan."
       },
       "modelChoose": "Pilih berkas…",
       "modelEmbeddingLabel": "Model pencarian: pencarian semantik & Tanya-Jawab",
@@ -3374,7 +3506,8 @@
         "text": "Teks & tampilan",
         "editing": "Penyuntingan",
         "writing": "Penulisan",
-        "features": "Fitur"
+        "features": "Fitur",
+        "tasks": "Tugas"
       },
       "preview": {
         "heading": "Musang cokelat gesit",
@@ -3386,7 +3519,20 @@
       "defaultView": "Tampilan bawaan",
       "typewriter": "Gulir mesin tik",
       "typewriterSubtitle": "Jaga kursor tetap di tengah vertikal",
-      "enableArchiving": "Aktifkan pengarsipan"
+      "enableArchiving": "Aktifkan pengarsipan",
+      "taskChipColor": {
+        "accent": "Aksen",
+        "danger": "Merah",
+        "help": "Warna ikon dan label chip tugas, di setiap permukaan tugas di perangkat ini.",
+        "label": "Warna chip tugas",
+        "muted": "Redup",
+        "sample": "1 Agu",
+        "theme": "Tema"
+      },
+      "taskChipIconOnly": {
+        "help": "Tampilkan prioritas hanya sebagai ikon, bukan kata.",
+        "label": "Prioritas hanya-ikon"
+      }
     },
     "search": {
       "placeholder": "Cari pengaturan…",
@@ -3466,7 +3612,11 @@
         "timezone": "zona waktu tz utc iana wilayah hari ini timezone",
         "periodicNotes": "catatan berkala mingguan bulanan pekan bulan folder templat format",
         "aiHistoryBudget": "percakapan riwayat konteks memori anggaran karakter agen chat permintaan",
-        "screenCaptureOverride": "tangkapan layar izinkan matikan nonaktifkan pembesar layar remote desktop aksesibilitas buka kunci layar hitam screen capture override"
+        "screenCaptureOverride": "tangkapan layar izinkan matikan nonaktifkan pembesar layar remote desktop aksesibilitas buka kunci layar hitam screen capture override",
+        "aiMemory": "memori fakta diingat asisten belajar kepribadian preferensi suara",
+        "ribbon": "pita kiri rel semat pin perintah perintah sesuaikan susun lepas bilah alat pintasan",
+        "folderNotes": "folder catatan indeks folder_index halaman muka klik ganda tautan folder proyek mati nonaktif",
+        "syncMembers": "anggota, bagikan, undang, tim, kolaborasi, brankas"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne tidak mengenali zona waktu itu. Gunakan nama seperti Europe/Berlin.",
       "errorSave": "Tidak dapat menyimpan pengaturan itu."
+    },
+    "folderNotes": {
+      "label": "Catatan folder",
+      "helper": "Buat catatan bertindak sebagai indeks foldernya: terbuka saat Anda mengklik ganda folder, dan tautan folder seperti [[Projects/]] menunjuk ke situ. Nonaktif secara bawaan. Menonaktifkannya menyembunyikan tombol yang membuat catatan folder dan menampilkan catatan yang sudah ada sebagai catatan biasa; tidak mengubah apa pun di disk, jadi menyalakannya kembali memulihkannya persis.",
+      "errorSaveSetting": "Pengaturan ini tidak dapat disimpan."
+    },
+    "ribbonCustomize": {
+      "add": "Tambah",
+      "empty": "Belum ada perintah di pita. Gunakan Tambah untuk menyematkannya.",
+      "errorSave": "Pengaturan pita tidak dapat disimpan.",
+      "helper": "Perintah di pita kiri, berurutan. Seret untuk menyusun ulang, tambah lainnya dari daftar perintah, atau hapus dengan ×. Rel menyembunyikan perintah yang tidak tersedia dalam status saat ini.",
+      "label": "Pita kiri",
+      "remove": "Hapus {{name}} dari pita",
+      "position": "{{name}}, {{index}} dari {{total}}",
+      "searchEmpty": "Tidak ada perintah yang cocok.",
+      "searchPlaceholder": "Cari perintah…",
+      "searchResultsLabel": "Perintah yang cocok",
+      "showHelper": "Tampilkan pita kiri di perangkat ini.",
+      "showLabel": "Tampilkan pita kiri"
+    },
+    "memory": {
+      "heading": "Apa yang diingat asisten",
+      "helper": "Fakta yang dipelajari AI saat bekerja dengan Anda. AI menulisnya sendiri (paling banyak satu per proses); Anda melihat dan dapat memperbaiki setiap entri. Entri disinkronkan ke perangkat lain Anda dan tetap terenkripsi.",
+      "empty": "Belum ada yang diingat. Entri muncul di sini saat asisten mempelajari sesuatu selama proses.",
+      "editLabel": "Edit",
+      "deleteLabel": "Hapus",
+      "save": "Simpan",
+      "cancel": "Batal",
+      "cancelLabel": "Batal",
+      "saveFailed": "Entri tidak dapat disimpan.",
+      "deleteFailed": "Entri tidak dapat dihapus.",
+      "entryUnreadable": "Tidak dapat membaca entri ini. Entri masih tersimpan; hapus di sini atau perbaiki di Pengaturan.",
+      "heldForReview": "Menunggu peninjauan: entri ini memicu pemindaian injeksi dan tidak digunakan asisten sampai Anda mengedit atau menghapusnya.",
+      "savedToast": "Memori diperbarui.",
+      "deletedToast": "Entri dihapus di mana-mana.",
+      "clearedToast": "Semua entri memori dihapus.",
+      "clearAllLabel": "Bersihkan semua memori",
+      "clearConfirm": "Hapus benar-benar setiap entri? Tindakan ini tidak dapat dibatalkan.",
+      "updatedAt": "Diperbarui {{val}}",
+      "personalityLabel": "Preferensi suara Anda",
+      "personalityHelper": "Satu instruksi per baris. Ini membentuk cara asisten menulis di setiap proses: nada, panjang, bahasa. Disimpan di brankas dan disinkronkan.",
+      "personalityPlaceholder": "Jawaban singkat, kesimpulan di depan.",
+      "personalitySaveLabel": "Simpan preferensi suara",
+      "personalitySavedToast": "Preferensi suara diperbarui.",
+      "personalitySaveFailed": "Preferensi suara tidak dapat disimpan.",
+      "loadFailed": "Tidak dapat memuat memori atau preferensi suara. Tidak ada yang diubah.",
+      "retryLabel": "Coba lagi"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Menghubungkan ke Tor. Sinkronisasi dijeda sampai koneksinya siap. Tidak ada yang dikirim secara langsung.",
       "settingsHint": "Pengaturan → Jaringan",
       "unavailable": "Tor tidak tersedia, jadi sinkronisasi dijeda. Tidak ada yang dikirim secara langsung. Matikan perutean Tor untuk menyinkronkan tanpanya."
+    },
+    "members": {
+      "title": "Anggota & Keamanan",
+      "access": "Akses Anda",
+      "epochLabel": "Epoch kunci grup",
+      "people": "Orang",
+      "removalLimitsLabel": "Batas penghapusan"
+    },
+    "memberRoster": {
+      "loading": "Memuat anggota…",
+      "error": "Tidak dapat membaca daftar anggota brankas.",
+      "hint": "Anggota brankas ini. Setiap orang bergabung dengan identitas dan kredensialnya sendiri.",
+      "empty": "Belum ada anggota. Mengundang seseorang adalah langkah berikutnya.",
+      "rotated": "Kunci dirotasi",
+      "keyChanged": "Kunci berubah. Verifikasi dengan pemilik.",
+      "relinkConfirmed": "Tautan ulang dikonfirmasi oleh pemilik",
+      "epoch": "Epoch kunci grup {{epoch}}",
+      "ownerBadge": "Pemilik",
+      "memberBadge": "Anggota",
+      "invite": "Undang anggota",
+      "remove": "Hapus",
+      "removeConfirm": "Hapus {{name}}? Setelah rotasi kunci selesai, mereka kehilangan akses ke perubahan mendatang. Ini tidak dapat menghapus apa pun yang sudah mereka salin, dan tidak menarik konten kembali dari perangkat atau penyedia AI mereka.",
+      "removalLimits": "Menghapus anggota hanya menghentikan akses mereka ke perubahan mendatang. Ini tidak dapat menghapus apa pun yang sudah mereka salin, dan tidak menarik konten kembali dari perangkat atau penyedia AI mereka.",
+      "inviteReady": "Undangan siap untuk {{fingerprint}}…",
+      "invitationsHeading": "Undangan yang Anda kirim",
+      "invitationClaimed": "Diterima",
+      "invitationPending": "Belum diterima",
+      "invitationsFailed": "Tidak dapat memuat undangan Anda.",
+      "title": "Anggota brankas",
+      "personHint": "Buka identitas keanggotaan Anda dengan frasa pemulihan. Tetap di perangkat ini sampai Anda mengunci brankas atau menutup aplikasi.",
+      "personUnlock": "Buka identitas keanggotaan",
+      "personReady": "Identitas keanggotaan terbuka.",
+      "ownerCodeHint": "Bagikan kode ini dengan orang yang Anda undang agar mereka dapat memverifikasi brankas milik Anda. Hanya berisi informasi publik.",
+      "personLock": "Kunci identitas keanggotaan",
+      "personError": "Frasa itu tidak membuka identitas keanggotaan.",
+      "inviteHint": "Tempel kode identitas anggota yang diundang (dari beranda identitas mereka).",
+      "inviteCodeLabel": "Kode identitas anggota",
+      "inspect": "Periksa sidik jari",
+      "sasHint": "Bacakan sidik jari ini kepada orang yang Anda undang, atau minta mereka membacakannya kepada Anda. Harus cocok di kedua sisi sebelum melanjutkan.",
+      "sasConfirm": "Saya mengonfirmasi sidik jari ini dengan orang tersebut di luar saluran",
+      "inviteCodeInvalid": "Itu bukan kode identitas anggota yang valid.",
+      "kemLabel": "Kunci publik ML-KEM",
+      "edLabel": "Kunci publik Ed25519",
+      "mldsaLabel": "Kunci publik ML-DSA",
+      "untitledVault": "Brankas tanpa judul",
+      "inviteFailed": "Undangan tidak dapat dibuat.",
+      "removeFailed": "Anggota tidak dapat dihapus."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Tidak ada apa pun di sini saat ini. Coba filter lain.",
       "rebuilding": "Membaca catatan Anda…",
       "scope": "Tidak ada tugas di folder atau tag ini. Coba perluas cakupannya.",
-      "vault": "Belum ada tugas. Tulis “- [ ]” pada sebuah baris di catatan mana pun untuk membuatnya."
+      "vault": "Belum ada tugas. Tulis “- [ ]” pada sebuah baris di catatan mana pun untuk membuatnya.",
+      "search": "Tidak ada tugas yang cocok dengan “{{query}}”."
     },
     "filter": {
       "all": "Semua",
@@ -3881,7 +4126,74 @@
       "allFolders": "Semua folder",
       "label": "Persempit menurut"
     },
-    "title": "Tugas"
+    "title": "Tugas",
+    "axis": {
+      "due": "Jatuh tempo",
+      "folder": "Folder",
+      "note": "Catatan",
+      "priority": "Prioritas",
+      "sort": "Urutkan",
+      "status": "Status",
+      "tag": "Tag"
+    },
+    "due": {
+      "any": "Tanggal apa saja",
+      "later": "Nanti",
+      "none": "Tanpa tanggal",
+      "overdue": "Terlambat",
+      "today": "Hari ini",
+      "upcoming": "Mendatang"
+    },
+    "filters": {
+      "button": "Filter",
+      "clearAll": "Bersihkan semua",
+      "selectHint": "Pilih filter untuk diterapkan",
+      "title": "Filter"
+    },
+    "priority": {
+      "high": "Tinggi",
+      "highest": "Tertinggi",
+      "low": "Rendah",
+      "lowest": "Terendah",
+      "medium": "Sedang"
+    },
+    "section": {
+      "done": "Selesai",
+      "later": "Nanti",
+      "none": "Tanpa tanggal",
+      "overdue": "Terlambat",
+      "today": "Hari ini",
+      "upcoming": "Mendatang"
+    },
+    "sort": {
+      "due": "Tanggal jatuh tempo",
+      "dueDesc": "Tanggal jatuh tempo, terbaru dulu",
+      "note": "Catatan",
+      "priority": "Prioritas"
+    },
+    "status": {
+      "all": "Semua",
+      "done": "Selesai",
+      "undone": "Terbuka"
+    },
+    "view": {
+      "allFolders": "Semua folder",
+      "allNotes": "Semua catatan",
+      "anyPriority": "Prioritas apa saja",
+      "anyTag": "Tag apa saja",
+      "dueLabel": "Saring berdasarkan tanggal jatuh tempo",
+      "folderLabel": "Saring berdasarkan folder",
+      "noteLabel": "Saring berdasarkan catatan",
+      "priorityLabel": "Saring berdasarkan prioritas",
+      "sortLabel": "Urutkan dalam bagian",
+      "statusLabel": "Saring berdasarkan penyelesaian",
+      "tagLabel": "Saring berdasarkan tag",
+      "untitled": "Tanpa judul"
+    },
+    "search": {
+      "label": "Cari tugas",
+      "placeholder": "Cari tugas…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Hapus brankas ini?",
     "deletePartialError": "Beberapa berkas tidak dapat dihapus. Brankas tidak lagi dapat digunakan. Lanjutkan untuk memulai dari awal.",
     "failClosedEyebrow": "Tidak dapat membuka brankas",
-    "restoreHint": "Pulihkan dari cadangan untuk melanjutkan."
+    "restoreHint": "Pulihkan dari cadangan untuk melanjutkan.",
+    "memberHint": "Brankas ini dibagikan kepada Anda. Buka dengan frasa pemulihan Anda sendiri.",
+    "memberPhraseLabel": "Frasa pemulihan",
+    "memberSubmit": "Buka",
+    "memberError": "Frasa itu tidak membuka brankas bersama ini."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "dibuka {{rel}}",
     "restoreFromBackup": "Pulihkan dari cadangan",
     "subline": "Anda memiliki lebih dari satu brankas di perangkat ini. Pilih salah satu untuk membuka kunci.",
-    "vaultFallback": "Brankas {{n}}"
+    "vaultFallback": "Brankas {{n}}",
+    "accountFallback": "Akun",
+    "moveToAccount": "Pindah ke akun…",
+    "moveToNewAccount": "Pindah ke akun baru",
+    "renameAccount": "Ganti nama akun",
+    "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
+    "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
+    "labelTooLong": "Nama itu terlalu panjang. Batasi di bawah 512 karakter.",
+    "renameCancel": "Batal",
+    "renamePlaceholder": "Nama akun",
+    "renameSave": "Ganti nama",
+    "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "atau",
       "title": "Pilih brankas untuk dipulihkan",
       "useAccountNumber": "Gunakan nomor akun",
-      "vaultFallback": "Brankas {{index}}"
+      "vaultFallback": "Brankas {{index}}",
+      "accountFallback": "Akun",
+      "accountsError": "Tidak dapat memuat pengelompokan akun. Brankas ditampilkan tanpa pengelompokan; tidak ada perubahan pada pemulihan."
+    },
+    "siblingNotice": {
+      "body_one": "Akun ini memegang {{count}} brankas lagi. Pulihkan juga agar tidak ada yang tertinggal.",
+      "body_other": "Akun ini memegang {{count}} brankas lagi. Pulihkan juga agar tidak ada yang tertinggal.",
+      "recoverAnother": "Pulihkan brankas lain",
+      "unknown": "Tidak dapat memeriksa apakah akun ini memegang brankas lain. Jika Anda punya lebih dari satu brankas, pulihkan masing-masing dengan frasanya sendiri."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Berkas sisa dari penghapusan yang terputus ({{n}}). Bersihkan sebelum membuat brankas.",
     "cleanUpFiles": "Bersihkan berkas sisa",
     "create": "Buat brankas",
-    "connect": "Hubungkan ke akun saya"
+    "connect": "Hubungkan ke akun saya",
+    "identityCta": "Buat identitas saja"
   },
   "wikiGraph": {
     "emptyTitle": "Belum ada tautan",
     "emptyBodyBefore": "Hubungkan catatan dengan menulis ",
-    "emptyBodyAfter": " di teks Anda. Catatan yang tertaut muncul di sini sebagai grafik."
+    "emptyBodyAfter": " di teks Anda. Catatan yang tertaut muncul di sini sebagai grafik.",
+    "canvasLabel": "Graf pengetahuan berisi {{count}} catatan"
   },
   "markdown": {
     "attachmentFallback": "lampiran",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "dibuka tahun lalu",
     "openedYearsAgo_one": "dibuka {{count}} tahun lalu",
     "openedYearsAgo_other": "dibuka {{count}} tahun lalu",
-    "corruptedBadge": "Rusak"
+    "corruptedBadge": "Rusak",
+    "accountFallback": "Akun",
+    "renameAccount": "Ganti nama akun",
+    "moveToNewAccount": "Pindah ke akun baru",
+    "moveToAccount": "Pindah ke akun…",
+    "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
+    "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
+    "labelTooLong": "Nama itu terlalu panjang. Batasi di bawah 512 karakter.",
+    "renameCancel": "Batal",
+    "renamePlaceholder": "Nama akun",
+    "renameSave": "Ganti nama",
+    "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah."
   },
   "join": {
     "transportError": "Tidak dapat menjangkau server sinkronisasi itu. Periksa alamat dan koneksi Anda, lalu coba lagi.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Aktifkan perlindungan tangkapan layar",
     "saveFailed": "Tidak dapat menyimpan pilihan itu, jadi tidak ada yang berubah. Coba lagi, atau jalankan Myne dengan --disable-screen-capture-protection.",
     "savedForNextLaunch": "Disimpan. Di sesi ini perlindungan masih mati karena sesi ini dimulai dengan --disable-screen-capture-protection, jadi perlindungan itu kembali saat Anda membuka Myne berikutnya tanpa opsi tersebut."
+  },
+  "identitySetup": {
+    "createCta": "Buat identitas",
+    "doneCta": "Selesai",
+    "error": "Identitas tidak dapat dibuat. Periksa apakah server sinkronisasi dikonfigurasi, lalu coba lagi.",
+    "intro": "Identitas memungkinkan orang mengalamatkan undangan kepada Anda sebelum Anda memiliki brankas. Tidak membuat brankas dan tidak menyimpan catatan.",
+    "pending": "Perangkat ini menunggu perangkat lain di akun untuk menyetujuinya.",
+    "phraseWarning": "Tulis 24 kata ini dan simpan dengan aman. Inilah satu-satunya kali mereka ditampilkan; satu-satunya cara memulihkan identitas ini.",
+    "recoverCta": "Pulihkan identitas",
+    "recoverIntro": "Sudah punya identitas? Masukkan frasa pemulihan 24 kata.",
+    "recovered": "Identitas dipulihkan.",
+    "title": "Hanya identitas"
+  },
+  "identityHome": {
+    "createVaultCta": "Buat brankas",
+    "invitesError": "Tidak dapat memuat undangan. Periksa koneksi dan server sinkronisasi Anda.",
+    "invitesHeading": "Undangan",
+    "invitesLoading": "Memeriksa undangan…",
+    "noInvites": "Belum ada undangan.",
+    "subtitle": "Anda punya identitas di perangkat ini, jadi orang dapat mengundang Anda ke brankas. Tidak perlu membuat satu untuk diundang.",
+    "accept": "Terima",
+    "acceptHint": "Tempel kode identitas pemilik (mereka membagikannya saat mengundang Anda).",
+    "acceptOwnerCodeLabel": "Kode identitas pemilik",
+    "acceptInspect": "Periksa sidik jari",
+    "acceptSasHint": "Bacakan sidik jari ini kepada pemilik brankas, atau minta mereka membacakannya kepada Anda. Harus cocok di kedua sisi sebelum melanjutkan.",
+    "acceptConfirm": "Saya mengonfirmasi sidik jari ini dengan pemilik di luar saluran",
+    "acceptSubmit": "Terima dan buka",
+    "acceptPhraseLabel": "Frasa pemulihan Anda",
+    "acceptError": "Undangan tidak dapat diterima.",
+    "acceptInvalid": "Itu bukan kode identitas pemilik yang valid.",
+    "shareCodeHeading": "Kode undangan Anda",
+    "shareCodeHint": "Bagikan kode ini dengan siapa pun yang mengundang Anda. Hanya berisi informasi publik (id identitas dan kunci publik Anda), tidak pernah frasa Anda.",
+    "title": "Identitas Anda"
   }
 }

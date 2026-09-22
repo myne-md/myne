@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "你的笔记中约 {{count}} 个字符已发送给服务商",
       "runSummaryOffDevice_other": "你的笔记中约 {{count}} 个字符已发送给服务商",
       "runSummaryOnDevice": "没有任何内容离开本设备",
-      "appendFlag": "追加到末尾"
+      "appendFlag": "追加到末尾",
+      "diffCurrent": "现在在笔记中",
+      "diffProposed": "此更改之后"
     },
     "undo": {
       "offer_one": "上次运行更改了 {{count}} 篇笔记。",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "在 {{count}} 篇笔记中使用",
       "usedInCount_other": "用于 {{count}} 篇笔记",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "预览 {{name}}"
     },
     "thumbnail": {
       "audioLabel": "音频：{{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "备份意外失败。未留下任何文件。",
         "memberTooLarge": "此保险库中的某个文件超过了备份格式允许的大小。",
         "vaultNotFound": "未找到可备份的保险库。",
-        "verifyFailed": "已写入的备份未通过校验，已被丢弃。请重试，若问题重复出现，请换用其他存储介质。"
+        "verifyFailed": "已写入的备份未通过校验，已被丢弃。请重试，若问题重复出现，请换用其他存储介质。",
+        "unknown": "备份因 Myne 无法识别的原因失败。不要依赖目标位置的任何文件；请重试。"
       },
       "restore": {
         "authOperationInProgress": "另一项保险库操作正在进行中。请等待其完成后再试。",
@@ -334,7 +338,8 @@
         "joinFailure": "恢复意外失败。未做任何更改。",
         "missingVaultMeta": "此备份缺少保险库元数据，无法恢复。",
         "notABackupFile": "此文件不是 Myne 备份。",
-        "vaultAlreadyExists": "此备份对应的保险库已存在于本设备上。"
+        "vaultAlreadyExists": "此备份对应的保险库已存在于本设备上。",
+        "unknown": "还原因 Myne 无法识别的原因失败。请重试；若再次出现，请检查备份文件。"
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "搜索笔记或运行命令。试试 tag: · path: · task:",
     "sectionCommands": "命令",
     "sectionNotes": "笔记",
-    "untitledNote": "无标题"
+    "untitledNote": "无标题",
+    "resultsLabel": "命令和笔记",
+    "pin": "固定到左侧功能条",
+    "unpin": "从左侧功能条取消固定",
+    "pinError": "无法固定该命令。"
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "打开本月笔记"
+      },
+      "focusSidebarRegion": {
+        "label": "聚焦笔记侧边栏"
+      },
+      "focusEditorRegion": {
+        "label": "聚焦编辑器"
+      },
+      "focusRightPanelRegion": {
+        "label": "聚焦右侧面板"
+      },
+      "cycleRegion": {
+        "label": "在区域间循环焦点"
+      },
+      "openInNewWindow": {
+        "label": "在新窗口中打开笔记"
+      },
+      "showIsolatedGraph": {
+        "label": "打开隔离图表"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "切换源代码模式",
         "toggleTaskList": "切换任务列表",
         "undo": "撤销",
-        "unfoldAll": "全部展开"
+        "unfoldAll": "全部展开",
+        "cycleRegion": "在区域间循环焦点",
+        "focusEditorRegion": "聚焦编辑器",
+        "focusRightPanelRegion": "聚焦右侧面板",
+        "focusSidebarRegion": "聚焦笔记侧边栏"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "正在加载"
     },
     "back": "返回",
-    "continue": "继续"
+    "continue": "继续",
+    "skipToContent": "跳到内容"
   },
   "deviceRevoked": {
     "cta": "重新开始",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} 篇新笔记。",
             "newNotes_other": "{{count}} 篇新笔记。",
             "proposed_one": "已提议 {{count}} 处更改。",
-            "proposed_other": "已提议 {{count}} 处更改。"
+            "proposed_other": "已提议 {{count}} 处更改。",
+            "memoryUpdated_one": "记忆已用一条记录更新。",
+            "memoryUpdated_other": "记忆已用 {{count}} 条记录更新。"
           },
           "askPlaceholder": "就你的笔记提一个问题…",
           "askSubmit": "提问",
@@ -1119,18 +1153,31 @@
           "thinking": "AI 正在思考…",
           "truncated": "已总结前 {{count}} 个字符。",
           "you": "你",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "历史",
+          "historyCancel": "取消",
+          "historyDelete": "删除",
+          "historyDeleteBody": "这会在每台设备下次连接时删除该对话。此操作无法撤销。",
+          "historyEmpty": "还没有对话。新的聊天会显示在这里。",
+          "historyError": "无法加载对话。请重试。",
+          "historyLoading": "加载中…",
+          "historyProposalAfter": "之后",
+          "historyProposalBefore": "之前",
+          "historyProposalNewNote": "新笔记",
+          "historyRename": "重命名",
+          "historyTitle": "聊天历史",
+          "historyDeleteTitle": "删除对话",
+          "persistWarning": "保存到保险库失败。你的消息仍在这里，将会重试。",
+          "memory": "记忆",
+          "memoryPopoverTitle": "助手记住的内容",
+          "memoryPopoverEmpty": "尚未记住任何内容。",
+          "memoryPopoverDelete": "删除",
+          "memoryPopoverDeleted": "记录已在各处移除。",
+          "memoryPopoverDeleteFailed": "无法删除该记录。",
+          "memoryPopoverEntryFailed": "无法读取此记录。它仍被存储；请在此删除或在设置中修正。",
+          "memoryPopoverLoadFailed": "无法加载记忆。没有任何更改。",
+          "memoryPopoverRetry": "重试",
+          "memoryPopoverSettings": "在设置中管理",
+          "memoryPopoverClose": "关闭"
         },
         "allHidden": "所有标签页均已隐藏。右键单击以恢复。",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "大纲",
           "tasks": "任务",
           "unlinked": "未链接的提及"
-        }
+        },
+        "tabStripLabel": "右侧面板"
       },
       "sidebarToggle": {
         "hideBacklinks": "隐藏反向链接侧边栏",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "将当前工作区另存为…",
         "switchLabel": "切换工作区",
         "toggleTitle": "工作区：{{name}}"
+      },
+      "region": {
+        "editor": "编辑器",
+        "rightPanel": "右侧面板",
+        "sidebar": "笔记侧边栏"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "已转为模板",
       "convertedToNote": "已转为笔记",
       "versionHistory": "版本历史",
-      "trash": "移至回收站"
+      "trash": "移至回收站",
+      "openInNewWindow": "在新窗口中打开"
     },
     "codeBlock": {
       "copyCode": "复制代码",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "正在渲染图表…",
-      "renderFailed": "无法渲染此图表：{{reason}}"
+      "renderFailed": "无法渲染此图表：{{reason}}",
+      "viewerLabel": "图表查看器",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "reset": "重置缩放以适应",
+      "panUp": "向上平移",
+      "panDown": "向下平移",
+      "panLeft": "向左平移",
+      "panRight": "向右平移",
+      "edit": "编辑图表源码",
+      "editText": "编辑",
+      "expand": "展开图表",
+      "expandText": "展开",
+      "expandClose": "关闭展开的图表",
+      "expandCloseText": "关闭"
     },
     "slash": {
       "aiContinue": "继续写作（AI）",
@@ -1323,7 +1391,20 @@
         "remind": "提醒"
       },
       "timeLabel": "时间（可选）",
-      "invalidRemind": "Myne 无法解析这个日期，因此不会提醒你。"
+      "invalidRemind": "Myne 无法解析这个日期，因此不会提醒你。",
+      "addTime": "添加时间",
+      "clear": "清除",
+      "dateGrid": "选择日期",
+      "dateNext": "下个月",
+      "datePrev": "上个月",
+      "today": "今天",
+      "tomorrow": "明天",
+      "selectField": "选择要添加的字段",
+      "noDate": "无日期",
+      "removeTime": "移除时间",
+      "timeHour": "小时",
+      "timeMeridiem": "上午或下午",
+      "timeMinute": "分钟"
     },
     "toolbar": {
       "apply": "应用",
@@ -1564,6 +1645,28 @@
         "weekly": "无法打开本周的笔记。",
         "monthly": "无法打开本月的笔记。"
       }
+    },
+    "a11y": {
+      "noteBody": "笔记正文：{{title}}",
+      "untitledNoteBody": "笔记正文，无标题笔记",
+      "sectionFolded_one": "小节已折叠",
+      "sectionFolded_other": "已折叠 {{count}} 个小节",
+      "sectionUnfolded_one": "小节已展开",
+      "sectionUnfolded_other": "已展开 {{count}} 个小节",
+      "diagram": "图表",
+      "diagramNamed": "图表：{{kind}}",
+      "brokenLink": "{{target}}，损坏的链接"
+    },
+    "ribbon": {
+      "customize": "自定义功能条…",
+      "label": "左侧功能条",
+      "unpin": "从功能条取消固定",
+      "runFailed": "无法运行功能条命令。"
+    },
+    "detachedDeleted": {
+      "title": "此笔记已在别处删除",
+      "body": "它已从另一个窗口删除，或从另一台设备同步而来。此窗口中未保存的更改已保留为单独副本。",
+      "close": "关闭窗口"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "颜色分组",
         "moveDown": "下移规则",
         "moveUp": "上移规则",
-        "namePlaceholder": "无标题规则"
+        "namePlaceholder": "无标题规则",
+        "rowLabel": "{{name}}，第 {{index}} 组，共 {{total}}。Alt 加上或下方向键可重新排序。",
+        "editRuleButton": "编辑",
+        "derivedMakeEditable": "使这些可编辑",
+        "derivedMakeEditableFailed": "无法保存这些分组。请重试。",
+        "derivedNote_one": "图谱按标签着色：{{count}} 个分组，由你的标签派生。在你使其可编辑之前不会保存。",
+        "derivedNote_other": "图谱按标签着色：{{count}} 个分组，由你的标签派生。在你使它们可编辑之前不会保存。",
+        "newRuleTitle": "新建颜色分组"
       },
       "depthToggleTitle": "切换邻域深度（1 ↔ 2 跳）",
       "filterAll": "全部",
@@ -1898,7 +2008,21 @@
         "reset": "恢复默认值",
         "showArrows": "显示方向箭头",
         "title": "关系图设置"
-      }
+      },
+      "canvasLabel": "{{count}} 篇笔记的知识图谱",
+      "filterSelectAriaLabel": "筛选图谱",
+      "listLinkCount_one": "{{count}} 个链接",
+      "listLinkCount_other": "{{count}} 个链接",
+      "listLinksFrom": "链接自：{{titles}}",
+      "listLinksTo": "链接到：{{titles}}",
+      "relayout": "重新布局",
+      "relayoutTitle": "从头重新布局图谱",
+      "showingCount_one": "显示 {{count}} 篇笔记",
+      "showingCount_other": "显示 {{count}} 篇笔记",
+      "untitledNote": "无标题笔记",
+      "viewGraph": "图谱",
+      "viewList": "列表",
+      "viewToggleAriaLabel": "选择图谱图片或其笔记列表"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "已导入 {{count}} 篇 · 跳过 {{skipped}} 篇",
       "importedWithSkips_other": "已导入 {{count}} 篇 · 跳过 {{skipped}} 篇",
       "importNoMarkdown": "拖放的内容中没有 Markdown 文件",
-      "moveFolderTo": "将文件夹移动到…"
+      "moveFolderTo": "将文件夹移动到…",
+      "treeLabel": "笔记和文件夹",
+      "selectionAnnouncement": "已选择 {{title}}",
+      "untitled": "无标题"
     },
     "newFromTemplate": {
       "back": "返回",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "任务笔记",
       "unsyncedLabel": "尚未上传到服务器",
       "unsyncedTitle": "此笔记的最新更改仅存在于此设备上",
-      "untitled": "无标题"
+      "untitled": "无标题",
+      "untitledDrawing": "无标题绘图"
     },
     "savedView": {
       "defaultName": "筛选视图"
@@ -2284,7 +2412,10 @@
       "pinned": "已固定",
       "pinnedTitle": "已固定：取消固定后才能关闭",
       "unpin": "取消固定",
-      "untitled": "无标题"
+      "untitled": "无标题",
+      "closeTabMenuItem": "关闭标签页",
+      "moveLeft": "向左移动",
+      "moveRight": "向右移动"
     },
     "tagBrowser": {
       "cancel": "取消",
@@ -3057,7 +3188,7 @@
         "whenLabel": "它在什么时候离开",
         "whoLabel": "谁会收到它",
         "connectionLabel": "如何传输",
-        "excludedLabel": ""
+        "excludedLabel": "排除的文件夹"
       },
       "disclosureToggle": "这是如何运作的？",
       "enableHelper": "运行你提供的模型。它在哪里运行、你的笔记是否会离开此设备，都取决于你在下方指定的服务商。实验性功能，默认关闭。",
@@ -3091,7 +3222,8 @@
         "unauthorized": "服务商拒绝了你的 API 密钥。请更换它：它可能有误、已被吊销，或属于另一个账户。",
         "unreachable": "无法连接到服务商。请检查你的网络连接。",
         "featureOff": "此设备上的 AI 已关闭。没有发送任何内容。请在设置中的 AI 处打开。",
-        "consentMissing": "你尚未同意从此设备向该提供方发送笔记。没有发送任何内容。请在设置中的 AI 处重新选择提供方，并阅读将要发送的内容。"
+        "consentMissing": "你尚未同意从此设备向该提供方发送笔记。没有发送任何内容。请在设置中的 AI 处重新选择提供方，并阅读将要发送的内容。",
+        "emptyGrant": "本次运行能读取的一切都在 AI 永远看不到的文件夹里。没有发送任何内容。可在设置、AI、排除的文件夹中更改。"
       },
       "modelChoose": "选择文件…",
       "modelEmbeddingLabel": "搜索模型：语义搜索和问答",
@@ -3374,7 +3506,8 @@
         "text": "文字与显示",
         "editing": "编辑",
         "writing": "写作",
-        "features": "功能"
+        "features": "功能",
+        "tasks": "任务"
       },
       "preview": {
         "heading": "敏捷的棕色狐狸",
@@ -3386,7 +3519,20 @@
       "defaultView": "默认视图",
       "typewriter": "打字机滚动",
       "typewriterSubtitle": "使光标保持垂直居中",
-      "enableArchiving": "启用归档"
+      "enableArchiving": "启用归档",
+      "taskChipColor": {
+        "accent": "强调色",
+        "danger": "红色",
+        "help": "此设备上每个任务界面中任务芯片图标和标签的颜色。",
+        "label": "任务芯片颜色",
+        "muted": "柔和",
+        "sample": "8月1日",
+        "theme": "主题"
+      },
+      "taskChipIconOnly": {
+        "help": "优先级只显示图标，不显示文字。",
+        "label": "仅图标优先级"
+      }
     },
     "search": {
       "placeholder": "搜索设置…",
@@ -3466,7 +3612,11 @@
         "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
         "periodicNotes": "周期笔记 每周 每月 周 月 文件夹 模板 格式",
         "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求",
-        "screenCaptureOverride": "屏幕捕获 覆盖 允许 关闭 禁用 放大镜 远程桌面 无障碍 解锁 黑屏 screen capture override allow disable magnifier remote desktop accessibility unlock black"
+        "screenCaptureOverride": "屏幕捕获 覆盖 允许 关闭 禁用 放大镜 远程桌面 无障碍 解锁 黑屏 screen capture override allow disable magnifier remote desktop accessibility unlock black",
+        "aiMemory": "记忆 记住 事实 助手 学习 个性 语气 偏好",
+        "ribbon": "左侧 功能条 轨道 固定 命令 定制 重新排序 取消固定 工具栏 快捷键",
+        "folderNotes": "文件夹 笔记 索引 folder_index 落地页 双击 文件夹链接 项目 关闭 开关 禁用",
+        "syncMembers": "成员、分享、邀请、团队、协作、保险库"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne 不认识该时区。请使用类似 Europe/Berlin 的名称。",
       "errorSave": "无法保存该设置。"
+    },
+    "folderNotes": {
+      "label": "文件夹笔记",
+      "helper": "让一篇笔记充当其文件夹的索引：双击文件夹时打开，[[Projects/]] 之类的文件夹链接指向它。默认关闭。关闭后会隐藏创建文件夹笔记的按钮，并将已有的显示为普通笔记；磁盘上没有任何变化，因此重新打开会完全恢复它们。",
+      "errorSaveSetting": "无法保存此设置。"
+    },
+    "ribbonCustomize": {
+      "add": "添加",
+      "empty": "功能条上还没有命令。使用添加来固定一个。",
+      "errorSave": "无法保存功能条设置。",
+      "helper": "左侧功能条上的命令，按顺序。拖动以重新排序，从命令列表添加更多，或用 × 移除。轨道会隐藏当前状态下不可用的命令。",
+      "label": "左侧功能条",
+      "remove": "从功能条移除 {{name}}",
+      "position": "{{name}}，第 {{index}} 个，共 {{total}}",
+      "searchEmpty": "没有匹配的命令。",
+      "searchPlaceholder": "搜索命令…",
+      "searchResultsLabel": "匹配的命令",
+      "showHelper": "在此设备上显示左侧功能条。",
+      "showLabel": "显示左侧功能条"
+    },
+    "memory": {
+      "heading": "助手记住的内容",
+      "helper": "AI 在与你协作时学到的事实。它自己写入（每次运行最多一条）；你看到并可修正每一条。记录会同步到你的其他设备并保持加密。",
+      "empty": "尚未记住任何内容。当助手在运行中学到东西时，记录会出现在这里。",
+      "editLabel": "编辑",
+      "deleteLabel": "删除",
+      "save": "保存",
+      "cancel": "取消",
+      "cancelLabel": "取消",
+      "saveFailed": "无法保存该记录。",
+      "deleteFailed": "无法删除该记录。",
+      "entryUnreadable": "无法读取此记录。它仍被存储；请在此删除或在设置中修正。",
+      "heldForReview": "待审查：此记录触发了注入扫描，在你编辑或删除之前，助手不会使用它。",
+      "savedToast": "记忆已更新。",
+      "deletedToast": "记录已在各处移除。",
+      "clearedToast": "所有记忆记录已移除。",
+      "clearAllLabel": "清除全部记忆",
+      "clearConfirm": "真的要移除所有记录吗？此操作无法撤销。",
+      "updatedAt": "更新于 {{val}}",
+      "personalityLabel": "你的语气偏好",
+      "personalityHelper": "每行一条指令。它们塑造助手每次运行的写法：语气、长度、语言。保存在保险库中并同步。",
+      "personalityPlaceholder": "回答保持简短，结论放前面。",
+      "personalitySaveLabel": "保存语气偏好",
+      "personalitySavedToast": "语气偏好已更新。",
+      "personalitySaveFailed": "无法保存语气偏好。",
+      "loadFailed": "无法加载记忆或语气偏好。没有任何更改。",
+      "retryLabel": "重试"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "正在连接 Tor。同步已暂停，直到连接就绪。没有任何内容被直接发送。",
       "settingsHint": "设置 → 网络",
       "unavailable": "Tor 不可用，因此同步已暂停。没有任何内容被直接发送。关闭 Tor 路由即可不经它进行同步。"
+    },
+    "members": {
+      "title": "成员与安全",
+      "access": "你的访问权限",
+      "epochLabel": "群组密钥纪元",
+      "people": "人员",
+      "removalLimitsLabel": "移除限制"
+    },
+    "memberRoster": {
+      "loading": "正在加载成员…",
+      "error": "无法读取保险库名册。",
+      "hint": "此保险库的成员。每人以自己的身份和凭据加入。",
+      "empty": "还没有成员。邀请某人是下一步。",
+      "rotated": "密钥已轮换",
+      "keyChanged": "密钥已更改。请与所有者验证。",
+      "relinkConfirmed": "所有者已确认重新链接",
+      "epoch": "群组密钥纪元 {{epoch}}",
+      "ownerBadge": "所有者",
+      "memberBadge": "成员",
+      "invite": "邀请成员",
+      "remove": "移除",
+      "removeConfirm": "移除 {{name}}？密钥轮换完成后，他们将失去对未来更改的访问权限。这无法清除他们已复制的任何内容，也无法从其设备或 AI 提供商召回内容。",
+      "removalLimits": "移除成员只会阻止其对未来更改的访问。这无法清除他们已复制的任何内容，也无法从其设备或 AI 提供商召回内容。",
+      "inviteReady": "{{fingerprint}} 的邀请已就绪…",
+      "invitationsHeading": "你发出的邀请",
+      "invitationClaimed": "已接受",
+      "invitationPending": "尚未接受",
+      "invitationsFailed": "无法加载你的邀请。",
+      "title": "保险库成员",
+      "personHint": "用你的恢复短语解锁成员身份。在你锁定保险库或关闭应用之前，它会停留在此设备上。",
+      "personUnlock": "解锁成员身份",
+      "personReady": "成员身份已解锁。",
+      "ownerCodeHint": "与你邀请的人共享此代码，以便他们验证保险库属于你。它只包含公开信息。",
+      "personLock": "锁定成员身份",
+      "personError": "该短语未能打开成员身份。",
+      "inviteHint": "粘贴被邀请成员的身份代码（来自其身份主页）。",
+      "inviteCodeLabel": "成员身份代码",
+      "inspect": "检查指纹",
+      "sasHint": "向你邀请的人读出此指纹，或让他们读给你。继续之前双方必须匹配。",
+      "sasConfirm": "我已与对方在应用外确认此指纹",
+      "inviteCodeInvalid": "这不是有效的成员身份代码。",
+      "kemLabel": "ML-KEM 公钥",
+      "edLabel": "Ed25519 公钥",
+      "mldsaLabel": "ML-DSA 公钥",
+      "untitledVault": "无标题保险库",
+      "inviteFailed": "无法创建邀请。",
+      "removeFailed": "无法移除该成员。"
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "这里暂时没有内容。换一个筛选条件试试。",
       "rebuilding": "正在读取你的笔记…",
       "scope": "此文件夹或标签下没有任务。请尝试扩大范围。",
-      "vault": "暂无任务。在任意笔记的某一行写下“- [ ]”即可创建一个。"
+      "vault": "暂无任务。在任意笔记的某一行写下“- [ ]”即可创建一个。",
+      "search": "没有与“{{query}}”匹配的任务。"
     },
     "filter": {
       "all": "全部",
@@ -3881,7 +4126,74 @@
       "allFolders": "所有文件夹",
       "label": "缩小范围"
     },
-    "title": "任务"
+    "title": "任务",
+    "axis": {
+      "due": "截止",
+      "folder": "文件夹",
+      "note": "笔记",
+      "priority": "优先级",
+      "sort": "排序",
+      "status": "状态",
+      "tag": "标签"
+    },
+    "due": {
+      "any": "任意日期",
+      "later": "以后",
+      "none": "无日期",
+      "overdue": "已逾期",
+      "today": "今天",
+      "upcoming": "即将"
+    },
+    "filters": {
+      "button": "筛选",
+      "clearAll": "全部清除",
+      "selectHint": "选择要应用的筛选",
+      "title": "筛选"
+    },
+    "priority": {
+      "high": "高",
+      "highest": "最高",
+      "low": "低",
+      "lowest": "最低",
+      "medium": "中"
+    },
+    "section": {
+      "done": "已完成",
+      "later": "以后",
+      "none": "无日期",
+      "overdue": "已逾期",
+      "today": "今天",
+      "upcoming": "即将"
+    },
+    "sort": {
+      "due": "截止日期",
+      "dueDesc": "截止日期，最新在前",
+      "note": "笔记",
+      "priority": "优先级"
+    },
+    "status": {
+      "all": "全部",
+      "done": "已完成",
+      "undone": "未完成"
+    },
+    "view": {
+      "allFolders": "所有文件夹",
+      "allNotes": "所有笔记",
+      "anyPriority": "任意优先级",
+      "anyTag": "任意标签",
+      "dueLabel": "按截止日期筛选",
+      "folderLabel": "按文件夹筛选",
+      "noteLabel": "按笔记筛选",
+      "priorityLabel": "按优先级筛选",
+      "sortLabel": "在各节内排序",
+      "statusLabel": "按完成情况筛选",
+      "tagLabel": "按标签筛选",
+      "untitled": "无标题"
+    },
+    "search": {
+      "label": "搜索任务",
+      "placeholder": "搜索任务…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "删除此保险库？",
     "deletePartialError": "部分文件无法移除。此保险库已无法使用。继续即可重新开始。",
     "failClosedEyebrow": "无法打开保险库",
-    "restoreHint": "从备份恢复以继续。"
+    "restoreHint": "从备份恢复以继续。",
+    "memberHint": "此保险库已与你共享。用你自己的恢复短语解锁它。",
+    "memberPhraseLabel": "恢复短语",
+    "memberSubmit": "解锁",
+    "memberError": "该短语未能打开此共享保险库。"
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "于 {{rel}} 打开",
     "restoreFromBackup": "从备份恢复",
     "subline": "你在本设备上拥有多个保险库。请选择一个进行解锁。",
-    "vaultFallback": "保险库 {{n}}"
+    "vaultFallback": "保险库 {{n}}",
+    "accountFallback": "账户",
+    "moveToAccount": "移动到账户…",
+    "moveToNewAccount": "移动到新账户",
+    "renameAccount": "重命名账户",
+    "accountError": "无法更新账户分组。没有任何更改。",
+    "accountHidden": "保险库名称隐藏时，账户操作不可用。",
+    "labelTooLong": "该名称太长。请保持在 512 个字符以内。",
+    "renameCancel": "取消",
+    "renamePlaceholder": "账户名称",
+    "renameSave": "重命名",
+    "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "或",
       "title": "选择要恢复的保险库",
       "useAccountNumber": "使用账号",
-      "vaultFallback": "保险库 {{index}}"
+      "vaultFallback": "保险库 {{index}}",
+      "accountFallback": "账户",
+      "accountsError": "无法加载账户分组。保险库未分组列出；恢复的任何内容都不变。"
+    },
+    "siblingNotice": {
+      "body_one": "此账户还有 {{count}} 个保险库。也恢复它，以免留下任何东西。",
+      "body_other": "此账户还有 {{count}} 个保险库。也恢复它们，以免留下任何东西。",
+      "recoverAnother": "恢复另一个保险库",
+      "unknown": "无法检查此账户是否还有其他保险库。如果你有多个保险库，请分别用各自的短语恢复。"
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "上次中断的删除留下的残留文件（{{n}}）。请在创建保险库前清理它们。",
     "cleanUpFiles": "清理残留文件",
     "create": "创建保险库",
-    "connect": "连接到我的账户"
+    "connect": "连接到我的账户",
+    "identityCta": "仅创建身份"
   },
   "wikiGraph": {
     "emptyTitle": "尚无链接",
     "emptyBodyBefore": "通过书写 ",
-    "emptyBodyAfter": " 来连接笔记。已链接的笔记会以图谱形式显示在此处。"
+    "emptyBodyAfter": " 来连接笔记。已链接的笔记会以图谱形式显示在此处。",
+    "canvasLabel": "{{count}} 篇笔记的知识图谱"
   },
   "markdown": {
     "attachmentFallback": "附件",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "去年打开",
     "openedYearsAgo_one": "{{count}} 年前打开",
     "openedYearsAgo_other": "{{count}} 年前打开",
-    "corruptedBadge": "已损坏"
+    "corruptedBadge": "已损坏",
+    "accountFallback": "账户",
+    "renameAccount": "重命名账户",
+    "moveToNewAccount": "移动到新账户",
+    "moveToAccount": "移动到账户…",
+    "accountError": "无法更新账户分组。没有任何更改。",
+    "accountHidden": "保险库名称隐藏时，账户操作不可用。",
+    "labelTooLong": "该名称太长。请保持在 512 个字符以内。",
+    "renameCancel": "取消",
+    "renamePlaceholder": "账户名称",
+    "renameSave": "重命名",
+    "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。"
   },
   "join": {
     "transportError": "无法连接到该同步服务器。请检查地址和你的网络连接，然后重试。",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "开启屏幕捕获保护",
     "saveFailed": "该设置无法保存，因此没有任何改动。请重试，或以 --disable-screen-capture-protection 启动 Myne。",
     "savedForNextLaunch": "已保存。本次会话的保护仍处于关闭状态，因为它是以 --disable-screen-capture-protection 启动的；下次你在不带该参数的情况下打开 Myne 时，保护就会恢复。"
+  },
+  "identitySetup": {
+    "createCta": "创建身份",
+    "doneCta": "完成",
+    "error": "无法设置身份。请检查是否配置了同步服务器，然后重试。",
+    "intro": "身份让人们在你拥有任何保险库之前就能向你发送邀请。它不创建保险库，也不存储笔记。",
+    "pending": "此设备正在等待账户上的另一台设备批准。",
+    "phraseWarning": "写下这 24 个词并妥善保管。它们只会显示这一次；这是恢复此身份的唯一方法。",
+    "recoverCta": "恢复身份",
+    "recoverIntro": "已有身份？输入其 24 词恢复短语。",
+    "recovered": "身份已恢复。",
+    "title": "仅身份"
+  },
+  "identityHome": {
+    "createVaultCta": "创建保险库",
+    "invitesError": "无法加载邀请。请检查你的连接和同步服务器。",
+    "invitesHeading": "邀请",
+    "invitesLoading": "正在检查邀请…",
+    "noInvites": "还没有邀请。",
+    "subtitle": "此设备上有你的身份，所以人们可以邀请你加入保险库。要被邀请不需要先创建一个。",
+    "accept": "接受",
+    "acceptHint": "粘贴所有者的身份代码（他们邀请你时会分享）。",
+    "acceptOwnerCodeLabel": "所有者身份代码",
+    "acceptInspect": "检查指纹",
+    "acceptSasHint": "向保险库所有者读出此指纹，或让他们读给你。继续之前双方必须匹配。",
+    "acceptConfirm": "我已与所有者在应用外确认此指纹",
+    "acceptSubmit": "接受并解锁",
+    "acceptPhraseLabel": "你的恢复短语",
+    "acceptError": "无法接受该邀请。",
+    "acceptInvalid": "这不是有效的所有者身份代码。",
+    "shareCodeHeading": "你的邀请码",
+    "shareCodeHint": "与邀请你的人共享此代码。它只包含公开信息（你的身份 id 和公钥），绝不包含你的短语。",
+    "title": "你的身份"
   }
 }

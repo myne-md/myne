@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
       "runSummaryOffDevice_other": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
       "runSummaryOnDevice": "inget lämnade den här enheten",
-      "appendFlag": "läggs till i slutet"
+      "appendFlag": "läggs till i slutet",
+      "diffCurrent": "I notisen nu",
+      "diffProposed": "Efter denna ändring"
     },
     "undo": {
       "offer_one": "Den senaste körningen ändrade {{count}} anteckning.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "Används i {{count}} anteckning",
       "usedInCount_other": "Används i {{count}} anteckningar",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Förhandsvisa {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Ljud: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Säkerhetskopieringen misslyckades oväntat. Ingen fil lämnades kvar.",
         "memberTooLarge": "En fil i det här valvet är större än vad säkerhetskopieringsformatet tillåter.",
         "vaultNotFound": "Inget valv hittades att säkerhetskopiera.",
-        "verifyFailed": "Den skrivna säkerhetskopian kunde inte verifieras, så den kasserades. Försök igen, på ett annat medium om det upprepas."
+        "verifyFailed": "Den skrivna säkerhetskopian kunde inte verifieras, så den kasserades. Försök igen, på ett annat medium om det upprepas.",
+        "unknown": "Säkerhetskopian misslyckades av en anledning Myne inte kunde identifiera. Lita inte på någon fil vid destinationen; försök igen."
       },
       "restore": {
         "authOperationInProgress": "En annan valvåtgärd pågår. Vänta tills den är klar och försök sedan igen.",
@@ -334,7 +338,8 @@
         "joinFailure": "Återställningen misslyckades oväntat. Inget ändrades.",
         "missingVaultMeta": "Den här säkerhetskopian saknar sin valvmetadata och kan inte återställas.",
         "notABackupFile": "Den här filen är inte en Myne-säkerhetskopia.",
-        "vaultAlreadyExists": "Ett valv från den här säkerhetskopian finns redan på den här enheten."
+        "vaultAlreadyExists": "Ett valv från den här säkerhetskopian finns redan på den här enheten.",
+        "unknown": "Återställningen misslyckades av en anledning Myne inte kunde identifiera. Försök igen och kontrollera säkerhetskopian om det upprepas."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Sök anteckningar eller kör ett kommando. Prova tag: · path: · task:",
     "sectionCommands": "Kommandon",
     "sectionNotes": "Anteckningar",
-    "untitledNote": "Namnlös"
+    "untitledNote": "Namnlös",
+    "resultsLabel": "Kommandon och anteckningar",
+    "pin": "Fäst till vänster list",
+    "unpin": "Lossa från vänster list",
+    "pinError": "Kommandot kunde inte fästas."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Öppna den här månadens anteckning"
+      },
+      "focusSidebarRegion": {
+        "label": "Fokusera på anteckningspanelen"
+      },
+      "focusEditorRegion": {
+        "label": "Fokusera på redigeraren"
+      },
+      "focusRightPanelRegion": {
+        "label": "Fokusera på högerpanelen"
+      },
+      "cycleRegion": {
+        "label": "Växla fokus mellan områden"
+      },
+      "openInNewWindow": {
+        "label": "Öppna anteckning i nytt fönster"
+      },
+      "showIsolatedGraph": {
+        "label": "Öppna isolerad graf"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Växla källäge",
         "toggleTaskList": "Växla uppgiftslista",
         "undo": "Ångra",
-        "unfoldAll": "Fäll ut alla"
+        "unfoldAll": "Fäll ut alla",
+        "cycleRegion": "Växla fokus mellan områden",
+        "focusEditorRegion": "Fokusera på redigeraren",
+        "focusRightPanelRegion": "Fokusera på högerpanelen",
+        "focusSidebarRegion": "Fokusera på anteckningspanelen"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Läser in"
     },
     "back": "Tillbaka",
-    "continue": "Fortsätt"
+    "continue": "Fortsätt",
+    "skipToContent": "Hoppa till innehåll"
   },
   "deviceRevoked": {
     "cta": "Börja om",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} ny anteckning.",
             "newNotes_other": "{{count}} nya anteckningar.",
             "proposed_one": "Föreslog {{count}} ändring.",
-            "proposed_other": "Föreslog {{count}} ändringar."
+            "proposed_other": "Föreslog {{count}} ändringar.",
+            "memoryUpdated_one": "Minne uppdaterat med en post.",
+            "memoryUpdated_other": "Minne uppdaterat med {{count}} poster."
           },
           "askPlaceholder": "Ställ en fråga om dina anteckningar…",
           "askSubmit": "Fråga",
@@ -1119,18 +1153,31 @@
           "thinking": "AI tänker…",
           "truncated": "Sammanfattade de första {{count}} tecknen.",
           "you": "Du",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historik",
+          "historyCancel": "Avbryt",
+          "historyDelete": "Ta bort",
+          "historyDeleteBody": "Detta tar bort konversationen från varje enhet nästa gång den ansluter. Detta kan inte ångras.",
+          "historyEmpty": "Inga konversationer än. Nya chattar visas här.",
+          "historyError": "Kunde inte läsa in konversationer. Försök igen.",
+          "historyLoading": "Läser in…",
+          "historyProposalAfter": "Efter",
+          "historyProposalBefore": "Före",
+          "historyProposalNewNote": "Ny anteckning",
+          "historyRename": "Byt namn",
+          "historyTitle": "Chathistorik",
+          "historyDeleteTitle": "Ta bort konversation",
+          "persistWarning": "Sparning till vaulten misslyckades. Dina meddelanden är fortfarande här och kommer att försökas igen.",
+          "memory": "Minne",
+          "memoryPopoverTitle": "Vad assistenten minns",
+          "memoryPopoverEmpty": "Inget minnt ännu.",
+          "memoryPopoverDelete": "Ta bort",
+          "memoryPopoverDeleted": "Post borttagen överallt.",
+          "memoryPopoverDeleteFailed": "Posten kunde inte tas bort.",
+          "memoryPopoverEntryFailed": "Kunde inte läsa denna post. Den är fortfarande sparad; ta bort den här eller rätta den i Inställningar.",
+          "memoryPopoverLoadFailed": "Kunde inte läsa in minnen. Inget ändrades.",
+          "memoryPopoverRetry": "Försök igen",
+          "memoryPopoverSettings": "Hantera i Inställningar",
+          "memoryPopoverClose": "Stäng"
         },
         "allHidden": "Alla flikar är dolda. Högerklicka för att återställa.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Disposition",
           "tasks": "Uppgifter",
           "unlinked": "Olänkade omnämnanden"
-        }
+        },
+        "tabStripLabel": "Högerpanel"
       },
       "sidebarToggle": {
         "hideBacklinks": "Dölj bakåtlänkssidofältet",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Spara nuvarande som…",
         "switchLabel": "Byt arbetsyta",
         "toggleTitle": "Arbetsyta: {{name}}"
+      },
+      "region": {
+        "editor": "Redigerare",
+        "rightPanel": "Högerpanel",
+        "sidebar": "Anteckningspanel"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "Gjord till mall",
       "convertedToNote": "Konverterad till anteckning",
       "versionHistory": "Versionshistorik",
-      "trash": "Flytta till papperskorgen"
+      "trash": "Flytta till papperskorgen",
+      "openInNewWindow": "Öppna i nytt fönster"
     },
     "codeBlock": {
       "copyCode": "Kopiera kod",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Renderar diagram…",
-      "renderFailed": "Det här diagrammet kunde inte ritas: {{reason}}"
+      "renderFailed": "Det här diagrammet kunde inte ritas: {{reason}}",
+      "viewerLabel": "Diagramvisare",
+      "zoomIn": "Zooma in",
+      "zoomOut": "Zooma ut",
+      "reset": "Återställ zoom till att passa",
+      "panUp": "Förskjut uppåt",
+      "panDown": "Förskjut nedåt",
+      "panLeft": "Förskjut vänster",
+      "panRight": "Förskjut höger",
+      "edit": "Redigera diagramkälla",
+      "editText": "Redigera",
+      "expand": "Fäll ut diagram",
+      "expandText": "Fäll ut",
+      "expandClose": "Stäng utfält diagram",
+      "expandCloseText": "Stäng"
     },
     "slash": {
       "aiContinue": "Fortsätt skriva (AI)",
@@ -1323,7 +1391,20 @@
         "remind": "Påminnelse"
       },
       "timeLabel": "Tid (valfritt)",
-      "invalidRemind": "Myne kan inte tolka det här datumet, så du får ingen påminnelse."
+      "invalidRemind": "Myne kan inte tolka det här datumet, så du får ingen påminnelse.",
+      "addTime": "Lägg till tid",
+      "clear": "Rensa",
+      "dateGrid": "Välj ett datum",
+      "dateNext": "Nästa månad",
+      "datePrev": "Föregående månad",
+      "today": "I dag",
+      "tomorrow": "I morgon",
+      "selectField": "Välj ett fält att lägga till",
+      "noDate": "Inget datum",
+      "removeTime": "Ta bort tid",
+      "timeHour": "Timme",
+      "timeMeridiem": "FM eller EM",
+      "timeMinute": "Minut"
     },
     "toolbar": {
       "apply": "Använd",
@@ -1564,6 +1645,28 @@
         "weekly": "Den här veckans anteckning kunde inte öppnas.",
         "monthly": "Den här månadens anteckning kunde inte öppnas."
       }
+    },
+    "a11y": {
+      "noteBody": "Anteckningskropp: {{title}}",
+      "untitledNoteBody": "Anteckningskropp, namnlös anteckning",
+      "sectionFolded_one": "Sektion vikt",
+      "sectionFolded_other": "{{count}} sektioner vikta",
+      "sectionUnfolded_one": "Sektion uvikt",
+      "sectionUnfolded_other": "{{count}} sektioner uvikta",
+      "diagram": "Diagram",
+      "diagramNamed": "Diagram: {{kind}}",
+      "brokenLink": "{{target}}, trasig länk"
+    },
+    "ribbon": {
+      "customize": "Anpassa list…",
+      "label": "Vänster list",
+      "unpin": "Lossa från list",
+      "runFailed": "Listkommandot kunde inte köras."
+    },
+    "detachedDeleted": {
+      "title": "Denna anteckning togs bort någon annanstans",
+      "body": "Den togs bort från ett annat fönster eller synkroniserades från en annan enhet. Alla osparade ändringar i det här fönstret behölls som en separat kopia.",
+      "close": "Stäng fönster"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Färggrupper",
         "moveDown": "Flytta regeln nedåt",
         "moveUp": "Flytta regeln uppåt",
-        "namePlaceholder": "Namnlös regel"
+        "namePlaceholder": "Namnlös regel",
+        "rowLabel": "{{name}}, grupp {{index}} av {{total}}. Alt plus upp- eller nedpilen ordnar om den.",
+        "editRuleButton": "Redigera",
+        "derivedMakeEditable": "Gör dessa redigerbara",
+        "derivedMakeEditableFailed": "Dessa grupper kunde inte sparas. Försök igen.",
+        "derivedNote_one": "Grafen färgas efter tagg: {{count}} grupp, härledd ur dina taggar. Den sparas inte förrän du gör den redigerbar.",
+        "derivedNote_other": "Grafen färgas efter tagg: {{count}} grupper, härledda ur dina taggar. De sparas inte förrän du gör dem redigerbara.",
+        "newRuleTitle": "Ny färggrupp"
       },
       "depthToggleTitle": "Växla grannskapsdjup (1 ↔ 2 hopp)",
       "filterAll": "Alla",
@@ -1898,7 +2008,21 @@
         "reset": "Återställ till standard",
         "showArrows": "Visa riktningspilar",
         "title": "Grafinställningar"
-      }
+      },
+      "canvasLabel": "Kunskapsgraf över {{count}} anteckningar",
+      "filterSelectAriaLabel": "Filtrera grafen",
+      "listLinkCount_one": "{{count}} länk",
+      "listLinkCount_other": "{{count}} länkar",
+      "listLinksFrom": "Länkad från: {{titles}}",
+      "listLinksTo": "Länkar till: {{titles}}",
+      "relayout": "Ordna om layout",
+      "relayoutTitle": "Lägg upp grafen igen från grunden",
+      "showingCount_one": "Visar {{count}} anteckning",
+      "showingCount_other": "Visar {{count}} anteckningar",
+      "untitledNote": "Namnlös anteckning",
+      "viewGraph": "Graf",
+      "viewList": "Lista",
+      "viewToggleAriaLabel": "Välj grafbilden eller en lista över dess anteckningar"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "Importerade {{count}} · {{skipped}} hoppades över",
       "importedWithSkips_other": "Importerade {{count}} · {{skipped}} hoppades över",
       "importNoMarkdown": "Inga Markdown-filer i det du släppte",
-      "moveFolderTo": "Flytta mapp till…"
+      "moveFolderTo": "Flytta mapp till…",
+      "treeLabel": "Anteckningar och mappar",
+      "selectionAnnouncement": "Valde {{title}}",
+      "untitled": "Namnlös"
     },
     "newFromTemplate": {
       "back": "Tillbaka",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Uppgiftsanteckning",
       "unsyncedLabel": "Inte på servern ännu",
       "unsyncedTitle": "Den här anteckningens senaste ändringar finns bara på den här enheten",
-      "untitled": "Namnlös"
+      "untitled": "Namnlös",
+      "untitledDrawing": "Namnlös ritning"
     },
     "savedView": {
       "defaultName": "Filtrerad vy"
@@ -2284,7 +2412,10 @@
       "pinned": "Fäst",
       "pinnedTitle": "Fäst: lossa för att stänga",
       "unpin": "Lossa",
-      "untitled": "Namnlös"
+      "untitled": "Namnlös",
+      "closeTabMenuItem": "Stäng flik",
+      "moveLeft": "Flytta vänster",
+      "moveRight": "Flytta höger"
     },
     "tagBrowser": {
       "cancel": "Avbryt",
@@ -3057,7 +3188,7 @@
         "whenLabel": "När det lämnar enheten",
         "whoLabel": "Vem som tar emot det",
         "connectionLabel": "Hur det färdas",
-        "excludedLabel": ""
+        "excludedLabel": "Undantagna mappar"
       },
       "disclosureToggle": "Hur fungerar det här?",
       "enableHelper": "Kör en modell du tillhandahåller. Var den körs, och om dina anteckningar lämnar den här enheten, beror på leverantören du anger nedan. Experimentell, av som standard.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Leverantören avvisade din API-nyckel. Byt ut den: den kan vara felaktig, återkallad eller höra till ett annat konto.",
         "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning.",
         "featureOff": "AI är avstängt på den här enheten. Ingenting skickades. Slå på det i Inställningar, under AI.",
-        "consentMissing": "Du har inte godkänt att skicka anteckningar till den här leverantören från den här enheten. Ingenting skickades. Välj leverantören igen i Inställningar, under AI, och läs vad som skickas."
+        "consentMissing": "Du har inte godkänt att skicka anteckningar till den här leverantören från den här enheten. Ingenting skickades. Välj leverantören igen i Inställningar, under AI, och läs vad som skickas.",
+        "emptyGrant": "Allt denna körning kunde läsa finns i mappar AI aldrig ser. Inget skickades. Ändra det i Inställningar, AI, Undantagna mappar."
       },
       "modelChoose": "Välj fil…",
       "modelEmbeddingLabel": "Sökmodell: semantisk sökning och frågor och svar",
@@ -3374,7 +3506,8 @@
         "text": "Text och visning",
         "editing": "Redigering",
         "writing": "Skrivande",
-        "features": "Funktioner"
+        "features": "Funktioner",
+        "tasks": "Uppgifter"
       },
       "preview": {
         "heading": "Flygande bäckasiner",
@@ -3386,7 +3519,20 @@
       "defaultView": "Standardvy",
       "typewriter": "Skrivmaskinsrullning",
       "typewriterSubtitle": "Håll markören vertikalt centrerad",
-      "enableArchiving": "Aktivera arkivering"
+      "enableArchiving": "Aktivera arkivering",
+      "taskChipColor": {
+        "accent": "Accent",
+        "danger": "Röd",
+        "help": "Färgen på en uppgiftschips ikon och etikett, på alla uppgiftytor på denna enhet.",
+        "label": "Uppgiftschipfärg",
+        "muted": "Dämpad",
+        "sample": "1 aug",
+        "theme": "Tema"
+      },
+      "taskChipIconOnly": {
+        "help": "Visa en prioritet endast som dess ikon, i stället för ordet.",
+        "label": "Endast ikon-prioritet"
+      }
     },
     "search": {
       "placeholder": "Sök inställningar…",
@@ -3466,7 +3612,11 @@
         "timezone": "tidszon zon tz utc iana region idag timezone time zone",
         "periodicNotes": "periodiska anteckningar veckovis månatlig vecka månad mapp mall format",
         "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan",
-        "screenCaptureOverride": "skärminspelning skärmdump tillåt stäng av åsidosätt förstoringsglas skärmförstorare fjärrskrivbord tillgänglighet upplåsning låsskärm svart fönster screen capture override"
+        "screenCaptureOverride": "skärminspelning skärmdump tillåt stäng av åsidosätt förstoringsglas skärmförstorare fjärrskrivbord tillgänglighet upplåsning låsskärm svart fönster screen capture override",
+        "aiMemory": "minne huskade fakta assistent lär personlighet röstpreferenser",
+        "ribbon": "vänster list skena fäst pin kommando kommandon anpassa ordna lossa verktygsfält genvägar",
+        "folderNotes": "mapp anteckning index folder_index landningssida dubbelklick mapplänk projekt av stäng av inaktivera",
+        "syncMembers": "medlemmar, dela, bjuda in, team, samarbete, vault"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne känner inte till den tidszonen. Använd ett namn som Europe/Berlin.",
       "errorSave": "Kunde inte spara inställningen."
+    },
+    "folderNotes": {
+      "label": "Mappanteckningar",
+      "helper": "Låt en anteckning fungera som mappens index: den öppnas när du dubbelklickar på mappen, och mapplänkar som [[Projects/]] pekar till den. Av som standard. Att stänga av den döljer knapparna som skapar mappanteckningar och visar sådana du redan har som vanliga anteckningar; det ändrar ingenting på disken, så att slå på den igen återställer dem exakt.",
+      "errorSaveSetting": "Denna inställning kunde inte sparas."
+    },
+    "ribbonCustomize": {
+      "add": "Lägg till",
+      "empty": "Inga kommandon på listan ännu. Använd Lägg till för att fästa ett.",
+      "errorSave": "Listinställningen kunde inte sparas.",
+      "helper": "Kommandona på vänster list, i ordning. Dra för att ordna om, lägg till flera från kommandolistan eller ta bort med ×. Listan döljer kommandon som inte är tillgängliga i nuvarande läge.",
+      "label": "Vänster list",
+      "remove": "Ta bort {{name}} från listan",
+      "position": "{{name}}, {{index}} av {{total}}",
+      "searchEmpty": "Inga matchande kommandon.",
+      "searchPlaceholder": "Sök kommandon…",
+      "searchResultsLabel": "Matchande kommandon",
+      "showHelper": "Visa vänster list på denna enhet.",
+      "showLabel": "Visa vänster list"
+    },
+    "memory": {
+      "heading": "Vad assistenten minns",
+      "helper": "Fakta AI:n lärde sig av att arbeta med dig. Den skriver dem själv (högst en per körning); du ser och kan rätta var och en. Poster synkroniseras till dina andra enheter och förblir krypterade.",
+      "empty": "Inget minnt ännu. Poster visas här när assistenten lär sig något under en körning.",
+      "editLabel": "Redigera",
+      "deleteLabel": "Ta bort",
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "cancelLabel": "Avbryt",
+      "saveFailed": "Posten kunde inte sparas.",
+      "deleteFailed": "Posten kunde inte tas bort.",
+      "entryUnreadable": "Kunde inte läsa denna post. Den är fortfarande sparad; ta bort den här eller rätta den i Inställningar.",
+      "heldForReview": "Väntar på granskning: denna post utlöste injektionsskanning och används inte av assistenten förrän du redigerar eller tar bort den.",
+      "savedToast": "Minne uppdaterat.",
+      "deletedToast": "Post borttagen överallt.",
+      "clearedToast": "Alla minnesposter borttagna.",
+      "clearAllLabel": "Rensa allt minne",
+      "clearConfirm": "Verkligen ta bort var och en? Detta kan inte ångras.",
+      "updatedAt": "Uppdaterad {{val}}",
+      "personalityLabel": "Dina röstpreferenser",
+      "personalityHelper": "En instruktion per rad. Dessa formar hur assistenten skriver i varje körning: ton, längd, språk. Sparas i vaulten och synkroniseras.",
+      "personalityPlaceholder": "Håll svaren korta, med slutsatsen först.",
+      "personalitySaveLabel": "Spara röstpreferenser",
+      "personalitySavedToast": "Röstpreferenser uppdaterade.",
+      "personalitySaveFailed": "Röstpreferenserna kunde inte sparas.",
+      "loadFailed": "Kunde inte läsa in minnen eller röstpreferenser. Inget ändrades.",
+      "retryLabel": "Försök igen"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Ansluter till Tor. Synkroniseringen är pausad tills anslutningen är klar. Ingenting skickas direkt.",
       "settingsHint": "Inställningar → Nätverk",
       "unavailable": "Tor är otillgängligt, så synkroniseringen är pausad. Ingenting skickas direkt. Stäng av Tor-routningen för att synkronisera utan den."
+    },
+    "members": {
+      "title": "Medlemmar och säkerhet",
+      "access": "Din åtkomst",
+      "epochLabel": "Gruppnyckel-epoch",
+      "people": "Personer",
+      "removalLimitsLabel": "Borttagningsgränser"
+    },
+    "memberRoster": {
+      "loading": "Läser in medlemmar…",
+      "error": "Kunde inte läsa vaultens medlemslista.",
+      "hint": "Medlemmar i denna vault. Var och en går med med egen identitet och inloggning.",
+      "empty": "Inga medlemmar ännu. Att bjuda in någon är nästa steg.",
+      "rotated": "Nyckel roterad",
+      "keyChanged": "Nyckel ändrad. Verifiera med ägaren.",
+      "relinkConfirmed": "Omkoppling bekräftad av ägare",
+      "epoch": "Gruppnyckel-epoch {{epoch}}",
+      "ownerBadge": "Ägare",
+      "memberBadge": "Medlem",
+      "invite": "Bjud in medlem",
+      "remove": "Ta bort",
+      "removeConfirm": "Ta bort {{name}}? När nyckelrotationen är klar förlorar de åtkomst till framtida ändringar. Detta kan inte radera något de redan kopierat, och det åkallar inte innehåll från deras enhet eller deras AI-leverantör.",
+      "removalLimits": "Att ta bort en medlem stoppar endast deras åtkomst till framtida ändringar. Det kan inte radera något de redan kopierat, och det åkallar inte innehåll från deras enhet eller deras AI-leverantör.",
+      "inviteReady": "Inbjudan redo för {{fingerprint}}…",
+      "invitationsHeading": "Inbjudningar du skickat",
+      "invitationClaimed": "Accepterad",
+      "invitationPending": "Inte accepterad ännu",
+      "invitationsFailed": "Kunde inte läsa in dina inbjudningar.",
+      "title": "Vault-medlemmar",
+      "personHint": "Lås upp din medlemsidentitet med din återställningsfras. Den förblir på denna enhet tills du låser vaulten eller stänger appen.",
+      "personUnlock": "Lås upp medlemsidentitet",
+      "personReady": "Medlemsidentitet upplåst.",
+      "ownerCodeHint": "Dela denna kod med personen du bjuder in, så att de kan verifiera att vaulten är din. Den innehåller bara offentlig information.",
+      "personLock": "Lås medlemsidentitet",
+      "personError": "Den frasen öppnade ingen medlemsidentitet.",
+      "inviteHint": "Klistra in den inbjudna medlemmets identitetskod (från deras identitetshem).",
+      "inviteCodeLabel": "Medlemsidentitetskod",
+      "inspect": "Kontrollera fingeravtryck",
+      "sasHint": "Läs detta fingeravtryck för personen du bjuder in, eller låt dem läsa det för dig. Det måste matcha på båda sidor innan du fortsätter.",
+      "sasConfirm": "Jag bekräftade detta fingeravtryck med personen utanför kanalen",
+      "inviteCodeInvalid": "Det är inte en giltig medlemsidentitetskod.",
+      "kemLabel": "ML-KEM offentlig nyckel",
+      "edLabel": "Ed25519 offentlig nyckel",
+      "mldsaLabel": "ML-DSA offentlig nyckel",
+      "untitledVault": "Namnlös vault",
+      "inviteFailed": "Inbjudan kunde inte skapas.",
+      "removeFailed": "Medlemmen kunde inte tas bort."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Ingenting här just nu. Prova ett annat filter.",
       "rebuilding": "Läser dina anteckningar…",
       "scope": "Inga uppgifter i den här mappen eller taggen. Prova att vidga omfånget.",
-      "vault": "Inga uppgifter ännu. Skriv ”- [ ]” på en rad i valfri anteckning för att skapa en."
+      "vault": "Inga uppgifter ännu. Skriv ”- [ ]” på en rad i valfri anteckning för att skapa en.",
+      "search": "Inga uppgifter matchar “{{query}}”."
     },
     "filter": {
       "all": "Alla",
@@ -3881,7 +4126,74 @@
       "allFolders": "Alla mappar",
       "label": "Avgränsa efter"
     },
-    "title": "Uppgifter"
+    "title": "Uppgifter",
+    "axis": {
+      "due": "Förfall",
+      "folder": "Mapp",
+      "note": "Anteckning",
+      "priority": "Prioritet",
+      "sort": "Sortera",
+      "status": "Status",
+      "tag": "Tagg"
+    },
+    "due": {
+      "any": "Valfritt datum",
+      "later": "Senare",
+      "none": "Inget datum",
+      "overdue": "Försenad",
+      "today": "I dag",
+      "upcoming": "Kommande"
+    },
+    "filters": {
+      "button": "Filter",
+      "clearAll": "Rensa alla",
+      "selectHint": "Välj ett filter att tillämpa",
+      "title": "Filter"
+    },
+    "priority": {
+      "high": "Hög",
+      "highest": "Högst",
+      "low": "Låg",
+      "lowest": "Lägst",
+      "medium": "Medium"
+    },
+    "section": {
+      "done": "Klar",
+      "later": "Senare",
+      "none": "Inget datum",
+      "overdue": "Försenad",
+      "today": "I dag",
+      "upcoming": "Kommande"
+    },
+    "sort": {
+      "due": "Förfallodatum",
+      "dueDesc": "Förfallodatum, senast först",
+      "note": "Anteckning",
+      "priority": "Prioritet"
+    },
+    "status": {
+      "all": "Alla",
+      "done": "Klar",
+      "undone": "Öppen"
+    },
+    "view": {
+      "allFolders": "Alla mappar",
+      "allNotes": "Alla anteckningar",
+      "anyPriority": "Valfri prioritet",
+      "anyTag": "Valfri tagg",
+      "dueLabel": "Filtrera efter förfallodatum",
+      "folderLabel": "Filtrera efter mapp",
+      "noteLabel": "Filtrera efter anteckning",
+      "priorityLabel": "Filtrera efter prioritet",
+      "sortLabel": "Sortera inom sektioner",
+      "statusLabel": "Filtrera efter klarhet",
+      "tagLabel": "Filtrera efter tagg",
+      "untitled": "Namnlös"
+    },
+    "search": {
+      "label": "Sök uppgifter",
+      "placeholder": "Sök uppgifter…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Ta bort det här valvet?",
     "deletePartialError": "Vissa filer kunde inte tas bort. Valvet går inte längre att använda. Fortsätt för att börja om.",
     "failClosedEyebrow": "Det går inte att öppna valvet",
-    "restoreHint": "Återställ från en säkerhetskopia för att fortsätta."
+    "restoreHint": "Återställ från en säkerhetskopia för att fortsätta.",
+    "memberHint": "Dessa vault delas med dig. Lås upp den med din egen återställningsfras.",
+    "memberPhraseLabel": "Återställningsfras",
+    "memberSubmit": "Lås upp",
+    "memberError": "Den frasen öppnade inte denna delade vault."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "öppnad {{rel}}",
     "restoreFromBackup": "Återställ från säkerhetskopia",
     "subline": "Du har fler än ett valv på den här enheten. Välj ett att låsa upp.",
-    "vaultFallback": "Valv {{n}}"
+    "vaultFallback": "Valv {{n}}",
+    "accountFallback": "Konto",
+    "moveToAccount": "Flytta till konto…",
+    "moveToNewAccount": "Flytta till nytt konto",
+    "renameAccount": "Byt namn på konto",
+    "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
+    "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
+    "labelTooLong": "Det namnet är för långt. Håll det under 512 tecken.",
+    "renameCancel": "Avbryt",
+    "renamePlaceholder": "Kontonamn",
+    "renameSave": "Byt namn",
+    "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "eller",
       "title": "Välj ett valv att återställa",
       "useAccountNumber": "Använd kontonummer",
-      "vaultFallback": "Valv {{index}}"
+      "vaultFallback": "Valv {{index}}",
+      "accountFallback": "Konto",
+      "accountsError": "Kunde inte läsa in kontogrupperingen. Vault-listan är utan gruppering; ingenting om återställning ändras."
+    },
+    "siblingNotice": {
+      "body_one": "Detta konto har {{count}} vault till. Återställ den också så att ingenting lämnas kvar.",
+      "body_other": "Detta konto har {{count}} vault-er till. Återställ dem också så att ingenting lämnas kvar.",
+      "recoverAnother": "Återställ en annan vault",
+      "unknown": "Kunde inte kontrollera om detta konto har andra vault-er. Om du har mer än en vault, återställ var och en med sin egen fras."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Kvarvarande filer från en avbruten borttagning ({{n}}). Rensa dem innan du skapar ett valv.",
     "cleanUpFiles": "Rensa kvarvarande filer",
     "create": "Skapa ett valv",
-    "connect": "Anslut till mitt konto"
+    "connect": "Anslut till mitt konto",
+    "identityCta": "Skapa endast en identitet"
   },
   "wikiGraph": {
     "emptyTitle": "Inga länkar ännu",
     "emptyBodyBefore": "Koppla samman anteckningar genom att skriva ",
-    "emptyBodyAfter": " i din text. Länkade anteckningar visas här som en graf."
+    "emptyBodyAfter": " i din text. Länkade anteckningar visas här som en graf.",
+    "canvasLabel": "Kunskapsgraf över {{count}} anteckningar"
   },
   "markdown": {
     "attachmentFallback": "bilaga",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "öppnad förra året",
     "openedYearsAgo_one": "öppnad för {{count}} år sedan",
     "openedYearsAgo_other": "öppnad för {{count}} år sedan",
-    "corruptedBadge": "Skadad"
+    "corruptedBadge": "Skadad",
+    "accountFallback": "Konto",
+    "renameAccount": "Byt namn på konto",
+    "moveToNewAccount": "Flytta till nytt konto",
+    "moveToAccount": "Flytta till konto…",
+    "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
+    "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
+    "labelTooLong": "Det namnet är för långt. Håll det under 512 tecken.",
+    "renameCancel": "Avbryt",
+    "renamePlaceholder": "Kontonamn",
+    "renameSave": "Byt namn",
+    "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades."
   },
   "join": {
     "transportError": "Det gick inte att nå synkroniseringsservern. Kontrollera adressen och din anslutning och försök igen.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Slå på skyddet mot skärminspelning",
     "saveFailed": "Det kunde inte sparas, så ingenting ändrades. Försök igen, eller starta Myne med --disable-screen-capture-protection.",
     "savedForNextLaunch": "Sparat. Den här sessionen har fortfarande skyddet avstängt eftersom den startades med --disable-screen-capture-protection, så skyddet kommer tillbaka nästa gång du öppnar Myne utan den flaggan."
+  },
+  "identitySetup": {
+    "createCta": "Skapa en identitet",
+    "doneCta": "Klar",
+    "error": "Identiteten kunde inte skapas. Kontrollera att en synkroniseringsserver är konfigurerad och försök igen.",
+    "intro": "En identitet låter folk adressera en inbjudan till dig innan du äger någon vault. Den skapar ingen vault och lagrar inga anteckningar.",
+    "pending": "Denna enhet väntar på att en annan enhet på kontot ska godkänna den.",
+    "phraseWarning": "Skriv dessa 24 ord och förvara dem tryggt. Det är enda gången de visas; de är det enda sättet att återställa denna identitet.",
+    "recoverCta": "Återställ en identitet",
+    "recoverIntro": "Har du redan en identitet? Ange dess 24-ords återställningsfras.",
+    "recovered": "Identitet återställd.",
+    "title": "Endast identitet"
+  },
+  "identityHome": {
+    "createVaultCta": "Skapa en vault",
+    "invitesError": "Kunde inte läsa in inbjudningar. Kontrollera din anslutning och synkroniseringsserver.",
+    "invitesHeading": "Inbjudningar",
+    "invitesLoading": "Kontrollerar efter inbjudningar…",
+    "noInvites": "Inga inbjudningar ännu.",
+    "subtitle": "Du har en identitet på denna enhet, så folk kan bjuda in dig till en vault. Du behöver inte skapa en för att bli inbjuden.",
+    "accept": "Acceptera",
+    "acceptHint": "Klistra in ägarens identitetskod (de delar den när de bjuder in dig).",
+    "acceptOwnerCodeLabel": "Ägarens identitetskod",
+    "acceptInspect": "Kontrollera fingeravtryck",
+    "acceptSasHint": "Läs detta fingeravtryck för vault-ägaren, eller låt dem läsa det för dig. Det måste matcha på båda sidor innan du fortsätter.",
+    "acceptConfirm": "Jag bekräftade detta fingeravtryck med ägaren utanför kanalen",
+    "acceptSubmit": "Acceptera och lås upp",
+    "acceptPhraseLabel": "Din återställningsfras",
+    "acceptError": "Inbjudan kunde inte accepteras.",
+    "acceptInvalid": "Det är inte en giltig ägaridentitetskod.",
+    "shareCodeHeading": "Din inbjudningskod",
+    "shareCodeHint": "Dela denna kod med vem som helst som bjuder in dig. Den innehåller bara offentlig information (ditt identitets-id och offentliga nycklar), aldrig din fras.",
+    "title": "Din identitet"
   }
 }

@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "ノートの約{{count}}文字がプロバイダーに送信されました",
       "runSummaryOffDevice_other": "ノートの約{{count}}文字がプロバイダーに送信されました",
       "runSummaryOnDevice": "このデバイスの外には何も出ていません",
-      "appendFlag": "末尾に追加"
+      "appendFlag": "末尾に追加",
+      "diffCurrent": "現在のノート内",
+      "diffProposed": "この変更の後"
     },
     "undo": {
       "offer_one": "前回の実行で{{count}}件のノートが変更されました。",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "{{count}}件のノートで使用中",
       "usedInCount_other": "{{count}}件のノートで使用中",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "{{name}}をプレビュー"
     },
     "thumbnail": {
       "audioLabel": "オーディオ：{{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "バックアップが予期せず失敗しました。ファイルは残されていません。",
         "memberTooLarge": "この保管庫内のファイルがバックアップ形式の上限を超えています。",
         "vaultNotFound": "バックアップする保管庫が見つかりませんでした。",
-        "verifyFailed": "書き込まれたバックアップを検証できなかったため、破棄されました。もう一度お試しください。繰り返す場合は別のメディアでお試しください。"
+        "verifyFailed": "書き込まれたバックアップを検証できなかったため、破棄されました。もう一度お試しください。繰り返す場合は別のメディアでお試しください。",
+        "unknown": "バックアップは、Myneが特定できない理由で失敗しました。移動先のファイルを信用せず、再試行してください。"
       },
       "restore": {
         "authOperationInProgress": "別の保管庫操作が実行中です。完了するまで待ってから、もう一度お試しください。",
@@ -334,7 +338,8 @@
         "joinFailure": "復元が予期せず失敗しました。何も変更されていません。",
         "missingVaultMeta": "このバックアップには保管庫メタデータがないため、復元できません。",
         "notABackupFile": "このファイルはMyneのバックアップではありません。",
-        "vaultAlreadyExists": "このバックアップの保管庫はすでにこのデバイスに存在します。"
+        "vaultAlreadyExists": "このバックアップの保管庫はすでにこのデバイスに存在します。",
+        "unknown": "復元は、Myneが特定できない理由で失敗しました。再試行し、繰り返される場合はバックアップファイルを確認してください。"
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "ノートを検索するかコマンドを実行。tag: · path: · task: を試す",
     "sectionCommands": "コマンド",
     "sectionNotes": "ノート",
-    "untitledNote": "無題"
+    "untitledNote": "無題",
+    "resultsLabel": "コマンドとノート",
+    "pin": "左リボンにピン留め",
+    "unpin": "左リボンからピン解除",
+    "pinError": "コマンドをピン留めできませんでした。"
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "今月のノートを開く"
+      },
+      "focusSidebarRegion": {
+        "label": "ノートサイドバーにフォーカス"
+      },
+      "focusEditorRegion": {
+        "label": "エディタにフォーカス"
+      },
+      "focusRightPanelRegion": {
+        "label": "右パネルにフォーカス"
+      },
+      "cycleRegion": {
+        "label": "領域間でフォーカスを切り替え"
+      },
+      "openInNewWindow": {
+        "label": "ノートを新ウィンドウで開く"
+      },
+      "showIsolatedGraph": {
+        "label": "分離グラフを開く"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "ソースモードを切り替え",
         "toggleTaskList": "タスクリストを切り替え",
         "undo": "元に戻す",
-        "unfoldAll": "すべて展開"
+        "unfoldAll": "すべて展開",
+        "cycleRegion": "領域間でフォーカスを切り替え",
+        "focusEditorRegion": "エディタにフォーカス",
+        "focusRightPanelRegion": "右パネルにフォーカス",
+        "focusSidebarRegion": "ノートサイドバーにフォーカス"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "読み込み中"
     },
     "back": "戻る",
-    "continue": "続ける"
+    "continue": "続ける",
+    "skipToContent": "コンテンツへスキップ"
   },
   "deviceRevoked": {
     "cta": "最初からやり直す",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "新規ノート{{count}}件。",
             "newNotes_other": "新規ノート{{count}}件。",
             "proposed_one": "{{count}}件の変更を提案しました。",
-            "proposed_other": "{{count}}件の変更を提案しました。"
+            "proposed_other": "{{count}}件の変更を提案しました。",
+            "memoryUpdated_one": "メモリを1件のエントリで更新しました。",
+            "memoryUpdated_other": "メモリを{{count}}件のエントリで更新しました。"
           },
           "askPlaceholder": "ノートについて質問する…",
           "askSubmit": "質問",
@@ -1119,18 +1153,31 @@
           "thinking": "AIが考えています…",
           "truncated": "最初の{{count}}文字を要約しました。",
           "you": "あなた",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "履歴",
+          "historyCancel": "キャンセル",
+          "historyDelete": "削除",
+          "historyDeleteBody": "次回接続時に、すべてのデバイスから会話が削除されます。元に戻せません。",
+          "historyEmpty": "まだ会話がありません。新しいチャットはここに表示されます。",
+          "historyError": "会話を読み込めませんでした。再試行してください。",
+          "historyLoading": "読み込み中…",
+          "historyProposalAfter": "後",
+          "historyProposalBefore": "前",
+          "historyProposalNewNote": "新しいノート",
+          "historyRename": "名前を変更",
+          "historyTitle": "チャット履歴",
+          "historyDeleteTitle": "会話を削除",
+          "persistWarning": "ボールトへの保存に失敗しました。メッセージはここに残っており、再試行されます。",
+          "memory": "メモリ",
+          "memoryPopoverTitle": "アシスタントが覚えていること",
+          "memoryPopoverEmpty": "まだ何も覚えていません。",
+          "memoryPopoverDelete": "削除",
+          "memoryPopoverDeleted": "エントリをすべての場所から削除しました。",
+          "memoryPopoverDeleteFailed": "エントリを削除できませんでした。",
+          "memoryPopoverEntryFailed": "このエントリを読み取れませんでした。まだ保存されています。ここで削除するか、設定で修正してください。",
+          "memoryPopoverLoadFailed": "メモリを読み込めませんでした。変更はありません。",
+          "memoryPopoverRetry": "再試行",
+          "memoryPopoverSettings": "設定で管理",
+          "memoryPopoverClose": "閉じる"
         },
         "allHidden": "すべてのタブが非表示です。右クリックで復元してください。",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "アウトライン",
           "tasks": "タスク",
           "unlinked": "未リンクのメンション"
-        }
+        },
+        "tabStripLabel": "右パネル"
       },
       "sidebarToggle": {
         "hideBacklinks": "バックリンクサイドバーを非表示",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "現在のワークスペースに名前を付けて保存…",
         "switchLabel": "ワークスペースを切り替え",
         "toggleTitle": "ワークスペース：{{name}}"
+      },
+      "region": {
+        "editor": "エディタ",
+        "rightPanel": "右パネル",
+        "sidebar": "ノートサイドバー"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "テンプレートにしました",
       "convertedToNote": "ノートに変換しました",
       "versionHistory": "バージョン履歴",
-      "trash": "ゴミ箱に移動"
+      "trash": "ゴミ箱に移動",
+      "openInNewWindow": "新ウィンドウで開く"
     },
     "codeBlock": {
       "copyCode": "コードをコピー",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "図を描画中…",
-      "renderFailed": "この図を描画できませんでした: {{reason}}"
+      "renderFailed": "この図を描画できませんでした: {{reason}}",
+      "viewerLabel": "図ビューア",
+      "zoomIn": "ズームイン",
+      "zoomOut": "ズームアウト",
+      "reset": "表示に合わせてズームをリセット",
+      "panUp": "上にパン",
+      "panDown": "下にパン",
+      "panLeft": "左にパン",
+      "panRight": "右にパン",
+      "edit": "図のソースを編集",
+      "editText": "編集",
+      "expand": "図を展開",
+      "expandText": "展開",
+      "expandClose": "展開した図を閉じる",
+      "expandCloseText": "閉じる"
     },
     "slash": {
       "aiContinue": "続きを書く（AI）",
@@ -1323,7 +1391,20 @@
         "remind": "リマインダー"
       },
       "timeLabel": "時刻（任意）",
-      "invalidRemind": "Myneはこの日付を読み取れないため、リマインダーは通知されません。"
+      "invalidRemind": "Myneはこの日付を読み取れないため、リマインダーは通知されません。",
+      "addTime": "時刻を追加",
+      "clear": "クリア",
+      "dateGrid": "日付を選択",
+      "dateNext": "翌月",
+      "datePrev": "前月",
+      "today": "今日",
+      "tomorrow": "明日",
+      "selectField": "追加するフィールドを選択",
+      "noDate": "日付なし",
+      "removeTime": "時刻を削除",
+      "timeHour": "時",
+      "timeMeridiem": "午前または午後",
+      "timeMinute": "分"
     },
     "toolbar": {
       "apply": "適用",
@@ -1564,6 +1645,28 @@
         "weekly": "今週のノートを開けませんでした。",
         "monthly": "今月のノートを開けませんでした。"
       }
+    },
+    "a11y": {
+      "noteBody": "ノート本文: {{title}}",
+      "untitledNoteBody": "ノート本文、無題のノート",
+      "sectionFolded_one": "セクションを折りたたみました",
+      "sectionFolded_other": "{{count}}個のセクションを折りたたみました",
+      "sectionUnfolded_one": "セクションを開きました",
+      "sectionUnfolded_other": "{{count}}個のセクションを開きました",
+      "diagram": "図",
+      "diagramNamed": "図: {{kind}}",
+      "brokenLink": "{{target}}、壊れたリンク"
+    },
+    "ribbon": {
+      "customize": "リボンをカスタマイズ…",
+      "label": "左リボン",
+      "unpin": "リボンからピン解除",
+      "runFailed": "リボンコマンドを実行できませんでした。"
+    },
+    "detachedDeleted": {
+      "title": "このノートは他の場所で削除されました",
+      "body": "他のウィンドウから削除されたか、別のデバイスから同期されました。このウィンドウの未保存の変更は別コピーとして保持されました。",
+      "close": "ウィンドウを閉じる"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "カラーグループ",
         "moveDown": "ルールを下に移動",
         "moveUp": "ルールを上に移動",
-        "namePlaceholder": "無題のルール"
+        "namePlaceholder": "無題のルール",
+        "rowLabel": "{{name}}、グループ{{index}} / {{total}}。Alt+上下矢印で並べ替えます。",
+        "editRuleButton": "編集",
+        "derivedMakeEditable": "編集可能にする",
+        "derivedMakeEditableFailed": "これらのグループを保存できませんでした。再試行してください。",
+        "derivedNote_one": "グラフはタグで色付けされています: {{count}}個のグループ、タグから導出。編集可能にするまで保存されません。",
+        "derivedNote_other": "グラフはタグで色付けされています: {{count}}個のグループ、タグから導出。編集可能にするまで保存されません。",
+        "newRuleTitle": "新しいカラーグループ"
       },
       "depthToggleTitle": "近傍の深さを切り替え（1 ↔ 2ホップ）",
       "filterAll": "すべて",
@@ -1898,7 +2008,21 @@
         "reset": "デフォルトに戻す",
         "showArrows": "方向の矢印を表示",
         "title": "グラフ設定"
-      }
+      },
+      "canvasLabel": "{{count}}個のノートのナレッジグラフ",
+      "filterSelectAriaLabel": "グラフをフィルタ",
+      "listLinkCount_one": "{{count}}件のリンク",
+      "listLinkCount_other": "{{count}}件のリンク",
+      "listLinksFrom": "からのリンク: {{titles}}",
+      "listLinksTo": "へのリンク: {{titles}}",
+      "relayout": "レイアウトを再配置",
+      "relayoutTitle": "グラフを一から再配置",
+      "showingCount_one": "{{count}}個のノートを表示中",
+      "showingCount_other": "{{count}}個のノートを表示中",
+      "untitledNote": "無題のノート",
+      "viewGraph": "グラフ",
+      "viewList": "リスト",
+      "viewToggleAriaLabel": "グラフ画像またはノートのリストを選択"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "{{count}}件をインポート · {{skipped}}件をスキップ",
       "importedWithSkips_other": "{{count}}件をインポート · {{skipped}}件をスキップ",
       "importNoMarkdown": "ドロップされたものにMarkdownファイルはありません",
-      "moveFolderTo": "フォルダを移動…"
+      "moveFolderTo": "フォルダを移動…",
+      "treeLabel": "ノートとフォルダ",
+      "selectionAnnouncement": "{{title}}を選択しました",
+      "untitled": "無題"
     },
     "newFromTemplate": {
       "back": "戻る",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "タスクノート",
       "unsyncedLabel": "サーバー未同期",
       "unsyncedTitle": "このノートの最新の変更はこのデバイスにのみあります",
-      "untitled": "無題"
+      "untitled": "無題",
+      "untitledDrawing": "無題の図"
     },
     "savedView": {
       "defaultName": "絞り込みビュー"
@@ -2284,7 +2412,10 @@
       "pinned": "ピン留め済み",
       "pinnedTitle": "ピン留め済み：閉じるにはピンを外してください",
       "unpin": "ピンを外す",
-      "untitled": "無題"
+      "untitled": "無題",
+      "closeTabMenuItem": "タブを閉じる",
+      "moveLeft": "左へ移動",
+      "moveRight": "右へ移動"
     },
     "tagBrowser": {
       "cancel": "キャンセル",
@@ -3057,7 +3188,7 @@
         "whenLabel": "いつ出ていくか",
         "whoLabel": "受け取る相手",
         "connectionLabel": "どのように送られるか",
-        "excludedLabel": ""
+        "excludedLabel": "除外フォルダ"
       },
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを実行します。どこで実行されるか、そしてノートがこのデバイスの外に出るかどうかは、下で指定するプロバイダーによって決まります。実験的機能で、デフォルトはオフです。",
@@ -3091,7 +3222,8 @@
         "unauthorized": "プロバイダーがAPIキーを拒否しました。キーを入れ替えてください：間違っているか、失効しているか、別のアカウントのものである可能性があります。",
         "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。",
         "featureOff": "この端末では AI がオフです。何も送信されていません。設定の「AI」でオンにしてください。",
-        "consentMissing": "この端末からこの提供者にノートを送ることに同意していません。何も送信されていません。設定の「AI」で提供者をもう一度選び、何が送られるかをお読みください。"
+        "consentMissing": "この端末からこの提供者にノートを送ることに同意していません。何も送信されていません。設定の「AI」で提供者をもう一度選び、何が送られるかをお読みください。",
+        "emptyGrant": "この実行が読めたものはすべて、AIが見ないフォルダにあります。送信はありません。設定、AI、除外フォルダで変更してください。"
       },
       "modelChoose": "ファイルを選択…",
       "modelEmbeddingLabel": "検索モデル：セマンティック検索とQ&A",
@@ -3374,7 +3506,8 @@
         "text": "テキストと表示",
         "editing": "編集",
         "writing": "執筆",
-        "features": "機能"
+        "features": "機能",
+        "tasks": "タスク"
       },
       "preview": {
         "heading": "いろはにほへと ちりぬるを",
@@ -3386,7 +3519,20 @@
       "defaultView": "デフォルトのビュー",
       "typewriter": "タイプライタースクロール",
       "typewriterSubtitle": "キャレットを垂直方向の中央に保つ",
-      "enableArchiving": "アーカイブを有効化"
+      "enableArchiving": "アーカイブを有効化",
+      "taskChipColor": {
+        "accent": "アクセント",
+        "danger": "赤",
+        "help": "このデバイスのすべてのタスク画面におけるタスクチップのアイコンとラベルの色。",
+        "label": "タスクチップの色",
+        "muted": "低彩度",
+        "sample": "8月1日",
+        "theme": "テーマ"
+      },
+      "taskChipIconOnly": {
+        "help": "優先度を単語ではなくアイコンのみで表示。",
+        "label": "アイコンのみ優先度"
+      }
     },
     "search": {
       "placeholder": "設定を検索…",
@@ -3466,7 +3612,11 @@
         "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today",
         "periodicNotes": "定期ノート ウィークリー マンスリー 週 月 フォルダー テンプレート 書式",
         "aiHistoryBudget": "会話 履歴 コンテキスト 記憶 上限 文字数 エージェント チャット リクエスト",
-        "screenCaptureOverride": "画面キャプチャ 上書き 許可 無効 オフ 拡大鏡 リモートデスクトップ アクセシビリティ ロック解除 黒い画面 真っ黒 screen capture override allow disable magnifier remote desktop accessibility unlock screen black"
+        "screenCaptureOverride": "画面キャプチャ 上書き 許可 無効 オフ 拡大鏡 リモートデスクトップ アクセシビリティ ロック解除 黒い画面 真っ黒 screen capture override allow disable magnifier remote desktop accessibility unlock screen black",
+        "aiMemory": "メモリ 覚えている事実 アシスタント 学ぶ 個性 音声設定",
+        "ribbon": "左リボン レール ピン留め ピン コマンド コマンド 並べ替え ピン解除 ツールバー ショートカット",
+        "folderNotes": "フォルダ ノート インデックス folder_index ランディングページ ダブルクリック フォルダリンク プロジェクト オフ 無効",
+        "syncMembers": "メンバー、共有、招待、チーム、コラボレーション、ボールト"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myneはそのタイムゾーンを認識できません。Europe/Berlin のような名前を使用してください。",
       "errorSave": "その設定を保存できませんでした。"
+    },
+    "folderNotes": {
+      "label": "フォルダノート",
+      "helper": "ノートをフォルダのインデックスとして機能させます: フォルダをダブルクリックすると開き、[[Projects/]]のようなフォルダリンクはそこを指します。既定でオフ。オフにするとフォルダノート作成ボタンが隠され、既存のものは通常のノートとして表示されます。ディスク上の何も変わらないため、オンに戻すと正確に復元されます。",
+      "errorSaveSetting": "この設定を保存できませんでした。"
+    },
+    "ribbonCustomize": {
+      "add": "追加",
+      "empty": "リボンにはまだコマンドがありません。追加でピン留めしてください。",
+      "errorSave": "リボン設定を保存できませんでした。",
+      "helper": "左リボンのコマンドを順に表示。ドラッグで並べ替え、コマンド一覧から追加、×で削除。レールは現在の状態で利用できないコマンドを隠します。",
+      "label": "左リボン",
+      "remove": "リボンから{{name}}を削除",
+      "position": "{{name}}、{{index}} / {{total}}",
+      "searchEmpty": "一致するコマンドがありません。",
+      "searchPlaceholder": "コマンドを検索…",
+      "searchResultsLabel": "一致するコマンド",
+      "showHelper": "このデバイスで左リボンを表示。",
+      "showLabel": "左リボンを表示"
+    },
+    "memory": {
+      "heading": "アシスタントが覚えていること",
+      "helper": "AIがあなたと作業して学んだ事実です。AI自身が書き込みます（実行ごとに最大1件）。すべて表示でき、修正できます。エントリは他のデバイスに同期され、暗号化されたままです。",
+      "empty": "まだ何も覚えていません。実行中にアシスタントが学ぶとエントリがここに表示されます。",
+      "editLabel": "編集",
+      "deleteLabel": "削除",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "cancelLabel": "キャンセル",
+      "saveFailed": "エントリを保存できませんでした。",
+      "deleteFailed": "エントリを削除できませんでした。",
+      "entryUnreadable": "このエントリを読み取れませんでした。まだ保存されています。ここで削除するか、設定で修正してください。",
+      "heldForReview": "レビュー待ち: このエントリはインジェクションスキャンに引っかかり、編集または削除するまでアシスタントは使用しません。",
+      "savedToast": "メモリを更新しました。",
+      "deletedToast": "エントリをすべての場所から削除しました。",
+      "clearedToast": "すべてのメモリエントリを削除しました。",
+      "clearAllLabel": "すべてのメモリをクリア",
+      "clearConfirm": "本当にすべてのエントリを削除しますか？元に戻せません。",
+      "updatedAt": "更新: {{val}}",
+      "personalityLabel": "音声設定",
+      "personalityHelper": "1行につき1つの指示。アシスタントの文体をすべての実行で形づくります: トーン、長さ、言語。ボールトに保存され、同期されます。",
+      "personalityPlaceholder": "結論を先に、簡潔に答える。",
+      "personalitySaveLabel": "音声設定を保存",
+      "personalitySavedToast": "音声設定を更新しました。",
+      "personalitySaveFailed": "音声設定を保存できませんでした。",
+      "loadFailed": "メモリまたは音声設定を読み込めませんでした。変更はありません。",
+      "retryLabel": "再試行"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Torに接続中です。接続が整うまで同期は一時停止します。直接送信されているものはありません。",
       "settingsHint": "設定 → ネットワーク",
       "unavailable": "Torを利用できないため、同期は一時停止しています。直接送信されているものはありません。Torなしで同期するには、Torルーティングをオフにしてください。"
+    },
+    "members": {
+      "title": "メンバーとセキュリティ",
+      "access": "あなたのアクセス",
+      "epochLabel": "グループ鍵エポック",
+      "people": "人",
+      "removalLimitsLabel": "削除制限"
+    },
+    "memberRoster": {
+      "loading": "メンバーを読み込み中…",
+      "error": "ボールトの名簿を読み取れませんでした。",
+      "hint": "このボールトのメンバー。各自が自分のアイデンティティと資格情報で参加します。",
+      "empty": "まだメンバーがいません。誰かを招待するのが次のステップです。",
+      "rotated": "鍵をローテーションしました",
+      "keyChanged": "鍵が変わりました。所有者と確認してください。",
+      "relinkConfirmed": "所有者が再リンクを確認しました",
+      "epoch": "グループ鍵エポック {{epoch}}",
+      "ownerBadge": "所有者",
+      "memberBadge": "メンバー",
+      "invite": "メンバーを招待",
+      "remove": "削除",
+      "removeConfirm": "{{name}}を削除しますか？鍵ローテーション完了後、将来の変更へのアクセスを失います。すでにコピーされたものを消去することはできず、デバイスやAIプロバイダーからコンテンツを呼び戻すこともできません。",
+      "removalLimits": "メンバーを削除すると、将来の変更へのアクセスが止まるだけです。すでにコピーされたものを消去することはできず、デバイスやAIプロバイダーからコンテンツを呼び戻すこともできません。",
+      "inviteReady": "{{fingerprint}}の招待の準備ができました…",
+      "invitationsHeading": "送信した招待",
+      "invitationClaimed": "承諾済み",
+      "invitationPending": "未承諾",
+      "invitationsFailed": "招待を読み込めませんでした。",
+      "title": "ボールトメンバー",
+      "personHint": "リカバリーフレーズでメンバーアイデンティティを解除します。ボールトをロックするかアプリを閉じるまで、このデバイスに留まります。",
+      "personUnlock": "メンバーアイデンティティを解除",
+      "personReady": "メンバーアイデンティティを解除しました。",
+      "ownerCodeHint": "招待する相手とこのコードを共有し、ボールトがあなたのものであることを検証できるようにします。公開情報のみを含みます。",
+      "personLock": "メンバーアイデンティティをロック",
+      "personError": "そのフレーズではメンバーアイデンティティを開けませんでした。",
+      "inviteHint": "招待されたメンバーのアイデンティティコードを貼り付け（本人のアイデンティティホームから）。",
+      "inviteCodeLabel": "メンバーアイデンティティコード",
+      "inspect": "フィンガープリント確認",
+      "sasHint": "このフィンガープリントを招待する相手に読み上げるか、相手に読み上げてもらいます。続行前に双方で一致している必要があります。",
+      "sasConfirm": "チャネル外でこのフィンガープリントを相手と確認しました",
+      "inviteCodeInvalid": "有効なメンバーアイデンティティコードではありません。",
+      "kemLabel": "ML-KEM公開鍵",
+      "edLabel": "Ed25519公開鍵",
+      "mldsaLabel": "ML-DSA公開鍵",
+      "untitledVault": "無題のボールト",
+      "inviteFailed": "招待を作成できませんでした。",
+      "removeFailed": "メンバーを削除できませんでした。"
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "今は何もありません。別のフィルタを試してください。",
       "rebuilding": "ノートを読み込み中…",
       "scope": "このフォルダまたはタグにタスクはありません。範囲を広げてみてください。",
-      "vault": "タスクはまだありません。いずれかのノートの行に「- [ ]」と書くと作成できます。"
+      "vault": "タスクはまだありません。いずれかのノートの行に「- [ ]」と書くと作成できます。",
+      "search": "「{{query}}」に一致するタスクはありません。"
     },
     "filter": {
       "all": "すべて",
@@ -3881,7 +4126,74 @@
       "allFolders": "すべてのフォルダ",
       "label": "絞り込み"
     },
-    "title": "タスク"
+    "title": "タスク",
+    "axis": {
+      "due": "期限",
+      "folder": "フォルダ",
+      "note": "ノート",
+      "priority": "優先度",
+      "sort": "並べ替え",
+      "status": "状態",
+      "tag": "タグ"
+    },
+    "due": {
+      "any": "日付を問わない",
+      "later": "後で",
+      "none": "日付なし",
+      "overdue": "期限超過",
+      "today": "今日",
+      "upcoming": "今後"
+    },
+    "filters": {
+      "button": "フィルタ",
+      "clearAll": "すべてクリア",
+      "selectHint": "適用するフィルタを選択",
+      "title": "フィルタ"
+    },
+    "priority": {
+      "high": "高",
+      "highest": "最高",
+      "low": "低",
+      "lowest": "最低",
+      "medium": "中"
+    },
+    "section": {
+      "done": "完了",
+      "later": "後で",
+      "none": "日付なし",
+      "overdue": "期限超過",
+      "today": "今日",
+      "upcoming": "今後"
+    },
+    "sort": {
+      "due": "期限日",
+      "dueDesc": "期限日、新しい順",
+      "note": "ノート",
+      "priority": "優先度"
+    },
+    "status": {
+      "all": "すべて",
+      "done": "完了",
+      "undone": "未完了"
+    },
+    "view": {
+      "allFolders": "すべてのフォルダ",
+      "allNotes": "すべてのノート",
+      "anyPriority": "すべての優先度",
+      "anyTag": "すべてのタグ",
+      "dueLabel": "期限日でフィルタ",
+      "folderLabel": "フォルダでフィルタ",
+      "noteLabel": "ノートでフィルタ",
+      "priorityLabel": "優先度でフィルタ",
+      "sortLabel": "セクション内の並べ替え",
+      "statusLabel": "完了状態でフィルタ",
+      "tagLabel": "タグでフィルタ",
+      "untitled": "無題"
+    },
+    "search": {
+      "label": "タスクを検索",
+      "placeholder": "タスクを検索…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "このボールトを削除しますか？",
     "deletePartialError": "一部のファイルを削除できませんでした。この保管庫はもう使用できません。続けて最初からやり直してください。",
     "failClosedEyebrow": "ボールトを開けません",
-    "restoreHint": "続けるにはバックアップから復元してください。"
+    "restoreHint": "続けるにはバックアップから復元してください。",
+    "memberHint": "このボールトはあなたと共有されています。自分のリカバリーフレーズで解除してください。",
+    "memberPhraseLabel": "リカバリーフレーズ",
+    "memberSubmit": "解除",
+    "memberError": "そのフレーズではこの共有ボールトを開けませんでした。"
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "{{rel}}に開きました",
     "restoreFromBackup": "バックアップから復元",
     "subline": "このデバイスには複数の保管庫があります。ロックを解除する保管庫を選んでください。",
-    "vaultFallback": "保管庫{{n}}"
+    "vaultFallback": "保管庫{{n}}",
+    "accountFallback": "アカウント",
+    "moveToAccount": "アカウントへ移動…",
+    "moveToNewAccount": "新しいアカウントへ移動",
+    "renameAccount": "アカウント名を変更",
+    "accountError": "アカウントのグループ化を更新できませんでした。変更はありません。",
+    "accountHidden": "ボールト名を隠している間、アカウント操作は利用できません。",
+    "labelTooLong": "その名前は長すぎます。512文字未満にしてください。",
+    "renameCancel": "キャンセル",
+    "renamePlaceholder": "アカウント名",
+    "renameSave": "名前を変更",
+    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "または",
       "title": "復元する保管庫を選択",
       "useAccountNumber": "アカウント番号を使用",
-      "vaultFallback": "保管庫{{index}}"
+      "vaultFallback": "保管庫{{index}}",
+      "accountFallback": "アカウント",
+      "accountsError": "アカウントのグループ化を読み込めませんでした。ボールトはグループなしで表示されます。復元の内容は変わりません。"
+    },
+    "siblingNotice": {
+      "body_one": "このアカウントにはさらに{{count}}個のボールトがあります。何も残さないよう、それも復元してください。",
+      "body_other": "このアカウントにはさらに{{count}}個のボールトがあります。何も残さないよう、それも復元してください。",
+      "recoverAnother": "別のボールトを復元",
+      "unknown": "このアカウントに他のボールトがあるか確認できませんでした。複数のボールトがある場合は、それぞれ自分のフレーズで復元してください。"
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "中断された削除から残ったファイルがあります（{{n}}）。ボールトを作成する前にクリーンアップしてください。",
     "cleanUpFiles": "残ったファイルをクリーンアップ",
     "create": "ボールトを作成",
-    "connect": "自分のアカウントに接続"
+    "connect": "自分のアカウントに接続",
+    "identityCta": "アイデンティティのみ作成"
   },
   "wikiGraph": {
     "emptyTitle": "リンクはまだありません",
     "emptyBodyBefore": "テキストに ",
-    "emptyBodyAfter": " と書いてノートを接続します。リンクされたノートはここにグラフとして表示されます。"
+    "emptyBodyAfter": " と書いてノートを接続します。リンクされたノートはここにグラフとして表示されます。",
+    "canvasLabel": "{{count}}個のノートのナレッジグラフ"
   },
   "markdown": {
     "attachmentFallback": "添付ファイル",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "昨年開きました",
     "openedYearsAgo_one": "{{count}}年前に開きました",
     "openedYearsAgo_other": "{{count}}年前に開きました",
-    "corruptedBadge": "破損"
+    "corruptedBadge": "破損",
+    "accountFallback": "アカウント",
+    "renameAccount": "アカウント名を変更",
+    "moveToNewAccount": "新しいアカウントへ移動",
+    "moveToAccount": "アカウントへ移動…",
+    "accountError": "アカウントのグループ化を更新できませんでした。変更はありません。",
+    "accountHidden": "ボールト名を隠している間、アカウント操作は利用できません。",
+    "labelTooLong": "その名前は長すぎます。512文字未満にしてください。",
+    "renameCancel": "キャンセル",
+    "renamePlaceholder": "アカウント名",
+    "renameSave": "名前を変更",
+    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。"
   },
   "join": {
     "transportError": "その同期サーバーに接続できませんでした。アドレスと接続を確認してから、もう一度お試しください。",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "画面キャプチャ保護をオンにする",
     "saveFailed": "保存できなかったため、何も変わっていません。もう一度試すか、Myneを --disable-screen-capture-protection を付けて起動してください。",
     "savedForNextLaunch": "保存しました。このセッションは --disable-screen-capture-protection を付けて起動されているため、保護はオフのままです。次にそれを付けずにMyneを開いたときに保護が戻ります。"
+  },
+  "identitySetup": {
+    "createCta": "アイデンティティを作成",
+    "doneCta": "完了",
+    "error": "アイデンティティを設定できませんでした。同期サーバーが構成されていることを確認して再試行してください。",
+    "intro": "アイデンティティを使うと、ボールトを持つ前に招待を自分宛にできます。ボールトは作らず、ノートも保存しません。",
+    "pending": "このデバイスはアカウント上の他のデバイスの承認を待っています。",
+    "phraseWarning": "この24語を紙に書き写し、安全に保管してください。表示はこれが最初で最後です。このアイデンティティの復元はこの語だけが使えます。",
+    "recoverCta": "アイデンティティを復元",
+    "recoverIntro": "すでにアイデンティティをお持ちですか？24語のリカバリーフレーズを入力してください。",
+    "recovered": "アイデンティティを復元しました。",
+    "title": "アイデンティティのみ"
+  },
+  "identityHome": {
+    "createVaultCta": "ボールトを作成",
+    "invitesError": "招待を読み込めませんでした。接続と同期サーバーを確認してください。",
+    "invitesHeading": "招待",
+    "invitesLoading": "招待を確認中…",
+    "noInvites": "まだ招待はありません。",
+    "subtitle": "このデバイスにアイデンティティがあるため、誰かがボールトに招待できます。招待されるために作成は不要です。",
+    "accept": "承諾",
+    "acceptHint": "所有者のアイデンティティコードを貼り付け（招待時に共有されます）。",
+    "acceptOwnerCodeLabel": "所有者のアイデンティティコード",
+    "acceptInspect": "フィンガープリント確認",
+    "acceptSasHint": "このフィンガープリントをボールト所有者に読み上げるか、相手に読み上げてもらいます。続行前に双方で一致している必要があります。",
+    "acceptConfirm": "チャネル外で所有者とこのフィンガープリントを確認しました",
+    "acceptSubmit": "承諾して解除",
+    "acceptPhraseLabel": "あなたのリカバリーフレーズ",
+    "acceptError": "招待を承諾できませんでした。",
+    "acceptInvalid": "有効な所有者アイデンティティコードではありません。",
+    "shareCodeHeading": "あなたの招待コード",
+    "shareCodeHint": "招待してくれる誰かとこのコードを共有してください。公開情報（アイデンティティIDと公開鍵）のみを含み、フレーズは含みません。",
+    "title": "あなたのアイデンティティ"
   }
 }

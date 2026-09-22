@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
       "runSummaryOffDevice_other": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
       "runSummaryOnDevice": "không có gì rời khỏi thiết bị này",
-      "appendFlag": "thêm vào cuối"
+      "appendFlag": "thêm vào cuối",
+      "diffCurrent": "Đang ở trong ghi chú",
+      "diffProposed": "Sau thay đổi này"
     },
     "undo": {
       "offer_one": "Lượt chạy vừa rồi đã thay đổi {{count}} ghi chú.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "Dùng trong {{count}} ghi chú",
       "usedInCount_other": "Dùng trong {{count}} ghi chú",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Xem trước {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Âm thanh: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Sao lưu thất bại bất ngờ. Không có tệp nào được tạo ra.",
         "memberTooLarge": "Một tệp trong kho này lớn hơn mức định dạng sao lưu cho phép.",
         "vaultNotFound": "Không tìm thấy kho nào để sao lưu.",
-        "verifyFailed": "Bản sao lưu đã ghi không xác minh được nên đã bị loại bỏ. Hãy thử lại, dùng phương tiện khác nếu vẫn lặp lại."
+        "verifyFailed": "Bản sao lưu đã ghi không xác minh được nên đã bị loại bỏ. Hãy thử lại, dùng phương tiện khác nếu vẫn lặp lại.",
+        "unknown": "Sao lưu thất bại vì lý do Myne không xác định được. Đừng tin tệp ở đích; thử lại."
       },
       "restore": {
         "authOperationInProgress": "Một thao tác kho khác đang diễn ra. Hãy chờ nó hoàn tất rồi thử lại.",
@@ -334,7 +338,8 @@
         "joinFailure": "Khôi phục thất bại bất ngờ. Không có gì thay đổi.",
         "missingVaultMeta": "Bản sao lưu này thiếu siêu dữ liệu kho nên không thể khôi phục.",
         "notABackupFile": "Tệp này không phải là bản sao lưu Myne.",
-        "vaultAlreadyExists": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này."
+        "vaultAlreadyExists": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này.",
+        "unknown": "Khôi phục thất bại vì lý do Myne không xác định được. Thử lại và kiểm tra tệp sao lưu nếu lỗi lặp lại."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh. Thử tag: · path: · task:",
     "sectionCommands": "Lệnh",
     "sectionNotes": "Ghi chú",
-    "untitledNote": "Không có tiêu đề"
+    "untitledNote": "Không có tiêu đề",
+    "resultsLabel": "Lệnh và ghi chú",
+    "pin": "Ghim vào dải bên trái",
+    "unpin": "Bỏ ghim khỏi dải bên trái",
+    "pinError": "Không ghim được lệnh."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Mở ghi chú tháng này"
+      },
+      "focusSidebarRegion": {
+        "label": "Tập trung vào thanh ghi chú"
+      },
+      "focusEditorRegion": {
+        "label": "Tập trung vào trình soạn thảo"
+      },
+      "focusRightPanelRegion": {
+        "label": "Tập trung vào bảng phải"
+      },
+      "cycleRegion": {
+        "label": "Chuyển tập trung giữa các vùng"
+      },
+      "openInNewWindow": {
+        "label": "Mở ghi chú trong cửa sổ mới"
+      },
+      "showIsolatedGraph": {
+        "label": "Mở đồ thị cô lập"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Bật/tắt chế độ nguồn",
         "toggleTaskList": "Bật/tắt danh sách công việc",
         "undo": "Hoàn tác",
-        "unfoldAll": "Mở rộng tất cả"
+        "unfoldAll": "Mở rộng tất cả",
+        "cycleRegion": "Chuyển tập trung giữa các vùng",
+        "focusEditorRegion": "Tập trung vào trình soạn thảo",
+        "focusRightPanelRegion": "Tập trung vào bảng phải",
+        "focusSidebarRegion": "Tập trung vào thanh ghi chú"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Đang tải"
     },
     "back": "Quay lại",
-    "continue": "Tiếp tục"
+    "continue": "Tiếp tục",
+    "skipToContent": "Nhảy tới nội dung"
   },
   "deviceRevoked": {
     "cta": "Bắt đầu lại",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} ghi chú mới.",
             "newNotes_other": "{{count}} ghi chú mới.",
             "proposed_one": "Đã đề xuất {{count}} thay đổi.",
-            "proposed_other": "Đã đề xuất {{count}} thay đổi."
+            "proposed_other": "Đã đề xuất {{count}} thay đổi.",
+            "memoryUpdated_one": "Bộ nhớ được cập nhật với một mục.",
+            "memoryUpdated_other": "Bộ nhớ được cập nhật với {{count}} mục."
           },
           "askPlaceholder": "Đặt câu hỏi về ghi chú của bạn…",
           "askSubmit": "Hỏi",
@@ -1119,18 +1153,31 @@
           "thinking": "AI đang suy nghĩ…",
           "truncated": "Đã tóm tắt {{count}} ký tự đầu tiên.",
           "you": "Bạn",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Lịch sử",
+          "historyCancel": "Hủy",
+          "historyDelete": "Xóa",
+          "historyDeleteBody": "Thao tác này sẽ xóa cuộc trò chuyện khỏi mọi thiết bị ở lần kết nối tới. Không thể hoàn tác.",
+          "historyEmpty": "Chưa có cuộc trò chuyện. Cuộc trò chuyện mới sẽ xuất hiện ở đây.",
+          "historyError": "Không tải được cuộc trò chuyện. Thử lại.",
+          "historyLoading": "Đang tải…",
+          "historyProposalAfter": "Sau",
+          "historyProposalBefore": "Trước",
+          "historyProposalNewNote": "Ghi chú mới",
+          "historyRename": "Đổi tên",
+          "historyTitle": "Lịch sử trò chuyện",
+          "historyDeleteTitle": "Xóa cuộc trò chuyện",
+          "persistWarning": "Không lưu được vào bộ nhớ. Tin nhắn của bạn ở đây, thao tác đang thử lại.",
+          "memory": "Bộ nhớ",
+          "memoryPopoverTitle": "Trợ lý nhớ gì",
+          "memoryPopoverEmpty": "Chưa nhớ gì.",
+          "memoryPopoverDelete": "Xóa",
+          "memoryPopoverDeleted": "Đã xóa mục ở mọi nơi.",
+          "memoryPopoverDeleteFailed": "Không xóa được mục.",
+          "memoryPopoverEntryFailed": "Không đọc được mục. Mục vẫn được lưu; xóa tại đây hoặc sửa trong cài đặt.",
+          "memoryPopoverLoadFailed": "Không tải được ký ức. Không có gì thay đổi.",
+          "memoryPopoverRetry": "Thử lại",
+          "memoryPopoverSettings": "Quản lý trong cài đặt",
+          "memoryPopoverClose": "Đóng"
         },
         "allHidden": "Tất cả tab đều bị ẩn. Nhấp chuột phải để khôi phục.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Dàn ý",
           "tasks": "Công việc",
           "unlinked": "Đề cập chưa liên kết"
-        }
+        },
+        "tabStripLabel": "Bảng phải"
       },
       "sidebarToggle": {
         "hideBacklinks": "Ẩn thanh bên liên kết ngược",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Lưu không gian hiện tại thành…",
         "switchLabel": "Chuyển không gian làm việc",
         "toggleTitle": "Không gian làm việc: {{name}}"
+      },
+      "region": {
+        "editor": "Trình soạn thảo",
+        "rightPanel": "Bảng phải",
+        "sidebar": "Thanh ghi chú"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "Đã biến thành mẫu",
       "convertedToNote": "Đã chuyển thành ghi chú",
       "versionHistory": "Lịch sử phiên bản",
-      "trash": "Chuyển vào Thùng rác"
+      "trash": "Chuyển vào Thùng rác",
+      "openInNewWindow": "Mở trong cửa sổ mới"
     },
     "codeBlock": {
       "copyCode": "Sao chép mã",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Đang dựng sơ đồ…",
-      "renderFailed": "Không thể hiển thị sơ đồ này: {{reason}}"
+      "renderFailed": "Không thể hiển thị sơ đồ này: {{reason}}",
+      "viewerLabel": "Trình xem sơ đồ",
+      "zoomIn": "Phóng to",
+      "zoomOut": "Thu nhỏ",
+      "reset": "Đặt lại tỷ lệ",
+      "panUp": "Di chuyển lên",
+      "panDown": "Di chuyển xuống",
+      "panLeft": "Di chuyển trái",
+      "panRight": "Di chuyển phải",
+      "edit": "Sửa mã nguồn sơ đồ",
+      "editText": "Sửa",
+      "expand": "Mở rộng sơ đồ",
+      "expandText": "Mở rộng",
+      "expandClose": "Đóng sơ đồ đã mở rộng",
+      "expandCloseText": "Đóng"
     },
     "slash": {
       "aiContinue": "Viết tiếp (AI)",
@@ -1323,7 +1391,20 @@
         "remind": "Nhắc nhở"
       },
       "timeLabel": "Giờ (tùy chọn)",
-      "invalidRemind": "Myne không đọc được ngày này, nên nó sẽ không nhắc bạn."
+      "invalidRemind": "Myne không đọc được ngày này, nên nó sẽ không nhắc bạn.",
+      "addTime": "Thêm giờ",
+      "clear": "Xóa",
+      "dateGrid": "Chọn ngày",
+      "dateNext": "Tháng sau",
+      "datePrev": "Tháng trước",
+      "today": "Hôm nay",
+      "tomorrow": "Ngày mai",
+      "selectField": "Chọn trường để thêm",
+      "noDate": "Không ngày",
+      "removeTime": "Bỏ giờ",
+      "timeHour": "Giờ",
+      "timeMeridiem": "SA hoặc CH",
+      "timeMinute": "Phút"
     },
     "toolbar": {
       "apply": "Áp dụng",
@@ -1564,6 +1645,28 @@
         "weekly": "Không mở được ghi chú tuần này.",
         "monthly": "Không mở được ghi chú tháng này."
       }
+    },
+    "a11y": {
+      "noteBody": "Thân ghi chú: {{title}}",
+      "untitledNoteBody": "Thân ghi chú, ghi chú không tiêu đề",
+      "sectionFolded_one": "Phần đã thu gọn",
+      "sectionFolded_other": "{{count}} phần đã thu gọn",
+      "sectionUnfolded_one": "Phần đã mở rộng",
+      "sectionUnfolded_other": "{{count}} phần đã mở rộng",
+      "diagram": "Sơ đồ",
+      "diagramNamed": "Sơ đồ: {{kind}}",
+      "brokenLink": "{{target}}, liên kết hỏng"
+    },
+    "ribbon": {
+      "customize": "Tùy chỉnh dải…",
+      "label": "Dải bên trái",
+      "unpin": "Bỏ ghim khỏi dải",
+      "runFailed": "Không chạy được lệnh dải."
+    },
+    "detachedDeleted": {
+      "title": "Ghi chú này đã bị xóa ở nơi khác",
+      "body": "Nó đã bị xóa từ cửa sổ khác hoặc đồng bộ từ thiết bị khác. Các thay đổi chưa lưu trong cửa sổ này được giữ dưới dạng bản sao riêng.",
+      "close": "Đóng cửa sổ"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Nhóm màu",
         "moveDown": "Chuyển quy tắc xuống",
         "moveUp": "Chuyển quy tắc lên",
-        "namePlaceholder": "Quy tắc không có tiêu đề"
+        "namePlaceholder": "Quy tắc không có tiêu đề",
+        "rowLabel": "{{name}}, nhóm {{index}} trên {{total}}. Alt với mũi tên lên hoặc xuống đổi thứ tự.",
+        "editRuleButton": "Sửa",
+        "derivedMakeEditable": "Cho phép chỉnh sửa",
+        "derivedMakeEditableFailed": "Không lưu được các nhóm này. Thử lại.",
+        "derivedNote_one": "Đồ thị được tô màu theo thẻ: {{count}} nhóm suy ra từ thẻ của bạn. Không được lưu cho đến khi bạn cho phép chỉnh sửa.",
+        "derivedNote_other": "Đồ thị được tô màu theo thẻ: {{count}} nhóm suy ra từ thẻ của bạn. Không được lưu cho đến khi bạn cho phép chỉnh sửa.",
+        "newRuleTitle": "Nhóm màu mới"
       },
       "depthToggleTitle": "Bật/tắt độ sâu lân cận (1 ↔ 2 bước)",
       "filterAll": "Tất cả",
@@ -1898,7 +2008,21 @@
         "reset": "Đặt lại về mặc định",
         "showArrows": "Hiện mũi tên chỉ hướng",
         "title": "Cài đặt đồ thị"
-      }
+      },
+      "canvasLabel": "Đồ thị kiến thức từ {{count}} ghi chú",
+      "filterSelectAriaLabel": "Bộ lọc đồ thị",
+      "listLinkCount_one": "{{count}} liên kết",
+      "listLinkCount_other": "{{count}} liên kết",
+      "listLinksFrom": "Liên kết từ: {{titles}}",
+      "listLinksTo": "Liên kết tới: {{titles}}",
+      "relayout": "Bố cục lại",
+      "relayoutTitle": "Sắp xếp đồ thị lại từ đầu",
+      "showingCount_one": "Hiển thị {{count}} ghi chú",
+      "showingCount_other": "Hiển thị {{count}} ghi chú",
+      "untitledNote": "Ghi chú không tiêu đề",
+      "viewGraph": "Đồ thị",
+      "viewList": "Danh sách",
+      "viewToggleAriaLabel": "Chọn hình đồ thị hoặc danh sách ghi chú của nó"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "Đã nhập {{count}} · bỏ qua {{skipped}}",
       "importedWithSkips_other": "Đã nhập {{count}} · bỏ qua {{skipped}}",
       "importNoMarkdown": "Không có tệp markdown nào trong phần vừa thả",
-      "moveFolderTo": "Chuyển thư mục đến…"
+      "moveFolderTo": "Chuyển thư mục đến…",
+      "treeLabel": "Ghi chú và thư mục",
+      "selectionAnnouncement": "Đã chọn: {{title}}",
+      "untitled": "Không tiêu đề"
     },
     "newFromTemplate": {
       "back": "Quay lại",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Ghi chú công việc",
       "unsyncedLabel": "Chưa có trên máy chủ",
       "unsyncedTitle": "Các thay đổi mới nhất của ghi chú này chỉ có trên thiết bị này",
-      "untitled": "Không có tiêu đề"
+      "untitled": "Không có tiêu đề",
+      "untitledDrawing": "Bản vẽ không tiêu đề"
     },
     "savedView": {
       "defaultName": "Chế độ xem đã lọc"
@@ -2284,7 +2412,10 @@
       "pinned": "Đã ghim",
       "pinnedTitle": "Đã ghim: bỏ ghim để đóng",
       "unpin": "Bỏ ghim",
-      "untitled": "Không có tiêu đề"
+      "untitled": "Không có tiêu đề",
+      "closeTabMenuItem": "Đóng thẻ",
+      "moveLeft": "Di chuyển trái",
+      "moveRight": "Di chuyển phải"
     },
     "tagBrowser": {
       "cancel": "Hủy",
@@ -3057,7 +3188,7 @@
         "whenLabel": "Khi nào nó rời đi",
         "whoLabel": "Ai nhận được nó",
         "connectionLabel": "Cách nó được truyền đi",
-        "excludedLabel": ""
+        "excludedLabel": "Thư mục loại trừ"
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Nhà cung cấp đã từ chối khóa API của bạn. Hãy thay khóa khác: có thể khóa sai, đã bị thu hồi, hoặc thuộc về một tài khoản khác.",
         "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn.",
         "featureOff": "AI đang tắt trên thiết bị này. Không có gì được gửi. Hãy bật trong Cài đặt, mục AI.",
-        "consentMissing": "Bạn chưa đồng ý gửi ghi chú tới nhà cung cấp này từ thiết bị này. Không có gì được gửi. Hãy chọn lại nhà cung cấp trong Cài đặt, mục AI, và đọc những gì sẽ được gửi."
+        "consentMissing": "Bạn chưa đồng ý gửi ghi chú tới nhà cung cấp này từ thiết bị này. Không có gì được gửi. Hãy chọn lại nhà cung cấp trong Cài đặt, mục AI, và đọc những gì sẽ được gửi.",
+        "emptyGrant": "Mọi thứ lần chạy này có thể đọc nằm trong thư mục AI không bao giờ thấy. Không gửi gì. Đổi trong Cài đặt, AI, Thư mục loại trừ."
       },
       "modelChoose": "Chọn tệp…",
       "modelEmbeddingLabel": "Mô hình tìm kiếm: tìm kiếm ngữ nghĩa & Hỏi đáp",
@@ -3374,7 +3506,8 @@
         "text": "Văn bản & hiển thị",
         "editing": "Chỉnh sửa",
         "writing": "Viết",
-        "features": "Tính năng"
+        "features": "Tính năng",
+        "tasks": "Tác vụ"
       },
       "preview": {
         "heading": "Con cáo nâu nhanh nhẹn",
@@ -3386,7 +3519,20 @@
       "defaultView": "Chế độ xem mặc định",
       "typewriter": "Cuộn kiểu máy đánh chữ",
       "typewriterSubtitle": "Giữ con trỏ ở giữa theo chiều dọc",
-      "enableArchiving": "Bật tính năng lưu trữ"
+      "enableArchiving": "Bật tính năng lưu trữ",
+      "taskChipColor": {
+        "accent": "Màu nhấn",
+        "danger": "Đỏ",
+        "help": "Màu biểu tượng và nhãn chip tác vụ trên mọi bề mặt tác vụ của thiết bị này.",
+        "label": "Màu chip tác vụ",
+        "muted": "Mờ",
+        "sample": "1 tháng 8",
+        "theme": "Chủ đề"
+      },
+      "taskChipIconOnly": {
+        "help": "Hiển thị ưu tiên chỉ bằng biểu tượng, không chữ.",
+        "label": "Ưu tiên chỉ biểu tượng"
+      }
     },
     "search": {
       "placeholder": "Tìm trong cài đặt…",
@@ -3466,7 +3612,11 @@
         "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today",
         "periodicNotes": "ghi chú định kỳ hằng tuần hằng tháng tuần tháng thư mục mẫu định dạng",
         "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu",
-        "screenCaptureOverride": "chụp màn hình ghi đè cho phép tắt phóng to màn hình điều khiển từ xa trợ năng mở khóa màn hình đen screen capture override"
+        "screenCaptureOverride": "chụp màn hình ghi đè cho phép tắt phóng to màn hình điều khiển từ xa trợ năng mở khóa màn hình đen screen capture override",
+        "aiMemory": "bộ nhớ sự thật đã nhớ trợ lý học cá tính cài đặt giọng",
+        "ribbon": "dải bên trái ghim lệnh lệnh thứ tự bỏ ghim thanh công cụ phím tắt",
+        "folderNotes": "thư mục ghi chú chỉ mục folder_index trang đích nhấp đúp liên kết tới thư mục dự án tắt",
+        "syncMembers": "thành viên, chia sẻ, mời, nhóm, cộng tác, kho"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne không biết múi giờ đó. Hãy dùng một tên như Europe/Berlin.",
       "errorSave": "Không thể lưu cài đặt đó."
+    },
+    "folderNotes": {
+      "label": "Ghi chú thư mục",
+      "helper": "Cho phép ghi chú đóng vai trò chỉ mục thư mục: mở khi nhấp đúp vào thư mục, và liên kết như [[Projects/]] trỏ tới nó. Mặc định tắt. Tắt sẽ ẩn nút tạo loại ghi chú này và hiển thị loại đã có như ghi chú thường; trên đĩa không thay đổi gì, nên bật lại sẽ khôi phục chính xác.",
+      "errorSaveSetting": "Không lưu được cài đặt này."
+    },
+    "ribbonCustomize": {
+      "add": "Thêm",
+      "empty": "Chưa có lệnh nào trên dải. Dùng \"Thêm\" để ghim.",
+      "errorSave": "Không lưu được cài đặt dải.",
+      "helper": "Các lệnh trên dải bên trái, theo thứ tự. Kéo để đổi thứ tự, thêm từ danh sách lệnh hoặc bỏ qua ×. Dải ẩn các lệnh không khả dụng ở trạng thái hiện tại.",
+      "label": "Dải bên trái",
+      "remove": "Bỏ {{name}} khỏi dải",
+      "position": "{{name}}, {{index}} trên {{total}}",
+      "searchEmpty": "Không có lệnh khớp.",
+      "searchPlaceholder": "Tìm lệnh…",
+      "searchResultsLabel": "Lệnh khớp",
+      "showHelper": "Hiển thị dải bên trái trên thiết bị này.",
+      "showLabel": "Hiển thị dải bên trái"
+    },
+    "memory": {
+      "heading": "Trợ lý nhớ gì",
+      "helper": "Sự thật AI học được khi làm việc với bạn. Nó tự ghi (tối đa một mỗi lần chạy); bạn thấy từng mục và sửa được. Mục đồng bộ với thiết bị khác và vẫn được mã hóa.",
+      "empty": "Chưa nhớ gì. Mục sẽ xuất hiện ở đây khi trợ lý học được điều gì đó trong lần chạy.",
+      "editLabel": "Sửa",
+      "deleteLabel": "Xóa",
+      "save": "Lưu",
+      "cancel": "Hủy",
+      "cancelLabel": "Hủy",
+      "saveFailed": "Không lưu được mục.",
+      "deleteFailed": "Không xóa được mục.",
+      "entryUnreadable": "Không đọc được mục. Mục vẫn được lưu; xóa tại đây hoặc sửa trong cài đặt.",
+      "heldForReview": "Chờ duyệt: mục này kích hoạt quét chèn và trợ lý không dùng cho đến khi bạn sửa hoặc xóa nó.",
+      "savedToast": "Đã cập nhật bộ nhớ.",
+      "deletedToast": "Đã xóa mục ở mọi nơi.",
+      "clearedToast": "Đã xóa mọi mục bộ nhớ.",
+      "clearAllLabel": "Xóa toàn bộ bộ nhớ",
+      "clearConfirm": "Thực sự xóa từng mục? Không thể hoàn tác.",
+      "updatedAt": "Đã cập nhật {{val}}",
+      "personalityLabel": "Cài đặt giọng của bạn",
+      "personalityHelper": "Một chỉ dẫn mỗi dòng. Chúng định trợ lý viết thế nào mỗi lần chạy: tông, độ dài, ngôn ngữ. Được lưu vào bộ nhớ và đồng bộ.",
+      "personalityPlaceholder": "Trả lời ngắn gọn, kết luận trước.",
+      "personalitySaveLabel": "Lưu cài đặt giọng",
+      "personalitySavedToast": "Đã cập nhật cài đặt giọng.",
+      "personalitySaveFailed": "Không lưu được cài đặt giọng.",
+      "loadFailed": "Không tải được ký ức hoặc cài đặt giọng. Không có gì thay đổi.",
+      "retryLabel": "Thử lại"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Đang kết nối tới Tor. Đồng bộ tạm dừng cho đến khi kết nối sẵn sàng. Không có gì đang được gửi trực tiếp.",
       "settingsHint": "Cài đặt → Mạng",
       "unavailable": "Không dùng được Tor, nên đồng bộ tạm dừng. Không có gì đang được gửi trực tiếp. Hãy tắt định tuyến qua Tor để đồng bộ mà không cần nó."
+    },
+    "members": {
+      "title": "Thành viên và bảo mật",
+      "access": "Quyền của bạn",
+      "epochLabel": "Kỷ nguyên khóa nhóm",
+      "people": "Mọi người",
+      "removalLimitsLabel": "Giới hạn gỡ bỏ"
+    },
+    "memberRoster": {
+      "loading": "Đang tải thành viên…",
+      "error": "Không đọc được danh sách thành viên kho.",
+      "hint": "Thành viên của kho này. Mỗi người tham gia bằng danh tính và thông tin xác thực của riêng họ.",
+      "empty": "Chưa có thành viên. Mời ai đó là bước tiếp theo.",
+      "rotated": "Đã xoay khóa",
+      "keyChanged": "Khóa đã thay đổi. Kiểm tra với chủ sở hữu.",
+      "relinkConfirmed": "Liên kết lại được chủ sở hữu xác nhận",
+      "epoch": "Kỷ nguyên khóa nhóm {{epoch}}",
+      "ownerBadge": "Chủ sở hữu",
+      "memberBadge": "Thành viên",
+      "invite": "Mời thành viên",
+      "remove": "Gỡ",
+      "removeConfirm": "Gỡ {{name}}? Sau khi xoay khóa họ sẽ mất quyền truy cập thay đổi tương lai. Thao tác này không xóa những gì đã sao chép và không thu hồi nội dung từ thiết bị hoặc nhà cung cấp AI của họ.",
+      "removalLimits": "Gỡ thành viên chỉ dừng quyền truy cập thay đổi tương lai. Thao tác này không xóa những gì đã sao chép và không thu hồi nội dung từ thiết bị hoặc nhà cung cấp AI của họ.",
+      "inviteReady": "Lời mời đã sẵn sàng cho {{fingerprint}}…",
+      "invitationsHeading": "Lời mời đã gửi",
+      "invitationClaimed": "Đã chấp nhận",
+      "invitationPending": "Chưa chấp nhận",
+      "invitationsFailed": "Không tải được lời mời của bạn.",
+      "title": "Thành viên kho",
+      "personHint": "Mở khóa danh tính thành viên bằng cụm từ khôi phục. Nó ở trên thiết bị cho đến khi bạn khóa kho và đóng ứng dụng.",
+      "personUnlock": "Mở khóa danh tính thành viên",
+      "personReady": "Đã mở khóa danh tính thành viên.",
+      "ownerCodeHint": "Chia sẻ mã này với người bạn mời để họ xác minh kho là của bạn. Nó chỉ chứa thông tin công khai.",
+      "personLock": "Khóa danh tính thành viên",
+      "personError": "Cụm từ này không mở khóa danh tính thành viên.",
+      "inviteHint": "Dán mã danh tính thành viên được mời (từ trang danh tính của họ).",
+      "inviteCodeLabel": "Mã danh tính thành viên",
+      "inspect": "Kiểm tra dấu vân tay",
+      "sasHint": "Đọc dấu vân tay này cho người bạn mời hoặc yêu cầu họ đọc của bạn. Nó phải khớp cả hai bên trước khi tiếp tục.",
+      "sasConfirm": "Tôi đã xác minh dấu vân tay này với người bên ngoài kênh",
+      "inviteCodeInvalid": "Đây không phải mã danh tính thành viên hợp lệ.",
+      "kemLabel": "Khóa công khai ML-KEM",
+      "edLabel": "Khóa công khai Ed25519",
+      "mldsaLabel": "Khóa công khai ML-DSA",
+      "untitledVault": "Kho không tiêu đề",
+      "inviteFailed": "Không tạo được lời mời.",
+      "removeFailed": "Không gỡ được thành viên."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Hiện chưa có gì ở đây. Hãy thử một bộ lọc khác.",
       "rebuilding": "Đang đọc ghi chú của bạn…",
       "scope": "Không có công việc nào trong thư mục hoặc thẻ này. Hãy thử mở rộng phạm vi.",
-      "vault": "Chưa có công việc nào. Hãy viết “- [ ]” trên một dòng trong bất kỳ ghi chú nào để tạo một công việc."
+      "vault": "Chưa có công việc nào. Hãy viết “- [ ]” trên một dòng trong bất kỳ ghi chú nào để tạo một công việc.",
+      "search": "Không có tác vụ cho \"{{query}}\"."
     },
     "filter": {
       "all": "Tất cả",
@@ -3881,7 +4126,74 @@
       "allFolders": "Tất cả thư mục",
       "label": "Thu hẹp theo"
     },
-    "title": "Công việc"
+    "title": "Công việc",
+    "axis": {
+      "due": "Hạn",
+      "folder": "Thư mục",
+      "note": "Ghi chú",
+      "priority": "Ưu tiên",
+      "sort": "Sắp xếp",
+      "status": "Trạng thái",
+      "tag": "Thẻ"
+    },
+    "due": {
+      "any": "Bất kỳ ngày nào",
+      "later": "Sau",
+      "none": "Không ngày",
+      "overdue": "Quá hạn",
+      "today": "Hôm nay",
+      "upcoming": "Sắp tới"
+    },
+    "filters": {
+      "button": "Bộ lọc",
+      "clearAll": "Xóa tất cả",
+      "selectHint": "Chọn bộ lọc để áp dụng",
+      "title": "Bộ lọc"
+    },
+    "priority": {
+      "high": "Cao",
+      "highest": "Cao nhất",
+      "low": "Thấp",
+      "lowest": "Thấp nhất",
+      "medium": "Trung bình"
+    },
+    "section": {
+      "done": "Xong",
+      "later": "Sau",
+      "none": "Không ngày",
+      "overdue": "Quá hạn",
+      "today": "Hôm nay",
+      "upcoming": "Sắp tới"
+    },
+    "sort": {
+      "due": "Hạn",
+      "dueDesc": "Hạn, mới trước",
+      "note": "Ghi chú",
+      "priority": "Ưu tiên"
+    },
+    "status": {
+      "all": "Tất cả",
+      "done": "Xong",
+      "undone": "Đang mở"
+    },
+    "view": {
+      "allFolders": "Tất cả thư mục",
+      "allNotes": "Tất cả ghi chú",
+      "anyPriority": "Bất kỳ ưu tiên",
+      "anyTag": "Bất kỳ thẻ",
+      "dueLabel": "Lọc theo hạn",
+      "folderLabel": "Lọc theo thư mục",
+      "noteLabel": "Lọc theo ghi chú",
+      "priorityLabel": "Lọc theo ưu tiên",
+      "sortLabel": "Sắp xếp trong các phần",
+      "statusLabel": "Lọc theo hoàn thành",
+      "tagLabel": "Lọc theo thẻ",
+      "untitled": "Không tiêu đề"
+    },
+    "search": {
+      "label": "Tìm tác vụ",
+      "placeholder": "Tìm tác vụ…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Xóa kho lưu trữ này?",
     "deletePartialError": "Không thể gỡ một số tệp. Kho không còn dùng được nữa. Hãy tiếp tục để bắt đầu lại.",
     "failClosedEyebrow": "Không thể mở kho lưu trữ",
-    "restoreHint": "Khôi phục từ một bản sao lưu để tiếp tục."
+    "restoreHint": "Khôi phục từ một bản sao lưu để tiếp tục.",
+    "memberHint": "Kho này được chia sẻ với bạn. Mở khóa bằng cụm từ khôi phục của bạn.",
+    "memberPhraseLabel": "Cụm từ khôi phục",
+    "memberSubmit": "Mở khóa",
+    "memberError": "Cụm từ này không mở khóa kho được chia sẻ."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "đã mở {{rel}}",
     "restoreFromBackup": "Khôi phục từ bản sao lưu",
     "subline": "Bạn có nhiều hơn một kho trên thiết bị này. Chọn một kho để mở khóa.",
-    "vaultFallback": "Kho {{n}}"
+    "vaultFallback": "Kho {{n}}",
+    "accountFallback": "Tài khoản",
+    "moveToAccount": "Chuyển vào tài khoản…",
+    "moveToNewAccount": "Chuyển vào tài khoản mới",
+    "renameAccount": "Đổi tên tài khoản",
+    "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
+    "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
+    "labelTooLong": "Tên quá dài. Rút gọn còn 512 ký tự.",
+    "renameCancel": "Hủy",
+    "renamePlaceholder": "Tên tài khoản",
+    "renameSave": "Đổi tên",
+    "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "hoặc",
       "title": "Chọn một kho để khôi phục",
       "useAccountNumber": "Dùng số tài khoản",
-      "vaultFallback": "Kho {{index}}"
+      "vaultFallback": "Kho {{index}}",
+      "accountFallback": "Tài khoản",
+      "accountsError": "Không tải được nhóm tài khoản. Các kho được liệt kê không theo nhóm; không ảnh hưởng khôi phục."
+    },
+    "siblingNotice": {
+      "body_one": "Tài khoản này còn {{count}} kho nữa. Khôi phục cả nó để không sót gì.",
+      "body_other": "Tài khoản này còn {{count}} kho nữa. Khôi phục cả chúng để không sót gì.",
+      "recoverAnother": "Khôi phục kho khác",
+      "unknown": "Không kiểm tra được tài khoản có kho khác không. Nếu có hơn một, khôi phục từng kho bằng cụm từ riêng."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Các tệp còn sót lại từ một lần xóa bị gián đoạn ({{n}}). Dọn dẹp chúng trước khi tạo kho lưu trữ.",
     "cleanUpFiles": "Dọn dẹp tệp còn sót lại",
     "create": "Tạo một kho lưu trữ",
-    "connect": "Kết nối tới tài khoản của tôi"
+    "connect": "Kết nối tới tài khoản của tôi",
+    "identityCta": "Tạo chỉ danh tính"
   },
   "wikiGraph": {
     "emptyTitle": "Chưa có liên kết nào",
     "emptyBodyBefore": "Kết nối các ghi chú bằng cách viết ",
-    "emptyBodyAfter": " trong văn bản của bạn. Các ghi chú được liên kết xuất hiện ở đây dưới dạng đồ thị."
+    "emptyBodyAfter": " trong văn bản của bạn. Các ghi chú được liên kết xuất hiện ở đây dưới dạng đồ thị.",
+    "canvasLabel": "Đồ thị kiến thức từ {{count}} ghi chú"
   },
   "markdown": {
     "attachmentFallback": "tệp đính kèm",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "đã mở năm trước",
     "openedYearsAgo_one": "đã mở {{count}} năm trước",
     "openedYearsAgo_other": "đã mở {{count}} năm trước",
-    "corruptedBadge": "Bị hỏng"
+    "corruptedBadge": "Bị hỏng",
+    "accountFallback": "Tài khoản",
+    "renameAccount": "Đổi tên tài khoản",
+    "moveToNewAccount": "Chuyển vào tài khoản mới",
+    "moveToAccount": "Chuyển vào tài khoản…",
+    "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
+    "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
+    "labelTooLong": "Tên quá dài. Rút gọn còn 512 ký tự.",
+    "renameCancel": "Hủy",
+    "renamePlaceholder": "Tên tài khoản",
+    "renameSave": "Đổi tên",
+    "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi."
   },
   "join": {
     "transportError": "Không thể kết nối tới máy chủ đồng bộ đó. Kiểm tra địa chỉ và kết nối của bạn, rồi thử lại.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Bật chống chụp màn hình",
     "saveFailed": "Không thể lưu lựa chọn đó, nên không có gì thay đổi. Hãy thử lại, hoặc khởi động Myne với --disable-screen-capture-protection.",
     "savedForNextLaunch": "Đã lưu. Phiên này vẫn đang tắt bảo vệ vì nó được khởi động với --disable-screen-capture-protection, nên bảo vệ sẽ trở lại vào lần tiếp theo bạn mở Myne mà không dùng tùy chọn đó."
+  },
+  "identitySetup": {
+    "createCta": "Tạo danh tính",
+    "doneCta": "Xong",
+    "error": "Không cấu hình được danh tính. Kiểm tra máy chủ đồng bộ đã cấu hình và thử lại.",
+    "intro": "Danh tính cho phép ai đó gửi lời mời cho bạn trước khi bạn có kho. Nó không tạo kho và không lưu ghi chú.",
+    "pending": "Thiết bị này đang chờ xác nhận từ thiết bị khác của tài khoản.",
+    "phraseWarning": "Ghi lại 24 từ này và giữ ở nơi an toàn. Chỉ hiển thị bây giờ; đây là cách duy nhất khôi phục danh tính này.",
+    "recoverCta": "Khôi phục danh tính",
+    "recoverIntro": "Đã có danh tính? Nhập cụm từ khôi phục 24 từ của nó.",
+    "recovered": "Đã khôi phục danh tính.",
+    "title": "Chỉ danh tính"
+  },
+  "identityHome": {
+    "createVaultCta": "Tạo kho",
+    "invitesError": "Không tải được lời mời. Kiểm tra kết nối và máy chủ đồng bộ.",
+    "invitesHeading": "Lời mời",
+    "invitesLoading": "Đang kiểm tra lời mời…",
+    "noInvites": "Chưa có lời mời.",
+    "subtitle": "Bạn có danh tính trên thiết bị nên có thể được mời vào kho. Không cần tạo kho để được mời.",
+    "accept": "Chấp nhận",
+    "acceptHint": "Dán mã danh tính chủ sở hữu (họ chia sẻ khi mời).",
+    "acceptOwnerCodeLabel": "Mã danh tính chủ sở hữu",
+    "acceptInspect": "Kiểm tra dấu vân tay",
+    "acceptSasHint": "Đọc dấu vân tay này cho chủ sở hữu kho hoặc yêu cầu họ đọc của bạn. Nó phải khớp cả hai bên trước khi tiếp tục.",
+    "acceptConfirm": "Tôi đã xác minh dấu vân tay này với chủ sở hữu bên ngoài kênh",
+    "acceptSubmit": "Chấp nhận và mở khóa",
+    "acceptPhraseLabel": "Cụm từ khôi phục của bạn",
+    "acceptError": "Không chấp nhận được lời mời.",
+    "acceptInvalid": "Đây không phải mã danh tính chủ sở hữu hợp lệ.",
+    "shareCodeHeading": "Mã mời của bạn",
+    "shareCodeHint": "Chia sẻ mã này với người mời bạn. Nó chỉ chứa thông tin công khai (id danh tính và khóa công khai), không bao giờ cụm từ.",
+    "title": "Danh tính của bạn"
   }
 }
