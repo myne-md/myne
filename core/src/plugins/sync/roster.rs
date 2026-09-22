@@ -114,6 +114,12 @@ pub struct RosterMemberEntry {
     /// B12). Omitted when the member never rotated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_fingerprint_hex: Option<String>,
+    /// Hex of a signed `myne.person-key-transition v1|` record proving the
+    /// superseded key authorised the fingerprint change, when one exists.
+    /// Present only for a cryptographic transition; an owner-confirmed relink
+    /// leaves it absent. Omitted when the member never changed identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition_hex: Option<String>,
     /// Unix epoch SECONDS of the join (or the rotation that re-rolled the
     /// row). A user-meaningful timestamp, so it lives inside the AEAD
     /// envelope per the project commitment.
@@ -143,6 +149,7 @@ fn roster_tie_break(a: &RosterMemberEntry, b: &RosterMemberEntry) -> std::cmp::O
             &a.member_mldsa_vk_hex,
             a.joined_at,
             &a.previous_fingerprint_hex,
+            &a.transition_hex,
             a.role,
         )
             .cmp(&(
@@ -153,6 +160,7 @@ fn roster_tie_break(a: &RosterMemberEntry, b: &RosterMemberEntry) -> std::cmp::O
                 &b.member_mldsa_vk_hex,
                 b.joined_at,
                 &b.previous_fingerprint_hex,
+                &b.transition_hex,
                 b.role,
             )),
     }
@@ -262,6 +270,38 @@ pub fn upsert_owner_once(roster: &RosterMap, owner: RosterMemberEntry) -> Roster
     }
 }
 
+/// Build the row for a member whose person identity changed, from their current
+/// row: same member data, the NEW fingerprint as the key, and the superseded
+/// fingerprint plus the signed transition record that proves the change
+/// (`decisions/protocol/0600`). This is the writer `previous_fingerprint_hex`
+/// and `transition_hex` were given; the caller re-signs the `NTV6` roster
+/// afterwards.
+pub fn transitioned_row(
+    old: &RosterMemberEntry,
+    new_fingerprint_hex: &str,
+    transition_hex: &str,
+) -> RosterMemberEntry {
+    let mut row = old.clone();
+    row.fingerprint_hex = new_fingerprint_hex.to_owned();
+    row.previous_fingerprint_hex = Some(old.fingerprint_hex.clone());
+    row.transition_hex = Some(transition_hex.to_owned());
+    row.version = old.version + 1;
+    row
+}
+
+/// The identity-continuity class a row implies for the signed roster:
+/// `Changed` when a signed transition record is present (the superseded key
+/// proved the change), `OwnerConfirmed` when only a previous fingerprint is
+/// recorded (an owner relink with no proof), else `Current`.
+pub fn continuity_of(entry: &RosterMemberEntry) -> protocol::person_invite::GroupKeyContinuity {
+    use protocol::person_invite::GroupKeyContinuity;
+    match (&entry.transition_hex, &entry.previous_fingerprint_hex) {
+        (Some(_), Some(_)) => GroupKeyContinuity::Changed,
+        (None, Some(_)) => GroupKeyContinuity::OwnerConfirmed,
+        _ => GroupKeyContinuity::Current,
+    }
+}
+
 /// Canonical-JSON serialization of the roster plaintext (the bytes
 /// `protocol::seal_membership_roster_raw` seals).
 ///
@@ -356,6 +396,7 @@ mod tests {
                 role: RosterRole::Member,
                 deleted,
                 previous_fingerprint_hex: None,
+                transition_hex: None,
                 joined_at: 1_700_000_000 + id as u64,
             },
         )
@@ -621,5 +662,51 @@ mod tests {
         let row = out.get(&fp).expect("present");
         assert!(row.deleted, "tombstone is not resurrected");
         assert_eq!(row.version, 3);
+    }
+
+    #[test]
+    fn transitioned_row_records_the_superseded_fingerprint_and_the_record() {
+        let (old_fp, old) = member(2, 3, false);
+        let new_fp = "ab".repeat(32);
+        let row = super::transitioned_row(&old, &new_fp, "cdcd");
+        assert_eq!(row.fingerprint_hex, new_fp);
+        assert_eq!(
+            row.previous_fingerprint_hex.as_deref(),
+            Some(old_fp.as_str())
+        );
+        assert_eq!(row.transition_hex.as_deref(), Some("cdcd"));
+        assert_eq!(row.version, 4, "the change advances the causal version");
+    }
+
+    #[test]
+    fn continuity_of_reflects_transition_and_previous() {
+        use protocol::person_invite::GroupKeyContinuity;
+        let (_, mut row) = member(2, 1, false);
+        assert_eq!(super::continuity_of(&row), GroupKeyContinuity::Current);
+        row.previous_fingerprint_hex = Some("ab".repeat(32));
+        assert_eq!(
+            super::continuity_of(&row),
+            GroupKeyContinuity::OwnerConfirmed
+        );
+        row.transition_hex = Some("cd".into());
+        assert_eq!(super::continuity_of(&row), GroupKeyContinuity::Changed);
+    }
+
+    #[test]
+    fn a_row_without_the_transition_field_parses_as_none() {
+        // Back-compat: a roster written before `transition_hex` existed must
+        // still parse, with the field absent rather than an error.
+        let fp = "aa".repeat(32);
+        let json = format!(
+            r#"{{"{fp}":{{"fingerprint_hex":"{fp}","display_name":"M","wrapped_items_key_hex":"{}","member_kem_ek_hex":"{}","member_ed_pk_hex":"{}","member_mldsa_vk_hex":"{}","version":1,"joined_at":0}}}}"#,
+            "bb".repeat(32),
+            "cd".repeat(1184),
+            "ef".repeat(32),
+            "01".repeat(1952),
+        );
+        let roster = super::parse_roster(json.as_bytes()).expect("parses without the field");
+        let row = roster.get(&fp).expect("row present");
+        assert!(row.transition_hex.is_none());
+        assert!(row.previous_fingerprint_hex.is_none());
     }
 }

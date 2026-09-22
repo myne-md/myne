@@ -275,6 +275,7 @@ async fn update_prefs_with_dir(
     use crate::plugins::sync::prefs_merge::shared_subset_hash;
 
     let _write_guard = write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     // ---- #250: the key and the path must name the SAME vault -------------
     //

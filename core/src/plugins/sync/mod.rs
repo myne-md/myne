@@ -63,6 +63,7 @@ pub mod cycle;
 pub mod engine;
 pub mod enroll;
 pub mod fork_audit;
+pub mod head_authority;
 pub mod http_transport;
 pub mod integrity;
 pub mod invite;
@@ -93,6 +94,18 @@ pub mod poke_listener;
 // over Tor (MYND-650 task 5). Host-only for the same reason `rustls_transport`
 // is — it drives that module's handshake — and the single enforcement point
 // both enrollment paths acquire a pin through.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod member_key_store;
+// The person account, membership and invite plane: host-only, like `pin_confirm`
+// and `rustls_transport` it drives. Gated off wasm32 (the web client is
+// capability-absent for B2B), so its `TauriHost`/`rustls_transport` references
+// never reach the wasm build.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod person_account;
+pub mod person_ai_store;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod person_ai_sync;
+pub mod person_auth;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod pin_confirm;
 pub mod prefs_classification;

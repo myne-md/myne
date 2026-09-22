@@ -77,6 +77,14 @@ pub enum GroupKeyContinuity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GroupRosterMember {
     pub fingerprint_hex: String,
+    /// The member's addressable `person_id_hash` (lowercase hex), when known.
+    /// Owner-supplied at invite time; it is what the server's per-vault
+    /// membership binding is keyed on, so the owner needs it in the roster to
+    /// revoke a removed member (myne-md/myne#711 task 14,
+    /// `decisions/protocol/0603`). Absent on a row migrated from a pre-B2B
+    /// membership roster, whose members have no person account to revoke.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person_id_hex: Option<String>,
     pub display_name: String,
     pub role: GroupRosterRole,
     pub state: GroupMemberState,
@@ -86,6 +94,13 @@ pub struct GroupRosterMember {
     pub member_mldsa_vk_hex: String,
     pub previous_fingerprint_hex: Option<String>,
     pub continuity: GroupKeyContinuity,
+    /// Hex of a `SignedPersonKeyTransition` when the row's identity changed and
+    /// the superseded key proved continuity. Absent when the member never
+    /// changed identity, or when the change was only owner-confirmed (then the
+    /// continuity is `OwnerConfirmed` and this is `None`). The record lets any
+    /// member verifier check the change is cryptographic rather than asserted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition_hex: Option<String>,
 }
 
 /// Canonical owner-authored roster payload. Members are strictly sorted by
@@ -238,6 +253,10 @@ fn validate_group_roster(payload: &GroupRosterPayload) -> Option<()> {
     let mut owner_count = 0usize;
     for member in &payload.members {
         if !is_lower_hex(&member.fingerprint_hex, 32)
+            || member
+                .person_id_hex
+                .as_deref()
+                .is_some_and(|p| !is_lower_hex(p, 16))
             || previous.is_some_and(|p| p >= member.fingerprint_hex.as_str())
         {
             return None;
@@ -502,16 +521,153 @@ pub fn sign_group_retirement(
 /// Verify BOTH signature halves against the pinned owner public half and parse
 /// the fixed payload. Both halves are mandatory: a retirement a server could
 /// forge would let it retire an epoch it never saw.
+/// Verify BOTH signature halves against the pinned owner public half, parse the
+/// fixed payload, and **bind the record to the verifying vault**: a
+/// `GroupKey`-namespace retirement must name this vault's `account_number_hash`
+/// and an `ItemsKey`-namespace one must name its `items_key_id`. A retirement
+/// copied from another vault therefore fails here instead of being accepted as
+/// a legitimate epoch change (the Grill 3 review's D4 finding).
 pub fn verify_group_retirement(
     owner: &crate::person_key::PersonPublicHalf,
     envelope: &SignedGroupRetirement,
+    account_number_hash: &[u8; 16],
+    items_key_id: &[u8; 16],
 ) -> Result<GroupRetirementPayload, crate::person_key::PersonKeyError> {
     owner.verify(
         &class_message(GROUP_RETIREMENT_PREFIX, &envelope.payload),
         &envelope.signature,
     )?;
-    parse_group_retirement(&envelope.payload)
-        .ok_or(crate::person_key::PersonKeyError::SignatureVerify)
+    let payload = parse_group_retirement(&envelope.payload)
+        .ok_or(crate::person_key::PersonKeyError::SignatureVerify)?;
+    let expected = match payload.namespace_kind {
+        RetiredNamespaceKind::GroupKey => account_number_hash,
+        RetiredNamespaceKind::ItemsKey => items_key_id,
+    };
+    if &payload.namespace_id != expected {
+        return Err(crate::person_key::PersonKeyError::SignatureVerify);
+    }
+    Ok(payload)
+}
+
+/// The canonical person-key transition payload length: the superseded
+/// identity's three public halves plus the replacement fingerprint.
+pub const PERSON_KEY_TRANSITION_PAYLOAD_LEN: usize = crate::person_key::PERSON_EK_LEN
+    + crate::person_key::PERSON_ED25519_PK_LEN
+    + crate::person_key::PERSON_MLDSA_VK_LEN
+    + crate::person_key::PERSON_FINGERPRINT_LEN;
+
+/// Canonical person-key transition payload (`decisions/protocol/0600`): the
+/// SUPERSEDED identity's public halves plus the REPLACEMENT fingerprint.
+///
+/// FIXED BINARY, no timestamp. The record is signed by the superseded key, so a
+/// verifier holding only this payload can rebuild the old public half, recompute
+/// the old fingerprint, and check both signature halves; the new fingerprint
+/// must equal the live roster row's. It exists because a deterministic identity
+/// migration changes a person's fingerprint, and the change must be
+/// cryptographic continuity rather than a silent edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonKeyTransitionPayload {
+    pub old_kem_ek: [u8; crate::person_key::PERSON_EK_LEN],
+    pub old_ed_pk: [u8; crate::person_key::PERSON_ED25519_PK_LEN],
+    pub old_mldsa_vk: [u8; crate::person_key::PERSON_MLDSA_VK_LEN],
+    pub new_fingerprint: [u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+}
+
+/// Encode the transition payload to its fixed binary form.
+#[must_use]
+pub fn encode_person_key_transition(payload: &PersonKeyTransitionPayload) -> Vec<u8> {
+    let mut out = Vec::with_capacity(PERSON_KEY_TRANSITION_PAYLOAD_LEN);
+    out.extend_from_slice(&payload.old_kem_ek);
+    out.extend_from_slice(&payload.old_ed_pk);
+    out.extend_from_slice(&payload.old_mldsa_vk);
+    out.extend_from_slice(&payload.new_fingerprint);
+    out
+}
+
+/// Strictly parse the fixed transition payload (trailing bytes are a rejection).
+#[must_use]
+pub fn parse_person_key_transition(bytes: &[u8]) -> Option<PersonKeyTransitionPayload> {
+    if bytes.len() != PERSON_KEY_TRANSITION_PAYLOAD_LEN {
+        return None;
+    }
+    let ek_end = crate::person_key::PERSON_EK_LEN;
+    let ed_end = ek_end + crate::person_key::PERSON_ED25519_PK_LEN;
+    let ml_end = ed_end + crate::person_key::PERSON_MLDSA_VK_LEN;
+    let mut old_kem_ek = [0u8; crate::person_key::PERSON_EK_LEN];
+    let mut old_ed_pk = [0u8; crate::person_key::PERSON_ED25519_PK_LEN];
+    let mut old_mldsa_vk = [0u8; crate::person_key::PERSON_MLDSA_VK_LEN];
+    let mut new_fingerprint = [0u8; crate::person_key::PERSON_FINGERPRINT_LEN];
+    old_kem_ek.copy_from_slice(&bytes[..ek_end]);
+    old_ed_pk.copy_from_slice(&bytes[ek_end..ed_end]);
+    old_mldsa_vk.copy_from_slice(&bytes[ed_end..ml_end]);
+    new_fingerprint.copy_from_slice(&bytes[ml_end..]);
+    Some(PersonKeyTransitionPayload {
+        old_kem_ek,
+        old_ed_pk,
+        old_mldsa_vk,
+        new_fingerprint,
+    })
+}
+
+/// Person-signed transition record (same binary frame as the roster/package).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedPersonKeyTransition {
+    pub payload: Vec<u8>,
+    pub signature: PersonSigned,
+}
+
+/// Canonical binary envelope for a signed transition record.
+#[must_use]
+pub fn encode_signed_person_key_transition(record: &SignedPersonKeyTransition) -> Option<Vec<u8>> {
+    encode_signed_group_frame(&record.payload, &record.signature)
+}
+
+/// Strictly parse a signed transition envelope.
+#[must_use]
+pub fn decode_signed_person_key_transition(bytes: &[u8]) -> Option<SignedPersonKeyTransition> {
+    let (payload, signature) = decode_signed_group_frame(bytes)?;
+    parse_person_key_transition(&payload)?;
+    Some(SignedPersonKeyTransition { payload, signature })
+}
+
+/// Double-sign a transition payload with the SUPERSEDED key under its dedicated
+/// class. The old key is available only at the moment of migration, which is why
+/// the record must be minted then.
+pub fn sign_person_key_transition(
+    superseded: &crate::person_key::PersonKeyPair,
+    payload: &PersonKeyTransitionPayload,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<SignedPersonKeyTransition, crate::person_key::PersonKeyError> {
+    let payload = encode_person_key_transition(payload);
+    let signature = superseded.sign(&class_message(PERSON_KEY_TRANSITION_PREFIX, &payload), rng)?;
+    Ok(SignedPersonKeyTransition { payload, signature })
+}
+
+/// Verify BOTH signature halves against the superseded key carried in the
+/// payload, and return `(old_fingerprint, new_fingerprint)`. Both halves are
+/// mandatory: a transition a server or a third party could forge would let it
+/// claim a key change that never happened.
+pub fn verify_person_key_transition(
+    envelope: &SignedPersonKeyTransition,
+) -> Result<
+    (
+        [u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+        [u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+    ),
+    crate::person_key::PersonKeyError,
+> {
+    let payload = parse_person_key_transition(&envelope.payload)
+        .ok_or(crate::person_key::PersonKeyError::SignatureVerify)?;
+    let superseded = crate::person_key::PersonPublicHalf::from_parts(
+        &payload.old_kem_ek,
+        &payload.old_ed_pk,
+        &payload.old_mldsa_vk,
+    );
+    superseded.verify(
+        &class_message(PERSON_KEY_TRANSITION_PREFIX, &envelope.payload),
+        &envelope.signature,
+    )?;
+    Ok((*superseded.fingerprint(), payload.new_fingerprint))
 }
 
 /// The minimum length of a sealed roster envelope: a 24-byte nonce plus the
@@ -1208,6 +1364,7 @@ mod tests {
         let public = pair.public_half();
         GroupRosterMember {
             fingerprint_hex: hex_of(pair.fingerprint()),
+            person_id_hex: None,
             display_name: if role == GroupRosterRole::Owner {
                 "Owner".into()
             } else {
@@ -1221,6 +1378,7 @@ mod tests {
             member_mldsa_vk_hex: hex_of(public.mldsa_vk()),
             previous_fingerprint_hex: None,
             continuity: GroupKeyContinuity::Current,
+            transition_hex: None,
         }
     }
 
@@ -1563,19 +1721,31 @@ mod tests {
             namespace_id: [0x11; 16],
         };
         let signed = sign_group_retirement(&owner, &payload, &mut SeededRng(70)).expect("sign");
-        let verified = verify_group_retirement(&owner.public_half(), &signed).expect("verify");
+        let verified =
+            verify_group_retirement(&owner.public_half(), &signed, &[0u8; 16], &[0x11; 16])
+                .expect("verify");
         assert_eq!(verified, payload);
+
+        // A retirement naming another vault's items_key_id is refused: the record
+        // is bound to the verifying vault (Grill 3 review D4).
+        assert!(
+            verify_group_retirement(&owner.public_half(), &signed, &[0u8; 16], &[0x99; 16])
+                .is_err()
+        );
 
         let bytes = encode_signed_group_retirement(&signed).expect("frame");
         let decoded = decode_signed_group_retirement(&bytes).expect("decode");
         assert_eq!(
-            verify_group_retirement(&owner.public_half(), &decoded),
+            verify_group_retirement(&owner.public_half(), &decoded, &[0u8; 16], &[0x11; 16]),
             Ok(payload)
         );
 
         // A different signer's envelope does not verify under the pinned owner.
         let forged = sign_group_retirement(&attacker, &payload, &mut SeededRng(71)).expect("sign");
-        assert!(verify_group_retirement(&owner.public_half(), &forged).is_err());
+        assert!(
+            verify_group_retirement(&owner.public_half(), &forged, &[0u8; 16], &[0x11; 16])
+                .is_err()
+        );
         // A cross-class replay fails: the roster class prefix differs.
         assert!(owner
             .public_half()
@@ -1587,7 +1757,69 @@ mod tests {
         // Tampering the epoch pair breaks the signature.
         let mut tampered = decoded;
         tampered.payload[0] ^= 1;
-        assert!(verify_group_retirement(&owner.public_half(), &tampered).is_err());
+        assert!(
+            verify_group_retirement(&owner.public_half(), &tampered, &[0u8; 16], &[0x11; 16])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn person_key_transition_round_trips_and_rejects_tamper() {
+        use crate::person_key::PersonKeyPair;
+        let old = PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
+        let new = PersonKeyPair::generate_raw(&[4u8; 64], &[5u8; 32], &[6u8; 32]);
+        let old_public = old.public_half();
+        let payload = PersonKeyTransitionPayload {
+            old_kem_ek: *old_public.kem_ek(),
+            old_ed_pk: *old_public.ed_pk(),
+            old_mldsa_vk: *old_public.mldsa_vk(),
+            new_fingerprint: *new.fingerprint(),
+        };
+        let signed = sign_person_key_transition(&old, &payload, &mut SeededRng(80)).expect("sign");
+        assert_eq!(
+            verify_person_key_transition(&signed),
+            Ok((*old.fingerprint(), *new.fingerprint()))
+        );
+
+        let bytes = encode_signed_person_key_transition(&signed).expect("frame");
+        let decoded = decode_signed_person_key_transition(&bytes).expect("decode");
+        assert_eq!(
+            verify_person_key_transition(&decoded),
+            Ok((*old.fingerprint(), *new.fingerprint()))
+        );
+
+        // A record signed by a key other than the superseded one does not verify.
+        let forged = sign_person_key_transition(&new, &payload, &mut SeededRng(81)).expect("sign");
+        assert!(verify_person_key_transition(&forged).is_err());
+
+        // Either signature half alone is insufficient.
+        let mut one_half = signed.clone();
+        one_half.signature.ed25519_sig = [0u8; crate::person_key::PERSON_ED25519_SIG_LEN];
+        assert!(verify_person_key_transition(&one_half).is_err());
+        let mut other_half = signed.clone();
+        other_half.signature.mldsa_sig = alloc::vec![0u8; other_half.signature.mldsa_sig.len()];
+        assert!(verify_person_key_transition(&other_half).is_err());
+
+        // A cross-class replay: the same signature under another class prefix
+        // does not verify.
+        assert!(old_public
+            .verify(
+                &class_message(GROUP_ROSTER_PREFIX, &signed.payload),
+                &signed.signature,
+            )
+            .is_err());
+
+        // Tampering the replacement fingerprint breaks the signature.
+        let mut tampered = decoded;
+        let mut parsed = parse_person_key_transition(&tampered.payload).expect("parse");
+        parsed.new_fingerprint = [0xFF; 32];
+        tampered.payload = encode_person_key_transition(&parsed);
+        assert!(verify_person_key_transition(&tampered).is_err());
+
+        // Strict trailing: an extra byte is a rejection.
+        let mut long = bytes;
+        long.push(0);
+        assert!(decode_signed_person_key_transition(&long).is_none());
     }
 
     #[test]
@@ -1654,8 +1886,8 @@ mod tests {
         // Two retirement records, both `retired → retired + 1`, both verified.
         assert_eq!(rotated.retirements.len(), 2);
         for record in &rotated.retirements {
-            let payload =
-                verify_group_retirement(&owner.public_half(), record).expect("retirement verifies");
+            let payload = verify_group_retirement(&owner.public_half(), record, &ACCT, &[0x22; 16])
+                .expect("retirement verifies");
             assert_eq!(payload.retired_epoch, 5);
             assert_eq!(payload.replacement_epoch, 6);
         }
@@ -1709,5 +1941,36 @@ mod tests {
         payload.owner_fingerprint_hex = "ab".repeat(31);
         let bytes2 = encode_invite_payload(&payload);
         assert!(parse_invite_payload(&bytes2).is_none());
+    }
+    #[test]
+    fn roster_member_person_id_is_optional_and_validated() {
+        let owner = owner_pair();
+        let member = member_pair();
+        let wrapped = "a".repeat(WRAPPED_32_BYTE_KEY_LEN * 2);
+        let base = || GroupRosterPayload {
+            account_number_hash_hex: "33".repeat(16),
+            group_key_epoch: 1,
+            owner_fingerprint_hex: hex_of(owner.fingerprint()),
+            members: alloc::vec![
+                roster_member(&owner, GroupRosterRole::Owner, GroupMemberState::Live, None),
+                roster_member(
+                    &member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    Some(wrapped.clone()),
+                ),
+            ],
+        };
+        // No person id: valid (a row migrated from the pre-B2B roster).
+        assert!(encode_group_roster(&base()).is_some());
+        // A valid person id round-trips.
+        let mut with_pid = base();
+        with_pid.members[1].person_id_hex = Some("11".repeat(16));
+        let bytes = encode_group_roster(&with_pid).expect("valid person id");
+        assert!(parse_group_roster(&bytes).is_some());
+        // An invalid person id is refused.
+        let mut bad = base();
+        bad.members[1].person_id_hex = Some("zz".into());
+        assert!(encode_group_roster(&bad).is_none());
     }
 }

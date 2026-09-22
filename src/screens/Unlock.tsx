@@ -89,6 +89,7 @@ import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
 import { listVaults, soleVaultId } from "../lib/vault-list";
+import { memberVaultStatus, personUnlockMemberVault } from "../lib/personAccount";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
@@ -486,6 +487,38 @@ export function Unlock({
     };
   }, []);
 
+  // A B2B member vault has no password: it is opened from the member's recovery
+  // phrase (myne-md/myne#711 task 25). Probed once; when true the password form
+  // is replaced by a phrase form. A failed probe leaves `false` (the pre-B2B
+  // password path).
+  const [memberVault, setMemberVault] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!vaultId) {
+      setMemberVault(false);
+      return;
+    }
+    // `Promise.resolve` so a test mock that answers an unknown command with
+    // `undefined` degrades to "not a member vault" instead of throwing.
+    void Promise.resolve(memberVaultStatus(vaultId)).then(
+      (isMember) => {
+        if (!cancelled) setMemberVault(isMember === true);
+      },
+      () => {
+        if (!cancelled) setMemberVault(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId]);
+
+  // Member-unlock form state. Declared HERE, above the early returns below, so
+  // the hook count never changes across the component's render branches.
+  const [memberPhrase, setMemberPhrase] = useState("");
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberBusy, setMemberBusy] = useState(false);
+
   // MYND-558 — which credential surface owns the screen. `available` (not
   // `configured`) is the gate: on a cold start the credential exists but the
   // spring-loaded session gate is closed, so redeeming would fail
@@ -704,6 +737,64 @@ export function Unlock({
       }
     })();
   };
+
+  // A member vault is opened from the recovery phrase, not a password
+  // (myne-md/myne#711 task 25). Rendered as its own card so the password form's
+  // quick-unlock / recovery machinery is untouched.
+  if (memberVault) {
+    const submitMember = (ev: FormEvent) => {
+      ev.preventDefault();
+      if (memberBusy || memberPhrase.trim() === "" || !vaultId) return;
+      setMemberBusy(true);
+      setMemberError(null);
+      void (async () => {
+        try {
+          await personUnlockMemberVault(vaultId, memberPhrase);
+          setMemberPhrase("");
+          onUnlocked();
+        } catch {
+          setMemberError(t("unlock.memberError"));
+          setMemberBusy(false);
+        }
+      })();
+    };
+    return (
+      <CenteredCard>
+        <form onSubmit={submitMember} data-testid="unlock.member-form">
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+            {t("unlock.memberHint")}
+          </p>
+          <textarea
+            data-testid="unlock.member-phrase"
+            aria-label={t("unlock.memberPhraseLabel")}
+            value={memberPhrase}
+            onChange={(e) => {
+              setMemberPhrase(e.target.value);
+              setMemberError(null);
+            }}
+            rows={3}
+            autoComplete="off"
+            spellCheck={false}
+            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}
+          />
+          <button
+            type="submit"
+            data-testid="unlock.member-submit"
+            disabled={memberBusy || memberPhrase.trim() === ""}
+            style={ctaStyle(memberBusy || memberPhrase.trim() === "")}
+            {...ctaHover(memberBusy || memberPhrase.trim() === "")}
+          >
+            {t("unlock.memberSubmit")}
+          </button>
+          {memberError ? (
+            <p data-testid="unlock.member-error" style={{ color: "var(--danger)", fontFamily: "var(--font-sans)" }}>
+              {memberError}
+            </p>
+          ) : null}
+        </form>
+      </CenteredCard>
+    );
+  }
 
   return (
     <CenteredCard>

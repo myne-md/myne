@@ -8,6 +8,7 @@ import {
 } from "react";
 import { AccountBootstrap } from "./screens/AccountBootstrap";
 import { Welcome } from "./screens/Welcome";
+import { IdentityHome } from "./screens/IdentityHome";
 import { RestoreBackup } from "./screens/RestoreBackup";
 
 import { Unlock } from "./screens/Unlock";
@@ -28,6 +29,7 @@ import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
+import { personStatus } from "./lib/personAccount";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { lockVault } from "./lib/vault-unlock";
 import { useIdleAutoLock } from "./hooks/useIdleAutoLock";
@@ -133,6 +135,12 @@ function App() {
   // substituted away in the web build, where the join door is `AccountBootstrap`
   // and an origin holds exactly one container.
   const [joinOpen, setJoinOpen] = useState(false);
+  // Identity-only home (myne-md/myne#711): at zero vaults, if this device
+  // already holds a person account, show the identity home instead of Welcome.
+  // Probe-only state; a failed probe leaves `false` (the pre-B2B Welcome path).
+  const [personEnrolled, setPersonEnrolled] = useState(false);
+  const [personIdHex, setPersonIdHex] = useState<string | null>(null);
+  const [identityCode, setIdentityCode] = useState<string | null>(null);
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
   // (disk enumeration) + `vault_slot_kind(None)` (the active runtime
@@ -183,8 +191,19 @@ function App() {
       // asks for no password, and the only exit from pending needs `root_key`.
       // The verdict is taken after unlock instead, where the screen it routes to
       // can actually make progress: `awaitingApprovalVerdict` below.
-      const [vaultList, activeSlotKind] = await Promise.all([listVaults(), probeSlotKind()]);
+      const [vaultList, activeSlotKind, person] = await Promise.all([
+        listVaults(),
+        probeSlotKind(),
+        // A vault-less identity probe. It only changes what the ZERO-VAULT
+        // (`welcome`) arm renders; every other route is decided by the vault
+        // probes, so a failure here degrades to the pre-B2B Welcome screen
+        // rather than blocking boot.
+        personStatus().catch(() => ({ enrolled: false, person_id_hex: null, identity_code: null })),
+      ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
+      setPersonEnrolled(person.enrolled);
+      setPersonIdHex(person.person_id_hex);
+      setIdentityCode(person.identity_code);
       setStage(initialStageFromProbe(vaultList, slotMap));
     })();
   }, [stage]);
@@ -565,6 +584,20 @@ function App() {
           />
         );
       case "welcome":
+        // Identity-only home (myne-md/myne#711): a device that already holds a
+        // person account lands here instead of Welcome, so a vault-less member
+        // sees their identity and pending invites. Creating a vault is still
+        // reachable from the home.
+        if (personEnrolled) {
+          return (
+            <IdentityHome
+              personIdHex={personIdHex}
+              identityCode={identityCode}
+              onCreateVault={() => dispatch({ type: "create-vault.start" })}
+              onAccepted={() => void reprobe()}
+            />
+          );
+        }
         return (
           <Welcome
             onCreateVault={() => dispatch({ type: "create-vault.start" })}
@@ -573,6 +606,9 @@ function App() {
             // this screen only opens it. Nothing is unlocked here, so unlike the
             // switcher entry there is nothing to tear down first.
             onJoinDevice={() => setJoinOpen(true)}
+            // After identity-only setup, re-probe so the zero-vault arm lands
+            // on the identity home instead of Welcome.
+            onIdentityCreated={reprobe}
           />
         );
       case "create-vault":

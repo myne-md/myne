@@ -286,6 +286,73 @@ async fn reindex_pulled_notes(
     }
 }
 
+/// Build the signed (`0x02`) head context for an `NTV6` vault, or `None` for a
+/// pre-B2B (`NTV5`) vault (decisions 0599, Q2 revised: the head format is keyed
+/// off the vault generation). The live roster rows' public halves let a peer
+/// resolve a head's signer.
+///
+/// A head is signed by the held person keypair (the owner's or a member's own)
+/// and verified against the roster, so a member authors heads under its own
+/// identity. The roster itself is **owner-signed**, so verifying it needs the
+/// owner's public half: the owner holds it as their identity, a member holds only
+/// the out-of-band identity code recorded at accept (`owner_identity_code`).
+async fn signed_head_ctx(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &std::path::Path,
+    state: &VaultRuntimeState,
+    shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
+    is_owner: bool,
+) -> Option<super::head_authority::SignedHeadCtx> {
+    let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
+    if bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return None;
+    }
+    let b2b = protocol::parse_vault_meta_ntv6(&bytes).ok()?;
+    let group_key = shared.group_bytes()?;
+    let envelope = protocol::person_invite::open_group_roster(
+        &group_key,
+        &b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+        &b2b.signed_roster_envelope,
+    )?;
+    let person = state.clone_person_identity().await?;
+    let owner_public = if is_owner {
+        person.public_half()
+    } else {
+        let code = super::state::read_sync_state(io, vault_dir)
+            .await
+            .ok()?
+            .owner_identity_code?;
+        super::invite::decode_person_identity_code(&code)
+            .ok()?
+            .public
+    };
+    let roster = protocol::person_invite::verify_group_roster(
+        &owner_public,
+        &envelope,
+        &b2b.base.account_number_hash,
+    )
+    .ok()?;
+    let roster_publics = roster
+        .members
+        .iter()
+        .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
+        .filter_map(|m| {
+            protocol::person_key::PersonPublicHalf::from_parts_hex(
+                &m.member_kem_ek_hex,
+                &m.member_ed_pk_hex,
+                &m.member_mldsa_vk_hex,
+            )
+            .ok()
+        })
+        .collect();
+    Some(super::head_authority::SignedHeadCtx::new(
+        person,
+        b2b.base.account_number_hash,
+        roster_publics,
+    ))
+}
+
 pub async fn run_active_cycle_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
@@ -370,28 +437,26 @@ pub async fn run_active_cycle_from_host(
         return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
     };
     // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
-    // the cycle needs the itemsKey material alongside the OWNER root key (the
-    // SCRAM secret and the vault-head MAC are owner-tier roles). Cloned out of
-    // the slot and the guard dropped immediately (holding the read guard across
-    // the network cycle would block lock/auto-lock). A member-held slot has no
-    // root key, so it is `NotReady` here until member server auth lands.
-    let Some((items_key, items_key_id, root_key, shared)) = ({
+    // the cycle needs the itemsKey material. The OWNER root key is optional: a
+    // MEMBER holds no `root_key` (that is the point of sharing) and the shared
+    // families it may sync derive their ids from the group tier instead. Cloned
+    // out of the slot and the guard dropped immediately (holding the read guard
+    // across the network cycle would block lock/auto-lock).
+    let Some((items_key, items_key_id, is_owner, root_key, shared)) = ({
         let slot = state.slot_read_active().await;
         match &*slot {
-            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
-                uv.owner_root_key().map(|root| {
-                    (
-                        uv.items_key.clone(),
-                        uv.items_key_id,
-                        zeroize::Zeroizing::new(**root),
-                        uv.shared_singleton_key(),
-                    )
-                })
-            }
+            crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => Some((
+                uv.items_key.clone(),
+                uv.items_key_id,
+                uv.authority() == crate::plugins::vault_unlock::state::VaultAuthority::Owner,
+                uv.owner_root_key()
+                    .map(|root| zeroize::Zeroizing::new(**root)),
+                uv.shared_singleton_key(),
+            )),
             _ => None,
         }
     }) else {
-        return CycleOutcome::NotReady; // vault locked (or member-held)
+        return CycleOutcome::NotReady; // vault locked
     };
     // The AAD identity, sourced from `vault.meta` rather than from the enrolment
     // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
@@ -419,27 +484,31 @@ pub async fn run_active_cycle_from_host(
                 return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
             }
         };
-    // Token: the stored per-device token, or — for a still-pending device — one
-    // claimed now if an existing device has just approved it (re-handshake under
-    // the unlocked root_key). Still pending → nothing to sync this tick.
+    // Token: the stored per-vault token. For an owner's still-pending device,
+    // claim one now if an existing device approved it (re-handshake under the
+    // unlocked root key). A member's per-vault token was stored at invite accept,
+    // so a missing one means the membership is not materialised here.
     let token = match super::token_store::default_store().read(io, &dir).await {
         Ok(Some(t)) => t,
-        _ => {
-            match try_claim_token(
-                io,
-                url.clone(),
-                pins.clone(),
-                dir.clone(),
-                root_key.clone(),
-                account_hash,
-                device_id,
-            )
-            .await
-            {
-                Some(t) => t,
-                None => return CycleOutcome::NotReady, // still pending approval
+        _ => match &root_key {
+            Some(root_key) => {
+                match try_claim_token(
+                    io,
+                    url.clone(),
+                    pins.clone(),
+                    dir.clone(),
+                    root_key.clone(),
+                    account_hash,
+                    device_id,
+                )
+                .await
+                {
+                    Some(t) => t,
+                    None => return CycleOutcome::NotReady, // still pending approval
+                }
             }
-        }
+            None => return CycleOutcome::NotReady, // member with no stored token
+        },
     };
 
     let mut token_hex = String::with_capacity(token.len() * 2);
@@ -452,6 +521,30 @@ pub async fn run_active_cycle_from_host(
     // closure below, and the success stamp is written after it returns.
     let vault_root_for_stamp = dir.clone();
     let dir_for_prefs = dir.clone();
+
+    // Signed `0x02` head authority for an `NTV6` vault (`None` keeps the `NTV5`
+    // HMAC head). Built before the blocking closure so the person keypair and the
+    // roster are gathered on the executor, not the blocking thread.
+    let signed_ctx = signed_head_ctx(io, &dir, state, &shared, is_owner).await;
+    // An `NTV6` vault's head is signature-authenticated. If no person identity is
+    // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
+    // authors a `0x01` head the `0x02` server refuses and wedges sync until the
+    // user runs the person unlock. Refuse loudly instead of downgrading.
+    {
+        let is_ntv6 = io
+            .read(&dir.join("vault.meta"))
+            .await
+            .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
+            .unwrap_or(false);
+        if is_ntv6 && signed_ctx.is_none() {
+            tracing::warn!(
+                stage = "sync_cycle",
+                event = "ntv6_head_unsigned",
+                "NTV6 vault without a held person identity; refusing to author a downgraded head"
+            );
+            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+        }
+    }
 
     let res = crate::task::run_blocking_future(move || async move {
         // A transport that cannot even be built is a Transport-class failure
@@ -483,7 +576,7 @@ pub async fn run_active_cycle_from_host(
         super::orchestrator::run_sync_cycle(
             io,
             transport.as_ref(),
-            &root_key,
+            root_key.as_deref(),
             &shared,
             account_number_hash,
             device_id,
@@ -496,6 +589,9 @@ pub async fn run_active_cycle_from_host(
                 items_key: &items_key,
                 items_key_id: &items_key_id,
             }),
+            // Signed `0x02` heads when the vault is `NTV6` and a person identity
+            // is held; `None` keeps the `NTV5` `root_key` HMAC head.
+            signed_ctx.as_ref(),
         )
         .await
     })
@@ -504,7 +600,7 @@ pub async fn run_active_cycle_from_host(
     // Emit the alert/reconcile events here (both `sync_now` and the loop call
     // this) — the orchestrator stays AppHandle-free (sim.rs drives it without a
     // Tauri app), so the emit lives at this boundary off the summary/error.
-    match res {
+    let outcome = match res {
         Ok(Ok(summary)) => {
             // Index what the cycle wrote (myne#305). Every LOCAL note writer
             // does this through the hooks seam; the pull path could not, because
@@ -608,7 +704,27 @@ pub async fn run_active_cycle_from_host(
         }
         // Join error — no class information survives a panicked task.
         Err(_) => CycleOutcome::Failed(super::loop_control::FailureClass::Other),
+    };
+
+    // The person-private AI store's sync plane (myne-md/myne#711 task 29,
+    // `decisions/protocol/0604`). Best-effort and member-only: it merges the
+    // remote `MYY5` profile into the local cache at the family layer and pushes
+    // the result. Runs after the content cycle so a profile-route hiccup never
+    // fails content sync. Host-only (the profile route drives the rustls
+    // transport), so it stands down on wasm32 where B2B is capability-absent.
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Err(e) =
+        crate::plugins::sync::person_ai_sync::person_ai_sync_from_host(host, io, state).await
+    {
+        // Stale server state, not data loss: the local cache is already written.
+        tracing::warn!(
+            stage = "person_ai_sync",
+            error = ?e,
+            "the person-private AI profile did not sync this cycle"
+        );
     }
+
+    outcome
 }
 
 /// Run one cycle NOW (the manual "Sync now" button) and report the resulting

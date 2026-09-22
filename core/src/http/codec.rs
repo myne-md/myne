@@ -50,6 +50,7 @@ pub fn build_http_request_ext(
         HttpMethod::Post => "POST",
         HttpMethod::Put => "PUT",
         HttpMethod::Head => "HEAD",
+        HttpMethod::Delete => "DELETE",
     };
     let mut head = String::new();
     head.push_str(&format!("{verb} {path} HTTP/1.1\r\n"));

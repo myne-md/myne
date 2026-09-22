@@ -24,6 +24,64 @@ use std::string::String;
 
 use crate::account::person_identity::hex_lower;
 
+/// The whole-string prefix of the **out-of-band person identity code**
+/// (myne-md/myne#711). This is the channel a vault owner uses to obtain the
+/// invitee's public halves, which the invite frame must seal the group key to.
+///
+/// It is NOT a protocol byte boundary and NOT an AEAD/magic value: it never
+/// reaches the sync server (the outer relay frame carries only the recipient
+/// person id and the vault id), and it carries **public** material only. It is
+/// written whole so a reader can grep it, per `discoverable-code.md`'s rule for
+/// a named string.
+///
+/// Shape: `<prefix><person_id_hex>:<kem_ek_hex>:<ed_pk_hex>:<mldsa_vk_hex>`,
+/// all lowercase hex, fixed-length per field, so parsing is unambiguous.
+pub const PERSON_IDENTITY_CODE_PREFIX: &str = "MYNE-PERSON-1:";
+
+/// A decoded person identity code: the addressable person id plus the public
+/// halves the invite is sealed to. The fingerprint is derived from the halves,
+/// so the SAS compare runs over the same bytes the code carried.
+#[derive(Debug, Clone)]
+pub struct PersonIdentityCode {
+    /// The 16-byte `person_id_hash`, the relay's addressing key.
+    pub person_id: [u8; 16],
+    /// The person's public halves (KEM ek + Ed25519 pk + ML-DSA vk).
+    pub public: PersonPublicHalf,
+}
+
+/// Encode a person identity code from the person id and public halves. The
+/// member's identity home renders this for the owner to paste (or, on a phone,
+/// scan once QR capacity allows; the paste path is the one that always works).
+pub fn encode_person_identity_code(person_id: &[u8; 16], public: &PersonPublicHalf) -> String {
+    let mut code = String::with_capacity(64 + 3 * 4096);
+    code.push_str(PERSON_IDENTITY_CODE_PREFIX);
+    code.push_str(&hex_lower(person_id));
+    code.push(':');
+    code.push_str(&hex_lower(public.kem_ek()));
+    code.push(':');
+    code.push_str(&hex_lower(public.ed_pk()));
+    code.push(':');
+    code.push_str(&hex_lower(public.mldsa_vk()));
+    code
+}
+
+/// Decode a person identity code. Every field is a fixed length, so a
+/// truncated, extra, or non-hex field is `BadFraming` rather than a partial
+/// parse: a code the owner pasted wrong must fail before an invite is sealed.
+pub fn decode_person_identity_code(code: &str) -> Result<PersonIdentityCode, InviteError> {
+    let rest = code
+        .strip_prefix(PERSON_IDENTITY_CODE_PREFIX)
+        .ok_or(InviteError::BadFraming)?;
+    let parts: Vec<&str> = rest.split(':').collect();
+    if parts.len() != 4 {
+        return Err(InviteError::BadFraming);
+    }
+    let person_id = super::devices::hex16(parts[0]).ok_or(InviteError::BadFraming)?;
+    let public = PersonPublicHalf::from_parts_hex(parts[1], parts[2], parts[3])
+        .map_err(|_| InviteError::BadFraming)?;
+    Ok(PersonIdentityCode { person_id, public })
+}
+
 /// Invite-flow errors. Separate enum per command (the per-command
 /// closed-enum discipline); no `String` field ever reaches the frontend.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +98,44 @@ pub enum InviteError {
     BadFraming,
     /// The OS CSPRNG failed.
     Csprng,
+}
+
+/// The acceptor's core for an `NTV6` **group package** (myne-md/myne#711
+/// task 12): verify the owner's double signature, confirm the package names
+/// this member at this vault, and unwrap the group key.
+///
+/// The owner's public half is a **pinned** input, not taken from the package
+/// (`protocol::person_invite`'s roster doc says the same): the member obtains it
+/// out of band through the owner's person identity code and confirms the
+/// fingerprint with the SAS compare, which is what stops a substituted owner key
+/// from being trusted. Verification is therefore against `owner`, never against
+/// a key the payload supplied.
+pub fn accept_group_package(
+    owner: &PersonPublicHalf,
+    member: &PersonKeyPair,
+    package: &protocol::person_invite::SignedGroupPackage,
+    account_number_hash: &[u8; 16],
+) -> Result<(zeroize::Zeroizing<[u8; 32]>, u64, String), InviteError> {
+    let payload =
+        protocol::person_invite::verify_group_package(owner, package).map_err(|e| match e {
+            protocol::person_key::PersonKeyError::SignatureVerify => InviteError::SignatureVerify,
+            protocol::person_key::PersonKeyError::AeadFailure => InviteError::CannotDecrypt,
+            _ => InviteError::BadFraming,
+        })?;
+    let epoch = payload.group_key_epoch;
+    let group_key = protocol::person_invite::open_group_package(
+        owner,
+        member,
+        package,
+        account_number_hash,
+        epoch,
+    )
+    .map_err(|e| match e {
+        protocol::person_key::PersonKeyError::SignatureVerify => InviteError::SignatureVerify,
+        protocol::person_key::PersonKeyError::AeadFailure => InviteError::CannotDecrypt,
+        _ => InviteError::BadFraming,
+    })?;
+    Ok((group_key, epoch, hex_lower(owner.fingerprint())))
 }
 
 /// The inviter core: build a signed invite for one prospective member.
@@ -104,6 +200,7 @@ pub fn invited_member_row(
         role,
         deleted: false,
         previous_fingerprint_hex: None,
+        transition_hex: None,
         joined_at: joined_at_secs,
     }
 }
@@ -395,5 +492,96 @@ mod tests {
         // equality, not membership, so it cannot over-refuse.
         assert!(!is_self_invite(&owner, &member.public_half()));
         assert!(!is_self_invite(&owner, &outsider.public_half()));
+    }
+
+    #[test]
+    fn person_identity_code_round_trips_and_keeps_the_fingerprint() {
+        let member = member_pair();
+        let person_id = [0x5Au8; 16];
+        let code = encode_person_identity_code(&person_id, &member.public_half());
+
+        let decoded = decode_person_identity_code(&code).expect("decodes");
+        assert_eq!(decoded.person_id, person_id);
+        // The SAS compare runs over the decoded halves, so the fingerprint the
+        // owner is shown MUST equal the member's own.
+        assert_eq!(decoded.public.fingerprint(), member.fingerprint());
+    }
+
+    #[test]
+    fn accept_group_package_verifies_owner_and_opens_the_group_key() {
+        let owner = owner_pair();
+        let member = member_pair();
+        let outsider = outsider_pair();
+        let group_key: [u8; 32] = fixture_seed(b"vault-group-key");
+
+        let package = protocol::person_invite::create_group_package(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            7,
+            &mut SeededRng(0),
+        )
+        .expect("package");
+
+        // The member opens the group key; the owner fingerprint is returned for
+        // the SAS compare.
+        let (opened, epoch, owner_fp) =
+            accept_group_package(&owner.public_half(), &member, &package, &ACCT).expect("accept");
+        assert_eq!(*opened, group_key);
+        assert_eq!(epoch, 7);
+        assert_eq!(owner_fp, hex_lower(owner.fingerprint()));
+
+        // A tampered signature is refused.
+        let mut tampered = package.clone();
+        let mid = tampered.signature.mldsa_sig.len() / 2;
+        tampered.signature.mldsa_sig[mid] ^= 0x01;
+        assert!(matches!(
+            accept_group_package(&owner.public_half(), &member, &tampered, &ACCT),
+            Err(InviteError::SignatureVerify)
+        ));
+
+        // A WRONG owner public (a substituted key the payload did not sign for)
+        // is refused, which is the property the out-of-band owner code anchors.
+        assert!(matches!(
+            accept_group_package(&outsider.public_half(), &member, &package, &ACCT),
+            Err(InviteError::SignatureVerify)
+        ));
+
+        // A package sealed to someone else does not open for this member.
+        assert!(matches!(
+            accept_group_package(&owner.public_half(), &outsider, &package, &ACCT),
+            Err(InviteError::CannotDecrypt)
+        ));
+    }
+
+    #[test]
+    fn person_identity_code_rejects_a_wrong_or_mangled_code() {
+        let member = member_pair();
+        let person_id = [0x5Au8; 16];
+        let code = encode_person_identity_code(&person_id, &member.public_half());
+
+        // Missing prefix (a bare hex blob the owner might paste by mistake).
+        assert!(matches!(
+            decode_person_identity_code(&code[PERSON_IDENTITY_CODE_PREFIX.len()..]),
+            Err(InviteError::BadFraming)
+        ));
+        // A truncated field (odd hex length / wrong key length).
+        let mut mangled = code.clone();
+        mangled.pop();
+        assert!(matches!(
+            decode_person_identity_code(&mangled),
+            Err(InviteError::BadFraming)
+        ));
+        // An extra field.
+        assert!(matches!(
+            decode_person_identity_code(&format!("{code}:00")),
+            Err(InviteError::BadFraming)
+        ));
+        // A person id of the wrong length.
+        assert!(matches!(
+            decode_person_identity_code(&format!("{PERSON_IDENTITY_CODE_PREFIX}abcd:0:0:0")),
+            Err(InviteError::BadFraming)
+        ));
     }
 }

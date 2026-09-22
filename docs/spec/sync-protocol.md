@@ -137,7 +137,7 @@ Each input starts with a distinct, non-overlapping prefix (the head via the `"my
 
 ### 3.6 `head_format_version` (forward hook)
 
-`head_format_version` is bound into the MAC so the sync layer can evolve the head's *shape* without a v0.1 major-version event — the head is wire-only, so no on-disk format bakes it in (`protocol.md` §10 reserved-expansion ban does not apply). The documented Phase-3 use is upgrading `manifest_hash` from a flat hash to a Merkle root (enabling light-client / partial-sync inclusion proofs); that is a sync-wire bump, not a vault-format change. v0.1 uses `head_format_version = 0x01`.
+`head_format_version` is bound into the MAC so the sync layer can evolve the head's *shape* without a v0.1 major-version event — the head is wire-only, so no on-disk format bakes it in (`protocol.md` §10 reserved-expansion ban does not apply). The documented Phase-3 use is upgrading `manifest_hash` from a flat hash to a Merkle root (enabling light-client / partial-sync inclusion proofs); that is a sync-wire bump, not a vault-format change. `head_format_version = 0x01` is the pre-B2B (`NTV5`) HMAC head; `head_format_version = 0x02` is the person-keypair-signed head every `NTV6` vault adopts (the supersession below and §4.1; `decisions/protocol/0599`).
 
 ---
 
@@ -169,6 +169,8 @@ A verifier holding the parents MUST reject a head for which **no** such componen
 The derivation needs the parents' VVs. Where a parent is on hand (the common case: the baseline is a parent of the candidate) the check runs; where a merge parent is unfetchable past the horizon, it is **skipped** exactly as §5.4 states, and is never replaced by an unauthenticated field. The author is a derived quantity, so it cannot contradict the VV by construction.
 
 **Actor-set authority (no separate roster).** A device's right to be a VV actor is **not** separately authenticated and need not be. Myne is single-user: anyone holding `root_key` is a legitimate author, so a device can introduce a new `device_id` simply by authoring a `root_key`-MAC'd head bearing it. The server, lacking `root_key`, cannot forge a head and therefore cannot inject a phantom `device_id` (it can only replay/withhold/reorder real heads). The VV actor-set is exactly "every `device_id` that appears in a validly-MAC'd head" = the user's enrolled devices. The Phase 2 device-approval gate (MYND-425) is an *availability* control over token issuance, **not** a cryptographic VV roster. Implementations MUST NOT add a roster-authentication step here.
+
+**Superseded for a signed (`0x02`) vault (myne-md/myne#711, `decisions/protocol/0599`).** The paragraph above describes the HMAC (`0x01`) head, which remains the format for a vault that never shares. From `head_format_version = 0x02` a head is **signature-authenticated**: the author is the holder of the person keypair whose vault-scoped pseudonymous id the head carries, the author's public half is resolved from the signed roster (or, in a single-user vault, from the device's own person key), and the actor-set authority is therefore "whoever the roster authorises", not "anyone holding `root_key`". A member holds no `root_key`, so the HMAC path cannot serve it; the signed path is what lets a member author a head. Verification stays **peer-side**: the server holds no key and relays the record opaquely. The record is `ed25519_sig || mldsa_sig || author_id || canonical_head_input`, the signature covers `"myne.head-signature v1|" || author_id || canonical_head_input`, and the author id is `SHA-256("myne.head-author v1|" || kem_ek || ed_pk || mldsa_vk || account_number_hash)[:16]`. The whole change is wire-only: no on-disk magic, AAD prefix, HKDF context or content blob moves, and the transition to it is a re-base (section 5.6.1). The signature covers the head only, so attribution is at push granularity: tampering is attributable to whoever pushed a revision and is not preventable or provable.
 
 **No pruning (v1).** A VV grows with the user's *lifetime* device count, not the active count. Dropping a component is forbidden in v1: it is "tombstone GC before causal stability" — it would make a fork involving that device undetectable thereafter. For a single user the device count is small, so there is no pressure. If pruning is ever introduced (a later version), it MUST ride an authenticated device-retirement event (a current device authoring a head that records "device X retired at component N"), never a unilateral drop — a unilateral drop is a server fork-hiding door.
 
@@ -623,16 +625,46 @@ canonical, and picking one would let the server choose), and MUST **refuse a low
 epoch** as a rollback. A retired epoch is recorded by an owner-double-signed
 `myne.group-retirement v1|` record (`protocol.md` §9.3.4) that carries no timestamp,
 so the server can neither forge a retirement nor order one against a removed
-member's package stream. **Live propagation of a new epoch is not delivered by the
-local rotation model** in this branch: the removing device's `vault.meta` is ahead
-of its peers, and nothing here carries the new epoch to them (Grill 4).
+member's package stream. **Live propagation of a new epoch is delivered by the sync meta phase's `NTV6`
+read path** (myne-md/myne#711 task 13): a peer whose local epoch is strictly lower
+adopts the server's rotated `vault.meta` **verbatim** (a re-serialize would drop the
+B2B tail and downgrade the vault), clears its per-blob CAS baselines so the next pull
+re-fetches every content header the owner rewrapped at the same ids, and only then
+decrypts (content ciphertext and `content_nonce` are unchanged by a rewrap). A
+strictly-lower server epoch is refused as a rollback, an equal epoch adopts a
+server-only roster change and refuses a concurrent one, and a member device adopts
+but never writes `vault.meta`.
 
-**Per-person private AI profiles ride a separate plane.** A `profiles/<profile-id>`
-blob (`MYY5`, `protocol.md` §9.28) is keyed from the person's own phrase and is
-**never** a member of the shared group manifest: its existence there would disclose
-one person's private AI use to the other members. The person-private sync plane
-(which authenticated session carries it) is Grill 4 work alongside person-scoped
-server auth; until then a profile is local to the device that wrote it.
+**Per-person private AI profiles ride a separate plane** (myne-md/myne#711 task 16,
+`decisions/protocol/0604`). A `profiles/<profile-id>` blob (`MYY5`, `protocol.md`
+§9.28) is keyed from the person's own phrase and is **never** a member of the shared
+group manifest: its existence there would disclose one person's private AI use to the
+other members. It travels in a vault-scoped, person-authorized namespace
+(`PUT|GET /b2b/vaults/{account_hash}/profiles/{profile_id}`), authorized by the
+person's own account session plus a membership binding, opaque to the server, which
+records the writing account so removal can schedule deletion after the retention
+grace. The AI layer's serialization into the blob is not yet wired, so a profile is
+written only by the explicit profile commands today.
+
+**Shared singleton addressing is group-derived in an `NTV6` vault** (myne-md/myne#711
+task 30, `decisions/protocol/0605`). The reserved blob-ids of the note/attachments
+catalog, `vault.prefs` and `vault.themes` derive from the session's shared-tier key:
+`root_key` in a pre-B2B (`NTV5`) vault, the current `group_key` in an `NTV6` vault.
+That is what lets a member, who holds no `root_key`, address the shared blobs the
+owner wrote. The ids therefore rotate with the group key on member removal, and the
+retirement record's `reclaim_sync_ids_hex` is what reclaims the superseded namespace.
+The AI catalogs (`vault.chats`, `vault.agent-memory`, `vault.personality`) have no
+group role and stay `root_key`-derived: in a shared vault a member's copy of those is
+person-private and rides the `MYY5` profile plane instead (design A).
+
+**The profile container merges at the family layer on pull** (myne-md/myne#711 task 29,
+`decisions/protocol/0606`). Because the container is one opaque value, a device MUST merge
+the remote profile into its local store before pushing: the memory and conversation
+catalogs use the same per-id causal join and remove-wins tombstone rule as their shared
+counterparts, conversation turn lists are append-merged, and a memory entry follows the
+greater catalog `version`. A merge that cannot decode one side refuses rather than writing
+over real content. Convergence is by pull-merge, so a container lost at the server is
+re-applied from the device that still holds it.
 
 ---
 
