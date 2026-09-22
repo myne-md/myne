@@ -382,7 +382,7 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
   it("hands the canvas the SAME model object across a colour-only rule change", async () => {
     // The repaint-only contract, at the seam that decides it. The real canvas's
     // `[model]` effect re-runs on a new OBJECT, so a colour edit that produces
-    // one re-lays-out the graph — which is what `gc1` caught in the container.
+    // one re-lays-out the graph, which is what `gc1` caught in the container.
     colorGroups = [bareTagRule()];
     const { rerender } = render(<GraphPane />);
     const pane = await settledPane();

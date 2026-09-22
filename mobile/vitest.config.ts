@@ -50,6 +50,12 @@ export default defineConfig({
       { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
       { find: /^@myne\/ornaments$/, replacement: sib("../ornaments/src/index.ts") },
       { find: /^@myne\/ornaments\/(.*)$/, replacement: sib("../ornaments/src/$1") },
+      // The shared knowledge-graph overlay builder (myne-md/myne#727) - mirror of
+      // vite.config.ts. `mobile/src/components/WikiGraph.tsx` and
+      // `EditorFlow.tsx` import it, so without these a test that reaches either
+      // fails to TRANSFORM and appears in no count, passing or failing.
+      { find: /^@myne\/graph-overlay$/, replacement: sib("../src/notes/graphOverlay.ts") },
+      { find: /^@myne\/graph-color-groups$/, replacement: sib("../src/notes/graphColorGroups.ts") },
       // The task index's wire decoder (myne-md/myne-mobile#36) - mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/task-wire$/, replacement: sib("../src/notes/taskWire.ts") },

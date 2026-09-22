@@ -114,7 +114,7 @@ export type FilterNode =
  *  when unset (Rust `skip_serializing_if`), so they read back as `undefined`. */
 /**
  * One graph colour-group rule (myne-md/myne#727). Mirrors Rust
- * `protocol::color_group::ColorGroup`, and `filter` reuses {@link FilterNode} —
+ * `protocol::color_group::ColorGroup`, and `filter` reuses {@link FilterNode},
  * the single canonical filter AST also used by {@link SavedView}.
  *
  * It reached this client's prefs mirror when the graph did: `color_groups` is

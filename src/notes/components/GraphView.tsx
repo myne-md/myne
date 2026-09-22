@@ -455,7 +455,12 @@ export function GraphPane() {
           // text alternative is the list above, which is generated from the same
           // model. Note the ordering benefit: list mode never mounts the lazy
           // canvas chunk, so a reader who wants text never downloads d3.
-          ariaLabel={t("notes.graph.canvasLabel", { count: overlay.model.nodes.length })}
+          ariaLabel={t("notes.graph.canvasLabel", {
+            // Notes only: the label says "notes", and mobile's twin
+            // (`wikiGraph.canvasLabel`) counts the same set. Counting the tag
+            // hubs here would make the pair disagree on a vault with hubs.
+            count: overlay.model.nodes.filter((n) => n.kind !== "tag").length,
+          })}
           // Whole/orphans/tag: a click navigates (or filters, for a tag node).
           // Local: a click PIVOTS (re-center, no ctx.open side-effect, SYNC-6);
           // double-click navigates.
@@ -477,6 +482,49 @@ export function GraphPane() {
       </Suspense>
     );
   }
+
+  const materializeDerived = () => {
+    setMaterializeFailed(false);
+    // Re-read DISK TRUTH and write only if it is STILL empty. The button's
+    // precondition is an emptiness sentinel, and `usePrefs` reports
+    // `DEFAULT_PREFS` (also empty) before its read resolves, so a click inside
+    // that window would otherwise replace rules that are about to arrive from
+    // disk. The backend already refuses a write over a DEGRADED prefs read;
+    // this closes the in-flight window, which is the one it cannot see.
+    void prefsRead()
+      .then((current) => {
+        if (current.color_groups.length > 0) return undefined;
+        return setColorGroups(defaultTagGroupsAsRules(tags));
+      })
+      .catch(() => {
+        // Reported, not swallowed: the button promises the defaults became
+        // editable, and a silent failure leaves the panel showing "N derived
+        // groups" as if nothing was pressed.
+        setMaterializeFailed(true);
+      });
+  };
+
+  // One element, rendered in either container (the list view wraps it in an
+  // absolutely-positioned box, the canvas view does not). A second copy is how
+  // the count, the materialise precondition and the fold state drift apart.
+  // The derived default is shown to the user as a COUNT and a one-click
+  // materialise, so the panel never says "no rules" while the picture is
+  // coloured; the count is `overlay.derivedGroupCount` (the qualifying, capped
+  // set the canvas actually paints), not `derivedGroups.length` (every tag).
+  const settingsPanel = (
+    <GraphSettingsPanel
+      open={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+      settings={ws.graphSettings}
+      onChange={ws.setGraphSettings}
+      onReset={() => ws.setGraphSettings(DEFAULT_GRAPH_SETTINGS)}
+      derivedGroupCount={
+        prefs.color_groups.length > 0 ? 0 : overlay.derivedGroupCount
+      }
+      derivedMaterializeFailed={materializeFailed}
+      onMaterializeDerived={materializeDerived}
+    />
+  );
 
   return (
     <div
@@ -517,7 +565,11 @@ export function GraphPane() {
         aria-live="polite"
         style={VISUALLY_HIDDEN}
       >
-        {t("notes.graph.showingCount", { count: overlay.model?.nodes.length ?? 0 })}
+        {t("notes.graph.showingCount", {
+          // Notes only, matching the canvas label above and mobile's twin.
+          count:
+            overlay.model?.nodes.filter((n) => n.kind !== "tag").length ?? 0,
+        })}
       </div>
       <div
         // The floating panel lives in THIS wrapper, not the outer pane div, so
@@ -740,7 +792,7 @@ export function GraphPane() {
           onClick={() => setSettingsOpen((open) => !open)}
         />
             </div>
-            {asList && (
+            {asList ? (
               <div
                 style={{
                   position: "absolute",
@@ -750,66 +802,10 @@ export function GraphPane() {
                   marginTop: "var(--space-2)",
                 }}
               >
-                <GraphSettingsPanel
-                  open={settingsOpen}
-                  onClose={() => setSettingsOpen(false)}
-                  settings={ws.graphSettings}
-                  onChange={ws.setGraphSettings}
-                  onReset={() => ws.setGraphSettings(DEFAULT_GRAPH_SETTINGS)}
-                  derivedGroupCount={
-                    prefs.color_groups.length > 0 ? 0 : derivedGroups.length
-                  }
-                  derivedMaterializeFailed={materializeFailed}
-                  onMaterializeDerived={() => {
-                    setMaterializeFailed(false);
-                    void prefsRead()
-                      .then((current) => {
-                        if (current.color_groups.length > 0) return undefined;
-                        return setColorGroups(defaultTagGroupsAsRules(tags));
-                      })
-                      .catch(() => {
-                        setMaterializeFailed(true);
-                      });
-                  }}
-                />
+                {settingsPanel}
               </div>
-            )}
-            {!asList && (
-            <GraphSettingsPanel
-              open={settingsOpen}
-              onClose={() => setSettingsOpen(false)}
-              settings={ws.graphSettings}
-              onChange={ws.setGraphSettings}
-              onReset={() => ws.setGraphSettings(DEFAULT_GRAPH_SETTINGS)}
-              // The derived default is shown to the user as a COUNT and a
-              // one-click materialise, so the panel never says "no rules"
-              // while the picture is coloured.
-              derivedGroupCount={
-                prefs.color_groups.length > 0 ? 0 : derivedGroups.length
-              }
-              derivedMaterializeFailed={materializeFailed}
-              onMaterializeDerived={() => {
-                setMaterializeFailed(false);
-                // Re-read DISK TRUTH and write only if it is STILL empty. The
-                // button's precondition is an emptiness sentinel, and `usePrefs`
-                // reports `DEFAULT_PREFS` (also empty) before its read resolves,
-                // so a click inside that window would otherwise replace rules
-                // that are about to arrive from disk. The backend already refuses
-                // a write over a DEGRADED prefs read; this closes the in-flight
-                // window, which is the one it cannot see.
-                void prefsRead()
-                  .then((current) => {
-                    if (current.color_groups.length > 0) return undefined;
-                    return setColorGroups(defaultTagGroupsAsRules(tags));
-                  })
-                  .catch(() => {
-                    // Reported, not swallowed: the button promises the defaults
-                    // became editable, and a silent failure leaves the panel
-                    // showing "N derived groups" as if nothing was pressed.
-                    setMaterializeFailed(true);
-                  });
-              }}
-            />
+            ) : (
+              settingsPanel
             )}
           </div>
         </div>

@@ -192,7 +192,13 @@ export function ScrollArea({
   };
   const onThumbPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     dragRef.current = null;
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    // Bound to both `pointerup` and `pointercancel`. On the cancel path the
+    // pointer may already be inactive, and `releasePointerCapture` throws
+    // `NotFoundError` for an id that no longer matches an active pointer, which
+    // would be an uncaught exception in the handler.
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
   return (

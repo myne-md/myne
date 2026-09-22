@@ -172,15 +172,26 @@ describe("GraphCanvas mounts (myne-md/myne#727)", () => {
 
   it("does not frame the camera again when only TAG nodes were added", async () => {
     // Task 18's contract: a hub arriving rebuilds the model (same notes, one
-    // more node) and must NOT move the view. `fittedKeyRef` is keyed on the
-    // NOTE set, and this is the assertion that would fail if it were keyed on
-    // the node set.
+    // more node) and must NOT frame the camera again, because `fittedKeyRef` is
+    // keyed on the NOTE set. The fixture therefore starts NOTES-ONLY and ADDS
+    // the hub (`tag:work`), which is the state the defect needs; the earlier
+    // version started with the hub and removed it, the opposite direction.
+    //
+    // The fitted transform itself is NOT the observable here: jsdom's canvas has
+    // no CSS box, so `fitTransform` clamps to its floor and `data-view-k` is the
+    // same number whether or not the fit re-ran, which is exactly how the old
+    // version passed while the defect was live. `data-fit-count`, bumped only
+    // when the note key changes, is the fixture that can hold it.
     const { default: GraphCanvas } = await import(
       "@myne/editor/host/notes/GraphCanvas"
     );
+    const NOTES_ONLY = {
+      nodes: MODEL.nodes.slice(0, 2),
+      edges: MODEL.edges.slice(0, 1),
+    };
     const { rerender } = render(
       <GraphCanvas
-        model={MODEL}
+        model={NOTES_ONLY}
         makeWorker={stubWorker}
         onPositionsChanged={() => {}}
         onNodeClick={() => {}}
@@ -189,19 +200,41 @@ describe("GraphCanvas mounts (myne-md/myne#727)", () => {
     const canvas = document.querySelector<HTMLCanvasElement>(
       '[data-testid="editor.graph-canvas"]',
     );
-    await waitFor(() =>
-      expect(canvas?.dataset["canvasModelNonce"]).toBe("1"),
-    );
+    await waitFor(() => expect(canvas?.dataset["canvasModelNonce"]).toBe("1"));
+    await waitFor(() => expect(canvas?.dataset["fitCount"]).toBe("1"));
+
+    // Same notes, one more node (the `tag:work` hub) plus its two edges. The
+    // model rebuilds, the camera must not refit.
     rerender(
       <GraphCanvas
-        model={{ nodes: MODEL.nodes.slice(0, 2), edges: MODEL.edges.slice(0, 1) }}
+        model={MODEL}
         makeWorker={stubWorker}
         onPositionsChanged={() => {}}
         onNodeClick={() => {}}
       />,
     );
-    await waitFor(() =>
-      expect(canvas?.dataset["canvasModelNonce"]).toBe("2"),
+    await waitFor(() => expect(canvas?.dataset["canvasModelNonce"]).toBe("2"));
+    await new Promise((r) => setTimeout(r, 40));
+    expect(canvas?.dataset["fitCount"]).toBe("1");
+
+    // Non-vacuity: a changed NOTE set DOES refit, so the assertion above is not
+    // passing merely because the count never moves at all.
+    rerender(
+      <GraphCanvas
+        model={{
+          nodes: [...MODEL.nodes, { id: "n-c", title: "Charlie" }],
+          edges: [
+            ...MODEL.edges,
+            { source: "n-a", target: "n-c", weight: 1 },
+            { source: "n-c", target: "n-b", weight: 1 },
+          ],
+        }}
+        makeWorker={stubWorker}
+        onPositionsChanged={() => {}}
+        onNodeClick={() => {}}
+      />,
     );
+    await waitFor(() => expect(canvas?.dataset["canvasModelNonce"]).toBe("3"));
+    await waitFor(() => expect(canvas?.dataset["fitCount"]).toBe("2"));
   });
 });

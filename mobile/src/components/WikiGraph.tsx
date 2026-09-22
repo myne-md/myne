@@ -19,7 +19,7 @@
 // supplies is only what only it knows: this one derives tags in the WebView
 // (`TagIndex`) where desktop asks the Rust tag tree.
 //
-// Graph SETTINGS still stay at their defaults here — this client has no settings
+// Graph SETTINGS still stay at their defaults here: this client has no settings
 // panel, and making the values cross devices is #201. That is why the force,
 // size and label numbers on a phone are the shipped ones.
 
@@ -55,7 +55,7 @@ export function WikiGraph({
 }: {
   model: GraphModel;
   onOpen: (id: string) => void;
-  /** Every tag this vault carries, and which notes carry each — the two things
+  /** Every tag this vault carries, and which notes carry each: the two things
    *  the derived default grouping and the tag nodes need, and the two things
    *  only this client can supply (it derives tags in the WebView; desktop asks
    *  the Rust tag tree). */

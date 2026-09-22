@@ -147,8 +147,8 @@ export function ColorGroupEditor({
   derivedMaterializeFailed = false,
 }: {
   /** How many groups the graph is showing from its DERIVED default (one per
-   *  top-level tag) because the vault has authored none (myne-md/myne#727).
-   *  Zero means there is nothing to explain. */
+   *  qualifying tag, at least two notes) because the vault has authored none
+   *  (myne-md/myne#727). Zero means there is nothing to explain. */
   derivedGroupCount?: number;
   /** Turn those derived groups into real, editable rules. The ONE moment this
    *  surface writes `color_groups`, and it is a write the user asked for. */

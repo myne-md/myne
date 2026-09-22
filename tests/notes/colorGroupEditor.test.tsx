@@ -332,3 +332,37 @@ describe("ColorGroupEditor — an unresolvable synced color key degrades", () =>
     expect(rules[0]!.color).toBe("group-future");
   });
 });
+
+describe("ColorGroupEditor — derived-default materialise (myne-md/myne#727)", () => {
+  // The one path this surface WRITES shared, whole-value-LWW `color_groups`.
+  // The block only renders on the empty-rule state, which `beforeEach` sets up.
+  it("hides the derived block when there is nothing to explain", () => {
+    render(<ColorGroupEditor derivedGroupCount={0} />);
+    expect(
+      document.querySelector('[data-testid="editor.color-groups-derived"]'),
+    ).toBeNull();
+  });
+
+  it("shows the derived count and calls onMaterializeDerived when pressed", () => {
+    const onMaterializeDerived = vi.fn();
+    render(
+      <ColorGroupEditor
+        derivedGroupCount={3}
+        onMaterializeDerived={onMaterializeDerived}
+      />,
+    );
+    const block = screen.getByTestId("editor.color-groups-derived");
+    expect(block.textContent).toContain("3 groups");
+    fireEvent.click(screen.getByTestId("editor.color-groups-materialize"));
+    expect(onMaterializeDerived).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a failed materialise instead of silently doing nothing", () => {
+    render(
+      <ColorGroupEditor derivedGroupCount={2} derivedMaterializeFailed />,
+    );
+    expect(
+      screen.getByTestId("editor.color-groups-materialize-failed"),
+    ).not.toBeNull();
+  });
+});

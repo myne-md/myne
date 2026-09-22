@@ -73,7 +73,7 @@ export function buildGraphOverlay(input: {
   const derivedGroupCount =
     input.colorGroups.length === 0 ? defaultGroupCount(input.tags) : 0;
 
-  // The tags the rules reference — the exact set of memberships owed. The
+  // The tags the rules reference: the exact set of memberships owed. The
   // tag-node rules are a subset, so a hub costs no extra lookup.
   const queried = new Map<string, ReadonlySet<string>>();
   for (const tag of collectRuleTags(rules)) {

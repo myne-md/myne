@@ -355,7 +355,6 @@ const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
   { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
   { id: "tags", labelKey: "editor.chrome.barItems.tags" },
   { id: "views", labelKey: "editor.chrome.barItems.views" },
-  { id: "graph", labelKey: "editor.chrome.barItems.graph" },
   { id: "settings", labelKey: "editor.chrome.barItems.settings" },
   { id: "lock", labelKey: "editor.chrome.barItems.lock" },
   { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
