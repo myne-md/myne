@@ -1733,7 +1733,7 @@ pub struct JoinResult {
 /// "Already there" is separated from a genuine IO failure by asking (`exists`)
 /// rather than by widening the closed `IoFailureKind` enum, the same shape
 /// `note_create` uses for its create-new refusal.
-async fn write_bootstrap_meta(
+pub(crate) async fn write_bootstrap_meta(
     io: &dyn crate::vault_io::VaultIo,
     meta_path: &std::path::Path,
     meta_bytes: &[u8],

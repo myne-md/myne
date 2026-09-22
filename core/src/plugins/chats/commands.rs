@@ -129,8 +129,11 @@ async fn seal_from_slot(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(Zeroizing<[u8; 32]>, VaultSeal), ChatsMutateError> {
-    let (root_key, _) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // Design A (myne-md/myne#711 task 28): a MEMBER of a shared vault holds no
+    // `root_key`, so the chats family seals under a key derived from the held
+    // person-profile key. Private once the blobs live in the `PersonAiFs`
+    // container; the owner and single-user vaults are unchanged.
+    let seal_key = crate::plugins::sync::person_ai_store::seal_key_from_slot(state)
         .await
         .ok_or(ChatsMutateError::SlotNotUnlocked)?;
     let bytes = io
@@ -142,10 +145,10 @@ async fn seal_from_slot(
     let seal = VaultSeal {
         version,
         hash: meta.account_number_hash,
-        chats_key: derive_subkey_versioned(version, &root_key, SubkeyRole::ChatsKey),
-        chats_catalog_key: derive_subkey_versioned(version, &root_key, SubkeyRole::ChatsCatalogKey),
+        chats_key: derive_subkey_versioned(version, &seal_key, SubkeyRole::ChatsKey),
+        chats_catalog_key: derive_subkey_versioned(version, &seal_key, SubkeyRole::ChatsCatalogKey),
     };
-    Ok((root_key, seal))
+    Ok((seal_key, seal))
 }
 
 fn io_error(e: IoFailureKind) -> ChatsMutateError {
@@ -595,8 +598,7 @@ async fn seal_from_slot_for_read(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(Zeroizing<[u8; 32]>, VaultSeal), ChatsReadError> {
-    let (root_key, _) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let seal_key = crate::plugins::sync::person_ai_store::seal_key_from_slot(state)
         .await
         .ok_or(ChatsReadError::SlotNotUnlocked)?;
     let bytes = io
@@ -608,10 +610,10 @@ async fn seal_from_slot_for_read(
     let seal = VaultSeal {
         version,
         hash: meta.account_number_hash,
-        chats_key: derive_subkey_versioned(version, &root_key, SubkeyRole::ChatsKey),
-        chats_catalog_key: derive_subkey_versioned(version, &root_key, SubkeyRole::ChatsCatalogKey),
+        chats_key: derive_subkey_versioned(version, &seal_key, SubkeyRole::ChatsKey),
+        chats_catalog_key: derive_subkey_versioned(version, &seal_key, SubkeyRole::ChatsCatalogKey),
     };
-    Ok((root_key, seal))
+    Ok((seal_key, seal))
 }
 
 /// List the roster: live entries ordered by `updated_at` descending (the
@@ -888,6 +890,23 @@ pub async fn chats_create_from_host(
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
     let now = host.now_unix_millis();
+    // Design A (task 28): a member's conversations live person-privately.
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsMutateError::CatalogUnreadable)?;
+        return chats_create_with_dir(
+            &fs,
+            &dir,
+            state,
+            hooks,
+            first_turn_payload,
+            now,
+            requested_id_hex,
+        )
+        .await;
+    }
     chats_create_with_dir(
         io,
         &dir,
@@ -911,6 +930,22 @@ pub async fn chats_append_turn_from_host(
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
     let now = host.now_unix_millis();
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsMutateError::CatalogUnreadable)?;
+        return chats_append_turn_with_dir(
+            &fs,
+            &dir,
+            state,
+            hooks,
+            conversation_id_hex,
+            turns_payload,
+            now,
+        )
+        .await;
+    }
     chats_append_turn_with_dir(
         io,
         &dir,
@@ -931,6 +966,12 @@ pub async fn chats_read_from_host(
 ) -> Result<String, ChatsReadError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsReadError::from)?;
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsReadError::CatalogUnreadable)?;
+        return chats_read_with_dir(&fs, &dir, state, conversation_id_hex).await;
+    }
     chats_read_with_dir(io, &dir, state, conversation_id_hex).await
 }
 
@@ -941,6 +982,12 @@ pub async fn chats_list_from_host(
 ) -> Result<Vec<ConversationListRow>, ChatsReadError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsReadError::from)?;
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsReadError::CatalogUnreadable)?;
+        return chats_list_with_dir(&fs, &dir, state).await;
+    }
     chats_list_with_dir(io, &dir, state).await
 }
 
@@ -955,6 +1002,14 @@ pub async fn chats_rename_from_host(
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
     let now = host.now_unix_millis();
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsMutateError::CatalogUnreadable)?;
+        return chats_rename_with_dir(&fs, &dir, state, hooks, conversation_id_hex, new_title, now)
+            .await;
+    }
     chats_rename_with_dir(io, &dir, state, hooks, conversation_id_hex, new_title, now).await
 }
 
@@ -968,6 +1023,13 @@ pub async fn chats_delete_from_host(
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
     let now = host.now_unix_millis();
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| ChatsMutateError::CatalogUnreadable)?;
+        return chats_delete_with_dir(&fs, &dir, state, hooks, conversation_id_hex, now).await;
+    }
     chats_delete_with_dir(io, &dir, state, hooks, conversation_id_hex, now).await
 }
 
@@ -1464,5 +1526,82 @@ mod tests {
         assert_eq!(rows[1].entry.title, "second"); // updated_at 2_000
         assert!(rows[0].entry.updated_at >= rows[1].entry.updated_at);
         let _ = b;
+    }
+
+    // ---- design A (task 28): a member's conversations are person-private --
+
+    #[test]
+    fn a_member_conversation_is_person_private_and_never_touches_the_shared_family() {
+        use crate::host::test_host::TestHost;
+        use crate::paths::active_vault_root_from_base;
+        use crate::plugins::sync::person_ai_store as pai;
+        use crate::plugins::vault_unlock::state::UnlockedVault;
+
+        let rt = rt();
+        let base = ScopedTempDir::new("chats-member-private").expect("scoped tempdir");
+        let host = TestHost::new(base.path());
+        let state = VaultRuntimeState::default();
+        rt.block_on(state.set_unlocked(
+            test_vault_id(),
+            UnlockedVault::member(
+                Zeroizing::new([0x21; 32]),
+                Zeroizing::new([0x22; 32]),
+                [0x23; 16],
+                0,
+                [0x24; 32],
+            ),
+        ));
+        let profile_id = [0x31u8; 16];
+        let profile_key = Zeroizing::new([0x32u8; 32]);
+        rt.block_on(state.set_person_profile(profile_id, profile_key.clone()));
+        let dir = active_vault_root_from_base(
+            &host.app_data_dir().expect("data dir"),
+            Some(test_vault_id()),
+        );
+        std::fs::create_dir_all(&dir).expect("vault root");
+        seed_real_vault_meta(&dir, HASH_BYTE);
+        let hooks: Hooks = std::sync::Arc::new(NoopHooks);
+
+        let id = rt
+            .block_on(chats_create_from_host(
+                &host,
+                &StdVaultIo,
+                &state,
+                &hooks,
+                FIRST_TURN,
+                None,
+            ))
+            .expect("member create");
+        let rows = rt
+            .block_on(chats_list_from_host(&host, &StdVaultIo, &state))
+            .expect("member list");
+        assert_eq!(rows.len(), 1);
+        let read = rt
+            .block_on(chats_read_from_host(&host, &StdVaultIo, &state, &id))
+            .expect("member read");
+        assert_eq!(read, FIRST_TURN);
+
+        // Nothing in the shared family the owner would hold.
+        assert!(!dir.join(CHATS_CATALOG_FILE).exists());
+        assert!(!dir.join(CHATS_DIR).exists());
+        // Everything in the person-private container.
+        let acct =
+            protocol::parse_vault_meta_any(&std::fs::read(dir.join("vault.meta")).expect("meta"))
+                .expect("parse meta")
+                .account_number_hash;
+        let container = rt
+            .block_on(pai::read_person_ai_state(
+                &StdVaultIo,
+                &dir,
+                &profile_id,
+                &profile_key,
+                &acct,
+            ))
+            .expect("container");
+        assert!(container.files.contains_key(CHATS_CATALOG_FILE));
+        assert!(container
+            .files
+            .keys()
+            .any(|k| k.starts_with(&format!("{CHATS_DIR}/"))));
     }
 }

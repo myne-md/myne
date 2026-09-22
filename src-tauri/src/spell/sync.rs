@@ -150,6 +150,10 @@ pub(crate) async fn persist_dictionary_with_dir(
         .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(SpellSyncError::SlotNotUnlocked)?;
+    // Hold off a shared-singleton reseal across this `vault.dictionary` write
+    // (myne-md/myne#711 task 15). The desktop spell plugin is the dictionary's
+    // writer, so the barrier has to be taken here.
+    let _quiesce = myne_core::singleton_quiesce::shared().await;
     let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
         shared.derive(version, SubkeyRole::PersonalDictKey);

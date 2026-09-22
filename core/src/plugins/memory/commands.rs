@@ -211,13 +211,23 @@ fn io_error(e: IoFailureKind) -> MemoryMutateError {
 /// Resolve the active vault's root directory from the host.
 /// The mutation-side seal loader: `vault.meta` read + the KEKs, mapped to
 /// the mutation error enum.
+/// The seal input for the active session. Design A (myne-md/myne#711 task 27):
+/// a MEMBER of a shared vault holds no `root_key`, so the memory family seals
+/// under a key derived from the held person-profile key instead. That is what
+/// makes the family's blobs person-private once they live in the `PersonAiFs`
+/// container. The owner and single-user vaults are unchanged.
+async fn seal_input_from_slot(state: &VaultRuntimeState) -> Option<Zeroizing<[u8; 32]>> {
+    crate::plugins::sync::person_ai_store::seal_key_from_slot(state).await
+}
+
+/// The mutation-side seal loader: `vault.meta` read + the KEKs, mapped to
+/// the mutation error enum.
 async fn seal_from_slot(
     io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(Zeroizing<[u8; 32]>, MemorySeal), MemoryMutateError> {
-    let (root_key, _) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let seal_key = seal_input_from_slot(state)
         .await
         .ok_or(MemoryMutateError::SlotNotUnlocked)?;
     let bytes = io
@@ -226,8 +236,8 @@ async fn seal_from_slot(
         .map_err(io_error)?;
     let version = meta_version_of(&bytes).ok_or(MemoryMutateError::InvalidVaultMeta)?;
     let meta = parse_vault_meta_any(&bytes).map_err(|_| MemoryMutateError::InvalidVaultMeta)?;
-    let s = seal_from_version(version, meta.account_number_hash, &root_key);
-    Ok((root_key, s))
+    let s = seal_from_version(version, meta.account_number_hash, &seal_key);
+    Ok((seal_key, s))
 }
 
 /// A read-side seal: the same derivation, mapped to the read error enum.
@@ -236,8 +246,7 @@ async fn seal_from_slot_for_read(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(Zeroizing<[u8; 32]>, MemorySeal), MemoryReadError> {
-    let (root_key, _) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    let seal_key = seal_input_from_slot(state)
         .await
         .ok_or(MemoryReadError::SlotNotUnlocked)?;
     let bytes = io
@@ -246,8 +255,8 @@ async fn seal_from_slot_for_read(
         .map_err(MemoryReadError::from)?;
     let version = meta_version_of(&bytes).ok_or(MemoryReadError::InvalidVaultMeta)?;
     let meta = parse_vault_meta_any(&bytes).map_err(|_| MemoryReadError::InvalidVaultMeta)?;
-    let s = seal_from_version(version, meta.account_number_hash, &root_key);
-    Ok((root_key, s))
+    let s = seal_from_version(version, meta.account_number_hash, &seal_key);
+    Ok((seal_key, s))
 }
 
 /// Read the catalog map from disk. `Absent` → empty map (§ 9.25's
@@ -2170,6 +2179,115 @@ mod tests {
         assert_eq!(rows[0].id, id);
     }
 
+    // ---- design A (task 27): a member's AI material is person-private -----
+
+    #[test]
+    fn a_member_memory_is_person_private_and_never_touches_the_shared_family() {
+        use crate::host::test_host::TestHost;
+        use crate::paths::active_vault_root_from_base;
+        use crate::plugins::sync::person_ai_store as pai;
+        use crate::plugins::vault_unlock::state::UnlockedVault;
+
+        let rt = rt();
+        let base = ScopedTempDir::new("memory-member-private").expect("scoped tempdir");
+        let host = TestHost::new(base.path());
+        let state = VaultRuntimeState::default();
+        rt.block_on(state.set_unlocked(
+            test_vault_id(),
+            UnlockedVault::member(
+                Zeroizing::new([0x21; 32]),
+                Zeroizing::new([0x22; 32]),
+                [0x23; 16],
+                0,
+                [0x24; 32],
+            ),
+        ));
+        let profile_id = [0x31u8; 16];
+        let profile_key = Zeroizing::new([0x32u8; 32]);
+        rt.block_on(state.set_person_profile(profile_id, profile_key.clone()));
+        let dir = active_vault_root_from_base(
+            &host.app_data_dir().expect("data dir"),
+            Some(test_vault_id()),
+        );
+        std::fs::create_dir_all(&dir).expect("vault root");
+        seed_real_vault_meta(&dir, HASH_BYTE);
+        let hooks: Hooks = std::sync::Arc::new(NoopHooks);
+        rt.block_on(crate::plugins::prefs::commands::set_ai_enabled_with_dir(
+            &dir,
+            &state,
+            &hooks,
+            true,
+            &StdVaultIo,
+            &host,
+        ))
+        .expect("opt in");
+
+        let id = rt
+            .block_on(memory_write_from_host(
+                &host,
+                &StdVaultIo,
+                &state,
+                &hooks,
+                None,
+                "A member-only fact.",
+                None,
+                MemoryAuthor::User,
+                &[],
+            ))
+            .expect("member write");
+        let rows = rt
+            .block_on(memory_list_from_host(&host, &StdVaultIo, &state))
+            .expect("member list");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, id);
+        let text = rt
+            .block_on(memory_read_from_host(&host, &StdVaultIo, &state, &id))
+            .expect("member read");
+        assert_eq!(text, "A member-only fact.");
+
+        // None of it is in the shared family the owner would hold.
+        assert!(!dir.join(AGENT_MEMORY_CATALOG_FILE).exists());
+        assert!(!dir.join(MEMORIES_DIR).exists());
+        // It IS in the person-private container.
+        let acct =
+            protocol::parse_vault_meta_any(&std::fs::read(dir.join("vault.meta")).expect("meta"))
+                .expect("parse meta")
+                .account_number_hash;
+        let container = rt
+            .block_on(pai::read_person_ai_state(
+                &StdVaultIo,
+                &dir,
+                &profile_id,
+                &profile_key,
+                &acct,
+            ))
+            .expect("container");
+        assert!(container.files.contains_key(AGENT_MEMORY_CATALOG_FILE));
+        assert!(container
+            .files
+            .keys()
+            .any(|k| k.starts_with(&format!("{MEMORIES_DIR}/"))));
+
+        // A member's personality directive is person-private too.
+        rt.block_on(personality_write_from_host(
+            &host,
+            &StdVaultIo,
+            &state,
+            &hooks,
+            &[PersonalityDirective {
+                text: "be terse".to_string(),
+                updated_at: 1_000,
+            }],
+        ))
+        .expect("member personality write");
+        assert!(!dir.join(PERSONALITY_FILE).exists());
+        let view = rt
+            .block_on(personality_read_from_host(&host, &StdVaultIo, &state))
+            .expect("member personality read");
+        assert_eq!(view.directives.len(), 1);
+        assert_eq!(view.directives[0].text, "be terse");
+    }
+
     // ---- roster bound (§ 9.25.3) ----------------------------------------
 
     #[test]
@@ -2417,11 +2535,7 @@ pub async fn memory_write_from_host(
     author: MemoryAuthor,
     source_note_folders: &[String],
 ) -> Result<String, MemoryMutateError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryMutateError::SlotNotUnlocked);
     }
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
@@ -2434,6 +2548,27 @@ pub async fn memory_write_from_host(
         .map(|view| view.ai_excluded_folders)
         .map_err(|_| MemoryMutateError::ExcludedSource)?;
     let now = host.now_unix_millis();
+    // Design A (task 27): a member's memory lives in the person-private store.
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| MemoryMutateError::CatalogUnreadable)?;
+        return memory_write_with_dir(
+            &fs,
+            &dir,
+            state,
+            hooks,
+            memory_id_hex,
+            text,
+            source_conversation_hex,
+            author,
+            source_note_folders,
+            &excluded,
+            now,
+        )
+        .await;
+    }
     memory_write_with_dir(
         io,
         &dir,
@@ -2457,11 +2592,7 @@ pub async fn memory_delete_from_host(
     hooks: &Hooks,
     memory_id_hex: &str,
 ) -> Result<(), MemoryMutateError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryMutateError::SlotNotUnlocked);
     }
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
@@ -2470,6 +2601,13 @@ pub async fn memory_delete_from_host(
         return Err(MemoryMutateError::AiDisabled);
     }
     let now = host.now_unix_millis();
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let _guard = crate::plugins::sync::person_ai_store::lock_write().await;
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| MemoryMutateError::CatalogUnreadable)?;
+        return memory_delete_with_dir(&fs, &dir, state, hooks, memory_id_hex, now).await;
+    }
     memory_delete_with_dir(io, &dir, state, hooks, memory_id_hex, now).await
 }
 
@@ -2478,17 +2616,19 @@ pub async fn memory_list_from_host(
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
 ) -> Result<Vec<MemoryListRow>, MemoryReadError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryReadError::SlotNotUnlocked);
     }
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(MemoryReadError::from)?;
     if !memory_gate_open(io, &dir, state).await {
         return Err(MemoryReadError::AiDisabled);
+    }
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| MemoryReadError::CatalogUnreadable)?;
+        return memory_list_with_dir(&fs, &dir, state).await;
     }
     memory_list_with_dir(io, &dir, state).await
 }
@@ -2499,17 +2639,19 @@ pub async fn memory_read_from_host(
     state: &VaultRuntimeState,
     memory_id_hex: &str,
 ) -> Result<String, MemoryReadError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryReadError::SlotNotUnlocked);
     }
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(MemoryReadError::from)?;
     if !memory_gate_open(io, &dir, state).await {
         return Err(MemoryReadError::AiDisabled);
+    }
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, &dir, state)
+            .await
+            .map_err(|_| MemoryReadError::CatalogUnreadable)?;
+        return memory_read_with_dir(&fs, &dir, state, memory_id_hex).await;
     }
     memory_read_with_dir(io, &dir, state, memory_id_hex).await
 }
@@ -2519,11 +2661,7 @@ pub async fn personality_read_from_host(
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
 ) -> Result<PersonalityView, MemoryReadError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryReadError::SlotNotUnlocked);
     }
     let dir =
@@ -2531,7 +2669,43 @@ pub async fn personality_read_from_host(
     if !memory_gate_open(io, &dir, state).await {
         return Err(MemoryReadError::AiDisabled);
     }
+    // Design A (myne-md/myne#711 task 27): a MEMBER of a shared vault reads
+    // their private AI material from their person-private profile, not the
+    // shared families the other members hold.
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        return personality_read_private(io, &dir, state).await;
+    }
     personality_read_with_dir(io, &dir, state).await
+}
+
+/// The person-private personality read: open the sealed profile from the
+/// device-local cache and take its `personality` section. Absent cache or
+/// section reads as the default empty view.
+async fn personality_read_private(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+) -> Result<PersonalityView, MemoryReadError> {
+    use crate::plugins::sync::person_ai_store as pai;
+    let Some((profile_id, key)) = state.clone_person_profile().await else {
+        return Ok(PersonalityView::default());
+    };
+    let meta = io
+        .read(&vault_dir.join("vault.meta"))
+        .await
+        .map_err(MemoryReadError::from)?;
+    let acct = protocol::parse_vault_meta_any(&meta)
+        .map_err(|_| MemoryReadError::PersonalityUnreadable)?
+        .account_number_hash;
+    match pai::read_person_ai_state(io, vault_dir, &profile_id, &key, &acct).await {
+        Some(st) => match st.personality() {
+            Some(bytes) => {
+                serde_json::from_slice(&bytes).map_err(|_| MemoryReadError::PersonalityUnreadable)
+            }
+            None => Ok(PersonalityView::default()),
+        },
+        None => Ok(PersonalityView::default()),
+    }
 }
 
 pub async fn personality_write_from_host(
@@ -2541,11 +2715,7 @@ pub async fn personality_write_from_host(
     hooks: &Hooks,
     directives: &[PersonalityDirective],
 ) -> Result<(), MemoryMutateError> {
-    if state
-        .peek_unlocked_root_key_and_hash_clone()
-        .await
-        .is_none()
-    {
+    if !crate::plugins::sync::person_ai_store::ai_slot_unlocked(state).await {
         return Err(MemoryMutateError::SlotNotUnlocked);
     }
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
@@ -2553,7 +2723,60 @@ pub async fn personality_write_from_host(
     if !memory_gate_open(io, &dir, state).await {
         return Err(MemoryMutateError::AiDisabled);
     }
+    // Design A (task 27): a member's personality directive is person-private.
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        return personality_write_private(io, &dir, state, hooks, directives).await;
+    }
     personality_write_with_dir(io, &dir, state, hooks, directives).await
+}
+
+/// The person-private personality write: validate, update the `personality`
+/// section of the sealed profile cache, re-seal and write it. An empty directive
+/// list clears the section (omit-when-empty, §9.27). The profile plane push is
+/// task 29.
+async fn personality_write_private(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &Hooks,
+    directives: &[PersonalityDirective],
+) -> Result<(), MemoryMutateError> {
+    use crate::plugins::sync::person_ai_store as pai;
+    validate_personality_directives(directives)?;
+    // The container is one read-modify-write; hold the person-AI lock so a
+    // concurrent memory or chats private command cannot interleave.
+    let _guard = pai::lock_write().await;
+    let Some((profile_id, key)) = state.clone_person_profile().await else {
+        return Err(MemoryMutateError::SlotNotUnlocked);
+    };
+    let meta = io
+        .read(&vault_dir.join("vault.meta"))
+        .await
+        .map_err(MemoryMutateError::from)?;
+    let acct = protocol::parse_vault_meta_any(&meta)
+        .map_err(|_| MemoryMutateError::InvalidVaultMeta)?
+        .account_number_hash;
+    let mut st = pai::read_person_ai_state(io, vault_dir, &profile_id, &key, &acct)
+        .await
+        .unwrap_or_else(pai::PersonAiState::empty);
+    if directives.is_empty() {
+        st.set_personality(None);
+    } else {
+        let view = PersonalityView {
+            directives: directives.to_vec(),
+        };
+        let bytes = serde_json::to_vec(&view).map_err(|_| MemoryMutateError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
+        st.set_personality(Some(&bytes));
+    }
+    pai::write_person_ai_state(io, vault_dir, &profile_id, &key, &acct, &st)
+        .await
+        .map_err(|_| MemoryMutateError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
+    hooks.bump_local_change();
+    Ok(())
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]

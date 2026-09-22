@@ -15,6 +15,10 @@ import { invoke } from "../platform/core";
  */
 export interface PersonIdentityView {
   fingerprint_hex: string;
+  person_id_hex: string;
+  /** The owner-side out-of-band code a member pastes to verify the group
+   *  package. Public material only. */
+  identity_code: string;
 }
 
 /** A vault role as the backend serializes it (lowercase). One shared type
@@ -76,18 +80,31 @@ export async function startB2bMigration(ownerDisplayName: string): Promise<B2bMi
   });
 }
 
-/** Invite one member to the unlocked vault. */
-export async function inviteMember(input: {
-  memberKemEkHex: string;
-  memberEdPkHex: string;
-  memberMldsaVkHex: string;
+/** The invitee's addressable id + SAS fingerprint, decoded from a pasted
+ *  identity code before the invite is sealed. */
+export interface InviteCodeView {
+  person_id_hex: string;
+  fingerprint_hex: string;
+}
+
+/** Parse a pasted person identity code for the out-of-band SAS compare (pure:
+ *  no vault, no network). */
+export async function inspectInviteCode(recipientCode: string): Promise<InviteCodeView> {
+  return invoke<InviteCodeView>("plugin:sync|sync_person_inspect_invite_code", {
+    recipientCode,
+  });
+}
+
+/** Create and relay an invite from a pasted person identity code. The owner
+ *  should have confirmed the SAS fingerprint from {@link inspectInviteCode}
+ *  first. */
+export async function personCreateInvite(input: {
+  recipientCode: string;
   vaultLabel: string;
   createdAtSecs: number;
 }): Promise<InviteCommandView> {
-  return invoke<InviteCommandView>("plugin:sync|sync_invite_member", {
-    memberKemEkHex: input.memberKemEkHex,
-    memberEdPkHex: input.memberEdPkHex,
-    memberMldsaVkHex: input.memberMldsaVkHex,
+  return invoke<InviteCommandView>("plugin:sync|sync_person_create_invite", {
+    recipientCode: input.recipientCode,
     vaultLabel: input.vaultLabel,
     createdAtSecs: input.createdAtSecs,
   });
@@ -110,9 +127,23 @@ export async function listRoster(): Promise<RosterListView> {
   return invoke<RosterListView>("plugin:sync|sync_list_roster");
 }
 
-/** Remove a member. PARKED until the roster wire ships: the backend refuses
- *  with `RemovalUnavailable` before touching the vault, and the roster panel
- *  offers no Remove affordance. Kept wired so the binding stays covered. */
+/** One invitation the owner has sent for this vault, with its claim state. */
+export interface VaultInviteSummary {
+  invite_id_hex: string;
+  recipient_person_id_hex: string;
+  claimed: boolean;
+}
+
+/** Owner-side claimed-versus-pending view of this vault's invitations. */
+export async function listVaultInvites(): Promise<VaultInviteSummary[]> {
+  return invoke<VaultInviteSummary[]>("plugin:sync|sync_list_vault_invites");
+}
+
+/** Remove a member. LIVE: the backend rotates the group hierarchy (epoch+1
+ *  group key, fresh `itemsKey`, singleton reseal, signed roster tombstone),
+ *  pushes the rotated `vault.meta`, records the namespace retirement and revokes
+ *  the member's server binding. Revocation is future-access only; it makes no
+ *  recall claim about content the removed person already copied. */
 export async function removeMember(memberFingerprintHex: string): Promise<void> {
   return invoke("plugin:sync|sync_remove_member", { memberFingerprintHex });
 }

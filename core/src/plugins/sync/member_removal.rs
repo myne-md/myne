@@ -455,6 +455,31 @@ async fn rekey_content_blobs(
 pub struct GroupRotationOutput {
     pub new_epoch: u64,
     pub retirements: Vec<protocol::person_invite::SignedGroupRetirement>,
+    /// The retired epoch's shared-singleton sync-ids (hex), for the owner-only
+    /// namespace-retirement call (`reclaim_sync_ids_hex`). Empty when the local
+    /// sync plane was not enrolled.
+    pub reclaim_sync_ids_hex: Vec<String>,
+}
+
+/// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
+/// vault: the attachments catalog, `vault.prefs` and `vault.themes` are all
+/// addressed by a group-derived id (decision 0605), so a rotation to a new
+/// `group_key` retires exactly these three.
+fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
+    let group = protocol::GroupKey::new(*old_group_key);
+    [
+        protocol::GroupRole::CatalogSyncId,
+        protocol::GroupRole::PrefsSyncId,
+        protocol::GroupRole::ThemesSyncId,
+    ]
+    .into_iter()
+    .map(|role| {
+        let sub = protocol::derive_group_subkey_v0_2(&group, role);
+        let mut id = [0u8; 16];
+        id.copy_from_slice(&sub[..16]);
+        crate::plugins::sync::to_hex(&id)
+    })
+    .collect()
 }
 
 /// **The local canonical group rotation** (B2B, myne-md/myne#712 task 7).
@@ -566,6 +591,10 @@ pub async fn rotate_group_from_host(
 
     let old_group = protocol::GroupKey::new(*old_group_key);
     let new_group = protocol::GroupKey::new(*new_group_key);
+    // Quiesce: hold every shared-singleton writer off for the whole reseal until
+    // the commit marker is written (myne-md/myne#711 task 15). Held until this
+    // function returns.
+    let _quiesce = crate::singleton_quiesce::exclusive().await;
     for filename in crate::plugins::vault_migrate::b2b::SHARED_SINGLETONS {
         let path = vault_root.join(filename);
         let blob = match io.read(&path).await {
@@ -673,10 +702,128 @@ pub async fn rotate_group_from_host(
         .refresh_meta_hash_if(id, old_meta_hash, new_hash)
         .await;
 
+    // (10) Re-base the sync plane: the shared-singleton sync-ids are group-derived
+    // in an `NTV6` vault, so the rotation moved them. Queue the retired epoch's
+    // ids for server reclaim and drop their baselines (decision 0605).
+    let reclaim_sync_ids_hex = group_rotation_reclaim_sync_ids(&old_group_key);
+    rebase_sync_plane_for_group_rotation(io, &vault_root, &old_group_key).await;
+
     Ok(GroupRotationOutput {
         new_epoch: rotated.new_epoch,
         retirements: rotated.retirements,
+        reclaim_sync_ids_hex,
     })
+}
+
+/// Re-base the sync plane for a group rotation (myne-md/myne#711 task 30,
+/// `decisions/protocol/0609`). In an `NTV6` vault the reserved sync-ids of the
+/// shared singletons (attachments catalog, prefs, themes) are derived from the
+/// group key, so a rotation to a new epoch moves them. Each retired epoch's id
+/// that this device holds a baseline for is queued as an orphan tombstone (the
+/// next push flags it on the server so horizon-GC reclaims the stranded record)
+/// and its baseline dropped, the same shape as
+/// `vault_migrate::rebase_sync_plane_after_rekey` for a root re-key.
+///
+/// Content addresses (note UUIDs, attachment ids, conversation/entry ids) do
+/// NOT move: those baselines stay. A device that did not perform the rotation
+/// learns of it from the greater `vault.meta` epoch and clears all baselines
+/// through the existing epoch-adoption path.
+async fn rebase_sync_plane_for_group_rotation(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    old_group_key: &[u8; 32],
+) {
+    use crate::plugins::sync::state::{read_sync_state, write_sync_state, OrphanTombstone};
+    let Ok(mut state) = read_sync_state(io, vault_root).await else {
+        // Present and unreadable: leave it alone, exactly as the root re-key
+        // does; a human has to look at it.
+        return;
+    };
+    if state.device_id_hex.is_none() {
+        return; // never enrolled: there is no sync plane to re-base
+    }
+    let mut changed = false;
+    for hex in group_rotation_reclaim_sync_ids(old_group_key) {
+        if let Some(baseline) = state.blobs.get(&hex) {
+            // Queue the tombstone BEFORE dropping the baseline: the removal
+            // takes the `base_version` the tombstone push CASes against. If the
+            // tombstone cannot be minted (RNG failure), leave the baseline so the
+            // next cycle can retry rather than dropping it un-tombstoned.
+            let mut nonce = [0u8; 24];
+            if getrandom::getrandom(&mut nonce).is_err() {
+                tracing::warn!(
+                    stage = "group_rotation",
+                    "could not mint a reclaim nonce; leaving the baseline for the next attempt"
+                );
+                continue;
+            }
+            state.pending_orphan_tombstones.push(OrphanTombstone {
+                blob_id_hex: hex.clone(),
+                base_version: baseline.version,
+                content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
+            });
+            state.blobs.remove(&hex);
+            changed = true;
+        }
+    }
+    if changed {
+        if let Err(e) = write_sync_state(io, vault_root, &state).await {
+            tracing::warn!(
+                stage = "group_rotation",
+                error = ?e,
+                "sync-plane rebase state write failed; the next cycle may strand the retired ids"
+            );
+        }
+    }
+}
+
+/// The removed member's addressable `person_id_hash` from the current signed
+/// roster, when the row carries one (myne-md/myne#711 task 14). `None` for a row
+/// migrated from the pre-B2B roster, which has no person account to revoke.
+pub async fn member_person_id_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    owner: &protocol::person_key::PersonKeyPair,
+    fingerprint_hex: &str,
+) -> Result<Option<String>, MemberRemovalError> {
+    let group_key = {
+        let slot = state.slot_read_active().await;
+        match &*slot {
+            Slot::Unlocked(uv) => Zeroizing::new(
+                **uv.group_key
+                    .as_ref()
+                    .ok_or(MemberRemovalError::InvalidVaultMeta)?,
+            ),
+            _ => return Err(MemberRemovalError::VaultLocked),
+        }
+    };
+    let vault_root = active_vault_root(host, state).await?;
+    let meta_bytes = io
+        .read(&vault_root.join("vault.meta"))
+        .await
+        .map_err(|_| MemberRemovalError::Io)?;
+    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+        .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    let account_number_hash = b2b_meta.base.account_number_hash;
+    let envelope = protocol::person_invite::open_group_roster(
+        &group_key,
+        &account_number_hash,
+        b2b_meta.group_key_epoch,
+        &b2b_meta.signed_roster_envelope,
+    )
+    .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    let roster = protocol::person_invite::verify_group_roster(
+        &owner.public_half(),
+        &envelope,
+        &account_number_hash,
+    )
+    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    Ok(roster
+        .members
+        .iter()
+        .find(|m| m.fingerprint_hex == fingerprint_hex)
+        .and_then(|m| m.person_id_hex.clone()))
 }
 
 /// Recover an interrupted rekey. Runs at unlock, before any other read.
@@ -1113,6 +1260,7 @@ mod tests {
         let public = pair.public_half();
         GroupRosterMember {
             fingerprint_hex: rot_hex(pair.fingerprint()),
+            person_id_hex: None,
             display_name: if role == GroupRosterRole::Owner {
                 "Owner".into()
             } else {
@@ -1126,6 +1274,7 @@ mod tests {
             member_mldsa_vk_hex: rot_hex(public.mldsa_vk()),
             previous_fingerprint_hex: None,
             continuity: GroupKeyContinuity::Current,
+            transition_hex: None,
         }
     }
 
@@ -1299,9 +1448,13 @@ mod tests {
             assert_eq!(out.new_epoch, 2);
             assert_eq!(out.retirements.len(), 2);
             for record in &out.retirements {
-                let payload =
-                    protocol::person_invite::verify_group_retirement(&owner.public_half(), record)
-                        .expect("retirement verifies");
+                let payload = protocol::person_invite::verify_group_retirement(
+                    &owner.public_half(),
+                    record,
+                    &ROT_ACCT,
+                    &ROT_ITEMS_ID,
+                )
+                .expect("retirement verifies");
                 assert_eq!(payload.retired_epoch, 1);
                 assert_eq!(payload.replacement_epoch, 2);
             }
@@ -1391,5 +1544,58 @@ mod tests {
             b"live"
         );
         assert!(!root.join("notes/note.myn").exists(), "nothing fabricated");
+    }
+
+    // The shared-singleton sync-ids are group-derived in an `NTV6` vault, so a
+    // rotation moves them. The retired epoch's ids must be queued for reclaim and
+    // their baselines dropped, or the next cycle strands the old server records.
+    #[test]
+    fn a_group_rotation_rebases_the_group_derived_singleton_sync_ids() {
+        block_on(async {
+            let tmp = ScopedTempDir::new("rotation-rebase").expect("tempdir");
+            let io = StdVaultIo;
+            let old_group = [0x5Au8; 32];
+
+            let old_sub = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(old_group),
+                protocol::GroupRole::CatalogSyncId,
+            );
+            let mut old_id = [0u8; 16];
+            old_id.copy_from_slice(&old_sub[..16]);
+            let old_hex = crate::plugins::sync::to_hex(&old_id);
+
+            let mut st = crate::plugins::sync::state::SyncState {
+                device_id_hex: Some("aa".repeat(16)),
+                ..Default::default()
+            };
+            st.blobs.insert(
+                old_hex.clone(),
+                crate::plugins::sync::state::BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "bb".repeat(24),
+                    doc_heads_hex: Vec::new(),
+                },
+            );
+            crate::plugins::sync::state::write_sync_state(&io, tmp.path(), &st)
+                .await
+                .expect("seed state");
+
+            rebase_sync_plane_for_group_rotation(&io, tmp.path(), &old_group).await;
+
+            let after = crate::plugins::sync::state::read_sync_state(&io, tmp.path())
+                .await
+                .expect("read state");
+            assert!(
+                !after.blobs.contains_key(&old_hex),
+                "the retired epoch's baseline is dropped"
+            );
+            assert!(
+                after
+                    .pending_orphan_tombstones
+                    .iter()
+                    .any(|t| t.blob_id_hex == old_hex && t.base_version == 3),
+                "the retired epoch's id is queued for server reclaim"
+            );
+        });
     }
 }

@@ -458,6 +458,10 @@ const V = {
     "typed-unsupported",
     "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
   ],
+  "src/lib/personAccount.ts": [
+    "typed-unsupported",
+    "`plugin:sync|sync_person_setup` is `Class::Unsupported` on web: the phrase is a device-enrolment credential and is deliberately absent from served code (`decisions.md` 2026-07-26, entry 0514), and the sealed identity lives in `<app_config_dir>`, outside OPFS. The only importer is `IdentitySetupDialog`, reached from `Welcome`, which the web client never renders at zero vaults (vaultCreation absent routes to account-entry).",
+  ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],
   "src/hooks/useOverlayInert.ts": [

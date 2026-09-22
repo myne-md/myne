@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
+import { IdentitySetupDialog } from "../components/IdentitySetupDialog";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 
 interface WelcomeProps {
@@ -15,10 +17,17 @@ interface WelcomeProps {
    * created made the join door unreachable.
    */
   onJoinDevice: () => void;
+  /** Fired after identity-only setup succeeds, so App re-probes and lands on
+   *  the identity home (`myne-md/myne#711`). */
+  onIdentityCreated?: () => void;
 }
 
-export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: WelcomeProps) {
+export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdentityCreated }: WelcomeProps) {
   const { t } = useTranslation();
+  // Identity-only setup (myne-md/myne#711): a vault-less person can create an
+  // identity and be invite-addressed before owning any vault. The dialog is
+  // local to this screen, like the other modal carve-outs; it creates no vault.
+  const [identityOpen, setIdentityOpen] = useState(false);
   return (
     <div
       data-testid="welcome.root"
@@ -110,12 +119,25 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
           >
             {t("welcome.joinCta")}
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIdentityOpen(true)}
+            data-testid="welcome.identity-cta"
+          >
+            {t("welcome.identityCta")}
+          </Button>
         </div>
 
         <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: "var(--space-2)" }}>
           v0.1 pre-alpha
         </div>
       </div>
+
+      <IdentitySetupDialog
+        open={identityOpen}
+        onClose={() => setIdentityOpen(false)}
+        onCreated={onIdentityCreated}
+      />
     </div>
   );
 }

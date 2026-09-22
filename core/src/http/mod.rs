@@ -64,6 +64,9 @@ pub enum HttpMethod {
     /// Header-only probe (the `/attachments/{id}` resume/dedup probe —
     /// `X-Uploaded-Length` / `X-Complete`; `server-protocol.md` §3.2).
     Head,
+    /// Resource removal (the B2B member revoke,
+    /// `DELETE /b2b/vaults/{hash}/members/{person_id}`, myne-md/myne#711 task 14).
+    Delete,
 }
 /// A transport response: the HTTP status and the opaque body bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]

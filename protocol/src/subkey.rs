@@ -895,12 +895,21 @@ pub fn derive_subkey_versioned(
 /// different output) without exposing arbitrary-info derivation to
 /// the public API.
 pub(crate) fn derive_with_context(root_key: &[u8; 32], info: &[u8]) -> Zeroizing<[u8; 32]> {
+    let mut okm = Zeroizing::new([0u8; 32]);
+    derive_with_context_into(root_key, info, &mut okm[..]);
+    okm
+}
+
+/// [`derive_with_context`] into a caller-sized buffer, for the one caller that
+/// needs more than 32 bytes: the deterministic person-identity expansion, whose
+/// ML-KEM seed is 64 bytes (`d || z`). Stays `pub(crate)` for the same reason
+/// the 32-byte entry does, and is the only other place in the crate that calls
+/// `hkdf.expand` (the registry guard permits `.expand(` in this module alone).
+pub(crate) fn derive_with_context_into(root_key: &[u8; 32], info: &[u8], out: &mut [u8]) {
     let zero_salt = [0u8; 32];
     let hk = Hkdf::<Sha256>::new(Some(&zero_salt), root_key);
-    let mut okm = Zeroizing::new([0u8; 32]);
-    hk.expand(info, &mut okm[..])
-        .expect("HKDF-Expand for 32 bytes is well within the SHA-256 8160-byte limit");
-    okm
+    hk.expand(info, out)
+        .expect("HKDF-Expand output length is within the SHA-256 8160-byte limit");
 }
 
 #[cfg(test)]
