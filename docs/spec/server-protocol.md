@@ -104,7 +104,7 @@ of a shipped route.
 
 The **floor** is not a strength claim: the secret is a uniformly-random 256-bit subkey, so PBKDF2 stretching buys nothing here and a low count costs nothing (a count mismatch simply fails the handshake). The **ceiling** is the load-bearing half, and it is an **availability** bound only — a party that controls what `/auth/scram/init` reports, or that wins the unauthenticated first write, otherwise pins an arbitrary amount of client CPU on every later handshake for that account (on the web client that work runs inline in the Worker, occupying its event loop for the duration). No confidentiality or integrity property depends on it.
 
-**Authed routes** — `Authorization: Bearer <token_hex>` (a valid, non-revoked per-device token); a missing/invalid token is `401 unauthenticated`:
+**Authed routes** — `Authorization: Bearer <token_hex>` (a valid, non-revoked per-device token); a missing/invalid token is `401 unauthenticated`. **A B2B member's per-vault membership token (§3.1a) is also accepted on the sync routes** (`/sync/push`, `/sync/pull`, `/sync/blob`, `/sync/blobs`, `/sync/poke`, `/account/status`), authorizing exactly the vault namespace it is bound to, so a member with no account of its own can read and write shared content. It is still refused for the `vault.meta` write (§3.4, `403 forbidden`), because the roster is owner-authored. A membership token carries no device id, so a member's pull cursor shares the zero-device slot; that costs at most a re-pull and never a wrong read. (myne-md/myne#711 task 24.)
 
 | Route | Request fields | Success response | Semantics |
 |---|---|---|---|
@@ -144,6 +144,46 @@ Normative points:
 - **A client MUST NOT treat this code as a retry class.** Retrying cannot help: only re-enrolment can, and only if the account owner allows it.
 - **What the client does with it is client policy, not server policy, and the two ship differently on purpose.** Desktop and mobile park and prompt to re-enrol, exactly as they already do on `unauthenticated` — the machine is the user's own, its vault directory is theirs, and erasing it on a server signal would be a destructive power nobody asked the server to have. The **web** client's storage is a cache of a sync-held vault (`decisions.md` 2026-07-26 makes sync required there), so it treats the code as terminal: lock, erase this browser's copy, and explain. The server emits one code; it does not know or care which policy is on the other end.
 - **This is not a remote wipe and not a cryptographic lockout, and no copy anywhere may imply that it is.** A device that already decrypted content cannot un-decrypt it, and an attacker holding the vault file plus the password is entirely unaffected — revocation is an **availability** control (§4). `REMOVE_DEVICE_DISCLOSURE` states exactly this and remains normative.
+
+### 3.1a Person accounts and vault membership (B2B; myne-md/myne#711)
+
+The B2B access model (`decisions/protocol/0603`) makes server accounts **person-level**: one account per person, independent of any vault. This section is the server's half; `internal/authapi` implements it. The invite relay routes and the owner-only `vault.meta` refusal are the neighbouring sections (tasks 8 and 9 of the same feature).
+
+**A person account is an account in the §3.1 SCRAM namespace, keyed by `person_id_hash`.** The person's server credential derives CLIENT-side from the normalized recovery phrase under the domain `"myne.v0.2 argon2id-person-server-auth|"` (plus `person_id_hash`), exactly as a vault account's derives from `root_key` under `server-auth`; the server is handed only a SCRAM verifier and never the secret. It registers and authenticates through `/auth/register`, `/auth/scram/init` and `/auth/scram/final` with `account_hash_hex = person_id_hash` and `username` the canonical lowercase hex of that same id. **There is deliberately no separate person-auth route**: the two ids are both 16 opaque bytes and the server cannot tell them apart, because it is blind to the difference. The id-typed namespace **is** the person namespace.
+
+**Access to a vault is a membership binding, not a key.** The server keeps a person↔vault table; a binding carries a role (owner or member) and issues a **per-vault bearer token** scoped to exactly that `(person, vault)`. The binding is an **availability** control: the server reads no roster plaintext, no fingerprint and no name, verifies no owner signature, and holds no public key. What it does learn is the pseudonymous person-to-vault mapping, which is the collaboration social graph already accepted by `decisions.md` 0459 (`threat-model.md` §7(4)).
+
+**Authorization on the membership routes.** The owner is bound by the **vault's own device session** — the owner's device is enrolled on the vault account, whose `account_number_hash` is the vault's public id and storage namespace (§2.1) — which is "owner at registration" and is first-write only. Every later member-management call is authorized by the **owner's per-vault membership token** (the same credential the owner-only `vault.meta` refusal will consume in the next task). The singleton owner is fixed at registration and cannot be re-assigned or removed through these routes.
+
+| Route | Auth | Request fields | Success response | Semantics |
+|---|---|---|---|---|
+| `POST /b2b/vaults/{account_hash}/members` | vault device token (owner registration) **or** the owner's per-vault token (add member) | `person_id_hex`, `role` (`"owner"` \| `"member"`) | `{"person_id_hex", "role", "token_hex"}` | Create a binding and issue its per-vault token. With the **vault device token**, only `role = "owner"` is accepted and the vault must have no owner yet (`409 already_owned` otherwise). With the **owner per-vault token**, only `role = "member"` is accepted (`400` for owner) and the token must be the owner of THIS vault (`403` otherwise); a re-bind is `409 already_bound`. |
+| `DELETE /b2b/vaults/{account_hash}/members/{person_id}` | owner's per-vault token | — | `{"ok": true}` | Delete one person's binding to one vault and revoke every outstanding token for that `(person, vault)`. `403` when the caller is not this vault's owner or when the target is the owner (the owner leaves only by deleting the vault); `404 not_found` when the person is not bound. A person's other vaults and their tokens are untouched. |
+
+Normative points:
+
+- **The per-vault token is bound to `(person, vault)` and to nothing else.** A token minted for one vault MUST NOT authorize another, and revocation MUST be per-binding: one `DELETE` stops one vault's access for one person, never the person's other vaults.
+- **Only the vault's own session may register its owner, and only once.** A second owner for the vault is `409 already_owned`; an owner token may not promote anyone to owner.
+- **`person_id_hex` is the lowercase hex of the 16-byte `person_id_hash`.** A malformed value is `400 bad_request`.
+- **The server verifies nothing about the vault's contents on these routes.** It stores no roster, no retirement record and no `MYY5` profile here; those ride the opaque blob plane (task 9 and the vault-scoped profile route), unchanged and unparsed.
+- **Self-host and hosted run the same binary, the same handler and the same route set.** These routes are registered unconditionally; no operator configuration adds, removes or reorders them. There is no operator override of a membership decision.
+
+**Sealed invite relay (the same feature, task 8).** An invite is delivered through the server as a **blind postbox**: the owner's authenticated session posts it addressed to the recipient's person account, the server stores it opaquely and releases it to that account on claim, then marks it claimed. The outer routing frame carries **only** the recipient person id, the vault id and the sealed payload; the account hashes, fingerprints and public halves the old frame carried in the clear live INSIDE the sealed payload now, so neither the server nor the vault's owner can read a member's fingerprint from the relay (`decisions/protocol/0603`, Grill 4 Q10). An invite is a slot, not a queue: a claimed invite is not re-claimable.
+
+| Route | Auth | Request fields | Success response | Semantics |
+|---|---|---|---|---|
+| `POST /b2b/invites` | **owner's per-vault token** | `recipient_person_id_hex`, `payload_b64` | `{"invite_id_hex", "vault_account_hash_hex", "recipient_person_id_hex"}` | Store a sealed invite addressed to the recipient for the token's vault. The vault comes from the token, not the path, so a member token is refused (`403`) and an unknown bearer is `401`. A payload over the cap is `400`. |
+| `GET /b2b/invites` | **recipient's person session** | — | `{"invites": [{"invite_id_hex", "vault_account_hash_hex", "claimed"}]}` | List the invites addressed to the caller, unclaimed and claimed alike. No payload is returned here; the claim is what releases it. |
+| `POST /b2b/invites/{invite_id}/claim` | **recipient's person session** | — | `{"payload_b64", "vault_account_hash_hex", "token_hex"}` | Release and consume the invite: return the sealed payload byte-identically, create the member↔vault binding, and issue the claiming person's per-vault token (the member-facing issuance path; the owner-side bind route is the other). A wrong-account claim and an unknown id are the **same `404`**, so one person cannot confirm another's invite exists; a second claim by the recipient is `409 already_claimed`. |
+| `GET /b2b/vaults/{account_hash}/invites` | **owner's per-vault token** | — | `{"invites": [{"invite_id_hex", "recipient_person_id_hex", "claimed"}]}` | The owner-side claimed-versus-pending view: the invitations the owner sent for the token's vault, with the recipient person id it supplied. A member token is `403`; no payload is returned. (myne-md/myne#711 task 11.) |
+| `PUT /b2b/vaults/{account_hash}/profiles/{profile_id}` | **person's own account session** + a membership binding to the vault | opaque `MYY5` bytes | `{"ok": true}` | Store one person's private AI profile in a vault-scoped namespace SEPARATE from the shared group manifest. `403` when the person is not bound to the vault, `401` for an unknown bearer, `400` when the body is empty or over-cap. The server records the writing account so member removal can schedule deletion after the retention grace; it reads none of the bytes. (myne-md/myne#711 task 16, `decisions/protocol/0608`.) |
+| `GET /b2b/vaults/{account_hash}/profiles/{profile_id}` | same | — | opaque `MYY5` bytes | Return the stored profile bytes byte-identically, or `404 not_found`. |
+
+Normative points:
+
+- **The server reads no fingerprint, public half or group key.** The stored frame is the recipient id, the vault id and opaque payload bytes; nothing in the relay parses, interprets or reorders the payload.
+- **A recipient must already hold a person account**, which is why identity setup registers one before any vault exists; the relay is addressed by `person_id_hash`.
+- **The relay is not a second access authority.** Claiming creates a membership binding through the same table §3.1a describes; a person with no invite cannot bind themselves, and a recipient can hold at most one binding per vault.
 
 ### 3.1b Cross-origin access for the web client (CORS; MYND-574)
 
@@ -205,6 +245,23 @@ Normative rules:
 - **Per-account namespacing is per-id.** An id belonging to another account is `not_found` — never `blob_reclaimed`, which would confirm the id exists somewhere, and never a whole-batch `403`, which a client could bisect.
 - **An unreadable body is a per-id omission** (`internal`), not a refusal of the whole response. A refusal poisons the window, which fails the client's cycle, which means one corrupt record wedges that account's sync permanently; as an omission the client skips the record without adopting a baseline and the next cycle re-lists it.
 - **Absent route is a legitimate client state.** A server predating this section answers `404`, or `405` behind a proxy that knows the `/sync` prefix but not the method; a client MUST fall back to `GET /sync/blob` for the remainder of that sync attempt. A **transport-level** failure is NOT that signal and MUST NOT trigger the fallback — it is an outage, and treating it as a missing route would mask one as a slow success.
+
+### 3.4 Owner-only `vault.meta` write and namespace retirement (B2B; myne-md/myne#711)
+
+Two server-side B2B enforcements ride the sync plane and share one authority: the owner's per-vault membership token (§3.1a). The server verifies **no signature and holds no public key** in either; the owner's authenticated session is the authority, and the owner-double-signed retirement record remains the PEER-verifiable artefact that travels the opaque blob plane (Grill 4 Q13).
+
+**`vault.meta` write gate.** For a vault that has an owner membership binding (a B2B vault), `PUT /vault.meta` MUST carry the **owner's per-vault token**: a member token is `403 forbidden`, and a device token is `403 owner_required`, because a device token carries no role and the roster is owner-authored. A vault with **no** owner binding (a single-user vault) keeps the pre-B2B device-token path unchanged, so the gate landing breaks no existing vault. The server learns nothing new: `vault.meta` stays opaque.
+
+| Route | Auth | Request fields | Success response | Semantics |
+|---|---|---|---|---|
+| `POST /b2b/vaults/{account_hash}/retire` | **owner's per-vault token** for that vault | `retired_epoch`, `replacement_epoch`, `namespace_kind` (`"group-key"` \| `"items-key"`), `namespace_id_hex`, `reclaim_sync_ids_hex` | `{"ok": true}` | Record a namespace retirement for the vault. `replacement_epoch` MUST equal `retired_epoch + 1` and `retired_epoch` MUST be non-zero (the record's own invariant). A `group-key` retirement's `namespace_id` MUST equal the vault's `account_hash`; an `items-key` retirement may name any id. A missing/member/unknown bearer is `401`/`403`. |
+
+Normative server behaviour after a retirement:
+
+- **A write to a retired sync id is refused** (`409 retired`), permanently, so a stale device cannot resurrect a namespace the owner rotated away from.
+- **The retired blobs are reclaimed only after a bounded grace** (a recovery window, default 7 days, operator-adjustable). Reclamation never runs before the window elapses. The server may always delay or withhold reclamation — that is a storage errand, not a guarantee, and a client MUST NOT treat a still-present old blob as evidence the retirement did not happen.
+- **No retirement recalls data.** It prevents FUTURE access once the rotation propagates; it cannot delete content already synced or copied. The server holds no key and deletes only what it stored.
+- **The server's retirement fields are provenance, not verification.** The epochs and namespace kind/id are recorded so an operator/audit read sees what was retired; enforcement keys on the sync ids the owner named, which is what a write can be matched against.
 
 ## 4. Device registry (AS16)
 
@@ -289,6 +346,8 @@ Enforcement policy persists in a **sparse top-level `accounts.json`** (server-si
 | `507` | `quota` | The account is at its effective storage ceiling |
 | `429` | `rate` | Per-account token-bucket limit (§5.2) |
 | `409` | `blob_stale` / `head_stale` | CAS loss — the pre-existing use of this field |
+| `409` | `retired` | The sync id was retired by the owner (§3.4) — a write is refused permanently; reclamation is separate and grace-bounded |
+| `403` | `owner_required` | A B2B vault's `vault.meta` write arrived with a device token rather than the owner's per-vault token (§3.4) |
 | `410` | `blob_reclaimed` | The body was Layer-2 reclaimed (`sync-protocol.md` §11.3) — fail-closed, never an empty-body `200` |
 | `404` | `not_found` | No such id **in this account's namespace** — never a statement about whether it exists elsewhere |
 

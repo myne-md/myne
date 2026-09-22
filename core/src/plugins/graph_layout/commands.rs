@@ -267,6 +267,7 @@ pub async fn graph_layout_write_with_dir(
     payload: &str,
 ) -> Result<(), GraphLayoutWriteError> {
     let _write_guard = write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     let shared = state
         .peek_unlocked_shared_singleton_key()

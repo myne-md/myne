@@ -52,7 +52,7 @@ use crate::phrase::RecoveryPhrase;
 use crate::types::KdfParams;
 use argon2::{Algorithm, Argon2, Params, Version};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Salt prefix for the password-derived wrap key
 /// (spec § 3.1; 28 ASCII bytes, trailing pipe).
@@ -100,6 +100,20 @@ pub const SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2: &[u8] =
 /// Domain for deriving a stable per-person, per-vault profile identifier.
 pub const PERSON_PROFILE_ID_PREFIX: &[u8] = b"myne.person-profile-id v1|";
 
+/// Salt domain for the **member vault key store** (myne-md/myne#711 task 25):
+/// the key that seals a member's group and items keys at rest on their device,
+/// so a member vault can be re-unlocked from the recovery phrase alone (a member
+/// has no vault password). Scoped per `(person, vault)` by the account-number
+/// hash in the salt, and distinct from the profile domain so the two secrets are
+/// never the same value.
+pub const SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2: &[u8] = b"myne.v0.2 argon2id-person-vault-member|";
+
+/// The FIXED salt randomizer for the member-vault-key KDF: the key must be
+/// reproducible from the phrase alone on any device (there is no per-device salt
+/// to store), so separation comes from the domain prefix and the vault's
+/// account-number hash. Deliberately not secret.
+pub const PERSON_VAULT_MEMBER_SALT_RANDOM: [u8; 16] = [0u8; 16];
+
 /// The FIXED salt randomizer for the private-profile KDF.
 ///
 /// The profile key must be reproducible from the phrase alone on every client
@@ -109,6 +123,48 @@ pub const PERSON_PROFILE_ID_PREFIX: &[u8] = b"myne.person-profile-id v1|";
 /// prefix and the `profile_id`, which already binds the person-id hash and the
 /// vault's account-number hash; this constant is deliberately not secret.
 pub const PERSON_VAULT_PROFILE_SALT_RANDOM: [u8; 16] = [0u8; 16];
+
+/// Salt domain for the deterministic person-identity key seed
+/// (`decisions/protocol/0604`, absorbing myne-md/myne#713). The person keypair
+/// is derived from the normalized phrase under this domain rather than generated
+/// from the OS CSPRNG, so the same phrase is the same identity on every device.
+/// Distinct from `SALT_PREFIX_PERSON_KEYPAIR_V0_2` so the key seed and the
+/// at-rest wrap key are never the same value.
+pub const SALT_PREFIX_PERSON_IDENTITY_V0_2: &[u8] = b"myne.v0.2 argon2id-person-identity|";
+
+/// The person-identity seed derivation uses no per-device randomizer: a fixed
+/// (non-secret) salt makes the derivation a pure function of the phrase, which
+/// is the whole point of the deterministic path. Mirrors the private-profile
+/// fixed salt.
+pub const PERSON_IDENTITY_SALT_RANDOM: [u8; 16] = [0u8; 16];
+
+/// The FIXED salt randomizer for the person-level SCRAM secret
+/// (`"myne.v0.2 argon2id-person-server-auth|"`, `decisions/protocol/0594`).
+///
+/// The secret must be reproducible from the phrase alone on every device the
+/// person signs in from (`decisions/protocol/0603`: a person account "opens one
+/// account bound to the person-id"), so there is no per-device salt to store or
+/// sync; a random one would strand every other device. Separation comes from the
+/// domain prefix and the `person_id_hash` in the salt slot, which is itself a
+/// pure function of the phrase; this constant is deliberately not secret.
+/// Mirrors [`PERSON_IDENTITY_SALT_RANDOM`] and [`PERSON_VAULT_PROFILE_SALT_RANDOM`].
+pub const PERSON_SERVER_AUTH_SALT_RANDOM: [u8; 16] = [0u8; 16];
+
+/// Per-key-type HKDF context strings for the deterministic person identity.
+/// Each key type derives from the one identity seed under its own context, so
+/// no key is a re-encoding of another (`decisions/protocol/0604`).
+pub const PERSON_KEM_CONTEXT: &[u8] = b"myne.person-kem v1|";
+pub const PERSON_ED25519_CONTEXT: &[u8] = b"myne.person-ed25519 v1|";
+pub const PERSON_MLDSA_CONTEXT: &[u8] = b"myne.person-mldsa v1|";
+
+/// Deterministic person-identity seed length (Argon2id output).
+pub const PERSON_IDENTITY_SEED_LEN: usize = 32;
+/// ML-KEM-768 decapsulation seed length (`d || z`).
+pub const PERSON_KEM_SEED_LEN: usize = 64;
+/// Ed25519 secret-seed length.
+pub const PERSON_ED25519_SEED_LEN: usize = 32;
+/// ML-DSA-65 signing-seed length.
+pub const PERSON_MLDSA_SEED_LEN: usize = 32;
 
 /// Argon2id salt length: 16 bytes (truncated SHA-256 output).
 pub const ARGON2_SALT_LEN: usize = 16;
@@ -327,6 +383,23 @@ pub fn derive_person_server_auth_key_from_normalized(
     argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 
+/// The production entry point for the person SCRAM secret: the
+/// `_from_normalized` form with the spec's fixed salt. The server never sees
+/// this value; the client feeds it to `scram_client_proof` and the server stores
+/// only the resulting verifier (`server-protocol.md` §3.1).
+pub fn derive_person_server_auth_key(
+    phrase_normalized: &str,
+    person_id_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    derive_person_server_auth_key_from_normalized(
+        phrase_normalized,
+        &PERSON_SERVER_AUTH_SALT_RANDOM,
+        person_id_hash,
+        params,
+    )
+}
+
 /// Derive a private AI-profile key scoped to one person and one vault.
 pub fn derive_person_vault_profile_key_from_normalized(
     phrase_normalized: &str,
@@ -356,6 +429,108 @@ pub fn derive_person_vault_profile_key(
         profile_id,
         params,
     )
+}
+
+/// The member-vault-key with the spec's fixed salt, the production entry point.
+/// [`derive_person_vault_member_key_from_normalized`] stays for vector
+/// generation, where the salt is an explicit input.
+pub fn derive_person_vault_member_key(
+    phrase_normalized: &str,
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    derive_person_vault_member_key_from_normalized(
+        phrase_normalized,
+        &PERSON_VAULT_MEMBER_SALT_RANDOM,
+        account_number_hash,
+        params,
+    )
+}
+
+/// Derive the key that seals one person's member-vault keys for one vault
+/// (myne-md/myne#711 task 25). Scoped per `(person, vault)` by the vault's
+/// account-number hash, so a member's key store for one vault does not open for
+/// another.
+pub fn derive_person_vault_member_key_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(
+        SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2,
+        account_number_hash,
+        salt_random,
+    );
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// Derive the deterministic person-identity key seed from the normalized
+/// recovery phrase (`decisions/protocol/0604`). The seed is the single root the
+/// three key-type seeds expand from; it is derived under its own salt domain so
+/// it is never the same value as the person-keypair at-rest wrap key.
+///
+/// [`derive_person_identity_seed`] is the production entry point (fixed salt);
+/// this `_from_normalized` form stays for vector generation, where the salt is
+/// an explicit input.
+pub fn derive_person_identity_seed_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    person_id_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(
+        SALT_PREFIX_PERSON_IDENTITY_V0_2,
+        person_id_hash,
+        salt_random,
+    );
+    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
+}
+
+/// The deterministic person-identity seed with the spec's fixed salt, the
+/// production entry point. A pure function of the normalized phrase and the
+/// phrase-derived `person_id_hash`, so one phrase is one identity everywhere.
+pub fn derive_person_identity_seed(
+    phrase_normalized: &str,
+    person_id_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    derive_person_identity_seed_from_normalized(
+        phrase_normalized,
+        &PERSON_IDENTITY_SALT_RANDOM,
+        person_id_hash,
+        params,
+    )
+}
+
+/// The three key-type seeds expanded from the one deterministic identity seed,
+/// each zeroized on drop.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct PersonIdentitySeeds {
+    /// ML-KEM-768 decapsulation seed (`d || z`, 64 bytes).
+    pub kem: [u8; PERSON_KEM_SEED_LEN],
+    /// Ed25519 secret seed (32 bytes).
+    pub ed25519: [u8; PERSON_ED25519_SEED_LEN],
+    /// ML-DSA-65 signing seed (32 bytes).
+    pub mldsa: [u8; PERSON_MLDSA_SEED_LEN],
+}
+
+/// Expand the one identity seed into the three key-type seeds, each under its
+/// own HKDF context string, so the KEM, Ed25519 and ML-DSA key material is
+/// domain-separated. The expansion goes through the crate's single HKDF helper
+/// (`subkey.rs`), never a bare `hkdf.expand` call.
+pub fn expand_person_identity_key_seeds(
+    seed: &[u8; PERSON_IDENTITY_SEED_LEN],
+) -> PersonIdentitySeeds {
+    let mut out = PersonIdentitySeeds {
+        kem: [0u8; PERSON_KEM_SEED_LEN],
+        ed25519: [0u8; PERSON_ED25519_SEED_LEN],
+        mldsa: [0u8; PERSON_MLDSA_SEED_LEN],
+    };
+    crate::subkey::derive_with_context_into(seed, PERSON_KEM_CONTEXT, &mut out.kem);
+    crate::subkey::derive_with_context_into(seed, PERSON_ED25519_CONTEXT, &mut out.ed25519);
+    crate::subkey::derive_with_context_into(seed, PERSON_MLDSA_CONTEXT, &mut out.mldsa);
+    out
 }
 
 /// The person-id hash: `SHA-256("myne.person-id|" || phrase_normalized)[:16]`.
@@ -1401,5 +1576,218 @@ mod tests {
         .expect("private profile key");
 
         assert_ne!(scram.as_slice(), profile.as_slice());
+    }
+
+    #[test]
+    fn person_server_auth_production_entry_point_uses_the_fixed_salt() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let person_id = person_id_hash(phrase);
+
+        // The production wrapper is the `_from_normalized` form with the spec's
+        // fixed salt, so a device with only the phrase derives the same secret.
+        let prod =
+            derive_person_server_auth_key(phrase, &person_id, &FAST_TEST_KDF_PARAMS).expect("prod");
+        let explicit = derive_person_server_auth_key_from_normalized(
+            phrase,
+            &PERSON_SERVER_AUTH_SALT_RANDOM,
+            &person_id,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("explicit");
+        assert_eq!(prod.as_slice(), explicit.as_slice());
+
+        // Phrase-sensitive AND bound to the person id in the salt slot.
+        let other_id = person_id_hash("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon");
+        let by_id =
+            derive_person_server_auth_key(phrase, &other_id, &FAST_TEST_KDF_PARAMS).expect("id");
+        assert_ne!(prod.as_slice(), by_id.as_slice());
+        let by_phrase = derive_person_server_auth_key(
+            "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",
+            &person_id,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("phrase");
+        assert_ne!(prod.as_slice(), by_phrase.as_slice());
+    }
+
+    // ---- Deterministic person identity (decisions/protocol/0604) ----
+
+    #[test]
+    fn person_identity_seed_is_deterministic_and_phrase_sensitive() {
+        let phrase_a = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let phrase_b = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon";
+        let id_a = person_id_hash(phrase_a);
+        let id_b = person_id_hash(phrase_b);
+
+        let seed_a1 =
+            derive_person_identity_seed(phrase_a, &id_a, &FAST_TEST_KDF_PARAMS).expect("seed A");
+        let seed_a2 =
+            derive_person_identity_seed(phrase_a, &id_a, &FAST_TEST_KDF_PARAMS).expect("seed A2");
+        let seed_b =
+            derive_person_identity_seed(phrase_b, &id_b, &FAST_TEST_KDF_PARAMS).expect("seed B");
+
+        assert_eq!(
+            *seed_a1, *seed_a2,
+            "the same phrase must derive the same identity seed on every call"
+        );
+        assert_ne!(
+            *seed_a1, *seed_b,
+            "a different phrase must derive a different identity seed"
+        );
+
+        let ka = expand_person_identity_key_seeds(&seed_a1);
+        let kb = expand_person_identity_key_seeds(&seed_b);
+        assert_ne!(
+            ka.kem, kb.kem,
+            "a different phrase must change the KEM seed"
+        );
+        assert_ne!(
+            ka.ed25519, kb.ed25519,
+            "a different phrase must change the Ed25519 seed"
+        );
+        assert_ne!(
+            ka.mldsa, kb.mldsa,
+            "a different phrase must change the ML-DSA seed"
+        );
+    }
+
+    #[test]
+    fn person_identity_seed_differs_from_the_at_rest_wrap_key() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let id = person_id_hash(phrase);
+        let seed =
+            derive_person_identity_seed(phrase, &id, &FAST_TEST_KDF_PARAMS).expect("identity seed");
+        let wrap = derive_person_keypair_wrap_key_from_normalized(
+            phrase,
+            &PERSON_IDENTITY_SALT_RANDOM,
+            &id,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("wrap key");
+        assert_ne!(
+            seed.as_slice(),
+            wrap.as_slice(),
+            "the identity seed and the at-rest wrap key must be domain-separated"
+        );
+    }
+
+    #[test]
+    fn person_identity_key_types_are_domain_separated() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let id = person_id_hash(phrase);
+        let seed =
+            derive_person_identity_seed(phrase, &id, &FAST_TEST_KDF_PARAMS).expect("identity seed");
+        let seeds = expand_person_identity_key_seeds(&seed);
+
+        assert_eq!(seeds.kem.len(), PERSON_KEM_SEED_LEN);
+        assert_eq!(seeds.ed25519.len(), PERSON_ED25519_SEED_LEN);
+        assert_eq!(seeds.mldsa.len(), PERSON_MLDSA_SEED_LEN);
+        assert_ne!(
+            &seeds.kem[..32],
+            &seeds.ed25519[..],
+            "KEM and Ed25519 seeds must differ"
+        );
+        assert_ne!(
+            &seeds.ed25519[..],
+            &seeds.mldsa[..],
+            "Ed25519 and ML-DSA seeds must differ"
+        );
+        assert_ne!(
+            &seeds.kem[..32],
+            &seeds.mldsa[..],
+            "KEM and ML-DSA seeds must differ"
+        );
+    }
+
+    #[test]
+    fn person_identity_derives_a_stable_keypair_and_fingerprint() {
+        use crate::person_key::PersonKeyPair;
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let id = person_id_hash(phrase);
+        let seed =
+            derive_person_identity_seed(phrase, &id, &FAST_TEST_KDF_PARAMS).expect("identity seed");
+
+        let k1 = expand_person_identity_key_seeds(&seed);
+        let k2 = expand_person_identity_key_seeds(&seed);
+        let a = PersonKeyPair::generate_raw(&k1.kem, &k1.ed25519, &k1.mldsa);
+        let b = PersonKeyPair::generate_raw(&k2.kem, &k2.ed25519, &k2.mldsa);
+        assert_eq!(
+            a.fingerprint(),
+            b.fingerprint(),
+            "a deterministically derived identity must be stable across calls"
+        );
+    }
+    #[test]
+    #[ignore = "vector generator; run explicitly to refresh person-member-key-store cases.json"]
+    fn emit_person_member_key_store_vectors_for_paste() {
+        extern crate std;
+        use crate::test_vector_fmt::{hex_lower, json_escape};
+        use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon \
+                      abandon abandon abandon abandon abandon abandon abandon abandon \
+                      abandon abandon abandon abandon abandon abandon abandon art";
+        let account_hash: [u8; 16] = [0x44; 16];
+        let vault_id: [u8; 16] = [0x77; 16];
+
+        let member_key =
+            derive_person_vault_member_key(phrase, &account_hash, &DEFAULT_V0_1_KDF_PARAMS)
+                .expect("derive member key");
+        let aad = crate::aead::aad_person_member_key_store(&vault_id, &account_hash);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"person-member-key-store\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str(
+            "  \"spec_section\": \"protocol.md section 9.28 / decisions/protocol/0606\",\n",
+        );
+        dump.push_str("  \"description\": \"Pins the B2B member-vault-key derivation (derive_person_vault_member_key: Argon2id over the normalized phrase under salt domain 'myne.v0.2 argon2id-person-vault-member|' with the vault account_number_hash in the salt slot) and the member-key-store AAD (aad_person_member_key_store: 'person-member-key-store' role, vault_id || account_number_hash, v0.2 prefix). A port that frames either differently derives a key that opens nothing, or an AAD that fails every open. EXPECTED RUNTIME: ~3s (Argon2id at canonical params). Generated by `cargo test -p protocol --lib emit_person_member_key_store_vectors_for_paste -- --ignored`.\",\n");
+        dump.push_str("  \"cases\": [\n");
+        dump.push_str("    {\n");
+        dump.push_str("      \"case_kind\": \"member-key-derivation\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("The member-vault key: Argon2id(normalized phrase) under the member salt domain with the vault's account_number_hash in the salt slot. Changing the phrase, the domain prefix, or the account hash changes the key.")
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_phrase\": \"{}\",\n",
+            json_escape(phrase)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_member_key_hex\": \"{}\"\n",
+            hex_lower(&*member_key)
+        ));
+        dump.push_str("    },\n");
+        dump.push_str("    {\n");
+        dump.push_str("      \"case_kind\": \"member-key-store-aad\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("The member-key-store AAD: v0.2 prefix || protocol byte || length-prefixed role 'person-member-key-store' || vault_id || account_number_hash. Binding both stops a store copied to another vault directory or account from opening.")
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_vault_id_hex\": \"{}\",\n",
+            hex_lower(&vault_id)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_aad_hex\": \"{}\"\n",
+            hex_lower(&aad)
+        ));
+        dump.push_str("    }\n");
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+        std::fs::write(
+            "/tmp/myne_person_member_key_store_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write person-member-key-store vectors dump");
     }
 }

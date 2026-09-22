@@ -57,6 +57,9 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     // panel's `.length` read.
     if (cmd === "plugin:sync|sync_list_roster")
       return { members: [], authority: "owner" };
+    // The owner-side invitation list (myne-md/myne#711 task 11), reached when
+    // the roster reports owner authority. An unanswered one crashes the panel.
+    if (cmd === "plugin:sync|sync_list_vault_invites") return [];
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;

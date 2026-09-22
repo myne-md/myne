@@ -23,6 +23,7 @@ use super::conflict::{
     plan_note_keep_both, ConflictCopyPlan, MetaWinner,
 };
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
+use super::head_authority::{HeadAuthority, SignedHeadCtx};
 use super::state::{
     clear_vault_meta_dirty, read_head_baseline, read_sync_state, vault_meta_is_dirty,
     write_head_baseline, write_sync_state, BlobSyncState, SyncState,
@@ -33,7 +34,7 @@ use crate::plugins::vault_unlock::state::SharedSingletonKey;
 use protocol::{
     compute_manifest_hash, derive_subkey, derive_subkey_versioned,
     encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
-    AttachmentsCatalog, ManifestEntry, MetaVersion, SubkeyRole, VaultHead, VvEntry,
+    AttachmentsCatalog, ManifestEntry, MetaVersion, SealedHead, SubkeyRole, VaultHead, VvEntry,
     AGENT_MEMORY_BLOB_MAGIC, AGENT_MEMORY_BLOB_V0_2_MAGIC, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
     AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_BLOB_MAGIC,
     AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC,
@@ -713,6 +714,39 @@ fn sync_id_for(root_key: &[u8; 32], role: SubkeyRole) -> [u8; 16] {
 /// `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`protocol.md` §3.4).
 pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
     sync_id_for(root_key, SubkeyRole::CatalogSyncId)
+}
+
+/// The reserved 16-byte sync-plane blob-id of a shared singleton, derived from
+/// the session's shared-tier key.
+///
+/// An owner/pre-B2B session (`OwnerRoot`) keeps the historical root-derived id:
+/// it names bytes the server already holds and the migration never rewrites it.
+/// An `NTV6` session (`Group`) derives it from the current group key
+/// (`GroupRole`), which is what lets a member address the same shared blobs the
+/// owner wrote (decision 0594: group roles cover shared content and shared
+/// singleton material). The id therefore rotates with the group key on member
+/// removal, and the retirement record's `reclaim_sync_ids_hex` is what reclaims
+/// the superseded namespace.
+///
+/// `role` MUST be an identifier derivation (`catalog-sync-id` /
+/// `prefs-sync-id` / `themes-sync-id` / `chats-catalog-sync-id` /
+/// `agent-memory-catalog-sync-id` / `agent-personality-sync-id`), never a KEK
+/// role: the id is server-visible, so truncating a key derivation into it
+/// would leak key material to the sync plane.
+fn shared_sync_id(shared: &SharedSingletonKey, role: SubkeyRole) -> [u8; 16] {
+    match shared {
+        SharedSingletonKey::OwnerRoot(root) => sync_id_for(root, role),
+        SharedSingletonKey::Group(group) => {
+            let group_role = role
+                .shared_group_role()
+                .expect("a shared-singleton identifier role must map to a group role");
+            let sub =
+                protocol::derive_group_subkey_v0_2(&protocol::GroupKey::new(**group), group_role);
+            let mut id = [0u8; 16];
+            id.copy_from_slice(&sub[..16]);
+            id
+        }
+    }
 }
 
 /// Read a vault singleton blob's outer nonce (offset 6, `AEAD_NONCE_LEN` bytes)
@@ -3531,25 +3565,137 @@ pub(crate) async fn sync_meta_phase(
     let local_changed = dirty || (baseline.is_some() && baseline != Some(local_hash.as_str()));
     let server_changed = baseline.is_none() || baseline != Some(server_hash.as_str());
 
-    // NTV6 guard. An `NTV6` `vault.meta` carries a B2B tail OUTSIDE `VaultMeta`
-    // (the owner-wrapped group key, the group-key epoch and the signed roster).
-    // `parse_vault_meta_any` now accepts the NTV6 base and `meta_version_of`
-    // maps it to `V0_2`, so the adopt and merge branches below would re-serialize
-    // through `serialize_vault_meta_v0_2`, silently DROP the tail and downgrade a
-    // migrated vault to `NTV5` — after which no root-tier unlock opens the
-    // group-sealed `itemsKey` and the vault is locked out. NTV6 meta sync is
-    // Grill 4, so only a VERBATIM push of our own NTV6 bytes is allowed here;
-    // adopt and merge are refused.
+    // NTV6 branch (B2B, myne-md/myne#711 task 13). An `NTV6` `vault.meta`
+    // carries a B2B tail OUTSIDE `VaultMeta` (the owner-wrapped group key, the
+    // group-key epoch and the signed roster), so it is NEVER re-serialized from
+    // the parsed `VaultMeta`: only a VERBATIM write of one side's bytes is safe
+    // (`serialize_vault_meta_v0_2` would drop the tail and downgrade the vault).
+    //
+    // The epoch rule: a strictly-greater server epoch is adopted; a lower one is
+    // a rollback and is refused; equal epochs must agree, and at equal epoch the
+    // server may still carry a newer roster (an invite writes the roster at the
+    // SAME epoch), so a server-only change is adopted too. A concurrent change at
+    // the same epoch cannot be tie-broken and is refused. A MEMBER device (no
+    // `root_key`) adopts but never writes `vault.meta`.
     let is_ntv6 = |b: &[u8]| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice());
     if is_ntv6(&local_bytes) || is_ntv6(&server_bytes) {
+        let member = root_key.is_none();
+        let (Ok(local_ntv6), Ok(server_ntv6)) = (
+            protocol::parse_vault_meta_ntv6(&local_bytes),
+            protocol::parse_vault_meta_ntv6(&server_bytes),
+        ) else {
+            // A one-sided `NTV6` (a generation transition) is not merged here.
+            return MetaPhaseOutcome::Skipped;
+        };
+        let local_epoch = local_ntv6.group_key_epoch;
+        let server_epoch = server_ntv6.group_key_epoch;
+
+        // Strictly-greater server epoch → adopt the server's bytes verbatim and
+        // trigger the M1 refresh: clear the per-blob CAS baselines so the next
+        // pull re-fetches every content header the owner rewrapped at the same
+        // ids. Content ciphertext and `content_nonce` are unchanged by a
+        // rewrap, so without this the peer would read itself as up to date.
+        if protocol::person_invite::accept_newer_epoch(local_epoch, server_epoch).is_some() {
+            // Authenticate the newer bytes BEFORE writing them. For an OWNER
+            // adopter the owner-wrapped group key must open under our root key
+            // and the roster envelope must open under that group key, so a
+            // hostile server cannot forge a high epoch and wedge or lock out the
+            // vault (the write below is irreversible: the genuine lower epoch is
+            // then refused as a rollback forever). A MEMBER holds no root key, so
+            // it cannot verify and relies on the group package it is delivered
+            // (owed delivery path, task 30); it adopts unverified.
+            if let Some(root_key) = root_key {
+                let group = match protocol::unlock_group_key_ntv6(
+                    &server_ntv6,
+                    &protocol::OwnerKey::new(*root_key),
+                ) {
+                    Ok(group) => group,
+                    Err(_) => {
+                        tracing::warn!(
+                            stage = "meta_phase",
+                            event = "ntv6_epoch_unverified",
+                            "refusing a newer group-key epoch whose owner wrap does not open"
+                        );
+                        return MetaPhaseOutcome::Skipped;
+                    }
+                };
+                if protocol::person_invite::open_group_roster(
+                    &group,
+                    &server_ntv6.base.account_number_hash,
+                    server_ntv6.group_key_epoch,
+                    &server_ntv6.signed_roster_envelope,
+                )
+                .is_none()
+                {
+                    tracing::warn!(
+                        stage = "meta_phase",
+                        event = "ntv6_epoch_unverified",
+                        "refusing a newer group-key epoch whose roster does not open"
+                    );
+                    return MetaPhaseOutcome::Skipped;
+                }
+            }
+            if io
+                .write(
+                    &meta_path,
+                    &server_bytes,
+                    crate::vault_io::WriteOpts::default(),
+                )
+                .await
+                .is_ok()
+            {
+                state.blobs.clear();
+                state.meta_baseline_hex = Some(server_hash);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
+                tracing::info!(
+                    stage = "meta_phase",
+                    event = "ntv6_epoch_adopted",
+                    "adopted a newer group-key epoch and queued the M1 header refresh"
+                );
+                return MetaPhaseOutcome::Adopted;
+            }
+            return MetaPhaseOutcome::Skipped;
+        }
+        // A lower server epoch is a rollback: refuse rather than regress the
+        // keys under a session that already holds the newer tier.
+        if server_epoch < local_epoch {
+            tracing::warn!(
+                stage = "meta_phase",
+                event = "ntv6_epoch_rollback_refused",
+                "refusing a lower group-key epoch as a rollback"
+            );
+            return MetaPhaseOutcome::Skipped;
+        }
+        // Equal epoch. The keys agree by construction; the roster may differ.
+        if server_changed && !local_changed {
+            if io
+                .write(
+                    &meta_path,
+                    &server_bytes,
+                    crate::vault_io::WriteOpts::default(),
+                )
+                .await
+                .is_ok()
+            {
+                state.meta_baseline_hex = Some(server_hash);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
+                return MetaPhaseOutcome::Adopted;
+            }
+            return MetaPhaseOutcome::Skipped;
+        }
         if local_changed && !server_changed {
-            if may_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
+            // A member never pushes `vault.meta`; the roster is owner-authored.
+            if !member
+                && may_push
+                && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
+            {
                 state.meta_baseline_hex = Some(local_hash);
                 let _ = clear_vault_meta_dirty(io, vault_root).await;
                 return MetaPhaseOutcome::Pushed;
             }
             return MetaPhaseOutcome::NoChange;
         }
+        // Both changed at the same epoch with no tie-break → fail closed.
         return MetaPhaseOutcome::Skipped;
     }
 
@@ -3786,7 +3932,11 @@ impl PushGate {
 pub async fn run_sync_cycle(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
-    root_key: &[u8; 32],
+    // The owner root key, or `None` for a member session: a member holds no
+    // `root_key`, and the shared families it may sync derive their ids from the
+    // group tier (`shared`) instead. Owner-only phases (the meta roster merge,
+    // credentials re-key) stand down when this is `None`.
+    root_key: Option<&[u8; 32]>,
     shared: &SharedSingletonKey,
     account_number_hash: [u8; 16],
     device_id: [u8; 16],
@@ -3801,6 +3951,10 @@ pub async fn run_sync_cycle(
     // their read-as-empty branch, which then re-seals empty over the real blob.
     version: MetaVersion,
     attachment_keys: Option<AttachmentKeys<'_>>,
+    // The signed (`0x02`) head authority when the vault is `NTV6` and a person
+    // identity is held; `None` keeps the `NTV5` `root_key` HMAC head. Keyed off
+    // the vault generation (decisions/protocol/0603, Q2 revised).
+    signed: Option<&SignedHeadCtx>,
 ) -> Result<SyncSummary, SyncCycleError> {
     let mut state = read_sync_state(io, vault_root)
         .await
@@ -3841,8 +3995,20 @@ pub async fn run_sync_cycle(
             .map_err(|_| SyncCycleError::Io)?;
     }
 
+    // The authority this vault's heads are authored, verified and baselined
+    // under: signed `0x02` on an `NTV6` vault with a held person identity, else
+    // the `NTV5` `root_key` HMAC.
+    let head_authority = match signed {
+        Some(ctx) => HeadAuthority::Signed(ctx),
+        // An `NTV5` head is HMAC'd under the owner root key, which a member
+        // does not hold; a member session is always `NTV6` and always signed.
+        None => match root_key {
+            Some(root_key) => HeadAuthority::Mac { root_key },
+            None => return Err(SyncCycleError::Head),
+        },
+    };
     // Baseline VV + seq from the device-local head baseline (empty on first sync).
-    let baseline_head = read_head_baseline(io, root_key, vault_root)
+    let baseline_head = read_head_baseline(io, &head_authority, vault_root)
         .await
         .ok()
         .flatten();
@@ -3872,6 +4038,7 @@ pub async fn run_sync_cycle(
             gate,
             version,
             attachment_keys,
+            &head_authority,
             &mut state,
             &baseline_vv,
             baseline_seq,
@@ -3893,7 +4060,7 @@ pub async fn run_sync_cycle(
                     vault_root,
                     &mut state,
                     gate.allows_content(),
-                    Some(root_key),
+                    root_key,
                 )
                 .await;
                 summary.credential_ambiguous =
@@ -3926,7 +4093,7 @@ pub async fn run_sync_cycle(
 async fn sync_cycle_attempt(
     io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
-    root_key: &[u8; 32],
+    root_key: Option<&[u8; 32]>,
     shared: &SharedSingletonKey,
     account_number_hash: [u8; 16],
     device_id: [u8; 16],
@@ -3941,6 +4108,7 @@ async fn sync_cycle_attempt(
     // their read-as-empty branch, which then re-seals empty over the real blob.
     version: MetaVersion,
     attachment_keys: Option<AttachmentKeys<'_>>,
+    head_authority: &HeadAuthority<'_>,
     state: &mut SyncState,
     baseline_vv: &[VvEntry],
     baseline_seq: u64,
@@ -3967,12 +4135,12 @@ async fn sync_cycle_attempt(
     // never diverge from disk and the old `manifest_stale` rescan valve is no
     // longer needed. The push-detect and head-manifest phases reuse the
     // maintained manifests instead of re-walking every blob header.
-    let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
-    let themes_id = themes_sync_id(root_key);
+    let cat_id = attachment_keys.map(|_| shared_sync_id(shared, SubkeyRole::CatalogSyncId));
+    let themes_id = shared_sync_id(shared, SubkeyRole::ThemesSyncId);
     // The chats catalog is unconditional like themes (a synced singleton that
     // exists for every holding vault), while the per-conversation files are
     // scanned below like attachments (an id-named per-file family).
-    let chats_catalog_id = chats_catalog_sync_id(root_key);
+    let chats_catalog_id = shared_sync_id(shared, SubkeyRole::ChatsCatalogSyncId);
     // In-memory union of the per-conversation files (conversation id →
     // on-disk nonce), maintained by the pull loop like `att_scan`.
     let mut chats_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4000,10 +4168,17 @@ async fn sync_cycle_attempt(
     // (sync-protocol.md §10.2.6/§10.2.7): an opted-out device derives no ids,
     // scans nothing, and inserts no baselines. It pushes/pulls nothing for
     // these ids, exactly as a vault with no conversations stays chats-silent.
-    let memory_on =
-        memory_sync_enabled(io, shared, &account_number_hash, vault_root, version).await;
-    let memory_catalog_id = memory_on.then(|| agent_memory_catalog_sync_id(root_key));
-    let personality_id = memory_on.then(|| agent_personality_sync_id(root_key));
+    // The memory plane is owner-only: a member's memory and personality are
+    // person-private (myne-md/myne#711 task 27), carried by the `MYY5` profile
+    // plane, and their family keys have no group role by design. `root_key`
+    // is `None` for a member, so the whole plane stands down exactly as it does
+    // for an opted-out device.
+    let memory_on = root_key.is_some()
+        && memory_sync_enabled(io, shared, &account_number_hash, vault_root, version).await;
+    let memory_catalog_id =
+        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentMemoryCatalogSyncId));
+    let personality_id =
+        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentPersonalitySyncId));
     // In-memory union of the per-entry files (entry id → on-disk nonce),
     // maintained by the pull loop like `chats_scan`.
     let mut memories_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4099,7 +4274,7 @@ async fn sync_cycle_attempt(
     let rekey_rebase = state.rekey_rebase_pending;
     let page = match engine::pull_to_stable(
         transport,
-        root_key,
+        head_authority,
         token,
         baseline_vv,
         from_cursor,
@@ -4116,7 +4291,7 @@ async fn sync_cycle_attempt(
                 .map_err(|_| SyncCycleError::Io)?;
             engine::pull_to_stable(
                 transport,
-                root_key,
+                head_authority,
                 token,
                 baseline_vv,
                 0,
@@ -4210,7 +4385,12 @@ async fn sync_cycle_attempt(
         }
     }
 
-    // --- chats phase (myne-md/myne#675): unconditional, every cycle ---
+    // --- chats phase (myne-md/myne#675): every cycle for an owner ---
+    // A member's conversations are person-private (myne-md/myne#711 task 28),
+    // carried by the `MYY5` profile plane, never the shared group manifest: the
+    // shared chats phase stands down for a member (its family key has no group
+    // role by design). The skipped outcome keeps every downstream consumer
+    // inert without a special case.
     // Like the themes singleton, the conversations catalog is never
     // head-committed; its dirty blob rides the push batch below so the CAS/409
     // machinery covers it. ONE critical section: the chats plugin's write
@@ -4226,19 +4406,24 @@ async fn sync_cycle_attempt(
         .find(|m| m.id == chats_catalog_id && m.attachment_id.is_none());
     let chats_write_mutex = crate::plugins::chats::commands::write_mutex();
     let chats_write_guard = chats_write_mutex.lock().await;
-    let mut chats_phase = sync_chats_phase(
-        io,
-        transport,
-        token,
-        root_key,
-        &account_number_hash,
-        vault_root,
-        state,
-        &chats_catalog_id,
-        remote_chats_cat_rec,
-        version,
-    )
-    .await?;
+    let mut chats_phase = match root_key {
+        Some(root_key) => {
+            sync_chats_phase(
+                io,
+                transport,
+                token,
+                root_key,
+                &account_number_hash,
+                vault_root,
+                state,
+                &chats_catalog_id,
+                remote_chats_cat_rec,
+                version,
+            )
+            .await?
+        }
+        None => skipped_chats_phase(),
+    };
 
     // --- conversation pull loop (catalog-guarded) ---
     // For every LIVE catalog row, reconcile the per-conversation file. A row
@@ -4252,6 +4437,10 @@ async fn sync_cycle_attempt(
     // act without its guard.
 
     let mut conversations_pulled: usize = 0;
+    // A non-skipped chats phase (a non-empty merged roster) only exists for an
+    // owner; a member's phase is skipped with an empty roster, so this loop is
+    // inert and the expect is unreachable for them.
+    let chats_root_key = root_key.expect("a non-skipped chats phase implies an owner root key");
     for (conv_hex, entry) in chats_phase.merged.iter() {
         let Some(conv_id) = from_hex16(conv_hex) else {
             // The catalog is canonical JSON from our own writer; a malformed
@@ -4288,7 +4477,7 @@ async fn sync_cycle_attempt(
             io,
             transport,
             token,
-            root_key,
+            chats_root_key,
             &account_number_hash,
             vault_root,
             &conv_id,
@@ -4337,6 +4526,9 @@ async fn sync_cycle_attempt(
     let mut personality_phase: Option<PersonalityPhase> = None;
     let mut entries_pulled: usize = 0;
     if let Some(mid) = memory_catalog_id {
+        // `memory_catalog_id` is only `Some` when `root_key` is: the shared
+        // memory plane is owner-only (a member's memory is person-private).
+        let root_key = root_key.expect("memory_on implies an owner root key");
         let remote_mem_cat_rec = page
             .all_metas
             .iter()
@@ -4623,7 +4815,7 @@ async fn sync_cycle_attempt(
     // Independent of the head/blob-manifest plane (like the catalog, the prefs
     // singleton is never head-committed); its dirty blob rides the push batch
     // below so the CAS/409 machinery covers it.
-    let prefs_id = prefs_sync_id(root_key);
+    let prefs_id = shared_sync_id(shared, SubkeyRole::PrefsSyncId);
     let remote_prefs_rec = page
         .all_metas
         .iter()
@@ -5851,7 +6043,10 @@ async fn sync_cycle_attempt(
             prev_head_hash,
             version_vector: version_vector.clone(),
         };
-        let sealed = head.seal(root_key).map_err(|_| SyncCycleError::Head)?;
+        let mut head_rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let sealed = head_authority
+            .seal(&head, &mut head_rng)
+            .map_err(|_| SyncCycleError::Head)?;
 
         // --- push, in bounded chunks (myne-md/myne#222) ---
         //
@@ -5914,25 +6109,30 @@ async fn sync_cycle_attempt(
                 // client can still authenticate at all. Left undone, nothing
                 // looks wrong until the token expires or a new device enrols,
                 // and then every handshake 401s permanently.
-                let new_secret = derive_subkey(root_key, SubkeyRole::ServerAuth);
-                let replaced = super::enroll::replace_verifier(
-                    transport,
-                    token,
-                    &account_number_hash,
-                    new_secret.as_slice(),
-                )
-                .is_ok();
-                // Both legs or neither: a head that landed with a stale verifier
-                // still leaves the account unreachable later, and clearing the
-                // flag would spend the one retry the next cycle has.
-                if replaced {
-                    state.rekey_rebase_pending = false;
-                } else {
-                    tracing::warn!(
-                        stage = "rekey_rebase",
-                        event = "verifier_replace_failed",
-                        "the re-based head landed but the SCRAM verifier did not; retrying next cycle"
-                    );
+                //
+                // Owner-only: a member holds no `root_key` and never sets
+                // `rekey_rebase_pending` (group rotation is not a root re-key).
+                if let Some(root_key) = root_key {
+                    let new_secret = derive_subkey(root_key, SubkeyRole::ServerAuth);
+                    let replaced = super::enroll::replace_verifier(
+                        transport,
+                        token,
+                        &account_number_hash,
+                        new_secret.as_slice(),
+                    )
+                    .is_ok();
+                    // Both legs or neither: a head that landed with a stale verifier
+                    // still leaves the account unreachable later, and clearing the
+                    // flag would spend the one retry the next cycle has.
+                    if replaced {
+                        state.rekey_rebase_pending = false;
+                    } else {
+                        tracing::warn!(
+                            stage = "rekey_rebase",
+                            event = "verifier_replace_failed",
+                            "the re-based head landed but the SCRAM verifier did not; retrying next cycle"
+                        );
+                    }
                 }
             }
             // The prefs push landed → its shared-subset hash is the new push-gate
@@ -5990,15 +6190,19 @@ async fn sync_cycle_attempt(
                 "marked the re-key's stranded singleton blobs for horizon-GC"
             );
         }
-        write_head_baseline(io, vault_root, &sealed)
+        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
     } else if let Some(vh) = &page.head {
-        // No local changes: adopt the pulled head as the new baseline (re-seal
-        // the decoded head — deterministic, reproduces the same record/head_id).
-        let sealed = vh.head.seal(root_key).map_err(|_| SyncCycleError::Head)?;
-        write_head_baseline(io, vault_root, &sealed)
+        // No local changes: adopt the pulled head as the new baseline, storing
+        // the PULLED record verbatim. Re-sealing the decoded head would be wrong
+        // for a signed (`0x02`) head, whose ML-DSA half is randomized.
+        let sealed = SealedHead {
+            record: vh.record.clone(),
+            head_id: vh.head_id,
+        };
+        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
     }
@@ -6235,7 +6439,7 @@ mod tests {
         blocking(run_sync_cycle(
             &IO,
             transport,
-            root_key,
+            Some(root_key),
             &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(*root_key)),
             account_number_hash,
             device_id,
@@ -6248,6 +6452,7 @@ mod tests {
                 PushGate::PollOnly
             },
             MetaVersion::V0_1,
+            None,
             None,
         ))
     }
@@ -8201,7 +8406,7 @@ mod tests {
         let held = blocking(run_sync_cycle(
             &IO,
             t.as_ref(),
-            &root_key,
+            Some(&root_key),
             &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
@@ -8210,6 +8415,7 @@ mod tests {
             &dir,
             PushGate::VerifyHold,
             MetaVersion::V0_1,
+            None,
             None,
         ))
         .expect("the held cycle still runs");
@@ -8280,7 +8486,7 @@ mod tests {
         let held = blocking(run_sync_cycle(
             &IO,
             t.as_ref(),
-            &root_key,
+            Some(&root_key),
             &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
@@ -8289,6 +8495,7 @@ mod tests {
             &dir,
             PushGate::VerifyHold,
             MetaVersion::V0_1,
+            None,
             None,
         ))
         .expect("the held first cycle");
@@ -8360,7 +8567,7 @@ mod tests {
         let held = blocking(run_sync_cycle(
             &IO,
             t.as_ref(),
-            &root_key,
+            Some(&root_key),
             &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root_key)),
             account_hash,
             dev,
@@ -8369,6 +8576,7 @@ mod tests {
             &dir,
             PushGate::VerifyHold,
             MetaVersion::V0_1,
+            None,
             None,
         ))
         .expect("the held first cycle");
@@ -10207,7 +10415,7 @@ mod tests {
         blocking(run_sync_cycle(
             &IO,
             transport,
-            root_key,
+            Some(root_key),
             &SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(*root_key)),
             account_number_hash,
             device_id,
@@ -10220,6 +10428,7 @@ mod tests {
                 items_key,
                 items_key_id,
             }),
+            None,
         ))
     }
 
@@ -12863,6 +13072,45 @@ mod tests {
             assert_ne!(themes_sync_id(&ROOT), themes_sync_id(&[0x11; 32]));
         }
 
+        // The addressing switch that lets a member sync shared singletons: an
+        // owner/pre-B2B session keeps the historical root-derived id, an `NTV6`
+        // session derives it from the group key (`GroupRole`), so an owner and a
+        // member holding the same epoch compute the SAME id while a member can
+        // never reproduce the root-derived one.
+        #[test]
+        fn shared_sync_ids_are_group_derived_for_ntv6_and_root_derived_for_ntv5() {
+            let root = [0x33u8; 32];
+            let group = zeroize::Zeroizing::new([0x77u8; 32]);
+            let owner = SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(root));
+            let member = SharedSingletonKey::Group(group.clone());
+            for (role, group_role) in [
+                (
+                    SubkeyRole::CatalogSyncId,
+                    protocol::GroupRole::CatalogSyncId,
+                ),
+                (SubkeyRole::PrefsSyncId, protocol::GroupRole::PrefsSyncId),
+                (SubkeyRole::ThemesSyncId, protocol::GroupRole::ThemesSyncId),
+            ] {
+                // The owner id is unchanged by this switch.
+                assert_eq!(shared_sync_id(&owner, role), sync_id_for(&root, role));
+                // The NTV6 id is the group derivation's first 16 bytes.
+                let derived = protocol::derive_group_subkey_v0_2(
+                    &protocol::GroupKey::new(*group),
+                    group_role,
+                );
+                let mut expected = [0u8; 16];
+                expected.copy_from_slice(&derived[..16]);
+                assert_eq!(shared_sync_id(&member, role), expected);
+                // A member could never have produced the root-derived id.
+                assert_ne!(shared_sync_id(&member, role), shared_sync_id(&owner, role));
+            }
+            // Distinct per family, so two blob families never collide.
+            assert_ne!(
+                shared_sync_id(&member, SubkeyRole::PrefsSyncId),
+                shared_sync_id(&member, SubkeyRole::ThemesSyncId)
+            );
+        }
+
         // A theme-less vault stays themes-silent: no local blob, no server
         // record ⇒ nothing to push (no §10.2.1-style initial publish here —
         // vault.themes carries no vault identity a joiner needs).
@@ -14858,6 +15106,194 @@ mod tests {
                 });
             }
             self.inner.request(method, path, body, token)
+        }
+    }
+    mod ntv6_epoch {
+        //! The `NTV6` epoch merge read path (myne-md/myne#711 task 13).
+        use super::super::*;
+        use super::{blocking, IO};
+        use crate::plugins::sync::state::{mark_vault_meta_dirty, SyncState};
+        use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
+        use crate::vault_io::VaultIo as _;
+
+        /// A structurally valid `NTV6` `vault.meta` at `epoch`: the group-key
+        /// wrap, the items-key wrap and the sealed roster are built exactly as a
+        /// migration/seal does, so `parse_vault_meta_ntv6` accepts it.
+        fn ntv6_meta_bytes(epoch: u64) -> Vec<u8> {
+            let root_key = [7u8; 32];
+            let items_key = [9u8; 32];
+            let group_key_bytes = [11u8; 32];
+            let account_hash = [0x33u8; 16];
+            let items_key_id = [0x07u8; 16];
+            let mut base = protocol::parse_vault_meta_v0_2(
+                &protocol::encode_vault_meta_v0_2_raw(
+                    &root_key,
+                    &items_key,
+                    &items_key_id,
+                    "pw",
+                    "abandon abandon abandon",
+                    &account_hash,
+                    &protocol::DEFAULT_V0_1_KDF_PARAMS,
+                    &[2u8; protocol::ARGON2_SALT_LEN],
+                    &[4u8; protocol::ARGON2_SALT_LEN],
+                    &[5u8; protocol::AEAD_NONCE_LEN],
+                    &[6u8; protocol::AEAD_NONCE_LEN],
+                    &[8u8; protocol::AEAD_NONCE_LEN],
+                )
+                .expect("encode NTV5 base"),
+            )
+            .expect("parse NTV5 base");
+            let group_key = protocol::GroupKey::new(group_key_bytes);
+            let group_nonce = [12u8; protocol::AEAD_NONCE_LEN];
+            let items_nonce = [13u8; protocol::AEAD_NONCE_LEN];
+            let enc_group = protocol::aead_seal_ctx(
+                &protocol::derive_owner_subkey_v0_2(
+                    &protocol::OwnerKey::new(root_key),
+                    protocol::OwnerRole::GroupKeyWrap,
+                ),
+                &group_nonce,
+                &group_key_bytes,
+                &protocol::aad_vault_group_key_wrap_v0_2(&account_hash, epoch),
+            )
+            .expect("seal group key");
+            let enc_items = protocol::aead_seal_ctx(
+                &protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::ItemsKeyWrap),
+                &items_nonce,
+                &items_key,
+                &protocol::aad_vault_items_key_wrap_v0_2(&items_key_id),
+            )
+            .expect("seal items key");
+            base.items_key_nonce = items_nonce;
+            base.enc_items_key.copy_from_slice(&enc_items);
+            let signed_roster_envelope = protocol::person_invite::seal_group_roster(
+                &group_key_bytes,
+                &account_hash,
+                epoch,
+                &[0xE6; protocol::AEAD_NONCE_LEN],
+                &protocol::person_invite::SignedGroupRoster {
+                    payload: vec![0xC3; 32],
+                    signature: protocol::person_key::PersonSigned {
+                        ed25519_sig: [0xD4; protocol::person_key::PERSON_ED25519_SIG_LEN],
+                        mldsa_sig: vec![0xE5; protocol::person_key::PERSON_MLDSA_SIG_LEN],
+                    },
+                },
+            )
+            .expect("seal roster envelope");
+            protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+                base,
+                group_key_nonce: group_nonce,
+                enc_group_key: enc_group.try_into().expect("fixed group-key wrap"),
+                group_key_epoch: epoch,
+                signed_roster_envelope,
+            })
+            .expect("serialize NTV6")
+        }
+
+        fn scratch(tag: &str) -> crate::test_support::ScopedTempDir {
+            crate::test_support::ScopedTempDir::new(tag).expect("temp dir")
+        }
+
+        async fn read_local(tmp: &crate::test_support::ScopedTempDir) -> Vec<u8> {
+            IO.read(&tmp.path().join("vault.meta")).await.unwrap()
+        }
+
+        async fn seeded(
+            tag: &str,
+            local: &[u8],
+        ) -> (crate::test_support::ScopedTempDir, SyncState) {
+            let tmp = scratch(tag);
+            IO.write(
+                &tmp.path().join("vault.meta"),
+                local,
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .unwrap();
+            let st = SyncState {
+                // Baseline == the local bytes → "only the server changed".
+                meta_baseline_hex: Some(super::super::sha256_hex(local)),
+                ..SyncState::default()
+            };
+            (tmp, st)
+        }
+
+        #[test]
+        fn a_strictly_greater_epoch_is_adopted_and_clears_baselines() {
+            blocking(async {
+                let local = ntv6_meta_bytes(1);
+                let server = ntv6_meta_bytes(2);
+                let (dir, mut st) = seeded("adopt", &local).await;
+                st.blobs.insert(
+                    "aa".repeat(16),
+                    crate::plugins::sync::state::BlobSyncState {
+                        version: 1,
+                        content_nonce_hex: "bb".repeat(24),
+                        doc_heads_hex: Vec::new(),
+                    },
+                );
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
+                let out =
+                    sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, Some(&[7u8; 32]))
+                        .await;
+                assert_eq!(out, MetaPhaseOutcome::Adopted);
+                assert_eq!(
+                    read_local(&dir).await,
+                    server,
+                    "server bytes written verbatim"
+                );
+                assert!(st.blobs.is_empty(), "M1 refresh cleared the baselines");
+                assert_eq!(
+                    st.meta_baseline_hex.as_deref(),
+                    Some(super::super::sha256_hex(&server).as_str())
+                );
+            });
+        }
+
+        #[test]
+        fn a_lower_epoch_is_refused_as_a_rollback() {
+            blocking(async {
+                let local = ntv6_meta_bytes(2);
+                let server = ntv6_meta_bytes(1);
+                let (dir, mut st) = seeded("rollback", &local).await;
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server);
+                let out =
+                    sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, Some(&[7u8; 32]))
+                        .await;
+                assert_eq!(out, MetaPhaseOutcome::Skipped);
+                assert_eq!(
+                    read_local(&dir).await,
+                    local,
+                    "a rollback must not regress the meta"
+                );
+            });
+        }
+
+        #[test]
+        fn a_member_device_adopts_but_never_pushes() {
+            blocking(async {
+                // Local epoch 1 differs from the server's equal-epoch copy and is
+                // dirty; the server is unchanged since our baseline. A MEMBER
+                // (root_key None) must NOT push; an OWNER pushes.
+                let server = ntv6_meta_bytes(1);
+                let local = ntv6_meta_bytes(1);
+                let (dir, mut st) = seeded("member", &local).await;
+                st.meta_baseline_hex = Some(super::super::sha256_hex(&server));
+                mark_vault_meta_dirty(&IO, dir.path()).await.unwrap();
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server);
+                t.on(HttpMethod::Put, "/vault.meta", 200, b"{}".to_vec());
+                let member =
+                    sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, None).await;
+                assert_eq!(member, MetaPhaseOutcome::NoChange);
+                assert!(
+                    !t.requests()
+                        .iter()
+                        .any(|r| r.1 == "/vault.meta" && r.0 == HttpMethod::Put),
+                    "a member must never write vault.meta"
+                );
+            });
         }
     }
 }

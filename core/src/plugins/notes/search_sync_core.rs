@@ -295,6 +295,9 @@ pub async fn persist_search_index_core(
         .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
+    // Hold off a shared-singleton reseal across this read-modify-write
+    // (myne-md/myne#711 task 15).
+    let _quiesce = crate::singleton_quiesce::shared().await;
     let (meta_version, account_hash) = account_number_hash(io, vault_dir).await?;
     let search_index_key = shared.derive(meta_version, SubkeyRole::SearchIndexKey);
     // Through the IO seam, NOT `notes_dir_under` (myne#303): that helper's root

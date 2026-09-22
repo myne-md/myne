@@ -108,6 +108,7 @@ impl BrowserTransport {
             HttpMethod::Post => "POST",
             HttpMethod::Put => "PUT",
             HttpMethod::Head => "HEAD",
+            HttpMethod::Delete => "DELETE",
         };
 
         // Headers as JSON rather than as a flattened list: the boundary already

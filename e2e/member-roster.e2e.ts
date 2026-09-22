@@ -7,8 +7,9 @@
 // What this proves that no other tier can: the Settings → Sync member-roster
 // panel exists in the REAL app and answers the PRE-B2B shape honestly. A
 // single-account vault (no membership roster extension) renders the panel
-// with an EMPTY list, a no-op by construction, not a hidden error. The full
-// two-device invite flow needs the Grill 4 wire route and lands with it.
+// with an EMPTY list, a no-op by construction, not a hidden error. The invite
+// is now by identity code and posts to the sealed relay; the two-device accept
+// and removal flows are owed (manual-test roster).
 //
 // The empty-state arm is load-bearing: it pins that the panel is a no-op on
 // every vault a pre-B2B user holds, which is the back-compat half of
@@ -74,11 +75,11 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     );
   });
 
-  it("the roster lists the owner and member with role badges after an invite", async () => {
+  it("the invite form takes an identity code and gates the post on a confirmed SAS compare", async () => {
     // Vault-count precondition: 1.
     let fixture!: SeededVault;
     await scenario(
-      "mr2-roster-roles",
+      "mr2-invite-code",
       { seed: (appDataDir) => { fixture = seedVault(appDataDir); } },
       async (app) => {
         await app.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
@@ -91,52 +92,29 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await phraseInput.replaceText(PERSON_PHRASE);
         await (await app.session.byTestId("member-roster.person-unlock-button")).click();
         await app.session.byTestId("member-roster.person-ready");
-        // Invite the deterministic fixture member through the real form.
+        // The invite form now takes the invitee's identity code (person id +
+        // public halves), not three pasted hexes (myne-md/myne#711 task 11).
         await (await app.session.byTestId("member-roster.invite-button")).click();
         await app.session.byTestId("member-roster.invite-modal");
-        await (await app.session.byTestId("member-roster.invite-kem")).replaceText(
+        const code = [
+          "MYNE-PERSON-1",
+          "77".repeat(16),
           MEMBER_FIXTURE.member_kem_ek_hex,
-        );
-        await (await app.session.byTestId("member-roster.invite-ed")).replaceText(
           MEMBER_FIXTURE.member_ed_pk_hex,
-        );
-        await (await app.session.byTestId("member-roster.invite-mldsa")).replaceText(
           MEMBER_FIXTURE.member_mldsa_vk_hex,
-        );
-        await (await app.session.byTestId("member-roster.invite-confirm")).click();
-        await app.session.byTestId("member-roster.invite-result");
-        // The roster reloads after a successful invite; wait for both rows
-        // (owner + member) rather than asserting on the first paint.
-        let rows = await app.session.findElements('[data-testid="member-roster.row"]');
-        const deadline = Date.now() + 20_000;
-        while (Date.now() < deadline) {
-          rows = await app.session.findElements('[data-testid="member-roster.row"]');
-          if (rows.length === 2) break;
-          await new Promise((r) => setTimeout(r, 500));
-        }
-        expect(rows).toHaveLength(2);
-        // Role badges: one Owner, one Member (real i18n English, not keys).
-        const badges = await app.session.findElements('[data-testid="member-roster.role"]');
-        const badgeTexts: string[] = [];
-        for (const b of badges) {
-          badgeTexts.push(((await b.textContent()) ?? "").trim());
-        }
-        expect(badgeTexts.sort()).toEqual(["Member", "Owner"]);
-        // The invited member is listed by fingerprint (first 16 of the
-        // deterministic fixture); the owner fingerprint varies per run.
-        const fps = await app.session.findElements(
-          '[data-testid="member-roster.fingerprint"]',
-        );
-        const fpTexts: string[] = [];
-        for (const f of fps) {
-          fpTexts.push(((await f.textContent()) ?? "").trim());
-        }
-        expect(fpTexts).toHaveLength(2);
-        expect(
-          fpTexts.some((t) =>
-            t.startsWith(MEMBER_FIXTURE.member_fingerprint_hex.slice(0, 16)),
-          ),
-        ).toBe(true);
+        ].join(":");
+        await (await app.session.byTestId("member-roster.invite-code")).replaceText(code);
+        // Inspect derives the SAS fingerprint locally (pure; no server needed).
+        await (await app.session.byTestId("member-roster.inspect")).click();
+        await app.session.byTestId("member-roster.sas-fingerprint");
+        // The post is gated on an explicit confirm.
+        const submit = await app.session.byTestId("member-roster.invite-confirm");
+        expect(await submit.attribute("disabled")).not.toBeNull();
+        await (await app.session.byTestId("member-roster.sas-confirm")).click();
+        // Submitting would post to the sealed relay, which needs an enrolled
+        // vault + server; this scenario pins the local form and the SAS gate. The
+        // two-device accept and removal flows are owed (manual-test roster).
+        await (await app.session.byTestId("member-roster.invite-cancel")).click();
         await closeSettings(app.session);
       },
     );

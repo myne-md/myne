@@ -1254,6 +1254,18 @@ The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialize
 
 Used in: `spec/sync-protocol.md` (vault head)
 
+### **head author id** &nbsp; 🗝️ *Key/identifier*
+
+The vault-scoped pseudonymous identifier a signed [vault head](#vault-head) carries so a peer can resolve which key signed it (`decisions/protocol/0603`, myne-md/myne#711). It is a deterministic function of the author's person public halves and the vault's `account_number_hash` under the hash domain `"myne.head-author v1|"`, so the same person shows a different id in each vault and the server cannot link one person across vaults. A verifier derives the candidate ids from the roster's public halves and matches; a single-user vault resolves it against the device's own person key. Deliberately not the raw [person fingerprint](#person-keypair).
+
+Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/sync-protocol.md` §3
+
+### **invite relay** &nbsp; 📦 *Product*
+
+The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, plus the owner-side claimed-versus-pending list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
+
+Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+
 ### **heading record** &nbsp; 📦 *Product*
 
 The per-note record set the structured index ([`vault.indices`](#vaultindices) / [`MYI1`](#myi1), `spec/protocol.md` §9.8.2) holds for each heading in a note body: `{text, level}` and nothing else. The source for the vault-wide `[[##` picker, replacing a read-and-reparse of every note body on each index change. Sibling of the [line-task projection](#line-task-projection) and the [block anchor](#block-anchor) records in the same payload, and the cheapest of the three: the client fills it from the parse an index update already runs, so it costs no extra pass.
@@ -1730,6 +1742,18 @@ The user's primary authentication credential. Held in user memory only. Fed to A
 
 Used in: `spec/protocol.md` §3.1, §4.1
 
+### **member removal** &nbsp; 📦 *Product*
+
+The owner action that ends a person's access to a shared vault (myne-md/myne#711 task 14, `decisions/protocol/0607`). It rotates the vault's group hierarchy: a fresh random `group_key` and `itemsKey` at epoch+1, every per-note/per-attachment/snapshot content key rewrapped under the new `itemsKey` with content ciphertext and every identifier byte-identical (`root_key` untouched), the removed member tombstoned in the owner-signed [group roster](#group-key-epoch), the owner-double-signed retirement records emitted, the rotated `vault.meta` pushed under the owner's per-vault token, and the removed member's server binding and per-vault token revoked (`DELETE /b2b/vaults/{hash}/members/{person_id}`). It is a **future-access revocation only**: a removed member keeps whatever they already synced, copied or exported, and nothing recalls it. A peer adopts the new epoch through the sync meta phase's read path.
+
+Used in: `docs/decisions/protocol/0607-member-removal-roster-person-id-and-revoke.md`; `docs/spec/sync-protocol.md` §10.3; `myne-md/myne#711`.
+
+### **member vault key store** &nbsp; 🗝️ *Key/identifier*
+
+The device-local `vault.member-key` file that lets a B2B member re-unlock a shared vault without a password (myne-md/myne#711 task 25, `decisions/protocol/0606`). It holds the member's `group_key` and `itemsKey` (64 bytes) AEAD-sealed under a key derived from the member's own normalized recovery phrase under the salt domain `"myne.v0.2 argon2id-person-vault-member|"` (the vault's `account_number_hash` in the salt slot), with AAD `aad_person_member_key_store(vault_id, account_number_hash)`. Device-local, never synced or backed up; a wrong phrase and tampering are the same AEAD failure. A member vault is unlocked by entering the recovery phrase.
+
+Used in: `docs/decisions/protocol/0606-member-vault-key-store.md`; `docs/spec/protocol.md` §5.2; `myne-md/myne#711`.
+
 ### **membership roster extension** &nbsp; 📦 *Product*
 
 The `vault.meta` membership field's third shape: NTV5 `reserved` byte
@@ -2045,6 +2069,31 @@ Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
 
 
+### **person account** &nbsp; 📦 *Product*
+
+A person-level server account independent of any vault (`decisions/protocol/0603`, myne-md/myne#711). It authenticates with SCRAM whose secret derives from the person's recovery phrase under `"myne.v0.2 argon2id-person-server-auth|"` plus `person_id_hash`, so one person holds one account across every vault they belong to. A vault keeps its own `account_number` as its public id, its namespace and its pre-auth `GET /vault.meta` bootstrap key. Access to a vault is an authenticated membership binding (owner at registration, member at acceptance) that issues a per-vault bearer token, so revoking one binding affects one vault and no other. The server knows the pseudonymous person-to-vault mapping, which is the collaboration social graph accepted by decisions 0459, but reads no roster plaintext.
+
+Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+
+### **person identity code** &nbsp; 🔑 *Identifier*
+
+The out-of-band string a person hands the other party in an invite so it can be
+verified (myne-md/myne#711, `decisions/protocol/0605`). **Bidirectional**: the
+invitee hands their code to the owner (to address and seal the invite), and the
+owner hands their code to the invitee (to verify the owner-signed group package
+against a pinned owner key). Shape:
+`MYNE-PERSON-1:<person_id_hex>:<kem_ek_hex>:<ed_pk_hex>:<mldsa_vk_hex>`, all
+lowercase hex. It carries **public** material only (the addressable [person
+account](#person-account) id and the [person keypair](#person-keypair) public
+halves) and never reaches the sync server: the sealed invite relay's outer frame
+is the recipient id and the vault id alone (`decisions/protocol/0603` Q10), so the
+public halves must travel through a channel the server does not control. The owner
+pastes it (a QR is not viable: the code is roughly 6.4k hex characters), sees the
+derived [fingerprint](#bootstrap-fingerprint), and confirms it out of band before
+the invite is sealed. Not an AEAD/magic value and not an AAD role.
+
+Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
+
 ### **person keypair** &nbsp; 🗝️ *Key/identifier*
 
 The B2B identity substrate's per-member cryptographic identity
@@ -2055,10 +2104,14 @@ two independent signatures preserve SUF-CMA), both carried by ONE person
 sealed under the person's OWN recovery phrase via the salt domain
 `"myne.v0.2 argon2id-person-keypair|"` (with the phrase-derived
 `person_id_hash` from the `"myne.person-id|"` domain in the salt slot). The
-keypair material itself is generated from the OS CSPRNG and sealed under that
-phrase-derived wrap key in a device-local file (`person_keypair.sealed`); it is
-NOT deterministically derived from the phrase, so a phrase on a NEW device mints
-a new identity unless the sealed file is present. Vault-independent (NOT
+keypair material itself is derived deterministically from the normalized phrase
+under the salt domain `"myne.v0.2 argon2id-person-identity|"` and the per-key-type
+HKDF contexts `"myne.person-kem v1|"`, `"myne.person-ed25519 v1|"` and
+`"myne.person-mldsa v1|"`, so the same phrase yields the same identity on every
+device; the device-local file (`person_keypair.sealed`) is a cache of the derived
+key, sealed under the phrase-derived wrap key above. This supersedes the CSPRNG
+generation clause of `decisions/protocol/0592` (deterministic derivation,
+`decisions/protocol/0604`, absorbing myne-md/myne#713). Vault-independent (NOT
 `root_key`-derived; `SubkeyRole::ALL` untouched), so one identity spans many
 vaults. The canonical fingerprint (SHA-256 over the domain-prefixed
 `"myne.person-fingerprint v1|"` public halves) is the [SAS](#bootstrap-fingerprint)
@@ -2071,9 +2124,15 @@ Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 ### **person key transition** &nbsp; 🗝️ *Key/identifier*
 
 The frozen signature class `"myne.person-key-transition v1|"` for a visible
-person-key continuity transition (myne-md/myne#712, `decisions/protocol/0594`).
-ALLOCATED, no frame is shipped yet: the class is declared so a later
-identity-re-roll feature cannot choose its own. Do not emit it.
+person-key continuity transition (myne-md/myne#712, `decisions/protocol/0594`;
+now written, `decisions/protocol/0604`). A surviving old person key double-signs
+it when an identity re-enrols, linking the superseded fingerprint to the new one
+so every roster the person is in records the change as cryptographic continuity;
+where the old key is unavailable the owner relinks explicitly and the roster is
+labelled owner-confirmed instead. A vault-less identity owes the record once it
+joins a vault.
+
+Used in: `docs/decisions/protocol/0604-deterministic-phrase-derived-person-identity.md`; `core/src/plugins/sync/roster.rs`
 
 ### **person private profile** &nbsp; 📋 *Protocol*
 
@@ -2088,9 +2147,18 @@ group key nor the owner `root_key` can read it. The `profile-id` is
 and is bound into the AAD with `account_number_hash`, so a profile moved to
 another person or vault fails verification. Provider choice, credential and
 egress consent are deliberately NOT in this blob (device-local). Removal and
-scheduled deletion make no recall guarantee.
+scheduled deletion make no recall guarantee. It syncs on a vault-scoped,
+person-authorized namespace SEPARATE from the shared group manifest
+(`PUT|GET /b2b/vaults/{account_hash}/profiles/{profile_id}`, authorized by the
+person's own account session plus a membership binding; the server reads none of
+it and records the writer for removal scheduling; `decisions/protocol/0608`). A
+**member's** memory, conversations and personality are serialized into it (design
+A); the local sealed container caches at `vault.person-ai`, and a pull merges the
+remote container at the family layer rather than by whole-value overwrite, so a
+concurrent edit on another device is not dropped (`decisions/protocol/0610`). An
+owner or single-user vault keeps the shared families instead.
 
-Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.28
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/decisions/protocol/0608-person-private-profile-plane.md`; `docs/decisions/protocol/0610-person-private-profile-family-layer-merge.md`; `docs/spec/protocol.md` §9.28
 
 
 
@@ -3336,7 +3404,7 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 
 ### **vault head** &nbsp; 📋 *Protocol* (deep entry)
 
-The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.16). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
+The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.16). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). **Signature-authenticated from `head_format_version = 0x02`** (`decisions/protocol/0603`, myne-md/myne#711): because a B2B member holds no `root_key`, a head is then signed by the author's [person keypair](#person-keypair) (Ed25519 + ML-DSA-65) and carries a vault-scoped pseudonymous [head author id](#head-author-id); verification is peer-side and covers the head only, so attribution is at push granularity. Every vault adopts `0x02`, including one that never invites, and the change is a re-base that reuses the whole-vault migration machinery; no on-disk magic, AAD prefix or content blob moves. Phase 2; full spec in `spec/sync-protocol.md`.
 
 Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.16, §10.3; `threat-model.md` §7 (MYND-416)
 
@@ -3362,9 +3430,10 @@ receipt. The invite-time SAS is the owner and member comparing fingerprints
 out of band (the [bootstrap-fingerprint](#bootstrap-fingerprint) pattern); a
 key change after the invite would be surfaced by
 [previousKeySet](#previouskeyset) once that identity-re-roll feature lands, and
-continuous Key Transparency stays on the roadmap. The transport route is not
-specified here (the sync wire contract is a follow-on); the envelope is opaque
-to the server except its public-key bytes.
+continuous Key Transparency stays on the roadmap. The transport is the [invite relay](#invite-relay)
+since `decisions/protocol/0603`: the invite is sealed and stored until claimed, and the outer routing
+frame carries only the recipient account id and the vault id, so the server reads no fingerprint,
+public half or group key.
 
 Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
@@ -3382,7 +3451,10 @@ the 16-byte account id of the account the vault belongs to. Sealed under a `root
 and to a filesystem adversary, and a field copied from another vault fails AEAD. Absent means
 unmigrated (the vault groups via the device-local **account record** alone), never a parse error.
 Written eagerly at vault creation and lazily on each natural unlock, never gating the unlock. The
-device-local half is the **account record**.
+device-local half is the **account record**. Distinct from the server-side person-to-vault
+[membership binding](#person-account) (`decisions/protocol/0603`), which is the authenticated record
+that issues a per-vault bearer token; this field is the encrypted client-side record of which account
+a vault belongs to.
 
 Used in: `spec/protocol.md` §9.3.1
 
