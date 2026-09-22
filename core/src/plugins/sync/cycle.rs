@@ -287,7 +287,7 @@ async fn reindex_pulled_notes(
 }
 
 /// Build the signed (`0x02`) head context for an `NTV6` vault, or `None` for a
-/// pre-B2B (`NTV5`) vault (decisions 0599, Q2 revised: the head format is keyed
+/// pre-B2B (`NTV5`) vault (decisions 0603, Q2 revised: the head format is keyed
 /// off the vault generation). The live roster rows' public halves let a peer
 /// resolve a head's signer.
 ///
