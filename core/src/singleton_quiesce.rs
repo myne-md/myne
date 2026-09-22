@@ -47,24 +47,52 @@ pub async fn exclusive() -> OwnedRwLockWriteGuard<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
+    /// The barrier's contract, proven without `try_write`: while a shared
+    /// holder exists, an exclusive acquisition does NOT resolve; once the
+    /// shared holder drops, it does. `try_write` is not a valid probe here
+    /// because it races with the multi-threaded runtime's scheduler under the
+    /// full parallel `--lib` run, which is what made the earlier version flaky.
     #[test]
     fn shared_blocks_exclusive_and_releases_it() {
         crate::test_support::block_on(async {
-            // Two shared holders coexist.
             let a = shared().await;
             let b = shared().await;
-            // An exclusive acquisition is refused while any shared holder exists.
+
+            // Spawn an exclusive acquisition and give it a chance to run. It
+            // must NOT complete while `a` and `b` are held.
+            let acquired = Arc::new(AtomicBool::new(false));
+            let flag = acquired.clone();
+            let waiter = tokio::spawn(async move {
+                let _g = exclusive().await;
+                flag.store(true, Ordering::SeqCst);
+            });
+            // Yield so the spawned task reaches the write lock and blocks.
+            for _ in 0..64 {
+                tokio::task::yield_now().await;
+            }
             assert!(
-                barrier().try_write().is_err(),
-                "exclusive must be refused while a shared holder exists"
+                !acquired.load(Ordering::SeqCst),
+                "exclusive must not resolve while a shared holder exists"
             );
+
+            // Drop one holder: still blocked (the other remains).
             drop(a);
-            drop(b);
-            // Once they drop, exclusive is free.
+            for _ in 0..64 {
+                tokio::task::yield_now().await;
+            }
             assert!(
-                barrier().try_write().is_ok(),
-                "exclusive is free once the shared holders drop"
+                !acquired.load(Ordering::SeqCst),
+                "exclusive must stay blocked while any shared holder remains"
+            );
+
+            // Drop the last holder: the exclusive acquisition now resolves.
+            drop(b);
+            waiter.await.expect("the exclusive waiter should complete");
+            assert!(
+                acquired.load(Ordering::SeqCst),
+                "exclusive resolves once every shared holder drops"
             );
         });
     }
