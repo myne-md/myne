@@ -657,6 +657,13 @@ function RestoreConfirm({
 }) {
   const { t } = useTranslation();
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // The confirm is a SECOND overlay stacked on the panel's own backdrop, and
+  // the owner's contract is "whatever is on top owns the page" (myne-md/myne#728,
+  // review). Without this, the panel content behind the confirm stayed
+  // reachable by a virtual cursor and a click, because the panel's own
+  // registration was the only one on the stack.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, true);
 
   useEffect(() => {
     cancelRef.current?.focus();
@@ -673,6 +680,7 @@ function RestoreConfirm({
 
   return (
     <div
+      ref={backdropRef}
       style={BACKDROP_STYLE}
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();

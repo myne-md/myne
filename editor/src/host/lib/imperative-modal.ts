@@ -14,6 +14,7 @@
 // idempotent, so a caller's own `finish`/`cleanup` may call it freely.
 
 import { trapFocus } from "./imperative-focus-trap";
+import { popOverlay, pushOverlay } from "./overlay-inert";
 
 export interface OpenModalOptions {
   /** className for the backdrop (CSS-class modals: diff/convert/lightbox). */
@@ -75,6 +76,12 @@ export function openModal(options: OpenModalOptions): OpenModal {
   const close = (): void => {
     if (closed) return;
     closed = true;
+    // Pop BEFORE releasing the trap. The trap's release restores focus to the
+    // element that held it, which lives in the background this call
+    // un-inerts; releasing first would ask the browser to focus an inert
+    // element. Every vanilla-DOM modal goes through this skeleton, so this is
+    // the one place the guarantee has to live (myne-md/myne#728).
+    popOverlay(backdrop);
     releaseTrap?.();
     document.removeEventListener("keydown", onKey, true);
     backdrop.remove();
@@ -82,6 +89,7 @@ export function openModal(options: OpenModalOptions): OpenModal {
 
   document.body.appendChild(backdrop);
   document.addEventListener("keydown", onKey, true);
+  pushOverlay(backdrop);
 
   const installTrap = (
     root: HTMLElement,
