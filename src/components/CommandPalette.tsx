@@ -31,6 +31,7 @@ import { setRibbonItems } from "../lib/prefs";
 import { resolveRibbonItems, ribbonEligibleIds } from "../notes/ribbonItems";
 import { Icon } from "./primitives/Icon";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useOverlayInert } from "../hooks/useOverlayInert";
 import { Keycaps } from "./primitives/Keycaps";
 import type {
   ActionVisibility,
@@ -102,6 +103,27 @@ const INPUT_STYLE: CSSProperties = {
   color: "var(--fg-1)",
   padding: "14px 16px",
 };
+
+/**
+ * The combobox wiring's two ids (myne-md/myne#728, task 5).
+ *
+ * The palette is an input over a filtered list, which is a combobox: the input
+ * keeps focus while the arrows move a highlight inside the list, so the moving
+ * selection is only conveyed by `aria-activedescendant`. Without it a screen
+ * reader announces nothing as the user arrows down a list of twenty commands.
+ *
+ * The pairing also removes an axe finding rather than suppressing one: a
+ * `role="listbox"` referenced by a `role="combobox"` through `aria-controls`
+ * is a combobox popup, and `scrollable-region-focusable` deliberately does not
+ * match one (axe-core `scrollableRegionFocusableMatches`). That rule was one of
+ * the four ids in the E2E baseline task 17 drains.
+ */
+const LIST_ID = "palette-results";
+
+/** Stable per-row id, so `aria-activedescendant` can name the highlighted row. */
+function paletteOptionId(index: number): string {
+  return `palette-option-${index}`;
+}
 
 const LIST_STYLE: CSSProperties = {
   flex: 1,
@@ -334,6 +356,13 @@ export function CommandPalette({
   // search input. MYND-93.
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
   // Monotonic dispatch counter for the note-search generation-guard (MYND-40):
   // each query dispatch claims the next value; only the latest-dispatched
   // response is applied (see `shouldApplyNoteSearchResult`).
@@ -771,7 +800,7 @@ export function CommandPalette({
   const showSectionLabels = commandCount > 0 && rows.length > commandCount;
 
   return (
-    <div style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
+    <div ref={backdropRef} style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
       <div
         ref={modalRef}
         style={MODAL_STYLE}
@@ -791,6 +820,21 @@ export function CommandPalette({
           onKeyDown={onKeyDown}
           placeholder={t("commandPalette.searchPlaceholder")}
           aria-label={t("commandPalette.searchPlaceholder")}
+          // Combobox (myne#728, task 5), the `SettingsSearch` pattern.
+          // `aria-controls` is set only while there is something to control,
+          // so the reference never dangles.
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={rows.length > 0}
+          aria-controls={rows.length > 0 ? LIST_ID : undefined}
+          // Named only while the index still points at a rendered row. A
+          // clamp would be fiction: in the one frame where the rows have
+          // shrunk (an async note-search result landing) and the clamping
+          // effect has not run yet, NO row carries `aria-selected`, so naming
+          // the last one would claim a highlight that is not on screen.
+          aria-activedescendant={
+            selectedIndex < rows.length ? paletteOptionId(selectedIndex) : undefined
+          }
           style={INPUT_STYLE}
           autoComplete="off"
           autoCorrect="off"
@@ -835,10 +879,18 @@ export function CommandPalette({
             })}
           </div>
         )}
-        <div style={LIST_STYLE} role="listbox" ref={listRef}>
-          {rows.length === 0 ? (
-            <div style={EMPTY_STYLE}>{t("commandPalette.noMatches")}</div>
-          ) : (
+        <div
+          id={LIST_ID}
+          style={LIST_STYLE}
+          role="listbox"
+          // Named (myne#728, task 4). A listbox with no name announces as
+          // "list box" and nothing else; the dialog's own name does not carry
+          // down to it. The results are commands AND notes, so the name says
+          // both rather than borrowing the dialog's.
+          aria-label={t("commandPalette.resultsLabel")}
+          ref={listRef}
+        >
+          {rows.length === 0 ? null : (
             rows.map((row, i) => {
               // Inject a section label before the first command row and before
               // the first note row (only when both sections are present).
@@ -877,6 +929,23 @@ export function CommandPalette({
             })
           )}
         </div>
+        {rows.length === 0 && (
+          // Announced (myne#728): typing a query that matches nothing is a
+          // state change the user has to be told about, and a silent list is
+          // indistinguishable from a list still loading.
+          //
+          // OUTSIDE the listbox, and that placement is the whole point. A
+          // `role="listbox"` may own only `option` and `group` children, so a
+          // roled child of any other kind is an `aria-required-children`
+          // violation - the very rule this branch removes from the axe
+          // baseline. A child with NO role is descended through and costs
+          // nothing; `role="status"` is collected and rejected. The listbox
+          // stays mounted and empty so the combobox's `aria-controls` and
+          // `aria-activedescendant` wiring keeps pointing at something real.
+          <div style={EMPTY_STYLE} role="status">
+            {t("commandPalette.noMatches")}
+          </div>
+        )}
         {pinError !== null && (
           <div style={PIN_ERROR_STYLE} role="alert" data-testid="palette.pin-error">
             {pinError}
@@ -922,6 +991,7 @@ function renderRow(
   return (
     <div
       style={style}
+      id={paletteOptionId(index)}
       role="option"
       aria-selected={selected}
       aria-disabled={isDisabled}
@@ -942,11 +1012,25 @@ function renderRow(
             <span style={CATEGORY_STYLE}>{row.action.category}</span>
           )}
           {/* Left-ribbon pin toggle (myne-md/myne#699): only ribbon-eligible
-              actions show it, and a disabled action offers nothing to pin. */}
+              actions show it, and a disabled action offers nothing to pin.
+
+              A MOUSE affordance, outside the accessibility tree, and the
+              real-render axe gate is what settled it (myne-md/myne#728). It
+              was a focusable `<button>` inside a `role="option"`, and
+              `option` is one of ARIA's children-presentational roles, so
+              that is `nested-interactive`: 19 nodes on a normal palette.
+              The rule was in the axe baseline task 17 deleted, so the
+              deletion is what surfaced it rather than anything new here.
+
+              There is no DOM shape that keeps a focusable control inside a
+              listbox option, the same bind the per-tab close is in. The
+              keyboard path is not lost, which is why this is the right
+              trade: Settings, Appearance, Customize ribbon is a full
+              keyboard-operable roster of the same pins, and the rail itself
+              has a right-click menu. */}
           {!isDisabled && row.action.ribbon !== undefined && (
-            <button
-              type="button"
-              aria-label={pinned ? t("commandPalette.unpin") : t("commandPalette.pin")}
+            <span
+              aria-hidden="true"
               title={pinned ? t("commandPalette.unpin") : t("commandPalette.pin")}
               data-testid="palette.pin"
               data-command-id={row.action.id}
@@ -955,13 +1039,6 @@ function renderRow(
                 e.preventDefault();
                 e.stopPropagation();
                 togglePin(row.action.id);
-              }}
-              onClick={(e) => {
-                // Keyboard activation (Enter/Space on the focused toggle)
-                // fires click with detail 0. A mouse click already toggled on
-                // mousedown above, so handling it again here would pin and
-                // immediately unpin.
-                if (e.detail === 0) togglePin(row.action.id);
               }}
               style={{
                 display: "inline-flex",
@@ -975,7 +1052,7 @@ function renderRow(
               }}
             >
               <Icon name="pin" size={16} />
-            </button>
+            </span>
           )}
           {isDisabled && row.action.disabledHint !== undefined && (
             <span style={HINT_STYLE}>{row.action.disabledHint}</span>

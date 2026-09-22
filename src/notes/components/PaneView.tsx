@@ -66,7 +66,7 @@ import {
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
-import { TabStrip, STRIP_HEIGHT } from "./TabStrip";
+import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
@@ -299,6 +299,13 @@ export function PaneView({
   // the dedicated view host lands in #4 task 2; view tabs cannot yet be opened.
   const activeId: NoteId | null =
     leaf.activeTab?.kind === "note" ? leaf.activeTab.id : null;
+  // The title that names this pane's editor body for assistive technology
+  // (myne-md/myne#728). Read from the resolver cache, the same source the tab
+  // strip's label uses, so the tab and the announcement never disagree.
+  // `undefined` and `null` both mean "no title known", which the editor turns
+  // into its untitled wording rather than into no name.
+  const activeTitle: string | null =
+    activeId === null ? null : (ctx.cache.get(activeId)?.title ?? null);
   // A view-kind active tab renders the view host (MYND-274) instead of the
   // note editor; `activeViewId` is non-null exactly then.
   const activeViewId: string | null =
@@ -1434,6 +1441,15 @@ export function PaneView({
   // is NOT a new-tab state (it renders the view host below).
   const inNewTabState = pendingNewTab || leaf.activeTab === null;
 
+  // Tabs <-> panel pairing (myne#728). One panel per pane, named after the tab
+  // the user picked; `null` while the pane is in its new-tab/empty state, where
+  // the strip has no selected tab to borrow a name from.
+  const panelDomId = `pane-panel-${leaf.id}`;
+  const activeTabDomId =
+    inNewTabState || leaf.activeTab === null
+      ? null
+      : tabDomId(leaf.id, itemKey(leaf.activeTab));
+
   const paneBody = useMemo<PaneBody>(() => {
     if (inNewTabState) {
       return {
@@ -1548,6 +1564,7 @@ export function PaneView({
             // Pushed live rather than keyed, because this view is long-lived
             // and notes are swapped through it.
             noteId={activeId}
+            noteTitle={activeTitle}
             // Set only by the autosave `updated:` echo; undefined for every
             // authoritative writer, so those still apply unconditionally.
             valueBase={buffer.base}
@@ -1637,6 +1654,7 @@ export function PaneView({
               // Same note as the primary editor above: the reading mirror draws
               // its own cover banner, so its controls need the same target.
               noteId={activeId}
+              noteTitle={activeTitle}
               // Deliberately NO `valueBase`: this mirror holds no local edits,
               // so it must adopt every value unconditionally. Handing it the
               // primary's baseline would make it silently skip `updated:`
@@ -1799,9 +1817,22 @@ export function PaneView({
         insetLeft={insetLeft}
         insetRight={insetRight}
         onDetachNote={ws.detachNote}
+        panelId={panelDomId}
       />
       <div
         ref={outlineScrollerRef}
+        // The pane body is the strip's `role="tabpanel"` (myne#728). Without
+        // it the tabs were a tablist controlling nothing, so a screen reader
+        // announced the switch and then had no region to move into. Named by
+        // the ACTIVE tab rather than by a label of its own, which is the
+        // WAI-ARIA tabs pattern: the panel's name IS the tab you picked.
+        //
+        // The role is conditional because a pane in the new-tab state (or with
+        // every tab closed) has no active tab, and a `tabpanel` with nothing
+        // labelling it is worse than a plain scroller.
+        id={panelDomId}
+        role={activeTabDomId === null ? undefined : "tabpanel"}
+        aria-labelledby={activeTabDomId ?? undefined}
         style={{
           flex: 1,
           minHeight: 0,

@@ -291,3 +291,36 @@ builds load from Vite and never exercise the production origin at all.
 | 11.6 | **Dev loop, cabled**, `pnpm mobile:android` (or iOS on the simulator), i.e. the `adb reverse` / loopback origin | the app loads and HMR works |
 | 11.7 | **Dev loop, `--host`**, `pnpm tauri ios dev --host` against a physical iPhone on the same LAN | the app loads from the LAN IP. This is the arm desktop's hardcoded loopback list would refuse, and the reason the dev arm reads `build.devUrl` at runtime |
 | 11.8 | **Refusal is silent to the user**, nothing in the table above surfaced an error toast or a crash | the policy denies by returning `false`; a refusal logs a scheme LABEL only, never the URL (it is the value most likely to carry note plaintext) |
+
+## 12. Screen-reader and external-keyboard checklist (myne-md/myne#728, task 16)
+
+The flows were built from `<div onClick=…>`. On a touchscreen that works perfectly, which is
+why it survived every hand-test: the row is tappable and looks tappable. To VoiceOver and
+TalkBack it was a piece of text, and to an external keyboard it did not exist. Task 16 made
+each one a real control (`mobile/src/app/a11y/tappable.ts`: role, Tab stop, Enter and Space),
+and `mobile/tests/a11y-tappable.test.tsx` holds the tree to it in both directions.
+
+**What that test cannot answer is whether a screen reader agrees.** A `role="button"` div is
+the right markup and it is still markup: whether VoiceOver announces the row's name the way
+the row reads, whether the rotor lists these rows usefully, and whether TalkBack's activation
+gesture reaches them are all observations a person has to make on a device. Neither CI lane
+builds for iOS or Android, so this table is the only thing between the unit tests and a user.
+
+> **Not run as of 2026-09-21, on either platform.** Recorded rather than implied by the
+> table's existence, in the voice section 11 uses: nothing schedules this checklist, so it
+> verifies nothing until somebody runs it and writes the result (device model, OS build,
+> screen-reader version) below.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 12.1 | **VoiceOver, note list.** Swipe through the notes list | each row is announced as a button, named by its title (and snippet/date where shown); a double-tap opens it |
+| 12.2 | **VoiceOver, folder tree.** Reach a folder row | announced as a button with its expanded/collapsed state, and a double-tap toggles it. The chevron is a CSS rotation, so the STATE is the only way a reader learns which way it points |
+| 12.3 | **VoiceOver, settings rows.** Swipe the Settings sheet | rows that DO something announce as buttons; static rows announce as text and are not offered as actionable |
+| 12.4 | **VoiceOver, theme rows.** The custom-theme list and the light/dark/system segments | the applied one announces as selected (it reports `pressed`), the others do not |
+| 12.5 | **VoiceOver, attachment tiles.** Swipe the attachments sheet | an image or PDF tile announces "Preview <filename>"; an audio or video tile is NOT announced as a preview button (it carries its own transport instead) |
+| 12.6 | **VoiceOver, acknowledgement toggles.** The create-vault "I've saved this" checkboxes | the toggle announces the sentence beside it, not an unnamed "pressed, button" |
+| 12.7 | **TalkBack parity.** Repeat 12.1 to 12.6 on Android | same announcements and the same activation behaviour |
+| 12.8 | **External keyboard, reach.** Pair a Bluetooth keyboard, Tab through the list and the settings sheet | every row the finger can reach, Tab can reach; Enter and Space both activate it |
+| 12.9 | **External keyboard, Space does not scroll.** Focus a list row and press Space | the row activates and the list does NOT jump a screen. A `role="button"` div gets no default suppression from the browser; this is the one the helper handles by hand |
+| 12.10 | **Announcements.** Trigger a toast, a sync banner and a failed snapshot | each is spoken without the user having to go looking for it |
+| 12.11 | **The scrim is not a control.** With the command palette open, swipe the screen reader through it | no full-screen unnamed button is announced in front of the palette; Escape (or the reader's dismiss) closes it |

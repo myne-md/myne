@@ -26,8 +26,10 @@ import {
   type ButtonHTMLAttributes,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
@@ -40,10 +42,12 @@ import {
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
 import { shouldDetachOnDrop } from "../detachDrop";
+import { useRovingFocus } from "@myne/editor/host/lib/roving-focus";
 import { has } from "../../platform/capabilities";
 import { getCurrentWindow } from "../../platform/window";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -93,6 +97,21 @@ const STRIP_BUTTON_HEIGHT = TITLE_BAR_CONTROL_HEIGHT;
 
 const TITLE_MAX = 160;
 
+/**
+ * Stable DOM id for a tab element (myne#728). The pane body carries
+ * `role="tabpanel"` and names itself after the ACTIVE tab through
+ * `aria-labelledby`, so the tab and the panel must agree on one id without
+ * either owning the other. Scoped by pane, because the same note can be open
+ * in two panes at once and an id is document-unique.
+ *
+ * `paneId` is a uuid and a tab handle is an `itemKey` (`note:<uuid>` and
+ * friends), so both are already id-safe; the colon is legal in an HTML5 id and
+ * is only kept out of CSS selectors, which nothing here uses.
+ */
+export function tabDomId(paneId: string, tabId: string): string {
+  return `tab-${paneId}-${tabId}`;
+}
+
 export type TabStripProps = {
   /** The pane this strip belongs to (carried in drag payloads). */
   paneId: string;
@@ -139,6 +158,11 @@ export type TabStripProps = {
   /** Extra right padding (px) when this strip sits at the window's top-right
    *  corner with no right sidebar — clears the right sidebar toggle. */
   insetRight?: number;
+  /** DOM id of the `role="tabpanel"` this strip's tabs control (myne#728).
+   *  Optional because the strip renders standalone in tests and in the
+   *  title-bar-alignment harness, where there is no panel to point at and a
+   *  dangling `aria-controls` would name an element that does not exist. */
+  panelId?: string;
   /** Drag a tab OUT of the window to pop the note into its own OS window
    *  (myne#678 / #681, SYNC-6). The workspace owns the MOVE (spawn the pop-out
    *  and close this tab); the strip only reports the gesture. A dragged tab is
@@ -167,6 +191,7 @@ export function TabStrip({
   insetLeft = 0,
   insetRight = 0,
   onDetachNote,
+  panelId,
 }: TabStripProps) {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -174,6 +199,21 @@ export function TabStrip({
   const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(
     null,
   );
+
+  // The strip is one Tab stop (myne#728): arrow keys move between tabs and
+  // activate them (automatic activation, the WAI-ARIA tablist convention), so a
+  // pane with a dozen open notes costs one stop instead of a dozen. Focus is
+  // moved by the primitive; the active tab follows it.
+  const activeIndex = activeTab === null ? -1 : tabs.indexOf(activeTab);
+  const roving = useRovingFocus({
+    count: tabs.length,
+    activeIndex,
+    orientation: "horizontal",
+    itemSelector: '[role="tab"][data-tab-id]',
+    // Arrows move focus; Enter/Space activates (`handleTabKeyDown`), so no
+    // `onActiveIndexChange`: under manual activation the hook never calls it.
+    manualActivation: true,
+  });
 
   const handleDrop = (e: ReactDragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -221,8 +261,6 @@ export function TabStrip({
         transition:
           "padding-left var(--duration-base) var(--ease-standard), padding-right var(--duration-base) var(--ease-standard)",
       }}
-      role="tablist"
-      aria-label={t("notes.tabStrip.openNotes")}
       data-editor-chrome
       data-testid="editor.tab-strip"
       data-pane-id={paneId}
@@ -235,10 +273,15 @@ export function TabStrip({
       onDrop={handleDrop}
     >
       <div
-        // Transparent to the a11y tree so the `role="tab"` children below are
-        // owned directly by the `role="tablist"` parent — without this the
-        // generic wrapper breaks axe's `aria-required-children` (MYND-93).
-        role="presentation"
+        // The row IS the tablist, and it holds ONLY tabs (the open notes plus
+        // the transient new-tab chip). The `+` and `…` controls live outside
+        // it: a tablist may own nothing but tabs, and a focusable sibling
+        // button is what axe's `aria-required-children` reported here
+        // (myne#728).
+        role="tablist"
+        aria-label={t("notes.tabStrip.openNotes")}
+        ref={roving.containerRef as RefObject<HTMLDivElement>}
+        onKeyDown={roving.onKeyDown}
         style={
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
@@ -262,6 +305,8 @@ export function TabStrip({
             pinned={isPinned?.(id) ?? false}
             stacked={stacked}
             stackIndex={i}
+            tabIndex={roving.tabIndexFor(i)}
+            panelId={panelId}
             onActivate={onActivate}
             onClose={onClose}
             onContextMenu={
@@ -273,10 +318,14 @@ export function TabStrip({
           />
         ))}
         {pendingNewTab && <NewTabChip onClose={onCloseNewTab} />}
-        <StripButton label={t("notes.tabStrip.newTab")} onClick={onNewTab}>
-          <Icon name="plus" size={14} />
-        </StripButton>
       </div>
+
+      {/* Outside the tablist on purpose (myne#728): a tablist owns only tabs.
+          The row is content-sized (`flex: 0 1 auto`) with a draggable filler
+          after it, so the + still reads as trailing the tabs. */}
+      <StripButton label={t("notes.tabStrip.newTab")} onClick={onNewTab}>
+        <Icon name="plus" size={14} />
+      </StripButton>
 
       {/* The empty trailing expanse doubles as the window-drag handle (the
           strip sits on the OS title-bar row for a top pane), Obsidian-style. */}
@@ -320,7 +369,15 @@ export function TabStrip({
         <ContextMenu
           x={tabMenu.x}
           y={tabMenu.y}
-          items={tabMenuItems(tabMenu.id, isPinned?.(tabMenu.id) ?? false, onTogglePin)}
+          items={tabMenuItems(
+            tabMenu.id,
+            isPinned?.(tabMenu.id) ?? false,
+            onTogglePin,
+            tabs.indexOf(tabMenu.id),
+            tabs.length,
+            (toIndex) => onMoveTab(paneId, tabMenu.id, toIndex),
+            onClose,
+          )}
           onClose={() => setTabMenu(null)}
         />
       )}
@@ -328,20 +385,72 @@ export function TabStrip({
   );
 }
 
-/** The tab right-click menu's items (tab-modes / MYND-320): a single
- *  Pin/Unpin toggle item whose label reflects the current state. */
+/**
+ * The tab right-click menu's items: the Pin/Unpin toggle (tab-modes /
+ * MYND-320) and the non-drag reorder (myne-md/myne#728, task 12; WCAG 2.5.7).
+ *
+ * Reordering a tab was a DRAG and nothing else, which means a user who cannot
+ * drag could not do it at all. The menu is the alternative, and it is reachable
+ * from the keyboard because the strip's tabs are focusable (the roving tabindex
+ * from task 3) and Shift+F10 / the context-menu key open this menu on the
+ * focused one.
+ *
+ * `index` is the tab's current slot and `move` takes the target slot in
+ * POST-REMOVAL terms, which is the same contract the drop handler uses: it
+ * removes the tab before re-inserting, so a rightward move of one place is
+ * `index + 1` rather than `index + 2`. Getting that wrong moves the tab two
+ * places to the right and looks like a different bug entirely.
+ *
+ * An end tab is offered only the direction it can go, rather than a disabled
+ * row: there is nothing to explain about why the first tab cannot move left.
+ */
 function tabMenuItems(
   id: string,
   pinned: boolean,
   onTogglePin: (id: string) => void,
+  index: number,
+  count: number,
+  move: (toIndex: number) => void,
+  close: (id: string) => void,
 ): ContextMenuItem[] {
-  return [
+  const items: ContextMenuItem[] = [
     {
       id: pinned ? "tab.unpin" : "tab.pin",
       label: pinned ? i18n.t("notes.tabStrip.unpin") : i18n.t("notes.tabStrip.pin"),
       onSelect: () => onTogglePin(id),
     },
   ];
+  if (index > 0) {
+    items.push({
+      id: "tab.move-left",
+      label: i18n.t("notes.tabStrip.moveLeft"),
+      onSelect: () => move(index - 1),
+    });
+  }
+  if (index >= 0 && index < count - 1) {
+    items.push({
+      id: "tab.move-right",
+      label: i18n.t("notes.tabStrip.moveRight"),
+      onSelect: () => move(index + 1),
+    });
+  }
+  // Close. This menu is one of the THREE keyboard paths the per-tab x's
+  // demotion to an `aria-hidden` mouse affordance rests on, and for one
+  // review round it was not one: the comment at the x, the axe baseline
+  // deletion's header and `docs/decisions/ui/0599` all named "the tab's
+  // context menu" while this function built Pin, Move left and Move right
+  // and nothing else. A justification for removing an accessible control
+  // that names a path which does not exist is worse than no justification,
+  // because it reads as checked. Absent for a PINNED tab, which is the same
+  // rule the x itself follows (`!pinned`): unpin first, deliberately.
+  if (!pinned) {
+    items.push({
+      id: "tab.close",
+      label: i18n.t("notes.tabStrip.closeTabMenuItem"),
+      onSelect: () => close(id),
+    });
+  }
+  return items;
 }
 
 function tabLabel(title: string | null): { text: string; italic: boolean } {
@@ -366,8 +475,13 @@ type TabProps = {
   stacked: boolean;
   /** Position in the strip — drives the stacked overlap offset. */
   stackIndex: number;
+  /** Roving tabindex from the strip's primitive (myne#728): 0 for the active
+   *  tab, -1 for the rest, so the whole strip is one Tab stop. */
+  tabIndex: 0 | -1;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  /** DOM id of the pane's `role="tabpanel"`, when the strip has one. */
+  panelId?: string;
   /** Right-click (tab-modes / MYND-320): open the Pin/Unpin menu at the cursor. */
   onContextMenu?: (x: number, y: number) => void;
   /** Drag this tab OUT of the window to pop its note out (myne#678/#681, SYNC-6);
@@ -386,6 +500,8 @@ function Tab({
   pinned,
   stacked,
   stackIndex,
+  tabIndex,
+  panelId,
   onActivate,
   onClose,
   onContextMenu,
@@ -504,10 +620,35 @@ function Tab({
     }
   };
 
+  // Keyboard close for the focused tab (myne#728). The × is a mouse affordance
+  // and is deliberately not a Tab stop (see the button below); Delete/Backspace
+  // on the tab is the per-tab keyboard path, and `pane.close-tab` (Mod-W) is the
+  // global one.
+  const handleTabKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if ((e.key === "Delete" || e.key === "Backspace") && !pinned) {
+      e.preventDefault();
+      onClose(id);
+      return;
+    }
+    // MANUAL activation (myne#728, review). The strip's arrows move focus
+    // only; this is what selects. Automatic activation would re-point the
+    // editor body and persist workspace state once per tab passed over, so
+    // arrowing from the first tab to the eighth did that seven times on the
+    // way. The tablist pattern sanctions manual activation exactly where
+    // switching is expensive.
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onActivate(id);
+    }
+  };
+
   return (
     <div
       role="tab"
+      id={tabDomId(paneId, id)}
       aria-selected={active}
+      aria-controls={active ? panelId : undefined}
+      tabIndex={tabIndex}
       data-testid="editor.tab"
       data-tab-id={id}
       data-active={active}
@@ -519,6 +660,7 @@ function Tab({
       style={style}
       onClick={() => onActivate(id)}
       onAuxClick={handleAux}
+      onKeyDown={handleTabKeyDown}
       onContextMenu={
         onContextMenu
           ? (e) => {
@@ -592,9 +734,26 @@ function Tab({
           <Icon name="pin" size={12} />
         </span>
       ) : (
-        <button
-          type="button"
-          aria-label={t("notes.tabStrip.closeTab", { title: text })}
+        // The × is a MOUSE affordance, deliberately outside the accessibility
+        // tree (myne#728). axe rejects both shapes that keep it interactive:
+        // nested in the `role="tab"` widget it trips `nested-interactive`, and
+        // lifted out of the tab but still inside the tablist it trips
+        // `aria-required-children`. There is no DOM shape that keeps a focusable
+        // per-tab close control out of both, so it becomes decoration and the
+        // keyboard paths carry the capability: `pane.close-tab` (Mod-W),
+        // Delete/Backspace on the focused tab (`handleTabKeyDown`), and the
+        // tab's context menu.
+        <span
+          aria-hidden="true"
+          data-testid="editor.tab-close"
+          // The tooltip a mouse user had before this became a span, restored
+          // (myne#728, review). A `title` on an `aria-hidden` element is
+          // exactly a mouse affordance and adds nothing to the accessibility
+          // tree, which is the point: the control is declared mouse-only, so
+          // losing its mouse label was the one regression the demotion should
+          // not have caused. It also re-uses `notes.tabStrip.closeTab`, which
+          // the demotion had otherwise orphaned across all 31 catalogs.
+          title={t("notes.tabStrip.closeTab", { title: text })}
           onClick={(e) => {
             e.stopPropagation();
             onClose(id);
@@ -604,9 +763,13 @@ function Tab({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 18,
-            height: 18,
-            flexShrink: 0,
+            // 2.5.8's 24px floor (myne#728, task 11). It is out of the
+            // accessibility tree, so axe's `target-size` never matches it,
+            // but the criterion is about POINTER targets and a mouse user is
+            // exactly who this control is for. The background is transparent
+            // and the glyph stays 12px, so the box grows and nothing is drawn
+            // differently.
+            ...MIN_TARGET,
             padding: 0,
             border: 0,
             borderRadius: "var(--radius-1)",
@@ -618,7 +781,7 @@ function Tab({
           }}
         >
           <Icon name="x" size={12} />
-        </button>
+        </span>
       )}
     </div>
   );
@@ -656,17 +819,28 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
         {t("notes.tabStrip.newTab")}
       </span>
       {onClose && (
-        <button
-          type="button"
-          aria-label={t("notes.tabStrip.closeNewTab")}
+        // The same mouse affordance the real tabs' close became, and for the
+        // same reason (myne#728). This one was missed in the first pass: it
+        // is a focusable `<button>` inside a `role="tab"`, which is exactly
+        // the `nested-interactive` shape the per-tab x was demoted to a span
+        // to remove, and deleting the axe baseline in the same change would
+        // have made the remaining instance read as fixed. It is invisible to
+        // the real-render gate too, because the chip renders only while a new
+        // tab is pending and no axe scenario opens one.
+        //
+        // The keyboard path out of the chooser is Escape, which
+        // `onCloseNewTab` is wired to, plus the ordinary tab commands.
+        <span
+          aria-hidden="true"
+          title={t("notes.tabStrip.closeNewTab")}
+          data-testid="editor.new-tab-close"
           onClick={onClose}
           {...hoverSurface()}
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 18,
-            height: 18,
+            ...MIN_TARGET,
             padding: 0,
             border: 0,
             borderRadius: "var(--radius-1)",
@@ -677,7 +851,7 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
           }}
         >
           <Icon name="x" size={12} />
-        </button>
+        </span>
       )}
     </div>
   );

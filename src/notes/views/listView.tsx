@@ -109,10 +109,13 @@ export function ListView({
         data-testid={VIEW_TESTID.listRow}
         data-note-id={row.noteId}
         role={interactive ? "button" : undefined}
-        tabIndex={interactive ? -1 : undefined}
+        // A Tab stop, not a `-1` placeholder: see `makeViewRowHandlers`, whose
+        // `key` entry is the other half (myne-md/myne#728).
+        tabIndex={interactive ? 0 : undefined}
         {...hoverSurface({ disabled: !interactive })}
         style={rowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
+        onKeyDown={onOpenNote ? rows.key(row.noteId) : undefined}
         onAuxClick={onOpenNote ? rows.aux(row.noteId) : undefined}
         onContextMenu={onContextMenu ? rows.contextMenu(row.noteId) : undefined}
       >

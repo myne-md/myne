@@ -40,6 +40,7 @@ import {
   type SetStateAction,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useRovingFocus } from "@myne/editor/host/lib/roving-focus";
 import {
   shouldMirrorSelection,
   shouldOpenIntoFocusedPane,
@@ -262,6 +263,7 @@ import {
 } from "../notes/workspaceContext";
 import { ClipDispatchListener } from "../clip/ClipDispatchListener";
 import { PaneTree } from "../notes/components/PaneTree";
+import { enterRegion, REGION_ATTR } from "../lib/regions";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
 import type { DocStats } from "../notes/documentStats";
@@ -2294,6 +2296,29 @@ function EditorChrome({
               />
             </div>
         </SidebarPane>
+        {/* Region root for the centre column (myne#728). It wraps the ternary
+            rather than either branch, because the editor region is "whatever
+            the centre shows": swapping to the attachments view must not make
+            the region disappear from the F6 cycle. Same flex contract as both
+            branches already carry, so the geometry is unchanged. */}
+        <div
+          {...{ [REGION_ATTR]: "editor" }}
+          // The route's ONE `main` (myne#728, task 9). It was `role="region"`
+          // when task 2 introduced the region model, with a note that the
+          // specific landmarks would replace it; this is that replacement.
+          // `AttachmentsLibrary` was demoted from `<main>` to `<section>` in
+          // the same change, because it renders inside this element and a
+          // nested second `main` makes "jump to main" ambiguous.
+          role="main"
+          aria-label={t("editor.chrome.region.editor")}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
         {centerView === "attachments" ? (
           // Attachments is a full-center view with no tab strip; give it a
           // matching drag-region clearance row so its toolbar clears the
@@ -2350,6 +2375,7 @@ function EditorChrome({
             rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
+        </div>
         {centerView !== "attachments" &&
           // Same condition as the right toggle: a non-note tab has no note for
           // the backlinks/outline sidebar to describe, so it is not shown - and
@@ -4295,6 +4321,17 @@ function WorkspaceHotkeys({
       { id: "pane.split-column", scope: {}, run: () => ws.splitFocused("column") },
       { id: "pane.focus-next", scope: {}, run: () => focusAdjacent(true) },
       { id: "pane.focus-prev", scope: {}, run: () => focusAdjacent(false) },
+      // The three-region keyboard model (myne#728). `scope: {}` is the right
+      // gate and deliberately not `allowInPlainInput`: F6 is how a keyboard
+      // user LEAVES the note body, and `focusKindOf` classifies `.cm-content`
+      // as `cm-editor` rather than a plain input, so the chord is live exactly
+      // where it is needed and stands down in a rename field, where Escape is
+      // the way out. Nothing here touches the workspace: a region is a DOM
+      // marker, so the run closures are one call each.
+      { id: "focus.cycle-region", scope: {}, run: () => enterRegion("next") },
+      { id: "focus.sidebar", scope: {}, run: () => enterRegion("sidebar") },
+      { id: "focus.editor", scope: {}, run: () => enterRegion("editor") },
+      { id: "focus.right-panel", scope: {}, run: () => enterRegion("right-panel") },
       { id: "nav.back", scope: {}, phase: "capture", run: () => ws.goBack() },
       { id: "nav.forward", scope: {}, phase: "capture", run: () => ws.goForward() },
       // reading-source-modes (MYND-299): Edit⇄Reading on the focused note tab.
@@ -4511,6 +4548,28 @@ function RightSidebar({
   // Healed-on-read: a stored pointer to a now-hidden/unknown tab is reinterpreted
   // (first visible), never rewritten to disk.
   const active = resolveActiveTab(prefs.right_panel_active_tab, order, effectiveHidden);
+
+  // The right-panel strip is one Tab stop (myne#728): arrows move between the
+  // icon tabs and activate them, so a panel with several tabs does not cost one
+  // stop per tab.
+  const rightPanelRoving = useRovingFocus({
+    count: visible.length,
+    activeIndex: active === null ? -1 : visible.indexOf(active),
+    orientation: "horizontal",
+    itemSelector: '[role="tab"][data-panel-tab-id]',
+    // MANUAL activation (myne#728, review): each activation here WRITES A
+    // PREF, so automatic activation performed one IPC write per tab passed
+    // over, arrowing from the first tab to the eighth costing seven.
+    //
+    // Nothing further is needed to activate: these tabs are native
+    // `<button>`s, so Enter and Space already fire their `onClick`. An
+    // explicit key handler beside that would double-write on Enter and
+    // suppress the native click on Space. And no `onActiveIndexChange`: the
+    // hook never calls it under manual activation, so a closure here would
+    // read as the per-arrow pref write this flag exists to remove.
+    manualActivation: true,
+  });
+
   // Folders the composer can attach as a scope. Derived from the notes the
   // resolver already holds, so it needs no second load; the authoritative
   // resolution and the excluded-folder clamp are host-side either way.
@@ -4555,6 +4614,12 @@ function RightSidebar({
       <div
         data-testid="editor.right-panel-tabs"
         role="tablist"
+        // A tablist with no name is a list of unlabelled icons to a screen
+        // reader (myne#728): the tabs themselves carry names, but nothing said
+        // what the group IS. The note strip is named the same way.
+        aria-label={t("editor.chrome.rightPanel.tabStripLabel")}
+        ref={rightPanelRoving.containerRef as RefObject<HTMLDivElement>}
+        onKeyDown={rightPanelRoving.onKeyDown}
         onContextMenu={(e) => {
           e.preventDefault();
           setTabMenu({ x: e.clientX, y: e.clientY });
@@ -4571,7 +4636,7 @@ function RightSidebar({
           borderBottom: "1px solid var(--line-1)",
         }}
       >
-        {visible.map((id) => {
+        {visible.map((id, i) => {
           const tab = RIGHT_PANEL_TABS.find((tt) => tt.id === id);
           if (tab === undefined) return null;
           const isActive = id === active;
@@ -4584,6 +4649,8 @@ function RightSidebar({
               key={id}
               type="button"
               role="tab"
+              id={`right-panel-tab-${id}`}
+              tabIndex={rightPanelRoving.tabIndexFor(i)}
               draggable
               aria-selected={isActive}
               aria-label={label}
@@ -4654,6 +4721,8 @@ function RightSidebar({
 
       {/* Active tab body */}
       <div
+        role="tabpanel"
+        aria-labelledby={active === null ? undefined : `right-panel-tab-${active}`}
         style={{
           flex: 1,
           minHeight: 0,
@@ -4833,6 +4902,7 @@ function SidebarPane({
   resizeLabel: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   // Collapse/expand is animated by transitioning the pane width between 0 and
   // its open width. The transition stays ARMED at all times EXCEPT during an
   // active resize: a drag changes `width` every pointermove, and an active
@@ -4871,6 +4941,30 @@ function SidebarPane({
       // "no pane" at a window width where both panes were open and visible.
       // A literal per side, never an expression carrying content.
       data-testid={side === "left" ? "editor.sidebar-left" : "editor.sidebar-right"}
+      // Region root for the three-region keyboard model (myne#728). The
+      // attribute IS the declaration: `src/lib/regions.ts` finds a region by
+      // querying for it, so a pane that is not rendered is simply not a region,
+      // with nothing to keep in step. A COLLAPSED pane is still rendered (at
+      // width 0, with its content `inert`), and the region helper skips it by
+      // reading that `inert` rather than by being told.
+      //
+      // `role="region"` with a name is what makes the same three areas
+      // navigable by a screen reader's landmark list. Task 9 of the
+      // accessibility pass replaces these with the specific landmark roles
+      // (navigation / main / complementary); the names stay.
+      {...{ [REGION_ATTR]: side === "left" ? "sidebar" : "right-panel" }}
+      // The specific landmarks (myne#728, task 9), replacing the generic
+      // `role="region"` task 2 marked these with. The notes sidebar is how the
+      // user moves between notes, which is `navigation`; the right panel
+      // describes the note that is open, which is `complementary`. Both are
+      // named, so a screen reader's landmark list reads as three places rather
+      // than three unlabelled regions.
+      role={side === "left" ? "navigation" : "complementary"}
+      aria-label={
+        side === "left"
+          ? t("editor.chrome.region.sidebar")
+          : t("editor.chrome.region.rightPanel")
+      }
       // A sidebar pane is a SURFACE for ornament purposes (myne#394): the theme
       // decides what a panel ground wears. Declared on the outer pane rather
       // than the inner wrapper so the ornament spans the pane's full height

@@ -834,6 +834,42 @@ describe("favorites", () => {
     expect(setFavorites).toHaveBeenCalledWith(["c", "a", "b"]);
   });
 
+  it("moveFavorite shifts one slot without any drag state", async () => {
+    // The WCAG 2.5.7 non-drag path. A sibling of `reorderFavorite` rather
+    // than a caller: that one reads `draggedRef.current` and clears four
+    // pieces of drag state, so driving it from a key press would mean faking
+    // a drag that never happened. Asserted behaviourally because the source
+    // scan in `tests/a11y/dragAlternatives.test.tsx` cannot see it regress.
+    prefs.favorites = ["a", "b", "c"];
+    const { result } = mount([rec("a", null), rec("b", null), rec("c", null)]);
+    await act(async () => {
+      result.current.moveFavorite("a", 1);
+      await Promise.resolve();
+    });
+    expect(setFavorites).toHaveBeenCalledWith(["b", "a", "c"]);
+  });
+
+  it("moveFavorite clamps at both ends rather than wrapping", async () => {
+    prefs.favorites = ["a", "b"];
+    const { result } = mount([rec("a", null), rec("b", null)]);
+    await act(async () => {
+      result.current.moveFavorite("a", -1);
+      result.current.moveFavorite("b", 1);
+      await Promise.resolve();
+    });
+    expect(setFavorites).not.toHaveBeenCalled();
+  });
+
+  it("moveFavorite ignores a note that is not a favorite", async () => {
+    prefs.favorites = ["a"];
+    const { result } = mount([rec("a", null), rec("z", null)]);
+    await act(async () => {
+      result.current.moveFavorite("z", 1);
+      await Promise.resolve();
+    });
+    expect(setFavorites).not.toHaveBeenCalled();
+  });
+
   it("reorderFavorite onto itself is a no-op", async () => {
     prefs.favorites = ["a"];
     const { result } = mount([rec("a", null)]);

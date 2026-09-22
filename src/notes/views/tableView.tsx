@@ -174,10 +174,13 @@ export function TableView({
         data-testid={VIEW_TESTID.tableRow}
         data-note-id={row.noteId}
         role={interactive ? "button" : undefined}
-        tabIndex={interactive ? -1 : undefined}
+        // A Tab stop, not a `-1` placeholder: see `makeViewRowHandlers`, whose
+        // `key` entry is the other half (myne-md/myne#728).
+        tabIndex={interactive ? 0 : undefined}
         {...hoverSurface({ restBg: "var(--paper)", disabled: !interactive })}
         style={dataRowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
+        onKeyDown={onOpenNote ? rows.key(row.noteId) : undefined}
         onAuxClick={onOpenNote ? rows.aux(row.noteId) : undefined}
         onContextMenu={onContextMenu ? rows.contextMenu(row.noteId) : undefined}
       >

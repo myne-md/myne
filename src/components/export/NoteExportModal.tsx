@@ -24,6 +24,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import {
@@ -142,6 +143,14 @@ export function NoteExportModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
+
   // Opt-in default (the backend command is the "opt-in attachments-
   // included export"): the toggle starts OFF on every open.
   const [include, setInclude] = useState(false);
@@ -165,6 +174,7 @@ export function NoteExportModal({
 
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="note-export-title"

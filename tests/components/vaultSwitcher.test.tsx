@@ -259,6 +259,88 @@ describe("VaultSwitcher — dropdown", () => {
     );
   });
 
+  // ── keyboard operability (myne-md/myne#728, task 8) ─────────────────────
+  //
+  // The menu was a DEAD END: the chip is a button, so a keyboard user could
+  // open it, and then reach nothing at all. Focus stayed on the chip and the
+  // rows carried no key handling, so the only exits were Escape and the mouse.
+
+  it("moves focus into the menu when it opens", async () => {
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const rows = await screen.findAllByTestId("switcher.vault-row");
+    await waitFor(() => expect(document.activeElement).toBe(rows[0]));
+  });
+
+  it("opens from the chip on Down, which is the menu-button pattern", async () => {
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.keyDown(screen.getByTestId("switcher.chip"), { key: "ArrowDown" });
+    const rows = await screen.findAllByTestId("switcher.vault-row");
+    await waitFor(() => expect(document.activeElement).toBe(rows[0]));
+  });
+
+  it("cycles the rows with the arrows, wrapping at both ends", async () => {
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const menu = await screen.findByRole("menu");
+    const items = (): HTMLElement[] =>
+      Array.from(menu.querySelectorAll<HTMLElement>('[role^="menuitem"]'));
+    await waitFor(() => expect(document.activeElement).toBe(items()[0]));
+
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items()[1]);
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(document.activeElement).toBe(items().at(-1));
+    // A menu wraps, unlike the sidebar tree: it is short and the user cannot
+    // lose their place in it.
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items()[0]);
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(items().at(-1));
+    fireEvent.keyDown(menu, { key: "Home" });
+    expect(document.activeElement).toBe(items()[0]);
+  });
+
+  it("names the menu, so it is not an unlabelled group of rows", async () => {
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const menu = await screen.findByRole("menu");
+    expect(menu.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("Tab closes the menu instead of trapping the user in it", async () => {
+    // A menu is not a dialog. Trapping Tab here would leave a keyboard user
+    // inside a popover with no visible way out, which is worse than the dead
+    // end being fixed.
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const menu = await screen.findByRole("menu");
+    fireEvent.keyDown(menu, { key: "Tab" });
+    await waitFor(
+      () => expect(screen.queryByTestId("switcher.create-cta")).toBeNull(),
+      { timeout: 1000 },
+    );
+  });
+
+  it("returns focus to the chip when Escape closes the menu", async () => {
+    // Without this, Escape leaves focus on `<body>` and the next Tab starts
+    // from the top of the document rather than from where the user was.
+    renderSwitcher(TWO);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await screen.findAllByTestId("switcher.vault-row");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(
+      () => expect(document.activeElement).toBe(screen.getByTestId("switcher.chip")),
+      { timeout: 1000 },
+    );
+  });
+
   it("the chip is disabled while a switch is in flight", async () => {
     renderSwitcher(TWO, { switching: true });
     await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());

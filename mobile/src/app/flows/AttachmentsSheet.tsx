@@ -16,6 +16,7 @@ import { usePrefs } from "../../lib/use-prefs";
 import { startTranscription, type TranscribeError } from "../../lib/transcribe";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { renderPdfFirstPage } from "@myne/editor/attachments/pdf-render";
+import { tappable } from "../a11y/tappable";
 
 const isImage = (t: string) => t.startsWith("image/");
 /** PDFs render a first-page thumbnail (MYND-477) — parity with the desktop
@@ -275,7 +276,23 @@ export function AttachmentsSheet({
             <div key={e.id} style={{ borderTop: "1px solid var(--line-1)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px" }}>
               <div
-                onClick={isAudio(e.content_type) || isVideo(e.content_type) ? undefined : () => openPreview(e)}
+                // Conditionally a control (myne#728, task 16): audio and video
+                // tiles carry their own transport inside, so the thumbnail is
+                // not a preview target for them and must not announce itself
+                // as one. `tappable` returns null there and the div stays a
+                // plain box.
+                //
+                // Labelled, unlike every row below, and this is the case the
+                // helper's comment warns about in reverse: the tile's contents
+                // are an `<img alt="">` or a glyph, so there IS no text to take
+                // a name from.
+                {...(tappable({
+                  onActivate:
+                    isAudio(e.content_type) || isVideo(e.content_type)
+                      ? undefined
+                      : () => openPreview(e),
+                  label: t("attachments.library.previewNamed", { name: e.filename }),
+                }) ?? {})}
                 style={{ width: 44, height: 44, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", cursor: previewKind(e.content_type) ? "pointer" : "default" }}
               >
                 {isImage(e.content_type) ? (
@@ -301,7 +318,10 @@ export function AttachmentsSheet({
                     style={{ width: "100%", height: 34, border: "1px solid var(--line-2)", borderRadius: 6, background: "var(--bg-1)", padding: "0 10px", fontSize: 15, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
                   />
                 ) : (
-                  <div onClick={() => openPreview(e)} style={{ cursor: previewKind(e.content_type) ? "pointer" : "default" }}>
+                  <div
+                {...tappable({ onActivate: () => openPreview(e) })}
+                style={{ cursor: previewKind(e.content_type) ? "pointer" : "default" }}
+              >
                     <div style={{ fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.filename}</div>
                     <div style={{ fontSize: 12, color: "var(--fg-3)" }}>{formatBytes(e.size)}</div>
                   </div>
