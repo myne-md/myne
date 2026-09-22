@@ -349,7 +349,17 @@ function CardArticle({
       onMouseEnter={reveal}
       onMouseLeave={unreveal}
       onFocus={reveal}
-      onBlur={unreveal}
+      // Hide only when focus leaves the CARD, not when it moves inside it. The
+      // Set-cover button is a descendant, so the focusout from the content block
+      // into that button bubbles here: an unconditional `unreveal` unmounted the
+      // button during the very Tab that was reaching it, which made the
+      // focus-revealed path (the whole reason it renders after the block) not
+      // work by keyboard.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          unreveal?.();
+        }
+      }}
     >
       <div
         data-testid="view.card-open"

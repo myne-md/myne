@@ -157,8 +157,17 @@ export function useRovingFocus({
     lastActive.current = activeIndex;
     if (focusOverride !== null) setFocusOverride(null);
   }
-  const focusedIndex =
+  const rawFocused =
     manualActivation && focusOverride !== null ? focusOverride : activeIndex;
+  // Clamp an out-of-range focused index. A group can SHRINK under it: closing
+  // the focused tab under manual activation leaves `focusOverride` pointing
+  // past the new end, `tabIndexFor` then matches no item, the whole group loses
+  // its single `tabIndex=0`, and the strip drops out of the Tab order while
+  // focus lands on `<body>`. Keep `-1` intact (it means "nothing active yet",
+  // and `tabIndexFor` maps it to the first item), and when the group empties
+  // fall back to `-1`.
+  const focusedIndex =
+    rawFocused < 0 ? rawFocused : count > 0 ? Math.min(rawFocused, count - 1) : -1;
 
   return {
     containerRef,

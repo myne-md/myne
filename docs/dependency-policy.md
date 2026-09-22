@@ -494,7 +494,7 @@ Six feature-level dependency admissions landed with their `decisions.md` entries
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |
 |---|---|---|---|---|---|
-| `axe-core` | ^4.12.1 (**devDependency**) | The WCAG 2.2 AA rule engine behind both accessibility tiers — the Vitest/jsdom structural pass (`tests/a11y/axe-config.ts`) and the real-render E2E pass (`e2e/support/axe.ts`, `e2e/a11y-axe.e2e.ts`) | **Zero** | MPL-2.0 | `decisions.md` 2026-06-25 (accessibility + keyboard-only release gate), which names it "test-scope devDependency, never bundled"; bar raised to 2.2 AA by `decisions/ui/0599` |
+| `axe-core` | ^4.12.1 (**devDependency**) | The WCAG 2.2 AA rule engine behind both accessibility tiers: the Vitest/jsdom structural pass (`tests/a11y/axe-config.ts`) and the real-render E2E pass (`e2e/support/axe.ts`, `e2e/a11y-axe.e2e.ts`) | **Zero** | MPL-2.0 | `decisions.md` 2026-06-25 (accessibility + keyboard-only release gate), which names it "test-scope devDependency, never bundled"; bar raised to 2.2 AA by `decisions/ui/0599` |
 
 - **It cannot reach a shipped artefact.** Dev-only, imported from `tests/` and `e2e/` alone; the E2E tier reads the UMD source off disk and injects it into the page under test at run time, so nothing about it is bundled.
 - **"The bar" Q1 (hand-roll?):** no — the maintained WCAG rule corpus *is* the dependency. The decision entry is explicit that axe covers only ~30–40% of WCAG and that the rest is a manual checklist, so the dep is never asked to carry more than it can.

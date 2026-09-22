@@ -316,7 +316,13 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // fingerprint for out-of-band cross-device eye-compare, then wait for approval.
   if (step === "pinned" && certFingerprint) {
     return (
-      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.pinned">
+      <div
+        ref={backdropRef}
+        role="dialog"
+        aria-modal="true"
+        style={BACKDROP}
+        data-testid="join.pinned"
+      >
         <div style={CARD}>
           <h2 style={TITLE}>{t("sync.join.pinnedTitle")}</h2>
           <p style={HELP}>{t("sync.join.pinnedCompare")}</p>
@@ -347,7 +353,13 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // Waiting for an existing device to approve — auto-polls, then advances to verify.
   if (step === "pending") {
     return (
-      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.pending">
+      <div
+        ref={backdropRef}
+        role="dialog"
+        aria-modal="true"
+        style={BACKDROP}
+        data-testid="join.pending"
+      >
         <div style={CARD}>
           <h2 style={TITLE}>{t("sync.join.waitingTitle")}</h2>
           <p style={HELP}>{ENROLL_PENDING_NOTICE}</p>
@@ -365,7 +377,13 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   // Mandatory head-fingerprint SAS eye-compare (SYNC-40).
   if (step === "verify") {
     return (
-      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.verify">
+      <div
+        ref={backdropRef}
+        role="dialog"
+        aria-modal="true"
+        style={BACKDROP}
+        data-testid="join.verify"
+      >
         <div style={CARD}>
           <h2 style={TITLE}>{t("sync.join.verifyTitle")}</h2>
           <p style={HELP}>{t("sync.join.verifyBody")}</p>
