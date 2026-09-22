@@ -147,6 +147,14 @@ export default defineConfig(async () => ({
       // has no imports at all. Exact specifier, no wildcard (same reasoning as
       // above).
       { find: /^@myne\/task-wire$/, replacement: sib("../src/notes/taskWire.ts") },
+      // The graph's overlay layer (myne-md/myne#727): the ONE implementation of
+      // "tags become nodes, the colour rules paint them", called by the desktop
+      // pane and by this client's `WikiGraph` so the two draw the same picture
+      // of the same vault by construction. Both modules are pure (their only
+      // `../lib/prefs` import is a TYPE import, erased at build), which is what
+      // makes them safe to alias out of the Tauri-coupled `../src/notes/`.
+      { find: /^@myne\/graph-overlay$/, replacement: sib("../src/notes/graphOverlay.ts") },
+      { find: /^@myne\/graph-color-groups$/, replacement: sib("../src/notes/graphColorGroups.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },

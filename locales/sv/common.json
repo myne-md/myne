@@ -1898,8 +1898,7 @@
         "reset": "Återställ till standard",
         "showArrows": "Visa riktningspilar",
         "title": "Grafinställningar"
-      },
-      "tagPlaceholder": "Tagg…"
+      }
     },
     "import": {
       "base": {

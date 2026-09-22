@@ -26,20 +26,28 @@ import {
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
-/** Count of `editor.graph-button` affordances currently in the bottom bar. */
-async function graphButtonCount(session: Session): Promise<number> {
-  return (await session.byTestIdAll("editor.graph-button")).length;
+/** How many bottom-bar items carry `itemId`. The item under test is Tags: the
+ *  graph affordance left the bar when the left ribbon shipped (myne-md/myne#727,
+ *  which supersedes #396's bottom-left launcher), and the hide/show contract
+ *  needs an item that is still in it. */
+async function barItemCount(session: Session, itemId: string): Promise<number> {
+  return (
+    await session.findElements(
+      testIdSelector("editor.bar-item", { "data-bar-item-id": itemId }),
+    )
+  ).length;
 }
 
 /** Open the bottom-bar LIST menu (per-item visibility toggles) and return the
- *  menu item for `itemId`. The bar's affordances sit in a RIGHT cluster after a
- *  `flex:1` spacer; right-clicking the bar CENTER lands on an affordance and
- *  opens its per-item (move/hide) menu instead. Right-click the empty LEFT
- *  spacer so the bar-root `onContextMenu` (list menu) fires. */
+ *  menu item for `itemId`. The menu belongs to the bar ROOT, and every place a
+ *  right-click could land other than the empty middle belongs to something
+ *  else: the graph launcher used to live in a left cluster (myne-md/myne#396),
+ *  which myne-md/myne#727 removed entirely; the
+ *  right cluster is full of affordances, each of which opens its OWN menu. So
+ *  the click targets the flexible spacer by testid rather than guessing an
+ *  offset from the bar's centre. */
 async function openBarMenuItem(session: Session, itemId: string) {
-  const bar = await session.byTestId("editor.bottom-bar");
-  const r = await bar.rect();
-  await bar.rightClick(-(Math.floor(r.width / 2) - 24), 0);
+  await (await session.byTestId("editor.bar-spacer")).rightClick();
   return await session.waitForElement(
     testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
   );
@@ -64,24 +72,24 @@ describeE2E("bb1 bottom-bar item hide/show persists (bottom-bar customization)",
         await dismissImporterOffer(s);
         await createNote(s, "bb1notealfa7k2m9qx4w8e5rj0aa");
 
-        // Baseline: the Graph affordance is present in the bar.
-        await s.byTestId("editor.graph-button");
-        expect(await graphButtonCount(s)).toBe(1);
+        // Baseline: the Tags affordance is present in the bar.
+        await s.byTestId("editor.tags-cta");
+        expect(await barItemCount(s, "tags")).toBe(1);
 
-        // Right-click the bar → the "Graph" item shows as checked (visible).
-        const graphItem = await openBarMenuItem(s, "graph");
-        expect(await graphItem.attribute("data-checked")).toBe("true");
+        // Right-click the bar → the "Tags" item shows as checked (visible).
+        const tagsItem = await openBarMenuItem(s, "tags");
+        expect(await tagsItem.attribute("data-checked")).toBe("true");
 
         // Toggle it off. The menu stays open (checkable-toggle mode), so close
         // it with a neutral outside-click before asserting the bar.
-        await graphItem.click();
+        await tagsItem.click();
         await dismissBarMenu(s);
-        await s.waitUntil(async () => ((await graphButtonCount(s)) === 0 ? true : null), {
-          label: "graph affordance disappears after toggle-off",
+        await s.waitUntil(async () => ((await barItemCount(s, "tags")) === 0 ? true : null), {
+          label: "tags affordance disappears after toggle-off",
         });
 
         // Persistence: lock → unlock mounts a fresh editor that reads
-        // hidden_bar_items from disk; the Graph affordance stays hidden.
+        // hidden_bar_items from disk; the Tags affordance stays hidden.
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input");
         await unlockToEditor(s, password);
@@ -89,17 +97,17 @@ describeE2E("bb1 bottom-bar item hide/show persists (bottom-bar customization)",
         // dismissal persisted, so it does NOT re-appear — present-or-skip.
         await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.bottom-bar");
-        expect(await graphButtonCount(s)).toBe(0);
+        expect(await barItemCount(s, "tags")).toBe(0);
 
-        // The reopened menu reflects the persisted state: "Graph" is unchecked.
-        const graphItemAfter = await openBarMenuItem(s, "graph");
-        expect(await graphItemAfter.attribute("data-checked")).toBe("false");
+        // The reopened menu reflects the persisted state: "Tags" is unchecked.
+        const tagsItemAfter = await openBarMenuItem(s, "tags");
+        expect(await tagsItemAfter.attribute("data-checked")).toBe("false");
 
         // Toggle it back on → the affordance returns to the bar.
-        await graphItemAfter.click();
+        await tagsItemAfter.click();
         await dismissBarMenu(s);
-        await s.waitUntil(async () => ((await graphButtonCount(s)) === 1 ? true : null), {
-          label: "graph affordance returns after toggle-on",
+        await s.waitUntil(async () => ((await barItemCount(s, "tags")) === 1 ? true : null), {
+          label: "tags affordance returns after toggle-on",
         });
       },
     );

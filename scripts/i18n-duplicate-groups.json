@@ -195,6 +195,14 @@
     "reason": "Same restore failure on the archive and trash twins; identical operations, identical string."
   },
   {
+    "value": "Knowledge graph of {{count}} notes",
+    "keys": [
+      "notes.graph.canvasLabel",
+      "wikiGraph.canvasLabel"
+    ],
+    "reason": "One accessible name for one picture. Desktop and mobile render the same shared canvas over the same model, so describing it differently would be two names for one thing; the count is the only variable and both interpolate it the same way."
+  },
+  {
     "value": "Choose your Obsidian vault folder",
     "keys": [
       "notes.import.modal.folderPickerTitle",

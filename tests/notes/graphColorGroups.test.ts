@@ -15,6 +15,7 @@ import {
   collectRuleTags,
   colorGroupVar,
   resolveGraphColorGroups,
+  tagNodeRules,
   type ColorGroupNoteMeta,
 } from "../../src/notes/graphColorGroups";
 import type { ColorGroup, FilterNode } from "../../src/lib/prefs";
@@ -309,5 +310,65 @@ describe("colorGroupVar — the shared declarative degrade", () => {
   it("treats an absent or empty key as unclassified", () => {
     expect(colorGroupVar(undefined)).toBe("var(--fg-2)");
     expect(colorGroupVar("")).toBe("var(--fg-2)");
+  });
+});
+
+describe("tagNodeRules (myne-md/myne#727 task 18)", () => {
+  it("takes a bare hasTag rule, folded, with the rule's own colour", () => {
+    expect(
+      tagNodeRules([rule("r1", "group-teal", { kind: "hasTag", tag: "Work" })]),
+    ).toEqual([{ key: "work", color: "group-teal" }]);
+  });
+
+  it("keys the hub on the SAME folded form collectRuleTags queried the index with", () => {
+    // Load-bearing rather than cosmetic: the hub's key becomes the node id and
+    // the membership lookup key, so if it differed from the queried form by even
+    // a space the hub would be built against a membership set that was fetched
+    // under a different key, i.e. it would claim notes it had no answer for.
+    const r = rule("r1", "group-teal", { kind: "hasTag", tag: "  Work  " });
+    expect(tagNodeRules([r])[0]!.key).toBe(collectRuleTags([r])[0]);
+  });
+
+  it("skips a disabled rule", () => {
+    expect(
+      tagNodeRules([
+        { ...rule("r1", "group-teal", { kind: "hasTag", tag: "work" }), enabled: false },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("skips a rule that is not a single bare hasTag leaf", () => {
+    // A combinator or a folder rule colours a SUBSET of a tag's notes, so a hub
+    // for it would connect to notes the rule does not match.
+    expect(tagNodeRules([rule("r1", "group-teal", { kind: "inFolder", path: "Work/" })])).toEqual([]);
+    expect(
+      tagNodeRules([
+        rule("r2", "group-rose", {
+          kind: "and",
+          children: [
+            { kind: "hasTag", tag: "work" },
+            { kind: "inFolder", path: "Work/" },
+          ],
+        }),
+      ]),
+    ).toEqual([]);
+    expect(
+      tagNodeRules([
+        rule("r3", "group-rose", { kind: "not", child: { kind: "hasTag", tag: "work" } }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("skips a whitespace-only tag, which denotes nothing", () => {
+    expect(tagNodeRules([rule("r1", "group-teal", { kind: "hasTag", tag: "   " })])).toEqual([]);
+  });
+
+  it("returns every qualifying rule in list order, because that order is precedence", () => {
+    expect(
+      tagNodeRules([
+        rule("r1", "group-teal", { kind: "hasTag", tag: "work" }),
+        rule("r2", "group-rose", { kind: "hasTag", tag: "home" }),
+      ]).map((r) => r.key),
+    ).toEqual(["work", "home"]);
   });
 });

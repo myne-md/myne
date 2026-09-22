@@ -29,6 +29,7 @@ import {
   createNote,
   dismissImporterOffer,
   openSettledGraphPane,
+  runPaletteAction,
   settleOn,
   unlockToEditor,
 } from "./support/flows";
@@ -73,8 +74,10 @@ describeE2E("gt1 graph opens as a singleton tab (MYND-198)", () => {
         await dismissImporterOffer(s);
         for (const t of TITLES) await createNote(s, t);
 
-        // Open the graph via the persistent BottomBar affordance.
-        await (await s.byTestId("editor.graph-button")).click();
+        // Open the graph through the palette. The BottomBar launcher this used
+        // to click is gone (myne-md/myne#727): the graph is a command the left
+        // ribbon hosts, and `graph.show` is its frozen palette id.
+        await runPaletteAction(s, "graph.show", "graph");
 
         // The graph mounts as a tab: the strip carries a `graph:graph` tab and
         // it is the active one; the pane body shows the graph (not the editor).
@@ -86,9 +89,9 @@ describeE2E("gt1 graph opens as a singleton tab (MYND-198)", () => {
         await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
         expect(await graphTabCount(s)).toBe(1);
 
-        // Re-fire the affordance — the graph is a workspace-wide singleton, so
-        // this reveals the existing tab instead of opening a second one.
-        await (await s.byTestId("editor.graph-button")).click();
+        // Re-fire the command: the graph is a workspace-wide singleton, so this
+        // reveals the existing tab instead of opening a second one.
+        await runPaletteAction(s, "graph.show", "graph");
         await s.waitUntil(
           async () => ((await graphTabCount(s)) === 1 ? true : null),
           { label: "graph tab stays a singleton after re-fire", timeoutMs: 15_000 },
@@ -284,6 +287,52 @@ describeE2E("gt3 the graph canvas follows a pane resize (myne-md/myne#534)", () 
           Math.abs(after.paneBottom - after.canvasBottom),
           "the graph still ends where the pane ends",
         ).toBeLessThanOrEqual(2);
+      },
+    );
+  });
+
+  // Vault-count precondition: 1 (weak KDF).
+  it("opens the ISOLATED view from the palette, which is its only entry point", async () => {
+    // `graph.show-isolated` is the one way in. The pane's own filter control
+    // deliberately cannot enter the view (its `<option>` is rendered only while
+    // it is already the value), so if this command is not driven here, nothing
+    // drives it at all (myne-md/myne#727, task 14).
+    let password = "";
+    await scenario(
+      "gt4-graph-isolated-command",
+      {
+        seed: (dir) => {
+          password = seedVault(dir).password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        // Notes with no links between them, so the vault has orphans.
+        for (const t of TITLES) await createNote(s, t);
+
+        await runPaletteAction(s, "graph.show-isolated", "isolated");
+        const pane = await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
+        const filter = await s.byTestId("editor.graph-filter", { timeoutMs: 15_000 });
+        // The control TELLS THE TRUTH about the view it is in: a `<select>`
+        // cannot display a value with no matching option, so the isolated
+        // option is rendered while it is the value.
+        expect(await filter.property<string>("value")).toBe("@isolated");
+        // The harness has no arbitrary-JS escape hatch on purpose, so the
+        // option's presence is read off the control's own text.
+        expect(await filter.property<string>("textContent")).toContain("Isolated");
+        // And the picture really is the isolated set: every note in this vault
+        // is an orphan, so the pane reports the whole set.
+        await s.waitUntil(
+          async () =>
+            (await pane.attribute("data-node-count")) === String(TITLES.length)
+              ? true
+              : null,
+          { label: "the isolated view holds every unlinked note", timeoutMs: 15_000 },
+        );
+        // No tag nodes: the isolated path is notes-only by design.
+        expect(await pane.attribute("data-tag-node-count")).toBe("0");
       },
     );
   });

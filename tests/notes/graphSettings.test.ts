@@ -11,7 +11,14 @@ import {
   DEFAULT_GRAPH_SETTINGS,
   decodeGraphSettings,
   encodeGraphSettings,
+  MAX_DEGREE_FOR_SIZE,
+  NODE_SIZE_RANGE,
+  TAG_NODE_MAX_DEGREE,
+  NODE_SIZE_STRENGTH_RANGE,
   resolveNodeRadius,
+  resolveReservedRadius,
+  resolveReservedTagNodeRadius,
+  resolveTagNodeRadius,
 } from "../../src/notes/graphSettings";
 
 describe("graphSettings", () => {
@@ -23,13 +30,13 @@ describe("graphSettings", () => {
     expect(DEFAULT_GRAPH_SETTINGS).toEqual({
       showArrows: true,
       labelFadeZoom: 1.4,
-      nodeSize: 5,
-      nodeSizeStrength: 0.8,
+      nodeSize: 6,
+      nodeSizeStrength: 1.2,
       lineThickness: 1,
       forceCenterStrength: 1,
-      forceRepelStrength: 120,
+      forceRepelStrength: 70,
       forceLinkStrength: 1,
-      forceLinkDistance: 60,
+      forceLinkDistance: 48,
     });
   });
 
@@ -122,5 +129,88 @@ describe("graphSettings", () => {
     const encoded = encodeGraphSettings(touched);
     expect(encoded).toEqual(touched);
     expect(decodeGraphSettings(encoded)).toEqual(touched);
+  });
+});
+
+describe("resolveTagNodeRadius (myne-md/myne#727 task 18)", () => {
+  it("grows with degree, but at its own dose and under its own lower cap", () => {
+    // The first version ignored degree entirely, so a tag over sixty notes drew
+    // at 9.6 against leaves at 8.4, a hub indistinguishable from its spokes.
+    // The correction is a GENTLER term, not the note's: a tag's degree is its
+    // note count, and sixty is ordinary for a tag and a landmark for a note.
+    expect(resolveTagNodeRadius(6, 1.2, 0)).toBeCloseTo(9.6, 10);
+    // 9.6 + 1.2 * 0.5 * 12
+    expect(resolveTagNodeRadius(6, 1.2, 60)).toBeCloseTo(16.8, 10);
+    // Capped: a tag with ten thousand notes reserves no more than one with 12.
+    expect(resolveTagNodeRadius(6, 1.2, 10_000)).toBe(
+      resolveTagNodeRadius(6, 1.2, TAG_NODE_MAX_DEGREE),
+    );
+    // Still visibly a hub, and still smaller than a well-connected NOTE.
+    expect(resolveTagNodeRadius(6, 1.2, 60)).toBeGreaterThan(
+      resolveNodeRadius(6, 1.2, 2, MAX_DEGREE_FOR_SIZE),
+    );
+    expect(resolveTagNodeRadius(6, 1.2, 60)).toBeLessThan(
+      resolveNodeRadius(6, 1.2, MAX_DEGREE_FOR_SIZE, MAX_DEGREE_FOR_SIZE),
+    );
+  });
+
+  it("scales with the user's node-size setting, so the control still reaches it", () => {
+    expect(resolveTagNodeRadius(12, 1.2, 5)).toBeGreaterThan(
+      resolveTagNodeRadius(6, 1.2, 5),
+    );
+    expect(resolveTagNodeRadius(6, 2.4, 5)).toBeGreaterThan(
+      resolveTagNodeRadius(6, 1.2, 5),
+    );
+  });
+});
+
+describe("resolveReservedRadius (myne-md/myne#727)", () => {
+  it("is never smaller than the largest radius the panel can draw", () => {
+    // THE invariant the whole "two nodes never touch" guarantee rests on. The
+    // layout reserves this much room; the renderer draws at most this much. If
+    // the reserved value were ever the smaller of the two, a user dragging node
+    // size up would grow a node past its reserved room and it would overlap its
+    // neighbours, and nothing would say why.
+    for (let degree = 0; degree <= 60; degree += 1) {
+      const drawnAtMax = resolveNodeRadius(
+        NODE_SIZE_RANGE.max,
+        NODE_SIZE_STRENGTH_RANGE.max,
+        degree,
+        MAX_DEGREE_FOR_SIZE,
+      );
+      expect(resolveReservedRadius(degree, MAX_DEGREE_FOR_SIZE)).toBeGreaterThanOrEqual(
+        drawnAtMax,
+      );
+    }
+  });
+
+  it("holds for a tag node too, whose dose and cap are its own", () => {
+    for (let degree = 0; degree <= 60; degree += 1) {
+      expect(resolveReservedTagNodeRadius()).toBeGreaterThanOrEqual(
+        resolveTagNodeRadius(
+          NODE_SIZE_RANGE.max,
+          NODE_SIZE_STRENGTH_RANGE.max,
+          degree,
+        ),
+      );
+    }
+  });
+
+  it("is the drawn radius exactly at the degree cap, and looser below it", () => {
+    // The stated cost, pinned so it cannot quietly become a surprise: at the cap
+    // the reservation is exact, and a low-degree note is reserved a few units
+    // more than it is drawn at under default styling.
+    const atCap = resolveReservedRadius(MAX_DEGREE_FOR_SIZE, MAX_DEGREE_FOR_SIZE);
+    expect(atCap).toBe(
+      resolveNodeRadius(
+        NODE_SIZE_RANGE.max,
+        NODE_SIZE_STRENGTH_RANGE.max,
+        MAX_DEGREE_FOR_SIZE,
+        MAX_DEGREE_FOR_SIZE,
+      ),
+    );
+    expect(resolveReservedRadius(0, MAX_DEGREE_FOR_SIZE)).toBeGreaterThan(
+      resolveNodeRadius(6, 1.2, 0, MAX_DEGREE_FOR_SIZE),
+    );
   });
 });

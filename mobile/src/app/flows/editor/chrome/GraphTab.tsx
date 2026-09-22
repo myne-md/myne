@@ -1,11 +1,23 @@
 import { useTranslation } from "react-i18next";
 import type { GraphModel } from "@myne/editor/host/notes/graphModel";
+import type { GraphTag } from "@myne/graph-overlay";
 import { WikiGraph } from "../../../../components/WikiGraph";
 
 /** Graph tab — the shared wikilink graph, rendered by the shared canvas
  *  (myne-md/myne#200). The header counts stay: how much of the vault is
  *  actually connected is the question the graph exists to answer. */
-export function GraphTab({ model, onOpen }: { model: GraphModel; onOpen: (id: string) => void }) {
+export function GraphTab({
+  model,
+  onOpen,
+  tags,
+  members,
+}: {
+  model: GraphModel;
+  onOpen: (id: string) => void;
+  /** Forwarded to the shared overlay builder; see `WikiGraph`. */
+  tags: ReadonlyArray<GraphTag>;
+  members: ReadonlyMap<string, ReadonlySet<string>>;
+}) {
   const { t } = useTranslation();
   const degree = new Map<string, number>();
   for (const e of model.edges) {
@@ -24,7 +36,7 @@ export function GraphTab({ model, onOpen }: { model: GraphModel; onOpen: (id: st
           </span>
         )}
       </div>
-      <WikiGraph model={model} onOpen={onOpen} />
+      <WikiGraph model={model} onOpen={onOpen} tags={tags} members={members} />
     </>
   );
 }

@@ -41,9 +41,11 @@ describe("graph model contract (mobile pipeline)", () => {
 
   it("lays the fixture out to the one expected set of coordinates", () => {
     // The coordinate half of the contract (myne-md/myne#200). The main repo
-    // asserts the same fingerprint from the desktop pipeline — two clients
-    // computing an identical layout with nothing synced between them is what
-    // makes `vault.graph` staying device-local survivable.
+    // asserts the same fingerprint from the desktop pipeline, and what it
+    // proves now is narrower than it was: the layout is device-local
+    // (myne-md/myne#727, decisions/ui/0600 and sync/0601), so the only thing
+    // keeping the two clients showing the same picture is that they compile
+    // this one kernel rather than each carrying one.
     const model = buildGraphModel(
       clientEdges(GRAPH_CONTRACT_RESOLVER_NOTES, bodies),
       GRAPH_CONTRACT_RESOLVER_NOTES,

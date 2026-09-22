@@ -1713,8 +1713,9 @@ runner(
       // GRAPH — LAST (it occupies a workspace tab over the editor; nothing
       // runs after it but the manifest write + teardown).
       // =====================================================================
-      // graph-tab.e2e.ts: editor.graph-button opens the graph as a tab; the
-      // body is editor.graph-pane.
+      // graph-tab.e2e.ts: the palette's `graph.show` opens the graph as a tab;
+      // the body is editor.graph-pane. (The BottomBar launcher is gone,
+      // myne-md/myne#727.)
       await frame(
         s,
         "graph-all",
@@ -1722,7 +1723,7 @@ runner(
         "The graph view showing the vault's notes as connected nodes.",
         async () => {
           await pressKey(s, ESCAPE); // dismiss any lingering overlay first
-          await (await s.byTestId("editor.graph-button")).click();
+          await runPaletteAction(s, "graph.show", "graph");
           await s.byTestId("editor.graph-pane", { timeoutMs: 12000 });
           await settle(s, 2800); // let the force-directed layout settle
         },

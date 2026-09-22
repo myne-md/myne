@@ -656,6 +656,9 @@
       "showGraph": {
         "label": "Show graph view…"
       },
+      "showIsolatedGraph": {
+        "label": "Open isolated graph"
+      },
       "showTasks": {
         "label": "Show tasks"
       },
@@ -1939,6 +1942,7 @@
     "graph": {
       "allConnected": "Everything is connected: no isolated notes.",
       "building": "Building graph…",
+      "canvasLabel": "Knowledge graph of {{count}} notes",
       "colorGroups": {
         "addRule": "Add rule",
         "colorSwatchTitle": "Choose color",
@@ -1947,7 +1951,12 @@
         "rowLabel": "{{name}}, group {{index}} of {{total}}. Alt plus the up or down arrow reorders it.",
         "editFilterButton": "Edit filter…",
         "editFilterTitle": "Edit color-group filter",
+        "editRuleButton": "Edit",
         "emptyBody": "Color groups let you color graph nodes by tag or folder: work notes in one color, personal notes in another. Add your first rule.",
+        "derivedMakeEditable": "Make these editable",
+        "derivedMakeEditableFailed": "Those groups could not be saved. Try again.",
+        "derivedNote_one": "The graph is colored by tag: {{count}} group, derived from your tags. It is not saved until you make it editable.",
+        "derivedNote_other": "The graph is colored by tag: {{count}} groups, derived from your tags. They are not saved until you make them editable.",
         "emptyTitle": "No color groups yet",
         "enableToggleAriaLabel": "Enable rule",
         "filterAllNotes": "Matches every note",
@@ -1956,18 +1965,26 @@
         "heading": "Color groups",
         "moveDown": "Move rule down",
         "moveUp": "Move rule up",
-        "namePlaceholder": "Untitled rule"
+        "namePlaceholder": "Untitled rule",
+        "newRuleTitle": "New color group"
       },
       "depthToggleTitle": "Toggle neighborhood depth (1 ↔ 2 hops)",
       "filterAll": "All",
       "filterAroundNote": "Around this note",
       "filterByTag": "Filter by tag",
       "filterIsolated": "Isolated",
+      "filterSelectAriaLabel": "Filter the graph",
       "hop": "{{depth}} hop",
+      "listLinkCount_one": "{{count}} link",
+      "listLinkCount_other": "{{count}} links",
+      "listLinksFrom": "Linked from: {{titles}}",
+      "listLinksTo": "Links to: {{titles}}",
       "loading": "Loading graph…",
       "noNotes": "No notes to graph yet.",
       "refresh": "Refresh",
       "refreshTitle": "The vault changed: rebuild the graph",
+      "relayout": "Re-layout",
+      "relayoutTitle": "Lay the graph out again from scratch",
       "settings": {
         "appearanceHeading": "Appearance",
         "closeTitle": "Close",
@@ -1982,10 +1999,15 @@
         "nodeSizeStrength": "Size by connections",
         "openTitle": "Graph settings",
         "reset": "Reset to defaults",
-        "showArrows": "Show direction arrows",
+        "showArrows": "Direction arrows on hover",
         "title": "Graph settings"
       },
-      "tagPlaceholder": "Tag…"
+      "showingCount_one": "Showing {{count}} note",
+      "showingCount_other": "Showing {{count}} notes",
+      "untitledNote": "Untitled note",
+      "viewGraph": "Graph",
+      "viewList": "List",
+      "viewToggleAriaLabel": "Choose the graph picture or a list of its notes"
     },
     "export": {
       "submenuLabel": "Export…",
@@ -4576,6 +4598,7 @@
     "connect": "Connect to my account"
   },
   "wikiGraph": {
+    "canvasLabel": "Knowledge graph of {{count}} notes",
     "emptyTitle": "No links yet",
     "emptyBodyBefore": "Connect notes by writing ",
     "emptyBodyAfter": " in your text. Linked notes appear here as a graph."

@@ -1969,8 +1969,7 @@
         "reset": "Rétablir les valeurs par défaut",
         "showArrows": "Afficher les flèches de direction",
         "title": "Paramètres du graphe"
-      },
-      "tagPlaceholder": "Étiquette…"
+      }
     },
     "import": {
       "base": {

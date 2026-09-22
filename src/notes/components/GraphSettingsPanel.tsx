@@ -11,12 +11,17 @@
 // `buildTrigger` in `GraphView.tsx`, so opening/closing the panel never bumps
 // the pane's layout-nonce.
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import { Switch } from "../../components/primitives/Switch";
-import type { GraphSettings } from "../graphSettings";
+import {
+  NODE_SIZE_RANGE,
+  NODE_SIZE_STRENGTH_RANGE,
+  type GraphSettings,
+} from "../graphSettings";
 import { ColorGroupEditor } from "./ColorGroupEditor";
+import { ScrollArea } from "../../components/primitives/ScrollArea";
 
 const SECTION_HEADING_STYLE: CSSProperties = {
   fontSize: "var(--text-xs)",
@@ -88,85 +93,191 @@ function SliderRow({
   );
 }
 
-export function GraphSettingsPanel({
-  settings,
-  onChange,
-  onReset,
+/** A collapsible group of settings (myne-md/myne#727), a disclosure, not a
+ *  tab: the panel is one list and the groups are its folds. Everything is
+ *  expanded on open, so collapsing is a choice the user makes rather than a
+ *  state the panel arrives in with its contents hidden.
+ *
+ *  Deliberately local to this panel rather than a shared primitive: the settings
+ *  MODAL's panels group with `ControlBlock` headings and are short enough not to
+ *  need folding, so a second adopter would be the point at which the shape is
+ *  worth lifting, and inventing the shared version now would be guessing at a
+ *  contract from one user.
+ */
+function SettingsGroup({
+  label,
+  testId,
+  children,
 }: {
-  settings: GraphSettings;
-  onChange: (next: GraphSettings) => void;
-  onReset: () => void;
+  label: string;
+  testId: string;
+  children: ReactNode;
 }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-
+  const [open, setOpen] = useState(true);
   return (
-    <div style={{ position: "absolute", top: 8, insetInlineEnd: 8, zIndex: 5 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={t("notes.graph.settings.openTitle")}
         aria-expanded={open}
-        title={t("notes.graph.settings.openTitle")}
-        data-testid="editor.graph-settings-gear"
+        data-testid={`${testId}-toggle`}
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          width: 28,
-          height: 28,
-          background: open ? "var(--paper-3)" : "var(--paper)",
-          border: "1px solid var(--line-1)",
-          borderRadius: "var(--radius-1)",
-          color: "var(--fg-2)",
+          gap: "var(--space-1)",
+          // Negative inline margin so the button's own hit area reaches the
+          // panel's padding edge while its text stays on the same optical line
+          // as the rows below it.
+          marginInline: "calc(var(--space-2) * -1)",
+          padding: "var(--space-1) var(--space-2)",
+          background: "transparent",
+          border: 0,
+          borderRadius: "var(--radius-2)",
+          color: "var(--fg-3)",
           cursor: "pointer",
+          font: "inherit",
+          textAlign: "left",
         }}
       >
-        <Icon name="settings" size={14} />
+        <Icon name={open ? "chevron-down" : "chevron-right"} size={12} />
+        <span style={SECTION_HEADING_STYLE}>{label}</span>
       </button>
       {open && (
         <div
-          data-testid="editor.graph-settings-panel"
+          data-testid={`${testId}-body`}
+          style={{ display: "flex", flexDirection: "column", gap: 10 }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function GraphSettingsPanel({
+  open,
+  onClose,
+  settings,
+  onChange,
+  onReset,
+  derivedGroupCount = 0,
+  onMaterializeDerived,
+  derivedMaterializeFailed = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  settings: GraphSettings;
+  onChange: (next: GraphSettings) => void;
+  onReset: () => void;
+  /** Forwarded to the colour-group section; see `ColorGroupEditor`. */
+  derivedGroupCount?: number;
+  onMaterializeDerived?: () => void;
+  derivedMaterializeFailed?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  if (!open) return null;
+  return (
+    <div
+      data-testid="editor.graph-settings-panel"
+      style={{
+        // No positioning of its own: it is the second child of the graph pane's
+        // overlay column, which is what puts it directly under the control
+        // cluster and keeps the two from needing a shared magic offset
+        // (myne-md/myne#727). The PANEL is still an OVERLAY rather than a column
+        // in the pane's layout, which is the load-bearing half: it takes no
+        // width from the canvas, so opening it cannot resize the canvas and
+        // re-run the layout.
+        width: 300,
+        maxHeight: "min(70vh, 520px)",
+        // `hidden`, not `auto`: the panel itself never scrolls any more. The
+        // header is a sibling of the scroller rather than a `position: sticky`
+        // child of it, which is the structural way to keep the title and the
+        // close control on screen, a sticky element needs its own background
+        // and a stacking decision to stop rows showing through it, and this
+        // needs neither.
+        overflow: "hidden",
+        background: "var(--paper)",
+        border: "1px solid var(--line-1)",
+        borderRadius: "var(--radius-3, 8px)",
+        boxShadow: "var(--shadow-3)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          flex: "0 0 auto",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          padding: "var(--space-3)",
+          borderBottom: "1px solid var(--line-1)",
+        }}
+      >
+        <span
           style={{
-            position: "absolute",
-            top: 34,
-            insetInlineEnd: 0,
-            width: 300,
-            maxHeight: "min(70vh, 520px)",
-            overflowY: "auto",
-            background: "var(--paper)",
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-3, 8px)",
-            boxShadow: "var(--shadow-3)",
-            padding: "var(--space-3)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
+            flex: "1 1 auto",
+            fontSize: 12,
+            fontWeight: "var(--weight-semibold)",
+            color: "var(--fg-1)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
-              {t("notes.graph.settings.title")}
-            </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label={t("notes.graph.settings.closeTitle")}
-              title={t("notes.graph.settings.closeTitle")}
-              data-testid="editor.graph-settings-close"
-              style={{
-                display: "flex",
-                background: "transparent",
-                border: 0,
-                color: "var(--fg-3)",
-                cursor: "pointer",
-                padding: 2,
-              }}
-            >
-              <Icon name="x" size={14} />
-            </button>
-          </div>
+          {t("notes.graph.settings.title")}
+        </span>
+        {/* Reset lives HERE, beside the close control, because it is a
+            panel-level action rather than the last row of a list, at the
+            bottom it read as one more setting and sat below the fold
+            (myne-md/myne#727). */}
+        <button
+          type="button"
+          onClick={onReset}
+          data-testid="editor.graph-settings-reset"
+          style={{
+            fontSize: "var(--text-xs)",
+            padding: "3px 8px",
+            background: "var(--bg-1)",
+            color: "var(--fg-2)",
+            border: "1px solid var(--line-1)",
+            borderRadius: "var(--radius-2)",
+            cursor: "pointer",
+          }}
+        >
+          {t("notes.graph.settings.reset")}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("notes.graph.settings.closeTitle")}
+          title={t("notes.graph.settings.closeTitle")}
+          data-testid="editor.graph-settings-close"
+          style={{
+            display: "flex",
+            background: "transparent",
+            border: 0,
+            color: "var(--fg-3)",
+            cursor: "pointer",
+            padding: 2,
+          }}
+        >
+          <Icon name="x" size={14} />
+        </button>
+      </div>
 
+      <ScrollArea
+        testId="editor.graph-settings-scroll"
+        style={{ flex: "1 1 auto" }}
+        contentStyle={{
+          padding: "var(--space-3)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
+        }}
+      >
+        <SettingsGroup
+          label={t("notes.graph.settings.appearanceHeading")}
+          testId="editor.graph-settings-group-appearance"
+        >
           <label
             style={{
               display: "flex",
@@ -200,8 +311,8 @@ export function GraphSettingsPanel({
           <SliderRow
             label={t("notes.graph.settings.nodeSize")}
             value={settings.nodeSize}
-            min={3}
-            max={10}
+            min={NODE_SIZE_RANGE.min}
+            max={NODE_SIZE_RANGE.max}
             step={1}
             testId="editor.graph-settings-node-size"
             onChange={(next) => onChange({ ...settings, nodeSize: next })}
@@ -209,8 +320,8 @@ export function GraphSettingsPanel({
           <SliderRow
             label={t("notes.graph.settings.nodeSizeStrength")}
             value={settings.nodeSizeStrength}
-            min={0}
-            max={1}
+            min={NODE_SIZE_STRENGTH_RANGE.min}
+            max={NODE_SIZE_STRENGTH_RANGE.max}
             step={0.1}
             testId="editor.graph-settings-node-size-strength"
             onChange={(next) => onChange({ ...settings, nodeSizeStrength: next })}
@@ -224,10 +335,14 @@ export function GraphSettingsPanel({
             testId="editor.graph-settings-line-thickness"
             onChange={(next) => onChange({ ...settings, lineThickness: next })}
           />
+        </SettingsGroup>
 
-          {/* Forces — wired through the layout-request protocol; a change
-              re-runs the bounded layout once, warm-started, then freezes. */}
-          <span style={SECTION_HEADING_STYLE}>{t("notes.graph.settings.forcesHeading")}</span>
+        {/* Forces, wired through the layout-request protocol; a change re-runs
+            the bounded layout once, warm-started, then freezes. */}
+        <SettingsGroup
+          label={t("notes.graph.settings.forcesHeading")}
+          testId="editor.graph-settings-group-forces"
+        >
           <SliderRow
             label={t("notes.graph.settings.forceCenter")}
             value={settings.forceCenterStrength}
@@ -264,33 +379,23 @@ export function GraphSettingsPanel({
             testId="editor.graph-settings-force-link-distance"
             onChange={(next) => onChange({ ...settings, forceLinkDistance: next })}
           />
+        </SettingsGroup>
 
-          {/* Color groups (graph-connection-ux-polish task 7) — a second
-              section, self-contained (reads/writes vault.prefs directly,
-              never `settings`/`onChange`). Deliberately independent of the
-              appearance/forces reset below: color-group rules are authored
-              content, not a physics/appearance tuning knob. */}
-          <ColorGroupEditor />
-
-          <button
-            type="button"
-            onClick={onReset}
-            data-testid="editor.graph-settings-reset"
-            style={{
-              alignSelf: "flex-start",
-              fontSize: 12,
-              padding: "4px 8px",
-              background: "var(--bg-1)",
-              color: "var(--fg-2)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-1)",
-              cursor: "pointer",
-            }}
-          >
-            {t("notes.graph.settings.reset")}
-          </button>
-        </div>
-      )}
+        {/* Color groups (graph-connection-ux-polish task 7), self-contained
+            (reads/writes vault.prefs directly, never `settings`/`onChange`),
+            and deliberately NOT inside the appearance/forces reset: color-group
+            rules are authored content, not a tuning knob. */}
+        <SettingsGroup
+          label={t("notes.graph.colorGroups.heading")}
+          testId="editor.graph-settings-group-colors"
+        >
+          <ColorGroupEditor
+            derivedGroupCount={derivedGroupCount}
+            onMaterializeDerived={onMaterializeDerived}
+            derivedMaterializeFailed={derivedMaterializeFailed}
+          />
+        </SettingsGroup>
+      </ScrollArea>
     </div>
   );
 }
