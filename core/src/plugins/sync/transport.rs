@@ -195,6 +195,7 @@ impl FakeTransport {
             HttpMethod::Post => "POST",
             HttpMethod::Put => "PUT",
             HttpMethod::Head => "HEAD",
+            HttpMethod::Delete => "DELETE",
         };
         alloc_format(m, path)
     }

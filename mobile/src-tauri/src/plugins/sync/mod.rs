@@ -11,7 +11,7 @@
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
-//! `sync:default` bundles all thirty commands into ONE narrow,
+//! `sync:default` bundles all thirty-four commands into ONE narrow,
 //! main-window-only grant — the nineteen-command desktop `sync:default` surface
 //! (including the recovered-notes quarantine quartet
 //! `sync_list_quarantine`/`sync_read_quarantine`/`sync_restore_quarantine`/
@@ -25,7 +25,7 @@
 //! push/pull/status/device commands are gated on an authenticated session inside
 //! the shared core. The `build.rs` `InlinedPlugin` command list, the
 //! `permissions/sync/default.toml` `commands.allow` entries, and the
-//! `generate_handler!` list below MUST match exactly (all thirty), a
+//! `generate_handler!` list below MUST match exactly (all thirty-four), a
 //! mismatch makes Tauri **fail closed** (the ACL resolver denies the invoke).
 //!
 //! ## R3 transport review-debt (registration ≠ verified crypto)
@@ -53,7 +53,7 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
 /// Construct the mobile `sync` plugin — registers the client command surface
-/// over the shared-core command bodies. All thirty commands, matching the
+/// over the shared-core command bodies. All thirty-four commands, matching the
 /// `build.rs` `InlinedPlugin` + `permissions/sync/default.toml` lists exactly.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("sync")
@@ -63,8 +63,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_status,
             commands::sync_now,
             commands::sync_person_unlock,
+            person_account::sync_person_setup,
+            person_account::sync_person_status,
+            person_account::sync_person_list_invites,
+            person_account::sync_list_vault_invites,
+            person_account::sync_person_accept_invite,
+            person_account::sync_person_unlock_member_vault,
+            person_account::sync_member_vault_status,
+            person_account::sync_person_profile_write,
+            person_account::sync_person_profile_read,
             commands::sync_person_lock,
-            commands::sync_invite_member,
+            commands::sync_person_create_invite,
+            commands::sync_person_inspect_invite_code,
             commands::sync_list_roster,
             commands::sync_remove_member,
             commands::sync_list_devices,

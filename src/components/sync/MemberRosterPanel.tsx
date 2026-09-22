@@ -9,8 +9,8 @@
 // flow until that lands, and the crypto behind it is identical either way.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { useRoster } from "../../hooks/useRoster";
-import { startB2bMigration } from "../../lib/invite";
+import { useRoster, type RosterMember } from "../../hooks/useRoster";
+import { startB2bMigration, inspectInviteCode } from "../../lib/invite";
 
 /** The `kind` of a serialized backend error, or `null` for anything else. */
 function syncErrorKind(e: unknown): string | null {
@@ -78,18 +78,24 @@ export function MemberRosterPanel({
     inviting,
     lastInvite,
     invite,
+    vaultInvites,
+    vaultInvitesFailed,
+    removing,
+    remove,
     unlockPerson,
     lockPerson,
   } = useRoster();
   const [personReady, setPersonReady] = useState(false);
   const [personError, setPersonError] = useState(false);
+  const [ownerCode, setOwnerCode] = useState<string | null>(null);
   const [phrase, setPhrase] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Removal is parked until the roster wire ships, so there is no removal
-  // dialog: the only child dialog is the invite form.
-  const childDialogOpen = inviteOpen;
+  // Removal is live again (myne-md/myne#711 task 14): the invite form and the
+  // removal confirm are the two child dialogs.
+  const childDialogOpen = inviteOpen || removeTarget !== null;
   useEffect(() => {
     onDialogOpenChange?.(childDialogOpen);
     return () => onDialogOpenChange?.(false);
@@ -133,9 +139,10 @@ export function MemberRosterPanel({
             data-testid="member-roster.person-unlock-button"
             onClick={async () => {
               try {
-                await unlockPerson(phrase);
+                const view = await unlockPerson(phrase);
                 setPhrase("");
                 setPersonError(false);
+                setOwnerCode(view.identity_code);
                 setPersonReady(true);
               } catch {
                 setPersonError(true);
@@ -153,6 +160,20 @@ export function MemberRosterPanel({
       ) : (
         <div data-testid="member-roster.person-ready">
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personReady")}</p>
+          {/* The owner's own out-of-band identity code: share it with an invitee
+              so they can verify the group package the owner sends. Public
+              material only. */}
+          {ownerCode ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              <p style={STATUS_STYLE}>{t("sync.memberRoster.ownerCodeHint")}</p>
+              <code
+                data-testid="member-roster.owner-code"
+                style={{ ...CODE_STYLE, wordBreak: "break-all" }}
+              >
+                {ownerCode}
+              </code>
+            </div>
+          ) : null}
           <Button
             type="button"
             data-testid="member-roster.person-lock-button"
@@ -217,14 +238,60 @@ export function MemberRosterPanel({
                     {t("sync.memberRoster.rotated")}
                   </span>
                 ) : null}
+                {authority === "owner" && m.role === "member" ? (
+                  <Button
+                    type="button"
+                    data-testid="member-roster.remove-button"
+                    onClick={() => setRemoveTarget(m)}
+                  >
+                    {t("sync.memberRoster.remove")}
+                  </Button>
+                ) : null}
               </li>
             ))}
           </ul>
-          <p data-testid="member-roster.remove-disabled" style={STATUS_STYLE}>
+          <p data-testid="member-roster.removal-limits" style={STATUS_STYLE}>
             {t("sync.memberRoster.removalLimits")}
           </p>
         </>
       )}
+
+      {/* Sent invitations, owner-only: claimed versus pending. The roster row
+          exists from invite time, so this list is how the owner tells an
+          accepted invite from one nobody has claimed yet. */}
+      {authority === "owner" && vaultInvites.length > 0 ? (
+        <div data-testid="member-roster.invitations">
+          <p style={STATUS_STYLE}>{t("sync.memberRoster.invitationsHeading")}</p>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {vaultInvites.map((inv) => (
+              <li
+                key={inv.invite_id_hex}
+                data-testid="member-roster.invitation-row"
+                style={ROW_STYLE}
+              >
+                <span data-testid="member-roster.invitation-recipient" style={CODE_STYLE}>
+                  {inv.recipient_person_id_hex.slice(0, 16)}
+                </span>
+                <span
+                  data-testid="member-roster.invitation-status"
+                  data-claimed={inv.claimed ? "true" : "false"}
+                  style={STATUS_STYLE}
+                >
+                  {inv.claimed
+                    ? t("sync.memberRoster.invitationClaimed")
+                    : t("sync.memberRoster.invitationPending")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {authority === "owner" && vaultInvitesFailed ? (
+        <p data-testid="member-roster.invitations-error" role="alert" style={ERROR_STYLE}>
+          {t("sync.memberRoster.invitationsFailed")}
+        </p>
+      ) : null}
 
       {/* Step 3: invite. Owner-only: a member is never shown an admin
           control they cannot use (the backend refuses with `NotOwner`). */}
@@ -279,6 +346,25 @@ export function MemberRosterPanel({
         />
       ) : null}
 
+      {removeTarget ? (
+        <RemoveConfirmDialog
+          name={
+            removeTarget.display_name ||
+            removeTarget.fingerprint_hex.slice(0, 16)
+          }
+          busy={removing}
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            try {
+              await remove(removeTarget.fingerprint_hex);
+              setRemoveTarget(null);
+            } catch {
+              setActionError(t("sync.memberRoster.removeFailed"));
+            }
+          }}
+        />
+      ) : null}
+
       {lastInvite ? (
         <p data-testid="member-roster.invite-result" style={CODE_STYLE}>
           {t("sync.memberRoster.inviteReady", {
@@ -308,8 +394,57 @@ function useEscapeToClose(onClose: () => void) {
   }, [onClose]);
 }
 
-/** The invite form. The invitee's public material is pasted; fetching it
- *  automatically is the Grill 4 wire contract. */
+/** The removal confirm. A modal dialog with a focus trap and Escape-to-close,
+ *  matching `InviteMemberModal`, so focus is moved in and `aria-modal="true"`
+ *  is truthful. */
+function RemoveConfirmDialog({
+  name,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, { enabled: true });
+  useEscapeToClose(onCancel);
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("sync.memberRoster.remove")}
+      data-testid="member-roster.remove-confirm"
+      style={STATUS_STYLE}
+    >
+      <p>{t("sync.memberRoster.removeConfirm", { name })}</p>
+      <Button
+        type="button"
+        data-testid="member-roster.remove-cancel"
+        onClick={onCancel}
+      >
+        {t("common.cancel")}
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        data-testid="member-roster.remove-submit"
+        disabled={busy}
+        onClick={() => void onConfirm()}
+      >
+        {t("sync.memberRoster.remove")}
+      </Button>
+    </div>
+  );
+}
+
+/** The invite form. The invitee's identity code is pasted; the SAS fingerprint
+ *  it decodes to is shown and must be explicitly confirmed before the invite is
+ *  sealed and relayed. The code carries public material only. */
 function InviteMemberModal({
   busy,
   onCancel,
@@ -317,16 +452,13 @@ function InviteMemberModal({
 }: {
   busy: boolean;
   onCancel: () => void;
-  onSubmit: (input: {
-    memberKemEkHex: string;
-    memberEdPkHex: string;
-    memberMldsaVkHex: string;
-  }) => Promise<void>;
+  onSubmit: (input: { recipientCode: string }) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [kem, setKem] = useState("");
-  const [ed, setEd] = useState("");
-  const [mldsa, setMldsa] = useState("");
+  const [code, setCode] = useState("");
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  const [inspectError, setInspectError] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useFocusTrap(ref, { enabled: true });
   useEscapeToClose(onCancel);
@@ -340,33 +472,59 @@ function InviteMemberModal({
       style={STATUS_STYLE}
     >
       <p>{t("sync.memberRoster.inviteHint")}</p>
-      <label>
-        {t("sync.memberRoster.kemLabel")}
-        <input
-          data-testid="member-roster.invite-kem"
-          value={kem}
-          onChange={(e) => setKem(e.target.value)}
-          style={INPUT_STYLE}
-        />
-      </label>
-      <label>
-        {t("sync.memberRoster.edLabel")}
-        <input
-          data-testid="member-roster.invite-ed"
-          value={ed}
-          onChange={(e) => setEd(e.target.value)}
-          style={INPUT_STYLE}
-        />
-      </label>
-      <label>
-        {t("sync.memberRoster.mldsaLabel")}
-        <input
-          data-testid="member-roster.invite-mldsa"
-          value={mldsa}
-          onChange={(e) => setMldsa(e.target.value)}
-          style={INPUT_STYLE}
-        />
-      </label>
+      <textarea
+        data-testid="member-roster.invite-code"
+        aria-label={t("sync.memberRoster.inviteCodeLabel")}
+        value={code}
+        onChange={(e) => {
+          setCode(e.target.value);
+          // A changed code invalidates a previous compare.
+          setFingerprint(null);
+          setConfirmed(false);
+          setInspectError(false);
+        }}
+        rows={4}
+        style={INPUT_STYLE}
+      />
+      {fingerprint === null ? (
+        <Button
+          type="button"
+          data-testid="member-roster.inspect"
+          disabled={code.trim() === ""}
+          onClick={async () => {
+            try {
+              const view = await inspectInviteCode(code.trim());
+              setFingerprint(view.fingerprint_hex);
+              setInspectError(false);
+            } catch {
+              setInspectError(true);
+            }
+          }}
+        >
+          {t("sync.memberRoster.inspect")}
+        </Button>
+      ) : (
+        <div data-testid="member-roster.sas">
+          <p>{t("sync.memberRoster.sasHint")}</p>
+          <code data-testid="member-roster.sas-fingerprint" style={CODE_STYLE}>
+            {fingerprint}
+          </code>
+          <label style={{ display: "block" }}>
+            <input
+              type="checkbox"
+              data-testid="member-roster.sas-confirm"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />
+            {t("sync.memberRoster.sasConfirm")}
+          </label>
+        </div>
+      )}
+      {inspectError ? (
+        <p data-testid="member-roster.inspect-error" style={ERROR_STYLE}>
+          {t("sync.memberRoster.inviteCodeInvalid")}
+        </p>
+      ) : null}
       <Button type="button" data-testid="member-roster.invite-cancel" onClick={onCancel}>
         {t("common.cancel")}
       </Button>
@@ -374,10 +532,8 @@ function InviteMemberModal({
         type="button"
         variant="primary"
         data-testid="member-roster.invite-confirm"
-        disabled={busy || kem === "" || ed === "" || mldsa === ""}
-        onClick={() =>
-          onSubmit({ memberKemEkHex: kem, memberEdPkHex: ed, memberMldsaVkHex: mldsa })
-        }
+        disabled={busy || fingerprint === null || !confirmed}
+        onClick={() => onSubmit({ recipientCode: code.trim() })}
       >
         {t("sync.memberRoster.invite")}
       </Button>

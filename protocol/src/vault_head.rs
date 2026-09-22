@@ -55,6 +55,24 @@ pub const VAULT_HEAD_PROTOCOL_VERSION: u8 = 0x01;
 /// The v0.1 head wire-format version (§3.6 forward hook).
 pub const VAULT_HEAD_FORMAT_V1: u8 = 0x01;
 
+/// The signed head format (`decisions/protocol/0603`): the head is
+/// signature-authenticated by the author's person keypair instead of HMAC'd
+/// under `root_key`, because a B2B member holds no `root_key`. Wire-only, so no
+/// on-disk magic moves; `protocol.md` §10's reserved-expansion ban does not
+/// apply to a sync-wire record.
+pub const VAULT_HEAD_FORMAT_V2: u8 = 0x02;
+
+/// The vault-scoped pseudonymous author id length (`myne.head-author v1|`).
+pub const HEAD_AUTHOR_ID_LEN: usize = 16;
+
+/// Signature-class prefix for a signed head. Changing it invalidates every head
+/// signature verification.
+const HEAD_SIGNATURE_PREFIX: &[u8] = b"myne.head-signature v1|";
+
+/// Hash domain for the vault-scoped pseudonymous author id. Distinct from the
+/// person fingerprint so the id cannot be linked across vaults.
+const HEAD_AUTHOR_ID_PREFIX: &[u8] = b"myne.head-author v1|";
+
 /// Length of `account_number_hash` bound into the head (§3.2).
 pub const VAULT_HEAD_ACCOUNT_HASH_LEN: usize = 16;
 /// Length of the manifest hash committed by the head (`SHA-256`, §4.2).
@@ -158,6 +176,12 @@ pub enum VaultHeadError {
     /// HMAC verification failed (not authored under this `root_key`).
     #[error("vault head MAC verification failed")]
     MacMismatch,
+    /// Signed-head signature verification failed (neither half, or wrong key).
+    #[error("vault head signature verification failed")]
+    SignatureMismatch,
+    /// Signed-head author id matches no known roster public half.
+    #[error("vault head author id matches no known roster public half")]
+    AuthorUnknown,
     /// `MYH1` baseline magic mismatch.
     #[error("vault.head-state magic mismatch (expected MYH1)")]
     StateMagicMismatch,
@@ -350,48 +374,57 @@ pub fn open_vault_head(root_key: &[u8; 32], record: &[u8]) -> Result<VaultHead, 
     }
 
     // Now decode the (authenticated) input.
+    parse_head_canonical(mac_input, VAULT_HEAD_FORMAT_V1)
+}
+
+/// Decode a canonical head input (exactly the bytes [`VaultHead::encode_mac_input`]
+/// produces), requiring `expected_format` in the format byte. Shared by the
+/// HMAC head (after its MAC verifies) and the signed `0x02` head (after its
+/// signature verifies), so the two formats cannot drift in how they read the
+/// fields the head commits.
+fn parse_head_canonical(input: &[u8], expected_format: u8) -> Result<VaultHead, VaultHeadError> {
     let mut off = 0usize;
     let p = VAULT_HEAD_DOMAIN_PREFIX.len();
-    if &mac_input[off..off + p] != VAULT_HEAD_DOMAIN_PREFIX {
+    if &input[off..off + p] != VAULT_HEAD_DOMAIN_PREFIX {
         return Err(VaultHeadError::DomainPrefixMismatch);
     }
     off += p;
-    if mac_input[off] != VAULT_HEAD_PROTOCOL_VERSION {
+    if input[off] != VAULT_HEAD_PROTOCOL_VERSION {
         return Err(VaultHeadError::ProtocolVersionMismatch);
     }
     off += 1;
-    let head_format_version = mac_input[off];
-    if head_format_version != VAULT_HEAD_FORMAT_V1 {
+    let head_format_version = input[off];
+    if head_format_version != expected_format {
         return Err(VaultHeadError::FormatUnsupported);
     }
     off += 1;
 
     let mut account_number_hash = [0u8; VAULT_HEAD_ACCOUNT_HASH_LEN];
-    account_number_hash.copy_from_slice(&mac_input[off..off + VAULT_HEAD_ACCOUNT_HASH_LEN]);
+    account_number_hash.copy_from_slice(&input[off..off + VAULT_HEAD_ACCOUNT_HASH_LEN]);
     off += VAULT_HEAD_ACCOUNT_HASH_LEN;
 
     let mut manifest_hash = [0u8; VAULT_HEAD_MANIFEST_HASH_LEN];
-    manifest_hash.copy_from_slice(&mac_input[off..off + VAULT_HEAD_MANIFEST_HASH_LEN]);
+    manifest_hash.copy_from_slice(&input[off..off + VAULT_HEAD_MANIFEST_HASH_LEN]);
     off += VAULT_HEAD_MANIFEST_HASH_LEN;
 
     let mut seq_bytes = [0u8; 8];
-    seq_bytes.copy_from_slice(&mac_input[off..off + 8]);
+    seq_bytes.copy_from_slice(&input[off..off + 8]);
     let seq = u64::from_be_bytes(seq_bytes);
     off += 8;
 
-    let parent_count = mac_input[off];
+    let parent_count = input[off];
     off += 1;
     if parent_count > 2 {
         return Err(VaultHeadError::ParentCountInvalid);
     }
     let need_parents = parent_count as usize * HEAD_ID_LEN;
-    if mac_input.len() < off + need_parents + 4 {
+    if input.len() < off + need_parents + 4 {
         return Err(VaultHeadError::RecordTooShort);
     }
     let mut prev_head_hash = Vec::with_capacity(parent_count as usize);
     for _ in 0..parent_count {
         let mut h = [0u8; HEAD_ID_LEN];
-        h.copy_from_slice(&mac_input[off..off + HEAD_ID_LEN]);
+        h.copy_from_slice(&input[off..off + HEAD_ID_LEN]);
         prev_head_hash.push(h);
         off += HEAD_ID_LEN;
     }
@@ -403,17 +436,17 @@ pub fn open_vault_head(root_key: &[u8; 32], record: &[u8]) -> Result<VaultHead, 
     }
 
     let mut vvlen_bytes = [0u8; 4];
-    vvlen_bytes.copy_from_slice(&mac_input[off..off + 4]);
+    vvlen_bytes.copy_from_slice(&input[off..off + 4]);
     let vv_len = u32::from_be_bytes(vvlen_bytes) as usize;
     off += 4;
-    if mac_input.len() != off + vv_len {
+    if input.len() != off + vv_len {
         return Err(VaultHeadError::TrailingBytes);
     }
     if vv_len < 4 {
         return Err(VaultHeadError::VersionVectorLenInvalid);
     }
     let mut ec_bytes = [0u8; 4];
-    ec_bytes.copy_from_slice(&mac_input[off..off + 4]);
+    ec_bytes.copy_from_slice(&input[off..off + 4]);
     let entry_count = u32::from_be_bytes(ec_bytes) as usize;
     off += 4;
     let entry_size = DEVICE_ID_LEN + 8;
@@ -426,10 +459,10 @@ pub fn open_vault_head(root_key: &[u8; 32], record: &[u8]) -> Result<VaultHead, 
     let mut version_vector = Vec::with_capacity(entry_count);
     for _ in 0..entry_count {
         let mut device_id = [0u8; DEVICE_ID_LEN];
-        device_id.copy_from_slice(&mac_input[off..off + DEVICE_ID_LEN]);
+        device_id.copy_from_slice(&input[off..off + DEVICE_ID_LEN]);
         off += DEVICE_ID_LEN;
         let mut c = [0u8; 8];
-        c.copy_from_slice(&mac_input[off..off + 8]);
+        c.copy_from_slice(&input[off..off + 8]);
         off += 8;
         version_vector.push(VvEntry {
             device_id,
@@ -451,6 +484,109 @@ pub fn open_vault_head(root_key: &[u8; 32], record: &[u8]) -> Result<VaultHead, 
         prev_head_hash,
         version_vector,
     })
+}
+
+/// The exact bytes a signed head's double signature covers:
+/// `HEAD_SIGNATURE_PREFIX || author_id || canonical_head_input`. The author id
+/// is authenticated by being inside the signed message.
+fn head_signature_message(author_id: &[u8; HEAD_AUTHOR_ID_LEN], canonical: &[u8]) -> Vec<u8> {
+    let mut m =
+        Vec::with_capacity(HEAD_SIGNATURE_PREFIX.len() + HEAD_AUTHOR_ID_LEN + canonical.len());
+    m.extend_from_slice(HEAD_SIGNATURE_PREFIX);
+    m.extend_from_slice(author_id);
+    m.extend_from_slice(canonical);
+    m
+}
+
+/// The vault-scoped pseudonymous author id: `SHA-256("myne.head-author v1|" ||
+/// kem_ek || ed_pk || mldsa_vk || account_number_hash)[:16]`. It binds the
+/// person and the vault, so the same person shows a different id in each vault
+/// and the server cannot link them.
+#[must_use]
+pub fn head_author_id(
+    public: &crate::person_key::PersonPublicHalf,
+    account_number_hash: &[u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
+) -> [u8; HEAD_AUTHOR_ID_LEN] {
+    let mut h = Sha256::new();
+    h.update(HEAD_AUTHOR_ID_PREFIX);
+    h.update(public.kem_ek());
+    h.update(public.ed_pk());
+    h.update(public.mldsa_vk());
+    h.update(account_number_hash);
+    let digest = h.finalize();
+    let mut out = [0u8; HEAD_AUTHOR_ID_LEN];
+    out.copy_from_slice(&digest[..HEAD_AUTHOR_ID_LEN]);
+    out
+}
+
+/// Author a signed (`0x02`) head: build the canonical input (the `VaultHead`
+/// must carry [`VAULT_HEAD_FORMAT_V2`]), double-sign `HEAD_SIGNATURE_PREFIX ||
+/// author_id || canonical` with the person keypair, and frame the record as
+/// `ed25519_sig || mldsa_sig || author_id || canonical`. `head_id` is
+/// `SHA-256(record)` as for the HMAC head.
+pub fn sign_vault_head(
+    head: &VaultHead,
+    author_id: &[u8; HEAD_AUTHOR_ID_LEN],
+    person: &crate::person_key::PersonKeyPair,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<SealedHead, VaultHeadError> {
+    if head.head_format_version != VAULT_HEAD_FORMAT_V2 {
+        return Err(VaultHeadError::FormatUnsupported);
+    }
+    let canonical = head.encode_mac_input()?;
+    let message = head_signature_message(author_id, &canonical);
+    let signature = person
+        .sign(&message, rng)
+        .map_err(|_| VaultHeadError::SignatureMismatch)?;
+    let sig_len =
+        crate::person_key::PERSON_ED25519_SIG_LEN + crate::person_key::PERSON_MLDSA_SIG_LEN;
+    let mut record = Vec::with_capacity(sig_len + HEAD_AUTHOR_ID_LEN + canonical.len());
+    record.extend_from_slice(&signature.ed25519_sig);
+    record.extend_from_slice(&signature.mldsa_sig);
+    record.extend_from_slice(author_id);
+    record.extend_from_slice(&canonical);
+    let head_id = compute_head_id(&record);
+    Ok(SealedHead { record, head_id })
+}
+
+/// Verify a signed (`0x02`) head peer-side against the candidate roster public
+/// halves: resolve the signer by recomputing each candidate's author id, check
+/// BOTH signature halves, then parse the canonical input. Returns the head and
+/// the resolved author id.
+pub fn open_signed_vault_head(
+    record: &[u8],
+    roster_publics: &[crate::person_key::PersonPublicHalf],
+    account_number_hash: &[u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
+) -> Result<(VaultHead, [u8; HEAD_AUTHOR_ID_LEN]), VaultHeadError> {
+    let sig_len =
+        crate::person_key::PERSON_ED25519_SIG_LEN + crate::person_key::PERSON_MLDSA_SIG_LEN;
+    if record.len() < sig_len + HEAD_AUTHOR_ID_LEN + 2 {
+        return Err(VaultHeadError::RecordTooShort);
+    }
+    let mut ed25519_sig = [0u8; crate::person_key::PERSON_ED25519_SIG_LEN];
+    ed25519_sig.copy_from_slice(&record[..crate::person_key::PERSON_ED25519_SIG_LEN]);
+    let mldsa_sig = record[crate::person_key::PERSON_ED25519_SIG_LEN..sig_len].to_vec();
+    let mut author_id = [0u8; HEAD_AUTHOR_ID_LEN];
+    author_id.copy_from_slice(&record[sig_len..sig_len + HEAD_AUTHOR_ID_LEN]);
+    let canonical = &record[sig_len + HEAD_AUTHOR_ID_LEN..];
+
+    let signer = roster_publics
+        .iter()
+        .find(|p| head_author_id(p, account_number_hash) == author_id)
+        .ok_or(VaultHeadError::AuthorUnknown)?;
+    let message = head_signature_message(&author_id, canonical);
+    signer
+        .verify(
+            &message,
+            &crate::person_key::PersonSigned {
+                ed25519_sig,
+                mldsa_sig,
+            },
+        )
+        .map_err(|_| VaultHeadError::SignatureMismatch)?;
+
+    let head = parse_head_canonical(canonical, VAULT_HEAD_FORMAT_V2)?;
+    Ok((head, author_id))
 }
 
 /// Look up a device's counter in a version vector (absent ⇒ 0).
@@ -1357,5 +1493,105 @@ mod tests {
 
         std::fs::write("/tmp/myne_vault_head_state_vectors.json", out.as_bytes())
             .expect("write vault-head-state vectors dump");
+    }
+
+    /// A minimal deterministic RNG for the signed-head test.
+    struct TestRng(u64);
+    impl rand_core::TryRng for TestRng {
+        type Error = core::convert::Infallible;
+        fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+            Ok(0)
+        }
+        fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+            Ok(0)
+        }
+        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+            use sha2::Digest as _;
+            let ctr = self.0.wrapping_add(1);
+            self.0 = ctr;
+            let digest = sha2::Sha256::digest(ctr.to_le_bytes());
+            let n = dst.len();
+            dst[..n].copy_from_slice(&digest[..n]);
+            Ok(())
+        }
+    }
+    impl rand_core::TryCryptoRng for TestRng {}
+
+    #[test]
+    fn signed_head_round_trips_and_rejects_a_wrong_signer() {
+        use crate::person_key::PersonKeyPair;
+        let author = PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
+        let other = PersonKeyPair::generate_raw(&[4u8; 64], &[5u8; 32], &[6u8; 32]);
+        let mut account = [0u8; VAULT_HEAD_ACCOUNT_HASH_LEN];
+        account[0] = 7;
+        let author_id = head_author_id(&author.public_half(), &account);
+        let head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V2,
+            account_number_hash: account,
+            manifest_hash: [9u8; 32],
+            seq: 1,
+            prev_head_hash: vec![],
+            version_vector: vec![VvEntry {
+                device_id: [1u8; DEVICE_ID_LEN],
+                counter: 1,
+            }],
+        };
+        let mut rng = TestRng(0);
+        let sealed = sign_vault_head(&head, &author_id, &author, &mut rng).expect("sign");
+        assert_eq!(sealed.head_id, compute_head_id(&sealed.record));
+
+        let (opened, resolved) =
+            open_signed_vault_head(&sealed.record, &[author.public_half()], &account)
+                .expect("open");
+        assert_eq!(resolved, author_id);
+        assert_eq!(opened, head);
+
+        // A roster without the author cannot resolve the signer.
+        assert!(matches!(
+            open_signed_vault_head(&sealed.record, &[other.public_half()], &account),
+            Err(VaultHeadError::AuthorUnknown)
+        ));
+
+        // A different vault id changes the author id, so the same signature does
+        // not resolve: no cross-vault author linkage.
+        let mut other_vault = account;
+        other_vault[0] ^= 1;
+        assert!(matches!(
+            open_signed_vault_head(&sealed.record, &[author.public_half()], &other_vault),
+            Err(VaultHeadError::AuthorUnknown)
+        ));
+
+        // Tampering the canonical bytes breaks the signature.
+        let mut tampered = sealed.record.clone();
+        let n = tampered.len();
+        tampered[n - 1] ^= 1;
+        assert!(matches!(
+            open_signed_vault_head(&tampered, &[author.public_half()], &account),
+            Err(VaultHeadError::SignatureMismatch)
+        ));
+
+        // Cross-class replay: the same signature under another class prefix
+        // (the roster class) does not verify, because the prefix is inside the
+        // signed bytes.
+        let sig_len =
+            crate::person_key::PERSON_ED25519_SIG_LEN + crate::person_key::PERSON_MLDSA_SIG_LEN;
+        let mut ed25519_sig = [0u8; crate::person_key::PERSON_ED25519_SIG_LEN];
+        ed25519_sig.copy_from_slice(&sealed.record[..crate::person_key::PERSON_ED25519_SIG_LEN]);
+        let mldsa_sig = sealed.record[crate::person_key::PERSON_ED25519_SIG_LEN..sig_len].to_vec();
+        let canonical = &sealed.record[sig_len + HEAD_AUTHOR_ID_LEN..];
+        let mut wrong_class = Vec::new();
+        wrong_class.extend_from_slice(crate::person_invite::GROUP_ROSTER_PREFIX);
+        wrong_class.extend_from_slice(&author_id);
+        wrong_class.extend_from_slice(canonical);
+        assert!(author
+            .public_half()
+            .verify(
+                &wrong_class,
+                &crate::person_key::PersonSigned {
+                    ed25519_sig,
+                    mldsa_sig,
+                },
+            )
+            .is_err());
     }
 }

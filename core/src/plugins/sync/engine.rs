@@ -27,12 +27,13 @@
 //! proven end-to-end against the real server by
 //! `orchestrator::tests::two_devices_replicate_a_note`.
 
+use super::head_authority::HeadAuthority;
 use super::transport::{HttpMethod, SyncTransport, TransportError};
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
 use protocol::{
-    compute_head_id, open_vault_head, vv_dominance, Dominance, SealedHead, VaultHead,
-    VaultHeadError, VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN, VAULT_HEAD_FORMAT_V1,
+    compute_head_id, vv_dominance, Dominance, SealedHead, VaultHead, VaultHeadError, VvEntry,
+    DEVICE_ID_LEN, HEAD_ID_LEN, VAULT_HEAD_FORMAT_V1,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -110,6 +111,11 @@ pub struct VerifiedHead {
     pub head_id: [u8; HEAD_ID_LEN],
     /// The §5.3 comparison of this head's VV against the device baseline.
     pub dominance: Dominance,
+    /// The exact wire record, so the baseline can be persisted verbatim. A
+    /// signed (`0x02`) head's ML-DSA half is randomized, so re-sealing the
+    /// decoded head would produce a DIFFERENT record/head_id; storing the pulled
+    /// bytes is what keeps the baseline's `head_id` the one the server holds.
+    pub record: Vec<u8>,
 }
 
 /// The result of one `/sync/pull` page.
@@ -243,7 +249,7 @@ fn hex_to_array<const N: usize>(s: &str) -> Option<[u8; N]> {
 #[allow(clippy::too_many_arguments)]
 pub fn pull_page(
     transport: &dyn SyncTransport,
-    root_key: &[u8; 32],
+    head_authority: &HeadAuthority,
     token: &str,
     baseline_vv: &[VvEntry],
     cursor: u64,
@@ -300,7 +306,7 @@ pub fn pull_page(
             let record = B64
                 .decode(hw.record_b64.as_bytes())
                 .map_err(|_| PullError::BadResponse)?;
-            let opened = open_vault_head(root_key, &record);
+            let opened = head_authority.open(&record);
             // A head that will not open under a root_key this device just
             // REPLACED is the expected shape, not a forgery (#429). Take its id —
             // `SHA-256(record)`, keyless — as the CAS parent for the head this
@@ -328,6 +334,7 @@ pub fn pull_page(
                         head: vault_head,
                         head_id,
                         dominance,
+                        record,
                     })
                 }
             }
@@ -374,7 +381,7 @@ pub fn pull_page(
 #[allow(clippy::too_many_arguments)]
 pub fn pull_to_stable(
     transport: &dyn SyncTransport,
-    root_key: &[u8; 32],
+    head_authority: &HeadAuthority,
     token: &str,
     baseline_vv: &[VvEntry],
     start_cursor: u64,
@@ -391,7 +398,7 @@ pub fn pull_to_stable(
     loop {
         let page = pull_page(
             transport,
-            root_key,
+            head_authority,
             token,
             baseline_vv,
             cursor,
@@ -1142,9 +1149,15 @@ pub fn author_merge_head(
 mod tests {
     use super::*;
     use crate::plugins::sync::transport::FakeTransport;
+    use protocol::vault_head::open_vault_head;
     use protocol::VAULT_HEAD_FORMAT_V1;
 
     const ROOT: [u8; 32] = [0x42; 32];
+
+    /// A `HeadAuthority` for the `NTV5` HMAC path, for the many pull tests.
+    fn mac() -> super::HeadAuthority<'static> {
+        super::HeadAuthority::Mac { root_key: &ROOT }
+    }
 
     fn vv(counters: &[(u8, u64)]) -> Vec<VvEntry> {
         counters
@@ -1204,7 +1217,7 @@ mod tests {
             200,
             pull_body("", 0, None),
         );
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
         assert_eq!(page.next_cursor, 0);
         assert!(page.head.is_none());
         assert!(page.changed.is_empty());
@@ -1229,7 +1242,7 @@ mod tests {
         );
 
         let local = HashMap::new(); // blob unknown locally → changed
-        let page = pull_page(&t, &ROOT, "tok", &baseline, 1, &local, false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &baseline, 1, &local, false, false).unwrap();
         let vh = page.head.unwrap();
         assert_eq!(vh.dominance, Dominance::Extension);
         assert_eq!(vh.head_id, head_id);
@@ -1251,7 +1264,7 @@ mod tests {
         );
         let mut local = HashMap::new();
         local.insert([0x01u8; 16], [0xaau8; 24]); // same content_nonce → not changed
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &local, false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &local, false, false).unwrap();
         assert!(page.changed.is_empty());
     }
 
@@ -1270,7 +1283,7 @@ mod tests {
         assert_eq!(
             pull_page(
                 &t,
-                &ROOT,
+                &mac(),
                 "tok",
                 &baseline,
                 0,
@@ -1297,7 +1310,7 @@ mod tests {
             200,
             pull_body("", 1, Some((&bad, &id))),
         );
-        let r = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false);
+        let r = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false);
         assert!(matches!(
             r,
             Err(PullError::HeadInvalid)
@@ -1330,13 +1343,13 @@ mod tests {
 
         // Default: indistinguishable from a forgery, and treated as one.
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
             PullError::HeadInvalid,
             "an unopenable head must stay fatal when this device did not re-key"
         );
 
         // Re-basing: the head is not verified, and only its id is taken.
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, true)
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true)
             .expect("a re-basing device accepts the stale-generation head");
         assert!(
             page.head.is_none(),
@@ -1366,7 +1379,7 @@ mod tests {
             pull_body("", 1, Some((&rec, &lying_id))),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, true).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true).unwrap_err(),
             PullError::HeadIdMismatch
         );
     }
@@ -1381,7 +1394,7 @@ mod tests {
             b"{\"error_code\":\"cursor_expired\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 5, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 5, &HashMap::new(), false, false).unwrap_err(),
             PullError::CursorExpired
         );
     }
@@ -1396,7 +1409,7 @@ mod tests {
             b"{\"error_code\":\"unauthenticated\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
             PullError::Unauthenticated
         );
     }
@@ -1419,7 +1432,7 @@ mod tests {
             b"{\"error_code\":\"device_revoked\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
             PullError::DeviceRevoked
         );
     }
@@ -1433,7 +1446,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/sync/pull?cursor=0", 401, body);
             assert_eq!(
-                pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+                pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
                 PullError::Unauthenticated
             );
         }
@@ -1546,7 +1559,7 @@ mod tests {
             b"{\"error_code\":\"device_revoked_soon\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
             PullError::Unauthenticated
         );
     }
@@ -1573,7 +1586,7 @@ mod tests {
         );
         let page = pull_to_stable(
             &t,
-            &ROOT,
+            &mac(),
             "tok",
             &baseline,
             0,
@@ -1621,7 +1634,7 @@ mod tests {
         assert_eq!(
             pull_to_stable(
                 &t,
-                &ROOT,
+                &mac(),
                 "tok",
                 &baseline,
                 1,
@@ -1633,8 +1646,17 @@ mod tests {
             PullError::CursorExpired
         );
         // Reconcile walk drains both pages.
-        let page =
-            pull_to_stable(&t, &ROOT, "tok", &baseline, 0, &HashMap::new(), true, false).unwrap();
+        let page = pull_to_stable(
+            &t,
+            &mac(),
+            "tok",
+            &baseline,
+            0,
+            &HashMap::new(),
+            true,
+            false,
+        )
+        .unwrap();
         assert_eq!(page.next_cursor, 1);
         assert_eq!(page.changed.len(), 2);
     }
@@ -1666,7 +1688,8 @@ mod tests {
             200,
             pull_body("", 6, None),
         );
-        let page = pull_to_stable(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page =
+            pull_to_stable(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
         assert_eq!(page.next_cursor, 6);
         assert_eq!(
             page.changed.len(),
@@ -2260,7 +2283,7 @@ mod tests {
             200,
             pull_body(meta, 1, None),
         );
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
         assert_eq!(page.changed.len(), 1);
         assert_eq!(page.changed[0].id, [0xEE; 16]);
         assert_eq!(page.changed[0].attachment_id, Some([0xEE; 32]));

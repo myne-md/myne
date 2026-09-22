@@ -415,7 +415,7 @@ impl Device {
         crate::test_support::block_on(run_sync_cycle(
             &crate::vault_io::StdVaultIo,
             self.transport.as_ref(),
-            &self.acct.root_key,
+            Some(&self.acct.root_key),
             &crate::plugins::vault_unlock::state::SharedSingletonKey::OwnerRoot(
                 zeroize::Zeroizing::new(self.acct.root_key),
             ),
@@ -432,6 +432,7 @@ impl Device {
                 items_key: &self.acct.items_key,
                 items_key_id: &self.acct.items_key_id,
             }),
+            None,
         ))
     }
 

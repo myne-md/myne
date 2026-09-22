@@ -585,6 +585,9 @@ pub async fn vault_indices_persist_from_host(
         .hold_unlocked_shared_singleton_material()
         .await
         .ok_or(VaultIndicesError::SlotNotUnlocked)?;
+    // Hold off a shared-singleton reseal across this read-modify-write
+    // (myne-md/myne#711 task 15).
+    let _quiesce = crate::singleton_quiesce::shared().await;
     let active_id = runtime.active_vault_id().await;
     let vault_dir = crate::paths::active_vault_root_from_host(host, active_id)
         .map_err(|_| VaultIndicesError::PersistIo)?;

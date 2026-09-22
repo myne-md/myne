@@ -34,6 +34,11 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "plugin:vault-unlock|vault_list") return [];
       if (cmd === "plugin:vault-unlock|vault_slot_kind") return "Empty";
+      // The vault-less identity probe (myne-md/myne#711): a fresh device holds
+      // no person account, so the welcome arm renders.
+      if (cmd === "plugin:sync|sync_person_status") {
+        return { enrolled: false, person_id_hex: null, identity_code: null };
+      }
       return undefined;
     });
 
@@ -49,5 +54,8 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
     const probeCalls = invokeMock.mock.calls.map(([cmd]) => cmd);
     expect(probeCalls.filter((c) => c === "plugin:vault-unlock|vault_list")).toHaveLength(1);
     expect(probeCalls.filter((c) => c === "plugin:vault-unlock|vault_slot_kind")).toHaveLength(1);
+    // The third boot probe shares the same `probed` guard, so it too must fire
+    // exactly once: without this the guard could be moved off it silently.
+    expect(probeCalls.filter((c) => c === "plugin:sync|sync_person_status")).toHaveLength(1);
   });
 });

@@ -6,14 +6,16 @@
 // hook never sends a private seed across IPC.
 import { useCallback, useEffect, useState } from "react";
 import {
-  inviteMember,
   listRoster,
+  listVaultInvites,
+  personCreateInvite,
   personLock,
   personUnlock,
   removeMember,
   type InviteCommandView,
   type RosterMemberView,
   type VaultAuthority,
+  type VaultInviteSummary,
 } from "../lib/invite";
 
 export type RosterMember = RosterMemberView;
@@ -34,7 +36,12 @@ export interface RosterHook {
   lockPerson: typeof personLock;
   inviting: boolean;
   lastInvite: InviteCommandView | null;
-  invite: typeof inviteMember;
+  invite: typeof personCreateInvite;
+  /** The owner's sent invitations with their claim state (empty for a member). */
+  vaultInvites: VaultInviteSummary[];
+  /** True when the last sent-invitation fetch failed, so the panel can say
+   *  "could not load" rather than rendering an empty list as "none sent". */
+  vaultInvitesFailed: boolean;
   removing: boolean;
   remove: typeof removeMember;
 }
@@ -48,6 +55,8 @@ export function useRoster(): RosterHook {
   const [inviting, setInviting] = useState(false);
   const [lastInvite, setLastInvite] = useState<InviteCommandView | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [vaultInvites, setVaultInvites] = useState<VaultInviteSummary[]>([]);
+  const [vaultInvitesFailed, setVaultInvitesFailed] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -78,20 +87,44 @@ export function useRoster(): RosterHook {
     };
   }, [tick]);
 
+  // The owner's sent invitations, for the claimed-versus-pending view. Fetch
+  // only as the owner (the vault-side list is owner-token authorized), and
+  // re-fetch on the same tick that reloads the roster, so an invite shows up.
+  useEffect(() => {
+    if (authority !== "owner") {
+      setVaultInvites([]);
+      return;
+    }
+    let cancelled = false;
+    setVaultInvitesFailed(false);
+    listVaultInvites()
+      .then((rows) => {
+        if (!cancelled) setVaultInvites(rows);
+      })
+      .catch(() => {
+        // Distinguish "the fetch failed" from "no invitations sent": a silent
+        // empty list reads as the latter and hides a relay outage.
+        if (!cancelled) setVaultInvitesFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authority, tick]);
+
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
   const invite = useCallback(
-    (async (...args: Parameters<typeof inviteMember>): Promise<InviteCommandView> => {
+    (async (...args: Parameters<typeof personCreateInvite>): Promise<InviteCommandView> => {
       setInviting(true);
       try {
-        const view = await inviteMember(...args);
+        const view = await personCreateInvite(...args);
         setLastInvite(view);
         reload();
         return view;
       } finally {
         setInviting(false);
       }
-    }) as typeof inviteMember,
+    }) as typeof personCreateInvite,
     [reload],
   );
 
@@ -120,6 +153,8 @@ export function useRoster(): RosterHook {
     inviting,
     lastInvite,
     invite,
+    vaultInvites,
+    vaultInvitesFailed,
     removing,
     remove,
   };

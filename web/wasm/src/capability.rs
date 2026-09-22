@@ -651,9 +651,23 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // rather than `Pending`: none of it becomes reachable by porting more,
     // the carrier itself is the blocker.
     ("plugin:sync|sync_person_unlock", Class::Unsupported),
+    ("plugin:sync|sync_person_setup", Class::Unsupported),
+    ("plugin:sync|sync_person_status", Class::Unsupported),
+    ("plugin:sync|sync_person_list_invites", Class::Unsupported),
+    ("plugin:sync|sync_list_vault_invites", Class::Unsupported),
+    ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
+    (
+        "plugin:sync|sync_person_unlock_member_vault",
+        Class::Unsupported,
+    ),
+    ("plugin:sync|sync_member_vault_status", Class::Unsupported),
     ("plugin:sync|sync_person_lock", Class::Unsupported),
     ("plugin:sync|sync_start_b2b_migration", Class::Unsupported),
-    ("plugin:sync|sync_invite_member", Class::Unsupported),
+    ("plugin:sync|sync_person_create_invite", Class::Unsupported),
+    (
+        "plugin:sync|sync_person_inspect_invite_code",
+        Class::Unsupported,
+    ),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`

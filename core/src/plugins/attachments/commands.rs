@@ -660,6 +660,7 @@ where
     // (7) Serialize the catalog read-modify-write under the per-plugin
     //     mutex so a concurrent import/delete cannot lose an update.
     let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     // (8) Dedup: read the catalog; if the id already exists, return the
     //     EXISTING entry verbatim (no re-store, no timestamp churn).
@@ -1428,6 +1429,7 @@ pub async fn attachment_clean_unused_with_dir(
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     // Catalog-first: drop survivors + rewrite the catalog, THEN unlink.
     let (survivors, skipped) = rewrite_catalog_dropping_unused(
@@ -1666,6 +1668,7 @@ pub async fn reclaim_stray_attachment_blobs(
     let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
 
     let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
     // No `run_blocking` wrapper any more: what this does is a catalog read, a
     // directory walk and N unlinks — all IO, all dispatching their own blocking
     // on the native arm. The one piece of CPU work, the catalog AEAD decode, is
@@ -1757,6 +1760,7 @@ pub async fn attachment_delete_with_dir(
         };
 
     let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
@@ -1940,6 +1944,7 @@ pub(crate) async fn attachment_rename_with_dir(
         };
 
     let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
