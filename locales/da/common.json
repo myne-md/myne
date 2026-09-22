@@ -1898,8 +1898,7 @@
         "reset": "Nulstil til standard",
         "showArrows": "Vis retningspile",
         "title": "Grafindstillinger"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {

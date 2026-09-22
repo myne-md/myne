@@ -22,7 +22,6 @@ export const RIGHT_CLUSTER_DEFAULT_ORDER: readonly string[] = [
   "view-mode",
   "tags",
   "views",
-  "graph",
   "settings",
   "lock",
   "vim-mode",

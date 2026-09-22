@@ -61,18 +61,34 @@ function hashId(id: string): number {
 export function seedInitialPosition(
   prev: GraphPosition | undefined,
   id: string,
-  index: number,
-  count: number,
 ): GraphPosition {
   if (prev !== undefined) return { x: prev.x, y: prev.y };
   const centre = LAYOUT_BOX / 2;
-  const radius = LAYOUT_BOX / 2 - 60;
-  const angle = (2 * Math.PI * index) / Math.max(1, count) - Math.PI / 2;
-  // 1024 buckets of jitter, keyed by the whole id — mobile's old ring keyed on
-  // the first and last char modulo 37, which collides constantly over UUIDs.
-  const jitter = (hashId(id) % 1024) / 1024;
-  const r = radius * (0.55 + 0.45 * jitter);
+  // A QUARTER of the box, not the rim, and a UNIFORM DISC rather than an
+  // annulus (myne-md/myne#727).
+  //
+  // The old form took the angle from the node's INDEX and jittered the radius
+  // between 0.55 and 1.0 of a fixed ring, so every unplaced node started on the
+  // same circle. Gravity is proportional to distance, which means a node's
+  // equilibrium radius is set by where it started: the entire orphan
+  // population then settled onto ONE visible ring around the cloud, evenly
+  // spaced like beads, which is the "absurdly even spacing" the maintainer saw.
+  // Orphans and connected notes also sat at the same distances, so the picture
+  // had no gradient at all.
+  //
+  // Two independent deterministic draws fix it: the angle from one salt, and
+  // `sqrt(u)` for the radius, which is the uniform-area distribution of a disc
+  // (a uniform draw in r would pile nodes at the centre). Nothing here uses
+  // `Math.random`, so a cold layout is still reproducible.
+  const angle = 2 * Math.PI * draw(id, "#angle");
+  const r = (LAYOUT_BOX / 4) * Math.sqrt(draw(id, "#radius"));
   return { x: centre + r * Math.cos(angle), y: centre + r * Math.sin(angle) };
+}
+
+/** A deterministic 0..1 draw from the id and a salt. The salt is what makes two
+ *  properties of one node independent while both stay reproducible. */
+function draw(id: string, salt: string): number {
+  return (hashId(id + salt) % 1024) / 1024;
 }
 
 /**

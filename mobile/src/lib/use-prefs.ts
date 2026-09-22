@@ -57,6 +57,7 @@ export const DEFAULT_PREFS: PrefsView = {
   // byte-identical to a pre-feature one.
   date_format: null,
   periodic_notes: {},
+  color_groups: [],
   timezone: null,
   favorites: [],
   item_order: {},

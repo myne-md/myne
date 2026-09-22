@@ -1898,8 +1898,7 @@
         "reset": "Tilbakestill til standard",
         "showArrows": "Vis retningspiler",
         "title": "Grafinnstillinger"
-      },
-      "tagPlaceholder": "Etikett…"
+      }
     },
     "import": {
       "base": {

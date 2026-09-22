@@ -416,6 +416,40 @@ a:focus-visible,
   background: transparent;
 }
 
+/* Custom scroll area (myne-md/myne#727), see `primitives/ScrollArea.tsx`.
+   The native bar is hidden on the scroller and the indicator is a real element,
+   because a `var()` inside `::-webkit-scrollbar-thumb` does NOT resolve against
+   the scrolled element's cascade: it takes the root's base value, which in this
+   app is the LIGHT theme's `--line-2`, so the panel drew a pale bar down a dark
+   surface while every other scroller looked right. Styling a real element is
+   what makes the tokens resolve the way every other rule in the app does. */
+.myne-scrollarea {
+  scrollbar-width: none;
+}
+.myne-scrollarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.myne-scrollarea-thumb {
+  position: absolute;
+  inset-inline-end: 3px;
+  width: 6px;
+  border-radius: var(--radius-2);
+  background: var(--line-3);
+  opacity: 0;
+  transition: opacity 160ms var(--ease-standard);
+  pointer-events: none;
+  touch-action: none;
+}
+.myne-scrollarea-thumb[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.myne-scrollarea-thumb:hover {
+  background: var(--fg-3);
+}
+
 /* Settings search (MYND-536) — brief highlight of a setting after a result is
    selected and the shell scrolls it into view. `data-setting-flash="true"` is
    toggled imperatively for ~1.2s by SettingsModal, then removed. Token-driven.

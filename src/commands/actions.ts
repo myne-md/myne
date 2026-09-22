@@ -1190,6 +1190,26 @@ const showGraphAction: CommandAction = {
   },
 };
 
+const showIsolatedGraphAction: CommandAction = {
+  // The isolated notes, opened in the graph. Deliberately its own command
+  // rather than a second mode of `graph.show`: the graph pane's filter is local
+  // state, so "open the graph, on this view" is a different request from "open
+  // the graph", and a user who wants the isolated view wants it directly rather
+  // than a pane they then have to filter. No keybinding by default, it is a
+  // once-in-a-while view, and the palette is where those live.
+  id: "graph.show-isolated",
+  get label() {
+    return i18n.t("commands.actions.showIsolatedGraph.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowIsolatedGraph();
+  },
+};
+
 const showTasksAction: CommandAction = {
   // The identifier is FROZEN here. Command ids carry migration weight the
   // moment a user rebinds one — a rename silently drops their keybinding — so
@@ -1520,6 +1540,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   removeNoteCoverAction,
   exportNoteTxtAction,
   showGraphAction,
+  showIsolatedGraphAction,
   showTasksAction,
   showTagsAction,
   showViewsAction,

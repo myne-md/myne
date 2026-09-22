@@ -1898,8 +1898,7 @@
         "reset": "恢复默认值",
         "showArrows": "显示方向箭头",
         "title": "关系图设置"
-      },
-      "tagPlaceholder": "标签…"
+      }
     },
     "import": {
       "base": {

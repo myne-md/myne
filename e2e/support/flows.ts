@@ -2103,10 +2103,18 @@ export async function settleOn<T>(
   return box.v;
 }
 
-/** Open the whole-vault graph through the persistent BottomBar affordance and
- *  return its pane. */
+/**
+ * Open the whole-vault graph and return its pane.
+ *
+ * Through the PALETTE, not a testid: `editor.graph-button` was the BottomBar
+ * launcher, and myne-md/myne#727 removed the launcher from the bottom bar
+ * entirely (it is a command the left ribbon hosts on the user's own terms, and a
+ * corner-pinned button was a second, uncustomizable place for it). The palette
+ * is the one entry point every build has, and `graph.show` is its frozen
+ * command id, so this cannot drift with a chrome decision again.
+ */
 export async function openGraphPane(session: Session): Promise<Element> {
-  await (await session.byTestId("editor.graph-button")).click();
+  await runPaletteAction(session, "graph.show", "graph");
   return session.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
 }
 

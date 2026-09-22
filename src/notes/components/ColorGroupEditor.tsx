@@ -21,13 +21,14 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import { Switch } from "../../components/primitives/Switch";
 import { collectFolderOptions } from "../../components/export/vaultExportFlow";
 import { usePrefs } from "../../hooks/usePrefs";
 import { setColorGroups, type ColorGroup } from "../../lib/prefs";
-import { colorGroupVar } from "../graphColorGroups";
+import { colorGroupVar, GROUP_COLOR_KEYS } from "../graphColorGroups";
 import { useSelectedNote } from "../sidebarState";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { dragEdge, insertionLineStyle } from "./reorderDnd";
@@ -41,28 +42,14 @@ import {
 
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
-/** The task-4 categorical palette — the 8 `--group-*` design tokens. The
- *  stored {@link ColorGroup.color} is the bare token name (no leading `--`);
- *  the canvas renderer (task 8) resolves it as `var(--${color})`. */
-const PALETTE: ReadonlyArray<{ key: string; label: string }> = [
-  { key: "group-olive", label: "Olive" },
-  { key: "group-fern", label: "Fern" },
-  { key: "group-teal", label: "Teal" },
-  { key: "group-denim", label: "Denim" },
-  { key: "group-indigo", label: "Indigo" },
-  { key: "group-violet", label: "Violet" },
-  { key: "group-orchid", label: "Orchid" },
-  { key: "group-rose", label: "Rose" },
-];
-
-const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  fontWeight: "var(--weight-semibold)",
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "0.02em",
-  marginTop: "var(--space-1)",
-};
+/** The task-4 categorical palette, the 8 `--group-*` design tokens, in the
+ *  order {@link GROUP_COLOR_KEYS} fixes. Only the human labels live here; the
+ *  KEYS are shared with the default tag grouping, because that assigns them in
+ *  sequence and the sequence is precedence. */
+const PALETTE_LABELS = ["Olive", "Fern", "Teal", "Denim", "Indigo", "Violet", "Orchid", "Rose"];
+const PALETTE: ReadonlyArray<{ key: string; label: string }> = GROUP_COLOR_KEYS.map(
+  (key, i) => ({ key, label: PALETTE_LABELS[i]! }),
+);
 
 const ROW_STYLE: CSSProperties = {
   position: "relative",
@@ -86,16 +73,26 @@ const NAME_INPUT_STYLE: CSSProperties = {
   outline: "none",
 };
 
-const ICON_BTN_STYLE: CSSProperties = {
-  display: "flex",
+const ROW_TEXT_BUTTON_STYLE: CSSProperties = {
+  display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   ...MIN_TARGET,
-  padding: 0,
+  padding: "0 var(--space-2)",
+  flexShrink: 0,
   background: "transparent",
-  border: 0,
-  color: "var(--fg-3)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  color: "var(--fg-2)",
   cursor: "pointer",
+};
+
+/** The remove control is the same button, square: `×` has no label to make room
+ *  for, and a square beside a labelled one is what makes the pair read as a
+ *  control group rather than as two unrelated glyphs. */
+const ROW_ICON_BUTTON_STYLE: CSSProperties = {
+  ...ROW_TEXT_BUTTON_STYLE,
+  padding: 0,
 };
 
 // The swatch is TWO elements (myne-md/myne#728, task 11): a transparent
@@ -163,7 +160,23 @@ function folderOptionsFrom(paths: readonly string[]): FolderOption[] {
   });
 }
 
-export function ColorGroupEditor() {
+export function ColorGroupEditor({
+  derivedGroupCount = 0,
+  onMaterializeDerived = undefined,
+  derivedMaterializeFailed = false,
+}: {
+  /** How many groups the graph is showing from its DERIVED default (one per
+   *  qualifying tag, at least two notes) because the vault has authored none
+   *  (myne-md/myne#727). Zero means there is nothing to explain. */
+  derivedGroupCount?: number;
+  /** Turn those derived groups into real, editable rules. The ONE moment this
+   *  surface writes `color_groups`, and it is a write the user asked for. */
+  onMaterializeDerived?: () => void;
+  /** The materialise write failed. Reported rather than swallowed: the button
+   *  promises the defaults became editable, and a silent failure leaves the
+   *  panel showing "N derived groups" as if nothing was pressed. */
+  derivedMaterializeFailed?: boolean;
+} = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const { cache } = useSelectedNote();
@@ -175,6 +188,9 @@ export function ColorGroupEditor() {
   );
   const [pickingColorFor, setPickingColorFor] = useState<string | null>(null);
   const [editingFilterFor, setEditingFilterFor] = useState<string | null>(null);
+  /** Whether the NEW-rule modal is open. The rule does not exist until this is
+   *  confirmed, which is what makes adding one a single step. */
+  const [creating, setCreating] = useState(false);
 
   const persist = (next: ColorGroup[]) => {
     void (async () => {
@@ -187,13 +203,21 @@ export function ColorGroupEditor() {
     })();
   };
 
-  const addRule = () => {
+  /** ONE step, not two. This used to persist an "Untitled rule" immediately and
+   *  leave the user to click Edit afterwards, which is what the maintainer
+   *  flagged: the thing you came to set was behind a second click, and the list
+   *  meanwhile held a rule matching every note. The modal opens first and the
+   *  rule only exists once it is confirmed. */
+  const addRule = () => setCreating(true);
+
+  const createRule = (draft: FilterDraft) => {
+    setCreating(false);
     const rule: ColorGroup = {
       id: crypto.randomUUID(),
       name: "",
       color: PALETTE[0]!.key,
       enabled: true,
-      filter: { kind: "all" },
+      filter: draftToFilterNode(sanitizeDraft(draft)),
     };
     persist([...rules, rule]);
   };
@@ -260,7 +284,10 @@ export function ColorGroupEditor() {
 
   return (
     <>
-      <span style={SECTION_HEADING_STYLE}>{t("notes.graph.colorGroups.heading")}</span>
+      {/* No section heading of its own: the panel renders this editor inside a
+          `SettingsGroup` and that group's label IS the heading (myne-md/myne#727).
+          A second heading here would be the same words twice, one of them
+          outside the fold. */}
 
       {rules.length === 0 ? (
         <div data-testid="editor.color-groups-empty" style={EMPTY_HINT_STYLE}>
@@ -268,6 +295,49 @@ export function ColorGroupEditor() {
             {t("notes.graph.colorGroups.emptyTitle")}
           </p>
           <p style={{ margin: "0 0 6px" }}>{t("notes.graph.colorGroups.emptyBody")}</p>
+          {/* The graph is ALREADY coloured when the vault has no rules: the
+              default grouping by tag is DERIVED at render time rather than
+              written into `color_groups`, because an empty rule list is the
+              same state before the prefs read resolves, on a failed read, and
+              after the user deletes everything (myne-md/myne#727). Saying so
+              here is what stops the panel and the picture disagreeing, and the
+              button is the one moment the write is what the user asked for. */}
+          {derivedGroupCount > 0 && (
+            <div
+              data-testid="editor.color-groups-derived"
+              style={{ marginTop: "var(--space-1)" }}
+            >
+              <p style={{ margin: "0 0 6px", color: "var(--fg-2)" }}>
+                {t("notes.graph.colorGroups.derivedNote", {
+                  count: derivedGroupCount,
+                })}
+              </p>
+              <button
+                type="button"
+                onClick={onMaterializeDerived}
+                data-testid="editor.color-groups-materialize"
+                style={{
+                  fontSize: "var(--text-xs)",
+                  padding: "var(--space-1) var(--space-2)",
+                  background: "var(--bg-1)",
+                  color: "var(--fg-2)",
+                  border: "1px solid var(--line-1)",
+                  borderRadius: "var(--radius-2)",
+                  cursor: "pointer",
+                }}
+              >
+                {t("notes.graph.colorGroups.derivedMakeEditable")}
+              </button>
+              {derivedMaterializeFailed && (
+                <p
+                  data-testid="editor.color-groups-materialize-failed"
+                  style={{ margin: "6px 0 0", color: "var(--danger)" }}
+                >
+                  {t("notes.graph.colorGroups.derivedMakeEditableFailed")}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div data-testid="editor.color-groups-list">
@@ -340,16 +410,10 @@ export function ColorGroupEditor() {
                   }}
                   style={NAME_INPUT_STYLE}
                 />
-                <button
-                  type="button"
-                  aria-label={t("notes.graph.colorGroups.editFilterButton")}
-                  title={t("notes.graph.colorGroups.editFilterButton")}
-                  data-testid="editor.color-group-edit-filter"
-                  onClick={() => setEditingFilterFor(rule.id)}
-                  style={ICON_BTN_STYLE}
-                >
-                  <Icon name="pencil" size={12} />
-                </button>
+                {/* The trailing controls read in ONE order and at ONE height
+                    (the Switch is 20px): toggle, edit, remove. The edit control
+                    is a labelled bordered button rather than a bare pencil, so
+                    it says what it does; remove is the same button square. */}
                 <Switch
                   checked={rule.enabled}
                   onChange={(next) => updateRule(rule.id, { enabled: next })}
@@ -358,11 +422,21 @@ export function ColorGroupEditor() {
                 />
                 <button
                   type="button"
+                  aria-label={t("notes.graph.colorGroups.editFilterButton")}
+                  title={t("notes.graph.colorGroups.editFilterButton")}
+                  data-testid="editor.color-group-edit-filter"
+                  onClick={() => setEditingFilterFor(rule.id)}
+                  style={ROW_TEXT_BUTTON_STYLE}
+                >
+                  {t("notes.graph.colorGroups.editRuleButton")}
+                </button>
+                <button
+                  type="button"
                   aria-label={t("notes.graph.colorGroups.deleteRuleTitle")}
                   title={t("notes.graph.colorGroups.deleteRuleTitle")}
                   data-testid="editor.color-group-delete"
                   onClick={() => deleteRule(rule.id)}
-                  style={ICON_BTN_STYLE}
+                  style={ROW_ICON_BUTTON_STYLE}
                 >
                   <Icon name="x" size={12} />
                 </button>
@@ -416,16 +490,20 @@ export function ColorGroupEditor() {
         onClick={addRule}
         data-testid="editor.color-group-add"
         style={{
-          alignSelf: "flex-start",
+          // FULL width and taller than a row control: this is the one action in
+          // the section that creates something, and at its old size it read as
+          // a footnote under the list rather than as the way to start one
+          // (myne-md/myne#727).
           display: "flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: "var(--space-1)",
           fontSize: 12,
-          padding: "4px 8px",
+          padding: "var(--space-2) var(--space-3)",
           background: "var(--bg-1)",
           color: "var(--fg-2)",
           border: "1px solid var(--line-1)",
-          borderRadius: "var(--radius-1)",
+          borderRadius: "var(--radius-2)",
           cursor: "pointer",
         }}
       >
@@ -433,20 +511,46 @@ export function ColorGroupEditor() {
         {t("notes.graph.colorGroups.addRule")}
       </button>
 
-      {editingRule !== null && (
-        <FilterBuilder
-          title={t("notes.graph.colorGroups.editFilterTitle")}
-          initialDraft={editingDraft ?? EMPTY_DRAFT}
-          representable={editingDraft !== null}
-          allowedTypes={["tag", "folder"]}
-          folderOptions={folderOptionsFrom(collectFolderOptions(cache.values()))}
-          onCancel={() => setEditingFilterFor(null)}
-          onSave={(draft) => {
-            setEditingFilterFor(null);
-            updateRule(editingRule.id, { filter: draftToFilterNode(sanitizeDraft(draft)) });
-          }}
-        />
-      )}
+      {/* Both modals go through a PORTAL. `ModalShell`'s backdrop is
+          `position: fixed`, and this editor renders inside the graph settings
+          panel, which is an absolutely-positioned, `overflowY: auto` box: an
+          ancestor that creates a containing block (a transform, a filter,
+          `will-change`) turns "fixed" into "fixed to that ancestor", and the
+          modal then renders clipped and off-centre. That is the defect the
+          maintainer saw as "it doesn't display correctly the modal". Portalling
+          to the body makes the backdrop resolve against the viewport, which is
+          what every other modal in the app already gets by living at the top
+          level. */}
+      {editingRule !== null &&
+        createPortal(
+          <FilterBuilder
+            title={t("notes.graph.colorGroups.editFilterTitle")}
+            initialDraft={editingDraft ?? EMPTY_DRAFT}
+            representable={editingDraft !== null}
+            allowedTypes={["tag", "folder"]}
+            folderOptions={folderOptionsFrom(collectFolderOptions(cache.values()))}
+            onCancel={() => setEditingFilterFor(null)}
+            onSave={(draft) => {
+              setEditingFilterFor(null);
+              updateRule(editingRule.id, { filter: draftToFilterNode(sanitizeDraft(draft)) });
+            }}
+          />,
+          document.body,
+        )}
+
+      {creating &&
+        createPortal(
+          <FilterBuilder
+            title={t("notes.graph.colorGroups.newRuleTitle")}
+            initialDraft={EMPTY_DRAFT}
+            representable
+            allowedTypes={["tag", "folder"]}
+            folderOptions={folderOptionsFrom(collectFolderOptions(cache.values()))}
+            onCancel={() => setCreating(false)}
+            onSave={createRule}
+          />,
+          document.body,
+        )}
     </>
   );
 }

@@ -1898,8 +1898,7 @@
         "reset": "Đặt lại về mặc định",
         "showArrows": "Hiện mũi tên chỉ hướng",
         "title": "Cài đặt đồ thị"
-      },
-      "tagPlaceholder": "Thẻ…"
+      }
     },
     "import": {
       "base": {

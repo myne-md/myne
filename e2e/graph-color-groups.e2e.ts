@@ -66,7 +66,7 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { testIdSelector, type Element, type Session } from "./support/webdriver";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -181,10 +181,13 @@ async function paletteNonce(s: Session): Promise<string | null> {
   );
 }
 
-/** Point the currently-open rule's filter at `tag` through the shared filter
- *  builder — the same modal Saved Views uses, here restricted to tag+folder. */
-async function setRuleTagFilter(s: Session, tag: string): Promise<void> {
-  await (await s.byTestId("editor.color-group-edit-filter")).click();
+/** Fill the rule-filter modal that is ALREADY open, through the shared filter
+ *  builder, the same modal Saved Views uses, here restricted to tag+folder.
+ *  It does not open the modal: since myne-md/myne#727's curation pass, `Add
+ *  rule` opens it directly and the rule only exists once it is saved, so the
+ *  create path and the edit path differ in how they OPEN it and not in how they
+ *  fill it. */
+async function fillRuleFilterModal(s: Session, tag: string): Promise<void> {
   await s.byTestId("view-filter.modal", { timeoutMs: 8_000 });
   await (await s.byTestId("view-filter.add-condition-first")).click();
   await s.byTestId("view-filter.condition");
@@ -199,6 +202,34 @@ async function setRuleTagFilter(s: Session, tag: string): Promise<void> {
   ).click();
   await (await s.byTestId("view-filter.save")).click();
   await s.waitForGone(testIdSelector("view-filter.modal"));
+}
+
+/**
+ * `data-canvas-model-nonce`, once it has stopped moving.
+ *
+ * Reading it straight after a condition the PANE satisfied is a race: the pane's
+ * attributes are written during React's render, and the canvas's `[model]` effect
+ * (which is what writes this one) runs after the commit. The first read can
+ * therefore catch the previous value, which is a flake rather than a finding
+ * (myne-md/myne#727).
+ */
+async function settledModelNonce(
+  s: Session,
+  canvas: Element,
+  timeoutMs = 5_000,
+): Promise<string | null> {
+  let last: string | null = null;
+  let run = 0;
+  await s.waitUntil(
+    async () => {
+      const cur = await canvas.attribute("data-canvas-model-nonce");
+      run = cur !== null && cur === last ? run + 1 : 0;
+      last = cur;
+      return run >= 2 ? true : null;
+    },
+    { label: "canvas model nonce settled", timeoutMs, intervalMs: 150 },
+  );
+  return last;
 }
 
 describeE2E("gc1 color groups paint the graph without re-running the layout", () => {
@@ -220,7 +251,7 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         // Two tagged notes: only the first carries #alfagroup.
         await seedTaggedNotes(s);
 
-        const { pane } = await openSettledGraphPane(s);
+        const { pane, canvas } = await openSettledGraphPane(s);
         // No rules yet → every node neutral.
         expect(await pane.attribute("data-colored-node-count")).toBe("0");
 
@@ -231,8 +262,8 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         await (await s.byTestId("editor.graph-settings-gear")).click();
         await s.byTestId("editor.graph-settings-panel");
         await (await s.byTestId("editor.color-group-add")).click();
+        await fillRuleFilterModal(s, "alfagroup");
         await s.byTestId("editor.color-group-row");
-        await setRuleTagFilter(s, "alfagroup");
 
         await s.waitUntil(
           async () =>
@@ -242,6 +273,19 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         // The load-bearing assertion: a rule edit REPAINTS, it does not
         // re-build the model or re-run the layout.
         expect(await pane.attribute("data-layout-nonce")).toBe("1");
+        // This FIRST rule edit is the one case that does rebuild the canvas
+        // (task 18): it is a bare `hasTag` rule, so it introduces a tag NODE,
+        // and the tag nodes are part of the model the canvas lays out. The
+        // canvas-side counter is captured here rather than asserted at zero,
+        // because the honest claim is "everything AFTER the hub arrived is
+        // repaint-only", which is what the three assertions below check.
+        const canvasModelNonce = await settledModelNonce(s, canvas);
+        expect(canvasModelNonce).not.toBeNull();
+        // …and the rule really did put a TAG NODE in the picture (task 18): the
+        // tag it filters on is a bare `hasTag` rule, so it claims a hub. This is
+        // the E2E half of "tags become nodes", the model-side half is in
+        // `tests/notes/graphModel.test.ts`.
+        expect(await pane.attribute("data-tag-node-count")).toBe("1");
 
         // …and the matching node really is painted in the group colour.
         await s.waitUntil(
@@ -267,6 +311,11 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         expect(await pixelCount(s, olive)).toBe(0);
         expect(await pane.attribute("data-layout-nonce")).toBe("1");
         expect(await pane.attribute("data-colored-node-count")).toBe("1");
+        // A COLOUR change moves no hub and must not rebuild the canvas: this is
+        // the repaint-only contract in the one place it can be observed
+        // directly (myne-md/myne#727 task 18).
+        expect(await settledModelNonce(s, canvas)).toBe(canvasModelNonce);
+        expect(await pane.attribute("data-tag-node-count")).toBe("1");
 
         // --- Theme switch: the canvas re-resolves its tokens and repaints in
         // the new theme's value for the SAME colour key — still no relayout.
@@ -288,6 +337,7 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
           { label: "node repainted in the dark-theme token", timeoutMs: 10_000 },
         );
         expect(await pane.attribute("data-layout-nonce")).toBe("1");
+        expect(await settledModelNonce(s, canvas)).toBe(canvasModelNonce);
 
         // --- A CUSTOM theme's own token override wins too. The built-in
         // switch above moves `<html data-theme>`; a custom theme instead writes
@@ -325,6 +375,7 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         );
         expect(await pane.attribute("data-layout-nonce")).toBe("1");
         expect(await pane.attribute("data-colored-node-count")).toBe("1");
+        expect(await settledModelNonce(s, canvas)).toBe(canvasModelNonce);
       },
     );
   });
@@ -364,6 +415,7 @@ describeE2E("gc2 color-group rules survive a restart", () => {
         await (await s.byTestId("editor.graph-settings-gear")).click();
         await s.byTestId("editor.graph-settings-panel");
         await (await s.byTestId("editor.color-group-add")).click();
+        await fillRuleFilterModal(s, "alfagroup");
         await s.byTestId("editor.color-group-row");
 
         const nameInput = await s.byTestId("editor.color-group-name");
@@ -379,7 +431,8 @@ describeE2E("gc2 color-group rules survive a restart", () => {
           )
         ).click();
 
-        await setRuleTagFilter(s, "alfagroup");
+        // The filter was set when the rule was CREATED, above, so there is no
+        // second edit pass here any more.
 
         const teal = await tokenRgb(s, RULE_COLOR_TOKEN);
         await s.waitUntil(

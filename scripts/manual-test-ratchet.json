@@ -291,7 +291,25 @@
     "    tree against a mocked Tauri IPC, so neither produces a real prefs write",
     "    arriving over sync, nor observes which side of the prefs merge each field",
     "    lands on. 10 minutes on ios and android, which is the whole of 9822 -> 9842.",
-    "CEILING RAISED 10655 -> 10675 by myne-md/myne#697, in the sanctioned direction: a new surface that genuinely needs a human. What added the minutes, named so the raise is an argument: the agent-memory surface (settings Memory section + chat-header popover + turn-end marker) on the two desktop WebViews the automated lane never drives, 10 minutes on desktop-macos and desktop-windows, core. The E2E scenario (task 10) covers the same flow on desktop-linux; the macOS/Windows renderings plus the OS-credential-store unlock path are unexercised anywhere else, the same shape as the #675 conversation-history raise. Both items are core, so gatedMinutes rises by the same 20."
+    "CEILING RAISED 10655 -> 10675 by myne-md/myne#697, in the sanctioned direction: a new surface that genuinely needs a human. What added the minutes, named so the raise is an argument: the agent-memory surface (settings Memory section + chat-header popover + turn-end marker) on the two desktop WebViews the automated lane never drives, 10 minutes on desktop-macos and desktop-windows, core. The E2E scenario (task 10) covers the same flow on desktop-linux; the macOS/Windows renderings plus the OS-credential-store unlock path are unexercised anywhere else, the same shape as the #675 conversation-history raise. Both items are core, so gatedMinutes rises by the same 20.",
+    "",
+    "CEILING RAISED 10675 -> 10699 by myne-md/myne#727, the graph exploration",
+    "rework, in the sanctioned direction: an EXISTING item genuinely grew rather",
+    "than a new surface arriving. What added the minutes: the graph-motion item",
+    "(pinch/pan smoothness) goes 12 -> 16 minutes on its six clients, +24, because",
+    "it now also covers the four behaviours this change introduced, each a",
+    "perceptual judgement about motion on a real display that no lane can make:",
+    "that a dragged node's neighbours followed it while the pointer was down and",
+    "that the node was pulled back on release (the link spring); that hovering",
+    "faded everything outside the hovered note's neighbourhood enough to make the",
+    "structure readable; that a layout of a few hundred notes settles over about a",
+    "second rather than appearing complete; and that framing the graph moves the",
+    "camera rather than cutting to it. The container drives WebKitGTK through",
+    "software rendering and reads DOM attributes and canvas pixels, so it has no",
+    "frame or timing observation at all, and the reduced-motion gate it CAN assert",
+    "is the opposite question. gatedMinutes is unchanged: the item is",
+    "standard-tier, so this widens what a human checks without widening the",
+    "blocking gate."
   ],
   "$comment2": [
     "CEILING RAISED 9822 -> 9846 by myne-md/myne#456, in the sanctioned direction.",
@@ -552,7 +570,15 @@
     "oversight: it is a FLOOR that `--record` may only move downward, so the",
     "actual gating figure rising above it (3837 recorded, the roster now",
     "reporting 67.3 h) is the state the bound is written for. The rule is that",
-    "gating may not fall by more than total does, and both rose."
+    "gating may not fall by more than total does, and both rose.",
+    "",
+    "CEILING 10817 -> 10841, the SUM of two independent raises that met in",
+    "this merge rather than a third one. develop's ceiling was 10817 (the",
+    "accessibility pass, myne-md/myne#728); the graph rework (myne-md/myne#727)",
+    "branched from 10675 and took it to 10699 (+24 for the graph curation",
+    "items), so the merged ceiling is 10817 + 24. The two branches cover",
+    "disjoint roster entries. Written out rather than bumped, so the number",
+    "stays an argument."
   ],
   "gatedTiers": [
     "core"
@@ -566,6 +592,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10817,
+  "totalMinutesCeiling": 10841,
   "gatedMinutes": 3837
 }

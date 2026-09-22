@@ -1969,8 +1969,7 @@
         "reset": "Ripristina i valori predefiniti",
         "showArrows": "Mostra le frecce di direzione",
         "title": "Impostazioni del grafico"
-      },
-      "tagPlaceholder": "Tag…"
+      }
     },
     "import": {
       "base": {
