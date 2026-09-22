@@ -27,7 +27,7 @@
 
 use super::config::SyncConfigError;
 use crate::io_failure_kind::IoFailureKind;
-use protocol::{decode_head_state, SealedHead, VaultHead, VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN};
+use protocol::{SealedHead, VaultHead, VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -162,6 +162,14 @@ pub struct SyncState {
     /// re-entry (the unlocked `root_key` re-derives the SCRAM secret).
     #[serde(default)]
     pub account_hash_hex: Option<String>,
+    /// The OWNER's person identity code (`MYNE-PERSON-1:…`), captured on a
+    /// member device at invite accept. A member's `NTV6` `vault.meta` carries an
+    /// owner-signed roster, so verifying it (and therefore any signed head)
+    /// needs the owner's public half, which a member holds only as this
+    /// out-of-band code. **Public material only** (the same bytes the owner
+    /// shared by hand), so it is stored in the clear like the account hash.
+    #[serde(default)]
+    pub owner_identity_code: Option<String>,
     /// Whether the last completed cycle PROVED this device holds every content
     /// blob the server's head commits to (phase3-web-client task 89).
     ///
@@ -218,6 +226,22 @@ pub struct SyncState {
     /// own, leaving the flag set and the queue empty or the reverse.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pending_orphan_tombstones: Vec<OrphanTombstone>,
+    /// The OWNER's per-vault membership token (lowercase hex), obtained by
+    /// binding this vault's owner person once (myne-md/myne#711 task 11).
+    ///
+    /// It authenticates the owner on the vault's B2B routes (`POST /b2b/invites`
+    /// is the first consumer). Vault-scoped and device-local, never synced. It is
+    /// the same class of credential as the endpoint pin: a revocable availability
+    /// token, not key material (`[person-token-storage] A` in the feature's
+    /// `progress.md`), so it is device-local plaintext beside the sync cursor
+    /// rather than under the token store's keychain seam.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_member_token_hex: Option<String>,
+    /// The owner person id the stored membership token belongs to. A re-bound
+    /// owner (a new person identity, e.g. after a migration) must not reuse the
+    /// old token, so the pair is compared and re-bound on mismatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_member_person_id_hex: Option<String>,
 }
 
 impl SyncState {
@@ -414,32 +438,52 @@ pub async fn write_sync_state(
 }
 
 /// Persist the last-seen head baseline to `<dir>/vault.head-state` as `MYH1`
-/// (atomic replace). The caller seals the head (`VaultHead::seal`) first.
+/// (atomic replace). `head_format_version` is the authority's expected byte
+/// (`0x01` HMAC, `0x02` signed), so a signed vault's baseline round-trips.
 pub async fn write_head_baseline(
     io: &dyn crate::vault_io::VaultIo,
     dir: &Path,
     sealed: &SealedHead,
+    head_format_version: u8,
 ) -> Result<(), SyncConfigError> {
     let path = dir.join(HEAD_STATE_FILE);
-    let blob = protocol::encode_head_state(sealed, protocol::VAULT_HEAD_FORMAT_V1);
+    let blob = protocol::encode_head_state(sealed, head_format_version);
     io.write(&path, &blob, crate::vault_io::WriteOpts::default())
         .await?;
     Ok(())
 }
 
 /// Read + verify the device-local head baseline. Absent → `Ok(None)`. A present
-/// blob is MAC-re-verified under `root_key`; a tamper / wrong-key blob is an
-/// error (the server cannot have written a valid one).
+/// blob is re-verified by the vault's [`HeadAuthority`] (the `root_key` HMAC on
+/// an `NTV5` vault, the person-keypair signature on an `NTV6` vault); a tamper /
+/// wrong-key blob is an error (the server cannot have written a valid one).
 pub async fn read_head_baseline(
     io: &dyn crate::vault_io::VaultIo,
-    root_key: &[u8; 32],
+    head_authority: &super::head_authority::HeadAuthority<'_>,
     dir: &Path,
 ) -> Result<Option<VaultHead>, HeadBaselineError> {
     let path = dir.join(HEAD_STATE_FILE);
-    // Same reasoning as `read_sync_state`: the verifier here is the head's own
-    // HMAC (§9.16 re-verifies it under `root_key` on every load), so it is what
-    // must choose between the two copies rather than the generation frame.
-    match crate::singleton::open_newest(io, &path, |blob| decode_head_state(root_key, blob)).await {
+    // The `MYH1` envelope is `magic(4) || protocol(1) || format(1)` then the wire
+    // record; the format byte must match what this vault's authority accepts, and
+    // the record is verified by that authority (MAC or signature), so a signed
+    // vault's baseline round-trips.
+    let decode = |blob: &[u8]| -> Result<VaultHead, protocol::vault_head::VaultHeadError> {
+        let header = 4 + 1 + 1;
+        if blob.len() < header {
+            return Err(protocol::vault_head::VaultHeadError::RecordTooShort);
+        }
+        if blob[0..4] != protocol::VAULT_HEAD_STATE_MAGIC {
+            return Err(protocol::vault_head::VaultHeadError::StateMagicMismatch);
+        }
+        if blob[4] != protocol::VAULT_HEAD_PROTOCOL_VERSION {
+            return Err(protocol::vault_head::VaultHeadError::ProtocolVersionMismatch);
+        }
+        if blob[5] != head_authority.expected_format() {
+            return Err(protocol::vault_head::VaultHeadError::FormatUnsupported);
+        }
+        head_authority.open(&blob[header..])
+    };
+    match crate::singleton::open_newest(io, &path, decode).await {
         Ok(head) => Ok(Some(head)),
         Err(crate::singleton::OpenOutcome::Absent) => Ok(None),
         Err(crate::singleton::OpenOutcome::Undecodable(_)) => Err(HeadBaselineError::Invalid),
@@ -525,10 +569,16 @@ mod tests {
         root_key: &[u8; 32],
         dir: &Path,
     ) -> Result<Option<VaultHead>, HeadBaselineError> {
-        rt(super::read_head_baseline(&IO, root_key, dir))
+        let auth = crate::plugins::sync::head_authority::HeadAuthority::Mac { root_key };
+        rt(super::read_head_baseline(&IO, &auth, dir))
     }
     fn write_head_baseline(dir: &Path, sealed: &SealedHead) -> Result<(), SyncConfigError> {
-        rt(super::write_head_baseline(&IO, dir, sealed))
+        rt(super::write_head_baseline(
+            &IO,
+            dir,
+            sealed,
+            protocol::VAULT_HEAD_FORMAT_V1,
+        ))
     }
     #[allow(dead_code)]
     fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
@@ -758,6 +808,9 @@ mod tests {
                 base_version: 7,
                 content_nonce_hex: "ee".repeat(24),
             }],
+            owner_member_token_hex: Some("ff".repeat(32)),
+            owner_member_person_id_hex: Some("12".repeat(16)),
+            owner_identity_code: Some("MYNE-PERSON-1:aa".to_string()),
         };
         let defaulted = SyncState::default();
 
@@ -782,6 +835,10 @@ mod tests {
         // about. So the loss is silent in the direction that matters.
         assert!(enrolled.last_success_at_ms.is_some());
         assert!(defaulted.last_success_at_ms.is_none());
+        // …and loses the owner's per-vault membership token, silently
+        // de-authorising every B2B admin call until a re-bind (task 11).
+        assert!(enrolled.owner_member_token_hex.is_some());
+        assert!(defaulted.owner_member_token_hex.is_none());
     }
 
     fn sample_head(root_key: &[u8; 32], counter: u64) -> SealedHead {

@@ -277,10 +277,10 @@ const KNOWN = [
     rule: "magic-parity",
     file: "protocol/src/vault_meta.rs",
     contains: "VAULT_META_MAGIC",
-    // Same: a `VAULT_META_V0_3_MAGIC` in a sibling module changes this set and
-    // the file starts failing again, which is the property a file-wide entry
-    // could not have.
-    missing: "VAULT_META_V0_2_MAGIC",
+    // A `VAULT_META_V0_3_MAGIC` or a further NTV generation in a sibling module
+    // changes this set and the file starts failing again, which is the property
+    // a file-wide entry could not have.
+    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_V0_2_MAGIC",
     why:
       "`parse_vault_meta` is deliberately v0.1-only and its single-generation rejection at " +
       "`bytes[0..4] != VAULT_META_MAGIC` is the correct behaviour for it: the version-aware " +
@@ -295,6 +295,21 @@ const KNOWN = [
       "not a hole: this guard owns the codec, that one owns who may call it. " +
       "Delete this entry if `parse_vault_meta` ever learns both generations, or if the v0.1 " +
       "path is retired.",
+  },
+  {
+    rule: "magic-parity",
+    file: "core/src/plugins/vault_migrate/mod.rs",
+    contains: "VAULT_META_MAGIC",
+    missing: "VAULT_META_NTV6_MAGIC",
+    why:
+      "The v0.1 to v0.2 ON-DISK migration reads a `MYV1` `vault.meta` and writes `NTV5`; an " +
+      "`NTV6` vault never reaches it, because the B2B `NTV5` to `NTV6` migration lives in " +
+      "`core/src/plugins/vault_migrate/b2b.rs`, which names `VAULT_META_NTV6_MAGIC`. This " +
+      "function reads only the v0.1 base (`parse_vault_meta`) behind the generation dispatcher, " +
+      "the legitimate single-generation-reader shape rule 5's header names. It became visible " +
+      "to rule 5 only when the family table learned the `_NTV<n>_MAGIC` spelling, which is why " +
+      "the third vault-meta generation is the one that surfaced it. Delete this entry if this " +
+      "function ever gains an `NTV6` arm.",
   },
   {
     rule: "length-prefix",
@@ -597,6 +612,11 @@ const byName = new Map([...registry].map(([magic, e]) => [e.name, { magic, file:
  */
 const magicFamilies = [];
 const GENERATION_SUFFIX = /^(.+)_V(\d+)_(\d+)_MAGIC$/;
+// The vault-meta family names its later generations `NTV5`/`NTV6` rather than
+// `_V0_2_MAGIC`, so a second pattern maps them to the same `VAULT_META` stem.
+// Without it `VAULT_META_NTV6_MAGIC` is invisible to rule 5 and the third
+// generation of a family the rule exists for goes unchecked.
+const NTV_GENERATION_SUFFIX = /^(.+)_NTV(\d+)_MAGIC$/;
 const laterByStem = new Map();
 for (const [name, e] of byName) {
   const m = GENERATION_SUFFIX.exec(name);
@@ -606,6 +626,19 @@ for (const [name, e] of byName) {
     magic: e.magic,
     token: name,
     gen: `v${m[2]}.${m[3]}`,
+    file: e.file,
+    re: reFor(name),
+  });
+  laterByStem.set(m[1], generations);
+}
+for (const [name, e] of byName) {
+  const m = NTV_GENERATION_SUFFIX.exec(name);
+  if (!m) continue;
+  const generations = laterByStem.get(m[1]) ?? [];
+  generations.push({
+    magic: e.magic,
+    token: name,
+    gen: `ntv${m[2]}`,
     file: e.file,
     re: reFor(name),
   });

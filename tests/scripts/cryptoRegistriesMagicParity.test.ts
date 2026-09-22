@@ -268,4 +268,50 @@ pub fn decode(blob: &[u8]) -> bool {
     expect(out).toContain("EXTRA_MAGIC_PAIRS");
     expect(out).toContain("NC05");
   });
+
+  it("FIRES for the NTV-spelled generation: a reader that names only the base magic", () => {
+    // The `_NTV<n>_MAGIC` spelling is a SECOND detection pattern (the vault-meta
+    // family names its generations NTV5/NTV6 rather than `_V0_2_MAGIC`), so a
+    // reader that handles only the base while an NTV6 generation exists must be
+    // named. Without a case here the second pattern could stop matching and rule
+    // 5 would print `ok` forever.
+    const root = fixture(
+      {
+        "core/src/meta_reader.rs":
+          "use protocol::vault_meta::VAULT_META_MAGIC;\n" +
+          "pub fn is_v0_1(b: &[u8]) -> bool {\n" +
+          "    b.len() >= 4 && &b[0..4] == VAULT_META_MAGIC\n" +
+          "}\n",
+      },
+      {
+        ...REGISTRY,
+        "protocol/src/vault_meta.rs": `pub const VAULT_META_MAGIC: [u8; 4] = *b"MYV1";\n`,
+        "protocol/src/vault_meta_v0_2.rs": `pub const VAULT_META_V0_2_MAGIC: [u8; 4] = *b"NTV5";\n`,
+        "protocol/src/vault_meta_ntv6.rs": `pub const VAULT_META_NTV6_MAGIC: [u8; 4] = *b"NTV6";\n`,
+      },
+    );
+    const { code, out } = run(root);
+    expect(code).toBe(1);
+    expect(out).toContain("core/src/meta_reader.rs");
+    expect(out).toContain("VAULT_META_NTV6_MAGIC");
+  });
+
+  it("and clears once the same file names the NTV6 generation too", () => {
+    const root = fixture(
+      {
+        "core/src/meta_reader.rs":
+          "use protocol::vault_meta::{VAULT_META_MAGIC, VAULT_META_V0_2_MAGIC, VAULT_META_NTV6_MAGIC};\n" +
+          "pub fn is_known(b: &[u8]) -> bool {\n" +
+          "    b.len() >= 4 && (&b[0..4] == VAULT_META_MAGIC || &b[0..4] == VAULT_META_V0_2_MAGIC || &b[0..4] == VAULT_META_NTV6_MAGIC)\n" +
+          "}\n",
+      },
+      {
+        ...REGISTRY,
+        "protocol/src/vault_meta.rs": `pub const VAULT_META_MAGIC: [u8; 4] = *b"MYV1";\n`,
+        "protocol/src/vault_meta_v0_2.rs": `pub const VAULT_META_V0_2_MAGIC: [u8; 4] = *b"NTV5";\n`,
+        "protocol/src/vault_meta_ntv6.rs": `pub const VAULT_META_NTV6_MAGIC: [u8; 4] = *b"NTV6";\n`,
+      },
+    );
+    expect(run(root).code).toBe(0);
+  });
 });

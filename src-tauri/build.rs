@@ -600,13 +600,21 @@ fn main() {
                 "sync_verify_hold_end",
                 // myne-md/myne#698 (B2B identity substrate): the member
                 // surface. `sync_person_unlock`/`sync_person_lock` hold the
-                // person identity backend-side; `sync_invite_member` reads
-                // it; `sync_list_roster`/`sync_remove_member` own the roster.
+                // person identity backend-side; `sync_person_create_invite`
+                // builds and relays the invite from a pasted identity code;
+                // `sync_list_roster`/`sync_remove_member` own the roster.
                 // Lock-stepped with `permissions/sync/default.toml` or the
                 // ACL resolver never authorizes these invokes.
                 "sync_person_unlock",
                 "sync_person_lock",
-                "sync_invite_member",
+                "sync_person_create_invite",
+                "sync_person_inspect_invite_code",
+                "sync_list_vault_invites",
+                "sync_person_accept_invite",
+                "sync_person_unlock_member_vault",
+                "sync_member_vault_status",
+                "sync_person_profile_write",
+                "sync_person_profile_read",
                 "sync_list_roster",
                 "sync_remove_member",
             ]),

@@ -701,6 +701,7 @@ async fn mutate_themes_with_dir(
     mutate: impl FnOnce(&mut ThemesMap),
 ) -> Result<(), ThemesError> {
     let _write_guard = write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
 
     // SYNC-6 writer-guard: hold the slot read guard across the atomic_write so a
     // slots WRITE-lock holder (backup quiescence, vault_lock, vault_delete)

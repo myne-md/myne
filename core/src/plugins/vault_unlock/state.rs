@@ -198,6 +198,13 @@ pub struct VaultRuntimeState {
     /// (`ZeroizeOnDrop`), and `take` moves it out so no clone lingers.
     person_identity: RwLock<Option<protocol::PersonKeyPair>>,
 
+    /// The addressable `person_id_hash` of the held person identity (B2B,
+    /// myne-md/myne#711 task 11). Derived at `sync_person_unlock` from the
+    /// normalized phrase, so the owner bind and the identity code do not need
+    /// the phrase again. Public (a pure function of the phrase) and dropped
+    /// with the identity.
+    person_id: RwLock<Option<[u8; 16]>>,
+
     /// Backend-held per-`(person, vault)` private AI profile key (`MYY5`,
     /// myne-md/myne#712 task 8). Derived at `sync_person_unlock` from the
     /// person's phrase AND the ACTIVE vault's account-number hash, so unlike the
@@ -210,6 +217,13 @@ pub struct VaultRuntimeState {
     /// [`Self::person_profile_key`] (the `profiles/<id>` filename component and
     /// the AAD binding). Held bare: it is a hash of public inputs.
     person_profile_id: RwLock<Option<[u8; 16]>>,
+
+    /// A pending signed `myne.person-key-transition v1|` record produced when a
+    /// legacy CSPRNG identity migrated at person unlock (`decisions/protocol/0604`).
+    /// The sync layer publishes it into each roster the person is in; it is
+    /// dropped with the person identity. Not secret (public key material and a
+    /// signature), so a plain `Vec<u8>`.
+    pending_person_key_transition: RwLock<Option<Vec<u8>>>,
 }
 
 impl Default for VaultRuntimeState {
@@ -224,8 +238,10 @@ impl Default for VaultRuntimeState {
             icon_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
             person_identity: RwLock::new(None),
+            person_id: RwLock::new(None),
             person_profile_key: RwLock::new(None),
             person_profile_id: RwLock::new(None),
+            pending_person_key_transition: RwLock::new(None),
         }
     }
 }
@@ -256,9 +272,38 @@ impl VaultRuntimeState {
     }
 
     /// Drop the held person identity, zeroizing it. Returns whether one
-    /// was held.
+    /// was held. The pending identity-migration transition is about the person,
+    /// not any vault, so it is dropped with the identity.
     pub async fn take_person_identity(&self) -> Option<protocol::PersonKeyPair> {
+        *self.pending_person_key_transition.write().await = None;
+        *self.person_id.write().await = None;
         self.person_identity.write().await.take()
+    }
+
+    /// Store the addressable person id that goes with the held identity.
+    pub async fn set_person_id(&self, person_id: [u8; 16]) {
+        *self.person_id.write().await = Some(person_id);
+    }
+
+    /// Clone the addressable person id for a command core.
+    pub async fn clone_person_id(&self) -> Option<[u8; 16]> {
+        *self.person_id.read().await
+    }
+
+    /// Store the signed migration transition produced at person unlock. No-op
+    /// callers still get the record published by the sync layer.
+    pub async fn set_pending_person_key_transition(&self, bytes: Vec<u8>) {
+        *self.pending_person_key_transition.write().await = Some(bytes);
+    }
+
+    /// Take the pending migration transition, if any (publish-once).
+    pub async fn take_pending_person_key_transition(&self) -> Option<Vec<u8>> {
+        self.pending_person_key_transition.write().await.take()
+    }
+
+    /// Clone the pending migration transition for one command.
+    pub async fn clone_pending_person_key_transition(&self) -> Option<Vec<u8>> {
+        self.pending_person_key_transition.read().await.clone()
     }
 
     /// Clone the held person identity for a command core. The clone lives

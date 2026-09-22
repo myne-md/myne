@@ -105,15 +105,21 @@ pub async fn migrate_owner_vault_to_ntv6(
         &protocol::aad_vault_items_key_wrap_v0_2(&base.items_key_id),
     )
     .map_err(|_| B2bMigrationError::CannotDecrypt)?;
-    let legacy_roster = base
-        .membership
-        .as_ref()
-        .and_then(|m| m.roster.as_ref())
-        .and_then(|env| {
-            protocol::unseal_membership_roster(root_key, env, &account_hash)
-                .ok()
-                .and_then(|plaintext| crate::plugins::sync::roster::parse_roster(&plaintext))
-        });
+    // A present-but-unreadable legacy roster is a REFUSAL, not "no members":
+    // collapsing it to `None` would carry an empty roster into `NTV6` and strand
+    // every member on the retired `itemsKey` with no row (the harm the loop below
+    // documents). Absent membership is the single-user case and is `None` here.
+    let legacy_roster = match base.membership.as_ref().and_then(|m| m.roster.as_ref()) {
+        None => None,
+        Some(env) => {
+            let plaintext = protocol::unseal_membership_roster(root_key, env, &account_hash)
+                .map_err(|_| B2bMigrationError::CannotDecrypt)?;
+            Some(
+                crate::plugins::sync::roster::parse_roster(&plaintext)
+                    .ok_or(B2bMigrationError::InvalidVaultMeta)?,
+            )
+        }
+    };
     base.items_key_nonce = items_key_nonce;
     base.enc_items_key.copy_from_slice(&enc_items);
     base.membership = None;
@@ -123,6 +129,8 @@ pub async fn migrate_owner_vault_to_ntv6(
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
     let mut members = vec![protocol::person_invite::GroupRosterMember {
         fingerprint_hex: owner_fingerprint.clone(),
+        // The pre-B2B migration has no person account id for the owner row.
+        person_id_hex: None,
         display_name: owner_display_name.to_owned(),
         role: protocol::person_invite::GroupRosterRole::Owner,
         state: protocol::person_invite::GroupMemberState::Live,
@@ -132,6 +140,7 @@ pub async fn migrate_owner_vault_to_ntv6(
         member_mldsa_vk_hex: hex_lower(owner_public.mldsa_vk()),
         previous_fingerprint_hex: None,
         continuity: protocol::person_invite::GroupKeyContinuity::Current,
+        transition_hex: None,
     }];
     // Carry every LIVE legacy member into the NTV6 roster with a fresh
     // group-key package. The migration is the one place their NTV5 `itemsKey`
@@ -142,30 +151,28 @@ pub async fn migrate_owner_vault_to_ntv6(
             if row.deleted || fingerprint == &owner_fingerprint {
                 continue;
             }
-            let Ok(public) = protocol::person_key::PersonPublicHalf::from_parts_hex(
+            let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
                 &row.member_kem_ek_hex,
                 &row.member_ed_pk_hex,
                 &row.member_mldsa_vk_hex,
-            ) else {
-                continue;
-            };
-            let Ok(package) = protocol::person_invite::create_group_package(
+            )
+            .map_err(|_| B2bMigrationError::InvalidVaultMeta)?;
+            let package = protocol::person_invite::create_group_package(
                 owner,
                 &public,
                 &group_bytes,
                 &account_hash,
                 epoch,
                 &mut rng,
-            ) else {
-                continue;
-            };
-            let Ok(payload) =
-                protocol::person_invite::verify_group_package(&owner_public, &package)
-            else {
-                continue;
-            };
+            )
+            .map_err(|_| B2bMigrationError::CannotDecrypt)?;
+            let payload = protocol::person_invite::verify_group_package(&owner_public, &package)
+                .map_err(|_| B2bMigrationError::CannotDecrypt)?;
             members.push(protocol::person_invite::GroupRosterMember {
                 fingerprint_hex: fingerprint.clone(),
+                // A row migrated from the pre-B2B membership roster names no
+                // person account, so there is nothing to revoke server-side.
+                person_id_hex: None,
                 display_name: row.display_name.clone(),
                 role: protocol::person_invite::GroupRosterRole::Member,
                 state: protocol::person_invite::GroupMemberState::Live,
@@ -174,7 +181,8 @@ pub async fn migrate_owner_vault_to_ntv6(
                 member_ed_pk_hex: row.member_ed_pk_hex.clone(),
                 member_mldsa_vk_hex: row.member_mldsa_vk_hex.clone(),
                 previous_fingerprint_hex: row.previous_fingerprint_hex.clone(),
-                continuity: protocol::person_invite::GroupKeyContinuity::Current,
+                continuity: crate::plugins::sync::roster::continuity_of(row),
+                transition_hex: row.transition_hex.clone(),
             });
         }
     }
@@ -207,6 +215,10 @@ pub async fn migrate_owner_vault_to_ntv6(
     })
     .map_err(|_| B2bMigrationError::InvalidVaultMeta)?;
 
+    // Quiesce: hold every shared-singleton writer off for the whole reseal, from
+    // before the first singleton is read to after the commit marker is written
+    // (myne-md/myne#711 task 15). Held until this function returns.
+    let _quiesce = crate::singleton_quiesce::exclusive().await;
     let mut staged = Vec::new();
     for filename in SHARED_SINGLETONS {
         let path = vault_root.join(filename);

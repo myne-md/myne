@@ -205,16 +205,25 @@ const CAPABILITY_BACKING = {
   // myne-md/myne#698: the B2B member-sharing surface (person keypairs, the
   // roster, the invite and the removal rekey). Named per command, NOT as the
   // whole `sync` plugin, which ships on web and dispatches most of its surface.
-  // The five are refused because the person identity's carrier is a
-  // device-local sealed file outside the browser's storage and the panel asks
-  // for the recovery phrase to unlock it, which `docs/vision.md` keeps out of
-  // served code by build-time substitution. The invite/removal path needs that
-  // identity to wrap or rotate the `itemsKey`.
+  // They are refused because the person identity's carrier is a device-local
+  // sealed file outside the browser's storage and the panel asks for the
+  // recovery phrase to unlock it, which `docs/vision.md` keeps out of served
+  // code by build-time substitution. The identity setup/status/invite commands
+  // (myne-md/myne#711) join them for the same reason; the invite/decode pair
+  // needs the held identity to wrap the group key.
   memberSharing: [
     "plugin:sync|sync_person_unlock",
     "plugin:sync|sync_person_lock",
+    "plugin:sync|sync_person_setup",
+    "plugin:sync|sync_person_status",
+    "plugin:sync|sync_person_list_invites",
+    "plugin:sync|sync_list_vault_invites",
+    "plugin:sync|sync_person_accept_invite",
+    "plugin:sync|sync_person_unlock_member_vault",
+    "plugin:sync|sync_member_vault_status",
+    "plugin:sync|sync_person_create_invite",
+    "plugin:sync|sync_person_inspect_invite_code",
     "plugin:sync|sync_start_b2b_migration",
-    "plugin:sync|sync_invite_member",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",
   ],

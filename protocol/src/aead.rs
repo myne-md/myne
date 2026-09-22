@@ -1119,6 +1119,23 @@ pub fn aad_vault_label_blob(vault_id: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// AAD for the device-local member-vault key store (myne-md/myne#711 task 25):
+/// the member's group and items keys sealed at rest. Binds the vault id the
+/// reader expected AND the vault's account-number hash, so a store copied to
+/// another vault name does not open. v0.2 prefix, matching the person plane.
+pub fn aad_person_member_key_store(vault_id: &[u8; 16], account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PERSON_MEMBER_KEY_STORE: &[u8] = b"person-member-key-store";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_PERSON_MEMBER_KEY_STORE.len() + 32,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_MEMBER_KEY_STORE);
+    aad.extend_from_slice(vault_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///

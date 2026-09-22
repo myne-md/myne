@@ -536,13 +536,31 @@ impl PersonPublicHalf {
         })
     }
 
+    /// Reconstruct from the three public halves as raw bytes, the counterpart
+    /// of [`Self::from_parts_hex`] for callers that already hold the bytes (the
+    /// person-key transition record carries the superseded identity's raw
+    /// halves). The fingerprint is the same canonical construction, so a
+    /// rebuilt half agrees byte-for-byte with the originator's.
+    #[must_use]
+    pub fn from_parts(
+        kem_ek: &[u8; PERSON_EK_LEN],
+        ed25519_pk: &[u8; PERSON_ED25519_PK_LEN],
+        mldsa_vk: &[u8; PERSON_MLDSA_VK_LEN],
+    ) -> Self {
+        Self {
+            kem_ek: *kem_ek,
+            ed25519_pk: *ed25519_pk,
+            mldsa_vk: *mldsa_vk,
+            fingerprint: compute_fingerprint(kem_ek, ed25519_pk, mldsa_vk),
+        }
+    }
+
     /// The ML-DSA verifying key (the value the member carries to verify
     /// signatures without a key round-trip).
     #[must_use]
     pub fn mldsa_vk(&self) -> &[u8; PERSON_MLDSA_VK_LEN] {
         &self.mldsa_vk
     }
-
     /// The Ed25519 public key.
     #[must_use]
     pub fn ed_pk(&self) -> &[u8; PERSON_ED25519_PK_LEN] {
