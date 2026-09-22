@@ -177,7 +177,9 @@
       "runSummaryOffDevice_many": "do dostawcy wysłano około {{count}} znaków Twoich notatek",
       "runSummaryOffDevice_other": "do dostawcy wysłano około {{count}} znaku Twoich notatek",
       "runSummaryOnDevice": "nic nie opuściło tego urządzenia",
-      "appendFlag": "dodaje na końcu"
+      "appendFlag": "dodaje na końcu",
+      "diffCurrent": "Teraz w notatce",
+      "diffProposed": "Po tej zmianie"
     },
     "undo": {
       "offer_one": "Ostatni przebieg zmienił {{count}} notatkę.",
@@ -327,7 +329,8 @@
       "usedInCount_few": "Używany w {{count}} notatkach",
       "usedInCount_many": "Używany w {{count}} notatkach",
       "usedInCount_other": "Używany w {{count}} notatkach",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Podgląd {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -381,7 +384,8 @@
         "joinFailure": "Tworzenie kopii zapasowej nieoczekiwanie się nie powiodło. Nie pozostawiono żadnego pliku.",
         "memberTooLarge": "Plik w tym skarbcu jest większy, niż dopuszcza format kopii zapasowej.",
         "vaultNotFound": "Nie znaleziono skarbca do utworzenia kopii zapasowej.",
-        "verifyFailed": "Zapisana kopia zapasowa nie przeszła weryfikacji, więc została odrzucona. Spróbuj ponownie, na innym nośniku, jeśli problem się powtarza."
+        "verifyFailed": "Zapisana kopia zapasowa nie przeszła weryfikacji, więc została odrzucona. Spróbuj ponownie, na innym nośniku, jeśli problem się powtarza.",
+        "unknown": "Kopia zapasowa nie powiodła się z powodu, którego Myne nie potrafiło zidentyfikować. Nie ufaj żadnemu plikowi w miejscu docelowym; spróbuj ponownie."
       },
       "restore": {
         "authOperationInProgress": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie, a potem spróbuj ponownie.",
@@ -394,7 +398,8 @@
         "joinFailure": "Przywracanie nieoczekiwanie się nie powiodło. Nic nie zostało zmienione.",
         "missingVaultMeta": "W tej kopii zapasowej brakuje metadanych skarbca i nie można jej przywrócić.",
         "notABackupFile": "Ten plik nie jest kopią zapasową Myne.",
-        "vaultAlreadyExists": "Skarbiec z tej kopii zapasowej już istnieje na tym urządzeniu."
+        "vaultAlreadyExists": "Skarbiec z tej kopii zapasowej już istnieje na tym urządzeniu.",
+        "unknown": "Przywracanie nie powiodło się z powodu, którego Myne nie potrafiło zidentyfikować. Spróbuj ponownie i sprawdź plik kopii zapasowej, jeśli problem się powtórzy."
       }
     },
     "export": {
@@ -439,7 +444,11 @@
     "searchPlaceholder": "Szukaj notatek lub uruchom polecenie. Wypróbuj tag: · path: · task:",
     "sectionCommands": "Polecenia",
     "sectionNotes": "Notatki",
-    "untitledNote": "Bez tytułu"
+    "untitledNote": "Bez tytułu",
+    "resultsLabel": "Polecenia i notatki",
+    "pin": "Przypnij do lewego paska",
+    "unpin": "Odepnij od lewego paska",
+    "pinError": "Nie udało się przypiąć polecenia."
   },
   "commands": {
     "actions": {
@@ -730,6 +739,24 @@
       },
       "openThisMonthNote": {
         "label": "Otwórz notatkę z tego miesiąca"
+      },
+      "focusSidebarRegion": {
+        "label": "Ustaw fokus na panelu notatek"
+      },
+      "focusEditorRegion": {
+        "label": "Ustaw fokus na edytorze"
+      },
+      "focusRightPanelRegion": {
+        "label": "Ustaw fokus na prawym panelu"
+      },
+      "cycleRegion": {
+        "label": "Przełączaj fokus między obszarami"
+      },
+      "openInNewWindow": {
+        "label": "Otwórz notatkę w nowym oknie"
+      },
+      "showIsolatedGraph": {
+        "label": "Otwórz odizolowany graf"
       }
     },
     "hotkeys": {
@@ -770,7 +797,11 @@
         "toggleSourceMode": "Przełącz tryb źródłowy",
         "toggleTaskList": "Przełącz listę zadań",
         "undo": "Cofnij",
-        "unfoldAll": "Rozwiń wszystko"
+        "unfoldAll": "Rozwiń wszystko",
+        "cycleRegion": "Przełączaj fokus między obszarami",
+        "focusEditorRegion": "Ustaw fokus na edytorze",
+        "focusRightPanelRegion": "Ustaw fokus na prawym panelu",
+        "focusSidebarRegion": "Ustaw fokus na panelu notatek"
       }
     },
     "rebind": {
@@ -798,7 +829,8 @@
       "loadingLabel": "Ładowanie"
     },
     "back": "Wstecz",
-    "continue": "Kontynuuj"
+    "continue": "Kontynuuj",
+    "skipToContent": "Przejdź do treści"
   },
   "deviceRevoked": {
     "cta": "Zacznij od nowa",
@@ -1185,7 +1217,11 @@
             "proposed_one": "Zaproponowano {{count}} zmianę.",
             "proposed_few": "Zaproponowano {{count}} zmiany.",
             "proposed_many": "Zaproponowano {{count}} zmian.",
-            "proposed_other": "Zaproponowano {{count}} zmiany."
+            "proposed_other": "Zaproponowano {{count}} zmiany.",
+            "memoryUpdated_one": "Pamięć zaktualizowana o jeden wpis.",
+            "memoryUpdated_other": "Pamięć zaktualizowana o {{count}} wpisów.",
+            "memoryUpdated_few": "Pamięć zaktualizowana o {{count}} wpisów.",
+            "memoryUpdated_many": "Pamięć zaktualizowana o {{count}} wpisów."
           },
           "askPlaceholder": "Zadaj pytanie o swoje notatki…",
           "askSubmit": "Zapytaj",
@@ -1217,18 +1253,31 @@
           "thinking": "AI myśli…",
           "truncated": "Podsumowano pierwsze {{count}} znaków.",
           "you": "Ty",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historia",
+          "historyCancel": "Anuluj",
+          "historyDelete": "Usuń",
+          "historyDeleteBody": "To usuwa rozmowę z każdego urządzenia przy następnym połączeniu. Nie można tego cofnąć.",
+          "historyEmpty": "Brak rozmów. Nowe czaty pojawią się tutaj.",
+          "historyError": "Nie udało się wczytać rozmów. Spróbuj ponownie.",
+          "historyLoading": "Wczytywanie…",
+          "historyProposalAfter": "Po",
+          "historyProposalBefore": "Przed",
+          "historyProposalNewNote": "Nowa notatka",
+          "historyRename": "Zmień nazwę",
+          "historyTitle": "Historia czatu",
+          "historyDeleteTitle": "Usuń rozmowę",
+          "persistWarning": "Zapis do skarbca nie powiódł się. Twoje wiadomości są tutaj i zostaną ponowione.",
+          "memory": "Pamięć",
+          "memoryPopoverTitle": "Co pamięta asystent",
+          "memoryPopoverEmpty": "Jeszcze nic nie pamięta.",
+          "memoryPopoverDelete": "Usuń",
+          "memoryPopoverDeleted": "Wpis usunięty wszędzie.",
+          "memoryPopoverDeleteFailed": "Nie udało się usunąć wpisu.",
+          "memoryPopoverEntryFailed": "Nie udało się odczytać tego wpisu. Nadal jest zapisany; usuń go tutaj albo popraw w Ustawieniach.",
+          "memoryPopoverLoadFailed": "Nie udało się wczytać wspomnień. Nic się nie zmieniło.",
+          "memoryPopoverRetry": "Spróbuj ponownie",
+          "memoryPopoverSettings": "Zarządzaj w Ustawieniach",
+          "memoryPopoverClose": "Zamknij"
         },
         "allHidden": "Wszystkie karty są ukryte. Kliknij prawym przyciskiem, aby przywrócić.",
         "outline": {
@@ -1243,7 +1292,8 @@
           "outline": "Konspekt",
           "tasks": "Zadania",
           "unlinked": "Niepowiązane wzmianki"
-        }
+        },
+        "tabStripLabel": "Prawy panel"
       },
       "sidebarToggle": {
         "hideBacklinks": "Ukryj panel odnośników zwrotnych",
@@ -1273,6 +1323,11 @@
         "saveCurrentAs": "Zapisz bieżący jako…",
         "switchLabel": "Przełącz obszar roboczy",
         "toggleTitle": "Obszar roboczy: {{name}}"
+      },
+      "region": {
+        "editor": "Edytor",
+        "rightPanel": "Prawy panel",
+        "sidebar": "Panel notatek"
       }
     },
     "noteActions": {
@@ -1286,7 +1341,8 @@
       "turnedIntoTemplate": "Zamieniono w szablon",
       "convertedToNote": "Przekonwertowano na notatkę",
       "versionHistory": "Historia wersji",
-      "trash": "Przenieś do kosza"
+      "trash": "Przenieś do kosza",
+      "openInNewWindow": "Otwórz w nowym oknie"
     },
     "codeBlock": {
       "copyCode": "Kopiuj kod",
@@ -1346,7 +1402,21 @@
     },
     "mermaid": {
       "rendering": "Renderowanie diagramu…",
-      "renderFailed": "Nie udało się wyrenderować tego diagramu: {{reason}}"
+      "renderFailed": "Nie udało się wyrenderować tego diagramu: {{reason}}",
+      "viewerLabel": "Przeglądarka diagramów",
+      "zoomIn": "Powiększ",
+      "zoomOut": "Pomniejsz",
+      "reset": "Zresetuj powiększenie do dopasowania",
+      "panUp": "Przesuń w górę",
+      "panDown": "Przesuń w dół",
+      "panLeft": "Przesuń w lewo",
+      "panRight": "Przesuń w prawo",
+      "edit": "Edytuj źródło diagramu",
+      "editText": "Edytuj",
+      "expand": "Rozwiń diagram",
+      "expandText": "Rozwiń",
+      "expandClose": "Zamknij rozwinięty diagram",
+      "expandCloseText": "Zamknij"
     },
     "slash": {
       "aiContinue": "Kontynuuj pisanie (AI)",
@@ -1421,7 +1491,20 @@
         "remind": "Przypomnienie"
       },
       "timeLabel": "Godzina (opcjonalnie)",
-      "invalidRemind": "Myne nie potrafi odczytać tej daty, więc nie pokaże przypomnienia."
+      "invalidRemind": "Myne nie potrafi odczytać tej daty, więc nie pokaże przypomnienia.",
+      "addTime": "Dodaj godzinę",
+      "clear": "Wyczyść",
+      "dateGrid": "Wybierz datę",
+      "dateNext": "Następny miesiąc",
+      "datePrev": "Poprzedni miesiąc",
+      "today": "Dziś",
+      "tomorrow": "Jutro",
+      "selectField": "Wybierz pole do dodania",
+      "noDate": "Brak daty",
+      "removeTime": "Usuń godzinę",
+      "timeHour": "Godzina",
+      "timeMeridiem": "AM lub PM",
+      "timeMinute": "Minuta"
     },
     "toolbar": {
       "apply": "Zastosuj",
@@ -1680,6 +1763,32 @@
         "weekly": "Nie udało się otworzyć notatki z tego tygodnia.",
         "monthly": "Nie udało się otworzyć notatki z tego miesiąca."
       }
+    },
+    "a11y": {
+      "noteBody": "Treść notatki: {{title}}",
+      "untitledNoteBody": "Treść notatki, notatka bez tytułu",
+      "sectionFolded_one": "Sekcja zwinięta",
+      "sectionFolded_other": "Zwinięto {{count}} sekcji",
+      "sectionUnfolded_one": "Sekcja rozwinięta",
+      "sectionUnfolded_other": "Rozwinięto {{count}} sekcji",
+      "diagram": "Diagram",
+      "diagramNamed": "Diagram: {{kind}}",
+      "brokenLink": "{{target}}, uszkodzony odnośnik",
+      "sectionFolded_few": "Zwinięto {{count}} sekcji",
+      "sectionFolded_many": "Zwinięto {{count}} sekcji",
+      "sectionUnfolded_few": "Rozwinięto {{count}} sekcji",
+      "sectionUnfolded_many": "Rozwinięto {{count}} sekcji"
+    },
+    "ribbon": {
+      "customize": "Dostosuj pasek…",
+      "label": "Lewy pasek",
+      "unpin": "Odepnij od paska",
+      "runFailed": "Nie udało się uruchomić polecenia paska."
+    },
+    "detachedDeleted": {
+      "title": "Ta notatka została usunięta w innym miejscu",
+      "body": "Została usunięta z innego okna lub zsynchronizowana z innego urządzenia. Wszystkie niezapisane zmiany w tym oknie zachowano jako osobną kopię.",
+      "close": "Zamknij okno"
     }
   },
   "export": {
@@ -2011,7 +2120,16 @@
         "heading": "Grupy kolorów",
         "moveDown": "Przesuń regułę w dół",
         "moveUp": "Przesuń regułę w górę",
-        "namePlaceholder": "Reguła bez nazwy"
+        "namePlaceholder": "Reguła bez nazwy",
+        "rowLabel": "{{name}}, grupa {{index}} z {{total}}. Alt ze strzałką w górę lub dół porządkuje ją ponownie.",
+        "editRuleButton": "Edytuj",
+        "derivedMakeEditable": "Uczyń edytowalnymi",
+        "derivedMakeEditableFailed": "Nie udało się zapisać tych grup. Spróbuj ponownie.",
+        "derivedNote_one": "Graf jest kolorowany według tagu: {{count}} grupa, wywiedziona z twoich tagów. Nie jest zapisywana, dopóki nie uczynisz jej edytowalną.",
+        "derivedNote_other": "Graf jest kolorowany według tagu: {{count}} grup, wywiedzionych z twoich tagów. Nie są zapisywane, dopóki nie uczynisz ich edytowalnymi.",
+        "newRuleTitle": "Nowa grupa kolorów",
+        "derivedNote_few": "Graf jest kolorowany według tagu: {{count}} grup, wywiedzionych z twoich tagów. Nie są zapisywane, dopóki nie uczynisz ich edytowalnymi.",
+        "derivedNote_many": "Graf jest kolorowany według tagu: {{count}} grup, wywiedzionych z twoich tagów. Nie są zapisywane, dopóki nie uczynisz ich edytowalnymi."
       },
       "depthToggleTitle": "Przełącz głębokość sąsiedztwa (1 ↔ 2 przeskoki)",
       "filterAll": "Wszystkie",
@@ -2040,7 +2158,25 @@
         "reset": "Przywróć domyślne",
         "showArrows": "Pokaż strzałki kierunku",
         "title": "Ustawienia grafu"
-      }
+      },
+      "canvasLabel": "Graf wiedzy z {{count}} notatkami",
+      "filterSelectAriaLabel": "Filtruj graf",
+      "listLinkCount_one": "{{count}} odnośnik",
+      "listLinkCount_other": "{{count}} odnośników",
+      "listLinksFrom": "Odnośniki z: {{titles}}",
+      "listLinksTo": "Odnośniki do: {{titles}}",
+      "relayout": "Przełóż układ",
+      "relayoutTitle": "Ułóż graf od nowa od zera",
+      "showingCount_one": "Wyświetlanie {{count}} notatki",
+      "showingCount_other": "Wyświetlanie {{count}} notatek",
+      "untitledNote": "Notatka bez tytułu",
+      "viewGraph": "Graf",
+      "viewList": "Lista",
+      "viewToggleAriaLabel": "Wybierz obraz grafu lub listę jego notatek",
+      "listLinkCount_few": "{{count}} odnośników",
+      "listLinkCount_many": "{{count}} odnośników",
+      "showingCount_few": "Wyświetlanie {{count}} notatek",
+      "showingCount_many": "Wyświetlanie {{count}} notatek"
     },
     "import": {
       "base": {
@@ -2332,7 +2468,10 @@
       "importedWithSkips_many": "Zaimportowano {{count}} notatek · pominięto {{skipped}}",
       "importedWithSkips_other": "Zaimportowano {{count}} notatek · pominięto {{skipped}}",
       "importNoMarkdown": "Brak plików Markdown wśród upuszczonych",
-      "moveFolderTo": "Przenieś folder do…"
+      "moveFolderTo": "Przenieś folder do…",
+      "treeLabel": "Notatki i foldery",
+      "selectionAnnouncement": "Wybrano {{title}}",
+      "untitled": "Bez tytułu"
     },
     "newFromTemplate": {
       "back": "Wstecz",
@@ -2387,7 +2526,8 @@
       "taskBadgeTitle": "Notatka-zadanie",
       "unsyncedLabel": "Jeszcze nie na serwerze",
       "unsyncedTitle": "Najnowsze zmiany w tej notatce są tylko na tym urządzeniu",
-      "untitled": "Bez tytułu"
+      "untitled": "Bez tytułu",
+      "untitledDrawing": "Rysunek bez tytułu"
     },
     "savedView": {
       "defaultName": "Widok filtrowany"
@@ -2458,7 +2598,10 @@
       "pinned": "Przypięte",
       "pinnedTitle": "Przypięte: odepnij, aby zamknąć",
       "unpin": "Odepnij",
-      "untitled": "Bez tytułu"
+      "untitled": "Bez tytułu",
+      "closeTabMenuItem": "Zamknij kartę",
+      "moveLeft": "Przesuń w lewo",
+      "moveRight": "Przesuń w prawo"
     },
     "tagBrowser": {
       "cancel": "Anuluj",
@@ -3267,7 +3410,7 @@
         "whenLabel": "Kiedy opuszcza urządzenie",
         "whoLabel": "Kto to otrzymuje",
         "connectionLabel": "Jak to podróżuje",
-        "excludedLabel": ""
+        "excludedLabel": "Wykluczone foldery"
       },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",
@@ -3301,7 +3444,8 @@
         "unauthorized": "Dostawca odrzucił Twój klucz API. Zastąp go: może być błędny, unieważniony albo należeć do innego konta.",
         "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe.",
         "featureOff": "SI jest wyłączona na tym urządzeniu. Nic nie zostało wysłane. Włącz ją w Ustawieniach, w sekcji SI.",
-        "consentMissing": "Nie wyraziłeś zgody na wysyłanie notatek do tego dostawcy z tego urządzenia. Nic nie zostało wysłane. Wybierz dostawcę ponownie w Ustawieniach, w sekcji SI, i przeczytaj, co zostanie wysłane."
+        "consentMissing": "Nie wyraziłeś zgody na wysyłanie notatek do tego dostawcy z tego urządzenia. Nic nie zostało wysłane. Wybierz dostawcę ponownie w Ustawieniach, w sekcji SI, i przeczytaj, co zostanie wysłane.",
+        "emptyGrant": "Wszystko, co to uruchomienie mogło czytać, jest w folderach, których AI nigdy nie widzi. Nic nie zostało wysłane. Zmień w Ustawieniach, AI, Wykluczone foldery."
       },
       "modelChoose": "Wybierz plik…",
       "modelEmbeddingLabel": "Model wyszukiwania: wyszukiwanie semantyczne i pytania/odpowiedzi",
@@ -3596,7 +3740,8 @@
         "text": "Tekst i wyświetlanie",
         "editing": "Edycja",
         "writing": "Pisanie",
-        "features": "Funkcje"
+        "features": "Funkcje",
+        "tasks": "Zadania"
       },
       "preview": {
         "heading": "Pchnąć w tę łódź jeża",
@@ -3608,7 +3753,20 @@
       "defaultView": "Widok domyślny",
       "typewriter": "Przewijanie maszynowe",
       "typewriterSubtitle": "Utrzymuj kursor wyśrodkowany w pionie",
-      "enableArchiving": "Włącz archiwizację"
+      "enableArchiving": "Włącz archiwizację",
+      "taskChipColor": {
+        "accent": "Akcent",
+        "danger": "Czerwony",
+        "help": "Kolor ikony i etykiety żetonu zadania na każdej powierzchni zadań na tym urządzeniu.",
+        "label": "Kolor żetonu zadania",
+        "muted": "Stonowany",
+        "sample": "1 sie",
+        "theme": "Motyw"
+      },
+      "taskChipIconOnly": {
+        "help": "Pokazuj priorytet tylko jako ikonę, nie jako słowo.",
+        "label": "Priorytet tylko z ikoną"
+      }
     },
     "search": {
       "placeholder": "Szukaj w ustawieniach…",
@@ -3688,7 +3846,11 @@
         "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
         "periodicNotes": "notatki okresowe tygodniowe miesięczne tydzień miesiąc folder szablon format",
         "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie",
-        "screenCaptureOverride": "przechwytywanie ekranu zezwól wyłącz lupa powiększenie pulpit zdalny dostępność odblokowanie czarny ekran screen capture override"
+        "screenCaptureOverride": "przechwytywanie ekranu zezwól wyłącz lupa powiększenie pulpit zdalny dostępność odblokowanie czarny ekran screen capture override",
+        "aiMemory": "pamięć zapamiętane fakty asystent uczy się osobowość preferencje głosu",
+        "ribbon": "lewy pasek szyna przypnij pin polecenia polecenia dostosuj uporządkuj odepnij pasek narzędzi skróty",
+        "folderNotes": "folder notatka indeks folder_index strona główna dwuklik odnośnik folderu projekty wyłącz zablokuj",
+        "syncMembers": "członkowie, udostępnij, zaproś, zespół, współpraca, skarbiec"
       }
     },
     "dateTime": {
@@ -3705,6 +3867,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne nie zna tej strefy czasowej. Użyj nazwy takiej jak Europe/Berlin.",
       "errorSave": "Nie udało się zapisać tego ustawienia."
+    },
+    "folderNotes": {
+      "label": "Notatki folderu",
+      "helper": "Pozwól notatce działać jako indeks folderu: otwiera się po dwukliku na folderze, a odnośniki folderów w stylu [[Projects/]] wskazują na nią. Domyślnie wyłączone. Wyłączenie ukrywa przyciski tworzenia notatek folderu i pokazuje istniejące jako zwykłe notatki; nie zmienia nic na dysku, więc ponowne włączenie przywraca je dokładnie.",
+      "errorSaveSetting": "Nie udało się zapisać tego ustawienia."
+    },
+    "ribbonCustomize": {
+      "add": "Dodaj",
+      "empty": "Na pasku nie ma jeszcze poleceń. Użyj Dodaj, aby przypiąć.",
+      "errorSave": "Nie udało się zapisać ustawienia paska.",
+      "helper": "Polecenia na lewym pasku, w kolejności. Przeciągnij, aby uporządkować, dodaj kolejne z listy lub usuń przez ×. Szyna ukrywa polecenia niedostępne w bieżącym stanie.",
+      "label": "Lewy pasek",
+      "remove": "Usuń {{name}} z paska",
+      "position": "{{name}}, {{index}} z {{total}}",
+      "searchEmpty": "Brak pasujących poleceń.",
+      "searchPlaceholder": "Szukaj poleceń…",
+      "searchResultsLabel": "Pasujące polecenia",
+      "showHelper": "Pokaż lewy pasek na tym urządzeniu.",
+      "showLabel": "Pokaż lewy pasek"
+    },
+    "memory": {
+      "heading": "Co pamięta asystent",
+      "helper": "Fakty, których AI nauczyło się pracując z Tobą. Zapisuje je samo (maksymalnie jedno na uruchomienie); widzisz każde i możesz je poprawić. Wpisy synchronizują się z innymi urządzeniami i pozostają zaszyfrowane.",
+      "empty": "Jeszcze nic nie pamięta. Wpisy pojawiają się tutaj, gdy asystent czegoś nauczy się podczas uruchomienia.",
+      "editLabel": "Edytuj",
+      "deleteLabel": "Usuń",
+      "save": "Zapisz",
+      "cancel": "Anuluj",
+      "cancelLabel": "Anuluj",
+      "saveFailed": "Nie udało się zapisać wpisu.",
+      "deleteFailed": "Nie udało się usunąć wpisu.",
+      "entryUnreadable": "Nie udało się odczytać tego wpisu. Nadal jest zapisany; usuń go tutaj albo popraw w Ustawieniach.",
+      "heldForReview": "Oczekuje na przegląd: ten wpis wywołał skan wstrzyknięć i asystent go nie użyje, dopóki go nie edytujesz lub nie usuniesz.",
+      "savedToast": "Pamięć zaktualizowana.",
+      "deletedToast": "Wpis usunięty wszędzie.",
+      "clearedToast": "Wszystkie wpisy pamięci usunięte.",
+      "clearAllLabel": "Wyczyść całą pamięć",
+      "clearConfirm": "Usunąć naprawdę każdy wpis? Nie da się tego cofnąć.",
+      "updatedAt": "Zaktualizowano {{val}}",
+      "personalityLabel": "Twoje preferencje głosu",
+      "personalityHelper": "Jedna instrukcja na linię. Kształtują, jak asystent pisze przy każdym uruchomieniu: ton, długość, język. Zapisywane w skarbcu i synchronizowane.",
+      "personalityPlaceholder": "Odpowiadaj krótko, najpierw wniosek.",
+      "personalitySaveLabel": "Zapisz preferencje głosu",
+      "personalitySavedToast": "Preferencje głosu zaktualizowane.",
+      "personalitySaveFailed": "Nie udało się zapisać preferencji głosu.",
+      "loadFailed": "Nie udało się wczytać wspomnień ani preferencji głosu. Nic się nie zmieniło.",
+      "retryLabel": "Spróbuj ponownie"
     }
   },
   "storageLost": {
@@ -4063,6 +4272,53 @@
       "connecting": "Łączenie z siecią Tor. Synchronizacja jest wstrzymana, dopóki połączenie nie będzie gotowe. Nic nie jest wysyłane bezpośrednio.",
       "settingsHint": "Ustawienia → Sieć",
       "unavailable": "Tor jest niedostępny, więc synchronizacja jest wstrzymana. Nic nie jest wysyłane bezpośrednio. Wyłącz kierowanie przez Tor, aby synchronizować bez niego."
+    },
+    "members": {
+      "title": "Członkowie i bezpieczeństwo",
+      "access": "Twój dostęp",
+      "epochLabel": "Epoka klucza grupowego",
+      "people": "Osoby",
+      "removalLimitsLabel": "Limity usuwania"
+    },
+    "memberRoster": {
+      "loading": "Wczytywanie członków…",
+      "error": "Nie udało się odczytać listy członków skarbca.",
+      "hint": "Członkowie tego skarbca. Każdy dołącza z własną tożsamością i danymi.",
+      "empty": "Jeszcze brak członków. Zaproszenie kogoś to następny krok.",
+      "rotated": "Klucz zrotowany",
+      "keyChanged": "Klucz się zmienił. Zweryfikuj z właścicielem.",
+      "relinkConfirmed": "Ponowne powiązanie potwierdzone przez właściciela",
+      "epoch": "Epoka klucza grupowego {{epoch}}",
+      "ownerBadge": "Właściciel",
+      "memberBadge": "Członek",
+      "invite": "Zaproś członka",
+      "remove": "Usuń",
+      "removeConfirm": "Usunąć {{name}}? Po zakończeniu rotacji klucza stracą dostęp do przyszłych zmian. Nie można tym usunąć niczego, co już skopiowali, i nie przywołuje treści z ich urządzenia ani dostawcy AI.",
+      "removalLimits": "Usunięcie członka zatrzyma tylko jego dostęp do przyszłych zmian. Nie może usunąć niczego, co już skopiowali, i nie przywołuje treści z ich urządzenia ani dostawcy AI.",
+      "inviteReady": "Zaproszenie gotowe dla {{fingerprint}}…",
+      "invitationsHeading": "Wysłane zaproszenia",
+      "invitationClaimed": "Zaakceptowane",
+      "invitationPending": "Jeszcze niezaakceptowane",
+      "invitationsFailed": "Nie udało się wczytać zaproszeń.",
+      "title": "Członkowie skarbca",
+      "personHint": "Odblokuj swoją tożsamość członka frazą odzyskiwania. Pozostaje na tym urządzeniu, dopóki nie zablokujesz skarbca lub nie zamkniesz aplikacji.",
+      "personUnlock": "Odblokuj tożsamość członka",
+      "personReady": "Tożsamość członka odblokowana.",
+      "ownerCodeHint": "Udostępnij ten kod osobie, którą zapraszasz, aby mogła zweryfikować, że skarbiec jest Twój. Zawiera tylko informacje publiczne.",
+      "personLock": "Zablokuj tożsamość członka",
+      "personError": "Ta fraza nie otworzyła tożsamości członka.",
+      "inviteHint": "Wklej kod tożsamości zaproszonego członka (z jego strony domowej tożsamości).",
+      "inviteCodeLabel": "Kod tożsamości członka",
+      "inspect": "Sprawdź odcisk palca",
+      "sasHint": "Przeczytaj ten odcisk palca osobie, którą zapraszasz, albo poproś ją o odczytanie go Tobie. Musi się zgadzać po obu stronach, zanim kontynuujesz.",
+      "sasConfirm": "Potwierdziłem ten odcisk palca z osobą poza kanałem",
+      "inviteCodeInvalid": "To nie jest prawidłowy kod tożsamości członka.",
+      "kemLabel": "Klucz publiczny ML-KEM",
+      "edLabel": "Klucz publiczny Ed25519",
+      "mldsaLabel": "Klucz publiczny ML-DSA",
+      "untitledVault": "Skarbiec bez tytułu",
+      "inviteFailed": "Nie udało się utworzyć zaproszenia.",
+      "removeFailed": "Nie udało się usunąć członka."
     }
   },
   "tasks": {
@@ -4086,7 +4342,8 @@
       "filter": "Na razie nic tu nie ma. Spróbuj innego filtra.",
       "rebuilding": "Odczytywanie Twoich notatek…",
       "scope": "Brak zadań w tym folderze lub tagu. Spróbuj poszerzyć zakres.",
-      "vault": "Brak zadań. Napisz „- [ ]” w wierszu dowolnej notatki, aby utworzyć zadanie."
+      "vault": "Brak zadań. Napisz „- [ ]” w wierszu dowolnej notatki, aby utworzyć zadanie.",
+      "search": "Żadne zadanie nie pasuje do „{{query}}”."
     },
     "filter": {
       "all": "Wszystkie",
@@ -4121,7 +4378,74 @@
       "allFolders": "Wszystkie foldery",
       "label": "Zawęź według"
     },
-    "title": "Zadania"
+    "title": "Zadania",
+    "axis": {
+      "due": "Termin",
+      "folder": "Folder",
+      "note": "Notatka",
+      "priority": "Priorytet",
+      "sort": "Sortuj",
+      "status": "Status",
+      "tag": "Tag"
+    },
+    "due": {
+      "any": "Dowolna data",
+      "later": "Później",
+      "none": "Brak daty",
+      "overdue": "Po terminie",
+      "today": "Dziś",
+      "upcoming": "Nadchodzące"
+    },
+    "filters": {
+      "button": "Filtry",
+      "clearAll": "Wyczyść wszystko",
+      "selectHint": "Wybierz filtr do zastosowania",
+      "title": "Filtry"
+    },
+    "priority": {
+      "high": "Wysoki",
+      "highest": "Najwyższy",
+      "low": "Niski",
+      "lowest": "Najniższy",
+      "medium": "Średni"
+    },
+    "section": {
+      "done": "Gotowe",
+      "later": "Później",
+      "none": "Brak daty",
+      "overdue": "Po terminie",
+      "today": "Dziś",
+      "upcoming": "Nadchodzące"
+    },
+    "sort": {
+      "due": "Termin",
+      "dueDesc": "Termin, najpierw najnowsze",
+      "note": "Notatka",
+      "priority": "Priorytet"
+    },
+    "status": {
+      "all": "Wszystkie",
+      "done": "Gotowe",
+      "undone": "Otwarte"
+    },
+    "view": {
+      "allFolders": "Wszystkie foldery",
+      "allNotes": "Wszystkie notatki",
+      "anyPriority": "Dowolny priorytet",
+      "anyTag": "Dowolny tag",
+      "dueLabel": "Filtruj według terminu",
+      "folderLabel": "Filtruj według folderu",
+      "noteLabel": "Filtruj według notatki",
+      "priorityLabel": "Filtruj według priorytetu",
+      "sortLabel": "Sortuj wewnątrz sekcji",
+      "statusLabel": "Filtruj według ukończenia",
+      "tagLabel": "Filtruj według tagu",
+      "untitled": "Bez tytułu"
+    },
+    "search": {
+      "label": "Szukaj zadań",
+      "placeholder": "Szukaj zadań…"
+    }
   },
   "templates": {
     "manager": {
@@ -4238,7 +4562,11 @@
     "deleteConfirmTitle": "Usunąć ten sejf?",
     "deletePartialError": "Nie udało się usunąć niektórych plików. Ten skarbiec nie nadaje się już do użytku. Kontynuuj, aby zacząć od nowa.",
     "failClosedEyebrow": "Nie można otworzyć sejfu",
-    "restoreHint": "Przywróć z kopii zapasowej, aby kontynuować."
+    "restoreHint": "Przywróć z kopii zapasowej, aby kontynuować.",
+    "memberHint": "Ten skarbiec jest z Tobą współdzielony. Odblokuj go własną frazą odzyskiwania.",
+    "memberPhraseLabel": "Fraza odzyskiwania",
+    "memberSubmit": "Odblokuj",
+    "memberError": "Ta fraza nie otworzyła tego współdzielonego skarbca."
   },
   "vault": {
     "ioBanner": {
@@ -4451,7 +4779,18 @@
     "openedRelative": "otwarto {{rel}}",
     "restoreFromBackup": "Przywróć z kopii zapasowej",
     "subline": "Masz więcej niż jeden skarbiec na tym urządzeniu. Wybierz jeden do odblokowania.",
-    "vaultFallback": "Skarbiec {{n}}"
+    "vaultFallback": "Skarbiec {{n}}",
+    "accountFallback": "Konto",
+    "moveToAccount": "Przenieś na konto…",
+    "moveToNewAccount": "Przenieś na nowe konto",
+    "renameAccount": "Zmień nazwę konta",
+    "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
+    "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
+    "labelTooLong": "Ta nazwa jest za długa. Trzymaj ją poniżej 512 znaków.",
+    "renameCancel": "Anuluj",
+    "renamePlaceholder": "Nazwa konta",
+    "renameSave": "Zmień nazwę",
+    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4496,7 +4835,17 @@
       "or": "lub",
       "title": "Wybierz skarbiec do odzyskania",
       "useAccountNumber": "Użyj numeru konta",
-      "vaultFallback": "Skarbiec {{index}}"
+      "vaultFallback": "Skarbiec {{index}}",
+      "accountFallback": "Konto",
+      "accountsError": "Nie udało się wczytać grupowania kont. Skarbce są wypisane bez grupowania; nic w odzyskiwaniu się nie zmienia."
+    },
+    "siblingNotice": {
+      "body_one": "To konto zawiera jeszcze {{count}} skarbiec. Odzyskaj go też, żeby nic nie zostało.",
+      "body_other": "To konto zawiera jeszcze {{count}} skarbców. Odzyskaj je też, żeby nic nie zostało.",
+      "recoverAnother": "Odzyskaj inny skarbiec",
+      "unknown": "Nie udało się sprawdzić, czy to konto zawiera inne skarbce. Jeśli masz więcej niż jeden, odzyskaj każdy własną frazą.",
+      "body_few": "To konto zawiera jeszcze {{count}} skarbców. Odzyskaj je też, żeby nic nie zostało.",
+      "body_many": "To konto zawiera jeszcze {{count}} skarbców. Odzyskaj je też, żeby nic nie zostało."
     }
   },
   "vaultSwitcher": {
@@ -4553,12 +4902,14 @@
     "residueBanner": "Pozostałe pliki z przerwanego usuwania ({{n}}). Wyczyść je przed utworzeniem sejfu.",
     "cleanUpFiles": "Wyczyść pozostałe pliki",
     "create": "Utwórz sejf",
-    "connect": "Połącz z moim kontem"
+    "connect": "Połącz z moim kontem",
+    "identityCta": "Utwórz tylko tożsamość"
   },
   "wikiGraph": {
     "emptyTitle": "Brak linków",
     "emptyBodyBefore": "Połącz notatki, wpisując ",
-    "emptyBodyAfter": " w tekście. Połączone notatki pojawią się tutaj jako graf."
+    "emptyBodyAfter": " w tekście. Połączone notatki pojawią się tutaj jako graf.",
+    "canvasLabel": "Graf wiedzy z {{count}} notatkami"
   },
   "markdown": {
     "attachmentFallback": "załącznik",
@@ -4643,7 +4994,18 @@
     "openedYearsAgo_few": "otwarto {{count}} lata temu",
     "openedYearsAgo_many": "otwarto {{count}} lat temu",
     "openedYearsAgo_other": "otwarto {{count}} lat temu",
-    "corruptedBadge": "Uszkodzony"
+    "corruptedBadge": "Uszkodzony",
+    "accountFallback": "Konto",
+    "renameAccount": "Zmień nazwę konta",
+    "moveToNewAccount": "Przenieś na nowe konto",
+    "moveToAccount": "Przenieś na konto…",
+    "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
+    "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
+    "labelTooLong": "Ta nazwa jest za długa. Trzymaj ją poniżej 512 znaków.",
+    "renameCancel": "Anuluj",
+    "renamePlaceholder": "Nazwa konta",
+    "renameSave": "Zmień nazwę",
+    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
   },
   "join": {
     "transportError": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź adres i połączenie, a następnie spróbuj ponownie.",
@@ -4778,5 +5140,38 @@
     "restoreTrigger": "Włącz ochronę przed przechwytywaniem ekranu",
     "saveFailed": "Nie udało się tego zapisać, więc nic się nie zmieniło. Spróbuj ponownie albo uruchom Myne z --disable-screen-capture-protection.",
     "savedForNextLaunch": "Zapisano. W tej sesji ochrona nadal jest wyłączona, ponieważ sesję uruchomiono z --disable-screen-capture-protection, więc ochrona wróci przy następnym otwarciu Myne bez tego przełącznika."
+  },
+  "identitySetup": {
+    "createCta": "Utwórz tożsamość",
+    "doneCta": "Gotowe",
+    "error": "Nie udało się skonfigurować tożsamości. Sprawdź, czy serwer synchronizacji jest skonfigurowany, a spróbuj ponownie.",
+    "intro": "Tożsamość pozwala adresować do Ciebie zaproszenie, zanim masz jakikolwiek skarbiec. Nie tworzy skarbca i nie zapisuje notatek.",
+    "pending": "To urządzenie czeka na zatwierdzenie przez inne urządzenie na koncie.",
+    "phraseWarning": "Zapisz te 24 słowa i przechowuj bezpiecznie. To jedyny raz, gdy są pokazywane; to jedyny sposób na odzyskanie tej tożsamości.",
+    "recoverCta": "Odzyskaj tożsamość",
+    "recoverIntro": "Masz już tożsamość? Podaj jej 24-słowową frazę odzyskiwania.",
+    "recovered": "Tożsomość odzyskana.",
+    "title": "Tylko tożsamość"
+  },
+  "identityHome": {
+    "createVaultCta": "Utwórz skarbiec",
+    "invitesError": "Nie udało się wczytać zaproszeń. Sprawdź połączenie i serwer synchronizacji.",
+    "invitesHeading": "Zaproszenia",
+    "invitesLoading": "Sprawdzanie zaproszeń…",
+    "noInvites": "Jeszcze brak zaproszeń.",
+    "subtitle": "Masz tożsamość na tym urządzeniu, więc inni mogą zaprosić Cię do skarbca. Nie musisz tworzyć, żeby zostać zaproszonym.",
+    "accept": "Akceptuj",
+    "acceptHint": "Wklej kod tożsamości właściciela (udostępniają go, gdy Cię zapraszają).",
+    "acceptOwnerCodeLabel": "Kod tożsamości właściciela",
+    "acceptInspect": "Sprawdź odcisk palca",
+    "acceptSasHint": "Przeczytaj ten odcisk palca właścicielowi skarbca albo poproś go o odczytanie go Tobie. Musi się zgadzać po obu stronach, zanim kontynuujesz.",
+    "acceptConfirm": "Potwierdziłem ten odcisk palca z właścicielem poza kanałem",
+    "acceptSubmit": "Akceptuj i odblokuj",
+    "acceptPhraseLabel": "Twoja fraza odzyskiwania",
+    "acceptError": "Nie udało się zaakceptować zaproszenia.",
+    "acceptInvalid": "To nie jest prawidłowy kod tożsamości właściciela.",
+    "shareCodeHeading": "Twój kod zaproszenia",
+    "shareCodeHint": "Udostępnij ten kod komukolwiek, kto Cię zaprasza. Zawiera tylko informacje publiczne (id tożsamości i klucze publiczne), nigdy Twoją frazę.",
+    "title": "Twoja tożsamość"
   }
 }

@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "etwa {{count}} Zeichen Ihrer Notizen wurde an den Anbieter gesendet",
       "runSummaryOffDevice_other": "etwa {{count}} Zeichen Ihrer Notizen wurden an den Anbieter gesendet",
       "runSummaryOnDevice": "nichts hat dieses Gerät verlassen",
-      "appendFlag": "wird am Ende angefügt"
+      "appendFlag": "wird am Ende angefügt",
+      "diffCurrent": "Aktuell in der Notiz",
+      "diffProposed": "Nach dieser Änderung"
     },
     "undo": {
       "offer_one": "Der letzte Durchlauf hat {{count}} Notiz geändert.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "In {{count}} Notiz verwendet",
       "usedInCount_other": "In {{count}} Notizen verwendet",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Vorschau für {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Die Sicherung ist unerwartet fehlgeschlagen. Es wurde keine Datei hinterlassen.",
         "memberTooLarge": "Eine Datei in diesem Tresor ist größer, als das Sicherungsformat erlaubt.",
         "vaultNotFound": "Kein Tresor zum Sichern gefunden.",
-        "verifyFailed": "Die geschriebene Sicherung konnte nicht verifiziert werden und wurde daher verworfen. Versuchen Sie es erneut, auf einem anderen Datenträger, falls es wieder passiert."
+        "verifyFailed": "Die geschriebene Sicherung konnte nicht verifiziert werden und wurde daher verworfen. Versuchen Sie es erneut, auf einem anderen Datenträger, falls es wieder passiert.",
+        "unknown": "Die Sicherung ist aus einem von Myne nicht identifizierbaren Grund fehlgeschlagen. Verlassen Sie sich auf keine Datei am Zielort; versuchen Sie es erneut."
       },
       "restore": {
         "authOperationInProgress": "Ein anderer Tresorvorgang läuft gerade. Warten Sie, bis er abgeschlossen ist, und versuchen Sie es erneut.",
@@ -334,7 +338,8 @@
         "joinFailure": "Die Wiederherstellung ist unerwartet fehlgeschlagen. Es wurde nichts geändert.",
         "missingVaultMeta": "Dieser Sicherung fehlen die Tresor-Metadaten und sie kann nicht wiederhergestellt werden.",
         "notABackupFile": "Diese Datei ist keine Myne-Sicherung.",
-        "vaultAlreadyExists": "Ein Tresor aus dieser Sicherung existiert bereits auf diesem Gerät."
+        "vaultAlreadyExists": "Ein Tresor aus dieser Sicherung existiert bereits auf diesem Gerät.",
+        "unknown": "Die Wiederherstellung ist aus einem von Myne nicht identifizierbaren Grund fehlgeschlagen. Versuchen Sie es erneut und prüfen Sie die Sicherungsdatei, wenn sich der Fehler wiederholt."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen. Probieren Sie tag: · path: · task:",
     "sectionCommands": "Befehle",
     "sectionNotes": "Notizen",
-    "untitledNote": "Ohne Titel"
+    "untitledNote": "Ohne Titel",
+    "resultsLabel": "Befehle und Notizen",
+    "pin": "An linker Leiste anheften",
+    "unpin": "Von linker Leiste lösen",
+    "pinError": "Der Befehl konnte nicht angeheftet werden."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Notiz dieses Monats öffnen"
+      },
+      "focusSidebarRegion": {
+        "label": "Notiz-Seitenleiste fokussieren"
+      },
+      "focusEditorRegion": {
+        "label": "Editor fokussieren"
+      },
+      "focusRightPanelRegion": {
+        "label": "Rechtes Panel fokussieren"
+      },
+      "cycleRegion": {
+        "label": "Fokus zwischen Bereichen wechseln"
+      },
+      "openInNewWindow": {
+        "label": "Notiz in neuem Fenster öffnen"
+      },
+      "showIsolatedGraph": {
+        "label": "Isolierten Graphen öffnen"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Quelltextmodus umschalten",
         "toggleTaskList": "Aufgabenliste umschalten",
         "undo": "Rückgängig",
-        "unfoldAll": "Alle ausklappen"
+        "unfoldAll": "Alle ausklappen",
+        "cycleRegion": "Fokus zwischen Bereichen wechseln",
+        "focusEditorRegion": "Editor fokussieren",
+        "focusRightPanelRegion": "Rechtes Panel fokussieren",
+        "focusSidebarRegion": "Notiz-Seitenleiste fokussieren"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Wird geladen"
     },
     "back": "Zurück",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "skipToContent": "Zum Inhalt springen"
   },
   "deviceRevoked": {
     "cta": "Von vorne beginnen",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} neue Notiz.",
             "newNotes_other": "{{count}} neue Notizen.",
             "proposed_one": "{{count}} Änderung vorgeschlagen.",
-            "proposed_other": "{{count}} Änderungen vorgeschlagen."
+            "proposed_other": "{{count}} Änderungen vorgeschlagen.",
+            "memoryUpdated_one": "Gedächtnis mit einem Eintrag aktualisiert.",
+            "memoryUpdated_other": "Gedächtnis mit {{count}} Einträgen aktualisiert."
           },
           "askPlaceholder": "Stelle eine Frage zu deinen Notizen…",
           "askSubmit": "Fragen",
@@ -1119,18 +1153,31 @@
           "thinking": "KI denkt nach…",
           "truncated": "Die ersten {{count}} Zeichen zusammengefasst.",
           "you": "Du",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Verlauf",
+          "historyCancel": "Abbrechen",
+          "historyDelete": "Löschen",
+          "historyDeleteBody": "Dies löscht die Unterhaltung auf jedem Gerät, sobald es sich das nächste Mal verbindet. Dies kann nicht rückgängig gemacht werden.",
+          "historyEmpty": "Noch keine Unterhaltungen. Neue Chats erscheinen hier.",
+          "historyError": "Unterhaltungen konnten nicht geladen werden. Versuche es erneut.",
+          "historyLoading": "Wird geladen…",
+          "historyProposalAfter": "Nach",
+          "historyProposalBefore": "Vor",
+          "historyProposalNewNote": "Neue Notiz",
+          "historyRename": "Umbenennen",
+          "historyTitle": "Chat-Verlauf",
+          "historyDeleteTitle": "Unterhaltung löschen",
+          "persistWarning": "Das Speichern im Tresor ist fehlgeschlagen. Ihre Nachrichten sind noch hier und werden erneut versucht.",
+          "memory": "Gedächtnis",
+          "memoryPopoverTitle": "Was sich der Assistent merkt",
+          "memoryPopoverEmpty": "Noch nichts gemerkt.",
+          "memoryPopoverDelete": "Löschen",
+          "memoryPopoverDeleted": "Eintrag überall entfernt.",
+          "memoryPopoverDeleteFailed": "Der Eintrag konnte nicht gelöscht werden.",
+          "memoryPopoverEntryFailed": "Dieser Eintrag konnte nicht gelesen werden. Er ist noch gespeichert; löschen Sie ihn hier oder korrigieren Sie ihn in den Einstellungen.",
+          "memoryPopoverLoadFailed": "Erinnerungen konnten nicht geladen werden. Nichts wurde geändert.",
+          "memoryPopoverRetry": "Erneut versuchen",
+          "memoryPopoverSettings": "In Einstellungen verwalten",
+          "memoryPopoverClose": "Schließen"
         },
         "allHidden": "Alle Tabs sind ausgeblendet. Rechtsklick zum Wiederherstellen.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Gliederung",
           "tasks": "Aufgaben",
           "unlinked": "Nicht verknüpfte Erwähnungen"
-        }
+        },
+        "tabStripLabel": "Rechtes Panel"
       },
       "sidebarToggle": {
         "hideBacklinks": "Backlinks-Seitenleiste ausblenden",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Aktuellen speichern unter…",
         "switchLabel": "Arbeitsbereich wechseln",
         "toggleTitle": "Arbeitsbereich: {{name}}"
+      },
+      "region": {
+        "editor": "Editor",
+        "rightPanel": "Rechtes Panel",
+        "sidebar": "Notiz-Seitenleiste"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "In Vorlage umgewandelt",
       "convertedToNote": "In Notiz umgewandelt",
       "versionHistory": "Versionsverlauf",
-      "trash": "In den Papierkorb verschieben"
+      "trash": "In den Papierkorb verschieben",
+      "openInNewWindow": "In neuem Fenster öffnen"
     },
     "codeBlock": {
       "copyCode": "Code kopieren",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Diagramm wird gerendert…",
-      "renderFailed": "Dieses Diagramm konnte nicht dargestellt werden: {{reason}}"
+      "renderFailed": "Dieses Diagramm konnte nicht dargestellt werden: {{reason}}",
+      "viewerLabel": "Diagrammbetrachter",
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern",
+      "reset": "Zoom zum Einpassen zurücksetzen",
+      "panUp": "Nach oben schwenken",
+      "panDown": "Nach unten schwenken",
+      "panLeft": "Nach links schwenken",
+      "panRight": "Nach rechts schwenken",
+      "edit": "Diagrammquelle bearbeiten",
+      "editText": "Bearbeiten",
+      "expand": "Diagramm ausklappen",
+      "expandText": "Ausklappen",
+      "expandClose": "Ausgeklapptes Diagramm schließen",
+      "expandCloseText": "Schließen"
     },
     "slash": {
       "aiContinue": "Weiterschreiben (KI)",
@@ -1323,7 +1391,20 @@
         "remind": "Erinnerung"
       },
       "timeLabel": "Uhrzeit (optional)",
-      "invalidRemind": "Myne kann dieses Datum nicht lesen, daher gibt es dazu keine Erinnerung."
+      "invalidRemind": "Myne kann dieses Datum nicht lesen, daher gibt es dazu keine Erinnerung.",
+      "addTime": "Uhrzeit hinzufügen",
+      "clear": "Leeren",
+      "dateGrid": "Datum wählen",
+      "dateNext": "Nächster Monat",
+      "datePrev": "Vorheriger Monat",
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "selectField": "Feld zum Hinzufügen wählen",
+      "noDate": "Kein Datum",
+      "removeTime": "Uhrzeit entfernen",
+      "timeHour": "Stunde",
+      "timeMeridiem": "AM oder PM",
+      "timeMinute": "Minute"
     },
     "toolbar": {
       "apply": "Anwenden",
@@ -1564,6 +1645,28 @@
         "weekly": "Die Notiz dieser Woche konnte nicht geöffnet werden.",
         "monthly": "Die Notiz dieses Monats konnte nicht geöffnet werden."
       }
+    },
+    "a11y": {
+      "noteBody": "Notizkörper: {{title}}",
+      "untitledNoteBody": "Notizkörper, unbenannte Notiz",
+      "sectionFolded_one": "Abschnitt eingeklappt",
+      "sectionFolded_other": "{{count}} Abschnitte eingeklappt",
+      "sectionUnfolded_one": "Abschnitt ausgeklappt",
+      "sectionUnfolded_other": "{{count}} Abschnitte ausgeklappt",
+      "diagram": "Diagramm",
+      "diagramNamed": "Diagramm: {{kind}}",
+      "brokenLink": "{{target}}, defekter Link"
+    },
+    "ribbon": {
+      "customize": "Leiste anpassen…",
+      "label": "Linke Leiste",
+      "unpin": "Von der Leiste lösen",
+      "runFailed": "Der Leistenbefehl konnte nicht ausgeführt werden."
+    },
+    "detachedDeleted": {
+      "title": "Diese Notiz wurde anderswo gelöscht",
+      "body": "Sie wurde in einem anderen Fenster gelöscht oder von einem anderen Gerät synchronisiert. Nicht gespeicherte Änderungen in diesem Fenster wurden als separate Kopie behalten.",
+      "close": "Fenster schließen"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Farbgruppen",
         "moveDown": "Regel nach unten verschieben",
         "moveUp": "Regel nach oben verschieben",
-        "namePlaceholder": "Regel ohne Titel"
+        "namePlaceholder": "Regel ohne Titel",
+        "rowLabel": "{{name}}, Gruppe {{index}} von {{total}}. Alt plus Auf- oder Abtaste ordnet sie neu.",
+        "editRuleButton": "Bearbeiten",
+        "derivedMakeEditable": "Diese editierbar machen",
+        "derivedMakeEditableFailed": "Diese Gruppen konnten nicht gespeichert werden. Versuchen Sie es erneut.",
+        "derivedNote_one": "Der Graph ist nach Tag eingefärbt: {{count}} Gruppe, abgeleitet aus Ihren Tags. Erst wenn Sie ihn editierbar machen, wird er gespeichert.",
+        "derivedNote_other": "Der Graph ist nach Tag eingefärbt: {{count}} Gruppen, abgeleitet aus Ihren Tags. Sie werden erst gespeichert, wenn Sie sie editierbar machen.",
+        "newRuleTitle": "Neue Farbgruppe"
       },
       "depthToggleTitle": "Nachbarschaftstiefe umschalten (1 ↔ 2 Sprünge)",
       "filterAll": "Alle",
@@ -1898,7 +2008,21 @@
         "reset": "Auf Standard zurücksetzen",
         "showArrows": "Richtungspfeile anzeigen",
         "title": "Graph-Einstellungen"
-      }
+      },
+      "canvasLabel": "Wissensgraph mit {{count}} Notizen",
+      "filterSelectAriaLabel": "Graph filtern",
+      "listLinkCount_one": "{{count}} Verbindung",
+      "listLinkCount_other": "{{count}} Verbindungen",
+      "listLinksFrom": "Verlinkt von: {{titles}}",
+      "listLinksTo": "Verlinkt zu: {{titles}}",
+      "relayout": "Neu anordnen",
+      "relayoutTitle": "Graph komplett neu anordnen",
+      "showingCount_one": "{{count}} Notiz wird angezeigt",
+      "showingCount_other": "{{count}} Notizen werden angezeigt",
+      "untitledNote": "Unbenannte Notiz",
+      "viewGraph": "Graph",
+      "viewList": "Liste",
+      "viewToggleAriaLabel": "Graphbild oder Liste seiner Notizen wählen"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "{{count}} Notiz importiert · {{skipped}} übersprungen",
       "importedWithSkips_other": "{{count}} Notizen importiert · {{skipped}} übersprungen",
       "importNoMarkdown": "Keine Markdown-Dateien in dieser Ablage",
-      "moveFolderTo": "Ordner verschieben nach…"
+      "moveFolderTo": "Ordner verschieben nach…",
+      "treeLabel": "Notizen und Ordner",
+      "selectionAnnouncement": "{{title}} ausgewählt",
+      "untitled": "Unbenannt"
     },
     "newFromTemplate": {
       "back": "Zurück",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Aufgabennotiz",
       "unsyncedLabel": "Noch nicht auf dem Server",
       "unsyncedTitle": "Die neuesten Änderungen dieser Notiz liegen nur auf diesem Gerät",
-      "untitled": "Ohne Titel"
+      "untitled": "Ohne Titel",
+      "untitledDrawing": "Unbenannte Zeichnung"
     },
     "savedView": {
       "defaultName": "Gefilterte Ansicht"
@@ -2284,7 +2412,10 @@
       "pinned": "Angeheftet",
       "pinnedTitle": "Angeheftet: zum Schließen lösen",
       "unpin": "Lösen",
-      "untitled": "Ohne Titel"
+      "untitled": "Ohne Titel",
+      "closeTabMenuItem": "Tab schließen",
+      "moveLeft": "Nach links verschieben",
+      "moveRight": "Nach rechts verschieben"
     },
     "tagBrowser": {
       "cancel": "Abbrechen",
@@ -3057,7 +3188,7 @@
         "whenLabel": "Wann es das Gerät verlässt",
         "whoLabel": "Wer es empfängt",
         "connectionLabel": "Wie es übertragen wird",
-        "excludedLabel": ""
+        "excludedLabel": "Ausgeschlossene Ordner"
       },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Der Anbieter hat Ihren API-Schlüssel zurückgewiesen. Ersetzen Sie ihn: Er könnte falsch, widerrufen oder für ein anderes Konto sein.",
         "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung.",
         "featureOff": "KI ist auf diesem Gerät ausgeschaltet. Es wurde nichts gesendet. Schalten Sie sie in den Einstellungen unter KI ein.",
-        "consentMissing": "Sie haben nicht zugestimmt, Notizen von diesem Gerät an diesen Anbieter zu senden. Es wurde nichts gesendet. Wählen Sie den Anbieter in den Einstellungen unter KI erneut aus und lesen Sie, was gesendet wird."
+        "consentMissing": "Sie haben nicht zugestimmt, Notizen von diesem Gerät an diesen Anbieter zu senden. Es wurde nichts gesendet. Wählen Sie den Anbieter in den Einstellungen unter KI erneut aus und lesen Sie, was gesendet wird.",
+        "emptyGrant": "Alles, was dieser Lauf lesen konnte, liegt in Ordnern, die die KI nie sieht. Nichts wurde gesendet. Ändern Sie es unter Einstellungen, KI, Ausgeschlossene Ordner."
       },
       "modelChoose": "Datei auswählen…",
       "modelEmbeddingLabel": "Suchmodell: semantische Suche & Q&A",
@@ -3374,7 +3506,8 @@
         "text": "Text & Anzeige",
         "editing": "Bearbeiten",
         "writing": "Schreiben",
-        "features": "Funktionen"
+        "features": "Funktionen",
+        "tasks": "Aufgaben"
       },
       "preview": {
         "heading": "Franz jagt im Taxi",
@@ -3386,7 +3519,20 @@
       "defaultView": "Standardansicht",
       "typewriter": "Schreibmaschinen-Scrollen",
       "typewriterSubtitle": "Cursor vertikal zentriert halten",
-      "enableArchiving": "Archivierung aktivieren"
+      "enableArchiving": "Archivierung aktivieren",
+      "taskChipColor": {
+        "accent": "Akzent",
+        "danger": "Rot",
+        "help": "Die Farbe von Symbol und Beschriftung eines Aufgaben-Chips auf jeder Aufgabenoberfläche auf diesem Gerät.",
+        "label": "Aufgaben-Chip-Farbe",
+        "muted": "Gedämpft",
+        "sample": "1. Aug.",
+        "theme": "Design"
+      },
+      "taskChipIconOnly": {
+        "help": "Priorität nur als Symbol statt als Wort anzeigen.",
+        "label": "Nur-Symbol-Priorität"
+      }
     },
     "search": {
       "placeholder": "Einstellungen durchsuchen…",
@@ -3466,7 +3612,11 @@
         "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
         "periodicNotes": "periodische Notizen wöchentlich monatlich Woche Monat Ordner Vorlage Format",
         "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage",
-        "screenCaptureOverride": "bildschirmaufnahme screenshot aufzeichnung ausnahme überschreiben erlauben deaktivieren bildschirmlupe lupe remote desktop fernwartung barrierefreiheit entsperren sperrbildschirm schwarz screen capture"
+        "screenCaptureOverride": "bildschirmaufnahme screenshot aufzeichnung ausnahme überschreiben erlauben deaktivieren bildschirmlupe lupe remote desktop fernwartung barrierefreiheit entsperren sperrbildschirm schwarz screen capture",
+        "aiMemory": "gedächtnis erinnerte fakten assistent lernt stil stilpräferenzen stimme",
+        "ribbon": "linke leiste schiene anheften pins befehl befehle anpassen umsortieren lösen werkzeugleiste kürzel",
+        "folderNotes": "ordner notiz index folder_index startseite doppelklick ordner link projekte aus schalter deaktivieren",
+        "syncMembers": "mitglieder, teilen, einladen, team, zusammenarbeit, tresor"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kennt diese Zeitzone nicht. Verwenden Sie einen Namen wie Europe/Berlin.",
       "errorSave": "Diese Einstellung konnte nicht gespeichert werden."
+    },
+    "folderNotes": {
+      "label": "Ordner-Notizen",
+      "helper": "Eine Notiz als Index ihres Ordners agieren lassen: Sie öffnet sich beim Doppelklick auf den Ordner, und Ordnerlinks wie [[Projekte/]] zeigen darauf. Standardmäßig aus. Ausschalten verbirgt die Schaltflächen zum Erstellen von Ordner-Notizen und zeigt vorhandene als normale Notizen; auf der Platte ändert sich nichts, erneutes Einschalten stellt sie genau wieder her.",
+      "errorSaveSetting": "Diese Einstellung konnte nicht gespeichert werden."
+    },
+    "ribbonCustomize": {
+      "add": "Hinzufügen",
+      "empty": "Noch keine Befehle auf der Leiste. Verwenden Sie Hinzufügen, um einen anzuhften.",
+      "errorSave": "Die Leisteneinstellung konnte nicht gespeichert werden.",
+      "helper": "Die Befehle auf der linken Leiste, in der Reihenfolge. Ziehen Sie zum Umsortieren, fügen Sie weitere aus der Befehlsliste hinzu oder entfernen Sie mit ×. Die Leiste verbirgt Befehle, die im aktuellen Zustand nicht verfügbar sind.",
+      "label": "Linke Leiste",
+      "remove": "{{name}} von der Leiste entfernen",
+      "position": "{{name}}, {{index}} von {{total}}",
+      "searchEmpty": "Keine passenden Befehle.",
+      "searchPlaceholder": "Befehle suchen…",
+      "searchResultsLabel": "Passende Befehle",
+      "showHelper": "Linke Leiste auf diesem Gerät anzeigen.",
+      "showLabel": "Linke Leiste anzeigen"
+    },
+    "memory": {
+      "heading": "Was sich der Assistent merkt",
+      "helper": "Fakten, die die KI beim Arbeiten mit Ihnen gelernt hat. Sie schreibt sie selbst (höchstens einen pro Lauf); Sie sehen und korrigieren jeden. Einträge synchronisieren mit Ihren anderen Geräten und bleiben verschlüsselt.",
+      "empty": "Noch nichts gemerkt. Einträge erscheinen hier, wenn der Assistent etwas während eines Laufs lernt.",
+      "editLabel": "Bearbeiten",
+      "deleteLabel": "Löschen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "cancelLabel": "Abbrechen",
+      "saveFailed": "Der Eintrag konnte nicht gespeichert werden.",
+      "deleteFailed": "Der Eintrag konnte nicht gelöscht werden.",
+      "entryUnreadable": "Dieser Eintrag konnte nicht gelesen werden. Er ist noch gespeichert; löschen Sie ihn hier oder korrigieren Sie ihn in den Einstellungen.",
+      "heldForReview": "Zur Prüfung zurückgehalten: Dieser Eintrag hat den Injektionsscan ausgelöst und wird vom Assistenten nicht verwendet, bis Sie ihn bearbeiten oder löschen.",
+      "savedToast": "Gedächtnis aktualisiert.",
+      "deletedToast": "Eintrag überall entfernt.",
+      "clearedToast": "Alle Gedächtniseinträge entfernt.",
+      "clearAllLabel": "Gesamtes Gedächtnis leeren",
+      "clearConfirm": "Wirklich jeden Eintrag entfernen? Das kann nicht rückgängig gemacht werden.",
+      "updatedAt": "Aktualisiert {{val}}",
+      "personalityLabel": "Ihre Stilpräferenzen",
+      "personalityHelper": "Eine Anweisung pro Zeile. Diese prägen, wie der Assistent in jedem Lauf schreibt: Ton, Länge, Sprache. Im Tresor gespeichert und synchronisiert.",
+      "personalityPlaceholder": "Antworten kurz halten, zuerst das Ergebnis.",
+      "personalitySaveLabel": "Stilpräferenzen speichern",
+      "personalitySavedToast": "Stilpräferenzen aktualisiert.",
+      "personalitySaveFailed": "Die Stilpräferenzen konnten nicht gespeichert werden.",
+      "loadFailed": "Erinnerungen oder Stilpräferenzen konnten nicht geladen werden. Nichts wurde geändert.",
+      "retryLabel": "Erneut versuchen"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Verbindung zu Tor wird aufgebaut. Sync ist pausiert, bis die Verbindung steht. Es wird nichts direkt gesendet.",
       "settingsHint": "Einstellungen → Netzwerk",
       "unavailable": "Tor ist nicht verfügbar, daher ist Sync pausiert. Es wird nichts direkt gesendet. Schalten Sie die Tor-Route aus, um ohne sie zu synchronisieren."
+    },
+    "members": {
+      "title": "Mitglieder & Sicherheit",
+      "access": "Ihr Zugriff",
+      "epochLabel": "Gruppenschlüssel-Epoche",
+      "people": "Personen",
+      "removalLimitsLabel": "Entfernungslimits"
+    },
+    "memberRoster": {
+      "loading": "Mitglieder werden geladen…",
+      "error": "Die Tresor-Liste konnte nicht gelesen werden.",
+      "hint": "Mitglieder dieses Tresors. Jedes tritt mit eigener Identität und Anmeldedaten bei.",
+      "empty": "Noch keine Mitglieder. Jemanden einzuladen ist der nächste Schritt.",
+      "rotated": "Schlüssel rotiert",
+      "keyChanged": "Schlüssel geändert. Mit dem Eigentümer verifizieren.",
+      "relinkConfirmed": "Erneute Verknüpfung vom Eigentümer bestätigt",
+      "epoch": "Gruppenschlüssel-Epoche {{epoch}}",
+      "ownerBadge": "Eigentümer",
+      "memberBadge": "Mitglied",
+      "invite": "Mitglied einladen",
+      "remove": "Entfernen",
+      "removeConfirm": "{{name}} entfernen? Nach Abschluss der Schlüsselrotation verlieren sie den Zugriff auf künftige Änderungen. Das kann nichts löschen, was sie bereits kopiert haben, und ruft nichts von ihrem Gerät oder ihrem KI-Anbieter zurück.",
+      "removalLimits": "Ein Mitglied zu entfernen stoppt nur seinen Zugriff auf künftige Änderungen. Es kann nichts löschen, was sie bereits kopiert haben, und ruft nichts von ihrem Gerät oder ihrem KI-Anbieter zurück.",
+      "inviteReady": "Einladung für {{fingerprint}} bereit…",
+      "invitationsHeading": "Gesendete Einladungen",
+      "invitationClaimed": "Angenommen",
+      "invitationPending": "Noch nicht angenommen",
+      "invitationsFailed": "Ihre Einladungen konnten nicht geladen werden.",
+      "title": "Tresor-Mitglieder",
+      "personHint": "Entsperren Sie Ihre Mitgliedsidentität mit Ihrer Wiederherstellungsphrase. Sie bleibt auf diesem Gerät, bis Sie den Tresor sperren oder die App schließen.",
+      "personUnlock": "Mitgliedsidentität entsperren",
+      "personReady": "Mitgliedsidentität entsperrt.",
+      "ownerCodeHint": "Teilen Sie diesen Code mit der eingeladenen Person, damit sie prüfen kann, dass der Tresor Ihnen gehört. Er enthält nur öffentliche Informationen.",
+      "personLock": "Mitgliedsidentität sperren",
+      "personError": "Diese Phrase hat keine Mitgliedsidentität geöffnet.",
+      "inviteHint": "Fügen Sie den Identitätscode des eingeladenen Mitglieds ein (von seiner Identitätsseite).",
+      "inviteCodeLabel": "Mitglieds-Identitätscode",
+      "inspect": "Fingerabdruck prüfen",
+      "sasHint": "Lesen Sie diesen Fingerabdruck der eingeladenen Person vor oder lassen Sie ihn sich vorlesen. Er muss auf beiden Seiten übereinstimmen, bevor Sie fortfahren.",
+      "sasConfirm": "Ich habe diesen Fingerabdruck mit der Person außerhalb der App bestätigt",
+      "inviteCodeInvalid": "Das ist kein gültiger Mitglieds-Identitätscode.",
+      "kemLabel": "ML-KEM-Öffentlicher Schlüssel",
+      "edLabel": "Ed25519-Öffentlicher Schlüssel",
+      "mldsaLabel": "ML-DSA-Öffentlicher Schlüssel",
+      "untitledVault": "Unbenannter Tresor",
+      "inviteFailed": "Die Einladung konnte nicht erstellt werden.",
+      "removeFailed": "Das Mitglied konnte nicht entfernt werden."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Hier ist gerade nichts. Versuchen Sie einen anderen Filter.",
       "rebuilding": "Ihre Notizen werden gelesen…",
       "scope": "Keine Aufgaben in diesem Ordner oder Tag. Erweitern Sie den Bereich.",
-      "vault": "Noch keine Aufgaben. Schreiben Sie „- [ ]“ in eine Zeile einer beliebigen Notiz, um eine zu erstellen."
+      "vault": "Noch keine Aufgaben. Schreiben Sie „- [ ]“ in eine Zeile einer beliebigen Notiz, um eine zu erstellen.",
+      "search": "Keine Aufgaben passen zu „{{query}}“."
     },
     "filter": {
       "all": "Alle",
@@ -3881,7 +4126,74 @@
       "allFolders": "Alle Ordner",
       "label": "Eingrenzen nach"
     },
-    "title": "Aufgaben"
+    "title": "Aufgaben",
+    "axis": {
+      "due": "Fällig",
+      "folder": "Ordner",
+      "note": "Notiz",
+      "priority": "Priorität",
+      "sort": "Sortieren",
+      "status": "Status",
+      "tag": "Tag"
+    },
+    "due": {
+      "any": "Beliebiges Datum",
+      "later": "Später",
+      "none": "Kein Datum",
+      "overdue": "Überfällig",
+      "today": "Heute",
+      "upcoming": "Demnächst"
+    },
+    "filters": {
+      "button": "Filter",
+      "clearAll": "Alle löschen",
+      "selectHint": "Wählen Sie einen anzuwendenden Filter",
+      "title": "Filter"
+    },
+    "priority": {
+      "high": "Hoch",
+      "highest": "Am höchsten",
+      "low": "Niedrig",
+      "lowest": "Am niedrigsten",
+      "medium": "Mittel"
+    },
+    "section": {
+      "done": "Erledigt",
+      "later": "Später",
+      "none": "Kein Datum",
+      "overdue": "Überfällig",
+      "today": "Heute",
+      "upcoming": "Demnächst"
+    },
+    "sort": {
+      "due": "Fälligkeitsdatum",
+      "dueDesc": "Fälligkeitsdatum, neueste zuerst",
+      "note": "Notiz",
+      "priority": "Priorität"
+    },
+    "status": {
+      "all": "Alle",
+      "done": "Erledigt",
+      "undone": "Offen"
+    },
+    "view": {
+      "allFolders": "Alle Ordner",
+      "allNotes": "Alle Notizen",
+      "anyPriority": "Beliebige Priorität",
+      "anyTag": "Beliebiger Tag",
+      "dueLabel": "Nach Fälligkeitsdatum filtern",
+      "folderLabel": "Nach Ordner filtern",
+      "noteLabel": "Nach Notiz filtern",
+      "priorityLabel": "Nach Priorität filtern",
+      "sortLabel": "Innerhalb der Abschnitte sortieren",
+      "statusLabel": "Nach Abschluss filtern",
+      "tagLabel": "Nach Tag filtern",
+      "untitled": "Unbenannt"
+    },
+    "search": {
+      "label": "Aufgaben suchen",
+      "placeholder": "Aufgaben suchen…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Diesen Tresor löschen?",
     "deletePartialError": "Einige Dateien konnten nicht entfernt werden. Der Tresor ist nicht mehr verwendbar. Fahre fort, um neu zu beginnen.",
     "failClosedEyebrow": "Tresor kann nicht geöffnet werden",
-    "restoreHint": "Zum Fortfahren aus einem Backup wiederherstellen."
+    "restoreHint": "Zum Fortfahren aus einem Backup wiederherstellen.",
+    "memberHint": "Dieser Tresor wurde mit Ihnen geteilt. Entsperren Sie ihn mit Ihrer eigenen Wiederherstellungsphrase.",
+    "memberPhraseLabel": "Wiederherstellungsphrase",
+    "memberSubmit": "Entsperren",
+    "memberError": "Diese Phrase hat diesen geteilten Tresor nicht geöffnet."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "geöffnet {{rel}}",
     "restoreFromBackup": "Aus Sicherung wiederherstellen",
     "subline": "Sie haben mehr als einen Tresor auf diesem Gerät. Wählen Sie einen zum Entsperren.",
-    "vaultFallback": "Tresor {{n}}"
+    "vaultFallback": "Tresor {{n}}",
+    "accountFallback": "Konto",
+    "moveToAccount": "Zu Konto verschieben…",
+    "moveToNewAccount": "Zu neuem Konto verschieben",
+    "renameAccount": "Konto umbenennen",
+    "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
+    "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
+    "labelTooLong": "Dieser Name ist zu lang. Halten Sie ihn unter 512 Zeichen.",
+    "renameCancel": "Abbrechen",
+    "renamePlaceholder": "Kontoname",
+    "renameSave": "Umbenennen",
+    "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "oder",
       "title": "Wählen Sie einen Tresor zur Wiederherstellung",
       "useAccountNumber": "Kontonummer verwenden",
-      "vaultFallback": "Tresor {{index}}"
+      "vaultFallback": "Tresor {{index}}",
+      "accountFallback": "Konto",
+      "accountsError": "Die Kontogruppierung konnte nicht geladen werden. Tresoren werden ungruppiert aufgelistet; an der Wiederherstellung ändert sich nichts."
+    },
+    "siblingNotice": {
+      "body_one": "Dieses Konto enthält noch {{count}} Tresor. Stellen Sie auch ihn wieder her, damit nichts zurückbleibt.",
+      "body_other": "Dieses Konto enthält noch {{count}} Tresoren. Stellen Sie auch sie wieder her, damit nichts zurückbleibt.",
+      "recoverAnother": "Weiteren Tresor wiederherstellen",
+      "unknown": "Es konnte nicht geprüft werden, ob dieses Konto weitere Tresoren enthält. Wenn Sie mehr als einen Tresor haben, stellen Sie jeden mit seiner eigenen Phrase wieder her."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Übrig gebliebene Dateien von einem unterbrochenen Löschvorgang ({{n}}). Bereinige sie, bevor du einen Tresor erstellst.",
     "cleanUpFiles": "Übrig gebliebene Dateien bereinigen",
     "create": "Tresor erstellen",
-    "connect": "Mit meinem Konto verbinden"
+    "connect": "Mit meinem Konto verbinden",
+    "identityCta": "Nur eine Identität erstellen"
   },
   "wikiGraph": {
     "emptyTitle": "Noch keine Verknüpfungen",
     "emptyBodyBefore": "Verbinde Notizen, indem du ",
-    "emptyBodyAfter": " in deinen Text schreibst. Verknüpfte Notizen erscheinen hier als Graph."
+    "emptyBodyAfter": " in deinen Text schreibst. Verknüpfte Notizen erscheinen hier als Graph.",
+    "canvasLabel": "Wissensgraph mit {{count}} Notizen"
   },
   "markdown": {
     "attachmentFallback": "Anhang",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "letztes Jahr geöffnet",
     "openedYearsAgo_one": "vor {{count}} Jahr geöffnet",
     "openedYearsAgo_other": "vor {{count}} Jahren geöffnet",
-    "corruptedBadge": "Beschädigt"
+    "corruptedBadge": "Beschädigt",
+    "accountFallback": "Konto",
+    "renameAccount": "Konto umbenennen",
+    "moveToNewAccount": "Zu neuem Konto verschieben",
+    "moveToAccount": "Zu Konto verschieben…",
+    "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
+    "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
+    "labelTooLong": "Dieser Name ist zu lang. Halten Sie ihn unter 512 Zeichen.",
+    "renameCancel": "Abbrechen",
+    "renamePlaceholder": "Kontoname",
+    "renameSave": "Umbenennen",
+    "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert."
   },
   "join": {
     "transportError": "Der Sync-Server konnte nicht erreicht werden. Überprüfe die Adresse und deine Verbindung und versuche es dann erneut.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Bildschirmaufnahme-Schutz aktivieren",
     "saveFailed": "Das konnte nicht gespeichert werden, daher hat sich nichts geändert. Versuchen Sie es erneut oder starten Sie Myne mit --disable-screen-capture-protection.",
     "savedForNextLaunch": "Gespeichert. In dieser Sitzung bleibt der Schutz deaktiviert, weil sie mit --disable-screen-capture-protection gestartet wurde; er greift wieder, wenn Sie Myne das nächste Mal ohne diese Option öffnen."
+  },
+  "identitySetup": {
+    "createCta": "Identität erstellen",
+    "doneCta": "Fertig",
+    "error": "Die Identität konnte nicht eingerichtet werden. Prüfen Sie, ob ein Sync-Server konfiguriert ist, und versuchen Sie es erneut.",
+    "intro": "Eine Identität ermöglicht es Menschen, Ihnen eine Einladung zu adressieren, bevor Sie einen Tresor besie. Sie erstellt keinen Tresor und speichert keine Notizen.",
+    "pending": "Dieses Gerät wartet darauf, dass ein anderes Gerät im Konto es genehmigt.",
+    "phraseWarning": "Schreiben Sie diese 24 Wörter auf und bewahren Sie sie sicher auf. Sie werden nur einmal gezeigt; sie sind der einzige Weg, diese Identität wiederherzustellen.",
+    "recoverCta": "Identität wiederherstellen",
+    "recoverIntro": "Haben Sie bereits eine Identität? Geben Sie deren 24-Wörter-Wiederherstellungsphrase ein.",
+    "recovered": "Identität wiederhergestellt.",
+    "title": "Nur Identität"
+  },
+  "identityHome": {
+    "createVaultCta": "Tresor erstellen",
+    "invitesError": "Einladungen konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und den Sync-Server.",
+    "invitesHeading": "Einladungen",
+    "invitesLoading": "Nach Einladungen wird gesucht…",
+    "noInvites": "Noch keine Einladungen.",
+    "subtitle": "Sie haben auf diesem Gerät eine Identität, sodass Menschen Sie in einen Tresor einladen können. Sie müssen keinen erstellen, um eingeladen zu werden.",
+    "accept": "Annehmen",
+    "acceptHint": "Fügen Sie den Identitätscode des Eigentümers ein (ihn teilt er, wenn er Sie einlädt).",
+    "acceptOwnerCodeLabel": "Eigentümer-Identitätscode",
+    "acceptInspect": "Fingerabdruck prüfen",
+    "acceptSasHint": "Lesen Sie diesen Fingerabdruck dem Tresoreigentümer vor oder lassen Sie ihn sich vorlesen. Er muss auf beiden Seiten übereinstimmen, bevor Sie fortfahren.",
+    "acceptConfirm": "Ich habe diesen Fingerabdruck mit dem Eigentümer außerhalb der App bestätigt",
+    "acceptSubmit": "Annehmen und entsperren",
+    "acceptPhraseLabel": "Ihre Wiederherstellungsphrase",
+    "acceptError": "Die Einladung konnte nicht angenommen werden.",
+    "acceptInvalid": "Das ist kein gültiger Eigentümer-Identitätscode.",
+    "shareCodeHeading": "Ihr Einladungscode",
+    "shareCodeHint": "Teilen Sie diesen Code mit jedem, der Sie einlädt. Er enthält nur öffentliche Informationen (Ihre Identitäts-ID und öffentliche Schlüssel), nie Ihre Phrase.",
+    "title": "Ihre Identität"
   }
 }

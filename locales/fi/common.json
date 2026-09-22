@@ -143,7 +143,9 @@
       "runSummaryOffDevice_one": "noin {{count}} merkki muistiinpanoistasi lähetettiin palveluntarjoajalle",
       "runSummaryOffDevice_other": "noin {{count}} merkkiä muistiinpanoistasi lähetettiin palveluntarjoajalle",
       "runSummaryOnDevice": "mitään ei poistunut tältä laitteelta",
-      "appendFlag": "lisätään loppuun"
+      "appendFlag": "lisätään loppuun",
+      "diffCurrent": "Muistiinpanossa nyt",
+      "diffProposed": "Tämän muutoksen jälkeen"
     },
     "undo": {
       "offer_one": "Viimeisin ajo muutti {{count}} muistiinpanon.",
@@ -273,7 +275,8 @@
       },
       "usedInCount_one": "Käytössä {{count}} muistiinpanossa",
       "usedInCount_other": "Käytössä {{count}} muistiinpanossa",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Esikatsele {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Ääni: {{filename}}",
@@ -321,7 +324,8 @@
         "joinFailure": "Varmuuskopiointi epäonnistui odottamatta. Tiedostoa ei jäänyt jäljelle.",
         "memberTooLarge": "Tässä holvissa oleva tiedosto on suurempi kuin varmuuskopiomuoto sallii.",
         "vaultNotFound": "Varmuuskopioitavaa holvia ei löytynyt.",
-        "verifyFailed": "Kirjoitettu varmuuskopio ei läpäissyt tarkistusta, joten se hylättiin. Yritä uudelleen, eri tallennusvälineelle, jos ongelma toistuu."
+        "verifyFailed": "Kirjoitettu varmuuskopio ei läpäissyt tarkistusta, joten se hylättiin. Yritä uudelleen, eri tallennusvälineelle, jos ongelma toistuu.",
+        "unknown": "Varmuuskopio epäonnistui syystä, jonka Myne ei voinut tunnistaa. Luota mihinkään tiedostoon kohteessa; yritä uudelleen."
       },
       "restore": {
         "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
@@ -334,7 +338,8 @@
         "joinFailure": "Palautus epäonnistui odottamatta. Mitään ei muutettu.",
         "missingVaultMeta": "Tästä varmuuskopiosta puuttuvat holvin metatiedot, eikä sitä voi palauttaa.",
         "notABackupFile": "Tämä tiedosto ei ole Mynen varmuuskopio.",
-        "vaultAlreadyExists": "Tämän varmuuskopion holvi on jo olemassa tällä laitteella."
+        "vaultAlreadyExists": "Tämän varmuuskopion holvi on jo olemassa tällä laitteella.",
+        "unknown": "Palautus epäonnistui syystä, jonka Myne ei voinut tunnistaa. Yritä uudelleen ja tarkista varmuuskopiotiedosto, jos se toistuu."
       }
     },
     "export": {
@@ -379,7 +384,11 @@
     "searchPlaceholder": "Etsi muistiinpanoja tai suorita komento. Kokeile tag: · path: · task:",
     "sectionCommands": "Komennot",
     "sectionNotes": "Muistiinpanot",
-    "untitledNote": "Nimetön"
+    "untitledNote": "Nimetön",
+    "resultsLabel": "Komennot ja muistiinpanot",
+    "pin": "Kiinnitä vasempaan nauhaan",
+    "unpin": "Poista vasemmasta nauhasta",
+    "pinError": "Komentoa ei voitu kiinnittää."
   },
   "commands": {
     "actions": {
@@ -670,6 +679,24 @@
       },
       "openThisMonthNote": {
         "label": "Avaa tämän kuukauden muistiinpano"
+      },
+      "focusSidebarRegion": {
+        "label": "Keskitä muistiinpanopaneeliin"
+      },
+      "focusEditorRegion": {
+        "label": "Keskitä muokkaimeen"
+      },
+      "focusRightPanelRegion": {
+        "label": "Keskitä oikeaan paneeliin"
+      },
+      "cycleRegion": {
+        "label": "Vaihda painopiste alueiden välillä"
+      },
+      "openInNewWindow": {
+        "label": "Avaa muistiinpano uudessa ikkunassa"
+      },
+      "showIsolatedGraph": {
+        "label": "Avaa eristetty kaavio"
       }
     },
     "hotkeys": {
@@ -710,7 +737,11 @@
         "toggleSourceMode": "Vaihda lähdetila",
         "toggleTaskList": "Vaihda tehtäväluettelo",
         "undo": "Kumoa",
-        "unfoldAll": "Laajenna kaikki"
+        "unfoldAll": "Laajenna kaikki",
+        "cycleRegion": "Vaihda painopiste alueiden välillä",
+        "focusEditorRegion": "Keskitä muokkaimeen",
+        "focusRightPanelRegion": "Keskitä oikeaan paneeliin",
+        "focusSidebarRegion": "Keskitä muistiinpanopaneeliin"
       }
     },
     "rebind": {
@@ -738,7 +769,8 @@
       "loadingLabel": "Ladataan"
     },
     "back": "Takaisin",
-    "continue": "Jatka"
+    "continue": "Jatka",
+    "skipToContent": "Siirry sisältöön"
   },
   "deviceRevoked": {
     "cta": "Aloita alusta",
@@ -1087,7 +1119,9 @@
             "newNotes_one": "{{count}} uusi muistiinpano.",
             "newNotes_other": "{{count}} uutta muistiinpanoa.",
             "proposed_one": "Ehdotettiin {{count}} muutosta.",
-            "proposed_other": "Ehdotettiin {{count}} muutosta."
+            "proposed_other": "Ehdotettiin {{count}} muutosta.",
+            "memoryUpdated_one": "Muisti päivitetty yhdellä merkinnällä.",
+            "memoryUpdated_other": "Muisti päivitetty {{count}} merkinnällä."
           },
           "askPlaceholder": "Kysy kysymys muistiinpanoistasi…",
           "askSubmit": "Kysy",
@@ -1119,18 +1153,31 @@
           "thinking": "Tekoäly ajattelee…",
           "truncated": "Tiivistettiin ensimmäiset {{count}} merkkiä.",
           "you": "Sinä",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historia",
+          "historyCancel": "Peruuta",
+          "historyDelete": "Poista",
+          "historyDeleteBody": "Tämä poistaa keskustelun jokaisesta laitteesta seuraavan yhdistyksen yhteydessä. Tätä ei voi kumota.",
+          "historyEmpty": "Ei keskusteluja vielä. Uudet chatit näkyvät tässä.",
+          "historyError": "Keskusteluja ei voitu ladata. Yritä uudelleen.",
+          "historyLoading": "Ladataan…",
+          "historyProposalAfter": "Jälkeen",
+          "historyProposalBefore": "Ennen",
+          "historyProposalNewNote": "Uusi muistiinpano",
+          "historyRename": "Nimeä uudelleen",
+          "historyTitle": "Chathistoria",
+          "historyDeleteTitle": "Poista keskustelu",
+          "persistWarning": "Tallennus valtiointiin epäonnistui. Viestisi ovat yhä täällä ja niitä yritetään uudelleen.",
+          "memory": "Muisti",
+          "memoryPopoverTitle": "Mitä avustaja muistaa",
+          "memoryPopoverEmpty": "Ei muistettu vielä.",
+          "memoryPopoverDelete": "Poista",
+          "memoryPopoverDeleted": "Merkintä poistettu kaikkialta.",
+          "memoryPopoverDeleteFailed": "Merkintää ei voitu poistaa.",
+          "memoryPopoverEntryFailed": "Tätä merkintää ei voitu lukea. Se on yhä tallennettu; poista se tästä tai korjaa Asetuksissa.",
+          "memoryPopoverLoadFailed": "Muistoja ei voitu ladata. Mitään ei muutettu.",
+          "memoryPopoverRetry": "Yritä uudelleen",
+          "memoryPopoverSettings": "Hallitse Asetuksissa",
+          "memoryPopoverClose": "Sulje"
         },
         "allHidden": "Kaikki välilehdet on piilotettu. Palauta napsauttamalla hiiren oikealla.",
         "outline": {
@@ -1145,7 +1192,8 @@
           "outline": "Jäsennys",
           "tasks": "Tehtävät",
           "unlinked": "Linkittämättömät maininnat"
-        }
+        },
+        "tabStripLabel": "Oikea paneeli"
       },
       "sidebarToggle": {
         "hideBacklinks": "Piilota paluuviittausten sivupalkki",
@@ -1175,6 +1223,11 @@
         "saveCurrentAs": "Tallenna nykyinen nimellä…",
         "switchLabel": "Vaihda työtilaa",
         "toggleTitle": "Työtila: {{name}}"
+      },
+      "region": {
+        "editor": "Muokkain",
+        "rightPanel": "Oikea paneeli",
+        "sidebar": "Muistiinpanopaneeli"
       }
     },
     "noteActions": {
@@ -1188,7 +1241,8 @@
       "turnedIntoTemplate": "Muutettu malliksi",
       "convertedToNote": "Muunnettu muistiinpanoksi",
       "versionHistory": "Versiohistoria",
-      "trash": "Siirrä roskakoriin"
+      "trash": "Siirrä roskakoriin",
+      "openInNewWindow": "Avaa uudessa ikkunassa"
     },
     "codeBlock": {
       "copyCode": "Kopioi koodi",
@@ -1248,7 +1302,21 @@
     },
     "mermaid": {
       "rendering": "Piirretään kaaviota…",
-      "renderFailed": "Tätä kaaviota ei voitu piirtää: {{reason}}"
+      "renderFailed": "Tätä kaaviota ei voitu piirtää: {{reason}}",
+      "viewerLabel": "Kaavion katselin",
+      "zoomIn": "Lähennä",
+      "zoomOut": "Loitonna",
+      "reset": "Nollaa zoomaus sopivaksi",
+      "panUp": "Siirrä ylös",
+      "panDown": "Siirrä alas",
+      "panLeft": "Siirrä vasemmalle",
+      "panRight": "Siirrä oikealle",
+      "edit": "Muokkaa kaavion lähdetekstiä",
+      "editText": "Muokkaa",
+      "expand": "Laajenna kaavio",
+      "expandText": "Laajenna",
+      "expandClose": "Sulje laajennettu kaavio",
+      "expandCloseText": "Sulje"
     },
     "slash": {
       "aiContinue": "Jatka kirjoittamista (tekoäly)",
@@ -1323,7 +1391,20 @@
         "remind": "Muistutus"
       },
       "timeLabel": "Kellonaika (valinnainen)",
-      "invalidRemind": "Myne ei osaa lukea tätä päivämäärää, joten se ei muistuta sinua."
+      "invalidRemind": "Myne ei osaa lukea tätä päivämäärää, joten se ei muistuta sinua.",
+      "addTime": "Lisää aika",
+      "clear": "Tyhjennä",
+      "dateGrid": "Valitse päivämäärä",
+      "dateNext": "Seuraava kuukausi",
+      "datePrev": "Edellinen kuukausi",
+      "today": "Tänään",
+      "tomorrow": "Huomenna",
+      "selectField": "Valitse lisättävä kenttä",
+      "noDate": "Ei päivämäärää",
+      "removeTime": "Poista aika",
+      "timeHour": "Tunti",
+      "timeMeridiem": "AM tai PM",
+      "timeMinute": "Minuutti"
     },
     "toolbar": {
       "apply": "Käytä",
@@ -1564,6 +1645,28 @@
         "weekly": "Tämän viikon muistiinpanoa ei voitu avata.",
         "monthly": "Tämän kuukauden muistiinpanoa ei voitu avata."
       }
+    },
+    "a11y": {
+      "noteBody": "Muistiinpanon runko: {{title}}",
+      "untitledNoteBody": "Muistiinpanon runko, nimetön muistiinpano",
+      "sectionFolded_one": "Osio taitettu",
+      "sectionFolded_other": "{{count}} osiota taitettu",
+      "sectionUnfolded_one": "Osio avattu",
+      "sectionUnfolded_other": "{{count}} osiota avattu",
+      "diagram": "Kaavio",
+      "diagramNamed": "Kaavio: {{kind}}",
+      "brokenLink": "{{target}}, rikkinäinen linkki"
+    },
+    "ribbon": {
+      "customize": "Muokkaa nauhaa…",
+      "label": "Vasen nauha",
+      "unpin": "Poista nauhasta",
+      "runFailed": "Nauhakomentoa ei voitu suorittaa."
+    },
+    "detachedDeleted": {
+      "title": "Tämä muistiinpano poistettiin muualla",
+      "body": "Se poistettiin toisesta ikkunasta tai synkronoitiin toisesta laitteesta. Kaikki tallentamattomat muutokset tässä ikkunassa säilytettiin erillisenä kopiona.",
+      "close": "Sulje ikkuna"
     }
   },
   "export": {
@@ -1869,7 +1972,14 @@
         "heading": "Väriryhmät",
         "moveDown": "Siirrä sääntöä alas",
         "moveUp": "Siirrä sääntöä ylös",
-        "namePlaceholder": "Nimetön sääntö"
+        "namePlaceholder": "Nimetön sääntö",
+        "rowLabel": "{{name}}, ryhmä {{index}}/{{total}}. Alt plus ylös- tai alasin siirtää sitä uudelleen.",
+        "editRuleButton": "Muokkaa",
+        "derivedMakeEditable": "Tee näistä muokattavia",
+        "derivedMakeEditableFailed": "Näitä ryhmiä ei voitu tallentaa. Yritä uudelleen.",
+        "derivedNote_one": "Kaavio värjätään tunnisteella: {{count}} ryhmä, johdettu tunnisteistasi. Sitä ei tallenneta ennen kuin teet siitä muokattavan.",
+        "derivedNote_other": "Kaavio värjätään tunnisteella: {{count}} ryhmää, johdettu tunnisteistasi. Niitä ei tallenneta ennen kuin teet niistä muokattavia.",
+        "newRuleTitle": "Uusi väiryhmä"
       },
       "depthToggleTitle": "Vaihda naapuruston syvyyttä (1 ↔ 2 hyppyä)",
       "filterAll": "Kaikki",
@@ -1898,7 +2008,21 @@
         "reset": "Palauta oletukset",
         "showArrows": "Näytä suuntanuolet",
         "title": "Kaavion asetukset"
-      }
+      },
+      "canvasLabel": "Tietografi {{count}} muistiinpanosta",
+      "filterSelectAriaLabel": "Suodata kaaviota",
+      "listLinkCount_one": "{{count}} linkki",
+      "listLinkCount_other": "{{count}} linkkiä",
+      "listLinksFrom": "Linkitetty lähteenä: {{titles}}",
+      "listLinksTo": "Linkittää kohteeseen: {{titles}}",
+      "relayout": "Järjestä asettelu uudelleen",
+      "relayoutTitle": "Aseta kaavio uudelleen alusta",
+      "showingCount_one": "Näytetään {{count}} muistiinpano",
+      "showingCount_other": "Näytetään {{count}} muistiinpanoa",
+      "untitledNote": "Nimetön muistiinpano",
+      "viewGraph": "Kaavio",
+      "viewList": "Luettelo",
+      "viewToggleAriaLabel": "Valitse kaavion kuva tai sen muistiinpanojen luettelo"
     },
     "import": {
       "base": {
@@ -2162,7 +2286,10 @@
       "importedWithSkips_one": "Tuotiin {{count}} muistiinpano · {{skipped}} ohitettu",
       "importedWithSkips_other": "Tuotiin {{count}} muistiinpanoa · {{skipped}} ohitettu",
       "importNoMarkdown": "Pudotuksessa ei ollut Markdown-tiedostoja",
-      "moveFolderTo": "Siirrä kansio kohteeseen…"
+      "moveFolderTo": "Siirrä kansio kohteeseen…",
+      "treeLabel": "Muistiinpanot ja kansiot",
+      "selectionAnnouncement": "Valittu {{title}}",
+      "untitled": "Nimetön"
     },
     "newFromTemplate": {
       "back": "Takaisin",
@@ -2217,7 +2344,8 @@
       "taskBadgeTitle": "Tehtävämuistiinpano",
       "unsyncedLabel": "Ei vielä palvelimella",
       "unsyncedTitle": "Tämän muistiinpanon viimeisimmät muutokset ovat vain tällä laitteella",
-      "untitled": "Nimetön"
+      "untitled": "Nimetön",
+      "untitledDrawing": "Nimetön piirros"
     },
     "savedView": {
       "defaultName": "Suodatettu näkymä"
@@ -2284,7 +2412,10 @@
       "pinned": "Kiinnitetty",
       "pinnedTitle": "Kiinnitetty: irrota kiinnitys sulkeaksesi",
       "unpin": "Irrota kiinnitys",
-      "untitled": "Nimetön"
+      "untitled": "Nimetön",
+      "closeTabMenuItem": "Sulje välilehti",
+      "moveLeft": "Siirrä vasemmalle",
+      "moveRight": "Siirrä oikealle"
     },
     "tagBrowser": {
       "cancel": "Peruuta",
@@ -3057,7 +3188,7 @@
         "whenLabel": "Milloin se lähtee",
         "whoLabel": "Kuka sen vastaanottaa",
         "connectionLabel": "Miten se kulkee",
-        "excludedLabel": ""
+        "excludedLabel": "Suljetut kansiot"
       },
       "disclosureToggle": "Miten tämä toimii?",
       "enableHelper": "Suorittaa antamasi mallin. Se, missä se suoritetaan ja poistuvatko muistiinpanosi tältä laitteelta, riippuu alla nimeämästäsi palveluntarjoajasta. Kokeellinen, oletuksena pois päältä.",
@@ -3091,7 +3222,8 @@
         "unauthorized": "Palveluntarjoaja hylkäsi API-avaimesi. Vaihda se: se voi olla väärä, peruutettu tai kuulua toiselle tilille.",
         "unreachable": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista verkkoyhteytesi.",
         "featureOff": "Tekoäly on pois käytöstä tässä laitteessa. Mitään ei lähetetty. Ota se käyttöön Asetuksissa kohdassa Tekoäly.",
-        "consentMissing": "Et ole hyväksynyt muistiinpanojen lähettämistä tälle palveluntarjoajalle tästä laitteesta. Mitään ei lähetetty. Valitse palveluntarjoaja uudelleen Asetuksissa kohdassa Tekoäly ja lue, mitä lähetetään."
+        "consentMissing": "Et ole hyväksynyt muistiinpanojen lähettämistä tälle palveluntarjoajalle tästä laitteesta. Mitään ei lähetetty. Valitse palveluntarjoaja uudelleen Asetuksissa kohdassa Tekoäly ja lue, mitä lähetetään.",
+        "emptyGrant": "Kaikki, mitä tämä suoritus voi lukea, on kansioissa, joita AI ei näe. Mitään ei lähetetty. Muuta se Asetukset, AI, Suljetut kansiot."
       },
       "modelChoose": "Valitse tiedosto…",
       "modelEmbeddingLabel": "Hakumalli: semanttinen haku sekä kysymykset ja vastaukset",
@@ -3374,7 +3506,8 @@
         "text": "Teksti ja näyttö",
         "editing": "Muokkaus",
         "writing": "Kirjoittaminen",
-        "features": "Ominaisuudet"
+        "features": "Ominaisuudet",
+        "tasks": "Tehtävät"
       },
       "preview": {
         "heading": "Viekas kettu punaturkki",
@@ -3386,7 +3519,20 @@
       "defaultView": "Oletusnäkymä",
       "typewriter": "Kirjoituskonevieritys",
       "typewriterSubtitle": "Pidä kohdistin pystysuunnassa keskellä",
-      "enableArchiving": "Ota arkistointi käyttöön"
+      "enableArchiving": "Ota arkistointi käyttöön",
+      "taskChipColor": {
+        "accent": "Korostus",
+        "danger": "Punainen",
+        "help": "Tehtävächipsin ikonin ja merkin väri kaikilla tehtäväpinnoilla tällä laitteella.",
+        "label": "Tehtävächipsin väri",
+        "muted": "Hillitty",
+        "sample": "1. elok.",
+        "theme": "Teema"
+      },
+      "taskChipIconOnly": {
+        "help": "Näytä prioriteetti vain ikonina, ei sanana.",
+        "label": "Vain ikonin prioriteetti"
+      }
     },
     "search": {
       "placeholder": "Etsi asetuksia…",
@@ -3466,7 +3612,11 @@
         "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone",
         "periodicNotes": "jaksottaiset muistiinpanot viikoittainen kuukausittainen viikko kuukausi kansio malli muoto",
         "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö",
-        "screenCaptureOverride": "näytönkaappaus ohitus salli poista käytöstä suurennuslasi näytönsuurennusohjelma etätyöpöytä saavutettavuus avaaminen avaus musta ikkuna näyttö screen capture override"
+        "screenCaptureOverride": "näytönkaappaus ohitus salli poista käytöstä suurennuslasi näytönsuurennusohjelma etätyöpöytä saavutettavuus avaaminen avaus musta ikkuna näyttö screen capture override",
+        "aiMemory": "muisti muistetut faktat avustaja oppii persoonallisuus äänensiirtymäasetukset",
+        "ribbon": "vasen nauha kisko kiinnitä pin komento komennot mukauta järjestä irrota työkalupalkki pikanäppäimet",
+        "folderNotes": "kansio muistiinpano indeksi folder_index laskeutumissivu kaksoisnapsautus kansiolinkki projektit pois poista käytöstä",
+        "syncMembers": "jäsenet, jaa, kutsu, tiimi, yhteistyö, valtiointi"
       }
     },
     "dateTime": {
@@ -3483,6 +3633,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ei tunne tuota aikavyöhykettä. Käytä nimeä, kuten Europe/Berlin.",
       "errorSave": "Tuota asetusta ei voitu tallentaa."
+    },
+    "folderNotes": {
+      "label": "Kansion muistiinpanot",
+      "helper": "Salli muistiinpanon toimia kansion indeksinä: se avautuu kun kaksoisnapsautat kansiota, ja kansiolinkit kuten [[Projects/]] osoittavat siihen. Poissa oletuksena. Poistaminen piilottaa kansiomuistiinpanon luomispainikkeet ja näyttää jo olemassa olevat tavallisina muistiinpanoina; se ei muuta mitään levylä, joten uudelleen ottaminen palauttaa ne täsmälleen.",
+      "errorSaveSetting": "Tätä asetusta ei voitu tallentaa."
+    },
+    "ribbonCustomize": {
+      "add": "Lisää",
+      "empty": "Ei komentoja nauhalla vielä. Käytä Lisää kiinnittääksesi komennon.",
+      "errorSave": "Nauha-asetusta ei voitu tallentaa.",
+      "helper": "Vasemman nauhan komennot järjestyksessä. Vedä järjestääksesi uudelleen, lisää lisää komentoluettelosta tai poista ×:llä. Kisko piilottaa komentoja, jotka eivät ole käytettävissä nykyisessä tilassa.",
+      "label": "Vasen nauha",
+      "remove": "Poista {{name}} nauhalta",
+      "position": "{{name}}, {{index}}/{{total}}",
+      "searchEmpty": "Ei vastaavia komentoja.",
+      "searchPlaceholder": "Etsi komentoja…",
+      "searchResultsLabel": "Vastaavat komennot",
+      "showHelper": "Näytä vasen nauha tällä laitteella.",
+      "showLabel": "Näytä vasen nauha"
+    },
+    "memory": {
+      "heading": "Mitä avustaja muistaa",
+      "helper": "Tiedot, jotka AI oppi työskentelemällä kanssasi. Se kirjoittaa ne itse (enintään yhden suoritusta kohti); näet ja voit korjata jokaisen. Merkinnät synkronoituvat muille laitteillesi ja pysyvät salattuina.",
+      "empty": "Ei muistettu vielä. Merkinnät näkyvät tässä, kun avustaja oppii jotain suorituksen aikana.",
+      "editLabel": "Muokkaa",
+      "deleteLabel": "Poista",
+      "save": "Tallenna",
+      "cancel": "Peruuta",
+      "cancelLabel": "Peruuta",
+      "saveFailed": "Merkintää ei voitu tallentaa.",
+      "deleteFailed": "Merkintää ei voitu poistaa.",
+      "entryUnreadable": "Tätä merkintää ei voitu lukea. Se on yhä tallennettu; poista se tästä tai korjaa Asetuksissa.",
+      "heldForReview": "Odottaa tarkistusta: tämä merkintä laukaisi injektionskannauksen, eikä avustaja käytä sitä ennen kuin muokkaat tai poistat sen.",
+      "savedToast": "Muisti päivitetty.",
+      "deletedToast": "Merkintä poistettu kaikkialta.",
+      "clearedToast": "Kaikki muistimerkinnät poistettu.",
+      "clearAllLabel": "Tyhjennä koko muisti",
+      "clearConfirm": "Poistetaanko todella jokainen merkintä? Tätä ei voi kumota.",
+      "updatedAt": "Päivitetty {{val}}",
+      "personalityLabel": "Äänensiirtymäasetuksesi",
+      "personalityHelper": "Yksi ohje rivillä. Nämä muovaavat, miten avustaja kirjoittaa jokaisessa suorituksessa: sävy, pituus, kieli. Tallennetaan valtiointiin ja synkronoidaan.",
+      "personalityPlaceholder": "Pidä vastaukset lyhyinä, päätelmä ensin.",
+      "personalitySaveLabel": "Tallenna äänensiirtymäasetukset",
+      "personalitySavedToast": "Äänensiirtymäasetukset päivitetty.",
+      "personalitySaveFailed": "Äänensiirtymäasetuksia ei voitu tallentaa.",
+      "loadFailed": "Muistoja tai äänensiirtymäasetuksia ei voitu ladata. Mitään ei muutettu.",
+      "retryLabel": "Yritä uudelleen"
     }
   },
   "storageLost": {
@@ -3827,6 +4024,53 @@
       "connecting": "Yhdistetään Toriin. Synkronointi on keskeytetty, kunnes yhteys on valmis. Mitään ei lähetetä suoraan.",
       "settingsHint": "Asetukset → Verkko",
       "unavailable": "Tor ei ole käytettävissä, joten synkronointi on keskeytetty. Mitään ei lähetetä suoraan. Poista Tor-reititys käytöstä synkronoidaksesi ilman sitä."
+    },
+    "members": {
+      "title": "Jäsenet ja turvallisuus",
+      "access": "Sinun pääsysi",
+      "epochLabel": "Ryhmäavain-epokki",
+      "people": "Ihmiset",
+      "removalLimitsLabel": "Poistolimittaukset"
+    },
+    "memberRoster": {
+      "loading": "Ladataan jäseniä…",
+      "error": "Valtiointin jäsenluetteloa ei voitu lukea.",
+      "hint": "Tämän valtiointin jäsenet. Jokainen liittyy omalla identiteetillään ja tunnuksillaan.",
+      "empty": "Ei jäseniä vielä. Kutsuminen on seuraava vaihe.",
+      "rotated": "Avain rotaatio",
+      "keyChanged": "Avain muuttui. Vahvista omistajan kanssa.",
+      "relinkConfirmed": "Uudelleenliitos vahvistettu omistajan toimesta",
+      "epoch": "Ryhmäavain-epokki {{epoch}}",
+      "ownerBadge": "Omistaja",
+      "memberBadge": "Jäsen",
+      "invite": "Kutsu jäsen",
+      "remove": "Poista",
+      "removeConfirm": "Poistetaanko {{name}}? Kun avainrotaatio on valmis, he menettävät pääsyn tuleviin muutoksiin. Tämä ei voi poistaa mitään, mitä he ovat jo kopioineet, eikä se palauta sisältöä laitteelta tai AI-palveluntarjoajalta.",
+      "removalLimits": "Jäsenen poistaminen pysäyttää vain heidän pääsynsä tuleviin muutoksiin. Se ei voi poistaa mitään, mitä he ovat jo kopioineet, eikä se palauta sisältöä laitteelta tai AI-palveluntarjoajalta.",
+      "inviteReady": "Kutsu valmis: {{fingerprint}}…",
+      "invitationsHeading": "Lähettämäsi kutsut",
+      "invitationClaimed": "Hyväksytty",
+      "invitationPending": "Ei hyväksytty vielä",
+      "invitationsFailed": "Kutsujasi ei voitu ladata.",
+      "title": "Valtiointin jäsenet",
+      "personHint": "Avaa jäsenidentiteettisi palautusfraasilla. Se pysyy tällä laitteella, kunnes lukitset valtiointin tai suljet sovelluksen.",
+      "personUnlock": "Avaa jäsenidentiteetti",
+      "personReady": "Jäsenidentiteetti avattu.",
+      "ownerCodeHint": "Jaa tämä koodi henkilölle, jonka kutsut, jotta he voivat vahvistaa, että valtiointi on sinun. Se sisältää vain julkista tietoa.",
+      "personLock": "Lukitse jäsenidentiteetti",
+      "personError": "Frasi ei avannut jäsenidentiteettiä.",
+      "inviteHint": "Liitä kutsutun jäsenen identiteettikoodi (heidän identiteetin kotisivulta).",
+      "inviteCodeLabel": "Jäsenidentiteettikoodi",
+      "inspect": "Tarkista sormenjälki",
+      "sasHint": "Lue tämä sormenjälki henkilölle, jota kutsut, tai lue se sinulle. Sen täytyy täsmätä molemmilla puolilla ennen kuin jatkat.",
+      "sasConfirm": "Vahvistin tämän sormenjäljen henkilön kanssa kanavan ulkopuolella",
+      "inviteCodeInvalid": "Tämä ei ole kelvollinen jäsenidentiteettikoodi.",
+      "kemLabel": "ML-KEM julkinen avain",
+      "edLabel": "Ed25519 julkinen avain",
+      "mldsaLabel": "ML-DSA julkinen avain",
+      "untitledVault": "Nimetön valtiointi",
+      "inviteFailed": "Kutsua ei voitu luoda.",
+      "removeFailed": "Jäsentä ei voitu poistaa."
     }
   },
   "tasks": {
@@ -3850,7 +4094,8 @@
       "filter": "Täällä ei ole nyt mitään. Kokeile toista suodatinta.",
       "rebuilding": "Luetaan muistiinpanojasi…",
       "scope": "Ei tehtäviä tässä kansiossa tai tunnisteessa. Kokeile laajentaa rajausta.",
-      "vault": "Ei vielä tehtäviä. Kirjoita ”- [ ]” riville missä tahansa muistiinpanossa luodaksesi sellaisen."
+      "vault": "Ei vielä tehtäviä. Kirjoita ”- [ ]” riville missä tahansa muistiinpanossa luodaksesi sellaisen.",
+      "search": "Yksikään tehtävä ei täsmää haula “{{query}}”."
     },
     "filter": {
       "all": "Kaikki",
@@ -3881,7 +4126,74 @@
       "allFolders": "Kaikki kansiot",
       "label": "Rajaa"
     },
-    "title": "Tehtävät"
+    "title": "Tehtävät",
+    "axis": {
+      "due": "Eräpäivä",
+      "folder": "Kansio",
+      "note": "Muistiinpano",
+      "priority": "Prioriteetti",
+      "sort": "Lajittele",
+      "status": "Tila",
+      "tag": "Tunniste"
+    },
+    "due": {
+      "any": "Mikä tahansa päivä",
+      "later": "Myöhemmin",
+      "none": "Ei päivämäärää",
+      "overdue": "Myöhässä",
+      "today": "Tänään",
+      "upcoming": "Tulossa"
+    },
+    "filters": {
+      "button": "Suodattimet",
+      "clearAll": "Tyhjennä kaikki",
+      "selectHint": "Valitse käytettävä suodatin",
+      "title": "Suodattimet"
+    },
+    "priority": {
+      "high": "Korkea",
+      "highest": "Korkein",
+      "low": "Matala",
+      "lowest": "Matalin",
+      "medium": "Keskitaso"
+    },
+    "section": {
+      "done": "Valmis",
+      "later": "Myöhemmin",
+      "none": "Ei päivämäärää",
+      "overdue": "Myöhässä",
+      "today": "Tänään",
+      "upcoming": "Tulossa"
+    },
+    "sort": {
+      "due": "Eräpäivä",
+      "dueDesc": "Eräpäivä, uusin ensin",
+      "note": "Muistiinpano",
+      "priority": "Prioriteetti"
+    },
+    "status": {
+      "all": "Kaikki",
+      "done": "Valmis",
+      "undone": "Avoin"
+    },
+    "view": {
+      "allFolders": "Kaikki kansiot",
+      "allNotes": "Kaikki muistiinpanot",
+      "anyPriority": "Mikä tahansa prioriteetti",
+      "anyTag": "Mikä tahansa tunniste",
+      "dueLabel": "Suodata eräpäivän mukaan",
+      "folderLabel": "Suodata kansion mukaan",
+      "noteLabel": "Suodata muistiinpanon mukaan",
+      "priorityLabel": "Suodata prioriteetin mukaan",
+      "sortLabel": "Lajittele osioiden sisällä",
+      "statusLabel": "Suodata valmiuden mukaan",
+      "tagLabel": "Suodata tunnisteen mukaan",
+      "untitled": "Nimetön"
+    },
+    "search": {
+      "label": "Etsi tehtäviä",
+      "placeholder": "Etsi tehtäviä…"
+    }
   },
   "templates": {
     "manager": {
@@ -3996,7 +4308,11 @@
     "deleteConfirmTitle": "Poistetaanko tämä holvi?",
     "deletePartialError": "Joitakin tiedostoja ei voitu poistaa. Holvi ei ole enää käyttökelpoinen. Jatka aloittaaksesi alusta.",
     "failClosedEyebrow": "Holvia ei voi avata",
-    "restoreHint": "Jatka palauttamalla varmuuskopiosta."
+    "restoreHint": "Jatka palauttamalla varmuuskopiosta.",
+    "memberHint": "Tämä valtiointi jaetaan kanssasi. Avaa se omalla palautusfraasillasi.",
+    "memberPhraseLabel": "Palautusfraasi",
+    "memberSubmit": "Avaa",
+    "memberError": "Frasi ei avannut tätä jaettua valtiointia."
   },
   "vault": {
     "ioBanner": {
@@ -4209,7 +4525,18 @@
     "openedRelative": "avattu {{rel}}",
     "restoreFromBackup": "Palauta varmuuskopiosta",
     "subline": "Tällä laitteella on useampi kuin yksi holvi. Valitse avattava holvi.",
-    "vaultFallback": "Holvi {{n}}"
+    "vaultFallback": "Holvi {{n}}",
+    "accountFallback": "Tili",
+    "moveToAccount": "Siirry tilille…",
+    "moveToNewAccount": "Siirry uudelle tiliin",
+    "renameAccount": "Nimeä tili uudelleen",
+    "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
+    "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
+    "labelTooLong": "Nimi on liian pitkä. Pidä se alle 512 merkkiä.",
+    "renameCancel": "Peruuta",
+    "renamePlaceholder": "Tilin nimi",
+    "renameSave": "Nimeä",
+    "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4254,7 +4581,15 @@
       "or": "tai",
       "title": "Valitse palautettava holvi",
       "useAccountNumber": "Käytä tilinumeroa",
-      "vaultFallback": "Holvi {{index}}"
+      "vaultFallback": "Holvi {{index}}",
+      "accountFallback": "Tili",
+      "accountsError": "Tilin ryhmittelyä ei voitu ladata. Valtiointien luettelo on ilman ryhmittelyä; palautukseen ei tule muutoksia."
+    },
+    "siblingNotice": {
+      "body_one": "Tällä tilillä on {{count}} valtiointi lisää. Palauta sekin, jottei mitään jää taakse.",
+      "body_other": "Tällä tilillä on {{count}} valtiointia lisää. Palauta nekin, jottei mitään jää taakse.",
+      "recoverAnother": "Palauta toinen valtiointi",
+      "unknown": "Ei voitu tarkistaa, onko tällä tilillä muita valtiointeja. Jos sinulla on useampi kuin yksi, palauta jokainen omalla fraasillaan."
     }
   },
   "vaultSwitcher": {
@@ -4301,12 +4636,14 @@
     "residueBanner": "Keskeytyneestä poistosta jääneitä tiedostoja ({{n}}). Siivoa ne ennen holvin luomista.",
     "cleanUpFiles": "Siivoa jäljelle jääneet tiedostot",
     "create": "Luo holvi",
-    "connect": "Yhdistä tiliini"
+    "connect": "Yhdistä tiliini",
+    "identityCta": "Luo vain identiteetti"
   },
   "wikiGraph": {
     "emptyTitle": "Ei vielä linkkejä",
     "emptyBodyBefore": "Yhdistä muistiinpanoja kirjoittamalla ",
-    "emptyBodyAfter": " tekstiisi. Linkitetyt muistiinpanot näkyvät tässä graafina."
+    "emptyBodyAfter": " tekstiisi. Linkitetyt muistiinpanot näkyvät tässä graafina.",
+    "canvasLabel": "Tietografi {{count}} muistiinpanosta"
   },
   "markdown": {
     "attachmentFallback": "liite",
@@ -4377,7 +4714,18 @@
     "openedLastYear": "avattu viime vuonna",
     "openedYearsAgo_one": "avattu {{count}} vuosi sitten",
     "openedYearsAgo_other": "avattu {{count}} vuotta sitten",
-    "corruptedBadge": "Vioittunut"
+    "corruptedBadge": "Vioittunut",
+    "accountFallback": "Tili",
+    "renameAccount": "Nimeä tili uudelleen",
+    "moveToNewAccount": "Siirry uudelle tiliin",
+    "moveToAccount": "Siirry tilille…",
+    "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
+    "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
+    "labelTooLong": "Nimi on liian pitkä. Pidä se alle 512 merkkiä.",
+    "renameCancel": "Peruuta",
+    "renamePlaceholder": "Tilin nimi",
+    "renameSave": "Nimeä",
+    "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu."
   },
   "join": {
     "transportError": "Synkronointipalvelinta ei tavoitettu. Tarkista osoite ja yhteytesi, ja yritä sitten uudelleen.",
@@ -4512,5 +4860,38 @@
     "restoreTrigger": "Ota näytönkaappaussuojaus käyttöön",
     "saveFailed": "Tätä ei voitu tallentaa, joten mikään ei muuttunut. Yritä uudelleen tai käynnistä Myne valitsimella --disable-screen-capture-protection.",
     "savedForNextLaunch": "Tallennettu. Tässä istunnossa suojaus on yhä pois päältä, koska istunto käynnistettiin valitsimella --disable-screen-capture-protection, joten suojaus palaa, kun avaat Mynen seuraavan kerran ilman sitä."
+  },
+  "identitySetup": {
+    "createCta": "Luo identiteetti",
+    "doneCta": "Valmis",
+    "error": "Identiteettiä ei voitu luoda. Varmista, että synkronointipalvelin on määritetty, ja yritä uudelleen.",
+    "intro": "Identiteetti mahdollistaa kutsun osoittamisen sinulle ennen kuin omistat minkään valtiointin. Se ei luo valtiointia eikä tallenna muistiinpanoja.",
+    "pending": "Tämä laite odottaa, että toinen tilin laite hyväksyy sen.",
+    "phraseWarning": "Kirjoita nämä 24 sanaa ylös ja säilytä ne turvallisesti. Ne näytetään vain tässä; ne ovat ainoa tapa palauttaa tämä identiteetti.",
+    "recoverCta": "Palauta identiteetti",
+    "recoverIntro": "Onko sinulla jo identiteetti? Anna sen 24-sanainen palautusfraasi.",
+    "recovered": "Identiteetti palautettu.",
+    "title": "Vain identiteetti"
+  },
+  "identityHome": {
+    "createVaultCta": "Luo valtiointi",
+    "invitesError": "Kutsuja ei voitu ladata. Tarkista yhteytesi ja synkronointipalvelin.",
+    "invitesHeading": "Kutsut",
+    "invitesLoading": "Tarkistetaan kutsuja…",
+    "noInvites": "Ei kutsuja vielä.",
+    "subtitle": "Sinulla on identiteetti tällä laitteella, joten ihmiset voivat kutsua sinut valtiointiin. Sinun ei tarvitse luoda sellaista saadaksesi kutsun.",
+    "accept": "Hyväksy",
+    "acceptHint": "Liitä omistajan identiteettikoodi (he jakavat sen, kun kutsuvat sinut).",
+    "acceptOwnerCodeLabel": "Omistajan identiteettikoodi",
+    "acceptInspect": "Tarkista sormenjälki",
+    "acceptSasHint": "Lue tämä sormenjälki valtiointin omistajalle tai lue se sinulle. Sen täytyy täsmätä molemmilla puolilla ennen kuin jatkat.",
+    "acceptConfirm": "Vahvistin tämän sormenjäljen omistajan kanssa kanavan ulkopuolella",
+    "acceptSubmit": "Hyväksy ja avaa",
+    "acceptPhraseLabel": "Palautusfraasisi",
+    "acceptError": "Kutsua ei voitu hyväksyä.",
+    "acceptInvalid": "Tämä ei ole kelvollinen omistajan identiteettikoodi.",
+    "shareCodeHeading": "Kutsukoodisi",
+    "shareCodeHint": "Jaa tämä koodi kenelle tahansa, joka kutsuu sinut. Se sisältää vain julkista tietoa (identiteettitunnuksesi ja julkiset avaimet), ei koskaan fraasia.",
+    "title": "Identiteettisi"
   }
 }

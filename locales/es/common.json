@@ -160,7 +160,9 @@
       "runSummaryOffDevice_many": "se enviaron al proveedor aproximadamente {{count}} caracteres de tus notas",
       "runSummaryOffDevice_other": "se enviaron al proveedor aproximadamente {{count}} caracteres de tus notas",
       "runSummaryOnDevice": "nada salió de este dispositivo",
-      "appendFlag": "se añade al final"
+      "appendFlag": "se añade al final",
+      "diffCurrent": "En la nota actual",
+      "diffProposed": "Después de este cambio"
     },
     "undo": {
       "offer_one": "La última ejecución cambió {{count}} nota.",
@@ -300,7 +302,8 @@
       "usedInCount_one": "Usado en {{count}} nota",
       "usedInCount_many": "Usado en {{count}} de notas",
       "usedInCount_other": "Usado en {{count}} notas",
-      "usedInLoading": "…"
+      "usedInLoading": "…",
+      "previewNamed": "Vista previa de {{name}}"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -351,7 +354,8 @@
         "joinFailure": "La copia de seguridad falló inesperadamente. No quedó ningún archivo.",
         "memberTooLarge": "Un archivo de esta bóveda es más grande de lo que permite el formato de copia de seguridad.",
         "vaultNotFound": "No se encontró ninguna bóveda para respaldar.",
-        "verifyFailed": "La copia de seguridad escrita no se verificó, así que se descartó. Inténtalo de nuevo, en otro medio si vuelve a ocurrir."
+        "verifyFailed": "La copia de seguridad escrita no se verificó, así que se descartó. Inténtalo de nuevo, en otro medio si vuelve a ocurrir.",
+        "unknown": "La copia de seguridad falló por una razón que Myne no pudo identificar. No confíes en ningún archivo en el destino; inténtalo de nuevo."
       },
       "restore": {
         "authOperationInProgress": "Hay otra operación de la bóveda en curso. Espera a que termine y vuelve a intentarlo.",
@@ -364,7 +368,8 @@
         "joinFailure": "La restauración falló inesperadamente. No se cambió nada.",
         "missingVaultMeta": "A esta copia de seguridad le faltan los metadatos de la bóveda y no se puede restaurar.",
         "notABackupFile": "Este archivo no es una copia de seguridad de Myne.",
-        "vaultAlreadyExists": "Ya existe una bóveda de esta copia de seguridad en este dispositivo."
+        "vaultAlreadyExists": "Ya existe una bóveda de esta copia de seguridad en este dispositivo.",
+        "unknown": "La restauración falló por una razón que Myne no pudo identificar. Inténtalo de nuevo y revisa el archivo de copia de seguridad si se repite."
       }
     },
     "export": {
@@ -409,7 +414,11 @@
     "searchPlaceholder": "Busca notas o ejecuta un comando. Prueba tag: · path: · task:",
     "sectionCommands": "Comandos",
     "sectionNotes": "Notas",
-    "untitledNote": "Sin título"
+    "untitledNote": "Sin título",
+    "resultsLabel": "Comandos y notas",
+    "pin": "Anclar a la cinta izquierda",
+    "unpin": "Soltar de la cinta izquierda",
+    "pinError": "No se pudo anclar el comando."
   },
   "commands": {
     "actions": {
@@ -700,6 +709,24 @@
       },
       "openThisMonthNote": {
         "label": "Abrir la nota de este mes"
+      },
+      "focusSidebarRegion": {
+        "label": "Enfocar la barra lateral de notas"
+      },
+      "focusEditorRegion": {
+        "label": "Enfocar el editor"
+      },
+      "focusRightPanelRegion": {
+        "label": "Enfocar el panel derecho"
+      },
+      "cycleRegion": {
+        "label": "Alternar el foco entre regiones"
+      },
+      "openInNewWindow": {
+        "label": "Abrir la nota en una ventana nueva"
+      },
+      "showIsolatedGraph": {
+        "label": "Abrir el grafo aislado"
       }
     },
     "hotkeys": {
@@ -740,7 +767,11 @@
         "toggleSourceMode": "Alternar modo de código fuente",
         "toggleTaskList": "Alternar lista de tareas",
         "undo": "Deshacer",
-        "unfoldAll": "Desplegar todo"
+        "unfoldAll": "Desplegar todo",
+        "cycleRegion": "Alternar el foco entre regiones",
+        "focusEditorRegion": "Enfocar el editor",
+        "focusRightPanelRegion": "Enfocar el panel derecho",
+        "focusSidebarRegion": "Enfocar la barra lateral de notas"
       }
     },
     "rebind": {
@@ -768,7 +799,8 @@
       "loadingLabel": "Cargando"
     },
     "back": "Atrás",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "skipToContent": "Saltar al contenido"
   },
   "deviceRevoked": {
     "cta": "Empezar de nuevo",
@@ -1136,7 +1168,10 @@
             "newNotes_other": "{{count}} notas nuevas.",
             "proposed_one": "Ha propuesto {{count}} cambio.",
             "proposed_many": "Ha propuesto {{count}} cambios.",
-            "proposed_other": "Ha propuesto {{count}} cambios."
+            "proposed_other": "Ha propuesto {{count}} cambios.",
+            "memoryUpdated_one": "Memoria actualizada con una entrada.",
+            "memoryUpdated_other": "Memoria actualizada con {{count}} entradas.",
+            "memoryUpdated_many": "Memoria actualizada con {{count}} entradas."
           },
           "askPlaceholder": "Haz una pregunta sobre tus notas…",
           "askSubmit": "Preguntar",
@@ -1168,18 +1203,31 @@
           "thinking": "La IA está pensando…",
           "truncated": "Se resumieron los primeros {{count}} caracteres.",
           "you": "Tú",
-          "history": "",
-          "historyCancel": "",
-          "historyDelete": "",
-          "historyDeleteBody": "",
-          "historyEmpty": "",
-          "historyError": "",
-          "historyLoading": "",
-          "historyProposalAfter": "",
-          "historyProposalBefore": "",
-          "historyProposalNewNote": "",
-          "historyRename": "",
-          "historyTitle": ""
+          "history": "Historial",
+          "historyCancel": "Cancelar",
+          "historyDelete": "Eliminar",
+          "historyDeleteBody": "Esto elimina la conversación de cada dispositivo la próxima vez que se conecte. Esto no se puede deshacer.",
+          "historyEmpty": "Todavía no hay conversaciones. Los chats nuevos aparecen aquí.",
+          "historyError": "No se pudieron cargar las conversaciones. Inténtalo de nuevo.",
+          "historyLoading": "Cargando…",
+          "historyProposalAfter": "Después",
+          "historyProposalBefore": "Antes",
+          "historyProposalNewNote": "Nota nueva",
+          "historyRename": "Renombrar",
+          "historyTitle": "Historial de chats",
+          "historyDeleteTitle": "Eliminar conversación",
+          "persistWarning": "No se pudo guardar en la bóveda. Tus mensajes siguen aquí y se reintentará.",
+          "memory": "Memoria",
+          "memoryPopoverTitle": "Lo que el asistente recuerda",
+          "memoryPopoverEmpty": "Todavía no recuerda nada.",
+          "memoryPopoverDelete": "Eliminar",
+          "memoryPopoverDeleted": "Entrada eliminada en todas partes.",
+          "memoryPopoverDeleteFailed": "No se pudo eliminar la entrada.",
+          "memoryPopoverEntryFailed": "No se pudo leer esta entrada. Sigue guardada; elimínala aquí o corrígela en Ajustes.",
+          "memoryPopoverLoadFailed": "No se pudieron cargar los recuerdos. No cambió nada.",
+          "memoryPopoverRetry": "Reintentar",
+          "memoryPopoverSettings": "Gestionar en Ajustes",
+          "memoryPopoverClose": "Cerrar"
         },
         "allHidden": "Todas las pestañas están ocultas. Haz clic derecho para restaurarlas.",
         "outline": {
@@ -1194,7 +1242,8 @@
           "outline": "Esquema",
           "tasks": "Tareas",
           "unlinked": "Menciones sin enlazar"
-        }
+        },
+        "tabStripLabel": "Panel derecho"
       },
       "sidebarToggle": {
         "hideBacklinks": "Ocultar barra lateral de retroenlaces",
@@ -1224,6 +1273,11 @@
         "saveCurrentAs": "Guardar el actual como…",
         "switchLabel": "Cambiar de espacio de trabajo",
         "toggleTitle": "Espacio de trabajo: {{name}}"
+      },
+      "region": {
+        "editor": "Editor",
+        "rightPanel": "Panel derecho",
+        "sidebar": "Barra lateral de notas"
       }
     },
     "noteActions": {
@@ -1237,7 +1291,8 @@
       "turnedIntoTemplate": "Convertida en plantilla",
       "convertedToNote": "Convertida en nota",
       "versionHistory": "Historial de versiones",
-      "trash": "Mover a la papelera"
+      "trash": "Mover a la papelera",
+      "openInNewWindow": "Abrir en una ventana nueva"
     },
     "codeBlock": {
       "copyCode": "Copiar código",
@@ -1297,7 +1352,21 @@
     },
     "mermaid": {
       "rendering": "Renderizando diagrama…",
-      "renderFailed": "No se pudo representar este diagrama: {{reason}}"
+      "renderFailed": "No se pudo representar este diagrama: {{reason}}",
+      "viewerLabel": "Visor de diagramas",
+      "zoomIn": "Acercar",
+      "zoomOut": "Alejar",
+      "reset": "Restablecer el zoom para ajustar",
+      "panUp": "Desplazar arriba",
+      "panDown": "Desplazar abajo",
+      "panLeft": "Desplazar a la izquierda",
+      "panRight": "Desplazar a la derecha",
+      "edit": "Editar el código del diagrama",
+      "editText": "Editar",
+      "expand": "Expandir el diagrama",
+      "expandText": "Expandir",
+      "expandClose": "Cerrar el diagrama expandido",
+      "expandCloseText": "Cerrar"
     },
     "slash": {
       "aiContinue": "Continuar escribiendo (IA)",
@@ -1372,7 +1441,20 @@
         "remind": "Recordatorio"
       },
       "timeLabel": "Hora (opcional)",
-      "invalidRemind": "Myne no puede leer esta fecha, así que no recibirás el recordatorio."
+      "invalidRemind": "Myne no puede leer esta fecha, así que no recibirás el recordatorio.",
+      "addTime": "Añadir hora",
+      "clear": "Borrar",
+      "dateGrid": "Elegir una fecha",
+      "dateNext": "Mes siguiente",
+      "datePrev": "Mes anterior",
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "selectField": "Selecciona un campo para añadir",
+      "noDate": "Sin fecha",
+      "removeTime": "Quitar la hora",
+      "timeHour": "Hora",
+      "timeMeridiem": "AM o PM",
+      "timeMinute": "Minuto"
     },
     "toolbar": {
       "apply": "Aplicar",
@@ -1622,6 +1704,30 @@
         "weekly": "No se pudo abrir la nota de esta semana.",
         "monthly": "No se pudo abrir la nota de este mes."
       }
+    },
+    "a11y": {
+      "noteBody": "Cuerpo de la nota: {{title}}",
+      "untitledNoteBody": "Cuerpo de la nota, nota sin título",
+      "sectionFolded_one": "Sección plegada",
+      "sectionFolded_other": "{{count}} secciones plegadas",
+      "sectionUnfolded_one": "Sección desplegada",
+      "sectionUnfolded_other": "{{count}} secciones desplegadas",
+      "diagram": "Diagrama",
+      "diagramNamed": "Diagrama: {{kind}}",
+      "brokenLink": "{{target}}, enlace roto",
+      "sectionFolded_many": "{{count}} secciones plegadas",
+      "sectionUnfolded_many": "{{count}} secciones desplegadas"
+    },
+    "ribbon": {
+      "customize": "Personalizar la cinta…",
+      "label": "Cinta izquierda",
+      "unpin": "Soltar de la cinta",
+      "runFailed": "No se pudo ejecutar el comando de la cinta."
+    },
+    "detachedDeleted": {
+      "title": "Esta nota se eliminó en otro lugar",
+      "body": "Se eliminó desde otra ventana o se sincronizó desde otro dispositivo. Los cambios sin guardar de esta ventana se conservaron como una copia separada.",
+      "close": "Cerrar ventana"
     }
   },
   "export": {
@@ -1940,7 +2046,15 @@
         "heading": "Grupos de color",
         "moveDown": "Mover la regla abajo",
         "moveUp": "Mover la regla arriba",
-        "namePlaceholder": "Regla sin título"
+        "namePlaceholder": "Regla sin título",
+        "rowLabel": "{{name}}, grupo {{index}} de {{total}}. Alt más la flecha arriba o abajo lo reordena.",
+        "editRuleButton": "Editar",
+        "derivedMakeEditable": "Hacer que se puedan editar",
+        "derivedMakeEditableFailed": "No se pudieron guardar esos grupos. Inténtalo de nuevo.",
+        "derivedNote_one": "El grafo se colorea por etiqueta: {{count}} grupo, derivado de tus etiquetas. No se guarda hasta que lo hagas editable.",
+        "derivedNote_other": "El grafo se colorea por etiqueta: {{count}} grupos, derivados de tus etiquetas. No se guardan hasta que los hagas editables.",
+        "newRuleTitle": "Nuevo grupo de color",
+        "derivedNote_many": "El grafo se colorea por etiqueta: {{count}} grupos, derivados de tus etiquetas. No se guardan hasta que los hagas editables."
       },
       "depthToggleTitle": "Alternar la profundidad del vecindario (1 ↔ 2 saltos)",
       "filterAll": "Todas",
@@ -1969,7 +2083,23 @@
         "reset": "Restablecer los valores predeterminados",
         "showArrows": "Mostrar flechas de dirección",
         "title": "Ajustes del grafo"
-      }
+      },
+      "canvasLabel": "Grafo de conocimiento de {{count}} notas",
+      "filterSelectAriaLabel": "Filtrar el grafo",
+      "listLinkCount_one": "{{count}} enlace",
+      "listLinkCount_other": "{{count}} enlaces",
+      "listLinksFrom": "Enlazado desde: {{titles}}",
+      "listLinksTo": "Enlaza a: {{titles}}",
+      "relayout": "Readistribuir",
+      "relayoutTitle": "Readistribuir el grafo desde cero",
+      "showingCount_one": "Mostrando {{count}} nota",
+      "showingCount_other": "Mostrando {{count}} notas",
+      "untitledNote": "Nota sin título",
+      "viewGraph": "Grafo",
+      "viewList": "Lista",
+      "viewToggleAriaLabel": "Elige la imagen del grafo o la lista de sus notas",
+      "listLinkCount_many": "{{count}} enlaces",
+      "showingCount_many": "Mostrando {{count}} notas"
     },
     "import": {
       "base": {
@@ -2247,7 +2377,10 @@
       "importedWithSkips_many": "Se importaron {{count}} · {{skipped}} omitidas",
       "importedWithSkips_other": "Se importaron {{count}} · {{skipped}} omitidas",
       "importNoMarkdown": "No hay archivos Markdown en lo que soltaste",
-      "moveFolderTo": "Mover carpeta a…"
+      "moveFolderTo": "Mover carpeta a…",
+      "treeLabel": "Notas y carpetas",
+      "selectionAnnouncement": "{{title}} seleccionada",
+      "untitled": "Sin título"
     },
     "newFromTemplate": {
       "back": "Atrás",
@@ -2302,7 +2435,8 @@
       "taskBadgeTitle": "Nota de tarea",
       "unsyncedLabel": "Aún no está en el servidor",
       "unsyncedTitle": "Los últimos cambios de esta nota solo están en este dispositivo",
-      "untitled": "Sin título"
+      "untitled": "Sin título",
+      "untitledDrawing": "Dibujo sin título"
     },
     "savedView": {
       "defaultName": "Vista filtrada"
@@ -2371,7 +2505,10 @@
       "pinned": "Fijada",
       "pinnedTitle": "Fijada: deja de fijarla para cerrar",
       "unpin": "Dejar de fijar",
-      "untitled": "Sin título"
+      "untitled": "Sin título",
+      "closeTabMenuItem": "Cerrar pestaña",
+      "moveLeft": "Mover a la izquierda",
+      "moveRight": "Mover a la derecha"
     },
     "tagBrowser": {
       "cancel": "Cancelar",
@@ -3162,7 +3299,7 @@
         "whenLabel": "Cuándo sale",
         "whoLabel": "Quién lo recibe",
         "connectionLabel": "Cómo viaja",
-        "excludedLabel": ""
+        "excludedLabel": "Carpetas excluidas"
       },
       "disclosureToggle": "¿Cómo funciona esto?",
       "enableHelper": "Ejecuta un modelo que tú proporcionas. Dónde se ejecuta, y si tus notas salen de este dispositivo, depende del proveedor que indiques más abajo. Experimental, desactivado de forma predeterminada.",
@@ -3196,7 +3333,8 @@
         "unauthorized": "El proveedor rechazó tu clave de API. Sustitúyela: puede que sea incorrecta, que esté revocada o que sea de otra cuenta.",
         "unreachable": "No se pudo conectar con el proveedor. Comprueba tu conexión de red.",
         "featureOff": "La IA está desactivada en este dispositivo. No se envió nada. Actívala en Ajustes, en IA.",
-        "consentMissing": "No has aceptado enviar notas a este proveedor desde este dispositivo. No se envió nada. Vuelve a elegir el proveedor en Ajustes, en IA, y lee qué se enviará."
+        "consentMissing": "No has aceptado enviar notas a este proveedor desde este dispositivo. No se envió nada. Vuelve a elegir el proveedor en Ajustes, en IA, y lee qué se enviará.",
+        "emptyGrant": "Todo lo que esta ejecución pudo leer está en carpetas que la IA nunca ve. No se envió nada. Cámbialo en Ajustes, IA, Carpetas excluidas."
       },
       "modelChoose": "Elegir archivo…",
       "modelEmbeddingLabel": "Modelo de búsqueda: búsqueda semántica y preguntas y respuestas",
@@ -3485,7 +3623,8 @@
         "text": "Texto y visualización",
         "editing": "Edición",
         "writing": "Escritura",
-        "features": "Funciones"
+        "features": "Funciones",
+        "tasks": "Tareas"
       },
       "preview": {
         "heading": "El veloz murciélago hindú",
@@ -3497,7 +3636,20 @@
       "defaultView": "Vista predeterminada",
       "typewriter": "Desplazamiento de máquina de escribir",
       "typewriterSubtitle": "Mantén el cursor centrado verticalmente",
-      "enableArchiving": "Activar archivado"
+      "enableArchiving": "Activar archivado",
+      "taskChipColor": {
+        "accent": "Acento",
+        "danger": "Rojo",
+        "help": "El color del icono y la etiqueta de una ficha de tarea, en cada superficie de tareas de este dispositivo.",
+        "label": "Color de la ficha de tarea",
+        "muted": "Apagado",
+        "sample": "1 ago",
+        "theme": "Tema"
+      },
+      "taskChipIconOnly": {
+        "help": "Mostrar una prioridad solo con su icono, en lugar de la palabra.",
+        "label": "Prioridad solo icono"
+      }
     },
     "search": {
       "placeholder": "Buscar ajustes…",
@@ -3577,7 +3729,11 @@
         "timezone": "zona horaria huso horario timezone tz utc iana región hoy",
         "periodicNotes": "notas periódicas semanal mensual semana mes carpeta plantilla formato",
         "aiHistoryBudget": "conversación historial contexto memoria presupuesto caracteres agente chat solicitud",
-        "screenCaptureOverride": "captura de pantalla anular permitir desactivar lupa escritorio remoto accesibilidad desbloqueo pantalla negra screen capture"
+        "screenCaptureOverride": "captura de pantalla anular permitir desactivar lupa escritorio remoto accesibilidad desbloqueo pantalla negra screen capture",
+        "aiMemory": "memoria recuerda datos asistente aprende personalidad voz preferencias",
+        "ribbon": "cinta izquierda raíl anclar pin comando comandos personalizar reordenar soltar barra de herramientas atajos",
+        "folderNotes": "carpeta nota índice folder_index página de inicio doble clic enlace carpeta proyectos apagar interruptor desactivar",
+        "syncMembers": "miembros, compartir, invitar, equipo, colaboración, bóveda"
       }
     },
     "dateTime": {
@@ -3594,6 +3750,53 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne no conoce esa zona horaria. Usa un nombre como Europe/Berlin.",
       "errorSave": "No se pudo guardar ese ajuste."
+    },
+    "folderNotes": {
+      "label": "Notas de carpeta",
+      "helper": "Permite que una nota actúe como índice de su carpeta: se abre al hacer doble clic en la carpeta, y los enlaces de carpeta como [[Proyectos/]] apuntan a ella. Desactivado por defecto. Al desactivarlo se ocultan los botones que crean notas de carpeta y las que ya tengas se muestran como notas normales; no cambia nada en el disco, así que volver a activarlas las restaura exactamente.",
+      "errorSaveSetting": "No se pudo guardar esta configuración."
+    },
+    "ribbonCustomize": {
+      "add": "Añadir",
+      "empty": "Todavía no hay comandos en la cinta. Usa Añadir para anclar uno.",
+      "errorSave": "No se pudo guardar la configuración de la cinta.",
+      "helper": "Los comandos de la cinta izquierda, en orden. Arrastra para reordenar, añade más desde la lista de comandos o quítalos con la ×. La barra oculta los comandos no disponibles en el estado actual.",
+      "label": "Cinta izquierda",
+      "remove": "Quitar {{name}} de la cinta",
+      "position": "{{name}}, {{index}} de {{total}}",
+      "searchEmpty": "No hay comandos coincidentes.",
+      "searchPlaceholder": "Buscar comandos…",
+      "searchResultsLabel": "Comandos coincidentes",
+      "showHelper": "Mostrar la cinta izquierda en este dispositivo.",
+      "showLabel": "Mostrar la cinta izquierda"
+    },
+    "memory": {
+      "heading": "Lo que el asistente recuerda",
+      "helper": "Datos que la IA aprendió al trabajar contigo. Los escribe ella misma (como mucho uno por ejecución); los ves y puedes corregir cada uno. Las entradas se sincronizan con tus otros dispositivos y siguen cifradas.",
+      "empty": "Todavía no recuerda nada. Las entradas aparecen aquí cuando el asistente aprende algo durante una ejecución.",
+      "editLabel": "Editar",
+      "deleteLabel": "Eliminar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "cancelLabel": "Cancelar",
+      "saveFailed": "No se pudo guardar la entrada.",
+      "deleteFailed": "No se pudo eliminar la entrada.",
+      "entryUnreadable": "No se pudo leer esta entrada. Sigue guardada; elimínala aquí o corrígela en Ajustes.",
+      "heldForReview": "Retenida para revisión: esta entrada activó el análisis de inyección y el asistente no la usa hasta que la edites o la elimines.",
+      "savedToast": "Memoria actualizada.",
+      "deletedToast": "Entrada eliminada en todas partes.",
+      "clearedToast": "Todas las entradas de memoria eliminadas.",
+      "clearAllLabel": "Borrar toda la memoria",
+      "clearConfirm": "¿De verdad quieres eliminar todas las entradas? Esto no se puede deshacer.",
+      "updatedAt": "Actualizado {{val}}",
+      "personalityLabel": "Tus preferencias de voz",
+      "personalityHelper": "Una instrucción por línea. Estas dan forma a cómo escribe el asistente en cada ejecución: tono, longitud, idioma. Se guardan en la bóveda y se sincronizan.",
+      "personalityPlaceholder": "Mantén las respuestas cortas, con la conclusión primero.",
+      "personalitySaveLabel": "Guardar preferencias de voz",
+      "personalitySavedToast": "Preferencias de voz actualizadas.",
+      "personalitySaveFailed": "No se pudieron guardar las preferencias de voz.",
+      "loadFailed": "No se pudieron cargar los recuerdos ni las preferencias de voz. No cambió nada.",
+      "retryLabel": "Reintentar"
     }
   },
   "storageLost": {
@@ -3945,6 +4148,53 @@
       "connecting": "Conectando con Tor. La sincronización está en pausa hasta que la conexión esté lista: no se está enviando nada directamente.",
       "settingsHint": "Ajustes → Red",
       "unavailable": "Tor no está disponible, así que la sincronización está en pausa. No se está enviando nada directamente. Desactiva el enrutamiento por Tor para sincronizar sin él."
+    },
+    "members": {
+      "title": "Miembros y seguridad",
+      "access": "Tu acceso",
+      "epochLabel": "Época de la clave de grupo",
+      "people": "Personas",
+      "removalLimitsLabel": "Límites de eliminación"
+    },
+    "memberRoster": {
+      "loading": "Cargando miembros…",
+      "error": "No se pudo leer el listado de la bóveda.",
+      "hint": "Miembros de esta bóveda. Cada uno se une con su propia identidad y credenciales.",
+      "empty": "Todavía no hay miembros. Invitar a alguien es el siguiente paso.",
+      "rotated": "Clave rotada",
+      "keyChanged": "Clave cambiada. Verifícala con el propietario.",
+      "relinkConfirmed": "Reenlace confirmado por el propietario",
+      "epoch": "Época de la clave de grupo {{epoch}}",
+      "ownerBadge": "Propietario",
+      "memberBadge": "Miembro",
+      "invite": "Invitar miembro",
+      "remove": "Quitar",
+      "removeConfirm": "¿Quitar a {{name}}? Cuando complete la rotación de la clave perderá el acceso a los cambios futuros. Esto no puede borrar nada que ya haya copiado, ni recupera contenido de su dispositivo o de su proveedor de IA.",
+      "removalLimits": "Quitar a un miembro solo detendría su acceso a los cambios futuros. No puede borrar nada que ya haya copiado, ni recupera contenido de su dispositivo o de su proveedor de IA.",
+      "inviteReady": "Invitación lista para {{fingerprint}}…",
+      "invitationsHeading": "Invitaciones que enviaste",
+      "invitationClaimed": "Aceptada",
+      "invitationPending": "Todavía no aceptada",
+      "invitationsFailed": "No se pudieron cargar tus invitaciones.",
+      "title": "Miembros de la bóveda",
+      "personHint": "Desbloquea tu identidad de miembro con tu frase de recuperación. Permanece en este dispositivo hasta que bloquees la bóveda o cierres la app.",
+      "personUnlock": "Desbloquear identidad de miembro",
+      "personReady": "Identidad de miembro desbloqueada.",
+      "ownerCodeHint": "Comparte este código con la persona que invitas para que pueda verificar que la bóveda es tuya. Solo contiene información pública.",
+      "personLock": "Bloquear identidad de miembro",
+      "personError": "Esa frase no abrió una identidad de miembro.",
+      "inviteHint": "Pega el código de identidad del miembro invitado (de su página de identidad).",
+      "inviteCodeLabel": "Código de identidad de miembro",
+      "inspect": "Comprobar la huella",
+      "sasHint": "Lee esta huella a la persona que invitas, o deja que ella te la lea. Debe coincidir en ambos lados antes de continuar.",
+      "sasConfirm": "Confirmé esta huella con la persona fuera de la app",
+      "inviteCodeInvalid": "Ese no es un código de identidad de miembro válido.",
+      "kemLabel": "Clave pública ML-KEM",
+      "edLabel": "Clave pública Ed25519",
+      "mldsaLabel": "Clave pública ML-DSA",
+      "untitledVault": "Bóveda sin título",
+      "inviteFailed": "No se pudo crear la invitación.",
+      "removeFailed": "No se pudo quitar al miembro."
     }
   },
   "tasks": {
@@ -3968,7 +4218,8 @@
       "filter": "Aquí no hay nada ahora mismo. Prueba con otro filtro.",
       "rebuilding": "Leyendo tus notas…",
       "scope": "No hay tareas en esta carpeta o etiqueta. Prueba a ampliar el ámbito.",
-      "vault": "Aún no hay tareas. Escribe “- [ ]” en una línea de cualquier nota para crear una."
+      "vault": "Aún no hay tareas. Escribe “- [ ]” en una línea de cualquier nota para crear una.",
+      "search": "No hay tareas que coincidan con “{{query}}”."
     },
     "filter": {
       "all": "Todas",
@@ -4001,7 +4252,74 @@
       "allFolders": "Todas las carpetas",
       "label": "Acotar por"
     },
-    "title": "Tareas"
+    "title": "Tareas",
+    "axis": {
+      "due": "Vence",
+      "folder": "Carpeta",
+      "note": "Nota",
+      "priority": "Prioridad",
+      "sort": "Ordenar",
+      "status": "Estado",
+      "tag": "Etiqueta"
+    },
+    "due": {
+      "any": "Cualquier fecha",
+      "later": "Más tarde",
+      "none": "Sin fecha",
+      "overdue": "Vencida",
+      "today": "Hoy",
+      "upcoming": "Próximas"
+    },
+    "filters": {
+      "button": "Filtros",
+      "clearAll": "Borrar todo",
+      "selectHint": "Selecciona un filtro para aplicar",
+      "title": "Filtros"
+    },
+    "priority": {
+      "high": "Alta",
+      "highest": "Máxima",
+      "low": "Baja",
+      "lowest": "Mínima",
+      "medium": "Media"
+    },
+    "section": {
+      "done": "Hechas",
+      "later": "Más tarde",
+      "none": "Sin fecha",
+      "overdue": "Vencidas",
+      "today": "Hoy",
+      "upcoming": "Próximas"
+    },
+    "sort": {
+      "due": "Fecha de vencimiento",
+      "dueDesc": "Fecha de vencimiento, más reciente primero",
+      "note": "Nota",
+      "priority": "Prioridad"
+    },
+    "status": {
+      "all": "Todas",
+      "done": "Hechas",
+      "undone": "Abiertas"
+    },
+    "view": {
+      "allFolders": "Todas las carpetas",
+      "allNotes": "Todas las notas",
+      "anyPriority": "Cualquier prioridad",
+      "anyTag": "Cualquier etiqueta",
+      "dueLabel": "Filtrar por fecha de vencimiento",
+      "folderLabel": "Filtrar por carpeta",
+      "noteLabel": "Filtrar por nota",
+      "priorityLabel": "Filtrar por prioridad",
+      "sortLabel": "Ordenar dentro de las secciones",
+      "statusLabel": "Filtrar por finalización",
+      "tagLabel": "Filtrar por etiqueta",
+      "untitled": "Sin título"
+    },
+    "search": {
+      "label": "Buscar tareas",
+      "placeholder": "Buscar tareas…"
+    }
   },
   "templates": {
     "manager": {
@@ -4117,7 +4435,11 @@
     "deleteConfirmTitle": "¿Eliminar esta bóveda?",
     "deletePartialError": "No se pudieron eliminar algunos archivos. La bóveda ya no es utilizable. Continúa para empezar de nuevo.",
     "failClosedEyebrow": "No se puede abrir la bóveda",
-    "restoreHint": "Restaura desde una copia de seguridad para continuar."
+    "restoreHint": "Restaura desde una copia de seguridad para continuar.",
+    "memberHint": "Esta bóveda está compartida contigo. Desbloquéala con tu propia frase de recuperación.",
+    "memberPhraseLabel": "Frase de recuperación",
+    "memberSubmit": "Desbloquear",
+    "memberError": "Esa frase no abrió esta bóveda compartida."
   },
   "vault": {
     "ioBanner": {
@@ -4330,7 +4652,18 @@
     "openedRelative": "abierta {{rel}}",
     "restoreFromBackup": "Restaurar desde copia de seguridad",
     "subline": "Tienes más de una bóveda en este dispositivo. Elige una para desbloquear.",
-    "vaultFallback": "Bóveda {{n}}"
+    "vaultFallback": "Bóveda {{n}}",
+    "accountFallback": "Cuenta",
+    "moveToAccount": "Mover a la cuenta…",
+    "moveToNewAccount": "Mover a una cuenta nueva",
+    "renameAccount": "Renombrar la cuenta",
+    "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
+    "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
+    "labelTooLong": "Ese nombre es demasiado largo. Mantenlo por debajo de 512 caracteres.",
+    "renameCancel": "Cancelar",
+    "renamePlaceholder": "Nombre de la cuenta",
+    "renameSave": "Renombrar",
+    "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4375,7 +4708,16 @@
       "or": "o",
       "title": "Elige una bóveda para recuperar",
       "useAccountNumber": "Usar número de cuenta",
-      "vaultFallback": "Bóveda {{index}}"
+      "vaultFallback": "Bóveda {{index}}",
+      "accountFallback": "Cuenta",
+      "accountsError": "No se pudo cargar la agrupación de cuentas. Las bóvedas se listan sin agrupar; nada cambia en la recuperación."
+    },
+    "siblingNotice": {
+      "body_one": "Esta cuenta contiene {{count}} bóveda más. Recupérala también para que no quede nada atrás.",
+      "body_other": "Esta cuenta contiene {{count}} bóvedas más. Recupéralas también para que no quede nada atrás.",
+      "recoverAnother": "Recuperar otra bóveda",
+      "unknown": "No se pudo comprobar si esta cuenta contiene otras bóvedas. Si tienes más de una bóveda, recupera cada una con su propia frase.",
+      "body_many": "Esta cuenta contiene {{count}} bóvedas más. Recupéralas también para que no quede nada atrás."
     }
   },
   "vaultSwitcher": {
@@ -4427,12 +4769,14 @@
     "residueBanner": "Archivos sobrantes de una eliminación interrumpida ({{n}}). Límpialos antes de crear una bóveda.",
     "cleanUpFiles": "Limpiar archivos sobrantes",
     "create": "Crear una bóveda",
-    "connect": "Conectar a mi cuenta"
+    "connect": "Conectar a mi cuenta",
+    "identityCta": "Crear solo una identidad"
   },
   "wikiGraph": {
     "emptyTitle": "Aún no hay enlaces",
     "emptyBodyBefore": "Conecta notas escribiendo ",
-    "emptyBodyAfter": " en tu texto. Las notas enlazadas aparecen aquí como un grafo."
+    "emptyBodyAfter": " en tu texto. Las notas enlazadas aparecen aquí como un grafo.",
+    "canvasLabel": "Grafo de conocimiento de {{count}} notas"
   },
   "markdown": {
     "attachmentFallback": "adjunto",
@@ -4510,7 +4854,18 @@
     "openedYearsAgo_one": "abierta hace {{count}} año",
     "openedYearsAgo_many": "abierta hace {{count}} de años",
     "openedYearsAgo_other": "abierta hace {{count}} años",
-    "corruptedBadge": "Dañada"
+    "corruptedBadge": "Dañada",
+    "accountFallback": "Cuenta",
+    "renameAccount": "Renombrar la cuenta",
+    "moveToNewAccount": "Mover a una cuenta nueva",
+    "moveToAccount": "Mover a la cuenta…",
+    "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
+    "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
+    "labelTooLong": "Ese nombre es demasiado largo. Mantenlo por debajo de 512 caracteres.",
+    "renameCancel": "Cancelar",
+    "renamePlaceholder": "Nombre de la cuenta",
+    "renameSave": "Renombrar",
+    "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada."
   },
   "join": {
     "transportError": "No se pudo conectar con ese servidor de sincronización. Comprueba la dirección y tu conexión, luego inténtalo de nuevo.",
@@ -4645,5 +5000,38 @@
     "restoreTrigger": "Activar la protección contra capturas de pantalla",
     "saveFailed": "No se pudo guardar, así que no ha cambiado nada. Inténtalo de nuevo o inicia Myne con --disable-screen-capture-protection.",
     "savedForNextLaunch": "Guardado. Esta sesión sigue con la protección desactivada porque se inició con --disable-screen-capture-protection, así que volverá la próxima vez que abras Myne sin ese parámetro."
+  },
+  "identitySetup": {
+    "createCta": "Crear una identidad",
+    "doneCta": "Listo",
+    "error": "No se pudo configurar la identidad. Comprueba que haya un servidor de sincronización configurado e inténtalo de nuevo.",
+    "intro": "Una identidad permite que la gente envíe una invitación a tu nombre antes de que tengas una bóveda. No crea ninguna bóveda ni guarda notas.",
+    "pending": "Este dispositivo está esperando que otro dispositivo de la cuenta lo apruebe.",
+    "phraseWarning": "Escribe estas 24 palabras y guárdalas en un lugar seguro. Es la única vez que se muestran; son la única forma de recuperar esta identidad.",
+    "recoverCta": "Recuperar una identidad",
+    "recoverIntro": "¿Ya tienes una identidad? Introduce su frase de recuperación de 24 palabras.",
+    "recovered": "Identidad recuperada.",
+    "title": "Solo identidad"
+  },
+  "identityHome": {
+    "createVaultCta": "Crear una bóveda",
+    "invitesError": "No se pudieron cargar las invitaciones. Comprueba tu conexión y el servidor de sincronización.",
+    "invitesHeading": "Invitaciones",
+    "invitesLoading": "Buscando invitaciones…",
+    "noInvites": "Todavía no hay invitaciones.",
+    "subtitle": "Tienes una identidad en este dispositivo, así que la gente puede invitarte a una bóveda. No necesitas crear una para que te inviten.",
+    "accept": "Aceptar",
+    "acceptHint": "Pega el código de identidad del propietario (lo comparte cuando te invita).",
+    "acceptOwnerCodeLabel": "Código de identidad del propietario",
+    "acceptInspect": "Comprobar la huella",
+    "acceptSasHint": "Lee esta huella al propietario de la bóveda, o deja que él te la lea. Debe coincidir en ambos lados antes de continuar.",
+    "acceptConfirm": "Confirmé esta huella con el propietario fuera de la app",
+    "acceptSubmit": "Aceptar y desbloquear",
+    "acceptPhraseLabel": "Tu frase de recuperación",
+    "acceptError": "No se pudo aceptar la invitación.",
+    "acceptInvalid": "Ese no es un código de identidad de propietario válido.",
+    "shareCodeHeading": "Tu código de invitación",
+    "shareCodeHint": "Comparte este código con quien te invite. Solo contiene información pública (tu id de identidad y claves públicas), nunca tu frase.",
+    "title": "Tu identidad"
   }
 }
