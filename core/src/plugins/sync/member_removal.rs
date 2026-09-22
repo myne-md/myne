@@ -463,7 +463,7 @@ pub struct GroupRotationOutput {
 
 /// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
 /// vault: the attachments catalog, `vault.prefs` and `vault.themes` are all
-/// addressed by a group-derived id (decision 0605), so a rotation to a new
+/// addressed by a group-derived id (decision 0609), so a rotation to a new
 /// `group_key` retires exactly these three.
 fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
     let group = protocol::GroupKey::new(*old_group_key);
@@ -704,7 +704,7 @@ pub async fn rotate_group_from_host(
 
     // (10) Re-base the sync plane: the shared-singleton sync-ids are group-derived
     // in an `NTV6` vault, so the rotation moved them. Queue the retired epoch's
-    // ids for server reclaim and drop their baselines (decision 0605).
+    // ids for server reclaim and drop their baselines (decision 0609).
     let reclaim_sync_ids_hex = group_rotation_reclaim_sync_ids(&old_group_key);
     rebase_sync_plane_for_group_rotation(io, &vault_root, &old_group_key).await;
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Head authority selection by vault generation (myne-md/myne#711, decisions
-//! 0599).
+//! 0603).
 //!
 //! The vault head's authenticity is keyed off the vault's generation: an
 //! `NTV6` (B2B) vault signs a head with the author's person keypair

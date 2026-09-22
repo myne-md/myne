@@ -1069,7 +1069,7 @@ pub async fn push_and_revoke_removed_member_from_host(
         super::enroll::put_vault_meta(transport.as_ref(), &owner_token, &meta_bytes)
             .map_err(|_| SyncDeviceError::Transport)?;
         // Retire the old epoch's namespace: a write to a retired sync-id is
-        // refused and its blob is reclaimed after the grace (decision 0605).
+        // refused and its blob is reclaimed after the grace (decision 0609).
         if retired_epoch != 0 && replacement_epoch == retired_epoch + 1 {
             retire_namespace_request(
                 transport.as_ref(),
@@ -1250,7 +1250,7 @@ mod tests {
     use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
 
     // A group rotation retires the old epoch's shared-singleton sync-ids; the
-    // owner-only call must name them, the vault and both epochs (decision 0605).
+    // owner-only call must name them, the vault and both epochs (decision 0609).
     #[test]
     fn retire_namespace_request_posts_the_group_key_retirement() {
         let t = FakeTransport::new();
