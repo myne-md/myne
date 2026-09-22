@@ -209,7 +209,7 @@ async function fillRuleFilterModal(s: Session, tag: string): Promise<void> {
  *
  * Reading it straight after a condition the PANE satisfied is a race: the pane's
  * attributes are written during React's render, and the canvas's `[model]` effect
- * — which is what writes this one — runs after the commit. The first read can
+ * (which is what writes this one) runs after the commit. The first read can
  * therefore catch the previous value, which is a flake rather than a finding
  * (myne-md/myne#727).
  */

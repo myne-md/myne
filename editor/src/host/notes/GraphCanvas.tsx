@@ -288,6 +288,31 @@ export default function GraphCanvas({
   // error boundary, which is the whole-workspace fail-closed card. Only a real
   // mount of this component reaches it.
   const fittedKeyRef = useRef<string | null>(null);
+  // How many times this instance has framed the camera. A bounded count, never
+  // a note id (SYNC-8 class, same as the nonces), written to `data-fit-count`
+  // so a canvas test can hold the note-set keying contract: adding a hub must
+  // NOT bump it, adding a note must. jsdom's zero-size canvas makes the fitted
+  // transform itself unobservable (it clamps to the floor), so the count is the
+  // only fixture that can hold that defect.
+  const fitCountRef = useRef(0);
+  // The four force settings the model effect's `requestFrom` must read. That
+  // effect deliberately does NOT depend on them (a slider drag would tear the
+  // whole canvas down and rebuild it), so it reads them through a ref instead
+  // of closing over the values it saw when the model first built. Without this
+  // a drag re-heat after a force change re-heated under the OLD constants,
+  // because `ensureLiveLayout` was created in the `[modelKey]` run.
+  const forcesRef = useRef({
+    forceCenterStrength,
+    forceRepelStrength,
+    forceLinkStrength,
+    forceLinkDistance,
+  });
+  forcesRef.current = {
+    forceCenterStrength,
+    forceRepelStrength,
+    forceLinkStrength,
+    forceLinkDistance,
+  };
   // Whether the arrival reveal has already played on this component instance.
   // See the reveal block in the `[model]` effect: the entrance is for the FIRST
   // model only, so switching a filter does not replay it.
@@ -303,8 +328,8 @@ export default function GraphCanvas({
   // identity. That is deliberate and it is the canvas's call to make: the layout
   // is what a rebuild costs, so the canvas, not its caller, should decide when
   // the model has changed. A caller that re-renders with an equal-but-new object
-  // — a colour-rule edit that rebuilt the node list, a state object replaced
-  // wholesale — used to cost a full teardown and a re-layout, which is the
+  // (a colour-rule edit that rebuilt the node list, a state object replaced
+  // wholesale) used to cost a full teardown and a re-layout, which is the
   // repaint-only contract `gc1` pins as never happening (myne-md/myne#727).
   const modelKey = useMemo(() => graphModelContentKey(model), [model]);
   const latestModelRef = useRef(model);
@@ -550,7 +575,11 @@ export default function GraphCanvas({
       .map((n) => n.id)
       .join("\u0000");
     const shouldFit = fittedKeyRef.current !== noteKey;
-    if (shouldFit) fittedKeyRef.current = noteKey;
+    if (shouldFit) {
+      fittedKeyRef.current = noteKey;
+      fitCountRef.current += 1;
+      canvas.dataset["fitCount"] = String(fitCountRef.current);
+    }
 
     /** The request for a run seeded from a given position map. */
     const requestFrom = (from: Record<string, GraphPosition>): LayoutRequest => ({
@@ -560,14 +589,16 @@ export default function GraphCanvas({
       })),
       edges: model.edges.map((e) => ({ source: e.source, target: e.target })),
       seed: from,
-      // Current force settings at build time, a LIVE change to one of them is
-      // handled by the separate `[forceCenterStrength, ...]` effect below, not
-      // by re-running this effect (which would recreate the whole sim).
+      // Force settings as of NOW, not as of this effect's own run: a LIVE change
+      // to one of them is handled by the separate `[forceCenterStrength, ...]`
+      // effect below, and a drag re-heat started later must use the values in
+      // force, not the ones captured when the model first built. Read through a
+      // ref for that reason (`forcesRef`).
       forces: {
-        centerStrength: forceCenterStrength,
-        repelStrength: forceRepelStrength,
-        linkStrength: forceLinkStrength,
-        linkDistance: forceLinkDistance,
+        centerStrength: forcesRef.current.forceCenterStrength,
+        repelStrength: forcesRef.current.forceRepelStrength,
+        linkStrength: forcesRef.current.forceLinkStrength,
+        linkDistance: forcesRef.current.forceLinkDistance,
       },
     });
 

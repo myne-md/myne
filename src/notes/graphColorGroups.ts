@@ -197,7 +197,9 @@ export function collectRuleTags(
 
 /**
  * The groups a graph shows when the vault has authored NO rules: one per
- * top-level tag, in the palette's order (myne-md/myne#727).
+ * qualifying tag (at least two notes, across every depth, not only top level),
+ * biggest cluster first so the largest takes the palette's first colour
+ * (myne-md/myne#727).
  *
  * **Derived, never written.** An earlier version of this persisted the groups
  * into `color_groups` on first graph open, and it was a data-loss bug rather

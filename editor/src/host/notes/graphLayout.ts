@@ -129,9 +129,6 @@ export interface LayoutResponse {
   positions: LaidOutNode[];
 }
 
-/** Bounded tick budget — then freeze. */
-const TICKS = 240;
-
 /**
  * d3's own default is `1 - Math.pow(alphaMin, 1 / 300)`, evaluated when the
  * simulation is constructed (`d3-force/src/simulation.js`). It is written here
@@ -373,8 +370,6 @@ export function createLayoutSimulation(req: LayoutRequest): LayoutSimulation {
       forceY<SimNode>(centre).strength(forces.centerStrength * CENTER_GRAVITY),
     )
     .stop();
-  sim.tick(TICKS);
-  sim.stop();
 
   const ids: readonly string[] = ordered.map((n) => n.id);
   let cycleTicks = 0;
