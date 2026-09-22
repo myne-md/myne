@@ -266,6 +266,16 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/person-identity/v0.2/cases.json"),
         ),
         (
+            "person-member-key-store",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-member-key-store/v0.2/cases.json"),
+        ),
+        (
+            "person-profile",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-profile/v0.2/cases.json"),
+        ),
+        (
             "attachment-blob",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/attachment-blob/v0.1/cases.json"),
@@ -2708,6 +2718,161 @@ fn person_identity_vectors() {
         assert!(
             seen_kinds.contains(required),
             "person-identity must cover the '{required}' case kind"
+        );
+    }
+}
+
+/// `person-member-key-store` v0.2: the B2B member-vault-key derivation and the
+/// device-local member-key-store AAD (myne-md/myne#711 task 25).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_member_key_store_vectors() {
+    use protocol::{
+        aad_person_member_key_store, derive_person_vault_member_key, DEFAULT_V0_1_KDF_PARAMS,
+    };
+
+    let Some(raw) = cases_json_v0_2("person-member-key-store") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-member-key-store/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-member-key-store");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    for case in cases {
+        let kind = case["case_kind"]
+            .as_str()
+            .expect("case_kind must be a string");
+        seen_kinds.insert(kind.to_string());
+        match kind {
+            "member-key-derivation" => {
+                let phrase = case["input_phrase"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{kind}] missing input_phrase"));
+                let acct: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{kind}] missing input_account_number_hash_hex")
+                        }),
+                );
+                let expected: [u8; 32] = hex_decode_array(
+                    case["expected_member_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_member_key_hex")),
+                );
+                let actual =
+                    derive_person_vault_member_key(phrase, &acct, &DEFAULT_V0_1_KDF_PARAMS)
+                        .expect("derive member key");
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[member-key-derivation] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&*actual),
+                );
+            }
+            "member-key-store-aad" => {
+                let vault: [u8; 16] = hex_decode_array(
+                    case["input_vault_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_vault_id_hex")),
+                );
+                let acct: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{kind}] missing input_account_number_hash_hex")
+                        }),
+                );
+                let expected: [u8; 68] = hex_decode_array(
+                    case["expected_aad_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_aad_hex")),
+                );
+                let actual = aad_person_member_key_store(&vault, &acct);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[member-key-store-aad] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            other => panic!("[{other}] unknown case_kind for person-member-key-store"),
+        }
+    }
+    for required in ["member-key-derivation", "member-key-store-aad"] {
+        assert!(
+            seen_kinds.contains(required),
+            "person-member-key-store must cover the '{required}' case kind"
+        );
+    }
+}
+
+/// `person-profile` v0.2: the MYY5 person-private AI profile codec.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_profile_vectors() {
+    use protocol::{decode_person_profile_blob, encode_person_profile_blob_raw};
+
+    let Some(raw) = cases_json_v0_2("person-profile") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-profile/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-profile");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    for case in cases {
+        let kind = case["case_kind"]
+            .as_str()
+            .expect("case_kind must be a string");
+        seen_kinds.insert(kind.to_string());
+        let key: [u8; 32] = hex_decode_array(case["input_key_hex"].as_str().unwrap_or(""));
+        let profile_id: [u8; 16] =
+            hex_decode_array(case["input_profile_id_hex"].as_str().unwrap_or(""));
+        let acct: [u8; 16] =
+            hex_decode_array(case["input_account_number_hash_hex"].as_str().unwrap_or(""));
+        let nonce: [u8; 24] = hex_decode_array(case["input_nonce_hex"].as_str().unwrap_or(""));
+        let plaintext = case["input_plaintext_utf8"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{kind}] missing input_plaintext_utf8"))
+            .as_bytes();
+        let expected = hex_decode(
+            case["expected_blob_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{kind}] missing expected_blob_hex")),
+        );
+        match kind {
+            "seal" => {
+                let actual =
+                    encode_person_profile_blob_raw(&key, &profile_id, &acct, &nonce, plaintext)
+                        .expect("seal profile");
+                assert_eq!(actual, expected, "[seal] blob mismatch");
+                let opened = decode_person_profile_blob(&key, &profile_id, &acct, &expected)
+                    .expect("open profile");
+                assert_eq!(&*opened, plaintext, "[seal] round-trip mismatch");
+            }
+            "cross_vault_fail" => {
+                assert!(
+                    decode_person_profile_blob(&key, &profile_id, &acct, &expected).is_err(),
+                    "[cross_vault_fail] the account hash is AAD-bound; a moved blob must fail closed"
+                );
+            }
+            other => panic!("[{other}] unknown case_kind for person-profile"),
+        }
+    }
+    for required in ["seal", "cross_vault_fail"] {
+        assert!(
+            seen_kinds.contains(required),
+            "person-profile must cover the '{required}' case kind"
         );
     }
 }

@@ -3685,6 +3685,7 @@ export const ROSTER = Object.freeze([
     title: "Welcome / first-run entry",
     paths: [
       "src/screens/Welcome.tsx",
+      "src/screens/IdentityHome.tsx",
       "src/components/RepairResidueBanner.tsx",
       "src/lib/routing.ts",
       "src/lib/stage.ts",

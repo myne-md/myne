@@ -46,11 +46,14 @@ vi.mock("../../src/hooks/useRoster", () => ({
     loading: false,
     error: null,
     reload: vi.fn(),
-    unlockPerson: vi.fn(() => Promise.resolve()),
+    unlockPerson: vi.fn(() =>
+      Promise.resolve({ fingerprint_hex: "00".repeat(32), person_id_hex: "11".repeat(16), identity_code: "MYNE-PERSON-1:x" }),
+    ),
     lockPerson: vi.fn(() => Promise.resolve()),
     inviting: false,
     lastInvite: null,
     invite: vi.fn(() => Promise.resolve(null)),
+    vaultInvites: [],
     removing: false,
     remove: vi.fn(() => Promise.resolve()),
   }),
@@ -91,14 +94,15 @@ describe("MemberRosterPanel phrase input", () => {
   });
 });
 
-describe("MemberRosterPanel removal parking", () => {
-  it("renders no Remove button while members are listed", () => {
+describe("MemberRosterPanel removal", () => {
+  it("offers the owner a Remove button that opens a confirm stating the limits", () => {
+    mockAuthority = "owner";
     render(<MemberRosterPanel />);
     try {
-      expect(screen.getByTestId("member-roster.list")).toBeDefined();
-      expect(screen.getAllByTestId("member-roster.row")).toHaveLength(1);
-      expect(screen.queryByTestId("member-roster.remove-button")).toBeNull();
-      expect(screen.queryByTestId("member-roster.remove-confirm")).toBeNull();
+      fireEvent.click(screen.getByTestId("member-roster.remove-button"));
+      const dialog = screen.getByTestId("member-roster.remove-confirm");
+      // The copy states future-access revocation and non-recall.
+      expect(dialog.textContent).toContain("sync.memberRoster.removeConfirm");
     } finally {
       cleanup();
     }
@@ -107,7 +111,7 @@ describe("MemberRosterPanel removal parking", () => {
   it("states the removal limits honestly and promises no recall", () => {
     render(<MemberRosterPanel />);
     try {
-      const notice = screen.getByTestId("member-roster.remove-disabled");
+      const notice = screen.getByTestId("member-roster.removal-limits");
       expect(notice.textContent).toBe("sync.memberRoster.removalLimits");
     } finally {
       cleanup();

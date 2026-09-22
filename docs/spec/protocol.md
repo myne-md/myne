@@ -153,6 +153,28 @@ person_wrap_key   = Argon2id(password = phrase_normalized (UTF-8 bytes),
 
 `random_salt_person_16` and the KDF params are generated once at person enrolment and stored, with the KDF params in the 11-byte canonical form (§4.3) **inside** the sealed person-keypair frame, so a later baseline bump does not strand the credential. The domain prefix is `"myne.v0.2 argon2id-person-keypair|"`; it is distinct from the vault password/recovery prefixes so a phrase used for both cannot derive a shared key.
 
+**Deterministic person identity** (`decisions/protocol/0600`; supersedes the CSPRNG clause of `decisions/protocol/0592`). Since 2026-09-21 the person keypair is **derived** from the phrase rather than generated, so the same phrase yields the same keypair and fingerprint on every device and the sealed frame above becomes a cache of the derived key. The key material derives under its own Argon2id salt domain, distinct from `"myne.v0.2 argon2id-person-keypair|"` so the key seed and the at-rest wrap key are never the same value, and the seed is expanded into the three key types under separate HKDF context strings:
+
+```
+salt_person_seed  = SHA-256("myne.v0.2 argon2id-person-identity|"
+                            || person_id_hash
+                            || PERSON_IDENTITY_SALT_RANDOM)[:16]
+
+kem_context       = "myne.person-kem v1|"
+ed25519_context   = "myne.person-ed25519 v1|"
+mldsa_context     = "myne.person-mldsa v1|"
+```
+
+`PERSON_IDENTITY_SALT_RANDOM` is the FIXED, non-secret 16-byte all-zero constant
+(`protocol/src/kdf.rs`), the same convention the private-profile salt below uses:
+it is present in the hash so the domain string, the `person_id_hash` and the fixed
+randomizer are hashed as three distinct fields, and it is NOT a per-vault secret
+(the phrase alone must reproduce the identity on any device). A port that omits
+it derives a different seed and therefore a different keypair and fingerprint for
+the same phrase.
+
+The exact seed byte framing and the per-key-type expansion are pinned with the deterministic-identity codec and the `person-identity` vectors; the four domain strings above are frozen now so no implementation chooses them ad hoc. The domain strings are load-bearing in the same sense as the person-path strings above: a change to any re-derives every person keypair and fingerprint. Migration off the retired CSPRNG path is governed by the same decision and is gated on a person unlock, where the old key signs a `"myne.person-key-transition v1|"` record.
+
 **Person fingerprint and hybrid-wrap combiner** (the other two person-path byte constructions, both cross-implementation and pinned by the `person-identity` vectors). The fingerprint is the SAS value the invite compare uses; the combiner produces the per-recipient wrap key.
 
 ```
@@ -298,6 +320,16 @@ that enum but **RESERVED**: the content-addressed attachment id stays
 (`server-auth`, `membership-key`, `vault-head-mac`, and the AI
 embedding/chats/memory/personality KEKs and sync-ids) stay `root_key`-derived and
 MUST NOT be derivable from a member-held `group_key`.
+
+Consequently the reserved sync-plane blob-ids of `catalog-sync-id`,
+`prefs-sync-id` and `themes-sync-id` are derived from the **group key** in an
+`NTV6` vault (`GroupRole::{Catalog,Prefs,Themes}SyncId`), so an owner and a member
+of the same epoch address the same shared blobs; in a pre-B2B (`NTV5`) vault they
+remain `root_key`-derived, which is the form the per-row table above states. The
+`chats-catalog-sync-id`, `agent-memory-catalog-sync-id` and
+`agent-personality-sync-id` roles have **no** group counterpart and stay
+`root_key`-derived: those families are person-private in a shared vault
+(`decisions/protocol/0605`, myne-md/myne#711).
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "`, and the next major version's context strings use its own prefix, which is not pre-allocated in v0.1.
 
@@ -519,6 +551,8 @@ substituted. Total AAD length: `10 + 1 + 16 + 8 + 16 = 51 bytes`.
 `AAD_pending_capture_blob` is the AAD bound into the AEAD seal of a pending-capture queue entry (`captures/<capture-id>`, `MYK1`, §9.18). It is the one blob AAD that binds **neither** `account_number_hash` **nor** `items_key_id`: the queue is written while the vault is locked and is vault-agnostic (§9.18), so it instead binds the per-entry `capture_id` (16 bytes, also the queue filename) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes). Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. There is no `DeriveSubkey` role — the KEK is a device-local key held in the OS keychain, not `root_key`-derived (§9.18.2).
 
 `AAD_vault_label_blob` is the AAD bound into the AEAD seal of the sealed label store (`vault.label`, `MYL1`, §9.22). Like `AAD_pending_capture_blob` it binds **neither** `account_number_hash` **nor** `items_key_id`, and it has no `DeriveSubkey` role, because its KEK is a **per-vault** device-local key held in the OS keychain rather than a `root_key` product (§9.22.2), and because the file belongs to a vault *directory* rather than to an account (one account can hold two vault directories on one device). It instead binds the 16-byte `vault_id` after the role string `"vault-label-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes). Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. One property is stronger here than in §9.18/§9.20: the bound `vault_id` is the one the **reader expected**, not merely the one the blob's own header carries, so a sealed file moved between vault directories fails AEAD instead of relying on an implementer's comparison. §9.22.3 states that as a MUST.
+
+`AAD_person_member_key_store` is the AAD bound into the AEAD seal of the device-local member-vault key store (`vault.member-key`, myne-md/myne#711 task 25, `decisions/protocol/0602`). It is the AAD of a **person-plane** device-local store: the KEK is derived from the member's own normalized recovery phrase under the salt domain `"myne.v0.2 argon2id-person-vault-member|"` (the vault's `account_number_hash` in the salt slot), not from `root_key` or `group_key`, so there is no `DeriveSubkey` role. Unlike `AAD_pending_capture_blob` and `AAD_vault_label_blob` it binds both the 16-byte `vault_id` the reader expected **and** the 16-byte `account_number_hash`, after the role string `"person-member-key-store"` (length-prefixed UTF-8: 2-B big-endian length + 23 ASCII bytes), under the **v0.2** AAD prefix (matching the person plane, not the v0.1 device-local stores). Total AAD length: `10 + 1 + 25 + 16 + 16 = 68 bytes`. The two bindings together stop a store copied to another vault directory *or* re-labelled to another account from opening.
 
 `AAD_account_record` is the AAD bound into the AEAD seal of the device-local account record (`<app_config_dir>/account.json`, §9.3.1 counterpart). It is the fixed domain string `"myne.v0.1 account-record"` (24 ASCII bytes), deliberately NOT in the prefix-plus-version framing above: the record is device-global, so there is no vault, no `account_number_hash`, and no `items_key_id` to bind, and it never crosses the sync boundary, so no generation byte is needed. Registered here (rather than exempted) so a second device-local sealed file cannot collide with it by accident.
 
@@ -1073,8 +1107,15 @@ sorted by `fingerprint_hex`. Exactly one live owner row matches
 and the three public person-key halves; a tombstone carries no wrap. The row also
 records `previous_fingerprint_hex` and one continuity state: `current`,
 `changed`, or `owner-confirmed`. Public halves MUST reconstruct the row's
-fingerprint. A member verifies this roster from the pinned owner public half;
-neither `root_key` nor a root-derived membership key participates.
+fingerprint. A row MAY also carry `person_id_hex` (optional; lowercase hex, 16
+bytes): the member's addressable `person_id_hash`, owner-supplied at invite time,
+which the owner needs to revoke that member's server membership binding
+(`DELETE /b2b/vaults/{hash}/members/{person_id}`). It is absent on a row migrated
+from a pre-B2B membership roster, whose members have no person account to revoke;
+when present it is part of the signed payload, so changing it is a different
+signed roster. A member verifies this roster from the pinned owner public half;
+neither `root_key` nor a root-derived membership key participates. (myne-md/myne#711
+task 14, `decisions/protocol/0603`.)
 
 Each live member has a separate recipient package. Its canonical JSON payload
 contains `account_number_hash_hex`, the positive `group_key_epoch`,
@@ -3080,7 +3121,7 @@ The profile carries no provider credential and no egress-consent record: those
 stay device-local. Removal and scheduled deletion make **no recall guarantee** —
 a removed member's already-copied profile is not cryptographically erasable, and
 the deletion schedule is a policy input (retention owned by `myne-md/myne-ops#48`).
-The person-private sync plane is not defined here (Grill 4).
+The person-private sync plane ships: the vault-scoped route `PUT|GET /b2b/vaults/{account_hash}/profiles/{profile_id}` (`server-protocol.md` §3.1a) carries the sealed blob, and the client merge/transport is normative in `sync-protocol.md` §8 (`decisions/protocol/0604`, `0606`).
 
 ## 10. Protocol Versioning & Migration
 

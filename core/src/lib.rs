@@ -165,6 +165,7 @@ pub mod search;
 /// 18) — the one place that implements "newest copy that verifies wins", so the
 /// ~10 singleton readers do not each carry a fallback loop.
 pub mod singleton;
+pub mod singleton_quiesce;
 pub mod snapshot_policy;
 pub mod snapshot_store;
 #[cfg(any(test, feature = "test-support"))]

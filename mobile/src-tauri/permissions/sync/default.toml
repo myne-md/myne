@@ -30,8 +30,18 @@ permissions = [
     "allow-sync-status",
     "allow-sync-now",
     "allow-sync-person-unlock",
+    "allow-sync-person-setup",
+    "allow-sync-person-status",
+    "allow-sync-person-list-invites",
     "allow-sync-person-lock",
-    "allow-sync-invite-member",
+    "allow-sync-person-create-invite",
+    "allow-sync-person-inspect-invite-code",
+    "allow-sync-list-vault-invites",
+    "allow-sync-person-accept-invite",
+    "allow-sync-person-unlock-member-vault",
+    "allow-sync-member-vault-status",
+    "allow-sync-person-profile-write",
+    "allow-sync-person-profile-read",
     "allow-sync-list-roster",
     "allow-sync-remove-member",
     "allow-sync-list-devices",
@@ -83,14 +93,65 @@ description = "Allow invoking sync:sync_person_unlock (B2B: derive-or-open the p
 commands.allow = ["sync_person_unlock"]
 
 [[permission]]
+identifier = "allow-sync-person-setup"
+description = "Allow invoking sync:sync_person_setup (B2B identity-only setup: generate or recover a person identity and register its account at the device-scoped endpoint under person_id_hash; the phrase is returned once when generated and never logged)."
+commands.allow = ["sync_person_setup"]
+
+[[permission]]
+identifier = "allow-sync-person-status"
+description = "Allow invoking sync:sync_person_status (read-only: whether this device holds a person account, and its person_id; device-local, no network)."
+commands.allow = ["sync_person_status"]
+
+[[permission]]
+identifier = "allow-sync-person-list-invites"
+description = "Allow invoking sync:sync_person_list_invites (read-only: list the invites addressed to this person account; ids and vault ids only, never a payload)."
+commands.allow = ["sync_person_list_invites"]
+
+[[permission]]
 identifier = "allow-sync-person-lock"
 description = "Allow invoking sync:sync_person_lock (B2B: drop the backend-held person identity)."
 commands.allow = ["sync_person_lock"]
 
+
 [[permission]]
-identifier = "allow-sync-invite-member"
-description = "Allow invoking sync:sync_invite_member (B2B invite: wrap the unlocked vault's itemsKey to the member's person public half and sign with the held owner identity)."
-commands.allow = ["sync_invite_member"]
+identifier = "allow-sync-person-create-invite"
+description = "Allow invoking sync:sync_person_create_invite (B2B invite by person identity code: decode the invitee's public halves, seal the invite locally, bind the owner person to the vault once, and POST the sealed frame to the relay with the owner's per-vault token)."
+commands.allow = ["sync_person_create_invite"]
+
+[[permission]]
+identifier = "allow-sync-person-inspect-invite-code"
+description = "Allow invoking sync:sync_person_inspect_invite_code (pure: parse a pasted person identity code and return the person id + SAS fingerprint for the out-of-band compare; no vault, no network)."
+commands.allow = ["sync_person_inspect_invite_code"]
+
+[[permission]]
+identifier = "allow-sync-list-vault-invites"
+description = "Allow invoking sync:sync_list_vault_invites (B2B owner-side: list the invitations this owner has sent for the active vault, with the recipient person id and the claimed flag. Authorized by the owner's per-vault token; no payload)."
+commands.allow = ["sync_list_vault_invites"]
+
+[[permission]]
+identifier = "allow-sync-person-accept-invite"
+description = "Allow invoking sync:sync_person_accept_invite (B2B: claim a sealed invite from the relay with the person token, verify the owner-signed group package against the owner's public half from the out-of-band owner identity code, unwrap the group key, derive the itemsKey, materialize a local member vault and install a member slot with no root key). The keys stay backend-side."
+commands.allow = ["sync_person_accept_invite"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock-member-vault"
+description = "Allow invoking sync:sync_person_unlock_member_vault (B2B: re-unlock a member vault from the recovery phrase by opening the device-local sealed member-key store and installing the member slot)."
+commands.allow = ["sync_person_unlock_member_vault"]
+
+[[permission]]
+identifier = "allow-sync-member-vault-status"
+description = "Allow invoking sync:sync_member_vault_status (read-only: whether a vault is a member vault, so the Unlock surface asks for the phrase instead of a password)."
+commands.allow = ["sync_member_vault_status"]
+
+[[permission]]
+identifier = "allow-sync-person-profile-write"
+description = "Allow invoking sync:sync_person_profile_write (B2B: seal this person's private MYY5 AI profile for the active vault under the held person-profile key and PUT it to the vault-scoped person-authorized namespace)."
+commands.allow = ["sync_person_profile_write"]
+
+[[permission]]
+identifier = "allow-sync-person-profile-read"
+description = "Allow invoking sync:sync_person_profile_read (B2B: read this person's private MYY5 AI profile for the active vault, or null when none exists)."
+commands.allow = ["sync_person_profile_read"]
 
 [[permission]]
 identifier = "allow-sync-list-roster"

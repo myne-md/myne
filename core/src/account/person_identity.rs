@@ -65,16 +65,22 @@ fn sealed_path(host: &dyn HostCtx) -> Result<PathBuf, PersonIdentityError> {
 }
 
 /// Unlock (or first-enroll) the backend-held person identity from the
-/// person's normalized recovery phrase. Reads the sealed file when
-/// present (open under the phrase-derived wrap); otherwise generates a
-/// fresh keypair, seals it, and persists the frame. Returns the live
-/// pair for the caller to store in
-/// [`crate::plugins::vault_unlock::state::VaultRuntimeState`].
+/// person's normalized recovery phrase.
+///
+/// The keypair is DETERMINISTIC from the phrase (`decisions/protocol/0600`), so
+/// the sealed file is a cache of the derived key rather than its sole carrier.
+/// A sealed file holding a legacy CSPRNG identity is migrated in place: the
+/// derived pair replaces it and the SUPERSEDED key double-signs a
+/// `myne.person-key-transition v1|` record, returned for the caller to publish
+/// into the rosters the person belongs to. Nothing changes silently.
+///
+/// Returns the pair to hold plus, when a migration happened, the encoded signed
+/// transition record.
 pub async fn unlock_person_identity(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
     phrase_normalized: &str,
-) -> Result<PersonKeyPair, PersonIdentityError> {
+) -> Result<(PersonKeyPair, Option<Vec<u8>>), PersonIdentityError> {
     if phrase_normalized.trim().is_empty() {
         return Err(PersonIdentityError::BadPhrase);
     }
@@ -85,9 +91,19 @@ pub async fn unlock_person_identity(
         // has no unlink): treat it as absent so a forget-then-reunlock
         // re-enrols rather than failing on the erased bytes.
         Ok(bytes) if is_erased_frame(&bytes) => {
-            enroll_fresh(host, io, phrase_normalized, &person_id).await
+            let pair = enroll_fresh(host, io, phrase_normalized, &person_id).await?;
+            Ok((pair, None))
         }
-        Ok(bytes) => open_sealed_file(&bytes, phrase_normalized, &person_id),
+        Ok(bytes) => {
+            let old = open_sealed_file(&bytes, phrase_normalized, &person_id)?;
+            let (new, transition) = migrate_pair(&old, phrase_normalized, &person_id)?;
+            if transition.is_some() {
+                // Re-seal the derived key so the file is a cache of it. The wrap
+                // salt is fresh and random; the KEY is deterministic.
+                seal_pair_to_file(host, io, phrase_normalized, &person_id, &new).await?;
+            }
+            Ok((new, transition))
+        }
         // ONLY a genuinely absent file means "first enrolment". Every other
         // read error (permission, transient IO, partial read) is surfaced,
         // never treated as absence: enrolling over an unreadable-but-present
@@ -95,7 +111,8 @@ pub async fn unlock_person_identity(
         // halves, and orphan every `itemsKey` wrap sealed to the old
         // fingerprint. That is the default-on-error-reaching-a-write shape.
         Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
-            enroll_fresh(host, io, phrase_normalized, &person_id).await
+            let pair = enroll_fresh(host, io, phrase_normalized, &person_id).await?;
+            Ok((pair, None))
         }
         Err(_) => Err(PersonIdentityError::Io),
     }
@@ -160,13 +177,64 @@ fn open_sealed_file(
     PersonKeyPair::open(&wrap_key, &nonce, ct).map_err(|_| PersonIdentityError::CannotDecrypt)
 }
 
-async fn enroll_fresh(
+/// The deterministic person keypair from the phrase: derive the identity seed,
+/// expand it into the three key-type seeds, and build the pair. A pure function
+/// of the phrase and the phrase-derived person id.
+fn deterministic_pair(
+    phrase_normalized: &str,
+    person_id: &[u8; 16],
+) -> Result<PersonKeyPair, PersonIdentityError> {
+    let seed = protocol::kdf::derive_person_identity_seed(
+        phrase_normalized,
+        person_id,
+        &DEFAULT_V0_1_KDF_PARAMS,
+    )
+    .map_err(|_| PersonIdentityError::CannotDecrypt)?;
+    let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+    Ok(PersonKeyPair::generate_raw(
+        &seeds.kem,
+        &seeds.ed25519,
+        &seeds.mldsa,
+    ))
+}
+
+/// Migrate an opened keypair to the deterministic derivation. Returns the pair
+/// to adopt and, when the fingerprint changed, the encoded signed transition
+/// record. A legacy CSPRNG identity migrates once; an already-deterministic one
+/// is a no-op.
+fn migrate_pair(
+    old: &PersonKeyPair,
+    phrase_normalized: &str,
+    person_id: &[u8; 16],
+) -> Result<(PersonKeyPair, Option<Vec<u8>>), PersonIdentityError> {
+    let new = deterministic_pair(phrase_normalized, person_id)?;
+    if new.fingerprint() == old.fingerprint() {
+        return Ok((new, None));
+    }
+    let old_public = old.public_half();
+    let payload = protocol::person_invite::PersonKeyTransitionPayload {
+        old_kem_ek: *old_public.kem_ek(),
+        old_ed_pk: *old_public.ed_pk(),
+        old_mldsa_vk: *old_public.mldsa_vk(),
+        new_fingerprint: *new.fingerprint(),
+    };
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let signed = protocol::person_invite::sign_person_key_transition(old, &payload, &mut rng)
+        .map_err(|_| PersonIdentityError::Csprng)?;
+    let bytes = protocol::person_invite::encode_signed_person_key_transition(&signed)
+        .ok_or(PersonIdentityError::Csprng)?;
+    Ok((new, Some(bytes)))
+}
+
+/// Seal a keypair to `<app_config_dir>/person_keypair.sealed` as
+/// `salt(16) || kdf_params(11) || nonce(24) || ct`.
+async fn seal_pair_to_file(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
     phrase_normalized: &str,
     person_id: &[u8; 16],
-) -> Result<PersonKeyPair, PersonIdentityError> {
-    let pair = PersonKeyPair::generate().map_err(|_| PersonIdentityError::Csprng)?;
+    pair: &PersonKeyPair,
+) -> Result<(), PersonIdentityError> {
     let mut salt = [0u8; SEALED_SALT_LEN];
     getrandom::getrandom(&mut salt).map_err(|_| PersonIdentityError::Csprng)?;
     let params = DEFAULT_V0_1_KDF_PARAMS;
@@ -192,6 +260,18 @@ async fn enroll_fresh(
     io.write(&path, &frame, WriteOpts::default())
         .await
         .map_err(|_| PersonIdentityError::Io)?;
+    Ok(())
+}
+
+/// First enrolment: derive the deterministic pair, seal it, and return it.
+async fn enroll_fresh(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    phrase_normalized: &str,
+    person_id: &[u8; 16],
+) -> Result<PersonKeyPair, PersonIdentityError> {
+    let pair = deterministic_pair(phrase_normalized, person_id)?;
+    seal_pair_to_file(host, io, phrase_normalized, person_id, &pair).await?;
     Ok(pair)
 }
 
@@ -249,5 +329,53 @@ mod tests {
     fn sealed_frame_rejects_truncation_closed() {
         let person_id = person_id_hash("word ".repeat(24).trim());
         assert!(open_sealed_file(&[0u8; 10], "word ".repeat(24).trim(), &person_id).is_err());
+    }
+
+    #[test]
+    fn deterministic_pair_is_stable_and_phrase_bound() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let a = deterministic_pair(phrase, &person_id_hash(phrase)).expect("a");
+        let b = deterministic_pair(phrase, &person_id_hash(phrase)).expect("b");
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        let other =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon";
+        let c = deterministic_pair(other, &person_id_hash(other)).expect("c");
+        assert_ne!(a.fingerprint(), c.fingerprint());
+    }
+
+    #[test]
+    fn migrate_pair_migrates_a_legacy_csprng_identity_visibly() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let person_id = person_id_hash(phrase);
+        let legacy = PersonKeyPair::generate_raw(&[9u8; 64], &[9u8; 32], &[9u8; 32]);
+        let (new, transition) = migrate_pair(&legacy, phrase, &person_id).expect("migrate");
+        assert_eq!(
+            new.fingerprint(),
+            deterministic_pair(phrase, &person_id)
+                .expect("deterministic")
+                .fingerprint()
+        );
+        assert_ne!(
+            new.fingerprint(),
+            legacy.fingerprint(),
+            "the fingerprint must change, and not silently"
+        );
+        let bytes = transition.expect("a migration emits a transition record");
+        let signed =
+            protocol::person_invite::decode_signed_person_key_transition(&bytes).expect("decodes");
+        let (old_fp, new_fp) =
+            protocol::person_invite::verify_person_key_transition(&signed).expect("verifies");
+        assert_eq!(&old_fp, legacy.fingerprint());
+        assert_eq!(&new_fp, new.fingerprint());
+    }
+
+    #[test]
+    fn migrate_pair_is_a_noop_for_a_deterministic_identity() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let person_id = person_id_hash(phrase);
+        let pair = deterministic_pair(phrase, &person_id).expect("deterministic");
+        let (new, transition) = migrate_pair(&pair, phrase, &person_id).expect("migrate");
+        assert_eq!(new.fingerprint(), pair.fingerprint());
+        assert!(transition.is_none(), "no migration means no transition");
     }
 }

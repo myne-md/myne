@@ -501,7 +501,7 @@ pub async fn sync_person_unlock<R: Runtime>(
     // simply derives a different (unusable) identity rather than erroring.
     let normalized = protocol::normalize_user_phrase(&phrase);
     let host = crate::host::tauri_host::TauriHost::new(app.clone());
-    let pair = crate::account::person_identity::unlock_person_identity(
+    let (pair, transition) = crate::account::person_identity::unlock_person_identity(
         &host,
         &crate::vault_io::StdVaultIo,
         normalized.as_str(),
@@ -516,10 +516,25 @@ pub async fn sync_person_unlock<R: Runtime>(
             E::Io | E::Csprng => SyncDeviceError::Transport,
         }
     })?;
+    let person_id = protocol::person_id_hash(&normalized);
     let view = PersonIdentityView {
         fingerprint_hex: crate::account::person_identity::hex_lower(pair.fingerprint()),
+        person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+        // The owner-side out-of-band code a member pastes to verify the group
+        // package (task 12). Public material only.
+        identity_code: super::invite::encode_person_identity_code(&person_id, &pair.public_half()),
     };
+    // The addressable id is a pure function of the same normalized phrase, held
+    // beside the identity so the owner bind and the identity code need no second
+    // phrase crossing (B2B, myne-md/myne#711 task 11).
+    state.inner().set_person_id(person_id).await;
     state.inner().set_person_identity(pair).await;
+    // A legacy CSPRNG identity migrated at this unlock produced a signed
+    // transition record; the sync layer publishes it into each roster the
+    // person is in (the deterministic-identity migration, myne-md/myne#713).
+    if let Some(bytes) = transition {
+        state.inner().set_pending_person_key_transition(bytes).await;
+    }
     // Derive the per-(person, vault) private AI profile key for the ACTIVE
     // vault, if one is unlocked. Best-effort: a locked vault leaves no profile
     // key and the profile is simply unavailable until the next person unlock
@@ -591,6 +606,11 @@ pub async fn sync_person_lock<R: Runtime>(
 pub struct PersonIdentityView {
     /// Canonical fingerprint (the SAS value), lowercase hex.
     pub fingerprint_hex: String,
+    /// The addressable person id (lowercase hex).
+    pub person_id_hex: String,
+    /// The out-of-band identity code a member pastes to verify this owner's
+    /// group package (task 12). Public material only.
+    pub identity_code: String,
 }
 
 /// Refuse an admin-only command invoked under a member authority (B2B,
@@ -729,6 +749,16 @@ pub async fn start_b2b_migration_from_host(
                 // resealed.
                 state.set_group_key(id, out.group_key).await;
             }
+            // The head format changes with the generation (0x01 HMAC to 0x02
+            // signed), so the next cycle must re-base rather than reject the
+            // server's still-HMAC head as a forgery (decisions/protocol/0599,
+            // Q2 revised: the head format is keyed off the vault generation).
+            if let Ok(mut sync_state) = super::state::read_sync_state(io, &root).await {
+                if !sync_state.rekey_rebase_pending {
+                    sync_state.rekey_rebase_pending = true;
+                    let _ = super::state::write_sync_state(io, &root, &sync_state).await;
+                }
+            }
             Ok(B2bMigrationView {
                 group_key_epoch: 1,
                 singletons_migrated: out.singletons_migrated,
@@ -750,36 +780,27 @@ pub async fn start_b2b_migration_from_host(
     }
 }
 
-/// **Invite a member to the unlocked vault** (B2B identity substrate,
-/// myne-md/myne#698 task 5-6 command core).
-///
-/// Wraps the vault's `itemsKey` to the member's full person public half
-/// (ML-KEM ek + Ed25519 pk + ML-DSA vk, all lowercase hex, fetched from
-/// the member's SCRAM account), seals the payload to the member under a
-/// fresh PQ-hybrid frame, and signs it with the HELD owner identity.
-/// Randomness comes from the OS CSPRNG; the held identity comes from
-/// `sync_person_unlock`; the vault hash binds the wrap to this vault.
-///
-/// The wire ROUTE is Grill 4's (B10): this core returns the invite frame;
-/// the caller relays it once the route exists.
-#[tauri::command]
-pub async fn sync_invite_member<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    member_kem_ek_hex: String,
-    member_ed_pk_hex: String,
-    member_mldsa_vk_hex: String,
-    vault_label: String,
+/// Host-taking core for [`sync_person_create_invite`]: seal an invite to
+/// `member_public`, write the invited member's roster row, and return the
+/// relayable frame. Split from the IPC wrapper so the identity-code path owns
+/// one implementation of the roster write and the crypto (myne-md/myne#711
+/// task 11). This replaced the pre-wire `sync_invite_member` command, which
+/// returned the frame and relied on no caller to relay it.
+pub async fn invite_member_from_host(
+    host: &dyn crate::host::HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+    member_public: &protocol::person_key::PersonPublicHalf,
+    member_person_id_hex: Option<&str>,
+    vault_label: &str,
     created_at_secs: u64,
 ) -> Result<InviteCommandView, SyncDeviceError> {
-    let host = crate::host::tauri_host::TauriHost::new(app.clone());
-    let io = crate::vault_io::StdVaultIo;
     // Peek the slot, then DROP the guard before any await: holding a
     // `slots.read()` across `active_vault_id()`'s own `slots.read()` is the
     // tokio RwLock deadlock shape (a queued writer blocks the second acquire
     // while the first stays held).
     let (root_key, items_key, authority, group_key) = {
-        let slot = state.inner().slot_read_active().await;
+        let slot = state.slot_read_active().await;
         match &*slot {
             crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
                 let authority = uv.authority();
@@ -802,21 +823,13 @@ pub async fn sync_invite_member<R: Runtime>(
     // `root_key` holder can seal a roster peers accept) still holds behind it.
     require_owner(authority)?;
     let owner = state
-        .inner()
         .clone_person_identity()
         .await
         .ok_or(SyncDeviceError::NotEnrolled)?;
 
-    let member_public = protocol::person_key::PersonPublicHalf::from_parts_hex(
-        &member_kem_ek_hex,
-        &member_ed_pk_hex,
-        &member_mldsa_vk_hex,
-    )
-    .map_err(|_| SyncDeviceError::BadRequest)?;
-
     // Refuse a self-invite (the helper names the consequence: the member
     // upsert would overwrite the owner row and silently demote the owner).
-    if super::invite::is_self_invite(&owner, &member_public) {
+    if super::invite::is_self_invite(&owner, member_public) {
         return Err(SyncDeviceError::BadRequest);
     }
 
@@ -827,7 +840,6 @@ pub async fn sync_invite_member<R: Runtime>(
     // invite write (both blobs stay AEAD-valid, so nothing detects it).
     // `member_removal` takes the permit first for the same reason.
     let _permit = state
-        .inner()
         .auth_permits()
         .try_acquire()
         .map_err(|_| SyncDeviceError::Transport)?;
@@ -838,7 +850,7 @@ pub async fn sync_invite_member<R: Runtime>(
         &host
             .app_data_dir()
             .map_err(|_| SyncDeviceError::Transport)?,
-        state.inner().active_vault_id().await,
+        state.active_vault_id().await,
     );
     let meta_path = root.join("vault.meta");
     let meta_bytes = io
@@ -852,13 +864,14 @@ pub async fn sync_invite_member<R: Runtime>(
         // The `NTV6` invite writes the owner-signed roster, and the member's
         // grant is a group-key package rather than an `itemsKey` wrap.
         return write_ntv6_invite(
-            state.inner(),
-            &io,
+            state,
+            io,
             &root,
             &meta_path,
             &meta_bytes,
             &owner,
-            &member_public,
+            member_public,
+            member_person_id_hex,
             group_key.as_deref(),
             &_permit,
         )
@@ -875,10 +888,10 @@ pub async fn sync_invite_member<R: Runtime>(
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
     let invite = super::invite::invite_create(
         &owner,
-        &member_public,
+        member_public,
         &items_key,
         &account_number_hash,
-        &vault_label,
+        vault_label,
         created_at_secs,
         &mut rng,
     )
@@ -889,15 +902,15 @@ pub async fn sync_invite_member<R: Runtime>(
     // empty, and `sync_remove_member` is unreachable.
     let wrapped = protocol::person_rekey::wrap_items_key_to_member(
         &items_key,
-        &member_public,
+        member_public,
         &account_number_hash,
         &mut rng,
     )
     .map_err(|_| SyncDeviceError::BadRequest)?;
     let row = super::invite::invited_member_row(
-        &member_public,
+        member_public,
         super::invite::wrapped_hex(&wrapped),
-        &vault_label,
+        vault_label,
         created_at_secs,
         super::roster::RosterRole::Member,
     );
@@ -905,10 +918,6 @@ pub async fn sync_invite_member<R: Runtime>(
     // member's row. It carries the owner's public halves and an `itemsKey`
     // wrap to the owner, marked `owner`, so the roster lists who administers
     // the vault. A later invite leaves it untouched (`upsert_owner_once`).
-    // The row stamps the invite time and the vault label as its joined-at
-    // and display name: the owner has no earlier roster timestamp and no
-    // chosen name, so these are the invite-time values, not a claim about
-    // when the owner joined or what they are called.
     let owner_public = owner.public_half();
     let owner_wrapped = protocol::person_rekey::wrap_items_key_to_member(
         &items_key,
@@ -920,14 +929,14 @@ pub async fn sync_invite_member<R: Runtime>(
     let owner_row = super::invite::invited_member_row(
         &owner_public,
         super::invite::wrapped_hex(&owner_wrapped),
-        &vault_label,
+        vault_label,
         created_at_secs,
         super::roster::RosterRole::Owner,
     );
     if let Err(e) = write_roster_row(
-        state.inner(),
+        state,
         &_permit,
-        &io,
+        io,
         &root,
         &meta_path,
         version,
@@ -957,6 +966,121 @@ pub async fn sync_invite_member<R: Runtime>(
     })
 }
 
+/// The invitee's addressable id + their SAS fingerprint, decoded from a pasted
+/// person identity code (task 11). Returned by
+/// [`sync_person_inspect_invite_code`] so the owner can run the out-of-band SAS
+/// compare BEFORE the invite is sealed and relayed.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InviteCodeView {
+    pub person_id_hex: String,
+    /// The person's fingerprint (the SAS value), lowercase hex.
+    pub fingerprint_hex: String,
+}
+
+/// **Inspect a pasted person identity code** (B2B, myne-md/myne#711 task 11).
+/// Pure: parses the code and derives the fingerprint, no vault and no network.
+#[tauri::command]
+pub fn sync_person_inspect_invite_code(
+    recipient_code: String,
+) -> Result<InviteCodeView, SyncDeviceError> {
+    inspect_invite_code(&recipient_code)
+}
+
+/// The pure body of [`sync_person_inspect_invite_code`].
+pub fn inspect_invite_code(recipient_code: &str) -> Result<InviteCodeView, SyncDeviceError> {
+    let code = super::invite::decode_person_identity_code(recipient_code)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    Ok(InviteCodeView {
+        person_id_hex: crate::account::person_identity::hex_lower(&code.person_id),
+        fingerprint_hex: crate::account::person_identity::hex_lower(code.public.fingerprint()),
+    })
+}
+
+/// **Create and relay an invite from a pasted person identity code** (B2B,
+/// myne-md/myne#711 task 11). This is the owner-side wire: decode the invitee's
+/// public halves from the out-of-band code, seal the invite locally (the same
+/// core [`sync_invite_member`] uses), then bind the owner person to the vault
+/// once and POST the sealed frame to the relay.
+///
+/// The owner learns the invitee's audience from `recipient_code` and nothing
+/// else: the outer relay frame carries only the recipient person id and the
+/// vault id (`server-protocol.md` §3.1a), so the server reads no fingerprint and
+/// no public half.
+#[tauri::command]
+pub async fn sync_person_create_invite<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    recipient_code: String,
+    vault_label: String,
+    created_at_secs: u64,
+) -> Result<InviteCommandView, SyncDeviceError> {
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    create_invite_from_host(
+        &host,
+        state.inner(),
+        &io,
+        &recipient_code,
+        &vault_label,
+        created_at_secs,
+    )
+    .await
+}
+
+/// Host-taking core for [`sync_person_create_invite`], so a test drives the
+/// decode, the local invite build and the two relay calls against a
+/// [`super::transport::FakeTransport`].
+pub async fn create_invite_from_host(
+    host: &dyn crate::host::HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+    recipient_code: &str,
+    vault_label: &str,
+    created_at_secs: u64,
+) -> Result<InviteCommandView, SyncDeviceError> {
+    let code = super::invite::decode_person_identity_code(recipient_code)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let owner_person_id = state
+        .clone_person_id()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let recipient_person_id_hex = crate::account::person_identity::hex_lower(&code.person_id);
+
+    // Bind the owner person to the vault once (server-side availability), then
+    // seal the invite locally, then relay it. The bind is idempotent and its
+    // token is stored device-locally, so a second invite skips the round-trip.
+    let owner_token = super::person_account::ensure_owner_member_token(
+        host,
+        io,
+        state,
+        &crate::account::person_identity::hex_lower(&owner_person_id),
+    )
+    .await?;
+
+    let view = invite_member_from_host(
+        host,
+        state,
+        io,
+        &code.public,
+        Some(&recipient_person_id_hex),
+        vault_label,
+        created_at_secs,
+    )
+    .await?;
+
+    let frame = super::person_account::hex_to_bytes(&view.invite_wire)
+        .ok_or(SyncDeviceError::BadRequest)?;
+    super::person_account::post_sealed_invite(
+        host,
+        io,
+        &owner_token,
+        &crate::account::person_identity::hex_lower(&code.person_id),
+        &frame,
+    )
+    .await?;
+    Ok(view)
+}
+
 /// **Invite a member to an `NTV6` vault** (B2B, myne-md/myne#712).
 ///
 /// The `NTV6` grant is a GROUP-key package, not an `itemsKey` wrap: the member
@@ -976,6 +1100,7 @@ async fn write_ntv6_invite(
     meta_bytes: &[u8],
     owner: &protocol::person_key::PersonKeyPair,
     member_public: &protocol::person_key::PersonPublicHalf,
+    member_person_id_hex: Option<&str>,
     group_key: Option<&[u8; 32]>,
     _permit: &tokio::sync::SemaphorePermit<'_>,
 ) -> Result<InviteCommandView, SyncDeviceError> {
@@ -983,7 +1108,12 @@ async fn write_ntv6_invite(
     let b2b =
         protocol::parse_vault_meta_ntv6(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let account_number_hash = b2b.base.account_number_hash;
-    let group_key = group_key.ok_or(SyncDeviceError::NotOwner)?;
+    // An `NTV6` invite wraps the shared `group_key`, so an owner session that
+    // does not carry the group tier cannot seal one. This is the typed refusal
+    // the variant exists for: the vault is valid and migrated, and the caller
+    // needs the group-key session tier rather than "bad request" (task 20's
+    // carry-over, given its producer here).
+    let group_key = group_key.ok_or(SyncDeviceError::GroupRosterInviteUnavailable)?;
     let epoch = b2b.group_key_epoch;
     let current = pi::open_group_roster(
         group_key,
@@ -1020,6 +1150,7 @@ async fn write_ntv6_invite(
     let mut members = roster.members;
     members.push(pi::GroupRosterMember {
         fingerprint_hex: member_fp.clone(),
+        person_id_hex: member_person_id_hex.map(str::to_string),
         // The member's chosen name is not known at invite time; the UI shows the
         // fingerprint, so an empty name is honest rather than a placeholder.
         display_name: String::new(),
@@ -1031,6 +1162,7 @@ async fn write_ntv6_invite(
         member_mldsa_vk_hex: crate::account::person_identity::hex_lower(member_public.mldsa_vk()),
         previous_fingerprint_hex: None,
         continuity: pi::GroupKeyContinuity::Current,
+        transition_hex: None,
     });
     let new_roster = pi::GroupRosterPayload {
         account_number_hash_hex: crate::account::person_identity::hex_lower(&account_number_hash),
@@ -1332,6 +1464,11 @@ pub struct RosterMemberView {
     /// it to distinguish a cryptographic key change from an owner-confirmed
     /// relink.
     pub continuity: Option<String>,
+    /// Hex of the member's signed `myne.person-key-transition v1|` record when
+    /// the fingerprint change was cryptographic. Absent for a never-changed
+    /// member and for an owner-confirmed relink, which is exactly the
+    /// distinction the UI renders.
+    pub transition_hex: Option<String>,
 }
 
 impl RosterMemberView {
@@ -1361,6 +1498,7 @@ impl RosterMemberView {
             member_kem_ek_hex: m.member_kem_ek_hex,
             member_mldsa_vk_hex: m.member_mldsa_vk_hex,
             continuity: Some(continuity),
+            transition_hex: m.transition_hex,
         }
     }
 
@@ -1376,6 +1514,7 @@ impl RosterMemberView {
             member_kem_ek_hex: e.member_kem_ek_hex,
             member_mldsa_vk_hex: e.member_mldsa_vk_hex,
             continuity: None,
+            transition_hex: e.transition_hex,
         }
     }
 }
@@ -1411,29 +1550,59 @@ pub async fn sync_remove_member<R: Runtime>(
         }
     };
     require_owner(authority)?;
-    super::member_removal::remove_member_from_host(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
-        &crate::vault_io::StdVaultIo,
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    let owner = state
+        .inner()
+        .clone_person_identity()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let person_id = super::member_removal::member_person_id_from_host(
+        &host,
+        &io,
         state.inner(),
+        &owner,
         &member_fingerprint_hex,
     )
     .await
-    .map_err(|e| {
-        // Map the closed enum by cause rather than collapsing every failure to
-        // `Transport`: a removed member that does not exist and a corrupt
-        // `vault.meta` are not transient network faults, and reporting them as
-        // one makes a failed call indistinguishable from a retryable one.
-        use super::member_removal::MemberRemovalError as E;
-        match e {
-            E::RemovalUnavailable => SyncDeviceError::RemovalUnavailable,
-            E::VaultLocked | E::NoRoster => SyncDeviceError::NotEnrolled,
-            E::MemberNotFound => SyncDeviceError::DeviceNotFound,
-            // A contended auth permit is transient: the frontend retries rather
-            // than re-enrolling, so it maps to `Transport`, not `NotEnrolled`.
-            E::Busy => SyncDeviceError::Transport,
-            E::CannotDecrypt | E::InvalidVaultMeta | E::Io => SyncDeviceError::BadRequest,
-        }
-    })
+    .map_err(map_remove_error)?;
+    let rotation = super::member_removal::rotate_group_from_host(
+        &host,
+        &io,
+        state.inner(),
+        &owner,
+        &member_fingerprint_hex,
+    )
+    .await
+    .map_err(map_remove_error)?;
+    super::person_account::push_and_revoke_removed_member_from_host(
+        &host,
+        &io,
+        state.inner(),
+        person_id.as_deref(),
+        rotation.new_epoch.saturating_sub(1),
+        rotation.new_epoch,
+        &rotation.reclaim_sync_ids_hex,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Map the closed member-removal enum by cause rather than collapsing every
+/// failure to `Transport`: a removed member that does not exist and a corrupt
+/// `vault.meta` are not transient network faults, and reporting them as one
+/// makes a failed call indistinguishable from a retryable one.
+fn map_remove_error(e: super::member_removal::MemberRemovalError) -> SyncDeviceError {
+    use super::member_removal::MemberRemovalError as E;
+    match e {
+        E::RemovalUnavailable => SyncDeviceError::RemovalUnavailable,
+        E::VaultLocked | E::NoRoster => SyncDeviceError::NotEnrolled,
+        E::MemberNotFound => SyncDeviceError::DeviceNotFound,
+        // A contended auth permit is transient: the frontend retries rather
+        // than re-enrolling, so it maps to `Transport`, not `NotEnrolled`.
+        E::Busy => SyncDeviceError::Transport,
+        E::CannotDecrypt | E::InvalidVaultMeta | E::Io => SyncDeviceError::BadRequest,
+    }
 }
 
 /// Approve a pending device (the existing unlocked device authorizes it).
@@ -2450,6 +2619,7 @@ mod tests {
             role: RosterRole::Owner,
             deleted: false,
             previous_fingerprint_hex: None,
+            transition_hex: None,
             joined_at: 0,
         };
         let view = super::RosterMemberView::from_entry(entry);
