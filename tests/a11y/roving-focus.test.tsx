@@ -194,3 +194,54 @@ describe("the group's arrows belong to the group's own items", () => {
     expect(onActiveIndexChange).toHaveBeenCalledWith(1);
   });
 });
+
+/** Manual activation plus a shrinking count: the state that leaves
+ *  `focusOverride` past the new end. */
+function ShrinkHarness({ count }: { count: number }) {
+  const [n, setN] = useState(count);
+  const roving = useRovingFocus({
+    count: n,
+    activeIndex: 0,
+    manualActivation: true,
+    orientation: "horizontal",
+    itemSelector: '[role="tab"]',
+  });
+  return (
+    <div
+      ref={roving.containerRef as RefObject<HTMLDivElement>}
+      role="tablist"
+      aria-label="tabs"
+      onKeyDown={roving.onKeyDown}
+    >
+      <button data-testid="shrink" onClick={() => setN((v) => v - 1)} />
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} role="tab" tabIndex={roving.tabIndexFor(i)} data-index={i}>
+          {`t${i}`}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+describe("useRovingFocus when the group shrinks", () => {
+  it("keeps exactly one Tab stop when the focused item is removed", () => {
+    // Under manual activation the hook owns the focused index. Arrow to the
+    // LAST tab, then close it: the count drops while `focusOverride` still
+    // points at the old last index. Without a clamp `tabIndexFor` matches no
+    // item, the group loses its single `tabIndex=0`, and the whole strip drops
+    // out of the Tab order. jsdom's fixture can hold this because it shrinks
+    // the count under a focused override, which is the state the defect needs.
+    render(<ShrinkHarness count={3} />);
+    let tabs = screen.getAllByRole("tab");
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    tabs = screen.getAllByRole("tab");
+    fireEvent.keyDown(tabs[1]!, { key: "ArrowRight" });
+    // focusOverride is now 2 (the last item).
+    fireEvent.click(screen.getByTestId("shrink"));
+    tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
+    const stops = tabs.map((el) => el.getAttribute("tabindex"));
+    expect(stops.filter((v) => v === "0")).toHaveLength(1);
+  });
+});

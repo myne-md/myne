@@ -227,8 +227,18 @@ class MermaidWidget extends WidgetType {
           // diagram. `role="img"` collapses it to one object, and the name says
           // what it is and which diagram, taken from the fence's first
           // line, the closest thing to a title the source carries.
-          card.setAttribute("role", "img");
-          card.setAttribute("aria-label", mermaidLabel(this.code));
+          //
+          // The role goes on the SVG ROOT, not on the CARD. The interactive
+          // viewer (`buildMermaidViewer`, myne-md/myne#708) appends a
+          // `role="group"` viewport and zoom/pan/expand/edit buttons as
+          // descendants of the card, and `role="img"` makes every descendant
+          // PRESENTATIONAL, so a card-level role silently dropped those controls
+          // out of the accessibility tree and left invalid nested content. On
+          // the SVG, the controls are siblings of the image and stay reachable.
+          const svgEl = card.querySelector("svg");
+          const labelled = svgEl ?? card;
+          labelled.setAttribute("role", "img");
+          labelled.setAttribute("aria-label", mermaidLabel(this.code));
           giveNaturalSize(card);
           // The bounded, interactive viewer (myne-md/myne#708). Returns null on
           // an unreadable viewBox, in which case the card stays as drawn.

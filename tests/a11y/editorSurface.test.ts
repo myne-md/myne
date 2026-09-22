@@ -82,8 +82,12 @@ describe("decorative widgets are out of the accessibility tree", () => {
 
 describe("meaningful widgets carry a label", () => {
   it("names a diagram by its Mermaid kind", () => {
+    // Assert against the CATALOG KEY, not a hard-coded "Diagram: " join: the
+    // separator is a translation decision (`mermaidLabel` documents why), so a
+    // joiner reimplemented here would keep passing while the shipped string
+    // changed.
     expect(mermaidLabel("flowchart TD\n  A-->B")).toBe(
-      `${i18n.t("editor.a11y.diagram")}: flowchart`,
+      i18n.t("editor.a11y.diagramNamed", { kind: "flowchart" }),
     );
     expect(mermaidLabel("sequenceDiagram\n  A->>B: hi")).toContain("sequenceDiagram");
   });

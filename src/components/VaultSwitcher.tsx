@@ -439,10 +439,19 @@ export function VaultSwitcher({
       // half, so the entry half reads the same flag rather than adding a
       // second piece of state.
       if (!wasOpen.current) {
-        menuRef.current
-          ?.querySelector<HTMLElement>('[role^="menuitem"]')
-          ?.focus();
-        wasOpen.current = true;
+        const first = menuRef.current?.querySelector<HTMLElement>(
+          '[role^="menuitem"]',
+        );
+        // Only mark the transition as handled when focus was actually placed.
+        // The guard above is `!wasOpen.current`; setting it with a null
+        // `menuRef` (the menu is not rendered until `vaults` resolves) would
+        // spend the transition and no later render would re-enter, leaving the
+        // menu a keyboard dead end on exactly the slow path the comment below
+        // names.
+        if (first) {
+          first.focus();
+          wasOpen.current = true;
+        }
       }
       return;
     }
