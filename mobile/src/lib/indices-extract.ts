@@ -11,6 +11,7 @@ import { parse } from "../dialect/parse";
 import { extractLineTasks } from "../dialect/visitors/lineTasks";
 import { extractProperties } from "@myne/editor/host/notes/propertyTyping";
 import { extractWikilinkEdges } from "@myne/editor/host/notes/graphModel";
+import { extractBlockAnchorEntries } from "@myne/editor/host/notes/blockAnchors";
 import { parseTags } from "./tags";
 import type { WikilinkEdge, TagEntry, IndexRecord } from "./vault-indices";
 
@@ -66,5 +67,17 @@ export function extractRecord(noteId: string, title: string, folder: string | nu
     // blocks, wikilink interiors and frontmatter structurally out. It owns its
     // own exclusions, so nothing here filters what it returns.
     tasks: extractLineTasks(body),
+    // MYND-382: imported `^block-id` anchors for the vault-wide `[[^^` picker,
+    // from the SHARED extractor over the one dialect scanner. Mobile had no
+    // extractor of its own and no second one was written here: the desktop
+    // function moved into `@myne/editor/host/notes/blockAnchors` instead
+    // (myne-md/myne#452), because a copy would sit at a different relative path
+    // from its twin and so be invisible to every twin guard in the tree.
+    blockAnchors: extractBlockAnchorEntries(body),
+    // myne#216: headings for the vault-wide `[[##` picker. Unlike the two
+    // extractors above this adds NO parse - `parse()` already enumerated them,
+    // with the frontmatter guard applied, so this is a map over a result that is
+    // already in hand. Identical to desktop's `reindexNoteFromBody`.
+    headings: parsed.headings.map((h) => ({ text: h.text, level: h.level })),
   };
 }

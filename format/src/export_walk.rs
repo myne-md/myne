@@ -34,7 +34,7 @@ use crate::notes::decode::decode_note_any;
 use crate::notes::export_mtime::{apply_updated_mtime_from, fm_rfc3339_field_in};
 use crate::notes::note_id::NoteId;
 use crate::notes::title_extract::{extract_title_slices, fm_folder, fm_title};
-use protocol::{decode_attachment_blob, AttachmentsCatalog, MetaVersion, SubkeyRole};
+use protocol::{decode_attachment_blob, AttachmentsCatalog, GroupKey, MetaVersion, SubkeyRole};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -100,7 +100,14 @@ pub struct StageParams {
     pub scope: Option<Vec<String>>,
     pub items_key: Zeroizing<[u8; 32]>,
     pub items_key_id: [u8; 16],
-    pub root_key: Zeroizing<[u8; 32]>,
+    /// Owner-tier root key. `Some` for an owner-held export; `None` for a
+    /// member-held `NTV6` export, which has no root key and needs none because
+    /// its shared singletons derive through `group_key`.
+    pub root_key: Option<Zeroizing<[u8; 32]>>,
+    /// Present for an `NTV6` vault, whose shared singletons (prefs, catalog) are
+    /// group-sealed. When set, [`shared_subkey`] derives through the group tier
+    /// instead of the root tier; a pre-B2B export leaves it `None`.
+    pub group_key: Option<Zeroizing<[u8; 32]>>,
     pub version: MetaVersion,
     /// How tombstoned notes are handled. The app excludes-and-counts; the CLI
     /// writes them into `_trash/`.
@@ -113,6 +120,31 @@ pub struct StageParams {
     /// `false` (snapshots are counted, never enumerated); the CLI sets `true`
     /// when `--history` is passed.
     pub history: bool,
+}
+
+/// Derive a SHARED singleton KEK (prefs, attachments catalog) the way the
+/// session that owns this vault sealed it: through the group tier for an
+/// `NTV6` vault, through the root tier otherwise. Mirrors
+/// `myne_core::plugins::vault_unlock::state::SharedSingletonKey::derive`
+/// without the cross-crate dependency; `role` must be a shared role, and the
+/// `expect` is the same fail-loud guard against asking the group tier for an
+/// owner-only key.
+fn shared_subkey(params: &StageParams, role: SubkeyRole) -> Zeroizing<[u8; 32]> {
+    match &params.group_key {
+        Some(group) => protocol::derive_group_subkey_v0_2(
+            &GroupKey::new(**group),
+            role.shared_group_role()
+                .expect("owner-only role requested from the group singleton tier"),
+        ),
+        None => protocol::derive_subkey_versioned(
+            params.version,
+            params
+                .root_key
+                .as_ref()
+                .expect("a group-less export must carry a root key"),
+            role,
+        ),
+    }
 }
 
 /// One attachment scheduled for the post-quiescence decrypt pass.
@@ -285,8 +317,7 @@ fn stage_export_tree_inner(
         Err(e) => return Err(e.into()),
     };
 
-    let prefs_key =
-        protocol::derive_subkey_versioned(params.version, &params.root_key, SubkeyRole::PrefsKey);
+    let prefs_key = shared_subkey(params, SubkeyRole::PrefsKey);
     let prefs = match std::fs::read(vault_dir.join("vault.prefs")) {
         Ok(bytes) => decode_prefs_or_default(&bytes, &prefs_key, &account_number_hash),
         Err(_) => protocol::PrefsView::default(),
@@ -424,11 +455,7 @@ fn stage_export_tree_inner(
                     );
                     return Err(VaultExportError::InvalidVaultMeta);
                 };
-                let catalog_key = protocol::derive_subkey_versioned(
-                    params.version,
-                    &params.root_key,
-                    SubkeyRole::AttachmentsCatalogKey,
-                );
+                let catalog_key = shared_subkey(params, SubkeyRole::AttachmentsCatalogKey);
                 let loaded = match std::fs::read(vault_dir.join("vault.attachments")) {
                     Ok(bytes) => protocol::read_or_empty(&catalog_key, &meta_hash, Some(&bytes)),
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => {

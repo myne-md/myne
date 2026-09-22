@@ -249,6 +249,7 @@
       "noUnusedNotice": "No unused attachments to clean.",
       "preview": "Preview",
       "previewAttachment": "Preview attachment",
+      "previewNamed": "Preview {{name}}",
       "searchAriaLabel": "Search attachments by filename",
       "searchPlaceholder": "Search by filename",
       "sort": {
@@ -367,6 +368,7 @@
     "archivedBadge": "Archive",
     "archivedBadgeTitle": "Archived",
     "dialogLabel": "Command palette",
+    "resultsLabel": "Commands and notes",
     "matchedInAttachment": "in attachment",
     "matchedInAttachmentTitle": "The query matched inside a file embedded in this note",
     "matchedInBody": "↳ matched in body",
@@ -485,6 +487,18 @@
       },
       "focusPrevPane": {
         "label": "Focus previous pane"
+      },
+      "focusSidebarRegion": {
+        "label": "Focus notes sidebar"
+      },
+      "focusEditorRegion": {
+        "label": "Focus editor"
+      },
+      "focusRightPanelRegion": {
+        "label": "Focus right panel"
+      },
+      "cycleRegion": {
+        "label": "Cycle focus between regions"
       },
       "goBack": {
         "label": "Go back"
@@ -684,11 +698,15 @@
         "bold": "Bold",
         "closeTab": "Close tab",
         "cycleHeadingLevel": "Cycle heading level",
+        "cycleRegion": "Cycle focus between regions",
         "cycleTabs": "Cycle tabs",
         "deleteWorkspace": "Delete workspace",
         "findInNote": "Find in note",
+        "focusEditorRegion": "Focus editor",
         "focusNextPane": "Focus next pane",
         "focusPrevPane": "Focus previous pane",
+        "focusRightPanelRegion": "Focus right panel",
+        "focusSidebarRegion": "Focus notes sidebar",
         "foldAll": "Fold all",
         "indent": "Indent",
         "inlineCode": "Inline code",
@@ -744,6 +762,7 @@
     "spinner": {
       "loadingLabel": "Loading"
     },
+    "skipToContent": "Skip to content",
     "back": "Back",
     "continue": "Continue"
   },
@@ -752,6 +771,17 @@
     "title": "This browser was removed from your account"
   },
   "editor": {
+    "a11y": {
+      "noteBody": "Note body: {{title}}",
+      "untitledNoteBody": "Note body, untitled note",
+      "sectionFolded_one": "Section folded",
+      "sectionFolded_other": "{{count}} sections folded",
+      "sectionUnfolded_one": "Section unfolded",
+      "sectionUnfolded_other": "{{count}} sections unfolded",
+      "diagram": "Diagram",
+      "diagramNamed": "Diagram: {{kind}}",
+      "brokenLink": "{{target}}, broken link"
+    },
     "ribbon": {
       "customize": "Customize ribbon…",
       "label": "Left ribbon",
@@ -764,7 +794,7 @@
         "exportFailed": "Couldn't export {{filename}}.",
         "renamed": "Renamed to {{name}}.",
         "renameFailed": "Couldn't rename the attachment.",
-        "saveDialogFailed": "Couldn't open the save dialog."
+        "saveDialogFailed": "Couldn't choose where to save this file."
       },
       "compression": {
         "bulkNotice_one": "{{count}} image compressed: {{from}} → {{to}}",
@@ -1088,6 +1118,11 @@
         "goForward": "Go forward"
       },
       "noNotesToOpen": "No notes to open.",
+      "region": {
+        "editor": "Editor",
+        "rightPanel": "Right panel",
+        "sidebar": "Notes sidebar"
+      },
       "resizeBacklinksSidebar": "Resize backlinks sidebar",
       "resizeNotesSidebar": "Resize notes sidebar",
       "rightPanel": {
@@ -1156,6 +1191,7 @@
           "memoryPopoverClose": "Close"
         },
         "allHidden": "All tabs are hidden. Right-click to restore.",
+        "tabStripLabel": "Right panel",
         "outline": {
           "collapse": "Collapse section",
           "empty": "No headings",
@@ -1277,7 +1313,21 @@
     },
     "mermaid": {
       "rendering": "Rendering diagram…",
-      "renderFailed": "This diagram could not be rendered: {{reason}}"
+      "renderFailed": "This diagram could not be rendered: {{reason}}",
+      "viewerLabel": "Diagram viewer",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "reset": "Reset zoom to fit",
+      "panUp": "Pan up",
+      "panDown": "Pan down",
+      "panLeft": "Pan left",
+      "panRight": "Pan right",
+      "edit": "Edit diagram source",
+      "editText": "Edit",
+      "expand": "Expand diagram",
+      "expandText": "Expand",
+      "expandClose": "Close expanded diagram",
+      "expandCloseText": "Close"
     },
     "slash": {
       "aiContinue": "Continue writing (AI)",
@@ -1898,6 +1948,7 @@
         "colorSwatchTitle": "Choose color",
         "deleteRuleTitle": "Delete rule",
         "dragHandleTitle": "Drag to reorder",
+        "rowLabel": "{{name}}, group {{index}} of {{total}}. Alt plus the up or down arrow reorders it.",
         "editFilterButton": "Edit filter…",
         "editFilterTitle": "Edit color-group filter",
         "editRuleButton": "Edit",
@@ -2197,6 +2248,9 @@
       "newViewTitle": "New view",
       "noteMovedToTrash": "Note moved to Trash",
       "notesHeading": "Notes",
+      "treeLabel": "Notes and folders",
+      "selectionAnnouncement": "Selected {{title}}",
+      "untitled": "Untitled",
       "notesMovedToTrash_one": "{{count}} note moved to Trash",
       "notesMovedToTrash_other": "{{count}} notes moved to Trash",
       "openArchive": "Open the archive",
@@ -2344,6 +2398,9 @@
     "tabStrip": {
       "closeNewTab": "Close new tab",
       "closeTab": "Close {{title}}",
+      "closeTabMenuItem": "Close tab",
+      "moveLeft": "Move left",
+      "moveRight": "Move right",
       "newTab": "New tab",
       "openNotes": "Open notes",
       "pin": "Pin",
@@ -3068,6 +3125,7 @@
       "position": "{{name}}, {{index}} of {{total}}",
       "searchEmpty": "No matching commands.",
       "searchPlaceholder": "Search commands…",
+      "searchResultsLabel": "Matching commands",
       "showHelper": "Show the left ribbon on this device.",
       "showLabel": "Show left ribbon"
     },
@@ -3717,6 +3775,13 @@
       "verifyAction": "Compare code",
       "yourDevices": "Your devices"
     },
+    "members": {
+      "title": "Members & Security",
+      "access": "Your access",
+      "epochLabel": "Group key epoch",
+      "people": "People",
+      "removalLimitsLabel": "Removal limits"
+    },
     "endpoint": {
       "connect": "Connect",
       "connected": "Connected",
@@ -3933,11 +3998,15 @@
       "hint": "Members of this vault. Each joins with their own identity and credentials.",
       "empty": "No members yet. Inviting someone is the next step.",
       "rotated": "Key rotated",
+      "keyChanged": "Key changed. Verify with the owner.",
+      "relinkConfirmed": "Relink confirmed by owner",
+      "epoch": "Group key epoch {{epoch}}",
       "ownerBadge": "Owner",
       "memberBadge": "Member",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Member removal is currently disabled until the roster sync follow-on ships. Invited members keep access to what they already synced, and nothing here removes them yet.",
+      "removalLimits": "Removing a member would stop their access to future changes only. It cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "inviteReady": "Invite ready for {{fingerprint}}…",
       "title": "Vault members",
       "personHint": "Unlock your member identity with your recovery phrase. It stays on this device until you lock the vault or close the app.",

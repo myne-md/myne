@@ -244,6 +244,13 @@ pub fn run() {
         // write — the Rust core does the only IO and rejects any destination
         // inside the app-data / vault tree (TB6). Holds no plugin-private state.
         .plugin(plugins::secret_export::init())
+        // The one destination a plaintext export may name (myne-md/myne#517).
+        // `export_path` resolves the export directory, creates it, applies the
+        // platform backup exclusion and sanitizes the filename in one call,
+        // sharing its body with `backup_exclude::init` below. It is what let
+        // `core:path:default` be dropped from `capabilities/default.json`:
+        // nothing under `mobile/src` reaches `plugin:path|*` any more.
+        .plugin(plugins::export_dir::init())
         // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync` — the
         // same 14 commands the desktop registers, gated by a single
         // deny-by-default `sync:default` capability (SYNC-15). Command bodies are
@@ -366,6 +373,17 @@ pub fn run() {
             // future writers too. iOS does it here; Android carries the same
             // property declaratively from the committed `android-widgets`
             // manifest, so this is a no-op there. See `backup_exclude`.
+            //
+            // Since myne-md/myne#517 this is no longer the ONLY place it
+            // happens: `init` and `plugin:export-dir|export_path` share one
+            // body (`backup_exclude::ensure`), and the command applies the
+            // exclusion on every export, failing closed if it does not read
+            // back as set. This call stays for the two things the command
+            // cannot do, it repairs a container restored from an older backup
+            // that predates the call, and it is what makes
+            // `mobile/docs/dev/device-matrix.md` §8 row 8.9 ("launch the app
+            // once, then `ls -l@` Documents") runnable exactly as written, on a
+            // row nobody has run yet.
             backup_exclude::init(app.handle());
 
             // MYND-469: one-time secure-field layer splice, protection ON —

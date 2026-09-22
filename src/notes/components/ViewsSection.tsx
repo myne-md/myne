@@ -29,6 +29,7 @@ import {
 } from "../../components/primitives/hoverSurface";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import type { SavedView } from "../../lib/prefs";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
 import {
   consumeRevealViews,
   useRevealViewsNonce,
@@ -75,10 +76,8 @@ const ICON_BTN_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 22,
-  height: 22,
+  ...MIN_TARGET,
   padding: 0,
-  flexShrink: 0,
   background: "transparent",
   border: 0,
   borderRadius: "var(--radius-1)",

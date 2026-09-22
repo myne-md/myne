@@ -15,7 +15,12 @@
 // separate `*_order` field). No `onChange` prop; the nonce bump inside
 // `setColorGroups` refreshes every `usePrefs` consumer, including this one.
 
-import { useState, type CSSProperties, type DragEvent as ReactDragEvent } from "react";
+import {
+  useState,
+  type CSSProperties,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
@@ -27,6 +32,7 @@ import { colorGroupVar, GROUP_COLOR_KEYS } from "../graphColorGroups";
 import { useSelectedNote } from "../sidebarState";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { dragEdge, insertionLineStyle } from "./reorderDnd";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
 import {
   draftToFilterNode,
   filterNodeToDraft,
@@ -71,8 +77,7 @@ const ROW_TEXT_BUTTON_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 20,
-  height: 20,
+  ...MIN_TARGET,
   padding: "0 var(--space-2)",
   flexShrink: 0,
   background: "transparent",
@@ -87,11 +92,27 @@ const ROW_TEXT_BUTTON_STYLE: CSSProperties = {
  *  control group rather than as two unrelated glyphs. */
 const ROW_ICON_BUTTON_STYLE: CSSProperties = {
   ...ROW_TEXT_BUTTON_STYLE,
-  width: 20,
   padding: 0,
 };
 
-const SWATCH_STYLE = (colorKey: string): CSSProperties => ({
+// The swatch is TWO elements (myne-md/myne#728, task 11): a transparent
+// button that meets 2.5.8's 24px pointer-target floor, and the 14px painted
+// circle inside it. Growing the button itself would have turned a small dot
+// into a large one everywhere it appears, which is a visual redesign rather
+// than an accessibility fix; `DecorationPopover`'s colour picker already had
+// this shape (a 24px button around a 14px span) and this follows it.
+const SWATCH_BUTTON_STYLE: CSSProperties = {
+  ...MIN_TARGET,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  border: 0,
+  background: "transparent",
+  cursor: "pointer",
+};
+
+const SWATCH_PAINT_STYLE = (colorKey: string): CSSProperties => ({
   width: 14,
   height: 14,
   flexShrink: 0,
@@ -104,8 +125,6 @@ const SWATCH_STYLE = (colorKey: string): CSSProperties => ({
   // the canvas is meanwhile painting neutral — two surfaces disagreeing about
   // the same key. `colorGroupVar` is the shared degrade both clients use.
   background: colorGroupVar(colorKey),
-  cursor: "pointer",
-  padding: 0,
 });
 
 const SWATCH_PICKER_STYLE: CSSProperties = {
@@ -223,6 +242,35 @@ export function ColorGroupEditor({
     persist([...rest.slice(0, insertAt), moved, ...rest.slice(insertAt)]);
   };
 
+  /**
+   * The non-drag path for that same reorder (myne-md/myne#728, WCAG 2.5.7,
+   * found in review). Order IS precedence here, so reordering is a real
+   * function rather than cosmetic arrangement, and drag was the only way to
+   * perform it: the row's own `onKeyDown` handled nothing, and the sole other
+   * key handler in the file belongs to the name input.
+   *
+   * Alt+Arrow, which is the rail's existing contract
+   * (`RibbonCustomizeSettings.onRowKeyDown`, `LeftRibbon`), rather than a
+   * fourth gesture invented for this surface. Expressed through `reorder` so
+   * the two paths cannot drift: the keyboard names its neighbour and the side
+   * to land on, which is exactly what a drop does.
+   */
+  const moveRule = (id: string, delta: -1 | 1) => {
+    const from = rules.findIndex((r) => r.id === id);
+    if (from === -1) return;
+    const to = from + delta;
+    if (to < 0 || to >= rules.length) return; // clamped at the ends, no wrap
+    const target = rules[to];
+    if (target === undefined) return;
+    reorder(id, target.id, delta === -1 ? "above" : "below");
+  };
+
+  const onRowKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>, id: string) => {
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    moveRule(id, e.key === "ArrowUp" ? -1 : 1);
+  };
+
   const commitName = (id: string, name: string) => {
     const trimmed = name.trim();
     const current = rules.find((r) => r.id === id);
@@ -298,6 +346,15 @@ export function ColorGroupEditor({
               <div
                 data-testid="editor.color-group-row"
                 data-rule-id={rule.id}
+                // Reachable and operable without a drag: a Tab stop that
+                // answers the rail's Alt+Arrow reorder contract.
+                tabIndex={0}
+                aria-label={t("notes.graph.colorGroups.rowLabel", {
+                  name: rule.name,
+                  index: rules.indexOf(rule) + 1,
+                  total: rules.length,
+                })}
+                onKeyDown={(e) => onRowKeyDown(e, rule.id)}
                 draggable
                 onDragStart={() => setDragId(rule.id)}
                 onDragOver={(e: ReactDragEvent<HTMLDivElement>) => {
@@ -338,8 +395,10 @@ export function ColorGroupEditor({
                   onClick={() =>
                     setPickingColorFor((cur) => (cur === rule.id ? null : rule.id))
                   }
-                  style={SWATCH_STYLE(rule.color)}
-                />
+                  style={SWATCH_BUTTON_STYLE}
+                >
+                  <span style={SWATCH_PAINT_STYLE(rule.color)} />
+                </button>
                 <input
                   type="text"
                   data-testid="editor.color-group-name"
@@ -405,12 +464,19 @@ export function ColorGroupEditor({
                         updateRule(rule.id, { color: entry.key });
                         setPickingColorFor(null);
                       }}
-                      style={{
-                        ...SWATCH_STYLE(entry.key),
-                        outline:
-                          entry.key === rule.color ? "2px solid var(--accent)" : "none",
-                      }}
-                    />
+                      style={SWATCH_BUTTON_STYLE}
+                    >
+                      <span
+                        style={{
+                          ...SWATCH_PAINT_STYLE(entry.key),
+                          // The selection ring goes on the PAINT, not on the
+                          // hit box: a ring around the invisible 24px box
+                          // would float unattached to the dot it marks.
+                          outline:
+                            entry.key === rule.color ? "2px solid var(--accent)" : "none",
+                        }}
+                      />
+                    </button>
                   ))}
                 </div>
               )}

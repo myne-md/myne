@@ -522,6 +522,12 @@ steps:
       # them; a saved recovery phrase reconstructs the vault, so a one-sided
       # drift is a zero-knowledge break that every build reports as green.
       - node scripts/check-mobile-export-backup.mjs
+      # myne#517: every `<plugin>:default` grant in the mobile capability
+      # resolves to a permission set that exists. A missing
+      # permissions/<plugin>/default.toml leaves cargo GREEN and refuses every
+      # command in that plugin at runtime, silently. All 27 directories, both
+      # directions.
+      - node scripts/check-mobile-plugin-acl.mjs
       # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
       # narrow Rust mirror in the export rewrite share one numeric bound. Both
       # sides claimed the published embed-layout vectors held them together, and

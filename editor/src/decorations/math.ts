@@ -80,6 +80,9 @@ class MathWidget extends WidgetType {
     private readonly key: string,
     private readonly block: boolean,
     private readonly from: number,
+    /** The LaTeX this was rendered from, which is the widget's accessible
+     *  name (myne-md/myne#728, task 10). */
+    private readonly latex: string,
   ) {
     super();
   }
@@ -89,7 +92,29 @@ class MathWidget extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const el = document.createElement(this.block ? "div" : "span");
     el.className = this.block ? "cm-math-block" : "cm-math-inline";
-    el.innerHTML = this.html; // KaTeX output (trust:false → no injection)
+    // Named math, not glyph soup (myne-md/myne#728, task 10).
+    //
+    // KaTeX's `html` output is a tree of absolutely-positioned spans holding
+    // one glyph each. Read by a screen reader it is the glyphs in DOM order
+    // with none of the structure, which for anything past a single variable
+    // is worse than silence. So the widget names itself with the LaTeX the
+    // author wrote and hides the visual layout from the accessibility tree.
+    //
+    // `aria-label` alone would not be enough: a name does not remove the
+    // subtree, so a virtual cursor would still walk into the spans underneath
+    // it. The inner wrapper carries `aria-hidden`, which is exactly what
+    // KaTeX's own MathML output does to its visual half.
+    //
+    // The LaTeX source rather than a spoken rendering, deliberately: turning
+    // `\frac{a}{b}` into "a over b" is a speech-rule engine, and a wrong
+    // reading of a formula is worse than the source. `render-math.ts` records
+    // why the MathML route was not taken.
+    el.setAttribute("role", "math");
+    el.setAttribute("aria-label", this.latex.trim());
+    const visual = document.createElement("span");
+    visual.setAttribute("aria-hidden", "true");
+    visual.innerHTML = this.html; // KaTeX output (trust:false → no injection)
+    el.appendChild(visual);
     attachMathClick(el, view, this.from);
     return el;
   }
@@ -142,7 +167,7 @@ function buildInlineMath(view: EditorView): DecorationSet {
         const key = `i:${latex}`;
         const widget =
           error === null
-            ? new MathWidget(html, key, false, node.from)
+            ? new MathWidget(html, key, false, node.from, latex)
             : new MathErrorWidget(`$${latex}$`, error, key, node.from);
         decorations.push(Decoration.replace({ widget }).range(node.from, node.to));
         return undefined;
@@ -225,7 +250,7 @@ function buildBlockMath(state: EditorState): DecorationSet {
     const key = `b:${latex}`;
     const widget =
       error === null
-        ? new MathWidget(html, key, true, from)
+        ? new MathWidget(html, key, true, from, latex)
         : new MathErrorWidget(doc.sliceString(from, to), error, key, from);
     builder.add(
       fromLine.from,

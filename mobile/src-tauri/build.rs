@@ -174,9 +174,11 @@ fn main() {
             )
             .plugin(
                 // MYND-31 (A11 — VaultIndices): shared from `myne-core`; the
-                // same 12 commands the desktop registers. Adding a command here
+                // same 16 commands the desktop registers. Adding a command here
                 // without a matching entry in
                 // `permissions/vault-indices/default.toml` is a security bug.
+                // The count is a weak stand-in for the parity check
+                // `plugins::agent` carries; it has been stale twice.
                 "vault-indices",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "vault_indices_apply",
@@ -193,6 +195,11 @@ fn main() {
                     "vault_indices_persist",
                     "vault_indices_hydrate",
                     "vault_indices_tasks",
+                    // myne-md/myne#452: the `[[##` and `[[^^` whole-vault picker
+                    // dumps. Both pickers already mount on mobile, so their
+                    // absence here showed up as two pickers that opened empty.
+                    "vault_indices_headings",
+                    "vault_indices_block_anchors",
                 ]),
             )
             .plugin(
@@ -415,6 +422,19 @@ fn main() {
                 // list with the `generate_handler!` in that mod.
                 "local-inference",
                 tauri_build::InlinedPlugin::new().commands(&["transcribe", "read_transcript"]),
+            )
+            .plugin(
+                // The one destination a plaintext export may name
+                // (myne-md/myne#517). `export_path` resolves the export
+                // directory, creates it, excludes it from the platform's
+                // automatic cloud backup and sanitizes the filename, in one
+                // call, so the WebView composes no destination of its own and
+                // `core:path:default` could be dropped from
+                // `capabilities/default.json`. Adding a command here without a
+                // matching entry in `permissions/export-dir/default.toml` is a
+                // security bug.
+                "export-dir",
+                tauri_build::InlinedPlugin::new().commands(&["export_path"]),
             ),
     )
     .unwrap();

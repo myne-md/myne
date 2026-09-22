@@ -187,6 +187,39 @@ describe("ColorGroupEditor — rule list", () => {
     expect(persisted()[1]).toMatchObject({ id: "b", enabled: true });
   });
 
+  it("reorders on Alt+Arrow, and order IS precedence", () => {
+    // WCAG 2.5.7's non-drag path, asserted behaviourally. It was pinned only
+    // by a source-string match for one review round, and the reviewer proved
+    // that vacuous by injecting an early `return` into `moveRule`: every
+    // test still passed. Order is precedence for colour groups, so a silent
+    // regression here changes which rule paints a node.
+    rules = [rule({ id: "a" }), rule({ id: "b" }), rule({ id: "c" })];
+    render(<ColorGroupEditor />);
+    fireEvent.keyDown(rows()[0]!, { key: "ArrowDown", altKey: true });
+    expect(persisted().map((r: ColorGroup) => r.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("moves up as well, and clamps at the ends rather than wrapping", () => {
+    rules = [rule({ id: "a" }), rule({ id: "b" })];
+    render(<ColorGroupEditor />);
+    fireEvent.keyDown(rows()[1]!, { key: "ArrowUp", altKey: true });
+    expect(persisted().map((r: ColorGroup) => r.id)).toEqual(["b", "a"]);
+    cleanup();
+
+    rules = [rule({ id: "a" }), rule({ id: "b" })];
+    setColorGroups.mockClear();
+    render(<ColorGroupEditor />);
+    fireEvent.keyDown(rows()[0]!, { key: "ArrowUp", altKey: true });
+    expect(setColorGroups, "the first row cannot move up").not.toHaveBeenCalled();
+  });
+
+  it("leaves a plain arrow alone, so the list keyboard still works", () => {
+    rules = [rule({ id: "a" }), rule({ id: "b" })];
+    render(<ColorGroupEditor />);
+    fireEvent.keyDown(rows()[0]!, { key: "ArrowDown" });
+    expect(setColorGroups).not.toHaveBeenCalled();
+  });
+
   it("deletes only the targeted rule", () => {
     rules = [rule({ id: "a" }), rule({ id: "b" }), rule({ id: "c" })];
     render(<ColorGroupEditor />);
@@ -301,10 +334,18 @@ describe("ColorGroupEditor — an unresolvable synced color key degrades", () =>
   // its INITIAL value — transparent — and the row shows an empty circle for a
   // rule the canvas is meanwhile painting neutral: two surfaces disagreeing
   // about the same key. `colorGroupVar` is the shared degrade both clients use.
+  // The swatch is two elements since myne-md/myne#728 task 11: the testid stays
+  // on the BUTTON, which is now a transparent 24px hit box meeting WCAG 2.5.8,
+  // and the 14px painted circle is its child. The degrade under test is a
+  // property of the PAINT, so this reads the child.
   const swatchStyle = (color: string): string => {
     rules = [rule({ id: "r1", color })];
     render(<ColorGroupEditor />);
-    return screen.getByTestId("editor.color-group-swatch").getAttribute("style") ?? "";
+    const paint = screen
+      .getByTestId("editor.color-group-swatch")
+      .querySelector("span");
+    expect(paint, "the swatch paints through a child span").not.toBeNull();
+    return paint?.getAttribute("style") ?? "";
   };
 
   it("resolves a known palette key through its token, with a neutral --fg-2 fallback", () => {

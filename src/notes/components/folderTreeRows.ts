@@ -30,8 +30,39 @@ import type { FolderNode, FolderTree } from "../folderTree";
 export { orderContainerChildren, buildContainerRank };
 export type { Child };
 
+/**
+ * Where a row sits in the hierarchy, for assistive technology
+ * (myne-md/myne#728, task 7).
+ *
+ * This tree is FLATTENED before it is rendered, because the sidebar windows it
+ * through `VirtualList`: there is one list of rows, each with a `depth` and a
+ * left padding, and no nested DOM containers at all. So `role="group"`, which
+ * the WAI-ARIA tree pattern uses to express nesting, has nothing to wrap: a
+ * screen reader walking the rendered rows would be told about a flat list of
+ * treeitems and hear nothing about the hierarchy the indentation is drawing.
+ *
+ * `aria-level` / `aria-posinset` / `aria-setsize` are what ARIA prescribes for
+ * exactly this case, and they are carried here rather than derived in the
+ * renderer because only the flattener knows a container's child count: the
+ * renderer sees one row at a time and a virtualized window of them at that.
+ *
+ * `level` is 1-based (ARIA counts from one; `depth` counts from zero and stays
+ * as-is because the layout arithmetic uses it). `posInSet` is 1-based within
+ * the row's OWN container, and `setSize` is that container's visible child
+ * count, so a collapsed folder's children are excluded from both, which is
+ * correct: they are not in the tree the user is walking.
+ */
+export interface RowHierarchy {
+  /** 1-based ARIA level. Root rows are 1. */
+  level: number;
+  /** 1-based position among the row's siblings in its own container. */
+  posInSet: number;
+  /** Number of visible siblings in that container, this row included. */
+  setSize: number;
+}
+
 export type VisibleRow =
-  | {
+  | ({
       kind: "folder";
       key: string;
       node: FolderNode;
@@ -39,8 +70,8 @@ export type VisibleRow =
       collapsed: boolean;
       /** No child folders and no notes anywhere beneath — a bare deliberate folder. */
       empty: boolean;
-    }
-  | { kind: "note"; key: string; id: NoteId; depth: number };
+    } & RowHierarchy)
+  | ({ kind: "note"; key: string; id: NoteId; depth: number } & RowHierarchy);
 
 /** A folder is "empty" (rendered dimmed, no disclosure) when it has no children,
  *  no notes, and no folder note. A folder whose only content is its (hidden,
@@ -81,9 +112,16 @@ export function flattenVisibleRows(
   const rows: VisibleRow[] = [];
 
   const walk = (children: readonly Child[], depth: number): void => {
+    // Counted once per container, before the walk: `posInSet`/`setSize`
+    // describe this container's own children, and a child's subtree is walked
+    // in between, so the size cannot be an accumulating counter.
+    const setSize = children.length;
+    let posInSet = 0;
     for (const child of children) {
+      posInSet += 1;
+      const hierarchy: RowHierarchy = { level: depth + 1, posInSet, setSize };
       if (child.kind === "note") {
-        rows.push({ kind: "note", key: `n-${child.id}`, id: child.id, depth });
+        rows.push({ kind: "note", key: `n-${child.id}`, id: child.id, depth, ...hierarchy });
         continue;
       }
       const node = child.node;
@@ -95,6 +133,7 @@ export function flattenVisibleRows(
         depth,
         collapsed: collapsedNode,
         empty: isEmptyFolder(node),
+        ...hierarchy,
       });
       if (collapsedNode) continue;
       // This folder is a container: rank its children by its own sequence.
@@ -140,12 +179,20 @@ export function buildFavoriteRows(
   favorites: readonly string[],
   cache: ReadonlyMap<NoteId, TitleRecord>,
 ): VisibleRow[] {
-  const rows: VisibleRow[] = [];
-  for (const id of favorites) {
-    if (!cache.has(id)) continue; // stale-UUID GC (render half)
-    rows.push({ kind: "note", key: `fav-${id}`, id, depth: 0 });
-  }
-  return rows;
+  const live = favorites.filter((id) => cache.has(id)); // stale-UUID GC (render half)
+  // Favorites is a FLAT section of its own, so every row is level 1 and the
+  // set is the live favourites. Counted after the GC filter rather than off
+  // `favorites.length`: a stale id is not a row, and announcing "3 of 7" over
+  // four rendered rows is worse than not announcing a position at all.
+  return live.map((id, i) => ({
+    kind: "note" as const,
+    key: `fav-${id}`,
+    id,
+    depth: 0,
+    level: 1,
+    posInSet: i + 1,
+    setSize: live.length,
+  }));
 }
 
 /**

@@ -91,6 +91,14 @@
     "reason": "Same IO-permission error on backup export and note export; one error, two call sites."
   },
   {
+    "value": "Cycle focus between regions",
+    "keys": [
+      "commands.actions.cycleRegion.label",
+      "commands.hotkeys.command.cycleRegion"
+    ],
+    "reason": "One command named in its two surfaces: the command palette row and the Hotkeys panel row are the same F6 command (myne#728), and a user who rebinds it in one place must recognise it in the other. Every bindable command in the catalog has this pair; the others sit under the 25-char floor rather than being exempt from the rule."
+  },
+  {
     "value": "Toggle side-by-side preview",
     "keys": [
       "commands.actions.togglePreview.label",

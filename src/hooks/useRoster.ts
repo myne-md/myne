@@ -23,6 +23,9 @@ export interface RosterHook {
   /** The caller's vault authority. Defaults to `member` (fail-closed: admin
    *  controls stay hidden until the backend confirms owner) and upgrades on load. */
   authority: VaultAuthority;
+  /** The current group-key epoch on an `NTV6` vault; `null` for a legacy
+   *  roster that has no group tier. */
+  groupKeyEpoch: number | null;
   loading: boolean;
   error: string | null;
   reload: () => void;
@@ -39,6 +42,7 @@ export interface RosterHook {
 export function useRoster(): RosterHook {
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [authority, setAuthority] = useState<VaultAuthority>("member");
+  const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -54,6 +58,7 @@ export function useRoster(): RosterHook {
         if (!cancelled) {
           setMembers(view.members);
           setAuthority(view.authority);
+          setGroupKeyEpoch(view.group_key_epoch);
           setError(null);
         }
       })
@@ -61,6 +66,7 @@ export function useRoster(): RosterHook {
         if (!cancelled) {
           setMembers([]);
           setAuthority("member");
+          setGroupKeyEpoch(null);
           setError(String(e));
         }
       })
@@ -105,6 +111,7 @@ export function useRoster(): RosterHook {
   return {
     members,
     authority,
+    groupKeyEpoch,
     loading,
     error,
     reload,

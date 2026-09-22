@@ -20,9 +20,23 @@ const devicePlatform = vi.fn();
 const shareFile = vi.fn(async () => {});
 
 vi.mock("../src/platform/core", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
+// The seam is one host call now (myne#517), not a pair of path accessors: the
+// destination, the directory it lives in and the backup exclusion all come back
+// from `plugin:export-dir|export_path`.
+//
+// **`dir` is deliberately NOT "Documents" and `name` is deliberately not the
+// argument.** The first version of this mock returned `dir: "Documents"`, which
+// is byte-identical to the literal the change removed from `secret-export.ts`,
+// so the fixture could not hold the defective state: reverting the source to the
+// hard-coded `` `Documents/${filename}` `` left all six tests passing. The test
+// asserted the mock rather than the change. Values the old code could not
+// possibly have produced are what make the assertion below mean anything.
 vi.mock("../src/platform/path", () => ({
-  documentDir: async () => "/app/Documents",
-  join: async (...parts: string[]) => parts.join("/"),
+  exportPath: async (filename: string) => ({
+    path: `/vault-exports/${filename}`,
+    dir: "Files",
+    name: `sanitized-${filename}`,
+  }),
 }));
 vi.mock("../src/lib/share", () => ({ shareFile: (...a: unknown[]) => shareFile(...a) }));
 vi.mock("../src/lib/prefs", () => ({ devicePlatform: () => devicePlatform() }));
@@ -54,17 +68,26 @@ describe("saveSecretToDocuments names the delivery the platform performed", () =
     // the message can do.
     devicePlatform.mockResolvedValue("android");
     const outcome = await saveSecretToDocuments("myne-recovery-phrase.txt", "w1 w2");
-    expect(outcome).toEqual({ kind: "path", label: "Documents/myne-recovery-phrase.txt" });
+    // Both halves come from the host: the directory's display name and the
+    // basename it actually used. Neither is reachable from the argument, so this
+    // goes red the moment the label is rebuilt from a literal or from the
+    // caller's own string.
+    expect(outcome).toEqual({
+      kind: "path",
+      label: "Files/sanitized-myne-recovery-phrase.txt",
+    });
   });
 
   it("writes and shares identically on both, so only the claim differs", async () => {
     devicePlatform.mockResolvedValue("ios");
     await saveSecretToDocuments("myne-account-number.txt", "MY-1234");
+    // The path is the HOST's answer, verbatim. Asserting a path this test could
+    // have composed itself would be asserting the mock again.
     expect(invoke).toHaveBeenCalledWith("plugin:secret-export|save_secret_text", {
-      path: "/app/Documents/myne-account-number.txt",
+      path: "/vault-exports/myne-account-number.txt",
       contents: "MY-1234",
     });
-    expect(shareFile).toHaveBeenCalledWith("/app/Documents/myne-account-number.txt");
+    expect(shareFile).toHaveBeenCalledWith("/vault-exports/myne-account-number.txt");
   });
 
   it("claims nothing at all when the platform probe fails", async () => {

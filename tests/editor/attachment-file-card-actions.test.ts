@@ -99,6 +99,34 @@ describe("exportAttachment", () => {
     expect(showAttachmentToast).toHaveBeenCalledWith("Exported report.docx.", "success");
   });
 
+  it("toasts the file the HOST wrote, not the name it was asked for", async () => {
+    // myne#517. The mobile host sanitizes the filename, so the two genuinely
+    // differ: an attachment named `../../x` lands as `_.._x`, and one named
+    // `..pdf` sanitizes away entirely and lands under a stem DERIVED from the
+    // name (`mobile/src/lib/exportFallbackStem.ts`), never as `attachment.pdf`.
+    // An earlier version of this comment said `attachment.pdf`, which is the
+    // exact collapse that module was added to remove: that literal is
+    // byte-identical to `auto_filename`'s output, so it is the one name most
+    // likely to be on disk already. Naming the argument reported a file that is
+    // not on disk, in the one flow whose filename is the user's rather than a
+    // literal the code controls.
+    //
+    // The fixture values are deliberately unrelated to the argument: a test that
+    // passed `"report.docx"` and expected `"report.docx"` cannot tell the two
+    // apart and would stay green with the derivation removed.
+    pickExportDestination.mockResolvedValue("/app/Documents/attachment.pdf");
+    attachmentExport.mockResolvedValue(undefined);
+    await exportAttachment(ID, "..pdf");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Exported attachment.pdf.", "success");
+  });
+
+  it("names the written file on a write failure too", async () => {
+    pickExportDestination.mockResolvedValue("/app/Documents/_.._x");
+    attachmentExport.mockRejectedValue(new Error("io"));
+    await exportAttachment(ID, "../../x");
+    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't export _.._x.", "error");
+  });
+
   it("is a silent no-op when the destination pick is cancelled (null)", async () => {
     pickExportDestination.mockResolvedValue(null);
     await exportAttachment(ID, "x.docx");
@@ -110,7 +138,13 @@ describe("exportAttachment", () => {
     pickExportDestination.mockRejectedValue(new Error("dialog crashed"));
     await exportAttachment(ID, "x.docx");
     expect(attachmentExport).not.toHaveBeenCalled();
-    expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't open the save dialog.", "error");
+    // Host-neutral since myne#517: mobile has no save dialog and its
+    // `pickExportDestination` is a host call that can REFUSE, so naming a dialog
+    // there pointed the user at an affordance the platform does not have.
+    expect(showAttachmentToast).toHaveBeenCalledWith(
+      "Couldn't choose where to save this file.",
+      "error",
+    );
   });
 
   it("toasts an export failure when the host write rejects", async () => {

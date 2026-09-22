@@ -54,7 +54,7 @@ describe("graph model contract (desktop pipeline)", () => {
     // The coordinate half of the contract (myne-md/myne#200). The same
     // assertion runs against the mobile client's own entry point, and what it
     // proves now is narrower than it was: the layout is device-local
-    // (myne-md/myne#727, decisions/ui/0594 and sync/0595), so the only thing
+    // (myne-md/myne#727, decisions/ui/0600 and sync/0601), so the only thing
     // keeping the two clients showing the same picture is that they compile
     // this one kernel rather than each carrying one. A fingerprint moving is
     // the cheapest signal that the sharing stopped being real.

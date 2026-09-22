@@ -19,9 +19,11 @@ import {
   type CSSProperties,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
+import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
@@ -55,7 +57,7 @@ import { noteExportEntries } from "../noteExportMenu";
 import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
-import { NoteRow } from "./NoteRow";
+import { NoteRow, noteRowDomId, type NoteRowSection } from "./NoteRow";
 import { TreeRails } from "./TreeRails";
 import { importDroppedMarkdown } from "../dropImport";
 import { BASE_PADDING_LEFT as TREE_BASE_PADDING_LEFT } from "./FolderRow";
@@ -103,6 +105,7 @@ import {
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
 import { useCenterView } from "../../screens/centerView";
+import { regionOf } from "../../lib/regions";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
 
@@ -205,6 +208,26 @@ export function makeKeyboardNavHandler(opts: {
     return false;
   };
 
+  /**
+   * Whether the sidebar's arrow keys apply to this event (myne-md/myne#728).
+   *
+   * This handler is bound at DOCUMENT level, so before the region model it
+   * answered arrows anywhere that was not an editable target: an arrow press
+   * inside the right panel moved the note selection behind the user's back.
+   * With F6 able to put focus in a named region, "which region am I in" is now
+   * a question with an answer, so the handler asks it.
+   *
+   * The `null` region is deliberately allowed, and it is the common case rather
+   * than an edge: nothing is focused (`document.body`) right after a click on a
+   * note row, and that is exactly when a user reaches for the arrows. Refusing
+   * it would take away behaviour that works today, which is not what scoping is
+   * for.
+   */
+  const appliesToRegion = (target: EventTarget | null): boolean => {
+    const region = regionOf(target instanceof Element ? target : null);
+    return region === null || region === "sidebar";
+  };
+
   return (e: KeyboardEvent) => {
     if (renamingId !== null) return; // rename mode owns keys
     // A modal dialog (role="alertdialog", e.g. the keyboard-delete confirm gate)
@@ -218,6 +241,7 @@ export function makeKeyboardNavHandler(opts: {
       return;
     }
     if (isEditableTarget(e.target)) return;
+    if (!appliesToRegion(e.target)) return;
     if (sortedIds.length === 0) return;
     const idx = selectedId === null ? -1 : sortedIds.indexOf(selectedId);
 
@@ -270,6 +294,190 @@ export function makeKeyboardNavHandler(opts: {
         // Drop a multi-selection (MYND-367); leave `selectedId` so the editor
         // keeps the open note. No-op when nothing is multi-selected.
         clearMultiSelection?.();
+        return;
+      }
+      default:
+        return;
+    }
+  };
+}
+
+/**
+ * Whether a ROW inside `ref` currently holds the group's Tab stop.
+ *
+ * Exported so `tests/a11y/noteListTabStops.test.tsx` drives THIS function
+ * rather than a copy of it. A private version was written first and the test
+ * reimplemented the same effect in its own harness, which is a fixture that
+ * cannot hold the defect: reverting the fix here would have left that test
+ * green, because it was never reading this code.
+ *
+ * Driven by a MutationObserver rather than by the caller's render cadence, and
+ * the review of this pass is why. A bare `useEffect` with no dependency array
+ * runs when the CALLER renders; the rows are mounted by `VirtualList`, which
+ * re-renders on scroll from its own internal state without re-rendering the
+ * caller. So an ordinary scroll that pushed the stop-holding row out of the
+ * window left this `true` over a tree with no `tabindex="0"` in it, the
+ * container kept `tabIndex={-1}` believing a row had the stop, and the whole
+ * sidebar had no Tab stop at all. Both directions matter: the mirror case
+ * leaves the container AND a row at `0`, which is two stops for one group.
+ *
+ * `attributeFilter: ["tabindex"]` is the third case and neither of the others
+ * covers it: the stop can move between two rows that both stay mounted.
+ */
+export function useRowOwnsTabStop(ref: RefObject<HTMLElement | null>): boolean {
+  const [owns, setOwns] = useState(false);
+  useEffect(() => {
+    const root = ref.current;
+    if (root === null) return;
+    const measure = (): void => {
+      const has = root.querySelector('[role="treeitem"][tabindex="0"]') !== null;
+      setOwns((prev) => (prev === has ? prev : has));
+    };
+    measure();
+    const observer = new MutationObserver(measure);
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["tabindex"],
+    });
+    return () => observer.disconnect();
+  }, [ref]);
+  return owns;
+}
+
+/**
+ * The sidebar tree's own keyboard handler (myne-md/myne#728, task 7).
+ *
+ * `makeKeyboardNavHandler` above is bound at DOCUMENT level and answers arrows
+ * while nothing in particular is focused, which is the state after clicking a
+ * row. It moves the note SELECTION over the note ids, and it cannot do more
+ * than that: folder rows are not notes, so it has never been able to reach
+ * one, which is why a keyboard user could not expand or collapse a folder at
+ * all.
+ *
+ * This one is bound on the tree CONTAINER and takes over whenever focus is on
+ * a row inside it, which is the WAI-ARIA tree pattern: Up/Down walk the rows
+ * (folders included), Left/Right collapse and expand a folder, Enter and Space
+ * activate. It calls `stopPropagation` on every key it handles, so the
+ * document handler stands down rather than the two both acting on one press.
+ *
+ * Landing on a NOTE row also selects it, so the behaviour a keyboard user
+ * already had is preserved rather than replaced: what changes is that folder
+ * rows are now stops on the same walk instead of being skipped.
+ *
+ * Home/End/PageUp/PageDown are deliberately NOT handled here and bubble to the
+ * document handler. It ranges over the whole note list, while this one can
+ * only see the rows the virtualizer has mounted, so its answer to "go to the
+ * end" is right and this one's would be "the end of the window".
+ *
+ * Taking a `rowsOf` reader rather than an element keeps it testable against a
+ * fabricated row list, and keeps the virtualized-window question in one place.
+ */
+export function makeTreeKeydownHandler(opts: {
+  /** The rendered `role="treeitem"` elements, in DOM order. */
+  rowsOf: () => readonly HTMLElement[];
+  /** Move the note selection (and, through the caller, the open note). */
+  select: (id: NoteId) => void;
+  /** Open the note under the cursor (Enter / Space on a note row). */
+  open: (id: NoteId) => void;
+  /** Collapse or expand a folder, by the folder's `node.key`. */
+  toggleFolder: (key: string) => void;
+  /** True while an inline rename owns the keyboard. */
+  renaming: boolean;
+}): (e: {
+  key: string;
+  target: EventTarget | null;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}) => void {
+  const { rowsOf, select, open, toggleFolder, renaming } = opts;
+
+  const focusRow = (row: HTMLElement | undefined): void => {
+    if (row === undefined) return;
+    row.focus();
+    const noteId = row.getAttribute("data-note-id");
+    // A folder row is a focus stop only; a note row is also a selection, which
+    // is what keeps the arrows doing what they already did.
+    if (noteId !== null) select(noteId);
+  };
+
+  return (e) => {
+    if (renaming) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (target === null) return;
+    // The inline rename input lives INSIDE a row, so `closest` would find the
+    // row and swallow the arrows the caret needs.
+    const tag = target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    const row = target.closest<HTMLElement>('[role="treeitem"]');
+    if (row === null) return;
+
+    const rows = rowsOf();
+    const here = rows.indexOf(row);
+    if (here === -1) return;
+
+    const folderKey = row.getAttribute("data-folder-key");
+    const isFolder = folderKey !== null;
+    const expanded = row.getAttribute("aria-expanded");
+
+    const handled = (): void => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    switch (e.key) {
+      case "ArrowDown":
+        handled();
+        focusRow(rows[Math.min(here + 1, rows.length - 1)]);
+        return;
+      case "ArrowUp":
+        handled();
+        focusRow(rows[Math.max(here - 1, 0)]);
+        return;
+      case "ArrowRight":
+        // On a collapsed folder, open it. On an expanded one, step into its
+        // first child, which is the next row by construction in a flattened
+        // tree. On a note (a leaf) it does nothing, which is what the pattern
+        // says a leaf does.
+        if (!isFolder) return;
+        handled();
+        if (expanded === "false") toggleFolder(folderKey);
+        else if (expanded === "true") focusRow(rows[here + 1]);
+        return;
+      case "ArrowLeft": {
+        // On an expanded folder, close it. Otherwise step out to the parent,
+        // which in a flattened tree is the nearest preceding row one level up.
+        //
+        // `handled()` comes AFTER the decision in every branch, the way
+        // ArrowRight above already does it. Consuming the key first meant
+        // ArrowLeft on a top-level leaf was a dead key: it silenced the
+        // document handler and killed the browser default while doing
+        // nothing itself.
+        if (isFolder && expanded === "true") {
+          handled();
+          toggleFolder(folderKey);
+          return;
+        }
+        const level = Number(row.getAttribute("aria-level") ?? "1");
+        for (let i = here - 1; i >= 0; i--) {
+          if (Number(rows[i]?.getAttribute("aria-level") ?? "1") < level) {
+            handled();
+            focusRow(rows[i]);
+            return;
+          }
+        }
+        return;
+      }
+      case "Enter":
+      case " ": {
+        handled();
+        if (isFolder) {
+          toggleFolder(folderKey);
+          return;
+        }
+        const noteId = row.getAttribute("data-note-id");
+        if (noteId !== null) open(noteId);
         return;
       }
       default:
@@ -554,6 +762,27 @@ const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
   marginInlineStart: "auto",
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
+};
+
+/** The selection live region's box: the shared visually-hidden recipe, plus
+ *  the positioning that takes it out of flow.
+ *
+ *  Spread from `VISUALLY_HIDDEN` rather than restated (myne#728, review). A
+ *  hand-rolled second copy lived here for one round, repeating that file's
+ *  own rationale in its own words, while the primitive's header opens "The
+ *  one definition of 'present to a screen reader, absent to the eye'" and
+ *  `e2e/screen-capture-override.e2e.ts` asserts its literal
+ *  `clip-path: inset(50%)` precisely so the constant is the one authority
+ *  behind that assertion. A third copy would have made that false. */
+const VISUALLY_HIDDEN_STYLE: CSSProperties = {
+  ...VISUALLY_HIDDEN,
+  position: "absolute",
+  margin: -1,
+  padding: 0,
+  // The pre-`clip-path` fallback, kept for the same reason the primitive
+  // documents: a live region that is merely off-screen still announces.
+  clip: "rect(0 0 0 0)",
+  border: 0,
 };
 
 const LIST_OUTER_STYLE: CSSProperties = {
@@ -1565,6 +1794,71 @@ function PopulatedList({
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+
+  // The tree container (myne-md/myne#728): the roving tabindex's fallback Tab
+  // stop, and the element focus is tracked against when the selection moves.
+  const treeRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus follows the selection, but ONLY while focus is already inside the
+  // tree. That condition is the whole of it: the arrow handler is bound at
+  // document level and a selection also changes when a note is opened from the
+  // palette, from a wikilink, or from a click, and stealing focus into the
+  // sidebar on any of those would pull the user out of whatever they were
+  // typing in. Inside the tree, though, a selection that moves without focus
+  // moving leaves the ring behind on the previous row and the next Tab leaves
+  // from the wrong place.
+  useEffect(() => {
+    const tree = treeRef.current;
+    if (tree === null || ctx.selectedId === null) return;
+    const active = document.activeElement;
+    if (active === null || !tree.contains(active)) return;
+    // By id rather than by a query, so the row and this lookup cannot disagree
+    // about how a row is addressed; `getElementById` also sidesteps escaping a
+    // note id into a CSS selector. The id is section-scoped, so this asks for
+    // the TREE copy specifically: a favourited note also has a Favorites copy
+    // earlier in the document, and an unscoped lookup used to return that one
+    // and then fail the containment check below, so focus never followed the
+    // selection for any pinned note.
+    const row = document.getElementById(noteRowDomId(ctx.selectedId, "tree"));
+    // Absent means the row is virtualized out; the container keeps the focus
+    // in that case rather than the focus being dropped on the document.
+    if (row !== null && row !== active && tree.contains(row)) row.focus();
+  }, [ctx.selectedId]);
+
+  // Whether a ROW currently carries the list's Tab stop. Measured from the
+  // DOM rather than predicted from state, because the three ways it can be
+  // false are a pref (`noteHighlightActive`), a virtualizer window and a
+  // section split, and a predicate over all three drifts from the rows the
+  // moment any of them changes. A stale `false` costs one redundant Tab stop
+  // for a frame, a stale `true` costs the whole list: the container holds
+  // `tabIndex={-1}` believing a row has the stop, the row is gone, and the
+  // sidebar has no Tab stop at all.
+  //
+  // Driven by a MutationObserver rather than by this component's render
+  // cadence, and the review of this pass is why. A bare `useEffect` with no
+  // dependency array runs when THIS component renders, and the thing it
+  // measures is mounted by `VirtualList`, which re-renders on scroll from its
+  // own internal state without re-rendering us. So an ordinary scroll that
+  // pushed the selected row out of the window left `treeOwnsTabStop` true
+  // over a tree with no `tabindex="0"` in it, which is exactly the
+  // whole-list-loses-its-Tab-stop case above, reachable by turning a wheel.
+  // The observer watches the thing that actually changes: rows entering and
+  // leaving the subtree, and `tabindex` moving between them.
+  const treeOwnsTabStop = useRowOwnsTabStop(treeRef);
+
+  // The selection announcement (myne-md/myne#728, story 11). Moving the
+  // selection with the arrows changes what the editor shows and paints a new
+  // row, and neither of those reaches a screen reader: focus moves between
+  // rows whose names are read, but the note that OPENED as a result is a
+  // separate event the user has to re-orient to find. A polite region states
+  // it once per move.
+  const selectedTitle =
+    ctx.selectedId === null ? null : (ctx.cache.get(ctx.selectedId)?.title ?? null);
+
+  // The tree's own keyboard handler. Rebuilt whenever its inputs move; the
+  // rows are read from the DOM at press time rather than captured, because the
+  // virtualizer mounts and unmounts them under us and a captured list would
+  // name elements that have left the document.
   // Trap + restore focus while the case-merge confirm dialog is open (MYND-93).
   const caseMergeDialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(caseMergeDialogRef, { enabled: fm.caseMerge !== null });
@@ -1614,6 +1908,57 @@ function PopulatedList({
   // just isn't *shown* as active here. Exactly one of {a note, Attachments} is
   // highlighted at any time.
   const noteHighlightActive = view !== "attachments";
+
+  const onTreeKeyDown = useMemo(
+    () =>
+      makeTreeKeydownHandler({
+        rowsOf: () =>
+          treeRef.current === null
+            ? []
+            : Array.from(
+                treeRef.current.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+              ),
+        select: ctx.select,
+        open: (id) => openNote(id),
+        toggleFolder: onToggleFolder,
+        renaming: ctx.renamingId !== null,
+      }),
+    [ctx.select, ctx.renamingId, openNote, onToggleFolder],
+  );
+
+  // The Favorites tree's own keyboard, which it did not have (myne#728,
+  // found in review). The block is declared `role="tree"` because its rows
+  // are `treeitem`s and a treeitem with no tree ancestor is invalid ARIA, but
+  // declaring the role was only half of it: the container carried no
+  // `tabIndex` and no `onKeyDown`, and `NoteRow` gives the roving Tab stop to
+  // the TREE copy of a favourited note and never to the Favorites one, so
+  // every row here was `-1` too. The result announced a tree to a screen
+  // reader that no keyboard could enter, by Tab, by F6 or by arrows, which is
+  // worse than the `aria-required-parent` it was added to fix.
+  //
+  // Its container is unconditionally the Tab stop, unlike the main tree's
+  // measured `treeOwnsTabStop`: no Favorites row can ever own one, by that
+  // same deliberate rule, so there is nothing to measure.
+  const favTreeRef = useRef<HTMLDivElement | null>(null);
+  const onFavTreeKeyDown = useMemo(
+    () =>
+      makeTreeKeydownHandler({
+        rowsOf: () =>
+          favTreeRef.current === null
+            ? []
+            : Array.from(
+                favTreeRef.current.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+              ),
+        select: ctx.select,
+        open: (id) => openNote(id),
+        // Flat by construction: a favourite is a note, never a folder, so the
+        // horizontal pair has nothing to expand here.
+        toggleFolder: () => {},
+        renaming: ctx.renamingId !== null,
+      }),
+    [ctx.select, ctx.renamingId, openNote],
+  );
+
   // Row activation intent router (MYND-166 open modifiers + MYND-367 multi-
   // select). Toggle / range gestures only mutate the selection SET (they never
   // open — see `SidebarState.selectedIds`); every open action first collapses
@@ -1794,11 +2139,22 @@ function PopulatedList({
   // identical NoteRow (only the `favorited` flag + the surrounding drag wrapper
   // differ). Keeping the prop wiring in one place stops the two sites drifting.
   const renderNoteRow = useCallback(
-    (record: TitleRecord, id: NoteId, favorited: boolean) => {
+    (
+      record: TitleRecord,
+      id: NoteId,
+      favorited: boolean,
+      hierarchy?: { level: number; posInSet: number; setSize: number },
+      // Which SECTION is rendering it (myne-md/myne#728). A favourited note is
+      // rendered twice, and the two copies must not share a DOM id or a Tab
+      // stop.
+      section: NoteRowSection = "tree",
+    ) => {
       const role = folderIndexRoles.get(id);
       return (
         <NoteRow
           record={record}
+          hierarchy={hierarchy}
+          section={section}
           selected={noteHighlightActive && ctx.selectedId === id}
           multiSelected={noteHighlightActive && ctx.selectedIds.has(id)}
           renaming={ctx.renamingId === id}
@@ -2568,6 +2924,21 @@ function PopulatedList({
               {t("notes.list.favoritesHeading")}
             </div>
           </div>
+          {/* Favorites is its OWN tree, and it has to be one (myne#728).
+              Its rows are the same `NoteRow`, which is a `role="treeitem"`
+              since this pass, and a treeitem with no `tree` ancestor is the
+              exact `aria-required-parent` violation the pass exists to close.
+              The block is a SIBLING of the main tree below, not part of it,
+              so it cannot borrow that one's role. Flat by construction: a
+              favourite is a note, never a folder. */}
+          <div
+            ref={favTreeRef}
+            data-testid="notes.favorites-tree"
+            role="tree"
+            aria-label={t("notes.list.favoritesHeading")}
+            tabIndex={0}
+            onKeyDown={onFavTreeKeyDown}
+          >
           {favRows.map((row) => {
             if (row.kind !== "note") return null;
             const record = ctx.cache.get(row.id);
@@ -2596,14 +2967,33 @@ function PopulatedList({
                   e.preventDefault();
                   void fm.reorderFavorite(id, dragEdge(e));
                 }}
+                // The non-drag path for that reorder (myne#728, WCAG 2.5.7,
+                // found in review). Alt+Arrow is the rail's existing contract
+                // (`RibbonCustomizeSettings`, `LeftRibbon`), not a new
+                // gesture. Bound on the wrapper rather than inside `NoteRow`
+                // so the tree's own plain arrows, which move the selection,
+                // keep reaching the row untouched.
+                onKeyDown={(e) => {
+                  if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  fm.moveFavorite(id, e.key === "ArrowUp" ? -1 : 1);
+                }}
               >
                 {favPlace && (
                   <div style={insertionLineStyle(favPlace)} aria-hidden="true" />
                 )}
-                {renderNoteRow(record, id, true)}
+                {renderNoteRow(
+                  record,
+                  id,
+                  true,
+                  { level: row.level, posInSet: row.posInSet, setSize: row.setSize },
+                  "favorites",
+                )}
               </div>
             );
           })}
+          </div>
           <div style={FAV_DIVIDER_STYLE} aria-hidden="true" />
         </div>
       )}
@@ -2628,6 +3018,37 @@ function PopulatedList({
         />
       )}
       <div
+        // The sidebar's note hierarchy IS a tree (myne-md/myne#728): folder
+        // rows have carried `role="treeitem"` and `aria-expanded` all along,
+        // with no `tree` above them, which is the `aria-required-parent`
+        // violation the axe baseline recorded. Note rows joined them as
+        // treeitem leaves in the same change, because a treeitem without a
+        // tree ancestor is a violation either way.
+        //
+        // `tabIndex` here is the OTHER half of the rows' roving tabindex: the
+        // container is the Tab stop exactly when no ROW is.
+        //
+        // `treeOwnsTabStop` is computed rather than inferred from
+        // `selectedId`, and the difference is three reachable states in which
+        // the whole sidebar dropped out of the Tab order while this said
+        // otherwise: the Attachments view (where `noteHighlightActive` is
+        // false, so no row is selected even though `selectedId` is not null),
+        // a selected row virtualized out of the window, and a selection that
+        // lives only in the Favorites copy. Caught in review; the comment here
+        // used to claim the virtualized case was handled and the predicate
+        // never looked.
+        ref={treeRef}
+        // Named for the E2E lane (myne#728, review): there are now TWO
+        // `role="tree"` elements in the sidebar and Favorites is the earlier
+        // one in document order, so `querySelector('[role="tree"]')` silently
+        // changes subject the moment a note is favourited. AK-2 was passing
+        // only because its fixture favourites nothing, which its stated
+        // preconditions did not say.
+        data-testid="notes.tree"
+        role="tree"
+        aria-label={t("notes.list.treeLabel")}
+        tabIndex={treeOwnsTabStop ? -1 : 0}
+        onKeyDown={onTreeKeyDown}
         style={{
           flex: 1,
           minHeight: 0,
@@ -2669,6 +3090,11 @@ function PopulatedList({
                   <FolderRow
                     node={row.node}
                     depth={row.depth}
+                    hierarchy={{
+                      level: row.level,
+                      posInSet: row.posInSet,
+                      setSize: row.setSize,
+                    }}
                     collapsed={row.collapsed}
                     empty={row.empty}
                     dropTarget={fm.dropTargetKey === row.node.key}
@@ -2772,12 +3198,34 @@ function PopulatedList({
                       aria-hidden="true"
                     />
                   )}
-                  {renderNoteRow(record, id, favSet.has(id))}
+                  {renderNoteRow(record, id, favSet.has(id), {
+                    level: row.level,
+                    posInSet: row.posInSet,
+                    setSize: row.setSize,
+                  })}
                 </div>
               </DisclosureWrapper>
             );
           }}
         />
+      </div>
+      {/* Selection announcement (myne#728, story 11). Visually hidden rather
+          than `display: none`, which removes an element from the accessibility
+          tree and would make this announce nothing. The single-space fallback
+          is not decoration either: an empty region that later gains text is a
+          change some screen readers do not report, so the region is always
+          non-empty and it is the TEXT that changes. */}
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="notes.selection-announcement"
+        style={VISUALLY_HIDDEN_STYLE}
+      >
+        {selectedTitle === null
+          ? " "
+          : t("notes.list.selectionAnnouncement", {
+              title: selectedTitle.trim() === "" ? t("notes.list.untitled") : selectedTitle,
+            })}
       </div>
       {fm.blockNotice !== null && (
         <div

@@ -1461,6 +1461,15 @@ export async function nameNewNote(session: Session, title: string): Promise<void
 }
 
 
+/**
+ * Create a note and name it.
+ *
+ * **It REUSES the focused pane's active tab** (myne-md/myne#728). Two calls
+ * leave ONE tab open, not two, so a scenario that needs a second tab has to
+ * ask for one: the row's own `open-in-new-tab` context item, through
+ * `rowMenuPick`. Recorded here because the assumption is invisible until a
+ * tab-strip assertion counts one tab and reads like a product bug.
+ */
 export async function createNote(session: Session, title: string): Promise<void> {
   await clickNewMenuItem(session, "notes.create");
   await nameNewNote(session, title);

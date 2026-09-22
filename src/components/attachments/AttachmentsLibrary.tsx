@@ -65,6 +65,7 @@ import { UsedInNotesPopover } from "./UsedInNotesPopover";
 import { DeleteAttachmentDialog } from "./DeleteAttachmentDialog";
 import { CleanUnusedAttachmentsDialog } from "./CleanUnusedAttachmentsDialog";
 import { TranscriptionModal } from "./TranscriptionModal";
+import { MIN_TARGET } from "../primitives/targetSize";
 import {
   formatBytes,
   formatCreatedAt,
@@ -221,9 +222,7 @@ const SEARCH_CLEAR_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 18,
-  height: 18,
-  flexShrink: 0,
+  ...MIN_TARGET,
   padding: 0,
   border: 0,
   borderRadius: "var(--radius-1)",
@@ -241,6 +240,23 @@ const SCROLL_STYLE: CSSProperties = {
   // through which rows scrolled (visible bleed). The header now sticks flush at
   // the scroll top; grid keeps its top breathing room via GRID_STYLE below.
   padding: "0 var(--space-4) var(--space-4)",
+  // WCAG 2.2 SC 2.4.11, focus not obscured (myne-md/myne#728, task 14).
+  //
+  // `LIST_HEADER_STYLE` is `position: sticky; top: 0` with an opaque
+  // background, and the rows under it carry `tabIndex={0}` on their preview
+  // target. Tabbing to a row just above the fold scrolls it to the scroll
+  // top, which is exactly where the header is: the focused control ends up
+  // ENTIRELY behind it, ring and all, and the user is tabbing blind.
+  //
+  // `scroll-padding-top` on the SCROLLER is the mechanism for this, and it is
+  // the reason it beats a `scroll-margin` on each row: the browser applies it
+  // to focus-driven scrolling and to `scrollIntoView` alike, so it covers
+  // paths this code does not own. `--space-6` is 32px, which clears the
+  // header's box (two `--space-2` paddings around one `--text-xs` line, plus
+  // its hairline) with a little slack rather than tracking it exactly; a
+  // clearance that has to be kept equal to a computed height is a clearance
+  // that goes stale the first time the type scale moves.
+  scrollPaddingTop: "var(--space-6)",
 };
 
 const GRID_STYLE: CSSProperties = {
@@ -737,7 +753,13 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   });
 
   return (
-    <main
+    // A `<section>`, not a `<main>` (myne-md/myne#728, task 9). The library
+    // renders INSIDE the editor's centre column, which is the route's one
+    // `main` landmark; a nested second one makes "jump to main" ambiguous and
+    // trips axe's `landmark-unique`. Nothing else about the element changes:
+    // `main` and `section` are both generic flow containers here, and the
+    // region it lives in already carries the name.
+    <section
       onDragOver={(e) => {
         // Only claim the drop when the OS is actually offering files; an
         // in-app note drag must keep falling through to the sidebar.
@@ -946,7 +968,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         text={transcriptModal?.text ?? ""}
         onClose={() => setTranscriptModal(null)}
       />
-    </main>
+    </section>
   );
 }
 

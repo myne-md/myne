@@ -482,10 +482,28 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // Deriving the `itemsKey` under the wrong one fails the AEAD open, so
             // a migrated vault refused every PIN and biometric attempt while the
             // password path branched correctly (myne-md/myne#442 follow-up).
-            let version =
-                protocol::meta_version_of(&meta_bytes).ok_or(QuickUnlockError::InvalidVaultMeta)?;
-            let items_key = protocol::derive_items_key_versioned(version, &root_key, &meta)
-                .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+            // An `NTV6` vault seals `itemsKey` under the GROUP tier, so the
+            // root-tier derive fails there; derive the group key first and build
+            // the slot with it, or the running session reads shared singletons
+            // through the wrong tier.
+            let (items_key, group_key) = if meta_bytes.get(..4)
+                == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+            {
+                let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes)
+                    .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+                let g = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
+                    .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+                let gk = protocol::GroupKey::new(*g);
+                let ik = protocol::unlock_items_key_ntv6(&b2b, &gk)
+                    .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+                (ik, Some(g))
+            } else {
+                let version = protocol::meta_version_of(&meta_bytes)
+                    .ok_or(QuickUnlockError::InvalidVaultMeta)?;
+                let ik = protocol::derive_items_key_versioned(version, &root_key, &meta)
+                    .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
+                (ik, None)
+            };
             let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&meta_bytes);
             // Drop every import source before the slot is installed, for the
             // reason `vault_unlock::commands` states above its own
@@ -513,6 +531,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                     vault_id,
                     UnlockedVault::owner(
                         root_key,
+                        group_key,
                         items_key,
                         meta.items_key_id,
                         host.monotonic_millis(),
@@ -948,6 +967,7 @@ mod tests {
                 vault_id,
                 UnlockedVault::owner(
                     Zeroizing::new(ROOT_KEY),
+                    None,
                     Zeroizing::new(ITEMS_KEY),
                     [0x07u8; 16],
                     0,
@@ -1113,6 +1133,7 @@ mod tests {
                 vault_id,
                 UnlockedVault::owner(
                     Zeroizing::new(ROOT_KEY),
+                    None,
                     Zeroizing::new(ITEMS_KEY),
                     [0x07u8; 16],
                     0,
@@ -1329,11 +1350,17 @@ mod tests {
         .await
         .expect("quick unlock on a migrated (NTV5) vault");
 
-        let (items_key, items_key_id, root_key) = fresh
+        let (items_key, items_key_id, shared) = fresh
             .peek_unlocked_attachment_material()
             .await
             .expect("unlocked");
-        assert_eq!(root_key.as_slice(), &ROOT_KEY);
+        assert_eq!(
+            shared
+                .owner_root_bytes()
+                .expect("an NTV5 session is root-tier")
+                .as_slice(),
+            &ROOT_KEY
+        );
         assert_eq!(items_key.as_slice(), &ITEMS_KEY);
         assert_eq!(items_key_id, [0x07u8; 16]);
     }

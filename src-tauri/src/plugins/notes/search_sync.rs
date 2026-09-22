@@ -36,7 +36,7 @@
 use crate::paths;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 use crate::search::SearchIndexState;
-use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+use protocol::{SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -127,15 +127,16 @@ fn resolve_search_io<'a, R: Runtime>(
 /// single ~345-byte read + parse, same lazy cadence rationale as prefs.
 fn read_account_number_hash(
     vault_meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], SearchSyncError> {
+) -> Result<(protocol::MetaVersion, [u8; VAULT_META_ACCOUNT_HASH_LEN]), SearchSyncError> {
     let bytes = std::fs::read(vault_meta_path).map_err(|_| SearchSyncError::Io)?;
+    let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
     // Either generation (myne-md/myne#433). This failure is swallowed as ONE
     // `warn` upstream, so an `NTV5` rejection here meant search returned zero
     // results forever with nothing user-visible saying why. The core twin
     // (`search_sync_core.rs`) was already version-aware.
     let meta =
         protocol::parse_vault_meta_any(&bytes).map_err(|_| SearchSyncError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
+    Ok((version, meta.account_number_hash))
 }
 
 /// MYND-448a: the per-attachment search docs for a note — `(attachment_id_hex,
@@ -162,13 +163,15 @@ pub(crate) async fn note_attachment_docs(
     if crate::plugins::attachments::reconcile::extract_att_ids(note_body).is_empty() {
         return Vec::new();
     }
-    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+    let Some(shared) = state.peek_unlocked_shared_singleton_key().await else {
         return Vec::new();
     };
-    let Ok(account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta")) else {
+    let Ok((version, account_number_hash)) =
+        read_account_number_hash(&vault_dir.join("vault.meta"))
+    else {
         return Vec::new();
     };
-    let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let key = shared.derive(version, SubkeyRole::AttachmentTextKey);
     let mut memo = std::collections::HashMap::new();
     crate::plugins::attachments::text_cache::collect_attachment_texts(
         note_body,
@@ -290,12 +293,13 @@ impl DesktopAttachmentDocs {
     async fn new(vault_dir: &Path, state: &VaultRuntimeState) -> Result<Self, SearchSyncError> {
         // items_key + items_key_id decrypt MYA1 sources for the lazy backfill of
         // attachments imported before the eager cache existed (MYND-328).
-        let (items_key, items_key_id, root_key) = state
+        let (items_key, items_key_id, shared) = state
             .peek_unlocked_attachment_material()
             .await
             .ok_or(SearchSyncError::SlotNotUnlocked)?;
-        let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
-        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let (version, account_number_hash) =
+            read_account_number_hash(&vault_dir.join("vault.meta"))?;
+        let catalog_key = shared.derive(version, SubkeyRole::AttachmentsCatalogKey);
         // Best-effort: an unreadable catalog yields an empty one, which makes the
         // backfill a no-op rather than failing the whole rebuild.
         let catalog = crate::plugins::attachments::blocking_reads::read_catalog(
@@ -307,7 +311,7 @@ impl DesktopAttachmentDocs {
         Ok(Self {
             vault_dir: vault_dir.to_path_buf(),
             account_number_hash,
-            attachment_text_key: derive_subkey(&root_key, SubkeyRole::AttachmentTextKey),
+            attachment_text_key: shared.derive(version, SubkeyRole::AttachmentTextKey),
             items_key,
             items_key_id,
             catalog,

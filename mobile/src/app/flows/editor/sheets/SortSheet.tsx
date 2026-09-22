@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
+import { tappable } from "../../../a11y/tappable";
 
 /** The Sort sheet — the note-list order picker. Same modal treatment as the
  *  Filter sheet, reached from the icon-only Sort button in the toolbar. */
@@ -16,7 +17,7 @@ export function SortSheet({
   const { t } = useTranslation();
   const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
     <div
-      onClick={onClick}
+      {...tappable({ onActivate: onClick, pressed: on })}
       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", borderTop: first ? undefined : "1px solid var(--line-1)", cursor: "pointer", color: on ? "var(--accent)" : "var(--fg-1)", fontWeight: on ? 600 : 400, fontSize: 16 }}
     >
       {content}

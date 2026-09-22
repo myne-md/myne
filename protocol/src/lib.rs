@@ -76,6 +76,7 @@ pub mod paired_extension;
 pub mod password_policy;
 pub mod person_invite;
 pub mod person_key;
+pub mod person_profile_blob;
 pub mod person_rekey;
 pub mod phrase;
 pub mod prefs;
@@ -113,12 +114,12 @@ pub use aead::{
     aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob,
     aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob,
     aad_membership_blob, aad_membership_roster_blob, aad_note_content_encrypt,
-    aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
+    aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2, aad_person_profile_blob,
     aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
     aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
-    aad_vault_indices_blob, aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2,
-    aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+    aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
+    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
 };
 pub use agent_memory_catalog_blob::{
     decode_agent_memory_catalog_blob, decode_agent_memory_catalog_blob_versioned,
@@ -220,10 +221,13 @@ pub use graph_layout_blob::{
 };
 pub use kdf::{
     derive_password_wrap_key, derive_password_wrap_key_v0_2,
-    derive_person_keypair_wrap_key_from_normalized, derive_recovery_wrap_key,
-    derive_recovery_wrap_key_from_normalized, derive_recovery_wrap_key_from_normalized_v0_2,
-    derive_recovery_wrap_key_v0_2, person_id_hash, ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
-    PERSON_ID_PREFIX,
+    derive_person_keypair_wrap_key_from_normalized, derive_person_server_auth_key_from_normalized,
+    derive_person_vault_profile_key, derive_person_vault_profile_key_from_normalized,
+    derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
+    derive_recovery_wrap_key_from_normalized_v0_2, derive_recovery_wrap_key_v0_2, person_id_hash,
+    person_profile_id, ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN, PERSON_ID_PREFIX,
+    PERSON_PROFILE_ID_PREFIX, PERSON_VAULT_PROFILE_SALT_RANDOM,
+    SALT_PREFIX_PERSON_SERVER_AUTH_V0_2, SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2,
 };
 pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
@@ -241,6 +245,12 @@ pub use person_key::{
     PERSON_ED25519_PK_LEN, PERSON_ED25519_SEED_LEN, PERSON_ED25519_SIG_LEN, PERSON_EK_LEN,
     PERSON_FINGERPRINT_LEN, PERSON_MLDSA_SEED_LEN, PERSON_MLDSA_SIG_LEN, PERSON_MLDSA_VK_LEN,
     PERSON_PLAINTEXT_LEN, PERSON_SEAL_NONCE_LEN, PERSON_SHARED_KEY_LEN,
+};
+pub use person_profile_blob::{
+    decode_person_profile_blob, encode_person_profile_blob, encode_person_profile_blob_raw,
+    PersonProfileBlobError, MAX_PERSON_PROFILE_PLAINTEXT_LEN, PERSON_PROFILE_BLOB_FORMAT_VERSION,
+    PERSON_PROFILE_BLOB_HEADER_LEN, PERSON_PROFILE_BLOB_MAGIC,
+    PERSON_PROFILE_BLOB_PROTOCOL_VERSION, PERSON_PROFILE_ID_LEN,
 };
 pub use phrase::{
     generate_recovery_phrase, normalize_user_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
@@ -268,7 +278,10 @@ pub use search_blob::{
     SEARCH_BLOB_PROTOCOL_VERSION,
 };
 pub use singleton_migrate::reseal_kek_envelope_v0_2;
-pub use subkey::{derive_subkey, derive_subkey_v0_2, derive_subkey_versioned, SubkeyRole};
+pub use subkey::{
+    derive_group_subkey_v0_2, derive_owner_subkey_v0_2, derive_subkey, derive_subkey_v0_2,
+    derive_subkey_versioned, GroupKey, GroupRole, OwnerKey, OwnerRole, SubkeyRole,
+};
 pub use template::{render, supported_tokens, RenderContext};
 pub use themes_blob::{
     decode_themes_blob, decode_themes_blob_versioned, encode_themes_blob, encode_themes_blob_raw,
@@ -306,11 +319,14 @@ pub use vault_meta::{
 };
 pub use vault_meta_v0_2::{
     derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, meta_version_of,
-    parse_vault_meta_any, parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
+    parse_vault_meta_any, parse_vault_meta_ntv6, parse_vault_meta_v0_2,
+    rewrite_vault_meta_password_side_ntv6, rewrite_vault_meta_password_side_v0_2,
     rewrite_vault_meta_password_side_versioned, seal_membership_raw, seal_membership_roster_raw,
-    serialize_vault_meta_v0_2, serialize_vault_meta_versioned, unlock_root_key_v0_2_password,
-    unlock_root_key_v0_2_recovery, unseal_membership, unseal_membership_roster,
-    VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
+    serialize_vault_meta_ntv6, serialize_vault_meta_v0_2, serialize_vault_meta_versioned,
+    unlock_group_key_ntv6, unlock_items_key_ntv6, unlock_root_key_v0_2_password,
+    unlock_root_key_v0_2_recovery, unseal_membership, unseal_membership_roster, B2bVaultMeta,
+    VAULT_META_NTV6_MAGIC, VAULT_META_NTV6_PROTOCOL_VERSION, VAULT_META_V0_2_MAGIC,
+    VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

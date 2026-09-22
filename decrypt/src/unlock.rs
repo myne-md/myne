@@ -15,6 +15,8 @@ use zeroize::Zeroizing;
 /// plus the `root_key` (for the prefs + catalog subkeys).
 pub struct UnlockedVault {
     pub root_key: Zeroizing<[u8; 32]>,
+    /// Present for an `NTV6` vault (the group tier the export walk needs).
+    pub group_key: Option<Zeroizing<[u8; 32]>>,
     pub items_key: Zeroizing<[u8; 32]>,
     pub items_key_id: [u8; 16],
     pub version: MetaVersion,
@@ -31,12 +33,14 @@ pub enum UnlockError {
 }
 
 /// Read `vault.meta` from `vault_dir` and parse it as either generation.
-fn read_meta(vault_dir: &std::path::Path) -> Result<(VaultMeta, MetaVersion), UnlockError> {
+fn read_meta(
+    vault_dir: &std::path::Path,
+) -> Result<(VaultMeta, MetaVersion, Vec<u8>), UnlockError> {
     let bytes =
         std::fs::read(vault_dir.join("vault.meta")).map_err(|_| UnlockError::InvalidVaultMeta)?;
     let version = protocol::meta_version_of(&bytes).ok_or(UnlockError::InvalidVaultMeta)?;
     let meta = protocol::parse_vault_meta_any(&bytes).map_err(|_| UnlockError::InvalidVaultMeta)?;
-    Ok((meta, version))
+    Ok((meta, version, bytes))
 }
 
 /// Derive `root_key` from the master password, for either generation.
@@ -103,19 +107,34 @@ fn root_key_from_phrase(
     }
 }
 
-/// Derive `items_key` from `root_key`, for either generation.
+/// Derive `items_key` (and the group key for an `NTV6` vault) from `root_key`.
+#[allow(clippy::type_complexity)]
 fn items_key_from_root(
     root_key: &[u8; 32],
     meta: &VaultMeta,
     version: MetaVersion,
-) -> Result<Zeroizing<[u8; 32]>, UnlockError> {
-    match version {
+    bytes: &[u8],
+) -> Result<(Zeroizing<[u8; 32]>, Option<Zeroizing<[u8; 32]>>), UnlockError> {
+    // An `NTV6` vault seals `itemsKey` under the GROUP tier; the root-tier
+    // derive fails there, so unwrap the group key first and return it too.
+    if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        let b2b =
+            protocol::parse_vault_meta_ntv6(bytes).map_err(|_| UnlockError::InvalidVaultMeta)?;
+        let group = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
+            .map_err(|_| UnlockError::InvalidVaultMeta)?;
+        let group_key = protocol::GroupKey::new(*group);
+        let items = protocol::unlock_items_key_ntv6(&b2b, &group_key)
+            .map_err(|_| UnlockError::InvalidVaultMeta)?;
+        return Ok((items, Some(group)));
+    }
+    let items = match version {
         MetaVersion::V0_1 => {
-            protocol::derive_items_key(root_key, meta).map_err(|_| UnlockError::InvalidVaultMeta)
+            protocol::derive_items_key(root_key, meta).map_err(|_| UnlockError::InvalidVaultMeta)?
         }
         MetaVersion::V0_2 => protocol::derive_items_key_v0_2(root_key, meta)
-            .map_err(|_| UnlockError::InvalidVaultMeta),
-    }
+            .map_err(|_| UnlockError::InvalidVaultMeta)?,
+    };
+    Ok((items, None))
 }
 
 /// AEAD-open a 32-byte secret and copy it into a fresh `Zeroizing` array.
@@ -140,13 +159,14 @@ pub fn unlock_with_password(
     vault_dir: &std::path::Path,
     password: &str,
 ) -> Result<UnlockedVault, UnlockError> {
-    let (meta, version) = read_meta(vault_dir)?;
+    let (meta, version, bytes) = read_meta(vault_dir)?;
     eprint!("Deriving the vault key (Argon2id, ~1-3 s)... ");
     let root_key = root_key_from_password(password, &meta, version)?;
-    let items_key = items_key_from_root(&root_key, &meta, version)?;
+    let (items_key, group_key) = items_key_from_root(&root_key, &meta, version, &bytes)?;
     eprintln!("done");
     Ok(UnlockedVault {
         root_key,
+        group_key,
         items_key,
         items_key_id: meta.items_key_id,
         version,
@@ -158,13 +178,14 @@ pub fn unlock_with_phrase(
     vault_dir: &std::path::Path,
     phrase_normalized: &str,
 ) -> Result<UnlockedVault, UnlockError> {
-    let (meta, version) = read_meta(vault_dir)?;
+    let (meta, version, bytes) = read_meta(vault_dir)?;
     eprint!("Deriving the vault key (Argon2id, ~1-3 s)... ");
     let root_key = root_key_from_phrase(phrase_normalized, &meta, version)?;
-    let items_key = items_key_from_root(&root_key, &meta, version)?;
+    let (items_key, group_key) = items_key_from_root(&root_key, &meta, version, &bytes)?;
     eprintln!("done");
     Ok(UnlockedVault {
         root_key,
+        group_key,
         items_key,
         items_key_id: meta.items_key_id,
         version,

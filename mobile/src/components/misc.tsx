@@ -189,6 +189,11 @@ export function Sheet({
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div
+        // The scrim is a touch convenience, not a control (myne#728): the
+        // sheet's own Done/Cancel and the back gesture are the reachable
+        // ways out, and announcing a full-screen unnamed button in front of
+        // every sheet would be worse than announcing none.
+        role="presentation"
         onClick={onClose ? close : undefined}
         style={{
           position: "absolute",
@@ -277,6 +282,8 @@ export function SidePanel({
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 45 }}>
       <div
+        // A second scrim, same reasoning as the one above (myne#728).
+        role="presentation"
         onClick={close}
         style={{
           position: "absolute",

@@ -57,11 +57,9 @@ function settleWith(edits: ProposedEdit[]) {
       notesRead: 1,
       charsOffDevice: null,
       excludedCount: 0,
-      // Inherited from develop, where `settleStep`'s parameter type gained this
-      // field and this fixture was not updated. It reddens
-      // `check-test-typecheck.mjs`, a blocking ratchet, for every branch cut
-      // from develop, so it is fixed here rather than left for the next person
-      // (myne-md/myne#727).
+      // myne#697 made this required on the settle payload without updating this
+      // fixture, so `check-test-typecheck.mjs` has been red on develop since. The
+      // test trees are outside `pnpm build`, which is why nothing else said so.
       memoryUpdated: 0,
     },
     currentRunEpoch(),

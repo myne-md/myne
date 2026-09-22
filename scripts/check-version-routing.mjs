@@ -196,38 +196,16 @@ function callsProtocolName(line, name, imports) {
  */
 const ALLOWED = new Map([
   // ── legitimately v0.1: REBUILDABLE, NEVER-SYNCED CACHES ───────────────────
-  // §10.4.1 point 2 DROPS these rather than re-sealing them, and says why their
-  // KEK may stay on the v0.1 context: it re-derives through `derive_subkey` on
-  // the v0.2 root, which is self-consistent by construction because a cache is
-  // written and read only on the migrated vault — it never crosses a generation
-  // boundary. Routing them would be churn with no reader on the other side.
-  ["core/src/plugins/graph_layout/commands.rs#kek", [2, "cache: vault.graph (GraphLayoutKey), dropped by the migration"]],
-  ["core/src/plugins/notes/search_sync_core.rs#kek", [2, "cache: vault.search (SearchIndexKey), dropped by the migration"]],
-  ["core/src/plugins/vault_indices/commands.rs#kek", [2, "cache: vault.indices (VaultIndicesKey), dropped by the migration"]],
-  ["core/src/plugins/workspace/commands.rs#kek", [2, "cache: vault.workspace (SessionStateKey), dropped by the migration"]],
-  ["src-tauri/src/plugins/notes/search_sync.rs#kek", [3, "cache: vault.search (SearchIndexKey) — the desktop twin"]],
-  ["src-tauri/src/plugins/local_inference/hydrate.rs#kek", [1, "cache: vault.embeddings (AiEmbeddingsKey), dropped by the migration"]],
-  ["src-tauri/src/plugins/local_inference/commands.rs#kek", [2, "cache: attachments-text (AttachmentTextKey), dropped by the migration"]],
-  // The mobile twin of the entry above, verbatim reason and verbatim count,
-  // which is the point: it seals the same MYE1 transcript cache under the same
-  // subkey role, so it is legitimate for exactly the same reason. It enters the
-  // record on myne-md/myne#479, with the tree (`mobile/src-tauri/src`) rather
-  // than after a change to the file. Its `#meta` sibling did NOT get an entry
-  // and was fixed instead: desktop moved to `parse_vault_meta_any` in
-  // myne-md/myne#433 and this twin never did, so on a migrated vault it
-  // answered `None` and the cache silently stopped sealing.
-  ["mobile/src-tauri/src/plugins/local_inference/commands.rs#kek", [2, "cache: attachments-text (AttachmentTextKey), dropped by the migration, the mobile twin of the desktop entry above"]],
-  ["src-tauri/src/plugins/attachments/read_text.rs#kek", [1, "cache: attachments-text (AttachmentTextKey)"]],
-  // The WRITER of that same cache, and it belongs in this table for exactly the
-  // reason its six readers do. `attachments-text/` is device-local, never
-  // synced and rebuildable, so §10.4.1 point 2's treatment applies: the KEK
-  // re-derives through the v0.1 context on a v0.2 root, self-consistent because
-  // a cache never crosses a generation boundary. It called
-  // `derive_subkey_versioned` until myne-md/myne#529, which made the writer
-  // disagree with every reader on a v0.2 vault and left the cache write-only —
-  // an OCR'd image never reached search, a voice transcript never rendered, and
-  // both misses look exactly like "there is nothing cached".
-  ["core/src/plugins/attachments/commands.rs#kek", [1, "cache: attachments-text (AttachmentTextKey), the write side of the six readers below"]],
+  // §10.4.1 point 2 DROPS these rather than re-sealing them. The SHARED
+  // singleton KEKs (prefs, search, workspace, indices, graph, themes,
+  // dictionary, attachments catalog and the attachment-text cache) used to be
+  // recorded here because every reader derived them with the v0.1-only
+  // `derive_subkey`. myne-md/myne#712 task 6 routed them through
+  // `SharedSingletonKey::derive`, which picks the GROUP tier on an `NTV6` vault
+  // and the root tier otherwise, so those v0.1-only calls are gone and their
+  // entries went stale in the same run. What remains here is genuinely
+  // root-only: `AiEmbeddingsKey` is an owner role, not a shared one.
+  ["src-tauri/src/plugins/local_inference/hydrate.rs#kek", [1, "cache: vault.embeddings (AiEmbeddingsKey), owner-only, dropped by the migration"]],
 
   // ── legitimately v0.1: SYNC-PLANE IDENTITY AND AUTH ───────────────────────
   // The reserved sync-ids (`catalog-`/`prefs-`/`themes-sync-id`) and the SCRAM
@@ -279,7 +257,6 @@ const ALLOWED = new Map([
   // EMPTY, and that is the point: #432/#433 drove it to zero. A new entry here
   // needs an argument for why the surface may stay broken on a migrated vault.
   ["core/src/plugins/notes/commands.rs#note", [3, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_write_batch"]],
-  ["src-tauri/src/plugins/attachments/ocr_queue.rs#kek", [2, "cache: attachments-text (AttachmentTextKey)"]],
 ]);
 
 const SKIP_DIRS = new Set(["target"]);

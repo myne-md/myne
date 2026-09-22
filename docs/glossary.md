@@ -570,7 +570,7 @@ Used in: `vision.md` Phase 1 Scope
 
 ### **color group** &nbsp; 📦 *Product*
 
-An ordered rule pairing a [filter AST](#filter-ast) with a palette color, applied to [graph view](#graph-view) nodes **at paint time**, the notes a rule matches render in its color; a note matching no rule keeps the neutral node color. Rules are evaluated **first-match-wins in list order**, so array position *is* precedence; a disabled rule stays in the list and contributes no match. Persisted as the `color_groups` field of [`vault.prefs`](#vaultprefs), a nested array of `{id, name, color, enabled, filter}` objects encoded in caller order verbatim (never sorted, unlike `saved_views`), omitted when empty so a vault that never opens the feature stays byte-identical to a pre-feature blob (`spec/protocol.md` §9.5.2). Phase 2 sync classification is **shared, whole-value LWW**, a per-key or set-union merge would silently corrupt precedence. `color` is a design-token palette key, not a hex value, so group colors follow theme, dark mode and a [custom theme](#custom-theme)'s override like every other token; an unresolvable key degrades to neutral. v1 exposes only the `hasTag` and `inFolder` leaves through the authoring UI while persisting the full AST, so widening later is UI-only; an unsupported leaf degrades to no-match rather than throwing, so a rule authored by a newer client never breaks an older one's render. **Non-load-bearing** (cosmetic, AS3-Sensitive content inside the AEAD blob), a tampered or replayed `vault.prefs` can at worst reset or stale the rule set. Color is a render-time layer only: a colour change repaints and never re-runs the graph layout. The one exception is a rule change that ADDS, REMOVES or DISABLES a bare-`hasTag` rule, because such a rule claims a [tag node](#tag-node) and tag nodes are part of the model the layout arranges (`decisions/ui/0596`); that rebuild is warm-started from the positions on screen and does not move the camera. Distinct from a [color label](#color-label), which colors a *sidebar row* and is keyed per note/folder rather than by a filter. (MYND-604)
+An ordered rule pairing a [filter AST](#filter-ast) with a palette color, applied to [graph view](#graph-view) nodes **at paint time**, the notes a rule matches render in its color; a note matching no rule keeps the neutral node color. Rules are evaluated **first-match-wins in list order**, so array position *is* precedence; a disabled rule stays in the list and contributes no match. Persisted as the `color_groups` field of [`vault.prefs`](#vaultprefs), a nested array of `{id, name, color, enabled, filter}` objects encoded in caller order verbatim (never sorted, unlike `saved_views`), omitted when empty so a vault that never opens the feature stays byte-identical to a pre-feature blob (`spec/protocol.md` §9.5.2). Phase 2 sync classification is **shared, whole-value LWW**, a per-key or set-union merge would silently corrupt precedence. `color` is a design-token palette key, not a hex value, so group colors follow theme, dark mode and a [custom theme](#custom-theme)'s override like every other token; an unresolvable key degrades to neutral. v1 exposes only the `hasTag` and `inFolder` leaves through the authoring UI while persisting the full AST, so widening later is UI-only; an unsupported leaf degrades to no-match rather than throwing, so a rule authored by a newer client never breaks an older one's render. **Non-load-bearing** (cosmetic, AS3-Sensitive content inside the AEAD blob), a tampered or replayed `vault.prefs` can at worst reset or stale the rule set. Color is a render-time layer only: a colour change repaints and never re-runs the graph layout. The one exception is a rule change that ADDS, REMOVES or DISABLES a bare-`hasTag` rule, because such a rule claims a [tag node](#tag-node) and tag nodes are part of the model the layout arranges (`decisions/ui/0602`); that rebuild is warm-started from the positions on screen and does not move the camera. Distinct from a [color label](#color-label), which colors a *sidebar row* and is keyed per note/folder rather than by a filter. (MYND-604)
 
 Used in: `spec/protocol.md` §9.5.2
 
@@ -981,6 +981,31 @@ A one-shot, user-initiated operation that decrypts user content and writes it as
 
 Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite), 2026-08-15 (mobile export directory excluded from platform backup)
 
+### **export chokepoint** &nbsp; 📦 *Product*
+
+The single host command every mobile plaintext [export](#export) asks for its destination,
+`plugin:export-dir|export_path` (`mobile/src-tauri/src/plugins/export_dir/`, myne-md/myne#517). It
+resolves the export directory, creates it, applies the [platform backup](#platform-backup) exclusion
+and sanitizes the supplied filename to a bare basename, in one call, and returns a path only when all
+four succeeded. Before it, four flows each composed `join(await documentDir(), name)` in the WebView
+and relied on a startup hook having excluded that directory, with the path-traversal sanitizer
+hand-rolled in two of the four and absent from the other two.
+
+**What it does not do**, because the name invites the stronger reading: it is not a containment
+boundary. The three export commands still take a caller-supplied path string, and a literal absolute
+path needs no `plugin:path` grant, so the mobile capability dropping the whole `core:path:` namespace
+does not close that route; the note PDF does not go through a command at all. Containment stays with
+the writers, which is where `threat-model.md` TB3's plaintext-egress exception already puts
+it. (This read `TB6` until review round 6. TB6 is server persistent storage; §3 defines no
+WebView-to-host boundary row, so the old citation pointed at a boundary the model does not have.) What the chokepoint gives is the
+only way to obtain an export directory guaranteed to exist and to be excluded, and one place where
+the ordering (create, then exclude, then hand over) is asserted by a test rather than described by a
+comment. Structurally the twin of the [prefs chokepoint](#prefs-chokepoint): one function every write
+of a kind must pass through, with a guard holding the tree to it
+(`scripts/check-mobile-export-backup.mjs`).
+
+Used in: `decisions.md` 2026-09-19; `threat-model.md` §3 (TB3); `mobile/src/platform/path.ts`; `mobile/src-tauri/src/plugins/export_dir/`
+
 ### **extended retention** &nbsp; 📦 *Product*
 
 A **self-host-only** operator flag (`MYNE_EXTENDED_RETENTION`) that disables the server's Layer-2 ciphertext reclamation, so deleted blobs are kept past the [tombstone horizon](#tombstone-horizon). A documented, deliberate **policy deviation**, never a default: it **weakens the user's "delete means gone" expectation** and the §6 operator obligation not to retain deleted ciphertext past the horizon. Hosted MUST NOT enable it. The structural guarantees (no plaintext, no required IP log) are unaffected — extended retention trades a retention-policy obligation, not a confidentiality guarantee. Phase 2.
@@ -1148,9 +1173,74 @@ Used in: `src/notes/components/GraphList.tsx`; myne-md/myne#727
 
 ### **graph view** &nbsp; 📦 *Product*
 
-The visualization of `[[wikilink]]` relationships between notes as a force-directed graph. Myne Phase 1 includes a minimal graph view, [d3-force](#d3-force) layout + a hand-rolled canvas renderer, in a separate, lazy-loaded panel (`vision.md` Phase 1 Scope). Nodes are notes, plus, in the whole-vault view, one [tag node](#tag-node) per tag claimed by an enabled bare-`hasTag` [color group](#color-group) rule (myne-md/myne#727, `decisions/ui/0596`, which supersedes the notes-only clause of `decisions.md` 2026-06-08); folders remain a filter dimension only. Edges are resolved cross-note references, plus one edge per (tag node, note) pair.
+The visualization of `[[wikilink]]` relationships between notes as a force-directed graph. Myne Phase 1 includes a minimal graph view, [d3-force](#d3-force) layout + a hand-rolled canvas renderer, in a separate, lazy-loaded panel (`vision.md` Phase 1 Scope). Nodes are notes, plus, in the whole-vault view, one [tag node](#tag-node) per tag claimed by an enabled bare-`hasTag` [color group](#color-group) rule (myne-md/myne#727, `decisions/ui/0602`, which supersedes the notes-only clause of `decisions.md` 2026-06-08); folders remain a filter dimension only. Edges are resolved cross-note references, plus one edge per (tag node, note) pair.
 
 Used in: `vision.md` Phase 1 Scope
+
+### **group key** &nbsp; 🗝️ *Key/identifier*
+
+A random 32-byte shared content authority for a B2B vault. It opens the current
+group content epoch but never opens the owner-only `root_key` authority. Removing
+a member retires its epoch and generates a fresh group key for the remaining
+members; it cannot revoke ciphertext the removed member already copied.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §3.4
+
+### **group-key epoch** &nbsp; 🗝️ *Key/identifier*
+
+The monotonically increasing generation number of a B2B vault's [group
+key](#group-key), starting at 1. Removing a member retires the current epoch and
+mints the next (`epoch + 1`); a reader accepts a strictly-greater owner-signed
+epoch only and refuses an EQUAL epoch rather than tie-breaking, so two
+conflicting rosters at one epoch cannot both be canonical. The epoch is carried
+in the owner-signed roster and bound into the group-key-wrap AAD.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.2
+
+### **group package** &nbsp; 🗝️ *Key/identifier*
+
+One live member's owner-signed recipient record for a group-key epoch: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`recipient_fingerprint_hex`, `wrapped_group_key_hex`) under the signature class
+`"myne.group-package v1|"`, where the wrapped key is the PQ-hybrid person
+envelope over the 32-byte `group_key`. A reader verifies both owner signatures,
+requires the expected vault, epoch and local fingerprint, and requires byte
+equality with that member's live row in the already-verified roster.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+### **group roster** &nbsp; 🗝️ *Key/identifier*
+
+The owner-authored, owner-double-signed membership list of an `NTV6` vault: a
+canonical-JSON payload (`account_number_hash_hex`, positive `group_key_epoch`,
+`owner_fingerprint_hex`, and `members` strictly sorted by fingerprint) under the
+signature class `"myne.group-roster v1|"`. It lives SEALED (under the group tier,
+§9.3.3) in the `NTV6` `vault.meta`, so the sync server reads neither the member
+fingerprints nor the display names. A member verifies it from the pinned owner
+public half; neither `root_key` nor a root-derived membership key participates.
+
+Used in: `docs/spec/protocol.md` §9.3.3
+
+
+### **roster continuity** &nbsp; 📋 *Protocol*
+
+A live roster row's identity-continuity state in an `NTV6` group roster:
+`current` (no prior identity), `changed` (the row's fingerprint superseded a
+previous one and the owner has not vouched for it) or `owner-confirmed` (the
+owner re-confirmed the transition). The UI renders `changed` and
+`owner-confirmed` differently on purpose. Distinct from the fork-consistency
+"continuity guarantee" sense of continuity used by the version vector.
+
+### **group retirement record** &nbsp; 🗝️ *Key/identifier*
+
+An owner-double-signed (`"myne.group-retirement v1|"`) fixed 33-byte record that
+names the namespace a retired group-key epoch applied to (group-key or content),
+the retired epoch and its immediate replacement (`retired + 1`). It carries NO
+timestamp, so a removed member's package stream cannot be ordered by it, and
+both signature halves are mandatory, so an untrusted server cannot forge a
+retirement.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.4
 
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
@@ -1163,6 +1253,14 @@ Used in: `threat-model.md` §6, §7
 The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialized full head record INCLUDING its head_mac)`. Hashing over the MAC (not just the pre-MAC content) makes the hash-DAG bind **authentication**, not merely content. A head's parent links (`prev_head_hash[]`) are the `head_id`s of its parents — one parent = linear extension, two = a legitimate concurrent-push merge (byte-sorted lexicographically for encoding determinism). Domain-separated from the [vault-head manifest](#vault-head-manifest) hash and the §5.1 [CTX commitment](#ctx-commitment) by a distinct leading prefix, so no SHA-256 input is reinterpretable as another's. Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head)
+
+### **heading record** &nbsp; 📦 *Product*
+
+The per-note record set the structured index ([`vault.indices`](#vaultindices) / [`MYI1`](#myi1), `spec/protocol.md` §9.8.2) holds for each heading in a note body: `{text, level}` and nothing else. The source for the vault-wide `[[##` picker, replacing a read-and-reparse of every note body on each index change. Sibling of the [line-task projection](#line-task-projection) and the [block anchor](#block-anchor) records in the same payload, and the cheapest of the three: the client fills it from the parse an index update already runs, so it costs no extra pass.
+
+Two deliberate omissions. The **byte offsets** a heading scanner also produces are not stored: they serve heading folding, which runs against the open note's own parse, and a vault-wide copy of them would go stale. And a row carries **no note title or folder**, unlike a block-anchor row, because the consumer must join against the resident note-set regardless, to drop trashed and template notes, and that join already holds both. The index itself is trash-blind.
+
+Used in: `spec/protocol.md` §9.8.2; `decisions.md` 2026-09-19 (0594)
 
 ### **HKDF (HKDF-SHA-256)** &nbsp; 🔐 *Primitive*
 
@@ -1314,7 +1412,7 @@ Used in: `decisions.md` 2026-07-25
 
 *(Alias: orphan note.)*
 
-A note with **zero resolved cross-note wikilink edges** in the graph view, nothing links to it and it links to nothing (MYND-198 / SYNC-13). Graph-STRUCTURAL, not "no authored links": a note whose only outbound link is broken (`[[Typo]]`) is still isolated (a broken link is not an edge), and a note connected only by a shared tag is still isolated (a tag node is a HUB the graph draws in the whole-vault view, not an edge between the notes carrying it, `decisions/ui/0596`). Embed / anchor / block-ref references (`![[Note]]`, `[[Note#h]]`, `[[Note^b]]`) DO count as edges, so a note reached only by an embed is not isolated. Surfaced by the graph view's "Isolated" filter (a degree-0 index query that works at any vault size).
+A note with **zero resolved cross-note wikilink edges** in the graph view, nothing links to it and it links to nothing (MYND-198 / SYNC-13). Graph-STRUCTURAL, not "no authored links": a note whose only outbound link is broken (`[[Typo]]`) is still isolated (a broken link is not an edge), and a note connected only by a shared tag is still isolated (a tag node is a HUB the graph draws in the whole-vault view, not an edge between the notes carrying it, `decisions/ui/0602`). Embed / anchor / block-ref references (`![[Note]]`, `[[Note#h]]`, `[[Note^b]]`) DO count as edges, so a note reached only by an embed is not isolated. Surfaced by the graph view's "Isolated" filter (a degree-0 index query that works at any vault size).
 
 Used in: `vision.md` Phase 1 Scope (graph view); `decisions.md` 2026-06-08 (graph visualization)
 
@@ -1970,6 +2068,31 @@ a person is who they are regardless of which devices they hold.
 Used in: `design-notes/protocol/0592`; `myne-md/myne#698`.
 
 
+### **person key transition** &nbsp; 🗝️ *Key/identifier*
+
+The frozen signature class `"myne.person-key-transition v1|"` for a visible
+person-key continuity transition (myne-md/myne#712, `decisions/protocol/0594`).
+ALLOCATED, no frame is shipped yet: the class is declared so a later
+identity-re-roll feature cannot choose its own. Do not emit it.
+
+### **person private profile** &nbsp; 📋 *Protocol*
+
+A sealed `MYY5` record at `profiles/<profile-id>` scoped to one person and one
+vault for private AI material (chat history, agent memory, personality
+directive). It is not shared group state: the KEK is derived from the person's
+OWN recovery phrase under the salt domain
+`"myne.v0.2 argon2id-person-vault-profile|"` with a fixed (non-secret) salt
+randomizer, so it opens on every client from the phrase alone and neither the
+group key nor the owner `root_key` can read it. The `profile-id` is
+`SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
+and is bound into the AAD with `account_number_hash`, so a profile moved to
+another person or vault fails verification. Provider choice, credential and
+egress consent are deliberately NOT in this blob (device-local). Removal and
+scheduled deletion make no recall guarantee.
+
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.28
+
+
 
 ### **Personal dictionary** &nbsp; 📦 *Product*
 
@@ -1996,15 +2119,15 @@ A short piece of dictated note text captured on the native-SwiftUI Apple Watch c
 
 ### **platform backup** &nbsp; ⚠️ *Threat*
 
-The **operating system's own** automatic copy of an app's files to the vendor's cloud: iCloud Backup on iOS, Auto Backup on Android, both on by default and neither authorized per file by the user. **Not** a Myne feature and not the [vault backup file](#vault-backup-file): the naming collision is unfortunate and worth holding, because every other backup term in this glossary means a copy Myne made deliberately, and this one means a copy the platform made without asking. It matters because it is a second [egress](#off-device-egress) channel across TB3 alongside the [export](#export) the user asked for: both platforms include the app directory Myne writes plaintext exports into, so a saved recovery phrase, which alone reconstructs the vault, was reaching Apple and Google until myne-md/myne#491. Myne declares that one directory excluded on both platforms (`NSURLIsExcludedFromBackupKey` on iOS; `android:dataExtractionRules` plus `android:fullBackupContent`, covering cloud backup **and** device transfer, on Android) and deliberately leaves the **encrypted vault** in the backup, which discloses nothing and is a real recovery path for a user who does not sync. Two limits belong to the term: the exclusion's *effect* has not been observed on a device (the mechanism is in place and `mobile/docs/dev/device-matrix.md` §8 rows 8.9/8.10 own the proof), and copies already taken before it landed cannot be retracted.
+The **operating system's own** automatic copy of an app's files to the vendor's cloud: iCloud Backup on iOS, Auto Backup on Android, both on by default and neither authorized per file by the user. **Not** a Myne feature and not the [vault backup file](#vault-backup-file): the naming collision is unfortunate and worth holding, because every other backup term in this glossary means a copy Myne made deliberately, and this one means a copy the platform made without asking. It matters because it is a second [egress](#off-device-egress) channel across TB3 alongside the [export](#export) the user asked for: both platforms include the app directory Myne writes plaintext exports into, so a saved recovery phrase, which alone reconstructs the vault, was reaching Apple and Google until myne-md/myne#491. Myne declares that one directory excluded on both platforms (`NSURLIsExcludedFromBackupKey` on iOS; `android:dataExtractionRules` plus `android:fullBackupContent`, covering cloud backup **and** device transfer, on Android) and deliberately leaves the **encrypted vault** in the backup, which discloses nothing and is a real recovery path for a user who does not sync. On iOS the exclusion is applied at two moments and by one body (myne-md/myne#517): once at startup, which also repairs a container restored from an older backup, and again inside the single host command that resolves an export destination, which returns a path only after the flag reads back as set. The directory is therefore excluded before anything can be written into it, which is an ordering rather than a promise, and it is asserted by a test. Two limits belong to the term: the exclusion's *effect* has not been observed on a device (the mechanism is in place and `mobile/docs/dev/device-matrix.md` §8 rows 8.9/8.10 own the proof), and copies already taken before it landed cannot be retracted.
 
-Used in: `threat-model.md` §3 (TB3), §4 (A5), §5; `decisions.md` 2026-08-15 (mobile export directory excluded from platform backup)
+Used in: `threat-model.md` §3 (TB3), §4 (A5), §5; `decisions.md` 2026-08-15 (mobile export directory excluded from platform backup), 2026-09-19 (the export destination becomes a host chokepoint that applies the exclusion in the same call)
 
 ### **platform seam** &nbsp; 📦 *Product*
 
 The internal boundary through which a client's UI tree reaches its host platform, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). The shared tree's seam is `src/platform/`: desktop's implementation re-exports Tauri, the web client's routes the same calls into a wasm Worker, and that one substitution is what makes the two clients the **same tree** rather than two trees that resemble each other.
 
-Since myne#492 the rule is stated per guarded tree rather than for `src/` alone, and `scripts/check-platform-seam.mjs` enforces it over **eight** roots in `pre-commit` and in CI. Two of them are Tauri hosts and get a seam directory of their own: `src` (`src/platform/`) and `mobile/src` (`mobile/src/platform/`, six modules). The other six get the strictest form, no seam directory at all, so `@tauri-apps/*` is banned outright: `editor/`, `dialect/`, `copy/`, `ornaments/`, `preview/` and `web/src`. The reason is not that those trees have no Tauri consumer, it is that not **every** consumer is one, and a module-scope import lands in a non-Tauri consumer's bundle whether or not the call ever fires.
+Since myne#492 the rule is stated per guarded tree rather than for `src/` alone, and `scripts/check-platform-seam.mjs` enforces it over **nine** roots in `pre-commit` and in CI. Two of them are Tauri hosts and get a seam directory of their own: `src` (`src/platform/`) and `mobile/src` (`mobile/src/platform/`, **five** modules: `core`, `event`, `path`, `window`, `deepLink`; this entry said six, as did `mobile/CLAUDE.md`, and both were right when written: `clipboardManager.ts` landed with the seam in `f643633c` and was removed a day later in `48f06b73`, when clipboard writes moved to the sensitive-clipboard plugin, and neither document was updated). Mobile's `path` is the one seam member that is not a re-export: since myne-md/myne#517 it is a single `exportPath(filename)` over a host command that resolves, creates, backup-excludes and sanitizes an export destination in one call, which is why the mobile capability no longer grants `core:path:default` at all. The other seven get the strictest form, no seam directory at all, so `@tauri-apps/*` is banned outright: `editor/`, `dialect/`, `copy/`, `client-core/`, `ornaments/`, `preview/` and `web/src`. (This entry said eight roots and listed six strict trees, omitting `client-core`; corrected alongside the module count in the same clause, because a corrected sentence carrying a second wrong number is what makes a reader stop trusting the correction.) The reason is not that those trees have no Tauri consumer, it is that not **every** consumer is one, and a module-scope import lands in a non-Tauri consumer's bundle whether or not the call ever fires.
 
 Mobile's seam is not a substitution point: mobile is a Tauri host on both of its targets, so there is nothing to substitute. It exists to give the guard a boundary to enforce and to keep the twin modules under `mobile/src/lib` byte-identical to their desktop counterparts, which is how a fix reaches both clients. `mobile/src/formfactor/` is a **different** thing that used to share the name: the iOS-versus-Android and phone-versus-tablet PRESENTATION split (see [size class](#size-class)), renamed out of the way so `<tree>/platform/` means one thing in all three clients.
 
@@ -2292,6 +2415,16 @@ Used in: `web-bundle-hashes.md`; `self-host-web.md`; `decisions.md` 2026-08-15
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
 
 Used in: `spec/markdown-dialect.md` §3.2, §5; `decisions.md` 2026-05-30
+
+### **region (keyboard region)** &nbsp; 📦 *Product*
+
+One of the **three keyboard destinations** the editor window is divided into: the notes sidebar, the editor pane, and the right panel (myne-md/myne#728). Each is a single Tab stop with roving navigation inside it, and **F6** cycles between them; each is also separately bindable, though only the cycle ships with a default chord. A region is **declared in the DOM**, by a `data-region` attribute on its root, rather than registered in a store: the three are rendered by three different components and any of them can be absent (a collapsed sidebar, a non-note tab with no right panel), and a store has to be told a region has gone while an attribute is simply not there. The same three roots carry the page's landmarks (`navigation`, `main`, `complementary`), so "jump to the sidebar" means the same place to a keyboard user and to a screen-reader user. A collapsed pane is skipped because its content is `inert`, which the shell already sets for the collapse animation, and the region model reads that rather than being told about it.
+
+**The right panel has three user-visible names and this is the one to use.** The strings added with the region model say **"right panel"**, which is what the published user guide calls it and what this entry calls it. Shipped strings from before the pass call the same surface the **"backlinks sidebar"** ("Toggle backlinks sidebar", "Resize backlinks sidebar"), which is narrower than the surface became once it grew tabs, and a fourth draft of the region strings briefly called it the **"side panel"** until review caught the third name arriving in one change. The older strings are deliberately left alone rather than renamed here: they are correct enough, and rewording a shipped surface invalidates its translation in 31 catalogs, which is a product decision rather than an accessibility fix. Anything NEW says "right panel".
+
+**Not [focus mode](#focus-mode), and not [line-focus dimming](#line-focus-dimming).** Focus mode is a *presentation* state that fades the chrome so only the words remain; line-focus dimming is a reading aid inside one note. A region is a *navigation* concept and is always present: it exists whether or not focus mode is on, changes nothing about what is drawn, and is about where the keyboard can go rather than about what the eye should rest on. The three collide in prose ("focus the editor region" versus "focus mode") and nowhere else.
+
+Used in: `decisions/ui/0599`; `src/lib/regions.ts`, `src/commands/bindableCatalog.ts` (`focus.cycle-region`, `focus.sidebar`, `focus.editor`, `focus.right-panel`), `e2e/a11y-keyboard.e2e.ts`
 
 ### **remember verb** &nbsp; 📦 *Product*
 
@@ -2745,9 +2878,9 @@ Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
 
 ### **tag node** &nbsp; 📦 *Product*
 
-A node in the whole-vault [graph view](#graph-view) standing for a TAG rather than a note (myne-md/myne#727; `decisions/ui/0596`, which reverses the notes-only node taxonomy of `decisions.md` 2026-06-08). Drawn as a coloured hub with a ring, labelled `#<display>`, joined by one edge to each note carrying the tag, so a cluster of notes reads as one group with a name on it. Its id is `tag:<folded-key>`, a form no note UUID can take, which is how every consumer tells a tag node from a note without a second field. A tag node exists **only in the whole-vault view**: the local-graph, tag-filter and orphan views stay notes-only, because a hub has no place in a neighbourhood BFS or in a list of notes with no links. It is created exactly when an enabled [color group](#color-group) rule whose filter is a single bare `hasTag` leaf claims the tag, so it costs no extra index query, and the hub and its notes are painted from one map and cannot drift. A rule that combines a tag with a folder or a `not` colours notes without claiming a hub, because it matches a SUBSET of the tag's notes and a hub for it would connect to notes it does not match. Its radius is a property of its KIND rather than of its degree (a tag's degree is its note count, which would otherwise make a popular tag the largest object on screen). Selecting one filters the graph to that tag. **Not synced, never leaves the device.** A tag node is a projection of the plaintext-derived VaultIndices and holds nothing the vault does not already have encrypted at rest; its POSITION is cached in [`vault.graph`](#vaultgraph) like every other node's, under its `tag:<key>` id, in a blob that is AEAD-sealed, device-local, never synced and never backed up (`decisions/sync/0595`). An earlier revision of this entry said the cache "holds node positions only", which a reader could take to mean no vault-content-derived id is in it (`myne-md/myne#727`). Distinct from a [tag chip](#tag-chip) (an editor decoration) and from the [tag index](#tag-index) (the derived data a tag node is drawn from).
+A node in the whole-vault [graph view](#graph-view) standing for a TAG rather than a note (myne-md/myne#727; `decisions/ui/0602`, which reverses the notes-only node taxonomy of `decisions.md` 2026-06-08). Drawn as a coloured hub with a ring, labelled `#<display>`, joined by one edge to each note carrying the tag, so a cluster of notes reads as one group with a name on it. Its id is `tag:<folded-key>`, a form no note UUID can take, which is how every consumer tells a tag node from a note without a second field. A tag node exists **only in the whole-vault view**: the local-graph, tag-filter and orphan views stay notes-only, because a hub has no place in a neighbourhood BFS or in a list of notes with no links. It is created exactly when an enabled [color group](#color-group) rule whose filter is a single bare `hasTag` leaf claims the tag, so it costs no extra index query, and the hub and its notes are painted from one map and cannot drift. A rule that combines a tag with a folder or a `not` colours notes without claiming a hub, because it matches a SUBSET of the tag's notes and a hub for it would connect to notes it does not match. Its radius is a property of its KIND rather than of its degree (a tag's degree is its note count, which would otherwise make a popular tag the largest object on screen). Selecting one filters the graph to that tag. **Not synced, never leaves the device.** A tag node is a projection of the plaintext-derived VaultIndices and holds nothing the vault does not already have encrypted at rest; its POSITION is cached in [`vault.graph`](#vaultgraph) like every other node's, under its `tag:<key>` id, in a blob that is AEAD-sealed, device-local, never synced and never backed up (`decisions/sync/0601`). An earlier revision of this entry said the cache "holds node positions only", which a reader could take to mean no vault-content-derived id is in it (`myne-md/myne#727`). Distinct from a [tag chip](#tag-chip) (an editor decoration) and from the [tag index](#tag-index) (the derived data a tag node is drawn from).
 
-Used in: `decisions/ui/0596`, myne-md/myne#727
+Used in: `decisions/ui/0602`, myne-md/myne#727
 
 ### **tag suggestion band** &nbsp; 📦 *Product*
 
@@ -3331,7 +3464,7 @@ Vault-level singleton encrypted blob ([`MYG1`](#myg1), `spec/protocol.md` §9.19
 
 ### **vault.indices** &nbsp; 📦 *Product*
 
-Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records** (MYND-31 design; persistence landed by MYND-271). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
+Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records**, plus three per-note record kinds the entry used to omit: the imported **[block anchor](#block-anchor) records** behind the `[[^^` picker (MYND-382), the **[line-task projection](#line-task-projection)** (MYND-612), and the **[heading records](#heading-record)** behind the `[[##` picker (myne#216) (MYND-31 design; persistence landed by MYND-271, and `spec/protocol.md` §9.8.2 is the normative enumeration). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
 
 Used in: `spec/protocol.md` §9.8; `decisions.md` 2026-06-14 (MYND-271)
 
