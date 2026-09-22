@@ -26,6 +26,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useRef } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useOverlayInert } from "../../src/hooks/useOverlayInert";
+import { openModal } from "@myne/editor/host/lib/imperative-modal";
 import {
   isInertByOverlay,
   KEEP_REACHABLE_ATTR,
@@ -276,16 +277,37 @@ describe("the screen-capture escape stays reachable behind an overlay", () => {
     expect(el.plain.hasAttribute("inert")).toBe(false);
   });
 
+  it("an imperative, non-React modal registers on the same stack", () => {
+    // `imperative-modal.ts` is the shared skeleton behind `promptForText`, the
+    // attachment rename prompt, the diff-preview, the wikilink converter, the
+    // lightbox and the task-field editors. It has to register with the SAME
+    // owner the React overlays use: a second stack would let an imperative
+    // modal and a React one both "own" the page, and the background behind a
+    // prompt would stay reachable by a virtual cursor and a click.
+    const behind = document.createElement("div");
+    document.body.appendChild(behind);
+
+    const modal = openModal({ onDismiss: () => {} });
+    expect(behind.hasAttribute("inert")).toBe(true);
+    expect(openOverlayCount()).toBe(1);
+
+    modal.close();
+    expect(behind.hasAttribute("inert")).toBe(false);
+    expect(openOverlayCount()).toBe(0);
+  });
+
   it("is used by exactly the surface the threat model requires, and no other", () => {
     // The marker is not a general escape hatch. A second user costs a
     // reviewer's argument rather than passing silently.
+    //
+    // The definition moved to the editor package (`editor/src/host/lib/overlay-inert.ts`)
+    // with the imperative-modal registration, so it is outside this `src/`
+    // scan; `ScreenCaptureEscape` is the one SETTER of the attribute, which is
+    // the surface the threat model names.
     const users = tsFiles("src").filter((f) =>
       /KEEP_REACHABLE_ATTR/.test(readFileSync(f, "utf8")),
     );
-    expect(users.sort()).toEqual([
-      "src/components/ScreenCaptureEscape.tsx",
-      "src/lib/overlay-inert.ts",
-    ]);
+    expect(users.sort()).toEqual(["src/components/ScreenCaptureEscape.tsx"]);
   });
 });
 
@@ -310,10 +332,10 @@ const NOT_OVERLAYS: Record<string, string> = {
     "there is no background to inert. Its `aria-modal` is questionable on " +
     "the same grounds and predates this pass.",
   "src/lib/promptForText.ts":
-    "One of the imperative modals (`imperative-modal.ts`). Builds its own " +
-    "root outside React and calls `trapFocus` directly, so wiring it needs " +
-    "the teardown ordering checked against that restore. Recorded as a gap " +
-    "in `src/lib/overlay-inert.ts`, not a decision.",
+    "REGISTERS through `openModal(` (myne-md/myne#728): the imperative-DOM " +
+    "skeleton pushes its backdrop and pops it in `close`, so the caller does " +
+    "not call `useOverlayInert` itself. Kept here only so the reason is " +
+    "written down; the scan's `openModal(` arm accepts it.",
   "src/components/sync/MemberRosterPanel.tsx":
     "The invite panel is INLINE, not an overlay: its `STATUS_STYLE` is two " +
     "text properties with no positioning and no backdrop, so it renders in " +
@@ -322,7 +344,6 @@ const NOT_OVERLAYS: Record<string, string> = {
     "the same grounds; left alone rather than widened here.",
   "src/components/primitives/ModalShell.tsx":
     "IS the shell: it registers, and every dialog built on it inherits that.",
-  "src/lib/overlay-inert.ts": "The owner itself; the string appears in its header prose.",
 };
 
 describe("every modal overlay registers with the owner", () => {
@@ -341,12 +362,19 @@ describe("every modal overlay registers with the owner", () => {
     // deleting the CALL and leaving the import reported clean - the same
     // hole `check-ipc-binding-callers.mjs` records about itself, found here
     // the same way, by injecting the defect and watching the test pass.
-    const unregistered = sites.filter(
-      (f) => !readFileSync(f, "utf8").includes("useOverlayInert(") && !(f in NOT_OVERLAYS),
-    );
+    //
+    // `openModal(` is the second accepted registration: the imperative-DOM
+    // skeleton (`imperative-modal.ts`) registers on its caller's behalf, and
+    // its callers are the ones that carry `aria-modal`. Without this arm a
+    // vanilla-DOM modal that registers correctly would read as unregistered.
+    const unregistered = sites.filter((f) => {
+      if (f in NOT_OVERLAYS) return false;
+      const src = readFileSync(f, "utf8");
+      return !src.includes("useOverlayInert(") && !src.includes("openModal(");
+    });
     expect(
       unregistered,
-      `Carries aria-modal but never registers with the overlay owner, so the background stays reachable by a virtual cursor and a click. Call \`useOverlayInert(backdropRef, open)\`, or add the file to NOT_OVERLAYS with the reason it is not an overlay.\n${unregistered.join("\n")}`,
+      `Carries aria-modal but never registers with the overlay owner, so the background stays reachable by a virtual cursor and a click. Call \`useOverlayInert(backdropRef, open)\` (or build on \`openModal\`), or add the file to NOT_OVERLAYS with the reason it is not an overlay.\n${unregistered.join("\n")}`,
     ).toEqual([]);
   });
 
