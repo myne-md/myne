@@ -9,6 +9,7 @@ import { Sheet, Banner, Spinner } from "../../components";
 import { snapshotList, snapshotPreview, snapshotRestore, type SnapshotMeta } from "../../lib/snapshots";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
+import { tappable } from "../a11y/tappable";
 
 function formatWhen(ms: number, t: TFunction): string {
   const d = new Date(ms);
@@ -98,7 +99,7 @@ export function SnapshotsSheet({
               snaps.map((s) => (
                 <div key={s.snapshot_uuid} style={{ borderTop: "1px solid var(--line-1)" }}>
                   <div
-                    onClick={() => void openPreview(s.snapshot_uuid)}
+                    {...tappable({ onActivate: () => void openPreview(s.snapshot_uuid) })}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px", cursor: "pointer" }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>

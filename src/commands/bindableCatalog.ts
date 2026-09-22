@@ -84,6 +84,18 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // Navigation
   { id: "nav.back", get label() { return i18n.t("commands.hotkeys.command.navigateBack"); }, group: "Navigation", defaultBindings: ["Mod-["], rebindable: true },
   { id: "nav.forward", get label() { return i18n.t("commands.hotkeys.command.navigateForward"); }, group: "Navigation", defaultBindings: ["Mod-]"], rebindable: true },
+  // The three-region keyboard model (myne#728). Tab keeps indenting inside the
+  // note, which is why the editor body had no keyboard exit at all; these are
+  // the exit. F6 is the platform convention for "next pane group" (Windows,
+  // GNOME, Firefox and Chrome all use it) and is free in this catalog and in
+  // `EDITOR_KEYMAP_DEFAULTS`, checked rather than assumed. The three direct
+  // commands ship with NO default chord: the cycle is the discoverable path and
+  // three more reserved chords would be three more conflicts for a user who
+  // never wanted them. They are bindable, which is the point of story 4.
+  { id: "focus.cycle-region", get label() { return i18n.t("commands.hotkeys.command.cycleRegion"); }, group: "Navigation", defaultBindings: ["F6"], rebindable: true },
+  { id: "focus.sidebar", get label() { return i18n.t("commands.hotkeys.command.focusSidebarRegion"); }, group: "Navigation", defaultBindings: [], rebindable: true },
+  { id: "focus.editor", get label() { return i18n.t("commands.hotkeys.command.focusEditorRegion"); }, group: "Navigation", defaultBindings: [], rebindable: true },
+  { id: "focus.right-panel", get label() { return i18n.t("commands.hotkeys.command.focusRightPanelRegion"); }, group: "Navigation", defaultBindings: [], rebindable: true },
 
   // View
   { id: "graph.show", get label() { return i18n.t("commands.hotkeys.command.showGraphView"); }, group: "View", defaultBindings: ["Mod-Shift-g"], rebindable: true },

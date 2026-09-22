@@ -21,6 +21,7 @@ import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
 import { cycleHeading } from "@myne/editor";
 import { sidebarCommands } from "../notes/sidebarCommands";
+import { enterRegion } from "../lib/regions";
 import { appDataDir, join } from "../platform/path";
 import { openPath } from "../platform/opener";
 import {
@@ -386,6 +387,33 @@ const focusPrevPaneAction = layoutAction(
   "pane.focus-prev",
   "commands.actions.focusPrevPane.label",
   (c) => c.onFocusPrevPane(),
+);
+// The three-region keyboard model (myne#728). These take no `CommandContext`
+// callback on purpose: entering a region is a DOM operation on the live
+// document (`src/lib/regions.ts`), with no workspace state behind it, so
+// threading four more callbacks through the context would add a layer that
+// only forwards. `enterRegion` also owns the deferral the palette needs - see
+// its comment; a synchronous focus move from a palette row is undone by the
+// closing modal's focus-trap restore.
+const focusSidebarRegionAction = layoutAction(
+  "focus.sidebar",
+  "commands.actions.focusSidebarRegion.label",
+  () => enterRegion("sidebar"),
+);
+const focusEditorRegionAction = layoutAction(
+  "focus.editor",
+  "commands.actions.focusEditorRegion.label",
+  () => enterRegion("editor"),
+);
+const focusRightPanelRegionAction = layoutAction(
+  "focus.right-panel",
+  "commands.actions.focusRightPanelRegion.label",
+  () => enterRegion("right-panel"),
+);
+const cycleRegionAction = layoutAction(
+  "focus.cycle-region",
+  "commands.actions.cycleRegion.label",
+  () => enterRegion("next"),
 );
 const goBackAction = layoutAction("nav.back", "commands.actions.goBack.label", (c) => c.onGoBack());
 const goForwardAction = layoutAction("nav.forward", "commands.actions.goForward.label", (c) =>
@@ -1530,6 +1558,10 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   prevTabAction,
   focusNextPaneAction,
   focusPrevPaneAction,
+  focusSidebarRegionAction,
+  focusEditorRegionAction,
+  focusRightPanelRegionAction,
+  cycleRegionAction,
   goBackAction,
   goForwardAction,
   togglePreviewAction,

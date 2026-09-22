@@ -24,6 +24,7 @@ import {
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
 import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
+import { SkipToContent } from "./components/SkipToContent";
 import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
@@ -769,6 +770,14 @@ function App() {
           editor. Renders nothing where the capability is absent (web has no
           capture affinity to lose). */}
       <ScreenCaptureEscape />
+      {/* Skip to content (myne#728, WCAG 2.4.1). SECOND, deliberately: the
+          capture escape above keeps the first slot because on Windows that
+          window can be a black rectangle whose only way out is that control.
+          Editor stage only, and that is not the roster-predicate failure the
+          comment above warns about: the target is a REGION, and regions exist
+          only on this stage by construction. A pre-unlock screen is one form
+          with no chrome to skip past. */}
+      {stage.name === "editor" && <SkipToContent />}
       {/* macOS overlay-mode title bar — `tauri.conf.json` sets
           `titleBarStyle: "Overlay"` so the webview extends under the
           traffic-light area. Non-editor stages get this plain 38px window-drag

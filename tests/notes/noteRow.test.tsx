@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { NoteRow, type NoteRowProps } from "../../src/notes/components/NoteRow";
+import { NoteRow, noteRowDomId, type NoteRowProps } from "../../src/notes/components/NoteRow";
 import type { TitleRecord } from "../../src/notes/loadNoteBatch";
 
 afterEach(cleanup);
@@ -111,13 +111,36 @@ describe("NoteRow — subtitle / timestamps", () => {
 });
 
 describe("NoteRow — selection + aria", () => {
-  it("reflects selection via aria-current", () => {
-    // `aria-selected` is not a permitted attribute on role="button"; the
-    // highlighted/active row conveys selection via `aria-current` instead.
+  it("reflects selection via aria-selected (myne#728)", () => {
+    // Was `aria-current`, because the row called itself a `button` and
+    // `aria-selected` is not permitted there. The row is a `treeitem` now (the
+    // sidebar holds folders and notes in one hierarchy), so the selection is
+    // conveyed by the attribute that means selection.
     renderRow({ selected: true });
-    expect(screen.getByTestId("notes.row").getAttribute("aria-current")).toBe(
-      "true",
-    );
+    const row = screen.getByTestId("notes.row");
+    expect(row.getAttribute("role")).toBe("treeitem");
+    expect(row.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("is the list's one Tab stop when selected, and -1 otherwise (myne#728)", () => {
+    // Roving tabindex: a vault with hundreds of notes costs one Tab press.
+    renderRow({ selected: true });
+    expect(screen.getByTestId("notes.row").getAttribute("tabindex")).toBe("0");
+    cleanup();
+    renderRow({ selected: false });
+    expect(screen.getByTestId("notes.row").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("does not give every multi-selected row a Tab stop (myne#728)", () => {
+    // `multiSelected` paints the row but must not add a stop, or a 40-note
+    // multi-selection would put 40 stops back into the Tab order.
+    renderRow({ multiSelected: true, selected: false });
+    expect(screen.getByTestId("notes.row").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("carries a stable DOM id the container can name it by (myne#728)", () => {
+    renderRow({ record: rec({ noteUuid: "abc" }) });
+    expect(screen.getByTestId("notes.row").id).toBe(noteRowDomId("abc"));
   });
 
   it("carries the note id on the row", () => {
@@ -127,11 +150,11 @@ describe("NoteRow — selection + aria", () => {
     );
   });
 
-  it("multiSelected → data-multiselected + aria-current (MYND-367)", () => {
+  it("multiSelected → data-multiselected + aria-selected (MYND-367)", () => {
     renderRow({ multiSelected: true });
     const row = screen.getByTestId("notes.row");
     expect(row.getAttribute("data-multiselected")).toBe("true");
-    expect(row.getAttribute("aria-current")).toBe("true");
+    expect(row.getAttribute("aria-selected")).toBe("true");
   });
 
   it("not multiSelected → no data-multiselected attribute", () => {

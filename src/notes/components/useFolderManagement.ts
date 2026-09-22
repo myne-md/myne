@@ -1186,6 +1186,32 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     [favorites, writeFavorites],
   );
 
+  /**
+   * The non-drag path for the favourites reorder (myne-md/myne#728, WCAG
+   * 2.5.7, found in review). Favourites are a user-ordered sequence and drag
+   * was the only way to change that order.
+   *
+   * A sibling of `reorderFavorite` rather than a caller of it: that one reads
+   * `draggedRef.current` and clears four pieces of drag state, so driving it
+   * from a key press would mean faking a drag that never happened. This moves
+   * by one slot against the CURRENT list, which is what Alt+Arrow means, and
+   * clamps at the ends rather than wrapping.
+   */
+  const moveFavorite = useCallback(
+    (id: NoteId, delta: -1 | 1) => {
+      const from = favorites.indexOf(id);
+      if (from === -1) return;
+      const to = from + delta;
+      if (to < 0 || to >= favorites.length) return;
+      const next = [...favorites];
+      const [moved] = next.splice(from, 1);
+      if (moved === undefined) return;
+      next.splice(to, 0, moved);
+      void writeFavorites(next);
+    },
+    [favorites, writeFavorites],
+  );
+
   return {
     deliberate,
     archivedFolders,
@@ -1230,6 +1256,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     toggleFavorite,
     onFavoritesDropNote,
     reorderFavorite,
+    moveFavorite,
     favoritesDropActive,
     setFavoritesDropActive,
     favReorderTarget,

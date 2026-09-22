@@ -62,7 +62,10 @@ describe("<TabStrip>", () => {
 
   it("the close control fires onClose for that tab", () => {
     const { onClose } = setup();
-    fireEvent.click(screen.getByRole("button", { name: "Close Note B" }));
+    // The × is a mouse affordance outside the a11y tree (myne#728), so it is
+    // found by testid rather than by role. Tab order is B at index 1.
+    const closes = screen.getAllByTestId("editor.tab-close");
+    fireEvent.click(closes[1]!);
     expect(onClose).toHaveBeenCalledWith("B");
   });
 

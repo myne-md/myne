@@ -19,6 +19,7 @@ import {
 } from "@myne/editor/host/notes/viewLayout";
 import { MobileGroupHeading, MobileViewEmpty } from "./viewChrome";
 import type { MobileOpenHandler } from "./MobileViewRenderHost";
+import { tappable } from "../../../a11y/tappable";
 
 const HEADING_STYLE: CSSProperties = {
   padding: "16px 20px 6px",
@@ -95,7 +96,7 @@ export function MobileListView({
               key={item.key}
               data-testid={VIEW_TESTID.listRow}
               data-note-id={row.noteId}
-              onClick={() => onOpen(row.noteId)}
+              {...tappable({ onActivate: () => onOpen(row.noteId) })}
               style={ROW_STYLE}
             >
               <div style={TITLE_STYLE}>

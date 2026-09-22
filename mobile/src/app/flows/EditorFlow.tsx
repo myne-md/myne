@@ -506,6 +506,18 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // pane to the shared Excalidraw canvas instead of CMEditor (parity w/ PaneView).
   const isDrawing = useMemo(() => isDrawingBody(editorText), [editorText]);
 
+  // The editor body's accessible name (myne-md/myne#728, review). Derived
+  // from the LIVE body rather than from a stored field, which is both the
+  // only title this flow has (`Editing` carries an id and nothing else) and
+  // the better answer: a rename is a body edit, so the name follows it
+  // without a reconfigure, which is the thing the desktop had to arrange
+  // explicitly. Empty maps to `null`, which the shared namer reads as
+  // "untitled" - an `aria-label=""` is not a name.
+  const editorTitle = useMemo(
+    () => deriveTitleSnippet(editorText).title || null,
+    [editorText],
+  );
+
   // Regular size classes: focusing a note collapses the left panes (sidebar +
   // note list) so the editor gets the full width - the EditorTopBar toggle reveals
   // them, and the next note open auto-collapses again (the effect below). On
@@ -3187,7 +3199,15 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       // Notes tab + drilled-into an archived folder: no per-row
                       // action (folder-archived notes restore via the folder row).
                       listView === "notes" || inArchiveFolder ? undefined : (
-                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                        <div
+                              // NOT a control (myne#728, task 16): an event
+                              // SHIELD around the row's buttons, so a tap on
+                              // one of them does not also open the note. It
+                              // has no behaviour of its own to announce.
+                              role="presentation"
+                              style={{ display: "flex", gap: 4, flexShrink: 0 }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                           {listView === "trash" ? (
                             <>
                               <button onClick={() => void organizeRow(restoreNote, n.id)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
@@ -3771,6 +3791,15 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // and a host that left it unset would hand the editor `null` and
             // put this flow back on the guess it is meant to replace.
             noteId={editing?.id ?? null}
+            // The editor body's accessible name (myne-md/myne#728, review).
+            // The prop is optional with an "Untitled note" fallback, so
+            // omitting it compiled and rendered and left EVERY note on this
+            // client announcing as untitled to VoiceOver and TalkBack. The
+            // desktop passes it from two call sites in `PaneView`; mobile
+            // renders the same shared surface and was the one host that did
+            // not. Nothing would have found it: no mobile test asserts the
+            // name and the roster's screen-reader item covers desktop only.
+            noteTitle={editorTitle}
             // MYND-559: the FormatBar (driven by the `onReady` view above) is
             // mobile's single formatting surface - suppress the engine's floating
             // selection toolbar so a word-select doesn't raise a second one.

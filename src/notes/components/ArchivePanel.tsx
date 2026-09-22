@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import { folderKey } from "../../dialect/folderPath";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useOverlayInert } from "../../hooks/useOverlayInert";
 import {
   archivedFolderKeys,
   collectSubtreeNoteIdsFromCache,
@@ -93,6 +94,14 @@ export function ArchivePanel({
   const dialogRef = useRef<HTMLDivElement>(null);
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
+  // The rest of the page goes INERT while this is open (myne-md/myne#728).
+  // The focus trap above contains Tab; it does not stop a screen reader's
+  // virtual cursor reading the page behind, and `aria-modal` is an assertion
+  // some assistive technology ignores. Registered on the BACKDROP, which is
+  // the whole overlay: registering the card would inert the backdrop it is in.
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useOverlayInert(backdropRef, open);
+
 
   const archivedKeys = useMemo(
     () => archivedFolderKeys(archivedFolders),
@@ -179,6 +188,7 @@ export function ArchivePanel({
 
   return (
     <div
+      ref={backdropRef}
       style={{
         ...BACKDROP_STYLE,
         animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",

@@ -136,7 +136,19 @@ function renderInline(tokens: Inline[], onOpenWikilink: (target: string) => void
         return (
           <span
             key={i}
+            // A LINK, not a button (myne#728): it navigates to another note,
+            // which is what `role="link"` means, and it matches the desktop
+            // wikilink chip. Named by its own text, and a Tab stop so a
+            // keyboard or switch user can follow it at all; Enter and Space
+            // both activate, because a role=link span gets neither for free.
+            role="link"
+            tabIndex={0}
             onClick={() => onOpenWikilink(t.target)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              onOpenWikilink(t.target);
+            }}
             style={{ color: "var(--accent)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, unicodeBidi: "isolate" }}
           >
             {t.label}

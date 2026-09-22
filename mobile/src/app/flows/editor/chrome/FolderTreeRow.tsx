@@ -1,6 +1,7 @@
 import { FolderGlyph } from "../../../../components";
 import { ColorDot } from "../decorations/ColorDot";
 import { useHold } from "./useHold";
+import { tappable } from "../../../a11y/tappable";
 
 /** A folder header row in the inline notes tree (MYND-480): tap toggles the
  *  subtree; a ~480ms long-press (that doesn't drift into a scroll) opens the
@@ -37,10 +38,17 @@ export function FolderTreeRow({
       // after a remount (MYND-561) — the chevron's rotation is a CSS transform,
       // which Playwright can't read as state.
       data-collapsed={collapsed ? "true" : "false"}
-      onClick={() => {
-        if (consumeHeldClick()) return; // this click was the long-press tail
-        onToggle();
-      }}
+      // A real control (myne#728, task 16), and `expanded` is the state a
+      // screen reader has no other way to learn: the chevron's direction is a
+      // CSS transform, which the accessibility tree cannot see any more than
+      // Playwright can.
+      {...tappable({
+        onActivate: () => {
+          if (consumeHeldClick()) return; // this click was the long-press tail
+          onToggle();
+        },
+        expanded: !collapsed,
+      })}
       {...handlers}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", paddingInlineStart: indentPx, cursor: "pointer" }}
     >

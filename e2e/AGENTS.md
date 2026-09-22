@@ -537,3 +537,27 @@
   ends at `finish` with an empty proposal. Three scenarios asserted a non-empty
   proposal and could never have passed. `StubEngine::agent_script` is the fixed
   script that fixes it, and its own tests assert the echo could not have worked.
+
+## Three harness premises that cost an afternoon each (myne-md/myne#728)
+
+Each is measured in this container rather than reasoned, and each has its full
+detail on the function that carries the trap, so there is one copy to keep true
+and this section is the signpost:
+
+- **Enter does not activate a `<button>` through the Actions API.** `U+E007`
+  and `U+E006` produce no click; `U+E00D` (Space) does. Drive a button with
+  `KEY.SPACE` here and say at the press that this is a statement about the
+  DRIVER, because a real WebKitGTK window does activate on Enter. Detail and
+  the measurement: `KEY.ENTER` in `e2e/support/keyboard.ts`.
+- **`blur()` does not reset the Tab sequence.** The engine resumes from where
+  the blurred element sat, so a walk that counts from an imagined start is
+  counting from somewhere else. Anchor on a known element and assert the
+  anchor before walking. Detail: `activeSignature` in the same file.
+- **`createNote` reuses the focused pane's active tab.** Two calls leave ONE
+  tab open. A second tab comes from the row's `open-in-new-tab` context item.
+  Detail: `createNote` in `e2e/support/flows.ts`.
+
+The reason all three are worth writing down is the shape they share: each
+failure wears the look of a product bug. Every other assertion in the scenario
+is green, the element is present and focusable, and the only tell is a detail
+nobody thinks to read.
