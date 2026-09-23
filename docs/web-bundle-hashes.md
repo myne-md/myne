@@ -107,6 +107,14 @@ leaving a force-push behind.**
 | 2026-08-14 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:1d8ccfeb4e673113ebc3f92da257c31a2fd62e70263af75387337f40832cad4d` |
 | 2026-08-26 | `5ffe8d388ddeb91e7b08859d122f5e29515a16fc` | `sha256:4870edbb39370d94faaf536cca1e87f708a4ee3d33bb67d156a47db1d4ccacb8` |
 | 2026-09-02 | `0b115cf0d68312126527704c1fd395d9696008da` | `sha256:9f695eb8b43bb1d02e949a0503a8920a5e7505ca1d749a743142d11e7f85f0e6` |
+| 2026-09-23 | `0d7c27ee5a9c168fe5fc816fc227331e2c60c941` | `sha256:f3deb65f3c30278df75c431f45ce8e042cfab577b3ca40d40221c21fe167949e` |
+
+### v0.8.0 has one row, and it rests on one machine rather than two
+
+`0d7c27ee` was built once, on the deploy host (Linux / amd64, native) through
+`web/container/Dockerfile` with `--platform linux/amd64` and both `--build-arg`
+values. No second host confirmed it. Same evidence class as the v0.7.0 row
+below.
 
 ### v0.7.0 has one row, and it rests on one machine rather than two
 
