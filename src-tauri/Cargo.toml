@@ -1,6 +1,6 @@
 [package]
 name = "myne-desktop"
-version = "0.7.0"
+version = "0.8.0"
 description = "Myne — end-to-end-encrypted markdown notes desktop client"
 edition = "2021"
 license = "AGPL-3.0"
