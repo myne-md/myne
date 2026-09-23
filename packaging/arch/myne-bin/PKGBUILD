@@ -34,6 +34,12 @@
 # the release's minisign-signed SHA256SUMS publishes and the same one myne.md
 # lists, so `makepkg` refuses a substituted download instead of trusting the
 # transport. Update it in the same edit as `pkgver`, never separately.
+#
+# Deliberately still 0.7.0 through the v0.8.0 cut: that release shipped no
+# `Myne_0.8.0_amd64.deb` (amd64 desktop builds skipped on the build host), and
+# this recipe sources the amd64 .deb. Bumping `pkgver` without a matching
+# `sha256sums` and source would make `makepkg` fail on a missing file while
+# advertising a version that does not exist on the origin.
 
 pkgname=myne-bin
 _appname=myne
