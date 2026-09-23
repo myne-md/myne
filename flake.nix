@@ -14,6 +14,12 @@
   # Fetching from the project's own origin does not cross the 2026-08-09 line
   # against Myne-initiated downloads: Nix is not a Myne client, an AppImage is
   # not a model, and the fetch happens because the user ran `nix run`.
+  #
+  # Deliberately still v0.6.0 through the v0.8.0 cut: that release shipped no
+  # x86-64 AppImage (amd64 desktop builds skipped on the build host), and
+  # advancing only the aarch64 arm would leave `packages` describing two
+  # different releases under one `version`. Both arms move together next time
+  # an amd64 AppImage exists.
   description = "Myne — calm, end-to-end-encrypted markdown notes";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
