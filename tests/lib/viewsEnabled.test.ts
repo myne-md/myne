@@ -45,6 +45,15 @@ const KEY = "myne.viewsEnabled";
  * jsdom win. Same posture as `tests/screens/web-walls.test.tsx`: install a
  * minimal in-memory store over `window.localStorage` when the ambient one
  * cannot answer.
+ *
+ * Key enumeration in this file goes through the Storage API (`length` +
+ * `key(i)`), not `Object.keys`: a plain stand-in and Node's experimental
+ * localStorage both expose methods as own properties, while a real Storage
+ * exposes only data keys. Only the Storage API answers correctly on all three.
+ * Tests that need to force a refusal spy on THIS `localStorage` object (after
+ * `ensureUsableStorage` has run), not on `Storage.prototype`: the stand-in is
+ * not a `Storage` instance, so a prototype spy never reaches it and the test
+ * would pass for the wrong reason on exactly the CI arm this helper exists for.
  */
 function ensureUsableStorage(): void {
   const s = globalThis.localStorage as Storage | undefined;
@@ -91,9 +100,18 @@ describe("the stored preference", () => {
   it("stores under the one documented key and nowhere else", () => {
     // The key is what makes this device-local rather than vault content, so it
     // is worth pinning by name. A second key would be a second source of truth.
+    // Enumerated through the Storage API (`length` + `key(i)`), not
+    // `Object.keys`: a plain stand-in and Node's experimental localStorage both
+    // expose methods as own properties, while a real Storage exposes only data
+    // keys. Only the Storage API answers correctly on all three.
     writeViewsEnabled(true);
     expect(localStorage.getItem(KEY)).toBe("1");
-    expect(Object.keys(localStorage)).toEqual([KEY]);
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k !== null) keys.push(k);
+    }
+    expect(keys).toEqual([KEY]);
   });
 
   it("reads an unrecognised stored value as untouched, not as false", () => {
@@ -187,7 +205,11 @@ describe("open surfaces are told, and a refusing store does not break the toggle
     // The header's own case: "private mode — just won't persist". The session
     // must still reflect the user's choice, so the event has to fire even when
     // the write threw. Otherwise the toggle looks inert in a private window.
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    // Spied on the live `localStorage` object, not `Storage.prototype`: the
+    // stand-in above is not a Storage instance, so a prototype spy never
+    // reaches it and this assertion would pass for the wrong reason on the
+    // CI arm the stand-in exists for.
+    vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     let fired = 0;
@@ -202,7 +224,9 @@ describe("open surfaces are told, and a refusing store does not break the toggle
   });
 
   it("reads as untouched when the store refuses to be read", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    // Same stand-in caveat as the setItem spy above: the live object, not the
+    // prototype, so the refusal is real on the CI stand-in arm too.
+    vi.spyOn(localStorage, "getItem").mockImplementation(() => {
       throw new DOMException("denied", "SecurityError");
     });
     expect(readViewsEnabledPref()).toBeNull();

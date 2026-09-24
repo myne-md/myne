@@ -121,7 +121,13 @@ describe("pre-unlock escape: reachable without being visible", () => {
     expect(trigger.tagName).toBe("BUTTON");
     expect(trigger.getAttribute("tabindex")).toBeNull();
 
-    fireEvent.focus(trigger);
+    // A real `.focus()`, not `fireEvent.focus`: the component syncs `focused`
+    // from `document.activeElement` in a layout effect (so a Cancel-restore that
+    // does not re-fire React's onFocus still paints). `fireEvent.focus` dispatches
+    // the event without moving focus, so that sync immediately flips `focused`
+    // back to false and the clip never lifts, which is why this failed on CI
+    // while the resting assertions above still passed.
+    trigger.focus();
     await waitFor(() => expect(trigger.style.clipPath).toBe(""));
     expect(trigger.textContent).toBe(t("screenCaptureEscape.disableTrigger"));
   });
