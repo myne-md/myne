@@ -49,13 +49,17 @@ import {
 } from "@myne/agent-store";
 import { scopeKey } from "@myne/agent-protocol";
 import type { GrantPreview, ProbeVerdict, ScopeGrant } from "@myne/agent-protocol";
+import { lineDiff } from "@myne/dialect";
+import { undoResultText, useUndoLastRun } from "@myne/undo-last-run";
 
 import {
   agentApproveScope,
   agentCancel,
   agentCapability,
+  agentLastRun,
   agentPreviewGrant,
   agentStart,
+  agentUndo,
 } from "../../lib/agent-run";
 import { chatsList, chatsRead } from "../../lib/chats";
 import {
@@ -67,6 +71,7 @@ import {
   stageTranscript,
   subscribeChatHistoryHealth,
   toHistorySeed,
+  type AgentSummaryJson,
   type ChatTurnJson,
 } from "../../lib/chatHistory";
 import { AiHistorySheet } from "./AiHistorySheet";
@@ -75,9 +80,21 @@ import { usePrefs } from "../../lib/use-prefs";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { ScreenScroll } from "../../components/layout";
-import { AiReviewFlow } from "./AiReviewFlow";
-import { AiUndoStrip } from "./AiUndoStrip";
+import { Sheet } from "../../components/misc";
+import { AiReviewFlow, DiffLineView } from "./AiReviewFlow";
 import { AiScopeSheet, type ProviderArm } from "./AiScopeSheet";
+
+/** A settled turn's frozen proposal, as the transcript carries it. */
+type FrozenProposal = NonNullable<AgentSummaryJson["proposal"]>;
+
+/** The proposal a turn carries, or null when it has nothing to show. Kept out
+ *  of the render body so the non-null narrowing survives to the click handler. */
+function proposalOf(s: AgentSummaryJson | undefined): FrozenProposal | null {
+  if (s?.proposal === undefined) return null;
+  return s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0
+    ? s.proposal
+    : null;
+}
 
 const COMPOSER_BAR: CSSProperties = {
   flex: "none",
@@ -118,6 +135,46 @@ const BODY_TEXT: CSSProperties = {
 
 const MUTED: CSSProperties = {
   ...BODY_TEXT,
+  color: "var(--fg-3)",
+};
+
+/** A compact icon affordance on a settled turn's header row. Sized to the
+ *  platform touch minimum (44px), not the icon's 14px box: at 28px it was the
+ *  smallest interactive control on the screen. */
+const TURN_ICON_BUTTON: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "var(--m-touch)",
+  height: "var(--m-touch)",
+  padding: 0,
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+  cursor: "pointer",
+};
+
+/** A sheet's own header: title left, dismiss right. */
+const SHEET_HEADER: CSSProperties = {
+  flex: "none",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+  paddingBottom: "var(--space-2)",
+};
+
+const SHEET_TITLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-lg)",
+  fontWeight: "var(--weight-semibold)",
+  color: "var(--fg-1)",
+};
+
+/** A small muted caption above a diff block. */
+const CAPTION: CSSProperties = {
+  fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
 };
 
@@ -188,7 +245,6 @@ export function AiChatFlow({
   titleOf,
   bodyOf,
   onNotesWritten,
-  onOpenHistory,
 }: {
   grant: ScopeGrant | null;
   /** Resolve a note's title, for the review list. The proposal carries ids. */
@@ -196,13 +252,23 @@ export function AiChatFlow({
   /** Read a note's current body, for the review's diff. */
   bodyOf: (noteId: string) => string | null;
   onNotesWritten?: (noteIds: string[]) => void;
-  /** Open the per-note version history for a note the last run wrote. The
-   *  durable path the undo strip's copy names, so the sentence points at
-   *  something reachable rather than at a concept. */
-  onOpenHistory?: (noteId: string) => void;
 }) {
   const { t } = useTranslation();
   const agent = useAgent();
+  // The last-run undo lives here rather than in a strip under the composer
+  // (myne-md/myne#741): one mount for the screen, with the offer and the report
+  // matched onto settled turns by `runId`.
+  const undo = useUndoLastRun({
+    agentLastRun,
+    agentUndo,
+    ...(onNotesWritten === undefined
+      ? {}
+      : { onReverted: (ids: readonly string[]) => onNotesWritten([...ids]) }),
+  });
+  // The settled turn whose frozen proposal the diff sheet shows, and the run
+  // whose revert is awaiting confirmation.
+  const [diffProposal, setDiffProposal] = useState<FrozenProposal | null>(null);
+  const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // The task the run in flight was started with, so the surface can show what
   // was asked while the answer is still coming. Not in the store: the store is
@@ -557,11 +623,6 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
   // a run that stopped to ask has not finished making its proposal, and opening
   // a review over the scope sheet would show a verdict on work in progress
   // while burying the question the run is waiting on.
-  // A note the last apply actually wrote, so the version-history offer has
-  // somewhere to go. The HOST's list, not the proposal's: an edit can be
-  // refused at apply time, and a history sheet for a note nothing changed is a
-  // dead end wearing a remedy's label.
-  const lastWritten = agent.applied?.notesWritten[0] ?? null;
   /** Before the first probe there is no verdict, so the send is offered and the
    *  check happens on Send. After one, it gates. */
   const probeVerdict = agent.probeVerdict;
@@ -573,6 +634,15 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     answered &&
     agent.end?.kind !== "awaitingScope" &&
     (agent.proposal.edits.length > 0 || agent.proposal.newNotes.length > 0);
+
+  // The host record's offer must stay reachable even when no open turn hosts it
+  // (New chat, a switched conversation), because the record is host-side and
+  // outlives the review screen. The turn icon is the primary surface; this
+  // drives the fallback in the toolbar.
+  const undoRunId = undo.run?.runId ?? null;
+  const undoHosted =
+    undoRunId !== null &&
+    openTurns.some((turn) => turn.agentSummary?.runId === undoRunId);
 
   return (
     <>
@@ -591,32 +661,93 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
               turns show the run's own closing summary (the answer in one
               mode), never the proposal: applying is a live-session flow
               through the review screen, here as on desktop. */}
-          {openTurns.map((turn) => (
-            <div
-              key={turn.id}
-              data-testid="ai.history-turn"
-              data-role={turn.role}
-              data-kind={turn.kind}
-              style={turn.role === "user" ? BUBBLE_USER : BUBBLE_ASSISTANT}
-            >
-              {turn.role === "user" ? (
-                <p style={{ ...BODY_TEXT, margin: 0 }}>{turn.text}</p>
-              ) : (
-                <p style={{ ...BODY_TEXT, margin: 0 }}>
-                  {turn.agentSummary !== undefined && turn.agentSummary.summary.length > 0
-                    ? turn.agentSummary.summary
-                    : turn.text}
-                </p>
-              )}
-              {(turn.agentSummary?.memoryUpdated ?? 0) > 0 ? (
-                <p data-testid="ai.memory-updated" style={MUTED}>
-                  {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
-                    count: turn.agentSummary?.memoryUpdated ?? 0,
-                  })}
-                </p>
-              ) : null}
-            </div>
-          ))}
+          {openTurns.map((turn) => {
+            const s = turn.agentSummary;
+            const proposal = proposalOf(s);
+            const runId = s?.runId ?? null;
+            const undoRun = undo.run;
+            // The revert affordance is only for the host's CURRENT undoable
+            // run: an older turn's run has been superseded and a second undo
+            // would report `noSuchRun`.
+            const canRevert =
+              runId !== null && undoRun !== null && runId === undoRun.runId;
+            const undoReport =
+              runId !== null && undo.report !== null && runId === undo.reportRunId
+                ? undo.report
+                : null;
+            return (
+              <div
+                key={turn.id}
+                data-testid="ai.history-turn"
+                data-role={turn.role}
+                data-kind={turn.kind}
+                style={turn.role === "user" ? BUBBLE_USER : BUBBLE_ASSISTANT}
+              >
+                {turn.role === "user" ? (
+                  <p style={{ ...BODY_TEXT, margin: 0 }}>{turn.text}</p>
+                ) : (
+                  <>
+                    {proposal !== null || canRevert ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "var(--space-1)",
+                          justifyContent: "flex-end",
+                          marginBottom: "var(--space-1)",
+                        }}
+                      >
+                        {proposal !== null ? (
+                          <button
+                            type="button"
+                            data-testid="ai.turn-diff"
+                            aria-label={t("editor.chrome.rightPanel.aiChat.viewDiff")}
+                            title={t("editor.chrome.rightPanel.aiChat.viewDiff")}
+                            onClick={() => setDiffProposal(proposal)}
+                            style={TURN_ICON_BUTTON}
+                          >
+                            <Icon name="columns-2" size={14} />
+                          </button>
+                        ) : null}
+                        {canRevert && runId !== null ? (
+                          <button
+                            type="button"
+                            data-testid="ai.turn-revert"
+                            aria-label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+                            title={t("editor.chrome.rightPanel.aiChat.revertRun")}
+                            disabled={undo.busy}
+                            onClick={() => setRevertConfirmRunId(runId)}
+                            style={{
+                              ...TURN_ICON_BUTTON,
+                              ...(undo.busy
+                                ? { opacity: 0.5, cursor: "not-allowed" }
+                                : null),
+                            }}
+                          >
+                            <Icon name="rotate-ccw" size={14} />
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <p style={{ ...BODY_TEXT, margin: 0 }}>
+                      {s !== undefined && s.summary.length > 0 ? s.summary : turn.text}
+                    </p>
+                    {undoReport !== null ? (
+                      <p data-testid="ai.undo-result" style={MUTED}>
+                        {undoResultText(undoReport, t)}
+                      </p>
+                    ) : null}
+                  </>
+                )}
+                {(turn.agentSummary?.memoryUpdated ?? 0) > 0 ? (
+                  <p data-testid="ai.memory-updated" style={MUTED}>
+                    {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
+                      count: turn.agentSummary?.memoryUpdated ?? 0,
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
           {historyError ? (
             <p data-testid="ai.history-error" style={MUTED}>
               {t("editor.chrome.rightPanel.aiChat.historyError")}
@@ -701,18 +832,6 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           )}
         </div>
       </ScreenScroll>
-
-      {/* **The undo offer lives OUTSIDE the review screen**
-          (`design-notes/ai/0518`). It is rendered here rather than in
-          `AiReviewFlow` precisely so closing the review does not take it: the
-          screen used to own the record, and "the whole run can be undone as one
-          action" was therefore true only while the user kept a screen open. */}
-      <AiUndoStrip
-        {...(onNotesWritten === undefined ? {} : { onReverted: (ids) => onNotesWritten([...ids]) })}
-        {...(onOpenHistory === undefined || lastWritten === null
-          ? {}
-          : { onOpenHistory: () => onOpenHistory(lastWritten) })}
-      />
 
       {/* **The scope and what approving it discloses, on the same screen as the
           button that sends it.** `design-notes/ai/0528`: the run opens with
@@ -806,6 +925,22 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
             style={TOOLBAR_BUTTON_STYLE}
           >
             <Icon name="plus" size={22} />
+          </Button>
+        ) : null}
+        {/* The fallback revert offer (myne-md/myne#741). Shown only when the
+            host holds an undoable record that no open turn can host, which is
+            New chat and a switched conversation; the turn icon is the primary
+            surface. Without it the record's offer is live but unreachable. */}
+        {undoRunId !== null && !undoHosted ? (
+          <Button
+            variant="ghost"
+            full={false}
+            data-testid="ai.revert-fallback"
+            aria-label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+            onClick={() => setRevertConfirmRunId(undoRunId)}
+            style={TOOLBAR_BUTTON_STYLE}
+          >
+            <Icon name="rotate-ccw" size={22} />
           </Button>
         ) : null}
       </div>
@@ -935,6 +1070,110 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       ) : null}
       {memorySheetOpen ? (
         <MemorySheet onDeleted={() => {}} onClose={() => setMemorySheetOpen(false)} />
+      ) : null}
+
+      {/* The frozen proposal, read-only (myne-md/myne#741). It replaces the
+          inline Before/After blocks that put two note bodies in a 280px bubble
+          on every open. Nothing here writes: a frozen proposal may quote a note
+          that has since changed, been trashed or moved folders, so the only
+          affordance is close. */}
+      {diffProposal !== null ? (
+        <Sheet
+          onClose={() => setDiffProposal(null)}
+          style={{ maxHeight: "82%", display: "flex", flexDirection: "column" }}
+        >
+          {(close) => (
+            <div
+              data-testid="ai.proposal-diff"
+              style={{ display: "flex", flexDirection: "column", minHeight: 0 }}
+            >
+              <div style={SHEET_HEADER}>
+                <h2 style={SHEET_TITLE}>
+                  {t("editor.chrome.rightPanel.aiChat.diffTitle")}
+                </h2>
+                <Button
+                  variant="ghost"
+                  full={false}
+                  data-testid="ai.proposal-diff-close"
+                  onClick={close}
+                >
+                  {t("common.close")}
+                </Button>
+              </div>
+              <div
+                data-testid="ai.proposal-diff-body"
+                style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
+              >
+                {diffProposal.edits.map((edit, i) => (
+                  <div
+                    key={`e${i}`}
+                    data-testid="ai.proposal-edit"
+                    data-note-id={edit.noteId}
+                    style={{ borderBottom: "1px solid var(--line-1)" }}
+                  >
+                    {lineDiff(edit.anchor, edit.replacement).map((line, j) => (
+                      <DiffLineView key={j} line={line} testIdPrefix="ai.proposal" />
+                    ))}
+                  </div>
+                ))}
+                {diffProposal.newNotes.map((note, i) => (
+                  <div
+                    key={`n${i}`}
+                    data-testid="ai.proposal-new-note"
+                    style={{ borderBottom: "1px solid var(--line-1)" }}
+                  >
+                    <div style={{ ...CAPTION, padding: "var(--space-2) 0 0" }}>
+                      {t("editor.chrome.rightPanel.aiChat.historyProposalNewNote")}:{" "}
+                      {note.title}
+                    </div>
+                    {lineDiff("", note.body).map((line, j) => (
+                      <DiffLineView key={j} line={line} testIdPrefix="ai.proposal" />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Sheet>
+      ) : null}
+
+      {/* Revert is a write, so it confirms first. The sentence states the one
+          asymmetry the offer always carries: edits go back, creates stay. */}
+      {revertConfirmRunId !== null ? (
+        <Sheet onClose={() => setRevertConfirmRunId(null)}>
+          {(close) => (
+            <div
+              data-testid="ai.revert-confirm"
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+            >
+              <h2 style={SHEET_TITLE}>
+                {t("editor.chrome.rightPanel.aiChat.revertConfirmTitle")}
+              </h2>
+              <p style={{ ...MUTED, margin: 0 }}>
+                {t("editor.chrome.rightPanel.aiChat.revertConfirmBody")}
+              </p>
+              {/* The session-scoped disclosure `0561` requires, carried forward
+                  into the confirm rather than dropped with the strip: the offer
+                  is lost on lock or close, and the version history is the
+                  durable path. */}
+              <p style={{ ...MUTED, margin: 0 }}>{t("agent.undo.sessionOnly")}</p>
+              <Button variant="secondary" data-testid="ai.revert-cancel" onClick={close}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                variant="secondary"
+                data-testid="ai.revert-confirm-undo"
+                disabled={undo.busy || undo.run?.runId !== revertConfirmRunId}
+                onClick={() => {
+                  void undo.undo();
+                  close();
+                }}
+              >
+                {t("agent.undo.action")}
+              </Button>
+            </div>
+          )}
+        </Sheet>
       ) : null}
     </>
   );

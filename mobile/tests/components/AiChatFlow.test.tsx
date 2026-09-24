@@ -17,7 +17,7 @@ import i18n from "@myne/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import { clearAgent, clearAgentForLock, getAgent } from "@myne/agent-store";
+import { clearAgent, clearAgentForLock, currentRunEpoch, getAgent, setUndoable } from "@myne/agent-store";
 import type { AgentRunView, RunProgress } from "@myne/agent-protocol";
 // The COMPLETE binding mock, from one place. A per-file mock breaks whenever a
 // different task wires a new call into a surface this file mounts, and the spec
@@ -25,9 +25,11 @@ import type { AgentRunView, RunProgress } from "@myne/agent-protocol";
 import {
   agentCancel,
   agentCapability,
+  agentLastRun,
   agentPreviewGrant,
   agentRunModule,
   agentStart,
+  agentUndo,
   resetAgentRunMock,
 } from "../helpers/agentRunMock";
 
@@ -528,5 +530,223 @@ describe("AiChatFlow: conversation history (myne-md/myne#675)", () => {
       { role: "user", text: "previous question" },
       { role: "assistant", text: "previous answer" },
     ]);
+  });
+});
+
+// myne-md/myne#741. The inline Before/After blocks and the undo strip under the
+// composer are gone. A settled turn now carries two icons: one opens its frozen
+// proposal read-only, the other reverts the host's current undoable run after a
+// confirm. Seeded through history (the icons read `turn.agentSummary`), which is
+// also what a live settle persists.
+describe("AiChatFlow: turn diff and revert icons (myne-md/myne#741)", () => {
+  const SUMMARY = {
+    runId: "r1",
+    summary: "done",
+    edits: 0,
+    newNotes: 0,
+    notesRead: 1,
+    iterations: 1,
+    charsOffDevice: null,
+    end: "finished",
+  };
+
+  function historyWith(agentSummary: Record<string, unknown>): void {
+    mockChatsList.mockResolvedValue([
+      { id: "b2", created_at: 200, title: "Newer", updated_at: 300, version: 2 },
+    ]);
+    mockChatsRead.mockResolvedValue(
+      JSON.stringify({
+        title_derived_from: "Newer",
+        turns: [
+          { id: "h1", kind: "text", role: "user", text: "q" },
+          { id: "h2", kind: "agent", role: "assistant", text: "", agentSummary },
+        ],
+      }),
+    );
+  }
+
+  it("opens a settled run's frozen proposal in a read-only sheet", async () => {
+    historyWith({
+      ...SUMMARY,
+      proposal: {
+        edits: [{ noteId: "n1", anchor: "old words", replacement: "new words" }],
+        newNotes: [{ title: "Scratch", body: "fresh text", folder: null }],
+      },
+    });
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-diff")).toBeTruthy());
+    expect(screen.queryByTestId("ai.proposal-diff")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("ai.turn-diff"));
+
+    const body = screen.getByTestId("ai.proposal-diff-body");
+    expect(body.textContent).toContain("old words");
+    expect(body.textContent).toContain("new words");
+    expect(body.textContent).toContain("Scratch");
+    expect(body.textContent).toContain("fresh text");
+    expect(
+      screen.getByTestId("ai.proposal-edit").getAttribute("data-note-id"),
+    ).toBe("n1");
+  });
+
+  it("renders no diff icon for a run that proposed nothing", async () => {
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(mockChatsRead).toHaveBeenCalled());
+    expect(screen.queryByTestId("ai.turn-diff")).toBeNull();
+  });
+
+  it("shows the revert icon only on the host's current undoable run", async () => {
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+    // The fallback is SUPPRESSED while a turn hosts the run; without this the
+    // condition and "always show it" are indistinguishable.
+    expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+    expect(agentLastRun).toHaveBeenCalled();
+  });
+
+  it("hides the revert icon when the host holds no undoable record", async () => {
+    agentLastRun.mockResolvedValue(null);
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(agentLastRun).toHaveBeenCalled());
+    expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+  });
+
+  it("confirms before undoing and reports the result on the turn", async () => {
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    agentUndo.mockResolvedValue({ reverted: 1, failed: [], notesCreatedNotReverted: 0 });
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId("ai.turn-revert"));
+    expect(screen.getByTestId("ai.revert-confirm")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+    await waitFor(() => expect(agentUndo).toHaveBeenCalledWith("r1"));
+    expect(agentUndo).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId("ai.undo-result")).toBeTruthy());
+    // The offer is gone once the host consumes its record.
+    await waitFor(() => expect(screen.queryByTestId("ai.turn-revert")).toBeNull());
+  });
+
+  it("cancels without calling undo", async () => {
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("ai.turn-revert"));
+    fireEvent.click(screen.getByTestId("ai.revert-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("ai.revert-confirm")).toBeNull());
+    expect(agentUndo).not.toHaveBeenCalled();
+  });
+
+  it("renders the icon only on the matching turn, not on an older run's turn", async () => {
+    // Two settled runs, the host holding the FIRST. The guard is `runId`
+    // equality, so the affordance lands on exactly one turn. Without this
+    // fixture the guard is vacuous.
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    mockChatsList.mockResolvedValue([
+      { id: "b2", created_at: 200, title: "Newer", updated_at: 300, version: 2 },
+    ]);
+    mockChatsRead.mockResolvedValue(
+      JSON.stringify({
+        title_derived_from: "Newer",
+        turns: [
+          { id: "h1", kind: "agent", role: "assistant", text: "", agentSummary: { ...SUMMARY, runId: "r1" } },
+          { id: "h2", kind: "agent", role: "assistant", text: "", agentSummary: { ...SUMMARY, runId: "r2" } },
+        ],
+      }),
+    );
+    mount();
+    await waitFor(() => expect(screen.getAllByTestId("ai.turn-revert")).toHaveLength(1));
+    expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+    expect(agentLastRun).toHaveBeenCalled();
+  });
+
+  it("keeps the offer reachable when no turn hosts it", async () => {
+    // A host record whose run is not in the open transcript: New chat, or a
+    // switched conversation. The turn icon cannot render, so the toolbar
+    // fallback must, or the offer is live but unreachable.
+    agentLastRun.mockResolvedValue({
+      runId: "r9",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.revert-fallback")).toBeTruthy());
+    expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.revert-fallback"));
+    expect(screen.getByTestId("ai.revert-confirm")).toBeTruthy();
+  });
+
+  it("fails closed: a read that throws offers nothing", async () => {
+    // Seed a live offer FIRST, so the assertion distinguishes a clearing catch
+    // from an already-empty store (which passes vacuously, since `beforeEach`'s
+    // `clearAgentForLock` nulls `undoable`).
+    setUndoable(
+      { runId: "r1", restorePoints: [["n1", "s1"]], notesCreated: 0 },
+      currentRunEpoch(),
+    );
+    agentLastRun.mockRejectedValue(new Error("locked"));
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(agentLastRun).toHaveBeenCalled());
+    expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+    expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+  });
+
+  it("re-reads rather than guessing when the undo itself fails", async () => {
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    agentUndo.mockRejectedValue(new Error("noSuchRun"));
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("ai.turn-revert"));
+    fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+    await waitFor(() => expect(agentUndo).toHaveBeenCalledWith("r1"));
+    await waitFor(() => expect(agentLastRun.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.queryByTestId("ai.undo-result")).toBeNull();
+  });
+
+  it("names the half an undo cannot do", async () => {
+    agentLastRun.mockResolvedValue({
+      runId: "r1",
+      restorePoints: [["n1", "s1"]],
+      notesCreated: [],
+    });
+    agentUndo.mockResolvedValue({ reverted: 1, failed: [], notesCreatedNotReverted: 2 });
+    historyWith(SUMMARY);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("ai.turn-revert"));
+    fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+    await waitFor(() => expect(screen.getByTestId("ai.undo-result")).toBeTruthy());
+    // "The run was undone" otherwise reads as covering the notes it created.
+    expect(screen.getByTestId("ai.undo-result").textContent).toContain("left in place");
   });
 });

@@ -3305,16 +3305,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   });
               }
             }}
-            // The durable path the undo strip's copy names. Opening the note
-            // first is not incidental: the history sheet is per note and reads
-            // `editing.id`, so a route that only flipped `historyOpen` would
-            // render a sheet for whatever note happened to be open, or for
-            // none. Landing on the note also puts the user where a restore
-            // will be visible.
-            onOpenHistory={(noteId) => {
-              setTab("notes");
-              void openNote(noteId).then(() => setHistoryOpen(true));
-            }}
             // One rule, shared with desktop. `editing.id` is null for a note
             // that has never been saved, and a run over an id the vault does
             // not hold is not a narrower scope, it is a broken one.

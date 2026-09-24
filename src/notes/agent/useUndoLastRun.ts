@@ -46,6 +46,9 @@ export interface UndoLastRunState {
   run: AppliedRun | null;
   /** The report of the undo that just happened, or null. */
   report: AgentUndoResult | null;
+  /** Which run `report` describes, so a caller can attach the result to that
+   *  turn. Null when there is no report. */
+  reportRunId: string | null;
   busy: boolean;
   /** Revert the offered run. A no-op when there is no offer or one is running. */
   undo: () => Promise<void>;
@@ -158,5 +161,11 @@ export function useUndoLastRun({
     }
   }
 
-  return { run, report: result?.report ?? null, busy, undo };
+  return {
+    run,
+    report: result?.report ?? null,
+    reportRunId: result?.runId ?? null,
+    busy,
+    undo,
+  };
 }

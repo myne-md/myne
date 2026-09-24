@@ -111,24 +111,29 @@ aiDescribe("ch1 AI chat history persists across lock, then deletes everywhere", 
         );
         expect((await s.byTestIdAll("ai.turn")).length).toBe(2);
 
-        // The frozen proposal renders read-only: anchors visible, and NO
-        // write affordance anywhere near it. An `ai.insert-turn` control or
-        // any button inside the proposal section would be a re-apply path
-        // for a proposal quoting a note that may since have changed.
-        const proposal = await s.byTestId("ai.agent-proposal", { timeoutMs: 10_000 });
-        const proposalText = (await proposal.textContent()) ?? "";
+        // The frozen proposal is reachable only through the turn's diff icon,
+        // and the modal is read-only: anchors visible, and NO write
+        // affordance. An `ai.insert-turn` control or any apply button would
+        // be a re-apply path for a proposal quoting a note that may since
+        // have changed.
+        await s.waitForElement(testIdSelector("ai.turn-diff"), { timeoutMs: 10_000 });
+        await (await s.byTestId("ai.turn-diff")).click();
+        await s.waitForElement(testIdSelector("ai.proposal-diff-body"), { timeoutMs: 10_000 });
+        const proposalText = (await (await s.byTestId("ai.proposal-diff-body")).textContent()) ?? "";
         expect(
           proposalText,
           "the frozen proposal shows the anchor text it was settled with",
         ).toContain("alpha beta gamma delta");
         expect(await s.byTestIdAll("ai.insert-turn")).toHaveLength(0);
         const buttonsInProposal = await s.execute<number>(
-          "return document.querySelectorAll('[data-testid=\"ai.agent-proposal\"] button').length;",
+          "return document.querySelectorAll('[data-testid=\"ai.proposal-diff-body\"] button:not([data-testid=\"ai.proposal-diff-close\"])').length;",
         );
         expect(
           buttonsInProposal,
-          "no button inside the frozen proposal section (read-only means read-only)",
+          "no write button inside the frozen proposal modal (read-only means read-only)",
         ).toBe(0);
+        await (await s.byTestId("ai.proposal-diff-close")).click();
+        await s.waitForGone(testIdSelector("ai.proposal-diff-body"), { timeoutMs: 10_000 });
 
         // Delete with confirm: the row goes away and the list empties.
         await (await s.byTestId("ai.history-button")).click();

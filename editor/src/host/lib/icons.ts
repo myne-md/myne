@@ -172,6 +172,10 @@ export const ICON_PATHS = {
   // `rotate-ccw` — a counter-clockwise circular arrow reads as "put it back".
   "rotate-ccw":
     '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  // Read-only proposal diff opener on an agent chat turn (myne-md/myne#741).
+  // Lucide `columns-2`: two side-by-side panes, the split-view silhouette.
+  "columns-2":
+    '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
 } satisfies Record<string, string>;
 
 /**
