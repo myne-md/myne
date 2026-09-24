@@ -267,6 +267,7 @@ export function buildMermaidViewer(opts: {
 
   const viewport = document.createElement("div");
   viewport.className = "cm-mermaid-viewport";
+  viewport.setAttribute("data-testid", "editor.mermaid.viewport");
   viewport.tabIndex = 0;
   viewport.setAttribute("role", "group");
   viewport.setAttribute("aria-label", i18n.t("editor.mermaid.viewerLabel"));
@@ -286,6 +287,12 @@ export function buildMermaidViewer(opts: {
   let controller: ZoomPanController | null = null;
   let expandClose: (() => void) | null = null;
   let destroyed = false;
+  // Floor for the viewport box. Starts at MIN_VIEWPORT_PX and is raised after
+  // the chrome exists if the two right-edge clusters need more room (see the
+  // measurement where chromeBar and the grid are appended). Applied to the
+  // box HEIGHT in `measure`, not to the cap: capping alone leaves a short
+  // diagram at its natural height, which is where the clusters collided.
+  let minStageH = MIN_VIEWPORT_PX;
 
   const capHeight = (): number =>
     Math.max(
@@ -297,13 +304,21 @@ export function buildMermaidViewer(opts: {
     );
 
   /** Size the viewport and the SVG's untransformed box, then hand the box to the
-   *  controller. The viewport is exactly as tall as the diagram needs up to the
-   *  cap, so a small diagram leaves no dead space and a tall one is bounded. */
+   *  controller. The viewport is as tall as the diagram needs up to the cap, so
+   *  a tall diagram stays bounded. A SHORT diagram is floored at `minStageH`
+   *  rather than at its own height: the bottom-right control grid is taller
+   *  than a small diagram's fitted box (measured at 110 px against 104 px for
+   *  the mv3 fixture), so at the natural height it reached over the top-right
+   *  chrome, and being later in the DOM it painted above it, leaving Expand
+   *  unclickable for a real user. The cap still wins over the floor. */
   const measure = (): ContentBox | null => {
     const stageW = viewport.clientWidth;
     if (stageW <= 0) return null;
     const atWidthHeight = natural.h * (stageW / natural.w);
-    const stageH = Math.max(1, Math.min(capHeight(), atWidthHeight));
+    const stageH = Math.min(
+      MAX_VIEWPORT_PX,
+      Math.max(minStageH, Math.min(capHeight(), atWidthHeight)),
+    );
     viewport.style.height = `${Math.round(stageH)}px`;
     const ratio = Math.min(stageW / natural.w, stageH / natural.h);
     const fitW = natural.w * ratio;
@@ -351,6 +366,7 @@ export function buildMermaidViewer(opts: {
 
     const stage = document.createElement("div");
     stage.className = "cm-mermaid-expand-stage";
+    stage.setAttribute("data-testid", "editor.mermaid.expand-stage");
     stage.tabIndex = 0;
     overlay.appendChild(stage);
     stage.appendChild(svg);
@@ -394,7 +410,7 @@ export function buildMermaidViewer(opts: {
         return { fitW, fitH, naturalW: natural.w };
       },
       rest: "width",
-      wheel: "modifier",
+      wheel: "always",
       doubleClick: false,
       keyboard: true,
       ready: true,
@@ -437,7 +453,7 @@ export function buildMermaidViewer(opts: {
       element: svg,
       measure,
       rest: "width",
-      wheel: "modifier",
+      wheel: "always",
       doubleClick: false,
       keyboard: true,
       ready: true,
@@ -471,7 +487,21 @@ export function buildMermaidViewer(opts: {
     ),
   );
   frame.appendChild(chromeBar);
-  frame.appendChild(buildGrid(() => controller));
+  const grid = buildGrid(() => controller);
+  frame.appendChild(grid);
+  // The chrome sits at the frame's top-right and the control grid at its
+  // bottom-right, so on a SHORT viewport (a small diagram at the height floor)
+  // the grid reaches up over the chrome, and being later in the DOM it paints
+  // above it: measured in the e2e probe for myne-md/myne#742, `elementFromPoint`
+  // at Expand's centre returned `.cm-mermaid-controls`, which left Expand
+  // unclickable in the real app, not just under the driver. Floor the box on
+  // the two clusters' LIVE heights (tokens included) so they cannot collide:
+  // chrome top inset + chrome + one inset of gap + grid + the grid's bottom inset.
+  const chromeInset = parseFloat(getComputedStyle(chromeBar).top) || 0;
+  minStageH = Math.max(
+    MIN_VIEWPORT_PX,
+    chromeBar.offsetHeight + grid.offsetHeight + chromeInset * 3,
+  );
 
   controller = mountInline();
   // Restore a scale remembered from an earlier mount of the same diagram. The
