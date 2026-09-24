@@ -317,6 +317,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       daily_date_format: null,
       daily_folder: null,
       daily_template: null,
+      // Fields `use-prefs.ts` DEFAULT_PREFS carries and the mock used to omit.
+      // `prefs_read` returns this object SPRAWLED over the app's defaults
+      // (`setPrefs(await prefsRead())` replaces state wholesale), so a missing
+      // key is `undefined`, not the default: `color_groups: undefined` made
+      // `effectiveColorGroups(authored, …)` throw on `authored.length`,
+      // ErrorBoundary replaced the shell, and `editor.graph-pane` never mounted
+      // (14 mobile-flow failures, myne-md/myne#739).
+      color_groups: [],
+      date_format: null,
+      timezone: null,
+      time_format: null,
+      device_names: {},
+      // ON matching the Rust default (MYND-563/592) — same reason as
+      // `reminders_enabled` below: an absent key must not read as off.
+      transcription_enabled: true,
       favorites: [],
       item_order: {},
       editor_layout: null,

@@ -64,51 +64,148 @@ async function sendCtrlChord(session: Session, key: string): Promise<void> {
 }
 
 /** Long enough to scroll in any window this suite runs in, and numbered so the
- *  line on screen identifies itself. */
+ *  line on screen identifies itself. `line 0` is the load-wait needle (always
+ *  rendered at scrollTop=0); `line 249` is only reachable after a scroll. */
 const LONG_BODY = [
   "# Long note",
   ...Array.from({ length: 250 }, (_, i) => `line ${i}`),
 ].join("\n");
+/** Head-of-doc token: proves the long body reached the buffer without
+ *  depending on a line the virtualised viewport has not rendered yet. */
+const LONG_HEAD = "line 0";
+
+/** Production `resolveScrollHost` shape (editor/src/scroll-slack.ts): start
+ *  OUTSIDE `.cm-editor`, first scrolling `overflow-y` (auto|scroll|overlay).
+ *  Finding the host does NOT require a scroll range (Myne's `.cm-scroller`
+ *  never scrolls — the editor grows inside an outer bounded scroller).
+ *  Callers that assign `scrollTop` pass `needScrollable` and only take a host
+ *  that can actually move. Emits a preamble that binds `found` (element|null);
+ *  it must NOT `return` a DOM node — WebDriver would hand the caller an object. */
+function resolveHostJs(opts: { needScrollable: boolean }): string {
+  const match = opts.needScrollable
+    ? "if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay')" +
+      " && el.scrollHeight > el.clientHeight + 1) { found = el; break; }"
+    : "if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') { found = el; break; }";
+  return (
+    "var found = null;" +
+    "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+    "if (content) {" +
+    "  var editor = content.closest('.cm-editor');" +
+    "  var el = editor ? editor.parentElement : content.parentElement;" +
+    "  while (el && el !== el.ownerDocument.documentElement) {" +
+    "    var oy = getComputedStyle(el).overflowY;" +
+    match +
+    "    el = el.parentElement;" +
+    "  }" +
+    "}"
+  );
+}
+
+/** DOM truth for a failed scroll wait: chain of ancestors + buffer size.
+ *  Layout numbers and class fragments only — never note content (SYNC-13). */
+async function scrollDiag(s: Session): Promise<string> {
+  try {
+    return await s.execute<string>(
+      "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+        "if (!content) return 'no .cm-content';" +
+        "var out = ['textLen=' + (content.textContent || '').length," +
+        "  'cmLines=' + content.querySelectorAll('.cm-line').length];" +
+        "var editor = content.closest('.cm-editor');" +
+        "var el = editor ? editor.parentElement : content.parentElement;" +
+        "var hops = 0;" +
+        "while (el && hops < 16) {" +
+        "  var st = getComputedStyle(el);" +
+        "  var tid = el.getAttribute && el.getAttribute('data-testid');" +
+        "  var role = el.getAttribute && el.getAttribute('role');" +
+        "  out.push(el.tagName.toLowerCase()" +
+        "    + (tid ? '#' + tid : role ? '[' + role + ']' : '.' + String(el.className || '').split(' ')[0])" +
+        "    + ' oy=' + st.overflowY + ' sh=' + el.scrollHeight + ' ch=' + el.clientHeight" +
+        "    + (el.scrollHeight > el.clientHeight + 1 ? ' scrollable' : ''));" +
+        "  if (el === el.ownerDocument.documentElement) break;" +
+        "  el = el.parentElement; hops++;" +
+        "}" +
+        "var d = document.scrollingElement || document.documentElement;" +
+        "out.push('doc oy=' + getComputedStyle(d).overflowY + ' sh=' + d.scrollHeight" +
+        "  + ' ch=' + d.clientHeight + ' top=' + Math.round(d.scrollTop));" +
+        "return out.join(' | ');",
+    );
+  } catch (raw) {
+    return `diag unreadable (${(raw as Error).message})`;
+  }
+}
 
 /** The pane's scroll offset, or -1 when nothing scrolls yet. */
 async function scrollTop(s: Session): Promise<number> {
   return s.execute<number>(
-    "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-      "if (!content) return -1;" +
-      "var host = content.parentElement;" +
-      "while (host) {" +
-      "  var oy = getComputedStyle(host).overflowY;" +
-      "  if ((oy === 'auto' || oy === 'scroll') && host.scrollHeight > host.clientHeight + 1) break;" +
-      "  host = host.parentElement;" +
-      "}" +
-      "return host ? Math.round(host.scrollTop) : -1;",
+    resolveHostJs({ needScrollable: true }) + "return found ? Math.round(found.scrollTop) : -1;",
   );
 }
 
 /** Scroll the pane to `top` and report where it actually landed. */
 async function scrollTo(s: Session, top: number): Promise<number> {
   return s.execute<number>(
-    "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-      "if (!content) return -1;" +
-      "var host = content.parentElement;" +
-      "while (host) {" +
-      "  var oy = getComputedStyle(host).overflowY;" +
-      "  if ((oy === 'auto' || oy === 'scroll') && host.scrollHeight > host.clientHeight + 1) break;" +
-      "  host = host.parentElement;" +
-      "}" +
-      "if (!host) return -1;" +
-      `host.scrollTop = ${top};` +
-      "host.dispatchEvent(new Event('scroll'));" +
-      "return Math.round(host.scrollTop);",
+    resolveHostJs({ needScrollable: true }) +
+      "if (!found) return -1;" +
+      `found.scrollTop = ${top};` +
+      "found.dispatchEvent(new Event('scroll'));" +
+      "return Math.round(found.scrollTop);",
+  );
+}
+
+/** Wait until the editor buffer actually holds `needle`.
+ *  Disk is not the pane: after an out-of-band write the load effect has to
+ *  re-read before `.cm-content` grows past a screenful. Waiting on
+ *  `scrollTop >= 0` alone times out on a short buffer that never scrolls.
+ *
+ *  The needle must be a HEAD-of-document token. CodeMirror virtualises: at
+ *  scrollTop=0 the last line of a long body is not in `.cm-content`
+ *  textContent until a scroll puts it in the viewport, so waiting on
+ *  `line 249` here would time out on a fully loaded note. Callers pass
+ *  `line 0` (or a short body's only marker) and let `waitScrollable` prove
+ *  the document is tall enough. */
+async function waitBodyLoaded(s: Session, needle: string): Promise<void> {
+  let lastLen = -1;
+  let lastHas = false;
+  await s.waitUntil(
+    async () => {
+      const body = await s.execute<string>(
+        "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+          "return c ? (c.textContent || '') : '';",
+      );
+      lastLen = body.length;
+      lastHas = body.includes(needle);
+      return lastHas ? true : null;
+    },
+    {
+      label: () =>
+        `editor buffer carries ${needle} (last: len=${lastLen} has=${lastHas})`,
+      timeoutMs: 30_000,
+    },
   );
 }
 
 /** Wait until the pane is scrollable, so a scroll can be performed at all. */
 async function waitScrollable(s: Session): Promise<void> {
-  await s.waitUntil(async () => ((await scrollTop(s)) >= 0 ? true : null), {
-    label: "the pane has something to scroll",
-    timeoutMs: 20_000,
-  });
+  let last = "";
+  await s.waitUntil(
+    async () => {
+      const top = await scrollTop(s);
+      if (top >= 0) return true;
+      last = await scrollDiag(s);
+      return null;
+    },
+    {
+      label: () => `the pane has something to scroll (last: ${last})`,
+      timeoutMs: 20_000,
+    },
+  );
+}
+
+/** Buffer holds `needle`, THEN the pane is scrollable — the order that makes
+ *  the second wait mean "long enough to scroll" rather than "still empty". */
+async function waitBodyScrollable(s: Session, needle: string): Promise<void> {
+  await waitBodyLoaded(s, needle);
+  await waitScrollable(s);
 }
 
 
@@ -121,19 +218,35 @@ async function scrollTopsAll(s: Session): Promise<number[]> {
     "var out = [];" +
       "var contents = document.querySelectorAll('[data-testid=\"editor.content\"] .cm-content');" +
       "for (var i = 0; i < contents.length; i++) {" +
-      "  var host = contents[i].parentElement;" +
-      "  while (host) {" +
-      "    var oy = getComputedStyle(host).overflowY;" +
-      "    if ((oy === 'auto' || oy === 'scroll') && host.scrollHeight > host.clientHeight + 1) break;" +
-      "    host = host.parentElement;" +
+      "  var content = contents[i];" +
+      "  var editor = content.closest('.cm-editor');" +
+      "  var el = editor ? editor.parentElement : content.parentElement;" +
+      "  while (el && el !== el.ownerDocument.documentElement) {" +
+      "    var oy = getComputedStyle(el).overflowY;" +
+      "    if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay')" +
+      "        && el.scrollHeight > el.clientHeight + 1) break;" +
+      "    el = el.parentElement;" +
       "  }" +
-      "  out.push(host ? Math.round(host.scrollTop) : -1);" +
+      "  var ok = el && el !== el.ownerDocument.documentElement" +
+      "    && el.scrollHeight > el.clientHeight + 1;" +
+      "  out.push(ok ? Math.round(el.scrollTop) : -1);" +
       "}" +
       "return out;",
   );
 }
 
 async function writeBody(s: Session, noteId: string, body: string): Promise<void> {
+  // `createNote` settles the title autosave, but a latest-wins follow-up can
+  // still be in flight; an out-of-band `note_update` that lands under it is
+  // rejected BaseMismatch or overwritten. The badge is "Saved·" with no
+  // Editing/Saving after the settle — poll that before the IPC.
+  await s.waitUntil(
+    async () => {
+      const t = (await (await s.byTestId("editor.save-status")).textContent()) ?? "";
+      return t.includes("Editing") || t.includes("Saving") ? null : true;
+    },
+    { label: "autosave idle before out-of-band write", timeoutMs: 15_000 },
+  );
   const r = await pageSeatInvoke(
     s,
     "plugin:notes|note_update",
@@ -144,6 +257,17 @@ async function writeBody(s: Session, noteId: string, body: string): Promise<void
   // The write is out of band (page-seat IPC, not the pane's autosave loop), so
   // the open pane owes a reload - see the helper's header.
   await notifyNoteWritten(s, noteId);
+  // Prove the bytes are on disk before the next step. A title autosave that
+  // lands after this write would strip them; polling note_read catches that
+  // while a later editorText check would just time out on a missing head.
+  const needle = body.includes(LONG_HEAD) ? LONG_HEAD : "short.";
+  await s.waitUntil(
+    async () => {
+      const again = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
+      return typeof again.ok === "string" && again.ok.includes(needle) ? true : null;
+    },
+    { label: "disk body carries the write", timeoutMs: 15_000 },
+  );
 }
 
 describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
@@ -180,7 +304,7 @@ describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
         // note is only now the ACTIVE one; bump once more so the reload effect
         // re-reads THIS note from disk rather than restoring a cached state.
         await notifyNoteWritten(s, longId);
-        await waitScrollable(s);
+        await waitBodyScrollable(s, LONG_HEAD);
         const parked = await scrollTo(s, 1200);
         expect(parked, "the pane should have scrolled").toBeGreaterThan(400);
 
@@ -201,11 +325,16 @@ describeE2E("sm1 a note keeps its reading position (myne#600)", () => {
         // note is only now the ACTIVE one; bump once more so the reload effect
         // re-reads THIS note from disk rather than restoring a cached state.
         await notifyNoteWritten(s, longId);
+        // Head needle is wrong here: the restore below (or an already-applied
+        // cache restore) parks the viewport mid-document, and CodeMirror
+        // virtualises the head out of `.cm-content`, so "line 0" is absent from
+        // a fully loaded body. A scroll range is the load proof once we are
+        // no longer at the top.
         await waitScrollable(s);
 
         // Back near where the reader was. A generous floor rather than pixel
-        // parity: the anchor is a document position, so the restore lands on the
-        // LINE, and the pixel it resolves to is the layout's business.
+        // parity: the anchor is a document position, so the restore lands on
+        // the LINE, and the pixel it resolves to is the layout's business.
         const restored = await s.waitUntil(
           async () => {
             const top = await scrollTop(s);
@@ -271,14 +400,32 @@ describeE2E("sm2 a split keeps the reading position it was split from (myne#600)
         // note is only now the ACTIVE one; bump once more so the reload effect
         // re-reads THIS note from disk rather than restoring a cached state.
         await notifyNoteWritten(s, longId);
-        await waitScrollable(s);
+        await waitBodyScrollable(s, LONG_HEAD);
         const parked = await scrollTo(s, 1200);
         expect(parked, "the pane should have scrolled").toBeGreaterThan(400);
 
         // The remember is debounced to scroll-settle, the same window sm1 gives
-        // it. Nothing in the DOM reports the anchor, so there is no observable
-        // effect to wait on instead.
+        // it. Assert the anchor landed in the DOM before the split: a missing
+        // or near-zero anchor makes the post-split wait a foregone conclusion,
+        // and the failure then names the wrong step.
         await new Promise((r) => setTimeout(r, 600));
+        const preDiag = await s.execute<string>(
+          resolveHostJs({ needScrollable: false }) +
+            "if (!found) return 'no-host|pos=none';" +
+            "var ds = found.dataset || {};" +
+            "return 'liveTop=' + Math.round(found.scrollTop)" +
+            " + '|pos=' + (ds.scrollAnchorPos || 'none')" +
+            " + '|write=' + (ds.scrollAnchorWrite || '-')" +
+            " + '|rememberTop=' + (ds.scrollAnchorTop || '-');",
+        );
+        const preAnchor = await s.execute<string>(
+          resolveHostJs({ needScrollable: false }) +
+            "return found && found.dataset.scrollAnchorPos ? found.dataset.scrollAnchorPos : 'none';",
+        );
+        expect(
+          Number(preAnchor),
+          `the pre-split scroll should have remembered a mid-document anchor (${preDiag})`,
+        ).toBeGreaterThan(50);
 
         if ((await s.byTestIdAll("editor.pane")).length !== 1) {
           throw new Error("expected a single pane before the split chord");
@@ -300,17 +447,56 @@ describeE2E("sm2 a split keeps the reading position it was split from (myne#600)
         // copy of the note, so there is exactly one `.cm-content` afterwards.
         // Measured, not assumed: the two-pane version of this assertion timed
         // out reporting `[1206]`, one scroller, correctly parked.
+        //
+        // Disk is checked alongside the DOM: a post-split body that vanished
+        // looks identical to a restore that failed, and `note_read` separates
+        // them without putting vault material in the label (length only).
         let seen: number[] = [];
+        let seenLen = -1;
+        let diskLen = -1;
+        let diag = "";
         const tops = await s.waitUntil(
           async () => {
             seen = await scrollTopsAll(s);
+            seenLen = await s.execute<number>(
+              "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+                "return c ? (c.textContent || '').length : -1;",
+            );
+            const r = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId: longId }, IPC_TIMEOUT);
+            diskLen = typeof r.ok === "string" ? r.ok.length : -1;
+            if (!(seen.length === 1 && seen[0]! > 400)) {
+              diag = await scrollDiag(s);
+              diag +=
+                " | restore=" +
+                (await s.execute<string>(
+                  "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+                    "if (!content) return 'no-content';" +
+                    "var el = content.closest('.cm-editor');" +
+                    "var hops = 0;" +
+                    "while (el && hops < 16) {" +
+                    "  var ds = el.dataset || {};" +
+                    "  if (ds.scrollRestore || ds.scrollRo || ds.scrollAnchorWrite) {" +
+                    "    return 'restore=' + (ds.scrollRestore || '-')" +
+                    "      + ' frames=' + (ds.scrollRestoreFrames || '-')" +
+                    "      + ' stable=' + (ds.scrollStable || '-')" +
+                    "      + ' applied=' + (ds.scrollAnchorApplied || '-')" +
+                    "      + ' off=' + (ds.scrollAnchorOffset || '-')" +
+                    "      + ' ro=' + (ds.scrollRo || '-')" +
+                    "      + ' roW=' + (ds.scrollRoWidth || '-')" +
+                    "      + ' anchorPos=' + (ds.scrollAnchorPos || '-')" +
+                    "      + ' write=' + (ds.scrollAnchorWrite || '-');" +
+                    "  }" +
+                    "  el = el.parentElement; hops++;" +
+                    "}" +
+                    "return 'no-diag-attrs';",
+                ));
+            }
             return seen.length === 1 && seen[0]! > 400 ? seen : null;
           },
           {
-            // The label carries the last reading, so a timeout says what the
-            // offset actually was rather than only that the wait ran out.
-            // Offsets are layout numbers, never note content (SYNC-13).
-            label: () => `the surviving pane near the parked line (last: [${seen.join(", ")}])`,
+            // Offsets and buffer lengths only — never note content (SYNC-13).
+            label: () =>
+              `the surviving pane near the parked line (last: [${seen.join(", ")}] len=${seenLen} disk=${diskLen}${diag ? " | " + diag : ""})`,
             timeoutMs: 20_000,
           },
         );

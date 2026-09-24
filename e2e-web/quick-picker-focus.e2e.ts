@@ -33,6 +33,11 @@
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault } from "./support/fixture-session";
+// The importer offer mounts over the shell on a fresh profile and holds
+// focus in its own trap, so the bottom-bar focus below never sticks and Esc
+// restores to <body>. Dismissed before the opener is focused — same rule
+// as every other fixture-driven scenario in this lane.
+import { dismissImporterOfferIfPresent } from "../e2e/support/flows";
 import { KEY, pressChord, pressKey, activeSignature } from "../e2e/support/keyboard";
 import type { Session } from "./support/session";
 
@@ -51,6 +56,11 @@ describeE2E("the quick picker's focus trap in a browser", () => {
     try {
       const { session } = ctx;
 
+      // The importer onboarding offer would otherwise hold focus in its own
+      // trap, so the bottom-bar focus below never sticks and Esc restores to
+      // <body> rather than the opener.
+      await dismissImporterOfferIfPresent(session);
+
       // The palette's toggle derives its `when` context from the FOCUSED
       // element, so something in the app has to hold focus before the chord
       // means anything — `e2e/keyboard-nav-working.e2e.ts` focuses the editor
@@ -61,6 +71,14 @@ describeE2E("the quick picker's focus trap in a browser", () => {
       await session.execute(
         "document.querySelector('[data-testid=\"editor.bottom-bar\"] button')?.focus();",
       );
+      // Prove the opener took focus before the chord; otherwise the assertion
+      // after Esc is about a restore target the test never established.
+      const openerSig = await activeSignature(session);
+      expect(
+        openerSig,
+        `the bottom-bar opener did not take focus (got ${openerSig}); ` +
+          `Esc would then legitimately restore to <body>`,
+      ).not.toBe("(body)");
 
       // The modifier is resolved from the PAGE, not assumed. `Mod` is Cmd on
       // macOS and Ctrl everywhere else (`src/commands/chord.ts::isMacPlatform`),

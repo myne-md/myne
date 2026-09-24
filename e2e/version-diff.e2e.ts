@@ -125,7 +125,7 @@ async function columnText(session: Session, side: "left" | "right"): Promise<str
  *  `createNote` just created and left selected). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    testIdSelector("notes.row", { "aria-current": "true" }),
+    testIdSelector("notes.row", { "aria-selected": "true" }),
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {

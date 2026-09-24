@@ -11,8 +11,10 @@
 //     stacked-navigation contract) instead of dead-ending; re-running the
 //     action and keyboard-selecting a folder (type-to-filter → Enter on
 //     the `data-selected` row) fires the real `bulkMoveWithSync` move —
-//     the note leaves the sidebar root and lands under the (collapsed)
-//     folder, exactly like the ms1 bulk-move (notes.e2e.ts).
+//     the note leaves the sidebar root and lands nested under the folder
+//     (the folder may auto-expand via revealFolder after the move; the
+//     assertion is aria-level > 1 on the note row, not a collapsed state),
+//     exactly like the ms1 bulk-move (notes.e2e.ts).
 //
 // Folder targets are the live note folders plus `deliberate_folders`
 // (canonical trailing-slash form — the picker option's `data-value` is
@@ -47,7 +49,7 @@ const ENTER = "\uE007";
  *  search-palette.e2e.ts). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-current="true"]',
+    '[data-testid="notes.row"][aria-selected="true"]',
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {
@@ -109,12 +111,28 @@ describeE2E("qp1 palette move-note QuickPicker: Esc pops back, Enter moves (pale
         await (await s.byTestId("quick-picker.input")).sendKeys(ENTER);
         await s.waitForGone(testIdSelector("quick-picker.dialog"));
 
-        // The move lands the note inside the folder, which defaults to
-        // collapsed (the ms1 contract) — the root row disappears…
-        await s.waitForGone(testIdSelector("notes.row"));
-        // …and EXPANDING the folder reveals exactly the moved note.
-        await (await s.byTestId("notes.folder-row")).click(); // expand
-        await s.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
+        // The move lands the note under the folder. The folder defaults to
+        // collapsed (the ms1 contract), BUT `justCreatedId` still pins the
+        // NoteList reveal effect: once the cache settles `folder = "Arsiv/"`,
+        // that effect opens the destination. Handle both — ensure expanded,
+        // then assert the moved note is nested one level under the folder
+        // (`aria-level` > 1) and is the only note row.
+        await s.waitUntil(
+          async () => {
+            const folders = await s.findElements(testIdSelector("notes.folder-row"));
+            if (folders.length === 0) return null;
+            if ((await folders[0].attribute("aria-expanded")) !== "true") {
+              await folders[0].click();
+              return null;
+            }
+            const rows = await s.findElements(
+              testIdSelector("notes.row", { "data-note-id": noteId }),
+            );
+            if (rows.length !== 1) return null;
+            return Number((await rows[0].attribute("aria-level")) ?? "1") > 1 ? true : null;
+          },
+          { label: "moved note appears nested under the folder", timeoutMs: 15_000 },
+        );
         expect((await s.byTestIdAll("notes.row")).length).toBe(1);
       },
     );

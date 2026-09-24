@@ -141,8 +141,6 @@ export function NoteExportModal({
 }: NoteExportModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open (MYND-93).
-  useFocusTrap(dialogRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -150,6 +148,8 @@ export function NoteExportModal({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
   // Opt-in default (the backend command is the "opt-in attachments-
   // included export"): the toggle starts OFF on every open.

@@ -149,7 +149,6 @@ export function ModalShell({
 
   // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
   const modalRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(modalRef, { enabled: open });
   // And make the rest of the page INERT while it is open (myne-md/myne#728).
   // The trap contains Tab; it does not stop a screen reader's virtual cursor
   // from reading the page behind the dialog, and `aria-modal` is an assertion
@@ -158,6 +157,7 @@ export function ModalShell({
   // siblings would inert the backdrop it sits in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  useFocusTrap(modalRef, { enabled: open });
 
   if (!open) return null;
 

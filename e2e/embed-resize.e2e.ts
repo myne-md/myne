@@ -77,7 +77,7 @@ async function noteBody(s: Session, noteId: string): Promise<string> {
 }
 
 async function activeNoteRowId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
   return (await row.attribute("data-note-id")) ?? "";
 }
 

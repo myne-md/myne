@@ -54,12 +54,14 @@
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault } from "./support/fixture-session";
+import { createNote, dismissImporterOfferIfPresent } from "./support/flows";
 import { setEmulatedMedia, supportsCdp } from "./support/cdp";
 import { harnessEnv, type SupportedBrowser } from "./support/harness";
 import type { Session } from "./support/session";
 
-/** Surfaces whose decoration must stop. Present in the unlocked shell with no
- *  note open, which is the state the fixture vault reaches. */
+/** Surfaces whose decoration must stop. `editor.sidebar-right` mounts only
+ *  while a NOTE tab is focused (`Editor.tsx`), so the fixture session opens a
+ *  note first — left + bottom bar alone would make the third assertion a no-op. */
 const DECORATED = ["editor.sidebar-left", "editor.sidebar-right", "editor.bottom-bar"] as const;
 
 /** What the exemption promises, in ms. `tokens.css` sets 1600 explicitly. */
@@ -126,6 +128,8 @@ describeE2E("prefers-reduced-motion stops decoration and keeps essential motion"
     const ctx = await openFixtureVault();
     try {
       const { session } = ctx;
+      await dismissImporterOfferIfPresent(session);
+      await createNote(session);
 
       // NO-PREFERENCE FIRST, and it is the non-vacuity half. "Every transition
       // is 0s under reduce" is also true of a page with no transitions at all,

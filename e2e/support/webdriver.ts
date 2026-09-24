@@ -160,6 +160,13 @@ export class Element {
    *  MYND-370). The single `click` between the pairs toggles disclosure twice
    *  (nets to no fold change), exactly as a real double-click does. */
   async doubleClick(): Promise<void> {
+    await this.doubleClickAt(0, 0);
+  }
+
+  /** Double-click at an offset from the element's top-left (W3C element origin).
+   *  (0,0) is the border-box corner, which for a full-width `.cm-line` sits in
+   *  the line-height leading above the glyphs and misses word-select. */
+  async doubleClickAt(offsetX: number, offsetY: number): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [
         {
@@ -171,8 +178,8 @@ export class Element {
               type: "pointerMove",
               duration: 0,
               origin: { [ELEMENT_KEY]: this.elementId },
-              x: 0,
-              y: 0,
+              x: offsetX,
+              y: offsetY,
             },
             { type: "pointerDown", button: 0 },
             { type: "pointerUp", button: 0 },
@@ -196,6 +203,13 @@ export class Element {
    *  and both DISPATCH the transaction the gesture would produce; this is the
    *  only lane where the gesture itself runs. */
   async tripleClick(): Promise<void> {
+    await this.tripleClickAt(0, 0);
+  }
+
+  /** Triple-click at an offset from the element's top-left (W3C element origin).
+   *  (0,0) is the border-box corner, which for a full-width `.cm-line` sits in
+   *  the line-height leading above the glyphs — same trap as `doubleClickAt`. */
+  async tripleClickAt(offsetX: number, offsetY: number): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [
         {
@@ -207,8 +221,8 @@ export class Element {
               type: "pointerMove",
               duration: 0,
               origin: { [ELEMENT_KEY]: this.elementId },
-              x: 0,
-              y: 0,
+              x: offsetX,
+              y: offsetY,
             },
             { type: "pointerDown", button: 0 },
             { type: "pointerUp", button: 0 },

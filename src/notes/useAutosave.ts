@@ -448,11 +448,15 @@ export function useAutosave(
         // caused the refusal is saved on the next cycle.
         savedBodyRef.current = patchedBody;
         dirtyRef.current = false;
-        setStatus({ status: "saved", at: new Date(), noteId: id });
         // MYND-31: live re-index from the just-saved body (decrypt-free —
-        // the body is already in V8). Best-effort, fire-and-forget so a
-        // VaultIndices hiccup never affects the save status.
-        void reindexNoteFromBody(id, patchedBody);
+        // the body is already in V8). Awaited BEFORE the `saved` status so
+        // `waitForSaved` (and a user who renames immediately) implies the
+        // index has this body: rename's inbound wikilink rewrite reads
+        // `backlinks()` off vault-indices, and a fire-and-forget reindex left
+        // that edge missing under load (ril1). `reindexNoteFromBody` swallows
+        // its own failures, so a VaultIndices hiccup still cannot fail the save.
+        await reindexNoteFromBody(id, patchedBody);
+        setStatus({ status: "saved", at: new Date(), noteId: id });
         const onSavedNow = onSavedRef.current;
         if (onSavedNow !== undefined && patchedBody !== bodyAtFire) {
           // Compare-and-swap, not a bare set (myne#167): the ONLY buffer this

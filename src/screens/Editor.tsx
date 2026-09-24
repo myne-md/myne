@@ -3327,6 +3327,15 @@ function CommandPaletteHost({
   // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
   // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
   const paletteWs = useWorkspace();
+  // The focused pane's active note. Local to this host (the chrome's
+  // `focusedActiveNoteId` is a sibling scope): cover handlers must pin THIS,
+  // not `ctx.selectedId`, because bridge B mirrors focus → selection in a
+  // passive effect and a palette open right after a split can still read the
+  // previous pane (nco3).
+  const focusedActiveNoteId =
+    paletteWs.focusedLeaf.activeTab?.kind === "note"
+      ? paletteWs.focusedLeaf.activeTab.id
+      : null;
   // (The palette's real-time-sync toggle was dropped in the develop merge - the
   // sync engine now manages SSE as an always-on baseline with an info-only
   // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
@@ -3725,11 +3734,15 @@ function CommandPaletteHost({
       // banner control and the title-row control are both hover-revealed.
       onSetNoteCover: () => {
         onClose();
-        setCoverPicker({ hasCover: false, noteId: null });
+        // Pin the FOCUSED pane's note, not `ctx.selectedId` via a null noteId.
+        // Bridge B mirrors focus → selection in a passive effect, so a palette
+        // open right after a split/focus click can still read the previous pane
+        // and the cover lands there (nco3).
+        setCoverPicker({ hasCover: false, noteId: focusedActiveNoteId });
       },
       onRemoveNoteCover: () => {
         onClose();
-        applyNoteCover(null, null);
+        applyNoteCover(null, focusedActiveNoteId);
       },
       onShowGraph,
       onShowIsolatedGraph,
@@ -3781,6 +3794,9 @@ function CommandPaletteHost({
       onExportNotePdf,
       onExportNoteHtml,
       onExportNoteTxt,
+      // Cover handlers close over the focused pane's note (nco3): rebuild when
+      // focus moves so they do not act on a stale id.
+      focusedActiveNoteId,
       onShowGraph,
       onShowIsolatedGraph,
       onShowTags,
@@ -3934,10 +3950,11 @@ function CommandPaletteHost({
   // `preventDefault` on `mousedown`, so a press in an unfocused pane never
   // focuses it and the passive effect that syncs the selection has not run
   // either, which cleared the OTHER pane's note. `null` keeps the old meaning,
-  // "the focused note", which is what the palette and the title-row control
-  // actually mean.
+  // "the focused note" — resolved as the focused pane's active note first,
+  // then `selectedId` (bridge B's mirror), because selection can lag focus
+  // across a split (nco3).
   const applyNoteCover = (choice: CoverChoice | null, target: string | null) => {
-    const id = target ?? activeNoteId;
+    const id = target ?? focusedActiveNoteId ?? activeNoteId;
     setCoverPicker(null);
     if (id === null) return;
     void setNoteCover(id, COVER_FIELD_KEY, choice)
@@ -3966,7 +3983,9 @@ function CommandPaletteHost({
   // one precedence rule to keep in step. `null` when no picker is open, or when
   // the entry point named nothing and nothing is selected either.
   const coverPickerTarget =
-    coverPicker === null ? null : (coverPicker.noteId ?? activeNoteId);
+    coverPicker === null
+      ? null
+      : (coverPicker.noteId ?? focusedActiveNoteId ?? activeNoteId);
   // The banner's two hover controls reach this component through window signals,
   // the same shape the vim `:q` ex command uses: the banner is CodeMirror DOM in
   // the shared editor package, with no route into the React context that owns
@@ -4029,7 +4048,8 @@ function CommandPaletteHost({
       // label that guesses would be wrong half the time. The picker itself is
       // the surface that shows what is already there.
       label: t("editor.cover.add"),
-      onSelect: () => setCoverPicker({ hasCover: false, noteId: null }),
+      onSelect: () =>
+        setCoverPicker({ hasCover: false, noteId: focusedActiveNoteId }),
     },
     {
       kind: "action",

@@ -3,6 +3,7 @@ import {
   type ButtonHTMLAttributes,
   type CSSProperties,
   type ReactNode,
+  type Ref,
 } from "react";
 import { Icon } from "./Icon";
 import type { IconName } from "../../lib/icons";
@@ -13,6 +14,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   icon?: IconName;
   children?: ReactNode;
+  /** React 19: a function component takes `ref` as a prop; `...rest` puts it on the `<button>`. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 const baseStyle: CSSProperties = {

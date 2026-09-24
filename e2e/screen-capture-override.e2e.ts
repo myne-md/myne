@@ -100,6 +100,33 @@ function fileOnDisk(appConfigDir: string): { disabled?: boolean } | null {
 async function openEscape(s: Session): Promise<void> {
   const reached = await tabToTestId(s, TRIGGER);
   expect(reached, "the escape must be reachable by Tab, that is the design").toBe(true);
+  // Focus is on the button, but React's onFocus setState has not necessarily
+  // committed the FOCUSED_TRIGGER_STYLE yet. Until it does the button is still
+  // the resting 1x1 clip-path box and a W3C click polls "not hit-testable".
+  //
+  // After a Cancel the trap restores focus with `.focus()`. When that restore
+  // does not re-fire React's onFocus (focus already on the element, or the
+  // handler ran while the dialog's unmount still owned the commit),
+  // `tabToTestId` sees the active element and returns true WITHOUT pressing
+  // Tab, the style stays clipped, and this wait times out. Re-fire focus by
+  // hand when the active element is already the trigger but the paint says
+  // otherwise — the same path a sighted user takes by clicking away and back.
+  const paint = async (): Promise<boolean> => {
+    const style = (await (await s.byTestId(TRIGGER)).attribute("style")) ?? "";
+    return !style.includes("clip-path");
+  };
+  if (!(await paint())) {
+    await s.execute(
+      "var el = document.activeElement;" +
+        "var t = document.querySelector('[data-testid=\"screen-capture-escape.trigger\"]');" +
+        "if (el && el.blur) el.blur();" +
+        "if (t && t.focus) t.focus();",
+    );
+  }
+  await s.waitUntil(paint, {
+    label: "the escape to paint its focused (unclipped) style after Tab",
+    timeoutMs: 5_000,
+  });
   await (await s.byTestId(TRIGGER)).click();
   await s.byTestId(DIALOG);
 }

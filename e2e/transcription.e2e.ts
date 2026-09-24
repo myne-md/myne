@@ -50,7 +50,7 @@ const IPC_TIMEOUT = 15_000;
 
 /** The id of the note currently open in the editor (the selected sidebar row). */
 async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {
     throw new Error("selected notes.row carried no data-note-id");

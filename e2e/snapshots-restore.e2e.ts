@@ -87,7 +87,7 @@ const IPC_TIMEOUT = 15_000;
  *  `data-note-id`). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-current="true"]',
+    '[data-testid="notes.row"][aria-selected="true"]',
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {

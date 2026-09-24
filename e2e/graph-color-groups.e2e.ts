@@ -139,9 +139,13 @@ async function tokenRgb(s: Session, token: string): Promise<[number, number, num
  *  var(--…)` style), so the read goes through computed style rather than an
  *  attribute — production code stays untouched. */
 async function rowSwatchRgb(s: Session): Promise<[number, number, number]> {
+  // a11y (myne#728): the testid is the 24px transparent hit target; the paint
+  // lives on the 14px child span. Reading the button yields rgba(0,0,0,0) → [0,0,0].
   const raw = await s.execute<string | null>(
     "var el = document.querySelector('[data-testid=\"editor.color-group-swatch\"]');" +
-      "return el ? getComputedStyle(el).backgroundColor : null;",
+      "if (!el) return null;" +
+      "var paint = el.querySelector('span') || el;" +
+      "return getComputedStyle(paint).backgroundColor;",
   );
   if (raw === null) throw new Error("no color-group row swatch on the page");
   return parseRgb(raw);

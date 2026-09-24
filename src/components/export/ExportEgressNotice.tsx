@@ -62,7 +62,6 @@ export function ExportEgressNotice({
 }: ExportEgressNoticeProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -70,6 +69,7 @@ export function ExportEgressNotice({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  useFocusTrap(dialogRef, { enabled: open });
 
   useEffect(() => {
     if (!open) return;

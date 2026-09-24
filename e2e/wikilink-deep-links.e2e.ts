@@ -47,7 +47,7 @@ const IPC_TIMEOUT = 15_000;
 /** Read the selected sidebar row's note-id (`createNote` leaves it selected). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-current="true"]',
+    '[data-testid="notes.row"][aria-selected="true"]',
   );
   return (await row.attribute("data-note-id")) ?? "";
 }
@@ -337,6 +337,7 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
 
         // The authoring note, with its OWN heading for `[[#` to find.
         await createNote(s, "Author");
+        const authorId = await selectedNoteId(s);
         await typeIntoEditor(s, "## Setup wdsetup\n\n");
         await waitForSaved(s);
 
@@ -352,12 +353,28 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
           { label: "[[# inserted the compact heading-anchor form", timeoutMs: 10_000 },
         );
 
-        // ── `[[##` vault-wide heading → full path form. ──
+        // ── `[[##` vault-wide heading → full path form. ── The chip widget is
+        // an atomic Decoration.replace mounted OUTSIDE myneDecorations()
+        // (extensions.ts wikilinkChipExtensions), so source mode still shows
+        // the chip display (`Spec › Goals wdgoals`), never the path — the
+        // only DOM lift is cursor-line reveal, which leaves as soon as focus
+        // moves. Assert the bytes the autosave wrote via production
+        // note_read IPC (same oracle wd1 already uses).
         await content.sendKeys("\n[[##goals");
         await realClickFresh(s, '[data-testid="picker.vault-heading-row"]');
+        await waitForSaved(s);
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("Spec.md#Goals wdgoals|") ? true : null),
-          { label: "[[## inserted the full path heading form", timeoutMs: 10_000 },
+          async () => {
+            const r = await pageSeatInvoke(
+              s,
+              "plugin:notes|note_read",
+              { noteId: authorId },
+              IPC_TIMEOUT,
+            );
+            const body = typeof r.ok === "string" ? r.ok : "";
+            return body.includes("Spec.md#Goals wdgoals|") ? true : null;
+          },
+          { label: "[[## inserted the full path heading form", timeoutMs: 15_000 },
         );
       },
     );

@@ -19,6 +19,7 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  pageSeatInvoke,
   runPaletteAction,
   settleOn,
   typeIntoEditor,
@@ -26,6 +27,28 @@ import {
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
+
+const IPC_TIMEOUT = 15_000;
+
+/** Wait until the backend task index carries both source lines. `waitForSaved`
+ *  only proves the badge settled; the live re-index after save is fire-and-forget
+ *  (`void reindexNoteFromBody`), so the panel can open on a nonce that has not
+ *  yet seen either task while still rendering section headers from a partial
+ *  fetch. Polling the IPC separates "index not ready" from "row text wrong". */
+async function waitForTaskIndex(s: Session, needles: readonly string[]): Promise<void> {
+  await s.waitUntil(
+    async () => {
+      const r = await pageSeatInvoke(s, "plugin:vault-indices|vault_indices_tasks", {}, IPC_TIMEOUT);
+      if (typeof r.ok !== "object" || r.ok === null || !Array.isArray((r.ok as unknown[]))) {
+        return null;
+      }
+      const rows = r.ok as Array<{ rawLine?: string }>;
+      const blob = rows.map((row) => row.rawLine ?? "").join("\n");
+      return needles.every((n) => blob.includes(n)) ? true : null;
+    },
+    { label: "task index carries both source lines", timeoutMs: 20_000 },
+  );
+}
 
 /** Open the vault-wide task tab through the command palette. */
 async function openTaskTab(s: Session): Promise<void> {
@@ -37,7 +60,9 @@ async function openTaskTab(s: Session): Promise<void> {
 
 async function rowTexts(s: Session): Promise<string[]> {
   const rows = await s.byTestIdAll("tasks.row.text");
-  return Promise.all(rows.map((r) => r.text()));
+  // textContent, not text(): this driver's W3C getText drops text nested under
+  // child elements, and TaskRow may wrap the span inside a stack container.
+  return Promise.all(rows.map((r) => r.textContent()));
 }
 
 /** Open the filter builder if closed, then pick an axis value. */
@@ -52,6 +77,49 @@ async function pickBuilderValue(
   }
   await (await s.byTestId(`${prefix}.builderTab.${axis}`)).click();
   await (await s.byTestId(`${prefix}.builderOption.${axis}.${value}`)).click();
+}
+
+/** Close the filter builder by clicking its fixed backdrop.
+ *
+ *  Leaving it open is not cosmetic: `BUILDER_BACKDROP_STYLE` is a fixed
+ *  full-viewport layer at z-index 40, so a later `.click()` on the Filters
+ *  button OR a row checkbox under it is refused as not-interactable for the
+ *  whole poll budget. The button sits UNDER that backdrop (strip has no
+ *  higher z-index), so toggling via `filtersButton` is the wrong close path —
+ *  the backdrop's own onClick is what a user gets when they miss the panel.
+ *  Escape also closes it (panel is focused on open), but the backdrop click
+ *  does not depend on focus. */
+async function closeBuilder(s: Session, prefix: string): Promise<void> {
+  if ((await s.byTestIdAll(`${prefix}.filtersPanel`)).length === 0) return;
+  await s.execute(
+    "var panel = document.querySelector(arguments[0]);" +
+      "var back = panel && panel.previousElementSibling;" +
+      "if (back) back.click();",
+    [testIdSelector(`${prefix}.filtersPanel`)],
+  );
+  await s.waitUntil(
+    async () => ((await s.byTestIdAll(`${prefix}.filtersPanel`)).length === 0 ? true : null),
+    { label: "filter builder closed", timeoutMs: 10_000 },
+  );
+}
+
+/** Centre-of-box hit test for a testid — what is covering it, if anything. */
+async function hitTestTestId(s: Session, testId: string): Promise<string> {
+  return s.execute<string>(
+    "var el = document.querySelector(arguments[0]);" +
+      "if (!el) return 'no such element';" +
+      "var r = el.getBoundingClientRect();" +
+      "if (r.width === 0 || r.height === 0) return 'box ' + r.width + 'x' + r.height;" +
+      "var cx = r.left + r.width / 2, cy = r.top + r.height / 2;" +
+      "var at = document.elementFromPoint(cx, cy);" +
+      "if (!at) return 'nothing at centre';" +
+      "if (at === el || el.contains(at)) return 'clear';" +
+      "var id = at.getAttribute('data-testid');" +
+      "var z = getComputedStyle(at).zIndex;" +
+      "return 'covered by <' + at.tagName.toLowerCase() + '>' + (id ? ' [' + id + ']' : '')" +
+      " + ' z=' + z;",
+    [testIdSelector(testId)],
+  );
 }
 
 describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", () => {
@@ -77,6 +145,7 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
         await typeIntoEditor(s, "- [ ] buy milk [due:: 2030-12-31]", { landedText: "buy milk" });
         await waitForSaved(s);
 
+        await waitForTaskIndex(s, ["pay the rent", "buy milk"]);
         await openTaskTab(s);
 
         // 1. Sections: both notes' tasks appear, and the section model puts the
@@ -102,6 +171,9 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
           { label: "neither task is in the upcoming window" },
         );
         await pickBuilderValue(s, "tasks", "due", "any");
+        // The builder's fixed backdrop covers the whole viewport while open;
+        // close it before any list interaction (see `closeBuilder`).
+        await closeBuilder(s, "tasks");
 
         // 3. Search narrows the list client-side over the live array - item 6 -
         //    and a query that matches nothing says so about the QUERY rather
@@ -126,19 +198,76 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
         // 4. Ticking from the list writes to the CORRECT note. With the list
         //    restored, tick the rent task and verify Bills changed - the
         //    property the single writer exists to guarantee.
-        const boxes = await s.byTestIdAll("tasks.row.checkbox");
-        const texts = await rowTexts(s);
-        const rentIndex = texts.findIndex((t) => t.includes("pay the rent"));
-        await boxes[rentIndex]!.click();
-
+        //
+        //    Status must be `all` first: the vault-wide tab defaults to
+        //    `undone`, so a completed task is FILTERED OUT of the list the
+        //    moment the tick lands and the row never reports aria-checked.
+        await pickBuilderValue(s, "tasks", "status", "all");
+        await closeBuilder(s, "tasks");
+        await s.waitUntil(
+          async () => ((await rowTexts(s)).length === 2 ? true : null),
+          { label: "status=all still lists both tasks" },
+        );
+        //
+        //    Re-find + scrollIntoView inside the poll, not a one-shot handle:
+        //    the windowed list re-renders on clear/search, and WebDriver's own
+        //    pre-click scroll does not reliably reach a nested `overflow`
+        //    container (`tasks.scroll`), so a bare `boxes[i].click()` reports
+        //    "element not interactable" for its whole 10 s budget while the
+        //    control sits under the sticky filter strip.
+        let lastClickReason = "";
         await s.waitUntil(
           async () => {
-            const marks = await s.byTestIdAll("tasks.row.checkbox");
-            return (await marks[rentIndex]!.attribute("aria-checked")) === "true"
-              ? true
-              : null;
+            const boxes = await s.byTestIdAll("tasks.row.checkbox");
+            const texts = await rowTexts(s);
+            const rentIndex = texts.findIndex((t) => t.includes("pay the rent"));
+            if (rentIndex < 0 || boxes[rentIndex] === undefined) {
+              lastClickReason = `no rent checkbox among ${boxes.length} rows`;
+              return null;
+            }
+            try {
+              await boxes[rentIndex].scrollIntoView();
+              await boxes[rentIndex].clickOnce();
+            } catch (raw) {
+              const err = raw as Error;
+              lastClickReason = err.message;
+              try {
+                const cover = await hitTestTestId(s, "tasks.row.checkbox");
+                lastClickReason += `; centre: ${cover}`;
+              } catch {
+                // hit-test is diagnostic only
+              }
+              return null; // replaced / not hit-testable — re-find next poll
+            }
+            return true;
           },
-          { label: "the ticked row reports completed" },
+          {
+            label: () => `rent task checkbox clicked (last: ${lastClickReason})`,
+            timeoutMs: 15_000,
+          },
+        );
+
+        // Re-find the rent row BY TEXT every poll: a completed task can move
+        // section (Overdue → …) or re-sort, so a rentIndex captured once
+        // points at the wrong checkbox after the tick lands.
+        let lastTickState = "";
+        await s.waitUntil(
+          async () => {
+            const texts = await rowTexts(s);
+            const boxes = await s.byTestIdAll("tasks.row.checkbox");
+            const idx = texts.findIndex((t) => t.includes("pay the rent"));
+            if (idx < 0 || boxes[idx] === undefined) {
+              lastTickState = `no rent row among ${texts.length} texts / ${boxes.length} boxes`;
+              return null;
+            }
+            const checked = await boxes[idx]!.attribute("aria-checked");
+            lastTickState = `idx=${idx} aria-checked=${checked ?? "null"} texts=${texts.length}`;
+            return checked === "true" ? true : null;
+          },
+          {
+            label: () => `the ticked row reports completed (last: ${lastTickState})`,
+            timeoutMs: 45_000,
+          },
         );
       },
     );

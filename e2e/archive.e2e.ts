@@ -129,7 +129,7 @@ describeE2E("ar2 archived note stays searchable with a badge (MYND-331)", () => 
         // is the selected row; archive it so it leaves the tree but stays
         // indexed (the Rust BM25 index is archive-blind).
         const selected = await s.waitForElement(
-          '[data-testid="notes.row"][aria-current="true"]',
+          '[data-testid="notes.row"][aria-selected="true"]',
         );
         await contextMenuPick(s, selected, "archive");
 

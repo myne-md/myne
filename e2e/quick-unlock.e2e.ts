@@ -70,12 +70,12 @@ const WRONG_PIN = "024680";
 
 /** Read the `data-note-id` of the currently-selected sidebar row — the note
  *  `createNote` just created and left selected. Mirrors the helper in
- *  `search-palette.e2e.ts`; the sidebar row carries `aria-current="true"`
+ *  `search-palette.e2e.ts`; the sidebar row carries `aria-selected="true"`
  *  alongside `data-note-id`, which is the byTestId-only path to a
  *  live-created note's id. */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-current="true"]',
+    '[data-testid="notes.row"][aria-selected="true"]',
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {

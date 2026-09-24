@@ -135,9 +135,10 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   createNote,
+  notifyNoteWritten,
+  pageSeatInvoke,
   dismissImporterOffer,
   runPaletteAction,
-  typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
 import { KEY } from "./support/keyboard";
@@ -150,7 +151,13 @@ const BAND_FRACTION = 0.15;
 /** Lines typed in the burst. Enough that a per-line drift accumulates into
  *  something the band can see, and enough to push the caret well past the
  *  scrollTop clamp. */
-const BURST_LINES = 30;
+const BURST_LINES = 80;
+
+/** Lines pre-seeded before the burst so the document is already taller than a
+ *  tall harness pane. 30 typed lines alone leave scrollTop at 0 on a large
+ *  window (the A7 clamp): focus-mode's pin cannot engage while the whole
+ *  document fits, so the pin is never under test. */
+const PRESEED_LINES = 120;
 
 interface Anchor {
   /** Signed px from the pane's vertical centre to the caret line's centre. */
@@ -318,9 +325,29 @@ async function enterTypewriterFocus(s: Session): Promise<void> {
   );
 }
 
+
+/** Pre-seed enough lines that the document is already taller than a tall
+ *  harness pane, so the burst starts PAST the top clamp and the pin is under
+ *  test from the first keystroke. IPC write + reload (page-seat discipline). */
+async function preseedLines(s: Session, noteId: string, n: number): Promise<void> {
+  const body = [
+    "# Typewriter",
+    ...Array.from({ length: n }, (_, i) => `preseed ${i}`),
+    "first line",
+  ].join("\n");
+  const r = await pageSeatInvoke(
+    s,
+    "plugin:notes|note_update",
+    { noteId, plaintext: body },
+    15_000,
+  );
+  expect(r.err, "preseed note_update should succeed").toBeUndefined();
+  await notifyNoteWritten(s, noteId);
+}
+
 describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#555)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("keeps the caret line at the pane centre for 30 typed lines", async () => {
+  it("keeps the caret line at the pane centre across a typing burst", async () => {
     let password = "";
     await scenario(
       "tw1-typewriter-anchor",
@@ -330,8 +357,14 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Typewriter");
-
-        await typeIntoEditor(s, " first line");
+        const row1 = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
+        const id1 = (await row1.attribute("data-note-id")) ?? "";
+        await preseedLines(s, id1, PRESEED_LINES);
+        await s.execute<void>(
+          "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
+            JSON.stringify(id1) +
+            "]'); if (e) e.click();",
+        );
         await enterTypewriterFocus(s);
 
         const first = await waitForAnchor(s, "before the burst");
@@ -403,10 +436,16 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Repin");
-
-        const content = await s.findElement('[data-testid="editor.content"] .cm-content');
-        await typeIntoEditor(s, " first line");
+        const row2 = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
+        const id2 = (await row2.attribute("data-note-id")) ?? "";
+        await preseedLines(s, id2, PRESEED_LINES);
+        await s.execute<void>(
+          "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
+            JSON.stringify(id2) +
+            "]'); if (e) e.click();",
+        );
         await enterTypewriterFocus(s);
+        const content = await s.findElement('[data-testid="editor.content"] .cm-content');
 
         // Get well past the clamp so "scrolled away" and "at the top" are
         // distinguishable.

@@ -47,13 +47,14 @@
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault } from "./support/fixture-session";
+import { createNote, dismissImporterOfferIfPresent } from "./support/flows";
 import { setEmulatedMedia, supportsCdp } from "./support/cdp";
 import { harnessEnv, type SupportedBrowser } from "./support/harness";
 import type { Session } from "./support/session";
 
-/** Surfaces to walk. Each is a testid that exists in the unlocked shell with no
- *  note open — the fixture vault holds none, which the lane's other scenarios
- *  already rely on. */
+/** Surfaces to walk. Each is a testid that exists in the unlocked shell once a
+ *  note is open — `editor.sidebar-right` mounts only while a NOTE tab is
+ *  focused (`Editor.tsx`), so the fixture session opens one first. */
 const SURFACES = [
   "editor.sidebar-left",
   "editor.sidebar-right",
@@ -107,6 +108,8 @@ describeE2E("the OS theme flips live and every surface follows", () => {
     const ctx = await openFixtureVault();
     try {
       const { session } = ctx;
+      await dismissImporterOfferIfPresent(session);
+      await createNote(session);
 
       // Pin BOTH ends explicitly rather than assuming the seat's default. A
       // headless Chromium's default is light, but "the default" is not a fact

@@ -102,7 +102,7 @@ async function importImage(s: Session): Promise<string> {
 /** Read the `data-note-id` of the currently-selected sidebar row — the byTestId
  *  path to a live-created note's id (the sp1 pattern). */
 async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {
     throw new Error("selected notes.row carried no data-note-id");

@@ -8,10 +8,10 @@
 // It is deliberately separate from `useFocusTrap` rather than folded into it:
 // a focus trap contains Tab, `inert` removes the background from the page.
 // Some surfaces want the first without the second (a non-modal popover that
-// the user may click past), and folding them together would make that
+// the user may click past), and folding them together would make it
 // unexpressible.
 
-import { useEffect, useState, type RefObject } from "react";
+import { useLayoutEffect, useState, type RefObject } from "react";
 import { popOverlay, pushOverlay } from "../lib/overlay-inert";
 
 export function useOverlayInert(
@@ -33,11 +33,18 @@ export function useOverlayInert(
   // slot updated by a callback ref makes the node itself a dependency, so
   // the effect re-runs exactly when the element appears or is replaced.
   const [node, setNode] = useState<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Poll-free: re-read on every render, and only re-render when it moved.
     setNode((prev) => (prev === ref.current ? prev : ref.current));
   });
-  useEffect(() => {
+  // Layout, not passive: on close this must pop `inert` in the SAME
+  // synchronous turn the focus trap restores focus. A passive cleanup runs
+  // after paint, so restore fires while the opener is still inert — and
+  // Chrome refuses `.focus()` on an inert subtree, leaving focus on `<body>`.
+  // That is the web quick-picker Esc assertion. Declaration order also
+  // matters: every dual-use surface must call this BEFORE `useFocusTrap`, so
+  // React's layout-cleanup order is pop-then-restore.
+  useLayoutEffect(() => {
     if (!enabled || node === null) return;
     pushOverlay(node);
     return () => popOverlay(node);

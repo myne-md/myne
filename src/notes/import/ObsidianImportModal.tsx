@@ -132,8 +132,6 @@ export function ObsidianImportModal({
   const spec = IMPORT_SOURCES[source];
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open (MYND-93).
-  useFocusTrap(dialogRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -141,6 +139,8 @@ export function ObsidianImportModal({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
   const [phase, setPhase] = useState<Phase>(initialSource === undefined ? "pick" : "setup");
   // The picked source, as the ONE type both pick shapes and both platforms
