@@ -358,6 +358,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/hkdf-sha256/v0.1/cases.json"),
         ),
         (
+            "hkdf-sha256",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/hkdf-sha256/v0.2/cases.json"),
+        ),
+        (
             "manifest",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/manifest/v0.1/cases.json"),
