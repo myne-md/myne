@@ -53,8 +53,11 @@ export interface ZoomPanOptions {
   /** "contain": k = 1 shows the whole content (the image lightbox default).
    *  "width": the rest scale is fit-to-width, capped at natural (mermaid). */
   readonly rest?: "contain" | "width";
-  /** "always": any wheel zooms (image). "modifier": only ctrl/meta zooms and a
-   *  plain wheel keeps scrolling the page (mermaid). */
+  /** "always": any wheel over the stage zooms (image lightbox, mermaid, and
+   *  every other caller today). "modifier": only ctrl/meta zooms and a plain
+   *  wheel keeps scrolling the page; no production caller passes it since
+   *  myne-md/myne#742, and it stays as the documented alternative for a future
+   *  surface that must live inside a scrolling page. */
   readonly wheel?: "always" | "modifier";
   /** Double-click / double-tap toggles rest <-> 100%. Off where double-click
    *  is the edit-source gesture (mermaid). */
