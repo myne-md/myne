@@ -130,14 +130,23 @@ const REAL_COMPANION =
     existsSync(join(c, "src", "manifest.json")),
   ) ?? join(REPO_ROOT, "myne-clipper");
 
+/** True when the real companion is checked out — CI never clones it. */
+const HAS_COMPANION = existsSync(join(REAL_COMPANION, "src", "manifest.json"));
+
 describe("the clipper-identifier guard", () => {
-  it("passes on the tree as it stands", () => {
+  // Companion-PRESENT assertions run only where the companion exists. CI's
+  // vitest step clones `myne-server` and `myne-test-vectors` only, so without
+  // this gate four tests failed on the runner with "derivation verified" /
+  // CHROMIUM-drift expectations against a guard that correctly printed NOT
+  // CHECKED (myne-md/myne#739). The companion-ABSENT arm below is the one that
+  // must run in CI — it is the branch a fresh clone actually takes.
+  it("passes on the tree as it stands", { skip: !HAS_COMPANION }, () => {
     const r = run(tree(), { companionDir: REAL_COMPANION });
     expect(r.ok, r.out).toBe(true);
     expect(r.out).toContain("derivation verified against the companion");
   });
 
-  it("names a Chromium id that does not derive from the committed key", () => {
+  it("names a Chromium id that does not derive from the committed key", { skip: !HAS_COMPANION }, () => {
     // THE cross-repo check, and the one no single repository can make. A pinned
     // id that stops matching the extension's key means the browser starts the
     // host for nobody.
@@ -157,7 +166,7 @@ describe("the clipper-identifier guard", () => {
     expect(r.out).toContain("not 32 characters of [a-p]");
   });
 
-  it("names a Firefox id that disagrees with the extension's gecko id", () => {
+  it("names a Firefox id that disagrees with the extension's gecko id", { skip: !HAS_COMPANION }, () => {
     const dir = tree();
     patchManifestRs(dir, '"clipper@myne.md"', '"other@myne.md"');
     const r = run(dir, { companionDir: REAL_COMPANION });
@@ -236,7 +245,7 @@ describe("the clipper-identifier guard", () => {
     expect(r.out).toContain("not checked out");
   });
 
-  it("names a companion manifest with no key", () => {
+  it("names a companion manifest with no key", { skip: !HAS_COMPANION }, () => {
     const dir = tree();
     const c = companion({ key: undefined });
     // Remove the key outright.

@@ -105,6 +105,20 @@ describeE2E("ril1 a rename rewrites the wikilinks inside notes the user never op
         // `[[[[Target]]]]` and test something else entirely.
         await createNote(s, LINKER);
         await pasteIntoEditor(s, `sees [[${TARGET_OLD}]] here`);
+        // `createNote` already leaves `Saved·`. Waiting on that badge alone can
+        // pass on the STALE create badge before the paste's autosave has fired,
+        // so rename would run against an index that has no linker→target edge.
+        // Leave `Saved·` first, then wait for it to come back: that cycle is
+        // the paste's own save (and its awaited reindex, myne-md/myne#739).
+        await s.waitUntil(
+          async () => {
+            const text = await (
+              await s.byTestId("editor.save-status")
+            ).textContent();
+            return text !== null && !text.includes("Saved·") ? true : null;
+          },
+          { label: "autosave leaves Saved· after paste", timeoutMs: 15_000 },
+        );
         await waitForSaved(s);
         const linkerId = await rowIdByTitle(s, LINKER);
         expect(linkerId, "the linking note must be in the sidebar").not.toBeNull();

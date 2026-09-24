@@ -44,6 +44,7 @@
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault } from "./support/fixture-session";
+import { createNote, dismissImporterOfferIfPresent } from "./support/flows";
 import type { Session } from "./support/session";
 
 /** Above the 916px both-fit threshold (260 + 280 + 2*8 + 360). */
@@ -133,6 +134,10 @@ describeE2E("the right panel collapses without stranding its tab strip", () => {
     const ctx = await openFixtureVault();
     try {
       const { session } = ctx;
+      // The right pane mounts only while a NOTE tab is focused; the fixture
+      // vault holds none, so the non-vacuity assertions below need one open.
+      await dismissImporterOfferIfPresent(session);
+      await createNote(session);
 
       const wideWidth = await resize(session, WIDE_PX);
       expect(

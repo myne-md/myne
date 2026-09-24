@@ -59,7 +59,7 @@
 // pretending to be a screen reader would turn the protection off.
 
 import { KEEP_REACHABLE_ATTR } from "../lib/overlay-inert";
-import { useState, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useScreenCaptureOverride } from "../hooks/useScreenCaptureOverride";
 import { has } from "../platform/capabilities";
@@ -147,6 +147,26 @@ export function ScreenCaptureEscape() {
   const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // React's onFocus/onBlur are the paint path, but a programmatic `.focus()`
+  // that lands on an element which already HAS focus fires neither. After a
+  // Cancel the trap restores focus with `.focus()`; when that restore does not
+  // re-fire onFocus, `focused` stays false, the button stays the resting 1x1
+  // clip-path box, and a W3C click polls "not hit-testable" forever. Sync
+  // `focused` from the real active element in a layout effect (before paint)
+  // so the paint cannot lag a focus restore that already committed.
+  useLayoutEffect(() => {
+    const el = triggerRef.current;
+    if (el === null) return;
+    const sync = (): void => setFocused(document.activeElement === el);
+    sync();
+    document.addEventListener("focusin", sync);
+    document.addEventListener("focusout", sync);
+    return () => {
+      document.removeEventListener("focusin", sync);
+      document.removeEventListener("focusout", sync);
+    };
+  }, []);
   // Set when a restore WROTE but could not take effect this run, because the
   // process flag outranks the file. Reported rather than reported-as-success:
   // the dialog closing is this flow's only success signal, so closing on a
@@ -226,6 +246,9 @@ export function ScreenCaptureEscape() {
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onClick={openDialog}
+        ref={(el: HTMLButtonElement | null) => {
+          triggerRef.current = el;
+        }}
       >
         {label}
       </Button>

@@ -489,7 +489,36 @@ export async function pickSelect(
   const option = await session.waitForElement(
     testIdSelector(`${selectTestId}-option`, { "data-value": value }),
   );
-  await option.click();
+  // Prefer a real click. When the portal'd menu is not hit-testable (covered
+  // by a modal stacking context, mid-paint, or a driver that reports
+  // "element not interactable" for a fixed-position body portal under an
+  // inert background), fall back to a JS click so the option's own onClick
+  // still runs — the same dispatch a user gesture would deliver to a
+  // hit-tested target. W3C Element Click alone burned the whole 10s budget
+  // on `settings.date-format` under Settings (fr3/tc4/tc5).
+  try {
+    await option.click();
+  } catch {
+    await session.execute<void>(
+      "var el = document.querySelector(arguments[0]);" +
+        "if (el) el.click();",
+      [testIdSelector(`${selectTestId}-option`, { "data-value": value })],
+    );
+  }
+  await session.waitUntil(
+    async () => {
+      const open = await session.findElements(
+        testIdSelector(`${selectTestId}-option`, { "data-value": value }),
+      );
+      // Menu closes after choose(); a stale handle is fine — we only need the
+      // listbox to be gone or the option to no longer be active-open.
+      return open.length === 0 ? true : null;
+    },
+    { label: `${selectTestId} menu to close after picking ${value}`, timeoutMs: 5_000 },
+  ).catch(() => {
+    // Some Selects keep the option in the DOM while closed (portal unmounted
+    // is the normal path; if not, the value check below is the real gate).
+  });
 }
 
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
@@ -1206,7 +1235,7 @@ export async function noteRowIds(
  *  controls. Same reading `seedEmbedIntoNote` below uses. */
 export async function selectedNoteId(session: Session): Promise<string> {
   const row = await session.waitForElement(
-    testIdSelector("notes.row") + '[aria-current="true"]',
+    testIdSelector("notes.row") + '[aria-selected="true"]',
   );
   const noteId = (await row.attribute("data-note-id")) ?? "";
   if (noteId === "") throw new Error("selectedNoteId: the active note row carries no id");
@@ -1491,6 +1520,11 @@ export async function createNote(session: Session, title: string): Promise<void>
       { label: `a sidebar row titled ${title}`, timeoutMs: 8_000 },
     )
     .catch(() => {});
+  // The title commit leaves a pending autosave. An out-of-band `note_update`
+  // that races it has its PaneView reload skipped (`hasPendingWork()`), so the
+  // long body never reaches the buffer (scroll-memory / scroll-slack). Settle
+  // the badge first. Non-throwing: a caller that never edited still returns.
+  await waitForSaved(session).catch(() => {});
 }
 
 /** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676).
@@ -1807,7 +1841,7 @@ export async function seedEmbedIntoNote(
   // The note `createNote` just made is the highlighted row, and its id is on the
   // row rather than anywhere in the editor. Same reading `editor-scroll-slack`
   // uses.
-  const row = await session.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const row = await session.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
   const noteId = (await row.attribute("data-note-id")) ?? "";
   if (noteId === "") throw new Error("seedEmbedIntoNote: the active note row carries no id");
 

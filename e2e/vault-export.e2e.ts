@@ -57,12 +57,18 @@ Root note body B.
 
 describeE2E("vault-export (MYND-211)", () => {
   it("ve1: Export block → modal setup (literal egress sentence) → page-seat export publishes the verbatim tree; appdata destination refused", async () => {
-    // Vault-count precondition: 1 (weak KDF).
-    await scenario("ve1-vault-export", {}, async (app) => {
-      const seeded = seedVault(app.appDataDir);
-      const { session } = app;
+    // Vault-count precondition: 1 (weak KDF). Seed in LaunchOptions, not in
+    // the body: a body seed runs AFTER the window is up, so `vault_list` can
+    // already have answered zero and routed to Welcome — the unlock screen
+    // never appears and the scenario burns its budget waiting for it.
+    let password = "";
+    await scenario(
+      "ve1-vault-export",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const { session } = app;
 
-      await unlockToEditor(session, seeded.password);
+        await unlockToEditor(session, password);
       await dismissImporterOffer(session);
 
       // Seed two notes through the production create IPC (the editor UI

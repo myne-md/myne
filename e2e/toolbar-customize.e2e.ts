@@ -48,9 +48,11 @@ import {
   typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
+import { KEY } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const EDITOR = '[data-testid="editor.content"]';
+const CM_CONTENT = `${EDITOR} .cm-content`;
 const CM_LINE = `${EDITOR} .cm-content .cm-line`;
 // The floating selection toolbar mounts on document.body as `.cm-toolbar` —
 // a CodeMirror-plugin surface (the `.cm-content` selector-exception class;
@@ -61,16 +63,97 @@ const FLOATING_TOOLBAR = ".cm-toolbar";
  *  a frozen on-disk vocabulary, so the literal list is stable to assert). */
 const PENDING_IDS = ["bulletList", "numberedList", "checklist", "quote", "wikilink"];
 
-/** Double-click the note's single word until the floating toolbar surfaces
- *  WITH the expected highlight-button presence. Re-selecting per iteration is
- *  load-bearing: each double-click re-renders the toolbar, which re-reads the
- *  layout fed by ToolbarLayoutSync — so a just-persisted customization that
- *  hasn't propagated yet fails the iteration, not the scenario. */
+/** Non-empty DOM selection inside the focused editor, or null. Anchored on
+ *  `.cm-focused` + `.cm-content` the way `task-row-selection` does: a selection
+ *  elsewhere on the page satisfies a bare length check and tells CM nothing. */
+async function selectionInEditor(s: Session): Promise<boolean> {
+  return s.execute<boolean>(
+    "var sel = window.getSelection();" +
+      "if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;" +
+      "if (!document.querySelector('.cm-editor.cm-focused')) return false;" +
+      "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+      "if (!content) return false;" +
+      "return content.contains(sel.anchorNode) || content.contains(sel.focusNode);",
+  );
+}
+
+/** Surface the floating toolbar until it matches `expectHighlight`.
+ *
+ *  Three selection strategies per poll, cheapest first:
+ *  1. Keyboard on the ELEMENT (`HOME` then sticky `Shift+End`). `Element.sendKeys`
+ *     targets the node directly and works with or without prior focus — the
+ *     lesson `ai-degradation` and `writing-assistant` both record about
+ *     `pressKey`/Actions delivering to whatever happens to hold focus.
+ *  2. Measured `doubleClickAt` on the word's glyph box (the ftp1 lesson: element
+ *     origin (0,0) sits in the line-height leading).
+ *  3. `tripleClickAt` on the same box — CM6's `detail: 3` line-selection gesture.
+ *
+ *  A mouseup is not required: CM6's `selectionSet` update already calls
+ *  `ToolbarView.refresh()`. Re-selecting each iteration is load-bearing (a
+ *  fresh render re-reads the layout fed by ToolbarLayoutSync). */
 async function surfaceToolbar(s: Session, expectHighlight: boolean): Promise<void> {
   await s.waitUntil(
     async () => {
-      const line = await s.waitForElement(CM_LINE, { timeoutMs: 2_000 });
-      await line.doubleClick();
+      // 1. Keyboard selection on the content node.
+      const [content] = await s.findElements(CM_CONTENT);
+      if (content !== undefined) {
+        try {
+          await content.clickOnce();
+          await content.sendKeys(KEY.HOME);
+          await content.sendKeys(KEY.SHIFT + KEY.END);
+        } catch {
+          // fall through to the mouse strategies
+        }
+      }
+      if (!(await selectionInEditor(s))) {
+        // 2/3. Measure the word (or first non-empty line) and hit its glyph box.
+        const hit = await s.execute<string>(
+          "var lines = document.querySelectorAll('[data-testid=\"editor.content\"] .cm-content .cm-line');" +
+            "var target = null;" +
+            "for (var i = 0; i < lines.length; i++) {" +
+            "  var t = (lines[i].textContent || '').toLowerCase();" +
+            "  if (t.indexOf('vurguhedefkelime42x') >= 0 || t.indexOf('siralamahedefkelime42x') >= 0) { target = lines[i]; break; }" +
+            "  if (!target && t.trim()) target = lines[i];" +
+            "}" +
+            "if (!target) return '';" +
+            "target.scrollIntoView({ block: 'center', inline: 'center' });" +
+            "var range = document.createRange();" +
+            "range.selectNodeContents(target);" +
+            "var rects = range.getClientRects();" +
+            "var box = null;" +
+            "for (var j = 0; j < rects.length; j++) {" +
+            "  if (rects[j].width > 0 && rects[j].height > 0) { box = rects[j]; break; }" +
+            "}" +
+            "var lineRect = target.getBoundingClientRect();" +
+            "var ox = 4, oy = Math.round(lineRect.height / 2);" +
+            "if (box) {" +
+            "  ox = Math.round(box.left + box.width / 2 - lineRect.left);" +
+            "  oy = Math.round(box.top + box.height / 2 - lineRect.top);" +
+            "}" +
+            "return JSON.stringify({" +
+            "  idx: Array.prototype.indexOf.call(lines, target)," +
+            "  ox: Math.max(0, ox), oy: Math.max(0, oy)" +
+            "});",
+        );
+        if (hit !== "") {
+          const { idx, ox, oy } = JSON.parse(hit) as { idx: number; ox: number; oy: number };
+          const lines = await s.findElements(CM_LINE);
+          const target = lines[idx];
+          if (target !== undefined) {
+            try {
+              await target.scrollIntoView();
+              await target.doubleClickAt(ox, oy);
+              if (!(await selectionInEditor(s))) {
+                await target.tripleClickAt(ox, oy);
+              }
+            } catch {
+              // next poll re-finds
+            }
+          }
+        }
+      }
+
+      if (!(await selectionInEditor(s))) return null;
       try {
         await s.waitForElement(FLOATING_TOOLBAR, { timeoutMs: 2_000 });
       } catch {

@@ -265,13 +265,13 @@ export function VaultExportModal({
   const stateRef = useRef(state);
   // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
   const modalRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(modalRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The trap above contains Tab; it does not stop a screen reader's virtual
   // cursor or a click reaching the background. Registered on the BACKDROP,
   // which is the whole overlay.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  useFocusTrap(modalRef, { enabled: open });
   stateRef.current = state;
   const start = useCallback(() => {
     const s = stateRef.current;

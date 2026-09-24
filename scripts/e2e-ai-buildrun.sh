@@ -24,12 +24,19 @@ IMAGE=myne-e2e
 # `voice-capture-stub` is what `e2e-buildrun.sh` passes and the rest of the
 # suite expects; `local-inference-stub` is this runner's reason to exist.
 # The `touch` forces the frontend re-embed; scripts/e2e-buildrun.sh says why.
+# `MYNE_E2E_RETRIES=0` is how `e2e/AGENTS.md` says to hunt flake; same wiring
+# as e2e-buildrun.sh / e2e-one.sh / e2e-batch.sh / e2e-local.sh.
+RETRY_FLAG=""
+if [ -n "${MYNE_E2E_RETRIES:-}" ]; then
+  RETRY_FLAG="--retry=${MYNE_E2E_RETRIES}"
+fi
+
 INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
 i=0
 for spec in "$@"; do
   i=$((i + 1))
   INNER+=" echo \"==== RUN ${i}: ${spec} ====\";"
-  INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
+  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
   INNER+=" if [ \$? -eq 0 ]; then PASS=\"\$PASS ${i}:${spec}\"; else FAIL=\"\$FAIL ${i}:${spec}\"; fi;"
 done
 INNER+=' echo "________ BATCH SUMMARY ________"; echo "PASS:$PASS"; echo "FAIL:$FAIL";'

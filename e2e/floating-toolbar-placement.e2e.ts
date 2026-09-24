@@ -273,7 +273,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         // subject is PLACEMENT, and `e2e/AGENTS.md` records what typing a long
         // body through the driver costs: dropped keystrokes over a few hundred
         // characters, and a body that is not what the scenario meant to write.
-        const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+        const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
         const noteId = (await row.attribute("data-note-id")) ?? "";
         expect(noteId, "the created note has no id to write into").not.toBe("");
 

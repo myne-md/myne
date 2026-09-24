@@ -22,10 +22,19 @@ IMAGE=myne-e2e
 # green build. `scripts/lib/e2e-docker.sh` now keys that volume per tree, so the
 # stale bundle can only be THIS tree's; the `touch` is still what stops that one,
 # and it costs one link.
+# `MYNE_E2E_RETRIES=0` is how `e2e/AGENTS.md` says to hunt flake, and this
+# runner used to be the one that silently ignored it: the config's default of 2
+# erased every failing first attempt from the report. Same wiring as
+# e2e-one.sh / e2e-batch.sh / e2e-local.sh.
+RETRY_FLAG=""
+if [ -n "${MYNE_E2E_RETRIES:-}" ]; then
+  RETRY_FLAG="--retry=${MYNE_E2E_RETRIES}"
+fi
+
 INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub; set +e; PASS=""; FAIL="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
-  INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
+  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
   INNER+=" if [ \$? -eq 0 ]; then PASS=\"\$PASS ${spec}\"; else FAIL=\"\$FAIL ${spec}\"; fi;"
 done
 INNER+=' echo "________ BATCH SUMMARY ________"; echo "PASS:$PASS"; echo "FAIL:$FAIL";'

@@ -137,7 +137,6 @@ export function QuickPicker({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -145,6 +144,7 @@ export function QuickPicker({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
 
   useEffect(() => {
     if (open) {

@@ -32,11 +32,46 @@ import {
 
 const KEY = "myne.viewsEnabled";
 
+/**
+ * A working Storage stand-in when the ambient one is unusable.
+ *
+ * CI's vitest step runs `image: node:25`, which exposes a global `localStorage`
+ * WITHOUT `clear`/`getItem` (incomplete experimental storage; often paired with
+ * `--localstorage-file was provided without a valid path`). That global shadows
+ * what `@vitest-environment jsdom` would otherwise provide, so the bare
+ * `localStorage` binding in this file is the broken one and every test dies in
+ * `beforeEach` with `TypeError: localStorage.clear is not a function` — while
+ * the same file passes on local Node 22, which has no such global and lets
+ * jsdom win. Same posture as `tests/screens/web-walls.test.tsx`: install a
+ * minimal in-memory store over `window.localStorage` when the ambient one
+ * cannot answer.
+ */
+function ensureUsableStorage(): void {
+  const s = globalThis.localStorage as Storage | undefined;
+  if (s && typeof s.clear === "function" && typeof s.getItem === "function") return;
+  const map = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, String(v)),
+      removeItem: (k: string) => void map.delete(k),
+      clear: () => map.clear(),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      get length() {
+        return map.size;
+      },
+    },
+  });
+}
+
 beforeEach(() => {
+  ensureUsableStorage();
   localStorage.clear();
 });
 
 afterEach(() => {
+  ensureUsableStorage();
   localStorage.clear();
   vi.restoreAllMocks();
 });

@@ -92,8 +92,6 @@ export function ArchivePanel({
   // Folder path armed for the inline "Move N to Trash?" confirm (null = none).
   const [confirmFolder, setConfirmFolder] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open (MYND-93).
-  useFocusTrap(dialogRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -101,6 +99,8 @@ export function ArchivePanel({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
 
   const archivedKeys = useMemo(

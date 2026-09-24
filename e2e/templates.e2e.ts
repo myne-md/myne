@@ -34,7 +34,7 @@ import { testIdSelector, type Session } from "./support/webdriver";
  *  `createNote` just created and left selected — the qp1 precedent). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-current="true"]',
+    '[data-testid="notes.row"][aria-selected="true"]',
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {

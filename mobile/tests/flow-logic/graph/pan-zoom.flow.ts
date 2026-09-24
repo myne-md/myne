@@ -126,7 +126,6 @@ test.describe("graph pan/zoom + node gestures (phone)", () => {
 
     // n1 sits exactly at its persisted position — drag it ~50 px and a write
     // must land (debounced).
-    const { k } = await view(page);
     const at = await screenPoint(page, POSITIONS["n1"]!);
     await page.mouse.move(at.x, at.y);
     await page.mouse.down();
@@ -139,13 +138,46 @@ test.describe("graph pan/zoom + node gestures (phone)", () => {
       )
       .toBeGreaterThan(0);
 
-    // The node followed the pointer in GRAPH space; recompute its pixel from
-    // the live camera rather than reusing the pre-drag one. The camera moves on
-    // its own here: the debounced index sweep rebuilds the model, and a rebuild
-    // refits — so a screen point captured before the wait is stale by the time
-    // the write lands.
-    const dragged = { x: POSITIONS["n1"]!.x + 50 / k, y: POSITIONS["n1"]!.y + 30 / k };
-    const now = await screenPoint(page, dragged);
+    // Do NOT reconstruct the post-drag pixel from the pointer delta. Two
+    // things move under the test: (1) on pointer-up the press is a
+    // `node-place` — the hold releases and the link force pulls the node
+    // through its connections until the re-heat settles; (2) that settle is
+    // interaction-woken, so GraphCanvas deliberately does NOT refit
+    // (`streamHandlers(false)`) and the camera still frames the pre-drag
+    // arrangement while the settled nodes sit outside it. Fit first (the
+    // same background double-tap the fit test uses), then project the
+    // written settled map through the now-framed camera.
+    const last = await page.evaluate(() => {
+      const w = (window as unknown as { __graphLayoutWrites?: string[] }).__graphLayoutWrites!;
+      return w[w.length - 1];
+    });
+    const n1 = (JSON.parse(last) as { pos: [string, number, number][] }).pos.find(
+      ([id]) => id === "n1",
+    );
+    expect(n1).toBeDefined();
+    const target = { x: n1![1], y: n1![2] };
+
+    const corner = await backgroundPoint(page);
+    await page.mouse.click(corner.x, corner.y);
+    await page.mouse.click(corner.x, corner.y);
+    // Fit tweens over CAMERA_TWEEN_MS (280ms). Wait until the published view
+    // stops changing, then project — a mid-tween "point is in the box" poll
+    // can fire while the camera is still moving and the click lands off-node.
+    let prev = "";
+    await expect
+      .poll(
+        async () => {
+          const v = await view(page);
+          const sig = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.k.toFixed(4)}`;
+          const stable = sig === prev;
+          prev = sig;
+          return stable;
+        },
+        { timeout: 3_000 },
+      )
+      .toBe(true);
+
+    const now = await screenPoint(page, target);
     await page.mouse.click(now.x, now.y);
     await expect(page.getByTestId("editor.top-bar")).toBeVisible();
   });

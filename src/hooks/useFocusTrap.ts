@@ -11,7 +11,7 @@
 // free; the carve-out modals (`SettingsModal`, `CommandPalette`) call it
 // directly without inheriting ModalShell's dismiss semantics.
 
-import { useEffect, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 import { trapFocus } from "../lib/imperative-focus-trap";
 
 export interface FocusTrapOptions {
@@ -29,7 +29,12 @@ export function useFocusTrap(
 ): void {
   const { enabled = true, initialFocusRef, restoreFocus = true } = options;
 
-  useEffect(() => {
+  // Layout effect, not passive: teardown must restore focus in the SAME
+  // synchronous turn that removed the dialog's DOM. A passive cleanup runs
+  // after paint, so a driver (or a screen reader) can observe the intermediate
+  // state where the modal is gone and focus has already fallen to `<body>`.
+  // That race is what KN-4 and the web quick-picker scenario both hit on Esc.
+  useLayoutEffect(() => {
     if (!enabled) return;
     const el = containerRef.current;
     if (!el) return;

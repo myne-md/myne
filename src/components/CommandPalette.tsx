@@ -355,7 +355,6 @@ export function CommandPalette({
   // strip the input + arrow/Enter list navigation). Initial focus is the
   // search input. MYND-93.
   const modalRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -363,6 +362,7 @@ export function CommandPalette({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
   // Monotonic dispatch counter for the note-search generation-guard (MYND-40):
   // each query dispatch claims the next value; only the latest-dispatched
   // response is applied (see `shouldApplyNoteSearchResult`).

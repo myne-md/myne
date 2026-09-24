@@ -427,7 +427,6 @@ function RecoveredPreviewModal({
 }) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, { enabled: true });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -435,6 +434,7 @@ function RecoveredPreviewModal({
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, true);
+  useFocusTrap(dialogRef, { enabled: true });
 
 
   useEffect(() => {

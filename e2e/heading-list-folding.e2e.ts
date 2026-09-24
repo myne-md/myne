@@ -159,7 +159,7 @@ describeE2E("hlf2 fold-all / unfold-all via the command palette (MYND-300)", () 
 
         // Switch back to the first note via ITS OWN row, addressed by title.
         //
-        // The `:not([aria-current="true"])` form this replaces picks the first
+        // The `:not([aria-selected="true"])` form this replaces picks the first
         // row that is not active, which is not necessarily "Fold Note A": the
         // sidebar is not ordered the way the test created the notes, so the row
         // it clicked could be any other note, the pane never switched, and the

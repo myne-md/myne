@@ -141,9 +141,22 @@ export function rememberScroll(
   view: EditorView,
   scroller: HTMLElement,
 ): void {
-  if (isRestoringScroll(noteId)) return;
+  // SYNC-8: layout numbers only. Written before any early return so a
+  // suppressed or unreadable pass still records where the pane actually was.
+  scroller.dataset.scrollAnchorTop = String(Math.round(scroller.scrollTop));
+  if (isRestoringScroll(noteId)) {
+    scroller.dataset.scrollAnchorWrite = "suppressed";
+    return;
+  }
   const anchor = readScrollAnchor(view, scroller);
-  if (anchor !== null) anchors.set(noteId, anchor);
+  if (anchor !== null) {
+    anchors.set(noteId, anchor);
+    // SYNC-8 observability: layout/document numbers only, never note content.
+    scroller.dataset.scrollAnchorPos = String(anchor.pos);
+    scroller.dataset.scrollAnchorWrite = "ok";
+  } else {
+    scroller.dataset.scrollAnchorWrite = "unreadable";
+  }
 }
 
 /** The anchor remembered for `noteId`, if any. */

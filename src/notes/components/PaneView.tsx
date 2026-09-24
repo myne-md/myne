@@ -24,6 +24,7 @@ import { noteBecameActive, recentNoteIds } from "../recentNotes";
 import {
   applyScrollAnchor,
   evictClosedTabs,
+  isRestoringScroll,
   recallScroll,
   rememberScroll,
 } from "../scrollMemory";
@@ -665,21 +666,111 @@ export function PaneView({
   // myne-md/myne#600: put a first-opened note's remembered line back, once its
   // body is actually on screen. Fires on `content` because that is when the view
   // holds the document the anchor refers to; the pending ref makes it once per
-  // open rather than once per keystroke.
+  // open rather than once per keystroke. `editorView` is a dep too: a SPLIT
+  // remounts this pane, `content` lands while `outlineViewRef` is still null
+  // (the editor child has not mounted), and without a re-run when the view
+  // arrives the pending restore is left set and never applied — the pane opens
+  // at the top while the anchor sits in the ref. Same shape as MYND-617's
+  // ref-vs-state split above: a ref does not re-render, so it cannot re-run
+  // this effect.
+  //
+  // And the pending ref stays set until the scroller HAS a range (myne#600
+  // sm2). Clearing it before `scrollIntoView` runs against a host that cannot
+  // yet move is a one-shot no-op: CodeMirror has not finished measuring, the
+  // tabpanel's `scrollHeight` still equals `clientHeight`, and there is no
+  // ResizeObserver arm for a pure height growth (width is unchanged by the
+  // measure). The anchor is spent, nothing re-runs, and the pane stays at the
+  // top for the life of the open — which is exactly the split symptom. Retry
+  // on rAF until there is room to scroll, with a frame budget so a pane that
+  // never grows (a short note, a filling body) still settles.
   useEffect(() => {
     const noteId = pendingScrollRestoreRef.current;
     if (noteId === null || noteId !== activeId) return;
     const view = outlineViewRef.current;
     if (view === null || view.state.doc.length === 0) return;
-    pendingScrollRestoreRef.current = null;
-    const anchor = recallScroll(noteId);
-    if (anchor === undefined) {
-      const scroller = outlineScrollerRef.current;
-      if (scroller !== null) scroller.scrollTop = 0;
+
+    // Nothing remembered for this note: land at top NOW, outside the
+    // stable-wait loop below. A deferred no-anchor apply runs `scrollTop = 0`
+    // whenever measure settles, which can land AFTER a scroll already made on
+    // this pane (sm2's pre-split `scrollTo(1200)`): the reset fires a scroll
+    // event, the settle remember saves pos=0, and every later restore opens
+    // the note at the top. A fresh mount is already at 0, so the only write
+    // here is clearing a leftover offset from a previous note in this pane.
+    const anchorNow = recallScroll(noteId);
+    const scroller0 = outlineScrollerRef.current;
+    if (anchorNow === undefined) {
+      pendingScrollRestoreRef.current = null;
+      if (scroller0 !== null) {
+        scroller0.dataset.scrollRestore = "none";
+        if (scroller0.scrollTop !== 0) scroller0.scrollTop = 0;
+      }
       return;
     }
-    applyScrollAnchor(view, anchor, noteId);
-  }, [content, activeId]);
+
+    const apply = (
+      v: NonNullable<OutlineTrackView>,
+      sc: HTMLElement | null,
+    ): void => {
+      pendingScrollRestoreRef.current = null;
+      const anchor = recallScroll(noteId);
+      if (sc !== null) {
+        sc.dataset.scrollRestore = anchor === undefined ? "none" : "anchor";
+        if (anchor !== undefined) {
+          sc.dataset.scrollAnchorApplied = String(anchor.pos);
+          sc.dataset.scrollAnchorOffset = String(anchor.offsetPx);
+        }
+      }
+      if (anchor === undefined) {
+        if (sc !== null) sc.scrollTop = 0;
+        return;
+      }
+      applyScrollAnchor(v, anchor, noteId);
+    };
+
+    // Wait for CodeMirror's first measure to settle, not merely for a scroll
+    // range. On a split remount the view is brand new: `scrollHeight` can
+    // already exceed `clientHeight` while line positions are still being
+    // measured, and `scrollIntoView` then no-ops or lands a few pixels from
+    // the top (sm2's `[4]` with `restore=anchor`). Stability of the outer
+    // height across frames is the cheap signal that measure has caught up.
+    // Only a real anchor reaches this loop (the no-anchor arm returns above).
+    const scroller = outlineScrollerRef.current;
+    if (scroller !== null) scroller.dataset.scrollRestore = "pending";
+
+    let frames = 0;
+    let lastHeight = -1;
+    let stable = 0;
+    let raf = 0;
+    const tick = (): void => {
+      raf = 0;
+      // A newer open took the pending ref; this retry is stale.
+      if (pendingScrollRestoreRef.current !== noteId) return;
+      const v = outlineViewRef.current;
+      if (v === null || v.state.doc.length === 0) return; // keep pending; editorView/content will re-run us
+      const sc = outlineScrollerRef.current;
+      frames += 1;
+      const h = sc === null ? 0 : sc.scrollHeight;
+      const range = sc !== null && h > sc.clientHeight + 1;
+      if (range && h === lastHeight) stable += 1;
+      else stable = 0;
+      lastHeight = h;
+      if (sc !== null) {
+        sc.dataset.scrollRestoreFrames = String(frames);
+        sc.dataset.scrollStable = String(stable);
+      }
+      // Two consecutive equal heights with a range: apply. Frame budget keeps
+      // a pane that never settles (short note, filling body) from spinning.
+      if ((range && stable >= 2) || frames >= 90) {
+        apply(v, sc);
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf !== 0) cancelAnimationFrame(raf);
+    };
+  }, [content, activeId, editorView]);
 
   // myne-md/myne#600: a width change re-wraps the text, so the pixel the reader
   // was at now points at different content, so put the LINE back instead. This is
@@ -726,12 +817,17 @@ export function PaneView({
       const width = scroller.clientWidth;
       if (width === lastWidth) return; // height-only change: nothing re-wrapped
       lastWidth = width;
+      scroller.dataset.scrollRoWidth = String(width);
       settle.run(() => {
         if (pointerDown) return; // myne#652, see the listeners above.
         const view = outlineViewRef.current;
         const noteId = activeIdRef.current;
-        if (view === null || noteId === null) return;
+        if (view === null || noteId === null) {
+          scroller.dataset.scrollRo = "skip-null";
+          return;
+        }
         const anchor = recallScroll(noteId);
+        scroller.dataset.scrollRo = anchor === undefined ? "no-anchor" : "apply";
         if (anchor !== undefined) applyScrollAnchor(view, anchor, noteId);
       });
     });
@@ -771,6 +867,19 @@ export function PaneView({
         if (view !== null && noteId !== null) rememberScroll(noteId, view, scroller);
       });
     const onScroll = () => {
+      // A genuine scroll while a restore is still pending means the reader
+      // (or a test) already took the pane over. Apply the pending line later
+      // and it yanks them back — measured as sm2's pre-split `liveTop=4`
+      // with `write=suppressed`: an early pos=0 anchor from the empty note
+      // waited out the stable-measure loop, fired within the settle window of
+      // `scrollTo(1200)`, and the user's own remember was then suppressed.
+      // A restore's own scroll cannot hit this: `apply` clears `pending`
+      // before it dispatches, and that path sits inside the suppression mark.
+      const pending = pendingScrollRestoreRef.current;
+      if (pending !== null && !isRestoringScroll(pending)) {
+        pendingScrollRestoreRef.current = null;
+        scroller.dataset.scrollRestore = "cancelled-by-scroll";
+      }
       rememberSoon();
       if (raf !== 0) return;
       raf = requestAnimationFrame(() => {
@@ -1726,6 +1835,14 @@ export function PaneView({
         position: "relative",
         flex: 1,
         minWidth: 0,
+        // Flex min-height:auto would size this to CONTENT, so a long body
+        // grows the section past `role=main` instead of giving the tabpanel
+        // below a bounded box to scroll in: tabpanel keeps overflow-y:auto
+        // but clientHeight === scrollHeight, and every ancestor that HAS a
+        // range is overflow:visible (not a scrollport) or overflow:hidden
+        // (app chrome). minHeight:0 is the standard flexbox trap fix — same
+        // as Editor.tsx's attachments arm.
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         // In a SPLIT, the focused pane gets a subtle top accent so you can

@@ -104,7 +104,7 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import { createNote, dismissImporterOffer, unlockToEditor } from "./support/flows";
 import { type Session } from "./support/webdriver";
 import { resizeAppWindow } from "./support/xwindow";
 
@@ -284,6 +284,10 @@ describeE2E("wr1 window width collapses the sidebars at the layout's thresholds 
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Both panes are measured; `editor.sidebar-right` mounts only while a
+        // NOTE tab is focused (`Editor.tsx`). A vault with no notes leaves the
+        // right side absent, and `paneWidths` then reports "no pane" forever.
+        await createNote(s, "wr1-note");
 
         const measured: Widths[] = [];
         for (const spec of SWEEP) {

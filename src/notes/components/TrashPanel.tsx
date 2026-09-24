@@ -84,8 +84,6 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [status, setStatus] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open (MYND-93).
-  useFocusTrap(dialogRef, { enabled: open });
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
   // The focus trap above contains Tab; it does not stop a screen reader's
   // virtual cursor reading the page behind, and `aria-modal` is an assertion
@@ -93,6 +91,8 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   // the whole overlay: registering the card would inert the backdrop it is in.
   const backdropRef = useRef<HTMLDivElement>(null);
   useOverlayInert(backdropRef, open);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
 
   const records = useMemo(() => trashedRecords(ctx.cache), [ctx.cache]);
