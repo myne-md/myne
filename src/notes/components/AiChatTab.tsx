@@ -53,19 +53,23 @@ import {
   isChatPersistLagging,
   subscribeChatPersistHealth,
 } from "../ai/chatPersist";
-import { agentCancel } from "../../lib/agent-run";
+import { agentCancel, agentLastRun, agentUndo } from "../../lib/agent-run";
+import type { AgentUndoResult, Proposal } from "../../lib/agent-protocol";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { Button } from "../../components/primitives/Button";
+import { IconButton } from "../../components/primitives/IconButton";
+import { ModalShell } from "../../components/primitives/ModalShell";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { CAPTION_STYLE, SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatComposer } from "./ChatComposer";
 import { ChatHistoryModal } from "./ChatHistoryModal";
 import { MemoryPopover } from "./MemoryPopover";
+import { ProposalDiffModal } from "./ProposalDiffModal";
 import { clearAgent, useAgent } from "../agent/agentStore";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { RunCostLine } from "../agent/components/RunCostLine";
-import { UndoLastRun } from "../agent/components/UndoLastRun";
+import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 
 /** Why the chat surface is at rest, as a fixed identifier — never content
  *  (#191 task 3). `ready` covers both "working" and "still asking the host":
@@ -248,13 +252,29 @@ function AgentTurnView({
   turn,
   working,
   t,
+  canRevert,
+  onOpenDiff,
+  onRequestRevert,
+  revertBusy,
+  undoReport,
 }: {
   turn: ChatTurn;
   /** Whether this turn's run is the one still working. See `working` below. */
   working: boolean;
   t: TFn;
+  /** True only when this turn's run is the host's current undoable record. */
+  canRevert: boolean;
+  onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
+  onRequestRevert: (runId: string) => void;
+  revertBusy: boolean;
+  /** The undo report, when it describes THIS turn's run. */
+  undoReport: AgentUndoResult | null;
 }) {
   const s = turn.agentSummary;
+  const hasProposal =
+    s !== undefined &&
+    s.proposal !== undefined &&
+    (s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0);
   return (
     <div
       data-testid="ai.turn"
@@ -264,7 +284,44 @@ function AgentTurnView({
       data-working={working ? "true" : "false"}
       style={bubbleStyle(false)}
     >
-      <TurnSpeaker isUser={false} t={t} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-1)",
+        }}
+      >
+        <TurnSpeaker isUser={false} t={t} />
+        {/* Icons only once the run has settled with something to show: a live
+            working turn has no frozen proposal and no undoable record yet. */}
+        {s !== undefined && !working ? (
+          <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0 }}>
+            {hasProposal ? (
+              <IconButton
+                icon="columns-2"
+                label={t("editor.chrome.rightPanel.aiChat.viewDiff")}
+                testId="ai.turn-diff"
+                iconSize={14}
+                onClick={() => onOpenDiff(s.proposal!)}
+              />
+            ) : null}
+            {/* Only the host's current undoable run gets the revert affordance:
+                an older turn's run has been superseded and a second undo would
+                report `noSuchRun`. */}
+            {canRevert ? (
+              <IconButton
+                icon="rotate-ccw"
+                label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+                testId="ai.turn-revert"
+                iconSize={14}
+                disabled={revertBusy}
+                onClick={() => onRequestRevert(s.runId)}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       {/* **The first leg has nothing else to show.** `beginRun()` nulls the
           view and only a settled step sets it, so until the host answers there
           is no run id, no scope total and no strip: without this line the
@@ -370,65 +427,12 @@ function AgentTurnView({
               {endStatusLabel(s.end, t)}
             </div>
           ) : null}
-          {/* **The frozen proposal, read-only** (myne-md/myne#675). A settled
-              turn carries what its run proposed as plain data, so history
-              shows it after `agentStore` drops the live copy on lock. There
-              is deliberately NO apply/insert affordance here: a frozen
-              proposal may quote a note that has since changed, been trashed,
-              or moved folders, and re-applying it would write stale bytes
-              over live content. Apply stays a live-session flow through the
-              review screen, which is a different component. */}
-          {s.proposal !== undefined &&
-          (s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0) ? (
-            <div
-              data-testid="ai.agent-proposal"
-              style={{ ...TURN_TEXT_STYLE, marginTop: "var(--space-2)" }}
-            >
-              {s.proposal.edits.map((edit, i) => (
-                <div
-                  key={`e${i}`}
-                  data-testid="ai.proposal-edit"
-                  data-note-id={edit.noteId}
-                  style={{ marginTop: i === 0 ? 0 : "var(--space-2)" }}
-                >
-                  {edit.anchor.length > 0 ? (
-                    <>
-                      <div style={CAPTION_STYLE}>
-                        {t("editor.chrome.rightPanel.aiChat.historyProposalBefore")}
-                      </div>
-                      <div
-                        style={{
-                          ...TURN_TEXT_STYLE,
-                          color: "var(--fg-3)",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
-                        {edit.anchor}
-                      </div>
-                    </>
-                  ) : null}
-                  <div style={CAPTION_STYLE}>
-                    {t("editor.chrome.rightPanel.aiChat.historyProposalAfter")}
-                  </div>
-                  <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
-                    {edit.replacement}
-                  </div>
-                </div>
-              ))}
-              {s.proposal.newNotes.map((note, i) => (
-                <div
-                  key={`n${i}`}
-                  data-testid="ai.proposal-new-note"
-                  style={{ marginTop: "var(--space-2)" }}
-                >
-                  <div style={CAPTION_STYLE}>
-                    {t("editor.chrome.rightPanel.aiChat.historyProposalNewNote")}: {note.title}
-                  </div>
-                  <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
-                    {note.body}
-                  </div>
-                </div>
-              ))}
+          {/* The undo report, attached to the turn it describes. Matching on
+              `runId` rather than rendering a strip under the composer: the
+              report is a statement about THIS run's reversion. */}
+          {undoReport !== null ? (
+            <div data-testid="ai.undo-result" style={CAPTION_STYLE}>
+              {undoResultText(undoReport, t)}
             </div>
           ) : null}
         </div>
@@ -629,6 +633,19 @@ export function AiChatTab({
   // ONE subscription to the run store, at the tab rather than one per agent
   // turn: the transcript's turns render frozen counts, which need no live read.
   const agent = useAgent();
+  // The last-run undo lives here rather than in a strip under the composer
+  // (myne-md/myne#741): one mount for the tab, with the offer and report
+  // matched onto turns by `runId`.
+  const undo = useUndoLastRun({
+    agentLastRun,
+    agentUndo,
+    ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
+  });
+  const [diffProposal, setDiffProposal] = useState<Pick<
+    Proposal,
+    "edits" | "newNotes"
+  > | null>(null);
+  const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
   // **A run, not merely a failure.** A start that never landed nulls the view,
   // and its message lives on the turn itself; rendering the strip for it too
   // printed the same sentence twice.
@@ -643,6 +660,17 @@ export function AiChatTab({
       break;
     }
   }
+
+  // **The offer is bounded by the record's life, not by which surface is on
+  // screen.** `undo.run` outlives the review screen (`0518`) and New chat
+  // deliberately does not clear it (the comment on that button), so a record
+  // whose run has no turn in the open transcript, after New chat, or after
+  // switching to another conversation, still needs a reachable affordance. The
+  // turn icon is the primary one; this flag drives the fallback in the header.
+  const undoRunId = undo.run?.runId ?? null;
+  const undoHosted =
+    undoRunId !== null &&
+    chat.turns.some((turn) => turn.agentSummary?.runId === undoRunId);
 
   // Follow the newest turn, but only when the reader is already at the bottom.
   // Yanking the viewport away from someone who has scrolled up to read a cited
@@ -770,6 +798,23 @@ export function AiChatTab({
               }}
             />
           ) : null}
+          {/* The fallback revert offer (myne-md/myne#741). Shown only when the
+              host holds an undoable record that no turn in the open transcript
+              can host, which is New chat and a switched conversation; the turn
+              icon is the primary surface. Without it the record's offer would be
+              live but unreachable, which is the narrowing this review found. */}
+          {undoRunId !== null && !undoHosted ? (
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="ai.revert-fallback"
+              style={HEADER_ICON_BUTTON_STYLE}
+              icon="rotate-ccw"
+              aria-label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+              title={t("editor.chrome.rightPanel.aiChat.revertRun")}
+              onClick={() => setRevertConfirmRunId(undoRunId)}
+            />
+          ) : null}
           {persistLagging ? (
             <span
               data-testid="ai.persist-warning"
@@ -866,6 +911,21 @@ export function AiChatTab({
                   turn={turn}
                   working={agent.running && turn.id === liveAgentTurnId}
                   t={t}
+                  canRevert={
+                    undo.run !== null &&
+                    turn.agentSummary !== undefined &&
+                    turn.agentSummary.runId === undo.run.runId
+                  }
+                  onOpenDiff={setDiffProposal}
+                  onRequestRevert={setRevertConfirmRunId}
+                  revertBusy={undo.busy}
+                  undoReport={
+                    undo.report !== null &&
+                    turn.agentSummary !== undefined &&
+                    turn.agentSummary.runId === undo.reportRunId
+                      ? undo.report
+                      : null
+                  }
                 />
               ) : (
                 <ChatTurnView
@@ -909,11 +969,6 @@ export function AiChatTab({
           unmounted by clearing the transcript. */}
       {runOpen ? <AgentProgress /> : null}
 
-      {/* The previous run's undo, above the composer rather than only on the
-          review screen: this is the surface that is still here after that screen
-          has been closed. Renders nothing when the host holds no record. */}
-      <UndoLastRun onReverted={onRunUndone} />
-
       {/* Shown whenever AI is on, and NOT gated on a side-loaded model, so it is
           reachable in the stub E2E build and in a no-model state (where a send
           surfaces the honest error turn). */}
@@ -938,6 +993,75 @@ export function AiChatTab({
           }}
           onShowToast={onShowToast ?? (() => {})}
         />
+      ) : null}
+      {diffProposal !== null ? (
+        <ProposalDiffModal
+          open
+          onClose={() => setDiffProposal(null)}
+          proposal={diffProposal}
+        />
+      ) : null}
+      {/* Revert is a write, so it confirms first. The sentence states the one
+          asymmetry the offer always carries: edits go back, creates stay. */}
+      {revertConfirmRunId !== null ? (
+        <ModalShell
+          open
+          onClose={() => setRevertConfirmRunId(null)}
+          title={t("editor.chrome.rightPanel.aiChat.revertConfirmTitle")}
+          labelId="ai-revert-confirm-title"
+          width={420}
+          closeLabel={t("common.close")}
+          testId="ai.revert-confirm"
+        >
+          <div
+            style={{
+              padding: "var(--space-4) var(--space-5)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
+            }}
+          >
+            <p style={{ ...TURN_TEXT_STYLE, color: "var(--fg-2)", margin: 0 }}>
+              {t("editor.chrome.rightPanel.aiChat.revertConfirmBody")}
+            </p>
+            {/* The session-scoped disclosure `0561` requires, carried forward
+                into the confirm rather than dropped with the strip: the offer
+                is lost on lock or close, and the version history is the durable
+                path. Stated at the moment of the write, which is where it
+                matters. */}
+            <p style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: 0 }}>
+              {t("agent.undo.sessionOnly")}
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "var(--space-2)",
+              }}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="ai.revert-cancel"
+                onClick={() => setRevertConfirmRunId(null)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={undo.busy || undo.run?.runId !== revertConfirmRunId}
+                data-testid="ai.revert-confirm-undo"
+                onClick={() => {
+                  setRevertConfirmRunId(null);
+                  void undo.undo();
+                }}
+              >
+                {t("agent.undo.action")}
+              </Button>
+            </div>
+          </div>
+        </ModalShell>
       ) : null}
     </div>
   );
