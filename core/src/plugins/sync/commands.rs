@@ -184,7 +184,19 @@ pub async fn sync_set_endpoint<R: Runtime>(
                         let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &path)
                             .await
                             .unwrap_or_default();
-                        let replaces_a_trusted_pin = cfg.endpoint_url.as_deref() == Some(url)
+                        // Compared through `same_endpoint`, not `==`, because
+                        // the string a user types and the server a connection
+                        // reaches are different things. `parse_endpoint` throws
+                        // away everything from the first `/`, so a trailing
+                        // slash made this comparison false against the very
+                        // endpoint it was guarding and the new certificate was
+                        // adopted in silence — which is what the myne#756
+                        // workaround did, every time, while the UI offered no
+                        // other way to recover from a rotated certificate.
+                        let replaces_a_trusted_pin = cfg
+                            .endpoint_url
+                            .as_deref()
+                            .is_some_and(|prev| super::config::same_endpoint(prev, url))
                             && cfg
                                 .cert_pin_hex
                                 .as_deref()
