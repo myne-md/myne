@@ -4177,7 +4177,7 @@
       "invitationPending": "Încă neacceptată",
       "invitationsFailed": "Invitațiile dvs. nu au putut fi încărcate.",
       "title": "Membrii depozitului",
-      "personHint": "Deblocați-vă identitatea de membru cu fraza de recuperare. Rămâne pe dispozitiv până blocați depozitul și închideți aplicația.",
+      "personHint": "Deblocați-vă identitatea de membru cu fraza de recuperare.",
       "personUnlock": "Deblochează identitatea de membru",
       "personReady": "Identitatea de membru a fost deblocată.",
       "ownerCodeHint": "Trimiteți acest cod persoanei pe care o invitați, ca să poată verifica că depozitul e al dvs. Conține doar informații publice.",
@@ -5012,6 +5012,11 @@
     "recoverIntro": "Aveți deja o identitate? Introduceți fraza de recuperare de 24 de cuvinte.",
     "recovered": "Identitatea a fost recuperată.",
     "title": "Doar identitate"
+  },
+  "personIdentityCode": {
+    "copy": "Copiază codul de identitate",
+    "copied": "Codul de identitate a fost copiat",
+    "copyFailed": "Codul de identitate nu a putut fi copiat"
   },
   "identityHome": {
     "createVaultCta": "Creează depozit",

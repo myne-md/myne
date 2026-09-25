@@ -4053,7 +4053,7 @@
       "invitationPending": "Chưa chấp nhận",
       "invitationsFailed": "Không tải được lời mời của bạn.",
       "title": "Thành viên kho",
-      "personHint": "Mở khóa danh tính thành viên bằng cụm từ khôi phục. Nó ở trên thiết bị cho đến khi bạn khóa kho và đóng ứng dụng.",
+      "personHint": "Mở khóa danh tính thành viên bằng cụm từ khôi phục.",
       "personUnlock": "Mở khóa danh tính thành viên",
       "personReady": "Đã mở khóa danh tính thành viên.",
       "ownerCodeHint": "Chia sẻ mã này với người bạn mời để họ xác minh kho là của bạn. Nó chỉ chứa thông tin công khai.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Đã có danh tính? Nhập cụm từ khôi phục 24 từ của nó.",
     "recovered": "Đã khôi phục danh tính.",
     "title": "Chỉ danh tính"
+  },
+  "personIdentityCode": {
+    "copy": "Sao chép mã định danh",
+    "copied": "Đã sao chép mã định danh",
+    "copyFailed": "Không thể sao chép mã định danh"
   },
   "identityHome": {
     "createVaultCta": "Tạo kho",

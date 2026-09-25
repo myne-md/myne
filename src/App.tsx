@@ -28,6 +28,7 @@ import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
 import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
+import { resetPersonIdentityState, setPersonIdentityState } from "./components/sync/personIdentityState";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
 import { personStatus } from "./lib/personAccount";
@@ -199,12 +200,21 @@ function App() {
         // (`welcome`) arm renders; every other route is decided by the vault
         // probes, so a failure here degrades to the pre-B2B Welcome screen
         // rather than blocking boot.
-        personStatus().catch(() => ({ enrolled: false, person_id_hex: null, identity_code: null })),
+        personStatus().catch(() => ({
+          enrolled: false,
+          identity_unlocked: false,
+          person_id_hex: null,
+          identity_code: null,
+        })),
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
       setPersonEnrolled(person.enrolled);
       setPersonIdHex(person.person_id_hex);
       setIdentityCode(person.identity_code);
+      setPersonIdentityState({
+        ready: person.identity_unlocked,
+        ownerCode: person.identity_code,
+      });
       setStage(initialStageFromProbe(vaultList, slotMap));
     })();
   }, [stage]);
@@ -283,6 +293,7 @@ function App() {
   // `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field".
   const setStageWithSuspicion = useCallback(
     (status: StageVaultStatus, suspicionReason?: SuspicionReason) => {
+      resetPersonIdentityState();
       // Functional set: read the CURRENT stage so the force-relock
       // unlock stays addressed at the vault that was just relocked
       // (MYND-219 / SYNC-17 — the editor stage carries the active
@@ -480,6 +491,22 @@ function App() {
   const dispatch = (action: Action) =>
     setStage((prev) => (prev ? transition(prev, action) : prev));
 
+  const onCreateAutoUnlockSuccess = (vaultId: string | null) => {
+    resetPersonIdentityState();
+    dispatch({
+      type: "create-vault.auto-unlock-success",
+      vaultId: vaultId ?? undefined,
+    });
+  };
+
+  const onCreateAutoUnlockFailed = (vaultId: string | null) => {
+    resetPersonIdentityState();
+    dispatch({
+      type: "create-vault.commit-success",
+      vaultId: vaultId ?? undefined,
+    });
+  };
+
   // Multi-vault switch handler (MYND-205). Fires the param-less
   // `vault_lock()` (four-surface teardown + `flushIfDirty`, SYNC-8) then
   // dispatches `editor.switch-vault` → `unlock(Exists, vaultId: target)`, so
@@ -627,18 +654,8 @@ function App() {
               // (The former `create-vault.back` → welcome arm stranded
               // picker/editor entrants on Welcome.)
               onBack={reprobe}
-              onAutoUnlockSuccess={(vaultId) =>
-                dispatch({
-                  type: "create-vault.auto-unlock-success",
-                  vaultId: vaultId ?? undefined,
-                })
-              }
-              onAutoUnlockFailed={(vaultId) =>
-                dispatch({
-                  type: "create-vault.commit-success",
-                  vaultId: vaultId ?? undefined,
-                })
-              }
+              onAutoUnlockSuccess={onCreateAutoUnlockSuccess}
+              onAutoUnlockFailed={onCreateAutoUnlockFailed}
             />
           </Suspense>
         );

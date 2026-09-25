@@ -24,15 +24,15 @@
 // That training is the entire mechanism behind `threat-model.md` A18
 // (credential phishing), which the 2026-08-15 reversal accepts as its cost and
 // bounds by exactly one rule: this client asks for the phrase in ONE situation,
-// a recovery the user started themselves. Never to add a device, never to sign
-// in. This grep is what keeps that sentence true on the artefact rather than in
-// the source.
+// a recovery the user started themselves. Never to add a device, sign in, unlock
+// a member identity, or open a member vault. This grep is what keeps that
+// sentence true on the artefact rather than in the source.
 //
-// # One marker is the whole assertion now, and that is deliberate
+// # The marker list is the whole assertion now, and that is deliberate
 //
-// A single needle looks thin next to the four it replaces. It is not thinner
-// than the property being asserted: three of the four described paths that are
-// now supposed to ship. Adding a marker back to make the list look substantial
+// A small list of distinct needles is stronger than one shared component
+// marker: each names a different phrase path that must be absent from the
+// served artefact. Adding a marker back for a path that is allowed to ship
 // would assert something false.
 //
 // # Why a grep over the built output, and not a test
@@ -50,14 +50,14 @@
 // is absence rather than a runtime gate: the phrase survives every password
 // change and there is no rotation command, so a single exposure is permanent
 // and has no in-app remedy. Against that, "the route is hidden" is not a
-// mitigation — the code would still be in the bundle, one devtools breakpoint
+// mitigation: the code would still be in the bundle, one devtools breakpoint
 // or one edited route away.
 //
 // # What it looks for
 //
-// A marker that exists only on the enrolment phrase path, and it is a string the
-// bundler cannot rename — a `data-testid` — because minification renames
-// identifiers but not string literals.
+// A marker that exists only on a non-recovery credential phrase path, and it is
+// a string the bundler cannot rename — a `data-testid` — because minification
+// renames identifiers but not string literals.
 //
 // The wordlist marker that used to live here (`"zoo"`, BIP-39's last entry) is
 // GONE on purpose: creation and recovery both ship, both need the wordlist, and
@@ -82,21 +82,50 @@ const MARKERS = [
     meaning:
       "the B2B member-identity phrase prompt (myne-md/myne#698). Unlocking a " +
       "member identity to send an invite is neither a recovery nor creation, so " +
-      "it is the fifth phrase path and the one that must never reach served " +
+      "it is one of the non-recovery phrase paths and must never reach served " +
       "code. It is substituted out of the bundle at build time " +
       "(`web/vite.config.ts`), the same mechanism as the enrolment and import " +
       "grids; this needle is what makes that absence a checked property",
   },
   {
+    needle: "unlock.member-phrase",
+    meaning:
+      "the member-vault unlock phrase prompt. A member vault is opened from a " +
+      "person phrase, not a password; this is a routine unlock path rather than " +
+      "a recovery or creation flow, so the member unlock card is substituted " +
+      "out of the served bundle and this needle makes that absence a checked " +
+      "property",
+  },
+  {
+    needle: "identity-home.accept-phrase",
+    meaning:
+      "the identity-only invite acceptance phrase path (myne-md/myne#711). It is " +
+      "not a recovery or creation flow and must be substituted out of the web " +
+      "bundle rather than merely hidden behind routing",
+  },
+  {
+    needle: "identity-setup.phrase-input",
+    meaning:
+      "the identity-only recovery phrase prompt. It is not a vault recovery or " +
+      "creation flow and must be substituted out of the web bundle",
+  },
+  {
+    needle: "migrate.phrase-input",
+    meaning:
+      "the whole-vault migration recovery-phrase prompt. Migration is a " +
+      "desktop-only flow, so the credential grid must be absent from the web " +
+      "bundle rather than merely unreachable",
+  },
+  {
     needle: "sync.enroll.phrase-cell",
     meaning:
-      "the device-enrolment phrase credential — the third phrase path, and the " +
+      "the device-enrolment phrase credential, a non-recovery phrase path, and the " +
       "one that is easy to miss because that screen is about adding a device",
   },
   {
     needle: "import-myne.phrase-cell",
     meaning:
-      "the vault-import SOURCE credential (myne-md/myne#464), the fourth phrase " +
+      "the vault-import SOURCE credential (myne-md/myne#464), a non-recovery phrase " +
       "path and the one this file's own rationale was cited to justify. The " +
       "import setup step takes the other vault's password OR its 24 words, and " +
       "an import is a ROUTINE action, which is exactly the training " +
@@ -106,11 +135,11 @@ const MARKERS = [
   },
 ];
 
-// Why the list GREW rather than the three surfaces sharing one needle. Each of
-// the three implements the same 24-cell grid separately and carries its own
-// `data-testid` precisely so this file can tell them apart in the artefact: a
-// shared testid would make one entry cover three modules, and the finding would
-// then name a path that may not be the one that leaked.
+// Why the list GREW rather than the credential surfaces sharing one needle. Each
+// of the seven non-recovery paths implements the same 24-cell grid separately
+// and carries its own `data-testid` precisely so this file can tell them apart
+// in the artefact: a shared testid would make one entry cover seven modules, and
+// the finding would then name a path that may not be the one that leaked.
 //
 // That reasoning is written into `MyneVaultSetup.tsx`, into `web/vite.config.ts`
 // and into `recovery-flow.md` §3.2, all three of which cite THIS guard as the

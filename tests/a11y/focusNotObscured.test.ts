@@ -95,7 +95,14 @@ function filesUnder(dir: string, out: string[] = []): string[] {
 }
 
 function code(path: string): string {
-  return readFileSync(path, "utf8")
+  let source: string;
+  try {
+    source = readFileSync(path, "utf8");
+  } catch (err) {
+    if ((err as { code?: unknown }).code === "ENOENT") return "";
+    throw err;
+  }
+  return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }

@@ -119,7 +119,11 @@ const V = {
   ],
   "src/components/settings/LanguageSelect.tsx": ["ported", "i18n only."],
   "src/components/settings/LineNumbersSettings.tsx": ["ported", "Prefs-backed."],
-  "src/components/settings/MigrateVaultForm.tsx": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only — its `vault_migrate` command is Class::Unsupported on web (a browser client joins an already-current account, never migrates). Present but its invoke answers the typed refusal."],
+  "src/components/settings/MigrateVaultForm.tsx": [
+    "excluded",
+    "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only and its recovery-phrase credential is substituted out of the web bundle; a browser client joins an already-current account and never migrates.",
+    "migrate.phrase-input",
+  ],
   "src/components/settings/SettleMigrationBlock.tsx": ["typed-unsupported", "The post-migration settle surface (§10.4.1 point 5, #430) — abort / confirm over the `legacy/` snapshot. Desktop-only for the same reason as the form above: a browser client never migrates, so it never has a `legacy/` snapshot to settle. Its status probe answers the typed refusal, and the block renders nothing when the probe fails, so on web it is simply absent."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NetworkPanel.tsx": [
@@ -459,8 +463,9 @@ const V = {
     "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
   ],
   "src/lib/personAccount.ts": [
-    "typed-unsupported",
-    "`plugin:sync|sync_person_setup` is `Class::Unsupported` on web: the phrase is a device-enrolment credential and is deliberately absent from served code (`decisions.md` 2026-07-26, entry 0514), and the sealed identity lives in `<app_config_dir>`, outside OPFS. The only importer is `IdentitySetupDialog`, reached from `Welcome`, which the web client never renders at zero vaults (vaultCreation absent routes to account-entry).",
+    "excluded",
+    "The person-account bindings are substituted out of the web bundle. The identity-only screens are absent and the backend is capability-refused there, so retaining these bindings would only preserve an unreachable path.",
+    "person-account-binding",
   ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],

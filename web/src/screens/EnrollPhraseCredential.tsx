@@ -20,6 +20,11 @@ export interface EnrollPhraseCredentialProps {
   cells: string[];
   onCellChange: (index: number) => (e: ChangeEvent<HTMLInputElement>) => void;
   onCellPaste: (index: number) => (e: ClipboardEvent<HTMLInputElement>) => void;
+  label?: string;
+  hint?: string;
+  disabled?: boolean;
+  gridTestId?: string;
+  cellTestId?: (index: number) => string;
 }
 
 export function EnrollPhraseCredential(_props: EnrollPhraseCredentialProps) {

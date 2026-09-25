@@ -69,8 +69,9 @@ const VERDICTS = {
     note: "Unreachable on web (an empty client routes to account-entry, task 85) and every door it offers — create, join, fresh-install restore — is an absent capability.",
   },
   "IdentityHome.tsx": {
-    verdict: "adapted",
-    note: "Ships as written but is unreachable on web: App.tsx renders it only when `sync_person_status` reports enrolled, and on web that probe is Unsupported (personEnrolled stays false), and an empty client routes to account-entry rather than the zero-vault welcome arm this replaces. No substituted marker because the component is a plain shared screen with no host call of its own.",
+    verdict: "excluded",
+    marker: "identity-home.identity-code",
+    note: "Unreachable on web because person status is unsupported, and the identity-only accept flow must not ship its recovery-phrase path in the served artefact.",
   },
   "VaultPicker.tsx": {
     verdict: "excluded",

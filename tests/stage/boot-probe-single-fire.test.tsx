@@ -23,9 +23,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import App from "../../src/App";
+import {
+  getPersonIdentityState,
+  resetPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 
 afterEach(() => {
   cleanup();
+  resetPersonIdentityState();
   vi.clearAllMocks();
 });
 
@@ -37,7 +42,7 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
       // The vault-less identity probe (myne-md/myne#711): a fresh device holds
       // no person account, so the welcome arm renders.
       if (cmd === "plugin:sync|sync_person_status") {
-        return { enrolled: false, person_id_hex: null, identity_code: null };
+        return { enrolled: false, identity_unlocked: false, person_id_hex: null, identity_code: null };
       }
       return undefined;
     });
@@ -57,5 +62,30 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
     // The third boot probe shares the same `probed` guard, so it too must fire
     // exactly once: without this the guard could be moved off it silently.
     expect(probeCalls.filter((c) => c === "plugin:sync|sync_person_status")).toHaveLength(1);
+  });
+
+  it("hydrates person readiness from the runtime status probe", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:vault-unlock|vault_list") return [];
+      if (cmd === "plugin:vault-unlock|vault_slot_kind") return "Empty";
+      if (cmd === "plugin:sync|sync_person_status") {
+        return {
+          enrolled: true,
+          identity_unlocked: true,
+          person_id_hex: "11".repeat(16),
+          identity_code: "MYNE-PERSON-1:runtime",
+        };
+      }
+      if (cmd === "plugin:sync|sync_person_list_invites") return [];
+      return undefined;
+    });
+
+    render(<App />);
+    await screen.findByTestId("identity-home.root");
+
+    expect(getPersonIdentityState()).toEqual({
+      ready: true,
+      ownerCode: "MYNE-PERSON-1:runtime",
+    });
   });
 });

@@ -2120,6 +2120,11 @@ a person is who they are regardless of which devices they hold.
 
 Used in: `design-notes/protocol/0592`; `myne-md/myne#698`.
 
+### **session-scoped person identity** &nbsp; 🗝️ *Key/identifier*
+
+The runtime lifetime of a person's private identity and per-vault private profile. The state is held only while the current vault session is active, is cleared at every vault boundary, and is re-established from the person's recovery phrase when an operation needs it. The persisted [person identity code](#person-identity-code) remains public and readable while the private state is locked. A vault boundary includes lock, idle lock, password-change relock, vault switch, direct first-vault creation, and vault deletion.
+
+Used in: `design-notes/protocol/0612-person-identity-is-session-scoped-across-every-vault-boundary.md`; `docs/threat-model.md` AS21.
 
 ### **person key transition** &nbsp; 🗝️ *Key/identifier*
 

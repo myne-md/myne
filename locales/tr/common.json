@@ -4053,7 +4053,7 @@
       "invitationPending": "Henüz kabul edilmedi",
       "invitationsFailed": "Davetleriniz yüklenemedi.",
       "title": "Kasa üyeleri",
-      "personHint": "Üye kimliğinizi kurtarma ifadenizle açın. Kasayı kilitleyene veya uygulamayı kapatana kadar bu cihazda kalır.",
+      "personHint": "Üye kimliğinizi kurtarma ifadenizle açın.",
       "personUnlock": "Üye kimliğini aç",
       "personReady": "Üye kimliği açıldı.",
       "ownerCodeHint": "Kasanın size ait olduğunu doğrulayabilsinler için davet ettiğiniz kişiyle bu kodu paylaşın. Yalnızca herkese açık bilgi içerir.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Zaten bir kimliğiniz mi var? 24 kelimelik kurtarma ifadesini girin.",
     "recovered": "Kimlik kurtarıldı.",
     "title": "Yalnızca kimlik"
+  },
+  "personIdentityCode": {
+    "copy": "Kimlik kodunu kopyala",
+    "copied": "Kimlik kodu kopyalandı",
+    "copyFailed": "Kimlik kodu kopyalanamadı"
   },
   "identityHome": {
     "createVaultCta": "Kasa oluştur",

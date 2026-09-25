@@ -67,6 +67,12 @@ const RENDERS_NOTHING = new Set([
   // a lie (there is no reachable surface) and returning markup would defeat the
   // substitution. See `web/vite.config.ts` SUBSTITUTED_MODULES.
   join("web", "src", "components", "sync", "MemberRosterPanel.tsx"),
+  // The member-vault phrase unlock is substituted out for the same reason as
+  // the member roster: a browser must not ship this credential path.
+  join("web", "src", "components", "sync", "MemberVaultUnlockCard.tsx"),
+  // Whole-vault migration is desktop-only, so its phrase credential is absent
+  // from the browser bundle rather than merely unreachable.
+  join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),
   join("web", "src", "main.tsx"), // the entry point; mounts, renders no markup of its own
 ]);
 

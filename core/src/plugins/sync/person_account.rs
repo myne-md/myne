@@ -94,11 +94,12 @@ pub async fn person_setup_from_host(
     };
     let normalized = Zeroizing::new(protocol::normalize_user_phrase(&phrase));
     let person_id = protocol::person_id_hash(&normalized);
+    let generation = state.person_session_generation().await;
 
     // Derive + seal + hold the identity. An absent sealed file is first
     // enrolment; `unlock_person_identity` returns a signed transition record
     // when a legacy CSPRNG identity migrated.
-    let (pair, transition) =
+    let (pair, mut transition) =
         crate::account::person_identity::unlock_person_identity(host, io, &normalized)
             .await
             .map_err(|e| {
@@ -108,6 +109,11 @@ pub async fn person_setup_from_host(
                     E::Io | E::Csprng => SyncDeviceError::Transport,
                 }
             })?;
+    if transition.is_none() {
+        transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
+            .await
+            .map_err(|_| SyncDeviceError::Transport)?;
+    }
     let fingerprint_hex = crate::account::person_identity::hex_lower(pair.fingerprint());
 
     // The person SCRAM secret. The server never sees it.
@@ -144,9 +150,6 @@ pub async fn person_setup_from_host(
     // out-of-band invite code, and those exist from setup (task 11).
     let public = pair.public_half();
     let identity_code = super::invite::encode_person_identity_code(&person_id, &public);
-    let path = person_auth_path(host, io)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
     let auth = PersonAuth {
         person_id_hex: crate::account::person_identity::hex_lower(&person_id),
         device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
@@ -159,14 +162,34 @@ pub async fn person_setup_from_host(
         ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
         mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
     };
-    write_person_auth(io, &path, &auth)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
 
-    state.set_person_id(person_id).await;
-    state.set_person_identity(pair).await;
-    if let Some(bytes) = transition {
-        state.set_pending_person_key_transition(bytes).await;
+    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+        pair,
+        person_id,
+        profile: None,
+        transition,
+    };
+    let installed_generation = generation.wrapping_add(1);
+    if !state
+        .install_person_session_if_generation(generation, install)
+        .await
+    {
+        return Err(SyncDeviceError::Transport);
+    }
+    let path = match person_auth_path(host, io).await {
+        Ok(path) => path,
+        Err(_) => {
+            let _ = state
+                .clear_person_session_if_generation(installed_generation)
+                .await;
+            return Err(SyncDeviceError::Internal);
+        }
+    };
+    if write_person_auth(io, &path, &auth).await.is_err() {
+        let _ = state
+            .clear_person_session_if_generation(installed_generation)
+            .await;
+        return Err(SyncDeviceError::Internal);
     }
 
     Ok(PersonSetupView {
@@ -206,37 +229,56 @@ pub async fn sync_person_setup<R: tauri::Runtime>(
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PersonStatusView {
     pub enrolled: bool,
+    pub identity_unlocked: bool,
     pub person_id_hex: Option<String>,
-    /// The out-of-band person identity code, rendered by the identity home so a
-    /// prospective owner can be handed this person's public halves (task 11).
-    /// `None` when the credential file predates task 11 or is incomplete.
+    /// The out-of-band person identity code. A locked device may still expose
+    /// the public code from its device-local credential; private operations
+    /// require the runtime identity separately.
     pub identity_code: Option<String>,
 }
 
-/// Read the device-local person credential (if any). Pure IO, no network.
+/// Read the device-local person credential and runtime identity readiness.
 pub async fn person_status_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
+    state: &VaultRuntimeState,
 ) -> Result<PersonStatusView, SyncDeviceError> {
     let path = person_auth_path_for_read(host).map_err(|_| SyncDeviceError::Internal)?;
-    match read_person_auth(io, &path).await {
-        Ok(Some(a)) if !a.token_hex.is_empty() => Ok(PersonStatusView {
-            enrolled: true,
-            identity_code: identity_code_from_auth(&a),
-            person_id_hex: Some(a.person_id_hex),
-        }),
-        Ok(_) => Ok(PersonStatusView {
-            enrolled: false,
-            person_id_hex: None,
-            identity_code: None,
-        }),
-        Err(_) => Err(SyncDeviceError::Internal),
-    }
+    let auth = read_person_auth(io, &path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let runtime = state.person_identity_status().await;
+    let enrolled = matches!(auth, Some(ref a) if !a.token_hex.is_empty());
+    let auth_person_id = auth
+        .as_ref()
+        .and_then(|a| super::devices::hex16(&a.person_id_hex));
+    let disk_identity_code = auth.as_ref().and_then(identity_code_from_auth);
+    let runtime_matches_auth = runtime.as_ref().map_or(auth.is_none(), |snapshot| {
+        auth_person_id == Some(snapshot.person_id)
+    });
+    let identity_unlocked = runtime.is_some() && runtime_matches_auth;
+    let runtime_identity_code = runtime
+        .as_ref()
+        .filter(|_| runtime_matches_auth)
+        .map(|snapshot| {
+            super::invite::encode_person_identity_code(&snapshot.person_id, &snapshot.public)
+        });
+    let identity_code = runtime_identity_code.or(disk_identity_code);
+    let person_id_hex = runtime
+        .as_ref()
+        .filter(|_| identity_unlocked)
+        .map(|snapshot| crate::account::person_identity::hex_lower(&snapshot.person_id))
+        .or_else(|| {
+            auth_person_id.map(|person_id| crate::account::person_identity::hex_lower(&person_id))
+        });
+    Ok(PersonStatusView {
+        enrolled,
+        identity_unlocked,
+        person_id_hex,
+        identity_code,
+    })
 }
 
-/// Rebuild the identity code from a stored credential. `None` when the public
-/// halves are absent (a pre-task-11 file) or malformed; the caller renders no
-/// code rather than a wrong one.
 fn identity_code_from_auth(a: &PersonAuth) -> Option<String> {
     let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
         &a.kem_ek_hex,
@@ -248,6 +290,30 @@ fn identity_code_from_auth(a: &PersonAuth) -> Option<String> {
     Some(super::invite::encode_person_identity_code(
         &person_id, &public,
     ))
+}
+
+pub(crate) async fn refresh_person_auth_public_material(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    person_id: [u8; 16],
+    public: &protocol::person_key::PersonPublicHalf,
+) -> Result<(), SyncDeviceError> {
+    let path = person_auth_path(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let Some(mut auth) = read_person_auth(io, &path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+    else {
+        return Ok(());
+    };
+    auth.person_id_hex = crate::account::person_identity::hex_lower(&person_id);
+    auth.kem_ek_hex = crate::account::person_identity::hex_lower(public.kem_ek());
+    auth.ed_pk_hex = crate::account::person_identity::hex_lower(public.ed_pk());
+    auth.mldsa_vk_hex = crate::account::person_identity::hex_lower(public.mldsa_vk());
+    write_person_auth(io, &path, &auth)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)
 }
 
 /// One invite addressed to this person, as the home lists it. The payload is
@@ -311,10 +377,12 @@ pub async fn person_list_invites_from_host(
 #[tauri::command]
 pub async fn sync_person_status<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
 ) -> Result<PersonStatusView, SyncDeviceError> {
     person_status_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
+        state.inner(),
     )
     .await
 }
@@ -684,10 +752,9 @@ pub async fn accept_invite_from_host(
 ) -> Result<AcceptedInviteView, SyncDeviceError> {
     use super::token_store::TokenStore as _;
 
-    let member = state
-        .clone_person_identity()
-        .await
-        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
+    let person_id = protocol::person_id_hash(normalized.as_str());
+    let generation = state.person_session_generation().await;
     let owner = super::invite::decode_person_identity_code(owner_code)
         .map_err(|_| SyncDeviceError::BadRequest)?;
 
@@ -697,6 +764,25 @@ pub async fn accept_invite_from_host(
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
+    if auth.person_id_hex != crate::account::person_identity::hex_lower(&person_id) {
+        return Err(SyncDeviceError::NotEnrolled);
+    }
+    let member = crate::account::person_identity::open_person_identity_without_mutation(
+        host,
+        io,
+        normalized.as_str(),
+    )
+    .await
+    .map_err(|error| {
+        use crate::account::person_identity::PersonIdentityError as E;
+        match error {
+            E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
+            E::Io | E::Csprng => SyncDeviceError::Transport,
+        }
+    })?;
+    let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
     let (url, pins) = endpoint_from_host(host, io).await?;
 
     let invite_id = invite_id_hex.to_string();
@@ -748,7 +834,6 @@ pub async fn accept_invite_from_host(
     // Persist the member keys, sealed under the member's own phrase, so the
     // vault can be re-unlocked later without a password (task 25). Written
     // BEFORE the slot install, which consumes the key values.
-    let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
     super::member_key_store::write_member_key_store(
         io,
         &vault_dir,
@@ -766,36 +851,10 @@ pub async fn accept_invite_from_host(
 
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
-    state
-        .set_unlocked_locking_others(
-            vault_id,
-            crate::plugins::vault_unlock::state::UnlockedVault::member(
-                group_key,
-                items_key,
-                items_key_id,
-                host.now_unix_secs(),
-                meta_hash,
-            ),
-        )
-        .await;
-    // Install the person-profile key for this `(person, vault)` so the member's
-    // AI material is private from the first write (tasks 27-29).
-    let person_id = protocol::person_id_hash(normalized.as_str());
-    let profile_id = protocol::person_profile_id(&person_id, &account_hash);
-    if let Ok(key) = protocol::derive_person_vault_profile_key(
-        normalized.as_str(),
-        &profile_id,
-        &b2b.base.kdf_params,
-    ) {
-        state.set_person_profile(profile_id, key).await;
-    }
-
     let mut st = super::state::read_sync_state(io, &vault_dir)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
     st.account_hash_hex = Some(claimed.vault_account_hash_hex.clone());
-    // Persist the owner's public half (as the identity code) so a later cycle
-    // can verify the owner-signed roster / signed heads (member head authority).
     st.owner_identity_code = Some(owner_code.to_string());
     st.device_id_hex = Some(crate::account::person_identity::hex_lower(
         &super::enroll::generate_device_id(),
@@ -808,6 +867,39 @@ pub async fn accept_invite_from_host(
         .store(io, &vault_dir, &token)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
+
+    let profile_id = protocol::person_profile_id(&person_id, &account_hash);
+    let profile = protocol::derive_person_vault_profile_key(
+        normalized.as_str(),
+        &profile_id,
+        &b2b.base.kdf_params,
+    )
+    .ok()
+    .map(|key| (profile_id, key));
+    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+        pair: member,
+        person_id,
+        profile,
+        transition,
+    };
+    let installed = state
+        .set_unlocked_locking_others_with_person_session(
+            generation,
+            vault_id,
+            crate::plugins::vault_unlock::state::UnlockedVault::member(
+                group_key,
+                items_key,
+                items_key_id,
+                host.now_unix_secs(),
+                meta_hash,
+            ),
+            Some(install),
+        )
+        .await;
+    if installed.is_none() {
+        let _ = io.remove_dir_all(&vault_dir).await;
+        return Err(SyncDeviceError::Transport);
+    }
 
     Ok(AcceptedInviteView {
         vault_id: vault_id.to_string(),
@@ -851,6 +943,7 @@ pub async fn unlock_member_vault_from_host(
     phrase: &str,
 ) -> Result<(), SyncDeviceError> {
     let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
+    let generation = state.person_session_generation().await;
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
@@ -870,24 +963,36 @@ pub async fn unlock_member_vault_from_host(
     .await
     .ok_or(SyncDeviceError::BadRequest)?;
 
-    // Re-derive and hold the person identity so the member can author signed
-    // heads; the phrase is the member's credential either way.
-    let (pair, transition) =
-        crate::account::person_identity::unlock_person_identity(host, io, &normalized)
-            .await
-            .map_err(|_| SyncDeviceError::BadRequest)?;
-    state
-        .set_person_id(protocol::person_id_hash(&normalized))
-        .await;
-    state.set_person_identity(pair).await;
-    if let Some(bytes) = transition {
-        state.set_pending_person_key_transition(bytes).await;
-    }
-
+    let pair = crate::account::person_identity::open_person_identity_without_mutation(
+        host,
+        io,
+        &normalized,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::BadRequest)?;
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
+    let person_id = protocol::person_id_hash(normalized.as_str());
+    let profile_id = protocol::person_profile_id(&person_id, &b2b.base.account_number_hash);
+    let profile = protocol::derive_person_vault_profile_key(
+        normalized.as_str(),
+        &profile_id,
+        &b2b.base.kdf_params,
+    )
+    .ok()
+    .map(|key| (profile_id, key));
+    let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+        pair,
+        person_id,
+        profile,
+        transition,
+    };
     state
-        .set_unlocked_locking_others(
+        .set_unlocked_locking_others_with_person_session(
+            generation,
             vault_id,
             crate::plugins::vault_unlock::state::UnlockedVault::member(
                 keys.group_key,
@@ -896,22 +1001,10 @@ pub async fn unlock_member_vault_from_host(
                 host.now_unix_secs(),
                 meta_hash,
             ),
+            Some(install),
         )
-        .await;
-    // Install the person-profile key for this `(person, vault)` so the member's
-    // memory, chats and personality route to the person-private store rather
-    // than the shared families (myne-md/myne#711 tasks 27-29). Without this
-    // `person_ai_is_private` is true while `clone_person_profile()` is None, and
-    // every private AI command and the profile plane refuse.
-    let person_id = protocol::person_id_hash(normalized.as_str());
-    let profile_id = protocol::person_profile_id(&person_id, &b2b.base.account_number_hash);
-    if let Ok(key) = protocol::derive_person_vault_profile_key(
-        normalized.as_str(),
-        &profile_id,
-        &b2b.base.kdf_params,
-    ) {
-        state.set_person_profile(profile_id, key).await;
-    }
+        .await
+        .ok_or(SyncDeviceError::Transport)?;
     Ok(())
 }
 
@@ -920,20 +1013,28 @@ pub async fn unlock_member_vault_from_host(
 pub async fn sync_person_unlock_member_vault<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
     vault_id_hex: String,
     phrase: String,
 ) -> Result<(), SyncDeviceError> {
     let phrase = zeroize::Zeroizing::new(phrase);
     let vault_id =
         crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
-    unlock_member_vault_from_host(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
-        &crate::vault_io::StdVaultIo,
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    unlock_member_vault_from_host(&host, &io, state.inner(), vault_id, &phrase).await?;
+    if state.inner().active_vault_id().await != Some(vault_id) {
+        return Err(SyncDeviceError::Transport);
+    }
+    crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
+        &host,
         state.inner(),
-        vault_id,
-        &phrase,
+        hooks.inner(),
+        &io,
+        crate::vault_label::key::platform_keychain(),
     )
-    .await
+    .await;
+    Ok(())
 }
 
 /// Whether a vault is a member vault (has a device-local member-key store), so
@@ -1285,8 +1386,12 @@ mod tests {
             let tmp = crate::test_support::ScopedTempDir::new("person-status").expect("temp dir");
             let host = crate::host::test_host::TestHost::new(tmp.path());
             let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
 
-            let before = person_status_from_host(&host, &io).await.expect("status");
+            let before = person_status_from_host(&host, &io, &state)
+                .await
+                .expect("status");
+
             assert!(!before.enrolled, "no credential on a fresh device");
 
             let path = person_auth_path(&host, &io)
@@ -1305,8 +1410,60 @@ mod tests {
             .await
             .expect("write credential");
 
-            let after = person_status_from_host(&host, &io).await.expect("status");
+            let after = person_status_from_host(&host, &io, &state)
+                .await
+                .expect("status");
             assert!(after.enrolled, "a stored token means enrolled");
+            assert!(
+                !after.identity_unlocked,
+                "a stored token alone is not a runtime unlock"
+            );
+
+            let pair = protocol::PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
+            let person_id = [0x44u8; 16];
+            state
+                .set_person_identity_and_id(pair.clone(), person_id)
+                .await;
+            let mismatched = person_status_from_host(&host, &io, &state)
+                .await
+                .expect("status");
+            assert!(!mismatched.identity_unlocked);
+            assert_eq!(mismatched.identity_code, None);
+
+            let public = pair.public_half();
+            write_person_auth(
+                &io,
+                &path,
+                &PersonAuth {
+                    person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+                    device_id_hex: "22".repeat(16),
+                    token_hex: "33".repeat(32),
+                    kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+                    ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+                    mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+                },
+            )
+            .await
+            .expect("write matching credential");
+            let unlocked = person_status_from_host(&host, &io, &state)
+                .await
+                .expect("status");
+            assert!(unlocked.identity_unlocked);
+            assert_eq!(
+                unlocked.identity_code.as_deref(),
+                Some(
+                    crate::plugins::sync::invite::encode_person_identity_code(&person_id, &public,)
+                        .as_str(),
+                )
+            );
+
+            state.take_person_identity().await.expect("take identity");
+            let locked = person_status_from_host(&host, &io, &state)
+                .await
+                .expect("status");
+            assert!(!locked.identity_unlocked);
+            assert_eq!(locked.identity_code, unlocked.identity_code);
+
             assert_eq!(after.person_id_hex.as_deref(), Some(&*"11".repeat(16)));
         });
     }

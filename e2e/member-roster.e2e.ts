@@ -27,6 +27,8 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
+import { startSyncServer, syncServerSupported } from "./support/sync-server";
+import { syncConfigSeed } from "./support/multi-device";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +46,12 @@ const MEMBER_FIXTURE: {
  *  abandon/about vector, not a secret; first enrolment mints the owner
  *  identity, whose fingerprint varies per run). */
 const PERSON_PHRASE = `${"abandon ".repeat(23).trim()} about`;
+const IDENTITY_CODE_COPIED = "Identity code copied";
+const serverSupport = syncServerSupported();
+if (!serverSupport.ok) {
+  // eslint-disable-next-line no-console
+  console.warn(`[e2e] member-roster identity-home scenario skipped: ${serverSupport.reason}`);
+}
 
 describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
   it("the panel mounts in Sync settings and answers empty on a single-account vault", async () => {
@@ -62,6 +70,15 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         // process shows.
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         await app.session.byTestId("member-roster.person-unlock");
+        const invitationObservationEndsAt = Date.now() + 1_000;
+        await app.session.waitUntil(
+          async () => {
+            if (Date.now() < invitationObservationEndsAt) return null;
+            const errors = await app.session.byTestIdAll("member-roster.invitations-error");
+            return errors.length === 0 ? true : null;
+          },
+          { timeoutMs: 3_000, label: "no invitation error before identity unlock" },
+        );
         // The empty-list arm: this is the load-bearing back-compat claim (a
         // single-account vault renders the panel as a no-op, not an error), so
         // the assertion is on the empty paragraph, not merely the mount.
@@ -88,10 +105,23 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await openSettings(app.session, "sync");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         // Unlock the person identity; first enrolment mints the owner.
-        const phraseInput = await app.session.byTestId("member-roster.phrase-input");
-        await phraseInput.replaceText(PERSON_PHRASE);
+        for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
+          const testId =
+            index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+          await (await app.session.byTestId(testId)).replaceText(word);
+        }
         await (await app.session.byTestId("member-roster.person-unlock-button")).click();
         await app.session.byTestId("member-roster.person-ready");
+        await (await app.session.byTestId("member-roster.copy-owner-code")).click();
+        await app.session.waitUntil(
+          async () => {
+            const toasts = await app.session.byTestIdAll("editor.toast-message");
+            if (toasts.length === 0) return null;
+            const message = (await toasts[0].text()).trim();
+            return message === IDENTITY_CODE_COPIED ? true : null;
+          },
+          { label: "identity code copy reports success", timeoutMs: 10_000 },
+        );
         // The invite form now takes the invitee's identity code (person id +
         // public halves), not three pasted hexes (myne-md/myne#711 task 11).
         await (await app.session.byTestId("member-roster.invite-button")).click();
@@ -118,5 +148,73 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await closeSettings(app.session);
       },
     );
+  });
+
+  (serverSupport.ok ? it : it.skip)("shows a real invitation-fetch failure after identity unlock", async () => {
+    const server = await startSyncServer();
+    try {
+      await scenario(
+        "mr3-invitation-fetch-failure",
+        {
+          seed: (appDataDir) => {
+            seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+          },
+          seedConfig: syncConfigSeed(server.url),
+        },
+        async (app) => {
+           await unlockToEditor(app.session, "CanaryPass-9-animals!");
+           await dismissImporterOffer(app.session);
+           await openSettings(app.session, "sync");
+          await app.session.byTestId("member-roster");
+          for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
+            const testId =
+              index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+            await (await app.session.byTestId(testId)).replaceText(word);
+          }
+          await (await app.session.byTestId("member-roster.person-unlock-button")).click();
+           await app.session.byTestId("member-roster.person-ready");
+           await app.session.byTestId("member-roster.invite-button");
+           await closeSettings(app.session);
+           await server.teardown();
+           await openSettings(app.session, "sync");
+           await app.session.byTestId("member-roster.person-ready");
+           await app.session.byTestId("member-roster.invitations-error", { timeoutMs: 10_000 });
+        },
+      );
+    } finally {
+      await server.teardown();
+    }
+  });
+
+  (serverSupport.ok ? it : it.skip)("identity-only home exposes the public code and copies it", async () => {
+    // Vault-count precondition: 0.
+    const server = await startSyncServer();
+    try {
+      await scenario(
+        "mr3-identity-home",
+        { seedConfig: syncConfigSeed(server.url) },
+        async (app) => {
+          await app.session.byTestId("welcome.identity-cta");
+          await (await app.session.byTestId("welcome.identity-cta")).click();
+          await (await app.session.byTestId("identity-setup.create-cta")).click();
+          await app.session.byTestId("identity-setup.phrase");
+          await (await app.session.byTestId("identity-setup.close-cta")).click();
+          await app.session.byTestId("identity-home.identity-code");
+          const code = await app.session.byTestId("identity-home.identity-code");
+          expect(await code.attribute("readonly")).not.toBeNull();
+          await (await app.session.byTestId("identity-home.copy-code")).click();
+          await app.session.waitUntil(
+            async () => {
+              const toasts = await app.session.byTestIdAll("editor.toast-message");
+              if (toasts.length === 0) return null;
+              return (await toasts[0].text()).trim() === IDENTITY_CODE_COPIED ? true : null;
+            },
+            { label: "identity home code copy reports success", timeoutMs: 10_000 },
+          );
+        },
+      );
+    } finally {
+      await server.teardown();
+    }
   });
 });

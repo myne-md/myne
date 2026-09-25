@@ -25,6 +25,11 @@
 // would be testing those instead of this.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getPersonIdentityState,
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -71,6 +76,7 @@ const STEPS = [
 
 beforeEach(() => {
   invokeMock.mockReset().mockResolvedValue(undefined);
+  resetPersonIdentityState();
   for (const step of STEPS) step.mockReset().mockImplementation(() => {});
 });
 
@@ -97,6 +103,12 @@ describe("lockVault reaches the lock", () => {
     STEPS[0].mockImplementation(throwing);
     await lockVault();
     for (const step of STEPS.slice(1)) expect(step).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the person identity on a normal lock", async () => {
+    setPersonIdentityState({ ready: true, ownerCode: "public-code" });
+    await lockVault();
+    expect(getPersonIdentityState()).toEqual({ ready: false, ownerCode: null });
   });
 
   it("still rejects when the IPC itself fails", async () => {

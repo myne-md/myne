@@ -10,6 +10,8 @@
 // and stores the per-device token device-scoped; no vault is created.
 import { invoke } from "../platform/core";
 
+export const PERSON_ACCOUNT_ABSENCE_MARKER = "person-account-binding";
+
 /**
  * The identity-only setup result, as the backend serializes it.
  *
@@ -43,9 +45,9 @@ export async function personSetup(phrase?: string): Promise<PersonSetupView> {
 /** Whether this device holds a person account, and whose it is. */
 export interface PersonStatusView {
   enrolled: boolean;
+  identity_unlocked: boolean;
   person_id_hex: string | null;
-  /** The out-of-band identity code, for the identity home to show; `null` for a
-   *  pre-task-11 credential. */
+  /** The out-of-band public identity code; available while the private identity is locked. */
   identity_code: string | null;
 }
 

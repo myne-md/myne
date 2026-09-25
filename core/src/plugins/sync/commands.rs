@@ -496,57 +496,66 @@ pub async fn sync_person_unlock<R: Runtime>(
     phrase: String,
 ) -> Result<PersonIdentityView, SyncDeviceError> {
     let phrase = zeroize::Zeroizing::new(phrase);
-    // `normalize_user_phrase` is infallible by signature: it canonicalizes
-    // whatever it is handed, and a phrase that does not decode as BIP-39
-    // simply derives a different (unusable) identity rather than erroring.
-    let normalized = protocol::normalize_user_phrase(&phrase);
+    let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(&phrase));
+    let generation = state.inner().person_session_generation().await;
     let host = crate::host::tauri_host::TauriHost::new(app.clone());
-    let (pair, transition) = crate::account::person_identity::unlock_person_identity(
+    let (pair, mut transition) = crate::account::person_identity::unlock_person_identity(
         &host,
         &crate::vault_io::StdVaultIo,
         normalized.as_str(),
     )
     .await
     .map_err(|e| {
-        // Map by cause: a transient IO or CSPRNG failure is not a "bad phrase",
-        // and telling the user to retype a correct phrase sends them in a loop.
         use crate::account::person_identity::PersonIdentityError as E;
         match e {
             E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
             E::Io | E::Csprng => SyncDeviceError::Transport,
         }
     })?;
-    let person_id = protocol::person_id_hash(&normalized);
+    if transition.is_none() {
+        transition = crate::account::person_identity::read_pending_person_key_transition(
+            &host,
+            &crate::vault_io::StdVaultIo,
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    }
+    let person_id = protocol::person_id_hash(normalized.as_str());
+    let public = pair.public_half();
     let view = PersonIdentityView {
         fingerprint_hex: crate::account::person_identity::hex_lower(pair.fingerprint()),
         person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-        // The owner-side out-of-band code a member pastes to verify the group
-        // package (task 12). Public material only.
-        identity_code: super::invite::encode_person_identity_code(&person_id, &pair.public_half()),
+        identity_code: super::invite::encode_person_identity_code(&person_id, &public),
     };
-    // The addressable id is a pure function of the same normalized phrase, held
-    // beside the identity so the owner bind and the identity code need no second
-    // phrase crossing (B2B, myne-md/myne#711 task 11).
-    state.inner().set_person_id(person_id).await;
-    state.inner().set_person_identity(pair).await;
-    // A legacy CSPRNG identity migrated at this unlock produced a signed
-    // transition record; the sync layer publishes it into each roster the
-    // person is in (the deterministic-identity migration, myne-md/myne#713).
-    if let Some(bytes) = transition {
-        state.inner().set_pending_person_key_transition(bytes).await;
-    }
-    // Derive the per-(person, vault) private AI profile key for the ACTIVE
-    // vault, if one is unlocked. Best-effort: a locked vault leaves no profile
-    // key and the profile is simply unavailable until the next person unlock
-    // with a vault open. The phrase never leaves this scope (it is zeroized
-    // when `normalized`/`phrase` drop).
-    if let Some((profile_id, profile_key)) =
-        derive_person_profile_key(&host, state.inner(), normalized.as_str()).await
+    let profile = derive_person_profile_key(&host, state.inner(), normalized.as_str()).await;
+    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+        pair,
+        person_id,
+        profile,
+        transition,
+    };
+    let installed_generation = generation.wrapping_add(1);
+    if !state
+        .inner()
+        .install_person_session_if_generation(generation, install)
+        .await
     {
-        state
+        return Err(SyncDeviceError::Transport);
+    }
+    if super::person_account::refresh_person_auth_public_material(
+        &host,
+        &crate::vault_io::StdVaultIo,
+        person_id,
+        &public,
+    )
+    .await
+    .is_err()
+    {
+        let _ = state
             .inner()
-            .set_person_profile(profile_id, profile_key)
+            .clear_person_session_if_generation(installed_generation)
             .await;
+        return Err(SyncDeviceError::Transport);
     }
     Ok(view)
 }
@@ -590,8 +599,7 @@ pub async fn sync_person_lock<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     forget: Option<bool>,
 ) -> Result<(), SyncDeviceError> {
-    let _ = state.inner().take_person_identity().await;
-    let _ = state.inner().take_person_profile().await;
+    let _ = state.inner().clear_person_session().await;
     if forget.unwrap_or(false) {
         let host = crate::host::tauri_host::TauriHost::new(app.clone());
         crate::account::person_identity::delete_sealed_file(&host, &crate::vault_io::StdVaultIo)

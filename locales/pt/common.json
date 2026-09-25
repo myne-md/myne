@@ -4177,7 +4177,7 @@
       "invitationPending": "Ainda não aceite",
       "invitationsFailed": "Não foi possível carregar os seus convites.",
       "title": "Membros do cofre",
-      "personHint": "Desbloqueie a sua identidade de membro com a sua frase de recuperação. Permanece neste dispositivo até travar o cofre ou fechar a app.",
+      "personHint": "Desbloqueie a sua identidade de membro com a sua frase de recuperação.",
       "personUnlock": "Desbloquear identidade de membro",
       "personReady": "Identidade de membro desbloqueada.",
       "ownerCodeHint": "Partilhe este código com a pessoa que convida para poder verificar que o cofre é seu. Contém apenas informação pública.",
@@ -5012,6 +5012,11 @@
     "recoverIntro": "Já tem uma identidade? Introduza a sua frase de recuperação de 24 palavras.",
     "recovered": "Identidade recuperada.",
     "title": "Apenas identidade"
+  },
+  "personIdentityCode": {
+    "copy": "Copiar código de identidade",
+    "copied": "Código de identidade copiado",
+    "copyFailed": "Não foi possível copiar o código de identidade"
   },
   "identityHome": {
     "createVaultCta": "Criar um cofre",

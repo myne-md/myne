@@ -4178,7 +4178,7 @@
       "invitationsFailed": "Impossibile caricare i tuoi inviti.",
       "title": "Membri del caveau",
       "personUnlock": "Sblocca identità membro",
-      "personHint": "Sblocca la tua identità membro con la tua frase di recupero. Resta su questo dispositivo finché non blocchi il caveau o chiudi l'app.",
+      "personHint": "Sblocca la tua identità membro con la tua frase di recupero.",
       "personReady": "Identità membro sbloccata.",
       "ownerCodeHint": "Condividi questo codice con la persona che inviti così può verificare che il caveau sia tuo. Contiene solo informazioni pubbliche.",
       "personLock": "Blocca identità membro",
@@ -5012,6 +5012,11 @@
     "recoverIntro": "Hai già un'identità? Inserisci la sua frase di recupero di 24 parole.",
     "recovered": "Identità recuperata.",
     "title": "Solo identità"
+  },
+  "personIdentityCode": {
+    "copy": "Copia il codice identità",
+    "copied": "Codice identità copiato",
+    "copyFailed": "Impossibile copiare il codice identità"
   },
   "identityHome": {
     "createVaultCta": "Crea un caveau",

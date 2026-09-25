@@ -4301,7 +4301,7 @@
       "invitationPending": "Zatím nepřijato",
       "invitationsFailed": "Vaše pozvánky se nepodařilo načíst.",
       "title": "Členi úložiště",
-      "personHint": "Odemkněte svou členskou identitu obnovovací frází. Zůstává na zařízení, dokud neuzamknete úložiště a nezavřete aplikaci.",
+      "personHint": "Odemkněte svou členskou identitu obnovovací frází.",
       "personUnlock": "Odemknout identitu člena",
       "personReady": "Identita člena odemčena.",
       "ownerCodeHint": "Sdílejte tento kód s tím, koho zvete, aby mohl ověřit, že úložiště je vaše. Obsahuje pouze veřejné informace.",
@@ -5152,6 +5152,11 @@
     "recoverIntro": "Už identitu máte? Zadejte její 24slovnou obnovovací frázi.",
     "recovered": "Identita obnovena.",
     "title": "Pouze identita"
+  },
+  "personIdentityCode": {
+    "copy": "Kopírovat identifikační kód",
+    "copied": "Identifikační kód zkopírován",
+    "copyFailed": "Identifikační kód se nepodařilo zkopírovat"
   },
   "identityHome": {
     "createVaultCta": "Vytvořit úložiště",

@@ -4053,7 +4053,7 @@
       "invitationPending": "Ikke accepteret endnu",
       "invitationsFailed": "Kunne ikke indlæse dine invitationer.",
       "title": "Bogens medlemmer",
-      "personHint": "Lås din medlemsidentitet op med din genfrasetægningsfrase. Den forbliver på denne enhed, indtil du låser bogen eller lukker appen.",
+      "personHint": "Lås din medlemsidentitet op med din genfrasetægningsfrase.",
       "personUnlock": "Lås medlemsidentitet op",
       "personReady": "Medlemsidentitet låst op.",
       "ownerCodeHint": "Del denne kode med den person, du inviterer, så de kan verificere, at bogen er din. Den indeholder kun offentlige oplysninger.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Har du allerede en identitet? Indtast dens 24-ords genfrasetægningsfrase.",
     "recovered": "Identitet gendannet.",
     "title": "Kun identitet"
+  },
+  "personIdentityCode": {
+    "copy": "Kopiér identitetskode",
+    "copied": "Identitetskode kopieret",
+    "copyFailed": "Identitetskoden kunne ikke kopieres"
   },
   "identityHome": {
     "createVaultCta": "Opret en bog",
