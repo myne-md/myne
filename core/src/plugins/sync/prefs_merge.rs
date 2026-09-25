@@ -794,6 +794,7 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
 mod tests {
     use super::*;
     use crate::plugins::sync::prefs_classification::classify;
+    use zeroize::Zeroizing;
 
     fn stamped(view: &mut PrefsView, field: &str, clock: u64) {
         view.field_clocks.insert(field.to_string(), clock);
@@ -813,6 +814,39 @@ mod tests {
             }
         }
         serde_json::from_value(v).expect("projected view deserializes")
+    }
+
+    /// `ai_provider_key` is `Shared(ScalarLww)`, so on an NTV6 vault any live
+    /// roster member can author it (the blob is group-sealed), and `lww_field`
+    /// resolves on the raw clock with no inspection of the winning value. A
+    /// CR/LF-bearing string therefore reaches every other device's local view
+    /// verbatim, and `authorize_remote` then builds a request head from it.
+    ///
+    /// Asserted in the REFUSAL direction so the fix makes it live, and ignored
+    /// because the fix is not this branch's. The merge is the layer that decides
+    /// what a PEER may install, so a shape check here is defence in depth behind
+    /// the `authorize_remote` chokepoint rather than a substitute for it. Run it
+    /// with `cargo test -p myne-core -- --ignored a_crlf_bearing_remote`.
+    /// myne-md/myne#750.
+    #[test]
+    #[ignore = "unfixed: merge_prefs adopts a peer's credential without shape validation; see myne-md/myne#750"]
+    fn a_crlf_bearing_remote_provider_key_is_not_adopted() {
+        let mut local = PrefsView {
+            ai_provider_key: Some(Zeroizing::new("sk-local".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut local, "ai_provider_key", 100);
+        let mut remote = PrefsView {
+            ai_provider_key: Some(Zeroizing::new("sk-evil\r\nX: 1".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut remote, "ai_provider_key", 200);
+
+        let merged = merge_prefs(&local, &remote);
+        assert!(
+            merged.ai_provider_key.as_ref().map(|k| k.as_str()) != Some("sk-evil\r\nX: 1"),
+            "a peer's credential reached the local view with a CR/LF in it"
+        );
     }
 
     #[test]

@@ -504,6 +504,22 @@ Reference: RFC 8439.
 
 The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
+### **characterisation test** &nbsp; 🛠️ *Tooling*
+
+A test whose assertions pin the code's **current** behaviour rather than the behaviour the code should have, used to keep a known defect from being quietly forgotten. It is a poor cousin of a regression test and the two are not interchangeable:
+
+- A **regression test** asserts the invariant, so it is **red before** a fix and **green after**. That direction is why it can be trusted to stay.
+- A **characterisation test** asserts the defect, so it is **green while the defect lives** and goes **red the moment someone fixes it**. A red suite then reads like a regression, and the person who fixed the defect concludes they broke something.
+
+So a characterisation test that ships asserts the defect is *correct*, and every fix is gated on rewriting it. Two rules follow, and the second is the one that is easy to skip:
+
+1. **Prefer fixing the defect.** If the fix is available in the same change, the test should assert the invariant and be red-then-green, like any other.
+2. **When the fix is not available, assert the invariant anyway and mark the test `#[ignore]` with a reason naming the tracking issue.** Then `cargo test` is green, the direction is right, `cargo test -- --ignored` fails today and passes after the fix, and nobody has to invert a passing test to make progress. This is strictly better than a green assertion of the defect, which is the shape that certifies a bug as intended behaviour.
+
+Run an ignored characterisation test with `cargo test -p <crate> -- --ignored <name>`. A test whose direction is right but whose fixture cannot reach the defective state is a different failure, and injection is the only thing that tells them apart: apply the fix, confirm the test turns red, restore.
+
+Used in: `core/src/inference/chatml.rs`, `core/src/http/codec.rs`, `core/src/inference/provider_gate.rs`, `core/src/plugins/sync/prefs_merge.rs`, `core/src/plugins/vault_migrate/mod.rs`; myne-md/myne#750
+
 ### **chat turn** &nbsp; 📦 *Product*
 
 One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
