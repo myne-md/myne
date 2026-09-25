@@ -24,6 +24,13 @@ export default defineConfig({
       { find: /^@myne\/editor\/(.*)$/, replacement: sib("../editor/src/$1") },
       { find: /^@myne\/dialect$/, replacement: sib("../dialect/src/index.ts") },
       { find: /^@myne\/dialect\/(.*)$/, replacement: sib("../dialect/src/$1") },
+      // The shared sync-staleness RULE (myne#583) - mirror of vite.config.ts,
+      // which carries the rationale for sharing it. `mobile/src/components/
+      // SyncBanners.tsx` imports it, so any test that reaches the components
+      // barrel fails to TRANSFORM without this line, and the file appears in
+      // no count. The mirror is kept complete rather than only where today's
+      // specs happen to reach it.
+      { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
       // Shared react-i18next runtime (MYND-485) - mirror of vite.config.ts.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },

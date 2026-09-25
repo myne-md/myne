@@ -64,8 +64,9 @@ export interface AgentState {
    *  `clearAgent` (myne-md/myne#596).
    *
    *  **The one thing that still moves when a run is applied and dropped in the
-   *  same write.** `UndoLastRun` re-reads the host's undo record whenever an
-   *  apply lands, and it used to key that on `applied?.applied`. Since a clean,
+   *  same write.** `useUndoLastRun` (mounted by the chat surfaces for the turn
+   *  revert affordance) re-reads the host's undo record whenever an apply lands,
+   *  and it used to key that on `applied?.applied`. Since a clean,
    *  complete apply now settles and calls `clearAgent` inside one
    *  {@link settleApply} call, React's store subscription only ever sees the
    *  final state: `applied` is back to null and the count reads 0 to 0, so the
@@ -694,8 +695,8 @@ export function clearAgent(): void {
     // Kept because it is a SESSION counter, not run state, and because this is
     // the call site that would break it: a clean, complete apply settles and
     // clears in one write, so a counter reset here would be back to its old
-    // value by the time React looked, and `UndoLastRun` would never re-read the
-    // host. That is the defect this field was added to fix; resetting it here
+    // value by the time React looked, and `useUndoLastRun` would never re-read
+    // the host. That is the defect this field was added to fix; resetting it here
     // would reintroduce it at the one call site that matters.
     applySeq: state.applySeq,
     rejected: new Set(),

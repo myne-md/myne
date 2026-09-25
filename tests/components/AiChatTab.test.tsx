@@ -7,7 +7,7 @@
 // `usePrefs` + i18n are mocked at their module boundaries (no Tauri IPC needed).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 let aiEnabled = true;
 let aiProvider: string | null = null;
@@ -40,6 +40,7 @@ vi.mock("../../src/hooks/useAiModelReady", () => ({
 // The agent bindings the folded-in surfaces reach for. Stubbed rather than left
 // to reject at the seam, so a test failure means what it says.
 const agentLastRun = vi.fn();
+const agentUndo = vi.fn();
 const agentCapability = vi.fn();
 const agentStart = vi.fn();
 const agentPreviewGrant = vi.fn();
@@ -47,12 +48,12 @@ const agentApproveScope = vi.fn();
 const agentCancel = vi.fn();
 vi.mock("../../src/lib/agent-run", () => ({
   agentLastRun: (...a: unknown[]) => agentLastRun(...a),
+  agentUndo: (...a: unknown[]) => agentUndo(...a),
   agentCapability: (...a: unknown[]) => agentCapability(...a),
   agentStart: (...a: unknown[]) => agentStart(...a),
   agentPreviewGrant: (...a: unknown[]) => agentPreviewGrant(...a),
   agentApproveScope: (...a: unknown[]) => agentApproveScope(...a),
   agentCancel: (...a: unknown[]) => agentCancel(...a),
-  agentUndo: vi.fn(),
 }));
 
 // `AgentProgress` asks which arm is serving before it renders the expansion
@@ -107,6 +108,7 @@ beforeEach(() => {
   __resetChatForTest();
   clearAgent();
   agentLastRun.mockReset().mockResolvedValue(null);
+  agentUndo.mockReset().mockResolvedValue({ reverted: 0, failed: [], notesCreatedNotReverted: 0 });
   agentCapability.mockReset();
   agentStart.mockReset();
   agentPreviewGrant.mockReset().mockResolvedValue({
@@ -549,12 +551,11 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     );
   });
 
-  // myne-md/myne#675. A settled turn carries its run's frozen proposal, so
-  // history shows what was proposed after `agentStore` drops the live copy on
-  // lock. Read-only: a frozen proposal may quote a note that has since
-  // changed, been trashed, or moved folders, so NOTHING in the section may
-  // write: no insert control, no apply button, no button at all.
-  it("renders a settled run's frozen proposal, and offers no way to apply it", () => {
+  // myne-md/myne#741. The inline Before/After blocks are gone; a settled turn
+  // carries a diff icon that opens one read-only modal. Read-only still: a
+  // frozen proposal may quote a note that has since changed, so NOTHING in the
+  // modal may write: no insert control, no apply button.
+  it("opens a settled run's frozen proposal in a read-only diff modal", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       ...SUMMARY,
@@ -565,23 +566,179 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     });
     render(<AiChatTab />);
 
-    const section = screen.getByTestId("ai.agent-proposal");
-    expect(section.textContent).toContain("old words");
-    expect(section.textContent).toContain("new words");
-    expect(section.textContent).toContain("Scratch");
-    expect(section.textContent).toContain("fresh text");
+    expect(screen.queryByTestId("ai.proposal-diff")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.turn-diff"));
+
+    const modal = screen.getByTestId("ai.proposal-diff-body");
+    expect(modal.textContent).toContain("old words");
+    expect(modal.textContent).toContain("new words");
+    expect(modal.textContent).toContain("Scratch");
+    expect(modal.textContent).toContain("fresh text");
     expect(
-      section.querySelector('[data-testid="ai.proposal-edit"]')?.getAttribute("data-note-id"),
+      screen
+        .getAllByTestId("ai.proposal-edit")[0]!
+        .getAttribute("data-note-id"),
     ).toBe("n1");
-    expect(section.querySelector('[data-testid="ai.insert-turn"]')).toBeNull();
-    expect(section.querySelector("button")).toBeNull();
+    // Read-only in the strong sense: the ONLY button in the modal is its close.
+    // `ai.insert-turn` alone would pass even if a write control were added.
+    expect(
+      screen.getByTestId("ai.proposal-diff").querySelectorAll("button").length,
+    ).toBe(1);
+    expect(screen.getByTestId("ai.proposal-diff-close")).toBeTruthy();
+    expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
   });
 
-  it("renders no proposal section for a run that proposed nothing", () => {
+  it("renders no diff icon for a run that proposed nothing", () => {
     sendAgentTurn("how many tasks", "This note");
     settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0 });
     render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.turn-diff")).toBeNull();
     expect(screen.queryByTestId("ai.agent-proposal")).toBeNull();
+  });
+
+  // myne-md/myne#741. The strip under the composer is gone; the offer lives on
+  // the host's current undoable run as a revert icon on that turn only.
+  describe("the revert offer", () => {
+    function offerRun(runId = "r1"): void {
+      agentLastRun.mockResolvedValue({
+        runId,
+        restorePoints: [["n1", "s1"]],
+        notesCreated: [],
+      });
+    }
+
+    it("shows the revert icon only on the host's current undoable run", async () => {
+      offerRun("r1");
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+      // The fallback is SUPPRESSED while a turn hosts the run; without this the
+      // condition and "always show it" are indistinguishable.
+      expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+      expect(agentLastRun).toHaveBeenCalled();
+    });
+
+    it("hides it when the host holds no undoable record", async () => {
+      agentLastRun.mockResolvedValue(null);
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(agentLastRun).toHaveBeenCalled());
+      expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+    });
+
+    it("confirms before undoing and reports the result on the turn", async () => {
+      offerRun("r1");
+      agentUndo.mockResolvedValue({ reverted: 1, failed: [], notesCreatedNotReverted: 0 });
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+
+      fireEvent.click(screen.getByTestId("ai.turn-revert"));
+      expect(screen.getByTestId("ai.revert-confirm")).toBeTruthy();
+
+      fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+      await waitFor(() => expect(agentUndo).toHaveBeenCalledWith("r1"));
+      expect(agentUndo).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.getByTestId("ai.undo-result")).toBeTruthy());
+      // The offer is gone once the host consumes its record.
+      expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+    });
+
+    it("cancels without calling undo", async () => {
+      offerRun("r1");
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+      fireEvent.click(screen.getByTestId("ai.turn-revert"));
+      fireEvent.click(screen.getByTestId("ai.revert-cancel"));
+      expect(screen.queryByTestId("ai.revert-confirm")).toBeNull();
+      expect(agentUndo).not.toHaveBeenCalled();
+    });
+
+    it("renders the icon only on the matching turn, not on an older run's turn", async () => {
+      // Two settled runs with different ids and the host holding the FIRST. The
+      // guard is `runId` equality, so the affordance must land on exactly one
+      // turn. Without this fixture the guard is vacuous (the review's injection
+      // removed it and every test stayed green).
+      offerRun("r1");
+      sendAgentTurn("first", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      sendAgentTurn("second", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r2" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getAllByTestId("ai.turn-revert")).toHaveLength(1));
+      expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+      expect(agentLastRun).toHaveBeenCalled();
+    });
+
+    it("keeps the offer reachable when no turn hosts it", async () => {
+      // A host record whose run is not in the open transcript: New chat, or a
+      // switched conversation. The turn icon cannot render, so the header
+      // fallback must, or the offer is live but unreachable.
+      offerRun("r9");
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.revert-fallback")).toBeTruthy());
+      expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+
+      fireEvent.click(screen.getByTestId("ai.revert-fallback"));
+      expect(screen.getByTestId("ai.revert-confirm")).toBeTruthy();
+    });
+
+    it("fails closed: a read that throws offers nothing", async () => {
+      // Seed a live offer FIRST, so the assertion distinguishes a clearing
+      // catch from an already-empty store (which passes vacuously, since
+      // `beforeEach`'s `clearAgent` keeps `undoable`).
+      setUndoable(
+        { runId: "r1", restorePoints: [["n1", "s1"]], notesCreated: 0 },
+        currentRunEpoch(),
+      );
+      agentLastRun.mockRejectedValue(new Error("locked"));
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(agentLastRun).toHaveBeenCalled());
+      expect(screen.queryByTestId("ai.turn-revert")).toBeNull();
+      expect(screen.queryByTestId("ai.revert-fallback")).toBeNull();
+    });
+
+    it("re-reads rather than guessing when the undo itself fails", async () => {
+      offerRun("r1");
+      agentUndo.mockRejectedValue(new Error("noSuchRun"));
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+
+      fireEvent.click(screen.getByTestId("ai.turn-revert"));
+      fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+      await waitFor(() => expect(agentUndo).toHaveBeenCalledWith("r1"));
+      // The failure clears the report and re-reads the host: one read on mount,
+      // at least one more after the failed undo.
+      await waitFor(() => expect(agentLastRun.mock.calls.length).toBeGreaterThanOrEqual(2));
+      expect(screen.queryByTestId("ai.undo-result")).toBeNull();
+    });
+
+    it("names the half an undo cannot do", async () => {
+      offerRun("r1");
+      agentUndo.mockResolvedValue({ reverted: 1, failed: [], notesCreatedNotReverted: 2 });
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, runId: "r1" });
+      render(<AiChatTab />);
+      await waitFor(() => expect(screen.getByTestId("ai.turn-revert")).toBeTruthy());
+      fireEvent.click(screen.getByTestId("ai.turn-revert"));
+      fireEvent.click(screen.getByTestId("ai.revert-confirm-undo"));
+      await waitFor(() => expect(screen.getByTestId("ai.undo-result")).toBeTruthy());
+      // "The run was undone" otherwise reads as covering the notes it created.
+      expect(screen.getByTestId("ai.undo-result").textContent).toContain(
+        "agent.undo.createdNotReverted",
+      );
+    });
   });
 
   // myne-md/myne#568. In one mode a question is a run like any other and

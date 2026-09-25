@@ -55,7 +55,9 @@ export type IconName =
   | "arrow-left"
   | "arrow-right"
   | "download"
-  | "link";
+  | "link"
+  | "columns-2"
+  | "rotate-ccw";
 
 // Stroke-based 24×24 paths (Lucide-style), drawn with currentColor so callers
 // set colour via `color`. Matches the design's thin-stroke icon language.
@@ -99,6 +101,8 @@ const PATHS: Record<IconName, string> = {
   "arrow-right": "M5 12h14|M12 5l7 7-7 7",
   download: "M12 3v12|M7 10l5 5 5-5|M5 21h14",
   link: "M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1|M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1",
+  "columns-2": "M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z|M12 3v18",
+  "rotate-ccw": "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8|M3 3v5h5",
 };
 
 export function Icon({
