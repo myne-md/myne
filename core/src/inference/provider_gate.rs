@@ -171,6 +171,30 @@ mod tests {
         assert_eq!(auth.key(), "sk-test");
     }
 
+    /// The fourth precondition is a `trim` plus a non-empty filter, and `trim`
+    /// touches only the ends, so an interior CR/LF survives into the
+    /// authorization the request head is built from. This is the chokepoint the
+    /// chain closes at: one shape check here refuses the value for every arm
+    /// downstream, and the field is `Shared(ScalarLww)`, so the value can arrive
+    /// from a vault co-member rather than from this device's own settings.
+    ///
+    /// Asserted in the REFUSAL direction so the fix makes it live, and ignored
+    /// because the fix is not this branch's. Run it with
+    /// `cargo test -p myne-core --features remote-ai -- --ignored
+    /// an_interior_crlf`. myne-md/myne#750.
+    #[test]
+    #[ignore = "unfixed: the credential gate checks presence, not shape; see myne-md/myne#750"]
+    fn an_interior_crlf_in_the_credential_is_refused() {
+        assert!(
+            authorize_remote(&PrefsView {
+                ai_provider_key: Some(Zeroizing::new("sk-real\r\nX: 1".into())),
+                ..ready()
+            })
+            .is_err(),
+            "a CR/LF in a synced credential must not become an authorization"
+        );
+    }
+
     /// Removing ANY ONE precondition refuses, and the refusals are
     /// distinguishable — table-driven, because a per-case test would pass even
     /// if two of them collapsed into the same message.

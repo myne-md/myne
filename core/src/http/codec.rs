@@ -498,6 +498,64 @@ mod tests {
         assert!(!s.contains("Content-Type"));
     }
 
+    /// `build_http_request_ext` interpolates every value it is handed into the
+    /// request head and inspects none of them, so a CR/LF inside the bearer
+    /// terminates the header line it sits on.
+    ///
+    /// Asserted in the REFUSAL direction, so the day the writer starts
+    /// validating this becomes a live regression test rather than a test that
+    /// goes red at the moment the defect is fixed. Ignored because the chokepoint
+    /// this branch does not own is upstream of the writer: `ai_provider_key` is
+    /// `Shared(ScalarLww)`, so a vault co-member can author the value that
+    /// reaches here, and a shape check in `authorize_remote` closes that. Run it
+    /// with `cargo test -p myne-core -- --ignored a_crlf_in_the_bearer`.
+    /// myne-md/myne#750.
+    ///
+    /// What this does NOT settle either way: whether any far side accepts the
+    /// result. The providers are third-party HTTP/1.1 implementations, so the
+    /// effect half is not observable from this repository. What IS observable
+    /// is that Myne emits the bytes, which is the half it owns.
+    #[test]
+    #[ignore = "unfixed: the request writer interpolates the bearer unvalidated; see myne-md/myne#750"]
+    fn a_crlf_in_the_bearer_cannot_terminate_the_authorization_line() {
+        let req = build_http_request_ext(
+            HttpMethod::Post,
+            "/api/v1/chat/completions",
+            "openrouter.ai",
+            &[],
+            b"{}",
+            Some("sk-real\r\nX-Injected: 1"),
+        );
+        let s = String::from_utf8(req).unwrap();
+        // The assertion prints the request, so it masks the credential rather
+        // than writing a bearer into a test log. The shape of the check is what
+        // this test exists for, and a leak here would be copied into a
+        // production error path.
+        let shown = s.replace("sk-real", "<redacted>");
+        assert!(
+            !s.contains("\r\nX-Injected: 1\r\n"),
+            "the injected value became a header of its own: {shown:?}"
+        );
+        // The doubled form would end the head early, so the builder's own
+        // framing lands inside what a parser would read as the body.
+        let req = build_http_request_ext(
+            HttpMethod::Post,
+            "/api/v1/chat/completions",
+            "openrouter.ai",
+            &[],
+            b"{}",
+            Some("sk-real\r\n\r\nGET /other HTTP/1.1"),
+        );
+        let s = String::from_utf8(req).unwrap();
+        let length_at = s.find("Content-Length").expect("the builder's own header");
+        let first_blank = s.find("\r\n\r\n").expect("a head terminator");
+        let shown = s.replace("sk-real", "<redacted>");
+        assert!(
+            length_at < first_blank,
+            "the head ended before the builder's own Content-Length: {shown:?}"
+        );
+    }
+
     #[test]
     fn build_post_carries_body() {
         let req = build_http_request(HttpMethod::Post, "/sync/push", "h", b"{}", None);

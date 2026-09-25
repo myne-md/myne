@@ -110,6 +110,52 @@ describe("links", () => {
     expect(html).not.toContain("javascript:");
     expect(html).toContain("x");
   });
+
+  // A filter that strips only a LEADING C0 run tests a different string from
+  // the one emitted: the WHATWG URL parser removes ASCII tab, LF and CR from
+  // ANY position before resolving, so `jav<TAB>ascript:` is a `javascript:` URL
+  // to the browser while looking scheme-less to an anchored `^[a-z]+:` probe.
+  // The angle-bracket destination is the construct that admits the tab at all
+  // (the bare form breaks on it as whitespace), which is why every payload here
+  // uses `<...>`.
+  //
+  // The reference-definition payload is the same parser, so it is the vector
+  // that survives a reader who "fixes" only the inline form.
+  it("refuses a scheme obfuscated with an interior tab", async () => {
+    const payloads = [
+      "[x](<jav\tascript:alert(1)>)",
+      "[x](</\t/evil.example>)",
+      "[x][r]\n\n[r]: <jav\tascript:alert(1)>\n",
+    ];
+    for (const payload of payloads) {
+      const html = await emit(payload);
+      expect(html, `payload: ${JSON.stringify(payload)}`).not.toContain("<a ");
+    }
+  });
+
+  // The other half of the fix. Normalising only the PROBE and still emitting the
+  // original string would leave the checked value and the emitted value
+  // different, which is the defect class itself, and every payload in the case
+  // above is a REFUSAL, so a suite made only of them passes either way. This
+  // asserts the ACCEPT path emits the normalised value: a legitimate
+  // destination that carries a control character, where the parser does hand a
+  // link node to `safeHref`. Reverting either `return probe` turns this red.
+  //
+  // Every payload is measured to reach `safeHref` rather than assumed to. A
+  // trailing newline changes how the GFM autolink extension splits a tab inside
+  // a destination, so the newline-free forms are the ones that survive, and
+  // adding one here silently converts the case back into a vacuous pass.
+  it("emits the normalised href, not the original string", async () => {
+    const accept: [string, string][] = [
+      ["[x](<https://a.exa\tmple/p>)", '<a href="https://a.example/p">'],
+      ["[x](<\thttps://a.example/p>)", '<a href="https://a.example/p">'],
+      ["[x](<\t/a.example/p>)", '<a href="/a.example/p">'],
+    ];
+    for (const [src, expected] of accept) {
+      const html = await emit(src);
+      expect(html, `payload: ${JSON.stringify(src)}`).toContain(expected);
+    }
+  });
 });
 
 describe("wikilinks (§3.5)", () => {
