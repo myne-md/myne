@@ -5,7 +5,7 @@
 // `docs/decisions/ai/0515` states the lifetime exactly: "The offer therefore
 // ends at the next apply or at vault lock, whichever comes first." The store
 // disagreed with that in two places, and both were invisible because
-// `UndoLastRun` re-reads the host whenever `applied` changes identity, which
+// `useUndoLastRun` re-reads the host whenever `applied` changes identity, which
 // masks the drop in the one sequence anybody tests by hand (apply, then close
 // the review) and not in the one that matters (apply run A, then start run B).
 //

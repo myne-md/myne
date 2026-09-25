@@ -128,8 +128,18 @@ const ACTIONS: CSSProperties = {
 
 /** One diff line. Rendered as its own block with a marker column, never as a
  *  side-by-side pair: two columns of wrapped note text at 390px is the shape
- *  that made the diff unreadable in the first place. */
-function DiffLineView({ line }: { line: DiffLine }) {
+ *  that made the diff unreadable in the first place.
+ *
+ *  Exported because the proposal diff sheet (myne-md/myne#741) renders the same
+ *  line, and the testid namespace is a parameter so that second surface does not
+ *  publish `ai.review-*` under a different screen. */
+export function DiffLineView({
+  line,
+  testIdPrefix = "ai.review",
+}: {
+  line: DiffLine;
+  testIdPrefix?: string;
+}) {
   const tone =
     line.type === "add"
       ? { background: "var(--diff-add-bg, transparent)", color: "var(--fg-1)" }
@@ -138,7 +148,7 @@ function DiffLineView({ line }: { line: DiffLine }) {
         : { color: "var(--fg-3)" };
   return (
     <div
-      data-testid={`ai.review-diff-${line.type}`}
+      data-testid={`${testIdPrefix}-diff-${line.type}`}
       style={{
         display: "flex",
         gap: "var(--space-2)",

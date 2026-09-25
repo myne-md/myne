@@ -157,8 +157,7 @@
       "failed_other": "{{count}} notes could not be restored.",
       "createdNotReverted_one": "{{count}} note the run created was left in place.",
       "createdNotReverted_other": "{{count}} notes the run created were left in place.",
-      "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history.",
-      "sessionOnlyLink": "Open version history"
+      "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history."
     }
   },
   "ai": {
@@ -1172,11 +1171,14 @@
           "historyEmpty": "No conversations yet. New chats appear here.",
           "historyError": "Couldn't load conversations. Try again.",
           "historyLoading": "Loading…",
-          "historyProposalAfter": "After",
-          "historyProposalBefore": "Before",
           "historyProposalNewNote": "New note",
           "historyRename": "Rename",
           "historyTitle": "Chat history",
+          "viewDiff": "View changes",
+          "revertRun": "Revert this run",
+          "diffTitle": "Proposed changes",
+          "revertConfirmTitle": "Revert this run?",
+          "revertConfirmBody": "Notes this run changed go back to how they were before it. Notes it created stay where they are.",
           "persistWarning": "Saving to the vault failed. Your messages are still here and will be retried.",
           "memory": "Memory",
           "memoryPopoverTitle": "What the assistant remembers",

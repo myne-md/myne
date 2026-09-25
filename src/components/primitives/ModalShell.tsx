@@ -205,6 +205,10 @@ export function ModalShell({
           <button
             type="button"
             aria-label={closeLabel}
+            // Namespaced from the caller's `testId` so a shared primitive does
+            // not publish one global name for every modal's close button; the
+            // bare `modal-close` remains the default for callers without one.
+            data-testid={testId === undefined ? "modal-close" : `${testId}-close`}
             onClick={onClose}
             style={CLOSE_BUTTON_STYLE}
           >

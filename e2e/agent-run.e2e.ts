@@ -220,17 +220,19 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
 
         // **A DIFFERENT fact from the `agentReview.appliedCount` this replaces,
         // and the difference is worth stating rather than glossing.** That
-        // counted EDITS applied; `agent.undo.offer` counts `restorePoints`,
-        // i.e. NOTES written, so three edits to one note read as "changed 1
-        // note". Both are non-zero exactly when the apply wrote something,
-        // which is what this scenario needs, but the strip is not the same
-        // number on a different surface. The applied-edit count is now asserted
-        // only by ag3, which is the run whose dialog stays open.
-        await s.waitForElement(testIdSelector("agentUndoLast.root"), {
+        // counted EDITS applied; the revert affordance's offer comes from the
+        // host's undoable record, i.e. NOTES written, so three edits to one
+        // note read as "changed 1 note". Both are non-zero exactly when the
+        // apply wrote something, which is what this scenario needs, but the
+        // icon is not the same number on a different surface. The applied-edit
+        // count is now asserted only by ag3, which is the run whose dialog
+        // stays open.
+        //
+        // The strip under the composer is gone (myne-md/myne#741): the offer
+        // lives on the settled turn as `ai.turn-revert`.
+        await s.waitForElement(testIdSelector("ai.turn-revert"), {
           timeoutMs: 15_000,
         });
-        const offer = await (await s.byTestId("agentUndoLast.summary")).textContent();
-        expect(offer).not.toContain("0");
 
         await waitForSaved(s);
         // The note changed. The specific text depends on the stub engine, so the
@@ -410,12 +412,17 @@ aiDescribe("ag4 undo after the review screen is closed", () => {
         const afterApply = await editorText(s);
         expect(afterApply).not.toBe(original);
 
-        // The offer is on the composer, reachable with the screen gone.
-        await s.waitForElement(testIdSelector("agentUndoLast.root"), {
+        // The offer is on the assistant turn as a revert icon, reachable with
+        // the review screen gone. One icon, one confirm, one undo.
+        await s.waitForElement(testIdSelector("ai.turn-revert"), {
           timeoutMs: 15_000,
         });
-        await (await s.byTestId("agentUndoLast.undo")).click();
-        await s.waitForElement(testIdSelector("agentUndoLast.result"), {
+        await (await s.byTestId("ai.turn-revert")).click();
+        await s.waitForElement(testIdSelector("ai.revert-confirm"), {
+          timeoutMs: 10_000,
+        });
+        await (await s.byTestId("ai.revert-confirm-undo")).click();
+        await s.waitForElement(testIdSelector("ai.undo-result"), {
           timeoutMs: 20_000,
         });
 
@@ -428,7 +435,7 @@ aiDescribe("ag4 undo after the review screen is closed", () => {
 
         // And the offer is gone, so a second press cannot restore the same
         // snapshots over anything written since.
-        expect((await s.byTestIdAll("agentUndoLast.undo")).length).toBe(0);
+        expect((await s.byTestIdAll("ai.turn-revert")).length).toBe(0);
       },
     );
   });

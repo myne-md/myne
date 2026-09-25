@@ -91,8 +91,9 @@ describe("a clean, complete apply drops the run", () => {
 
   it("still moves the apply counter, so the undo strip re-reads the host", () => {
     // **The regression the E2E caught and nothing else would have.**
-    // `UndoLastRun` re-reads the host's undo record in an effect keyed on this
-    // counter. When the close was made atomic with the settle, `applied` was
+    // `useUndoLastRun` re-reads the host's undo record in an effect keyed on
+    // this counter. When the close was made atomic with the settle, `applied`
+    // was
     // written and nulled inside one `settleApply` call, so React's store
     // subscription only ever saw the final state: the old key (`applied
     // ?.applied`) read 0 to 0, the effect never fired, `agentLastRun()` was
