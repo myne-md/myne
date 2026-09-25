@@ -8,12 +8,29 @@
 // ships, so no Remove button renders and the disabled notice does.
 
 import { describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { RosterMemberView } from "../../src/lib/invite";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+
+// The person unlock result per test.
+type MockUnlockView = {
+  fingerprint_hex: string;
+  person_id_hex: string;
+  identity_code: string;
+};
+let mockUnlockPerson = (): Promise<MockUnlockView> =>
+  Promise.resolve({
+    fingerprint_hex: "00".repeat(32),
+    person_id_hex: "11".repeat(16),
+    identity_code: "MYNE-PERSON-1:x",
+  });
 
 // The roster rows per test. `members: []` renders the invite-only empty
 // state; a non-empty list renders the rows plus the removal-disabled notice.
@@ -46,9 +63,7 @@ vi.mock("../../src/hooks/useRoster", () => ({
     loading: false,
     error: null,
     reload: vi.fn(),
-    unlockPerson: vi.fn(() =>
-      Promise.resolve({ fingerprint_hex: "00".repeat(32), person_id_hex: "11".repeat(16), identity_code: "MYNE-PERSON-1:x" }),
-    ),
+    unlockPerson: vi.fn(() => mockUnlockPerson()),
     lockPerson: vi.fn(() => Promise.resolve()),
     inviting: false,
     lastInvite: null,
@@ -72,11 +87,16 @@ import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
 describe("MemberRosterPanel phrase input", () => {
   it("exposes the recovery-phrase field under a programmatic label", () => {
     render(<MemberRosterPanel />);
-    try {
-      const input = screen.getByTestId("member-roster.phrase-input");
-      expect(input.getAttribute("aria-label")).toBe("sync.memberRoster.personHint");
-      // The label query resolves to the same element: assistive tech names it.
-      expect(screen.getByLabelText("sync.memberRoster.personHint")).toBe(input);
+     try {
+       const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
+       expect(input.type).toBe("text");
+       expect(input.style.padding).toBe("var(--space-1) var(--space-2)");
+       expect(input.style.borderRadius).toBe("var(--radius-1)");
+       expect(input.getAttribute("aria-label")).toBe("sync.enroll.wordAria");
+
+       // The label query resolves to the same element: assistive tech names it.
+       expect(screen.getAllByLabelText("sync.enroll.wordAria")[0]).toBe(input);
+
     } finally {
       cleanup();
     }
@@ -86,12 +106,46 @@ describe("MemberRosterPanel phrase input", () => {
     render(<MemberRosterPanel />);
     try {
       const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
-      fireEvent.change(input, { target: { value: "word ".repeat(24).trim() } });
-      expect(input.value.split(" ")).toHaveLength(24);
+      fireEvent.change(input, { target: { value: "abandon" } });
+      expect(input.value).toBe("abandon");
     } finally {
       cleanup();
     }
   });
+
+  it("does not publish an unlock that resolves after a session reset", async () => {
+    let resolveUnlock!: (view: MockUnlockView) => void;
+    mockUnlockPerson = () =>
+      new Promise<MockUnlockView>((resolve) => {
+        resolveUnlock = resolve;
+      });
+    render(<MemberRosterPanel />);
+    try {
+      for (let index = 0; index < 24; index += 1) {
+        const testId = index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+        fireEvent.change(screen.getByTestId(testId), { target: { value: "abandon" } });
+      }
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-button"));
+      resetPersonIdentityState();
+      resolveUnlock({
+        fingerprint_hex: "00".repeat(32),
+        person_id_hex: "11".repeat(16),
+        identity_code: "MYNE-PERSON-1:stale",
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId("member-roster.person-ready")).toBeNull();
+      });
+    } finally {
+      cleanup();
+      mockUnlockPerson = () =>
+        Promise.resolve({
+          fingerprint_hex: "00".repeat(32),
+          person_id_hex: "11".repeat(16),
+          identity_code: "MYNE-PERSON-1:x",
+        });
+    }
+  });
+
 });
 
 describe("MemberRosterPanel removal", () => {
@@ -190,6 +244,20 @@ describe("MemberRosterPanel roles", () => {
       expect(badges[0].textContent).toBe("sync.memberRoster.memberBadge");
     } finally {
       cleanup();
+    }
+  });
+
+  it("hides the owner identity code from a member", () => {
+    mockAuthority = "member";
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:owner" });
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.owner-code")).toBeNull();
+      expect(screen.queryByTestId("member-roster.copy-owner-code")).toBeNull();
+    } finally {
+      cleanup();
+      resetPersonIdentityState();
+      mockAuthority = "owner";
     }
   });
 

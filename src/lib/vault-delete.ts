@@ -37,6 +37,7 @@
 
 import { invoke } from "../platform/core";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
+import { resetPersonIdentityState } from "../components/sync/personIdentityState";
 import { has as hasCapability } from "../platform/capabilities";
 import { appDataDir, join } from "../platform/path";
 import type { VaultDeleteError } from "../types/vault-delete-error";
@@ -253,5 +254,6 @@ export async function deleteVault(vaultId: string): Promise<void> {
   // the app shows next. `myne-core` drops its half in `vault_delete`; this is
   // the WebView half (myne-md/myne#609, found in review).
   resetDateTimeDisplayForLock();
+  resetPersonIdentityState();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

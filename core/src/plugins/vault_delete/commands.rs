@@ -246,8 +246,7 @@ async fn run_post_delete_teardown(
         // myne-md/myne#698: the backend-held B2B person identity is Critical-class
         // key material and dies with the vault on this path too (AS21 "every lock
         // path"); it lives outside the slot map, so nothing else reaches it here.
-        let _ = state.take_person_identity().await;
-        let _ = state.take_person_profile().await;
+        let _ = state.clear_person_session().await;
         hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor too.
         hooks.clear_staged_descriptor();

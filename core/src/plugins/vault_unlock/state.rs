@@ -187,43 +187,7 @@ pub struct VaultRuntimeState {
     /// quick-unlock works) — never weaker — so it needs no wiring there.
     full_unlock_this_session: AtomicBool,
 
-    /// Backend-held person identity (B2B, myne-md/myne#698): the owner's
-    /// [`protocol::PersonKeyPair`] for this process, populated ONCE by
-    /// `sync_person_unlock` from the person's recovery phrase and dropped
-    /// by `sync_person_lock`. Vault-independent (one person, many vaults)
-    /// and deliberately OUTSIDE the per-vault slot map: relocking a vault
-    /// does not revoke personhood, and inviting needs an unlocked vault
-    /// PLUS this identity. Held behind its own lock; `None` means "no
-    /// person unlocked this process". The pair zeroizes on drop
-    /// (`ZeroizeOnDrop`), and `take` moves it out so no clone lingers.
-    person_identity: RwLock<Option<protocol::PersonKeyPair>>,
-
-    /// The addressable `person_id_hash` of the held person identity (B2B,
-    /// myne-md/myne#711 task 11). Derived at `sync_person_unlock` from the
-    /// normalized phrase, so the owner bind and the identity code do not need
-    /// the phrase again. Public (a pure function of the phrase) and dropped
-    /// with the identity.
-    person_id: RwLock<Option<[u8; 16]>>,
-
-    /// Backend-held per-`(person, vault)` private AI profile key (`MYY5`,
-    /// myne-md/myne#712 task 8). Derived at `sync_person_unlock` from the
-    /// person's phrase AND the ACTIVE vault's account-number hash, so unlike the
-    /// person keypair it is VAULT-scoped: a vault switch without a fresh person
-    /// unlock leaves no key for the new vault. Dropped with the person identity
-    /// and at every vault-leaving path. The key zeroizes on drop.
-    person_profile_key: RwLock<Option<Zeroizing<[u8; AEAD_KEY_LEN]>>>,
-
-    /// The non-secret deterministic profile id that goes with
-    /// [`Self::person_profile_key`] (the `profiles/<id>` filename component and
-    /// the AAD binding). Held bare: it is a hash of public inputs.
-    person_profile_id: RwLock<Option<[u8; 16]>>,
-
-    /// A pending signed `myne.person-key-transition v1|` record produced when a
-    /// legacy CSPRNG identity migrated at person unlock (`decisions/protocol/0604`).
-    /// The sync layer publishes it into each roster the person is in; it is
-    /// dropped with the person identity. Not secret (public key material and a
-    /// signature), so a plain `Vec<u8>`.
-    pending_person_key_transition: RwLock<Option<Vec<u8>>>,
+    person_session: RwLock<PersonSession>,
 }
 
 impl Default for VaultRuntimeState {
@@ -237,13 +201,50 @@ impl Default for VaultRuntimeState {
             label_cache: RwLock::new(HashMap::new()),
             icon_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
-            person_identity: RwLock::new(None),
-            person_id: RwLock::new(None),
-            person_profile_key: RwLock::new(None),
-            person_profile_id: RwLock::new(None),
-            pending_person_key_transition: RwLock::new(None),
+            person_session: RwLock::new(PersonSession::default()),
         }
     }
+}
+
+struct PersonIdentitySession {
+    pair: protocol::PersonKeyPair,
+    person_id: Option<[u8; 16]>,
+}
+
+struct PersonProfileSession {
+    profile_id: [u8; 16],
+    profile_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+}
+
+#[derive(Default)]
+struct PersonSession {
+    identity: Option<PersonIdentitySession>,
+    profile: Option<PersonProfileSession>,
+    pending_transition: Option<Vec<u8>>,
+    generation: u64,
+}
+
+impl PersonSession {
+    fn clear(&mut self) -> Option<protocol::PersonKeyPair> {
+        self.generation = self.generation.wrapping_add(1);
+        self.profile = None;
+        self.pending_transition = None;
+        self.identity.take().map(|identity| identity.pair)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct PersonSessionInstall {
+    pub(crate) pair: protocol::PersonKeyPair,
+    pub(crate) person_id: [u8; 16],
+    pub(crate) profile: Option<([u8; 16], Zeroizing<[u8; AEAD_KEY_LEN]>)>,
+    pub(crate) transition: Option<Vec<u8>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct PersonIdentitySnapshot {
+    pub(crate) person_id: [u8; 16],
+    pub(crate) public: protocol::person_key::PersonPublicHalf,
 }
 
 /// Why [`VaultRuntimeState::set_import_source`] can refuse, and what each
@@ -264,85 +265,159 @@ impl VaultRuntimeState {
         &self.auth_permits
     }
 
-    /// Store the backend-held person identity (B2B unlock). Overwrites
-    /// any previous identity: one person per process, and a second
-    /// unlock is a switch, never an accumulation.
     pub async fn set_person_identity(&self, pair: protocol::PersonKeyPair) {
-        *self.person_identity.write().await = Some(pair);
+        let mut session = self.person_session.write().await;
+        session.identity = Some(PersonIdentitySession {
+            pair,
+            person_id: None,
+        });
     }
 
-    /// Drop the held person identity, zeroizing it. Returns whether one
-    /// was held. The pending identity-migration transition is about the person,
-    /// not any vault, so it is dropped with the identity.
+    pub async fn set_person_identity_and_id(
+        &self,
+        pair: protocol::PersonKeyPair,
+        person_id: [u8; 16],
+    ) {
+        let mut session = self.person_session.write().await;
+        session.identity = Some(PersonIdentitySession {
+            pair,
+            person_id: Some(person_id),
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn person_session_generation(&self) -> u64 {
+        self.person_session.read().await.generation
+    }
+
+    pub async fn clear_person_session(&self) -> Option<protocol::PersonKeyPair> {
+        self.person_session.write().await.clear()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn clear_person_session_if_generation(
+        &self,
+        expected_generation: u64,
+    ) -> bool {
+        let mut session = self.person_session.write().await;
+        if session.generation != expected_generation {
+            return false;
+        }
+        let _ = session.clear();
+        true
+    }
+
     pub async fn take_person_identity(&self) -> Option<protocol::PersonKeyPair> {
-        *self.pending_person_key_transition.write().await = None;
-        *self.person_id.write().await = None;
-        self.person_identity.write().await.take()
+        self.clear_person_session().await
     }
 
-    /// Store the addressable person id that goes with the held identity.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn install_person_session_if_generation(
+        &self,
+        expected_generation: u64,
+        install: PersonSessionInstall,
+    ) -> bool {
+        let mut session = self.person_session.write().await;
+        if session.generation != expected_generation {
+            return false;
+        }
+        session.generation = session.generation.wrapping_add(1);
+        session.identity = Some(PersonIdentitySession {
+            pair: install.pair,
+            person_id: Some(install.person_id),
+        });
+        session.profile = install
+            .profile
+            .map(|(profile_id, profile_key)| PersonProfileSession {
+                profile_id,
+                profile_key,
+            });
+        session.pending_transition = install.transition;
+        true
+    }
+
     pub async fn set_person_id(&self, person_id: [u8; 16]) {
-        *self.person_id.write().await = Some(person_id);
+        if let Some(identity) = self.person_session.write().await.identity.as_mut() {
+            identity.person_id = Some(person_id);
+        }
     }
 
-    /// Clone the addressable person id for a command core.
     pub async fn clone_person_id(&self) -> Option<[u8; 16]> {
-        *self.person_id.read().await
+        self.person_session
+            .read()
+            .await
+            .identity
+            .as_ref()
+            .and_then(|identity| identity.person_id)
     }
 
-    /// Store the signed migration transition produced at person unlock. No-op
-    /// callers still get the record published by the sync layer.
     pub async fn set_pending_person_key_transition(&self, bytes: Vec<u8>) {
-        *self.pending_person_key_transition.write().await = Some(bytes);
+        self.person_session.write().await.pending_transition = Some(bytes);
     }
 
-    /// Take the pending migration transition, if any (publish-once).
     pub async fn take_pending_person_key_transition(&self) -> Option<Vec<u8>> {
-        self.pending_person_key_transition.write().await.take()
+        self.person_session.write().await.pending_transition.take()
     }
 
-    /// Clone the pending migration transition for one command.
     pub async fn clone_pending_person_key_transition(&self) -> Option<Vec<u8>> {
-        self.pending_person_key_transition.read().await.clone()
+        self.person_session.read().await.pending_transition.clone()
     }
 
-    /// Clone the held person identity for a command core. The clone lives
-    /// only for the call: command cores must not retain it past the
-    /// operation (no caching outside this lock).
     pub async fn clone_person_identity(&self) -> Option<protocol::PersonKeyPair> {
-        self.person_identity.read().await.clone()
+        self.person_session
+            .read()
+            .await
+            .identity
+            .as_ref()
+            .map(|identity| identity.pair.clone())
     }
 
-    /// Install the per-`(person, vault)` private AI profile key + id derived at
-    /// person unlock.
+    pub async fn person_identity_unlocked(&self) -> bool {
+        self.person_session.read().await.identity.is_some()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn person_identity_status(&self) -> Option<PersonIdentitySnapshot> {
+        self.person_session
+            .read()
+            .await
+            .identity
+            .as_ref()
+            .and_then(|identity| {
+                identity.person_id.map(|person_id| PersonIdentitySnapshot {
+                    person_id,
+                    public: identity.pair.public_half(),
+                })
+            })
+    }
+
     pub async fn set_person_profile(
         &self,
         profile_id: [u8; 16],
         profile_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     ) {
-        *self.person_profile_key.write().await = Some(profile_key);
-        *self.person_profile_id.write().await = Some(profile_id);
+        self.person_session.write().await.profile = Some(PersonProfileSession {
+            profile_id,
+            profile_key,
+        });
     }
 
-    /// Drop the held private-profile key, zeroizing it.
     pub async fn take_person_profile(&self) -> Option<([u8; 16], Zeroizing<[u8; AEAD_KEY_LEN]>)> {
-        let id = self.person_profile_id.write().await.take();
-        let key = self.person_profile_key.write().await.take();
-        match (id, key) {
-            (Some(id), Some(key)) => Some((id, key)),
-            _ => None,
-        }
+        self.person_session
+            .write()
+            .await
+            .profile
+            .take()
+            .map(|profile| (profile.profile_id, profile.profile_key))
     }
 
-    /// Clone the held private-profile key + id for one command. The clone lives
-    /// only for the call.
     pub async fn clone_person_profile(&self) -> Option<([u8; 16], Zeroizing<[u8; AEAD_KEY_LEN]>)> {
-        let id = *self.person_profile_id.read().await;
-        let key = self.person_profile_key.read().await;
-        match (id, key.as_ref()) {
-            (Some(id), Some(key)) => Some((id, key.clone())),
-            _ => None,
-        }
+        self.person_session
+            .read()
+            .await
+            .profile
+            .as_ref()
+            .map(|profile| (profile.profile_id, profile.profile_key.clone()))
     }
 
     /// Swap the unlocked slot's `itemsKey` for a freshly rotated one
@@ -1063,8 +1138,12 @@ impl VaultRuntimeState {
     /// Param-less `vault_lock` stays the active-vault convenience (SYNC-8) and
     /// resolves the sole active id, then funnels through this same primitive.
     pub async fn take(&self, id: VaultId) -> Slot {
-        // Remove the entry; a missing key IS empty → `Slot::Empty`.
-        let taken = self.slots.write().await.remove(&id).unwrap_or(Slot::Empty);
+        let mut slots = self.slots.write().await;
+        let taken = slots.remove(&id).unwrap_or(Slot::Empty);
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
+        drop(slots);
         // #270: same eviction as the idle take. Callers that already evicted
         // are unaffected — both removals are idempotent.
         self.label_cache.write().await.remove(&id);
@@ -1089,25 +1168,29 @@ impl VaultRuntimeState {
             Some(Slot::Recovering { .. }) => {}
             _ => return None,
         }
-        match slots.remove(&id) {
+        let material = match slots.remove(&id) {
             Some(Slot::Recovering {
                 root_key,
                 items_key,
                 items_key_id,
                 recovered_at,
-            }) => Some(RecoveringMaterial {
+            }) => RecoveringMaterial {
                 root_key,
                 items_key,
                 items_key_id,
                 recovered_at,
-            }),
+            },
             // Unreachable given the guard above; restore defensively.
             Some(other) => {
                 slots.insert(id, other);
-                None
+                return None;
             }
-            None => None,
-        }
+            None => return None,
+        };
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
+        Some(material)
     }
 
     /// Populate [`Slot::Recovering`].
@@ -1133,11 +1216,12 @@ impl VaultRuntimeState {
         };
         // Insert under `id`; the prior entry (or `Slot::Empty` if absent) is
         // returned for diagnostics.
-        self.slots
-            .write()
-            .await
-            .insert(id, new)
-            .unwrap_or(Slot::Empty)
+        let mut slots = self.slots.write().await;
+        let prior = slots.insert(id, new).unwrap_or(Slot::Empty);
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
+        prior
     }
 
     /// Populate [`Slot::Unlocked`].
@@ -1160,11 +1244,14 @@ impl VaultRuntimeState {
             .store(self.relative_millis(now_millis), Ordering::Relaxed);
         // Insert under `id`; the prior entry (or `Slot::Empty` if absent) is
         // returned for diagnostics.
-        self.slots
-            .write()
-            .await
+        let mut slots = self.slots.write().await;
+        let prior = slots
             .insert(id, Slot::Unlocked(vault))
-            .unwrap_or(Slot::Empty)
+            .unwrap_or(Slot::Empty);
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
+        prior
     }
 
     /// Populate [`Slot::Unlocked`] for `id`, FIRST locking (dropping +
@@ -1221,9 +1308,67 @@ impl VaultRuntimeState {
         // is replaced; on a switch it is `Empty` for `id` so this insert is
         // the first `Unlocked` entry after the teardown above.
         let prior_same_id = slots.insert(id, Slot::Unlocked(vault));
-        // Prefer the locked-prior (switch) variant for the caller's teardown
-        // decision; otherwise hand back this id's own prior slot.
+        let mut person = self.person_session.write().await;
+        person.generation = person.generation.wrapping_add(1);
+        person.identity = None;
+        person.profile = None;
+        person.pending_transition = None;
+        drop(person);
+
         locked_prior.or(prior_same_id).unwrap_or(Slot::Empty)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn set_unlocked_locking_others_with_person_session(
+        &self,
+        expected_generation: u64,
+        id: VaultId,
+        vault: UnlockedVault,
+        person_session: Option<PersonSessionInstall>,
+    ) -> Option<Slot> {
+        let now_millis = vault.unlocked_at;
+
+        let mut slots = self.slots.write().await;
+        let mut person = self.person_session.write().await;
+        if person.generation != expected_generation {
+            return None;
+        }
+        self.last_activity_millis
+            .store(self.relative_millis(now_millis), Ordering::Relaxed);
+
+        let active = slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(other, _)| *other)
+            .min();
+        let locked_prior = match active {
+            Some(other) if other != id => slots.remove(&other),
+            _ => None,
+        };
+        let prior_same_id = slots.insert(id, Slot::Unlocked(vault));
+        person.generation = person.generation.wrapping_add(1);
+        if let Some(install) = person_session {
+            person.identity = Some(PersonIdentitySession {
+                pair: install.pair,
+                person_id: Some(install.person_id),
+            });
+            person.profile =
+                install
+                    .profile
+                    .map(|(profile_id, profile_key)| PersonProfileSession {
+                        profile_id,
+                        profile_key,
+                    });
+            person.pending_transition = install.transition;
+        } else {
+            person.identity = None;
+            person.profile = None;
+            person.pending_transition = None;
+        }
+        drop(person);
+        drop(slots);
+
+        Some(locked_prior.or(prior_same_id).unwrap_or(Slot::Empty))
     }
 
     /// Read-lock peek that returns a CLONE of the `root_key` from
@@ -1599,6 +1744,9 @@ impl VaultRuntimeState {
         let dropped = slots.remove(&id);
         // Explicit drop fires zeroize NOW — before any IO.
         drop(dropped);
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
         // Lock still held across the spawn_blocking await; any concurrent
         // slot-touching op queues on the RwLock.
         match crate::task::run_blocking(unlink).await {
@@ -1662,6 +1810,9 @@ impl VaultRuntimeState {
         // Explicit drop fires zeroize NOW — before the erase future is even
         // constructed, let alone polled.
         drop(dropped);
+        let mut person = self.person_session.write().await;
+        let _ = person.clear();
+        drop(person);
         match erase().await {
             Ok(()) => Ok(()),
             Err(e) => Err(TakeAndRunError::Closure(e)),
@@ -2200,6 +2351,85 @@ mod tests {
                 state.clone_person_profile().await.is_none(),
                 "the profile key is gone after take"
             );
+        });
+    }
+
+    #[test]
+    fn first_vault_install_clears_person_session() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let pair = protocol::PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
+            state.set_person_identity_and_id(pair, [4u8; 16]).await;
+            state
+                .set_person_profile([5u8; 16], Zeroizing::new([6u8; AEAD_KEY_LEN]))
+                .await;
+            state.set_pending_person_key_transition(vec![7u8]).await;
+
+            state
+                .set_unlocked_locking_others(test_vault_id(), fixture_unlocked())
+                .await;
+
+            assert!(!state.person_identity_unlocked().await);
+            assert!(state.clone_person_profile().await.is_none());
+            assert!(state.clone_pending_person_key_transition().await.is_none());
+        });
+    }
+
+    #[test]
+    fn stale_person_publication_is_rejected_after_a_boundary() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let generation = state.person_session_generation().await;
+            state.clear_person_session().await;
+            let installed = state
+                .install_person_session_if_generation(
+                    generation,
+                    PersonSessionInstall {
+                        pair: protocol::PersonKeyPair::generate_raw(
+                            &[8u8; 64],
+                            &[9u8; 32],
+                            &[10u8; 32],
+                        ),
+                        person_id: [11u8; 16],
+                        profile: None,
+                        transition: None,
+                    },
+                )
+                .await;
+            assert!(!installed);
+            assert!(!state.person_identity_unlocked().await);
+        });
+    }
+
+    #[test]
+    fn stale_member_install_cannot_resurrect_a_locked_slot() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            let generation = state.person_session_generation().await;
+            state.take(test_vault_id()).await;
+            let installed = state
+                .set_unlocked_locking_others_with_person_session(
+                    generation,
+                    test_vault_id(),
+                    fixture_unlocked(),
+                    Some(PersonSessionInstall {
+                        pair: protocol::PersonKeyPair::generate_raw(
+                            &[8u8; 64],
+                            &[9u8; 32],
+                            &[10u8; 32],
+                        ),
+                        person_id: [11u8; 16],
+                        profile: None,
+                        transition: None,
+                    }),
+                )
+                .await;
+            assert!(installed.is_none());
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+            assert!(!state.person_identity_unlocked().await);
         });
     }
 

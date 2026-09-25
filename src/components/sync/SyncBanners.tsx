@@ -48,6 +48,7 @@ import { useMaterialisationProgress } from "../../hooks/useMaterialisationProgre
 import { useTorState } from "../../hooks/useTorState";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { isSyncStale } from "../../lib/sync-staleness";
+import { resetPersonIdentityState } from "./personIdentityState";
 
 const STACK_STYLE: CSSProperties = {
   display: "flex",
@@ -113,7 +114,10 @@ export function SyncBanners() {
     void sub("sync://reconcile-finished", armReconcile);
     void sub("sync://integrity-alert", () => setIntegrity(true));
     void sub("sync://credential-ambiguous", () => setCredentialAmbiguous(true));
-    void sub("sync://vault-rekeyed", () => setRekeyedElsewhere(true));
+    void sub("sync://vault-rekeyed", () => {
+      resetPersonIdentityState();
+      setRekeyedElsewhere(true);
+    });
     return () => {
       cancelled = true;
       for (const fn of unlisteners) fn();

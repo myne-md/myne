@@ -578,7 +578,23 @@
     "branched from 10675 and took it to 10699 (+24 for the graph curation",
     "items), so the merged ceiling is 10817 + 24. The two branches cover",
     "disjoint roster entries. Written out rather than bumped, so the number",
-    "stays an argument."
+    "stays an argument.",
+     "CEILING RAISED 10841 -> 10851 by myne-md/myne#745, in the sanctioned",
+     "direction: the identity-only home copy control is a new surface on the",
+     "two desktop clients without an automated lane. The Linux E2E scenario",
+     "now drives the enrolled zero-vault route and successful clipboard write,",
+     "while the component test drives the failure callback; macOS and Windows",
+     "have no driver lane and a real platform clipboard rejection remains an",
+     "OS event source. The item is 5 minutes on each of 2 clients, so the +10",
+     "is the whole of 10841 -> 10851. It is standard, so gatedMinutes is",
+     "unchanged.",
+     "CEILING RAISED 10851 -> 10881 by myne-md/myne#743-745 for the real",
+     "two-person invite acceptance and member-vault re-unlock walk. The existing",
+     "member-roster E2E scenario proves the local form and failure path, but no",
+     "lane provisions two live person accounts and drives the member vault",
+     "across a real relay. The new manual item is 10 minutes on each of three",
+     "desktop clients, so the +30 is the whole of 10851 -> 10881. It is",
+     "standard, so gatedMinutes is unchanged."
   ],
   "gatedTiers": [
     "core"
@@ -592,6 +608,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10841,
+  "totalMinutesCeiling": 10881,
   "gatedMinutes": 3837
 }

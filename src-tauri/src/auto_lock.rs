@@ -373,6 +373,7 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
         // `threat-model.md` AS21 says "every lock path"). It lives OUTSIDE the
         // slot map, so nothing else on this path reaches it.
         let _ = state.take_person_identity().await;
+        let _ = state.take_person_profile().await;
         // Canonical teardown order (decisions 2026-05-30, leg-split): hide
         // (2a, BEFORE zeroize — renderer-independent cover) → zeroize (leg 1)
         // → reapply screen-capture → reload (2b, AFTER zeroize). The window

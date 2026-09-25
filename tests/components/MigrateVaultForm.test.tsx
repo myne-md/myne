@@ -33,8 +33,18 @@ import { MigrateVaultForm, migrateErrorMessageKey } from "../../src/components/s
 function typePassword(v: string) {
   fireEvent.change(screen.getByTestId("migrate.password-input"), { target: { value: v } });
 }
-function typePhrase(v: string) {
-  fireEvent.change(screen.getByTestId("migrate.phrase-input"), { target: { value: v } });
+function typePhrase(phrase: string) {
+  const words = phrase.trim().split(/\s+/);
+  for (let i = 0; i < 24; i += 1) {
+    fireEvent.change(
+      screen.getByTestId(i === 0 ? "migrate.phrase-input" : `migrate.phrase-cell-${i + 1}`),
+      { target: { value: words[i] ?? "" } },
+    );
+  }
+}
+
+function testPhrase(): string {
+  return Array.from({ length: 24 }, (_, i) => `word${i + 1}`).join(" ");
 }
 
 beforeEach(() => migrateVault.mockReset());
@@ -47,7 +57,8 @@ describe("MigrateVaultForm (#420)", () => {
     expect(submit.disabled).toBe(true);
     typePassword("pw");
     expect(submit.disabled).toBe(true); // phrase still empty
-    typePhrase("word ".repeat(12));
+     typePhrase(testPhrase());
+
     expect(submit.disabled).toBe(false); // both present → enabled
   });
 
@@ -55,10 +66,12 @@ describe("MigrateVaultForm (#420)", () => {
     migrateVault.mockResolvedValue({ notes_migrated: 3, singletons_migrated: 1 });
     render(<MigrateVaultForm />);
     typePassword("correct");
-    typePhrase("abandon abandon about");
+     typePhrase(testPhrase());
+
     await clickAndFlush(screen.getByTestId("migrate.submit"));
     const done = screen.getByTestId("migrate.done");
-    expect(migrateVault).toHaveBeenCalledWith("correct", "abandon abandon about");
+     expect(migrateVault).toHaveBeenCalledWith("correct", testPhrase());
+
     expect(done.textContent).toBe("migrate.done:3");
   });
 

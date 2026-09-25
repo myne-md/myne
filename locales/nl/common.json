@@ -4053,7 +4053,7 @@
       "invitationPending": "Nog niet geaccepteerd",
       "invitationsFailed": "Je uitnodigingen konden niet worden geladen.",
       "title": "Kuisleden",
-      "personHint": "Ontgrendel je lididentiteit met je herstelzin. Hij blijft op dit apparaat tot je de kluis vergrendelt of de app sluit.",
+      "personHint": "Ontgrendel je lididentiteit met je herstelzin.",
       "personUnlock": "Lididentiteit ontgrendelen",
       "personReady": "Lididentiteit ontgrendeld.",
       "ownerCodeHint": "Deel deze code met de persoon die je uitnodigt zodat hij kan verifiëren dat de kluis van jou is. Hij bevat alleen publieke informatie.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Heb je al een identiteit? Voer de herstelzin van 24 woorden in.",
     "recovered": "Identiteit hersteld.",
     "title": "Alleen identiteit"
+  },
+  "personIdentityCode": {
+    "copy": "Identiteitscode kopiëren",
+    "copied": "Identiteitscode gekopieerd",
+    "copyFailed": "Identiteitscode kon niet worden gekopieerd"
   },
   "identityHome": {
     "createVaultCta": "Kluis aanmaken",

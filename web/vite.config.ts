@@ -238,6 +238,36 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "sync",
     "MemberRosterPanel",
   ),
+  [path.join(repoRoot, "src", "components", "sync", "MemberVaultUnlockCard")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "MemberVaultUnlockCard",
+  ),
+  [path.join(repoRoot, "src", "components", "settings", "MigrateVaultForm")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "settings",
+    "MigrateVaultForm",
+  ),
+  [path.join(repoRoot, "src", "screens", "IdentityHome")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "screens",
+    "IdentityHome",
+  ),
+  [path.join(repoRoot, "src", "lib", "personAccount")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "lib",
+    "personAccount",
+  ),
 };
 
 function platformSeamSubstitution(): Plugin {

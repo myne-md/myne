@@ -4053,7 +4053,7 @@
       "invitationPending": "Inte accepterad ännu",
       "invitationsFailed": "Kunde inte läsa in dina inbjudningar.",
       "title": "Vault-medlemmar",
-      "personHint": "Lås upp din medlemsidentitet med din återställningsfras. Den förblir på denna enhet tills du låser vaulten eller stänger appen.",
+      "personHint": "Lås upp din medlemsidentitet med din återställningsfras.",
       "personUnlock": "Lås upp medlemsidentitet",
       "personReady": "Medlemsidentitet upplåst.",
       "ownerCodeHint": "Dela denna kod med personen du bjuder in, så att de kan verifiera att vaulten är din. Den innehåller bara offentlig information.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Har du redan en identitet? Ange dess 24-ords återställningsfras.",
     "recovered": "Identitet återställd.",
     "title": "Endast identitet"
+  },
+  "personIdentityCode": {
+    "copy": "Kopiera identitetskod",
+    "copied": "Identitetskod kopierat",
+    "copyFailed": "Identitetskoden kunde inte kopieras"
   },
   "identityHome": {
     "createVaultCta": "Skapa en vault",

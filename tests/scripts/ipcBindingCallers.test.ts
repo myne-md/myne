@@ -351,15 +351,19 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
+    "src/components/sync/personIdentityState.ts": `export function resetPersonIdentityState(): void {}\n`,
+
     // The two DELETE paths. Only the display store is asserted on them: what it
     // holds describes the READER, so erasing the vault erases the source of the
     // value and never the value. Every other store skips them with a stated
     // reason, which is why these bodies carry one call each.
     "src/lib/vault-delete.ts": `export async function deleteVault(vaultId: string): Promise<void> {
   resetDateTimeDisplayForLock();
+  resetPersonIdentityState();
   await invoke("plugin:vault-unlock|vault_delete");
 }
 `,
+
     "mobile/src/lib/vault-delete.ts": `export async function deleteVault(vaultId?: string): Promise<void> {
   resetDateTimeDisplayForLock();
   await invoke("plugin:vault-unlock|vault_delete");
@@ -384,8 +388,10 @@ export function resetMermaidZoom(): void {}\n`,
   resetTranscripts();
   resetMermaidZoom();
   resetDateTimeDisplayForLock();
+  resetPersonIdentityState();
 }
 `,
+
     "src/lib/vault-switch.ts": `export async function leaveActiveVault(deps: {
   reason: string;
 }): Promise<void> {
@@ -402,6 +408,10 @@ export function resetMermaidZoom(): void {}\n`,
   resetTranscripts();
   resetMermaidZoom();
   resetDateTimeDisplayForLock();
+}
+`,
+    "src/App.tsx": `const onCreateAutoUnlockSuccess = () => {
+  resetPersonIdentityState();
 }
 `,
     // Mobile (myne-md/myne#456). One choke point, and the background listener,
@@ -460,6 +470,50 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     const errors = run(files);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("lockVault does not call clearAgentForLock()");
+  });
+
+  it("names a person-state reset removed from the desktop lock choke point", () => {
+    const files = healthyFiles();
+    files["src/lib/vault-unlock.ts"] = files["src/lib/vault-unlock.ts"].replace(
+      "  resetPersonIdentityState();\n",
+      "",
+    );
+    const errors = run(files);
+    expect(errors.some((error) => error.includes("lockVault does not call resetPersonIdentityState()"))).toBe(true);
+  });
+
+  it("names a person-state reset removed from the desktop delete path", () => {
+    const files = healthyFiles();
+    files["src/lib/vault-delete.ts"] = files["src/lib/vault-delete.ts"].replace(
+      "  resetPersonIdentityState();\n",
+      "",
+    );
+    const errors = run(files);
+    expect(errors.some((error) => error.includes("deleteVault does not call resetPersonIdentityState()"))).toBe(true);
+  });
+
+  it("names a person-state reset removed from the direct create boundary", () => {
+    const files = healthyFiles();
+    files["src/App.tsx"] = files["src/App.tsx"].replace(
+      "  resetPersonIdentityState();\n",
+      "",
+    );
+    const errors = run(files);
+    expect(
+      errors.some((error) =>
+        error.includes("onCreateAutoUnlockSuccess does not call resetPersonIdentityState()"),
+      ),
+    ).toBe(true);
+  });
+
+  it("names a person-state reset removed from the switch choke point", () => {
+    const files = healthyFiles();
+    files["src/lib/vault-switch.ts"] = files["src/lib/vault-switch.ts"].replace(
+      "  await lockVault();\n",
+      "",
+    );
+    const errors = run(files);
+    expect(errors.some((error) => error.includes("leaveActiveVault does not call lockVault()"))).toBe(true);
   });
 
   it("does not demand a call the roster reasons its way out of", () => {
@@ -527,6 +581,7 @@ describe("check-frontend-lock-teardown: the cross product", () => {
   await invoke("plugin:vault_unlock|vault_lock");
 `;
     expect(run(files)).toEqual([
+      "could not extract lockVault's body in src/lib/vault-unlock.ts",
       "could not extract lockVault's body in src/lib/vault-unlock.ts",
     ]);
   });
