@@ -13,6 +13,7 @@ import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { listAwareIndent, nextIndentColumn } from "../../editor/src/list-indent";
 import { indentUnit } from "@codemirror/language";
+import { assertParsedState } from "./_parse-budget";
 
 describe("nextIndentColumn", () => {
   it("defers to indentMore on a line that is not a list item", () => {
@@ -69,6 +70,7 @@ describe("the indent the parser actually reads", () => {
       doc,
       extensions: [markdown({ base: markdownLanguage })],
     });
+    assertParsedState(state);
     let depth = 0;
     let maxListDepth = 0;
     syntaxTree(state).iterate({
@@ -91,6 +93,7 @@ describe("the indent the parser actually reads", () => {
       doc,
       extensions: [markdown({ base: markdownLanguage })],
     });
+    assertParsedState(state);
     let found = false;
     syntaxTree(state).iterate({
       enter: (node) => {
@@ -153,6 +156,7 @@ describe("listAwareIndent", () => {
       doc,
       extensions: [markdown({ base: markdownLanguage })],
     });
+    assertParsedState(st);
     let found = false;
     syntaxTree(st).iterate({
       enter: (n) => {

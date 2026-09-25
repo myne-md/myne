@@ -48,7 +48,7 @@
 // bare state. Do NOT call `forceParsing`/`ensureSyntaxTree` directly from a
 // test: every pre-existing direct call site in this tree was found discarding
 // the result, and that is how the class recurs.
-import { ensureSyntaxTree, forceParsing } from "@codemirror/language";
+import { ensureSyntaxTree, forceParsing, syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
@@ -65,7 +65,20 @@ export function assertParsed(view: EditorView, budgetMs = PARSE_BUDGET_MS): void
 /** Throw unless the state's syntax tree covers the whole document. */
 export function assertParsedState(state: EditorState, budgetMs = PARSE_BUDGET_MS): void {
   const upto = state.doc.length;
-  if (ensureSyntaxTree(state, upto, budgetMs) === null) {
+  ensureSyntaxTree(state, upto, budgetMs);
+  // `ensureSyntaxTree` returning non-null is NOT sufficient, and trusting it is
+  // how this helper came to pass a truncated tree. It advances the language's
+  // parse CONTEXT, but `syntaxTree()` returns `field.tree`, a snapshot taken
+  // when the language state field was built. The two diverge: measured on a
+  // 46,890-character document, `syntaxTree()` reports length 3003 both before
+  // and after a successful `ensureSyntaxTree`, while the context tree holds the
+  // whole document. So a caller that checks only the return value is told the
+  // parse finished and then reads a tree covering 3 KB of 46 KB.
+  //
+  // Therefore the contract is checked against the tree the CALLER will read.
+  // `assertParsed` above needs no such check because `forceParsing` dispatches,
+  // which rebuilds the field; the state path cannot dispatch.
+  if (syntaxTree(state).length < upto) {
     throw incompleteParseError(upto, budgetMs);
   }
 }
