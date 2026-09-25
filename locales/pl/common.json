@@ -4301,7 +4301,7 @@
       "invitationPending": "Jeszcze niezaakceptowane",
       "invitationsFailed": "Nie udało się wczytać zaproszeń.",
       "title": "Członkowie skarbca",
-      "personHint": "Odblokuj swoją tożsamość członka frazą odzyskiwania. Pozostaje na tym urządzeniu, dopóki nie zablokujesz skarbca lub nie zamkniesz aplikacji.",
+      "personHint": "Odblokuj swoją tożsamość członka frazą odzyskiwania.",
       "personUnlock": "Odblokuj tożsamość członka",
       "personReady": "Tożsamość członka odblokowana.",
       "ownerCodeHint": "Udostępnij ten kod osobie, którą zapraszasz, aby mogła zweryfikować, że skarbiec jest Twój. Zawiera tylko informacje publiczne.",
@@ -5152,6 +5152,11 @@
     "recoverIntro": "Masz już tożsamość? Podaj jej 24-słowową frazę odzyskiwania.",
     "recovered": "Tożsomość odzyskana.",
     "title": "Tylko tożsamość"
+  },
+  "personIdentityCode": {
+    "copy": "Kopiuj kod tożsamości",
+    "copied": "Kod tożsamości skopiowany",
+    "copyFailed": "Nie udało się skopiować kodu tożsamości"
   },
   "identityHome": {
     "createVaultCta": "Utwórz skarbiec",

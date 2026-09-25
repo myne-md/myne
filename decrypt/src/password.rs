@@ -114,9 +114,18 @@ mod tests {
         // A real phrase with one word swapped is not a valid BIP-39 checksum.
         let phrase = protocol::generate_recovery_phrase().expect("getrandom");
         let mut words: Vec<String> = phrase.words().to_vec();
-        words[0] = "abandon".to_string();
-        let joined = words.join(" ");
-        assert!(validate_bip39(&joined).is_err());
+        let original = words[0].clone();
+        for candidate in Language::English.word_list() {
+            if *candidate == original {
+                continue;
+            }
+            words[0] = (*candidate).to_string();
+            if validate_bip39(&words.join(" ")).is_err() {
+                break;
+            }
+        }
+        assert_ne!(words[0], original);
+        assert!(validate_bip39(&words.join(" ")).is_err());
     }
 
     #[test]

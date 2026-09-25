@@ -3782,8 +3782,17 @@ export const ROSTER = Object.freeze([
       "e2e-web/smoke.e2e.ts",
       "e2e-web/capability-gating.e2e.ts",
       "e2e-web/create-account.e2e.ts",
+      "e2e/member-roster.e2e.ts",
     ],
     manual: [
+      {
+        see: "On a device with an enrolled person identity and no vault, open the identity-only home. Confirm the identity code is selectable, Copy identity code copies the complete public code, and the inline confirmation appears. Repeat with a clipboard write failure and confirm the inline failure message and error toast both appear.",
+         whyNotAutomated: "The Linux E2E scenario now drives the enrolled zero-vault route and the successful clipboard write, while the component test drives the failure callback; macOS and Windows still have no driver lane, and a real platform clipboard rejection is an OS event source that the container cannot raise.",
+         clients: ["desktop-macos", "desktop-windows"],
+         estimateMin: 5,
+
+        tier: "standard",
+      },
       {
         see: "On a Mac, launch a build with an empty data directory. Confirm the Welcome card is centred both ways in the window, that the three macOS traffic lights sit over empty chrome with no Myne text, glyph or CTA underneath or clipped by them, and that dragging the empty strip above the card moves the window.",
         whyNotAutomated: "tauri.conf.json sets titleBarStyle Overlay, hiddenTitle and trafficLightPosition {x:16,y:20}, all macOS-only, and HAS_OVERLAY_WINDOW_CONTROLS in src/screens/titlebar.ts is a navigator.userAgent test that is false in every lane. So the overlay title bar and the 70px inset are never rendered anywhere a driver runs, and traffic lights are drawn by the macOS window server, not the DOM.",
@@ -5698,8 +5707,9 @@ export const ROSTER = Object.freeze([
       "src/components/sync/DeviceJoinQr.tsx",
       "src/components/sync/FingerprintConfirm.tsx",
       "src/components/sync/DeviceManagementPanel.tsx",
-      "src/components/sync/MemberRosterPanel.tsx",
-      "src/hooks/useRoster.ts",
+       "src/components/sync/MemberRosterPanel.tsx",
+       "src/components/sync/MemberVaultUnlockCard.tsx",
+       "src/hooks/useRoster.ts",
       "src/lib/invite.ts",
       "src/components/sync/EnrollDeviceForm.tsx",
       "src/components/sync/EnrollPhraseCredential.tsx",
@@ -5732,9 +5742,16 @@ export const ROSTER = Object.freeze([
       "e2e/sync-usage.e2e.ts",
       "e2e/member-roster.e2e.ts",
     ],
-    manual: [
-      {
-        see: "On two real devices signed into one account, start a device approval and hold it at the fingerprint step. Confirm four things. The two screens show the SAME fingerprint, in a form a person can compare aloud without transcribing. The string does not change while you compare it, which is the push hold doing its job. A deliberate mismatch (approve on one device while the other shows a different code) is surfaced as a mismatch, and the offered action is Remove device rather than an accept-anyway. A third device pushing to the account mid-ceremony is announced rather than absorbed silently. Record which two devices you used.",
+     manual: [
+       {
+         see: "On two real devices signed into one person account, create a disposable vault as the owner, copy the owner's public identity code, and send an invite to the second device. On the second device, confirm the invite appears, inspect the owner's fingerprint out of band, enter the member phrase, and accept. Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
+         whyNotAutomated: "The Linux E2E lane covers the local invite form, identity-home code, and a deliberately failed invitation fetch, but it does not provision two live person accounts or drive the member vault's real acceptance and re-unlock path. The pass condition is a cross-session identity handoff over a real relay and a real second device.",
+         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+         estimateMin: 10,
+         tier: "standard",
+       },
+       {
+         see: "On two real devices signed into one account, start a device approval and hold it at the fingerprint step. Confirm four things. The two screens show the SAME fingerprint, in a form a person can compare aloud without transcribing. The string does not change while you compare it, which is the push hold doing its job. A deliberate mismatch (approve on one device while the other shows a different code) is surfaced as a mismatch, and the offered action is Remove device rather than an accept-anyway. A third device pushing to the account mid-ceremony is announced rather than absorbed silently. Record which two devices you used.",
         whyNotAutomated: "The comparison is a person reading two screens at once, which no single-session driver can be, and the property under test is that a HUMAN can tell two strings apart under time pressure. It also needs two real enrolled devices and a live lease-bounded hold that a fixture cannot reproduce. docs/threat-model.md section 7's vault-head limit names this eye-compare as the only mitigation for a malicious server seating a device onto a stale or forked history, and its myne-md/myne#462 amendment records that a moved head is announced rather than swapped in silently, with the announcement being user attention rather than a structural property.",
         clients: ["desktop-macos", "ios", "android"],
         estimateMin: 15,
@@ -6187,7 +6204,9 @@ export const ROSTER = Object.freeze([
       "src/lib/vault-migrate.ts",
       "src/lib/vault-repair.ts",
       "src/components/RepairResidueBanner.tsx",
-      "src/components/settings/MigrateVaultForm.tsx",
+       "src/components/settings/MigrateVaultForm.tsx",
+       "web/src/components/settings/MigrateVaultForm.tsx",
+
       "src/components/settings/SettleMigrationBlock.tsx",
       "src/platform/capabilities.ts",
       "src-tauri/src/plugins/vault_migrate/",
@@ -6585,6 +6604,7 @@ export const ROSTER = Object.freeze([
       "web/src/components/settings/ConnectedExtensions.tsx",
       "web/src/components/sync/EndpointConfig.tsx",
       "web/src/screens/Welcome.tsx",
+      "web/src/screens/IdentityHome.tsx",
       "web/src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
       "web/src/screens/EnrollPhraseCredential.tsx",

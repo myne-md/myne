@@ -240,10 +240,8 @@ pub async fn unlock_from_host(
             state.evict_cached_label(prior).await;
             state.evict_cached_icon(prior).await;
         }
-        // The private AI profile key is per-(person, VAULT), unlike the
-        // vault-independent person identity: a switch must drop the prior
-        // vault's profile key + id so a later reader cannot target it.
-        let _ = state.take_person_profile().await;
+        // The private identity and per-vault profile are cleared at the
+        // canonical `unlock_with_path` lock-then-unlock seam.
     }
 
     // The last-unlock stamp used to live here, inline in the password path —
@@ -1125,10 +1123,6 @@ pub async fn unlock_with_path(
         )
         .await;
     if matches!(switched_from, Slot::Unlocked(_)) {
-        // A previously-active vault was locked by the switch; its keys already
-        // wiped (the returned `Slot::Unlocked` dropped at the helper's scope
-        // end). Audit the lock-on-switch with the same `vault_locked` event the
-        // manual / idle lock paths emit.
         tracing::info!(
             event = "vault_locked",
             from_slot_kind = "unlocked",
@@ -1392,14 +1386,6 @@ pub async fn lock_from_host(
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
 
-    // myne-md/myne#698: drop the backend-held B2B person identity on the same
-    // lock path. It holds the person's PQ-hybrid private seeds in RAM, so it is
-    // as sensitive as `root_key`; leaving it resident after a lock is the A6
-    // guarantee being false for a keypair the user never saw a lock button for.
-    // `take_person_identity` moves the pair out, zeroizing it on drop.
-    let _ = state.take_person_identity().await;
-    let _ = state.take_person_profile().await;
-
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
     // Same lock path as the search-index wipe — the wikilink graph + tag
@@ -1588,7 +1574,10 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
             state.evict_cached_icon(id).await;
             state.take(id).await
         }
-        None => Slot::Empty,
+        None => {
+            let _ = state.clear_person_session().await;
+            Slot::Empty
+        }
     };
     let from_slot_kind: &'static str = match &prior {
         Slot::Empty => "empty",

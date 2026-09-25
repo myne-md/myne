@@ -103,8 +103,7 @@ pub async fn change_password_from_host(
         crate::plugins::vault_unlock::import_source::close_all(state).await;
         // myne-md/myne#698: the backend-held person identity dies with the slot
         // on this force-relock too (AS21 "every lock path").
-        let _ = state.take_person_identity().await;
-        let _ = state.take_person_profile().await;
+        let _ = state.clear_person_session().await;
         hooks.zeroize_search_index();
         // MYND-262/266: wipe the spell engine + personal/ignore sets (each add
         // already persisted, so nothing to flush — only RAM to zeroize).

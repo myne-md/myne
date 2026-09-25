@@ -9,10 +9,11 @@
 // caution is that it re-keys the whole vault and is one-way (the old vault survives
 // in a device-local `legacy/` snapshot until confirmed).
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { PasswordInput } from "../PasswordInput";
 import { Button } from "../primitives/Button";
+import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../sync/EnrollPhraseCredential";
 import {
   isAlreadyMigrated,
   isRecoveryPhraseRequired,
@@ -58,7 +59,9 @@ export interface MigrateVaultFormProps {
 export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): React.ReactElement {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
-  const [phrase, setPhrase] = useState("");
+  const [phraseCells, setPhraseCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [state, setState] = useState<State>({ kind: "idle" });
 
@@ -90,16 +93,20 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
   // The UI-side phrase gate mirrors the backend one — Migrate stays disabled
   // until both credentials are entered. The backend re-verifies regardless.
   const canSubmit =
-    password.trim().length > 0 && phrase.trim().length > 0 && !inFlight && state.kind !== "done";
+    password.trim().length > 0 &&
+    phraseCells.every((cell) => cell.length > 0) &&
+    !inFlight &&
+    state.kind !== "done";
 
   async function onSubmit() {
     if (!canSubmit) return;
     setState({ kind: "migrating" });
     try {
-      const summary = await migrateVault(password, phrase);
+      const summary = await migrateVault(password, phraseCells.join(" "));
       setState({ kind: "done", summary });
-      setPassword("");
-      setPhrase("");
+       setPassword("");
+       setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+
       // Migration re-keyed the vault and the backend dropped the running slot;
       // route back to Unlock so the user re-derives the new keys. Without a
       // handler (isolation tests) the "done" confirmation above is the terminal.
@@ -131,40 +138,39 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
         testId="migrate.password-input"
       />
 
-      <label style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-        <span
-          style={{
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-3)",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            fontWeight: "var(--weight-semibold)",
-          }}
-        >
-          {t("migrate.phraseLabel")}
-        </span>
-        <textarea
-          data-testid="migrate.phrase-input"
-          value={phrase}
-          onChange={(e) => setPhrase(e.target.value)}
-          disabled={inFlight}
-          rows={3}
-          spellCheck={false}
-          autoCapitalize="none"
-          autoCorrect="off"
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "var(--text-sm)",
-            padding: "var(--space-2)",
-            border: "1px solid var(--line-2)",
-            borderRadius: "var(--radius-2)",
-            background: "var(--bg-1)",
-            color: "var(--fg-1)",
-            resize: "vertical",
-          }}
-        />
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{t("migrate.phraseHelp")}</span>
-      </label>
+      <EnrollPhraseCredential
+        baseId="migrate"
+        label={t("migrate.phraseLabel")}
+        hint={t("migrate.phraseHelp")}
+        disabled={inFlight}
+        cells={phraseCells}
+        onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
+          setPhraseCells((cells) =>
+            cells.map((cell, cellIndex) =>
+              cellIndex === index ? event.target.value.replace(/\s+/g, "") : cell,
+            ),
+          );
+        }}
+        onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
+          const tokens = event.clipboardData
+            .getData("text")
+            .split(/\s+/)
+            .filter((token) => token.length > 0);
+          if (tokens.length < 2) return;
+          event.preventDefault();
+          setPhraseCells((cells) => {
+            const next = [...cells];
+            for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
+              next[index + i] = tokens[i];
+            }
+            return next;
+          });
+        }}
+        gridTestId="migrate.phrase-grid"
+        cellTestId={(index) =>
+          index === 0 ? "migrate.phrase-input" : `migrate.phrase-cell-${index + 1}`
+        }
+      />
 
       {state.kind === "error" && (
         <div data-testid="migrate.error" style={{ color: "var(--danger)", fontSize: "var(--text-sm)" }}>

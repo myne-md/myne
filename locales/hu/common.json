@@ -4053,7 +4053,7 @@
       "invitationPending": "Még nem fogadta el",
       "invitationsFailed": "A meghívók betöltése nem sikerült.",
       "title": "Trezor tagok",
-      "personHint": "Nyissa fel tag-identitását a helyreállítási kifejezéssel. Az az eszközön marad, amíg nem zárja be a trezort vagy az alkalmazást.",
+      "personHint": "Nyissa fel a tagazonosságát a helyreállítási kifejezéssel.",
       "personUnlock": "Tag-identitás felnyitása",
       "personReady": "Tag-identitás felnyitva.",
       "ownerCodeHint": "Ossza meg ezt a kódot a meghívott személlyel, hogy ellenőrizhesse: a trezor az Öné. Csak nyilvános információt tartalmaz.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Már van identitása? Adja meg a 24 szavas helyreállítási kifejezését.",
     "recovered": "Identitás visszaállítva.",
     "title": "Csak identitás"
+  },
+  "personIdentityCode": {
+    "copy": "Identitáskód másolása",
+    "copied": "Az identitáskód másolva",
+    "copyFailed": "Az identitáskódot nem sikerült másolni"
   },
   "identityHome": {
     "createVaultCta": "Trezor létrehozása",

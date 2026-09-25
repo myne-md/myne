@@ -89,11 +89,11 @@ describe("switchVault orchestration: lock-then-route (vault_lock then dispatch)"
     // Stub the lock IPC wrapper so the orchestration runs without a backend.
     const order: string[] = [];
     vi.resetModules();
-    vi.doMock("../../src/lib/vault-unlock", () => ({
-      lockVault: vi.fn(async () => {
-        order.push("lock");
-      }),
-    }));
+     const lockVault = vi.fn(async () => {
+
+      order.push("lock");
+    });
+    vi.doMock("../../src/lib/vault-unlock", () => ({ lockVault }));
     const { switchVault } = await import("../../src/lib/vault-switch");
 
     const savingStates: boolean[] = [];
@@ -115,6 +115,8 @@ describe("switchVault orchestration: lock-then-route (vault_lock then dispatch)"
     expect(savingStates).toEqual([true, false]);
     // Lock ran, THEN the route dispatched (lock-then-unlock, never reversed).
     expect(order).toEqual(["saving:true", "lock", "saving:false", "dispatch"]);
+     expect(lockVault).toHaveBeenCalledWith();
+
     // The dispatched action carries the target vaultId.
     expect(dispatched).toEqual([{ type: "editor.switch-vault", vaultId: target }]);
 

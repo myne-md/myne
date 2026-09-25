@@ -4053,7 +4053,7 @@
       "invitationPending": "Belum diterima",
       "invitationsFailed": "Tidak dapat memuat undangan Anda.",
       "title": "Anggota brankas",
-      "personHint": "Buka identitas keanggotaan Anda dengan frasa pemulihan. Tetap di perangkat ini sampai Anda mengunci brankas atau menutup aplikasi.",
+      "personHint": "Buka identitas keanggotaan Anda dengan frasa pemulihan.",
       "personUnlock": "Buka identitas keanggotaan",
       "personReady": "Identitas keanggotaan terbuka.",
       "ownerCodeHint": "Bagikan kode ini dengan orang yang Anda undang agar mereka dapat memverifikasi brankas milik Anda. Hanya berisi informasi publik.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Sudah punya identitas? Masukkan frasa pemulihan 24 kata.",
     "recovered": "Identitas dipulihkan.",
     "title": "Hanya identitas"
+  },
+  "personIdentityCode": {
+    "copy": "Salin kode identitas",
+    "copied": "Kode identitas disalin",
+    "copyFailed": "Kode identitas tidak dapat disalin"
   },
   "identityHome": {
     "createVaultCta": "Buat brankas",

@@ -9,18 +9,28 @@
 // Desktop + mobile only: reached only when `sync_person_status` reports
 // enrolled, which on web is impossible (`sync_person_setup` is Unsupported and
 // the web client never renders `welcome` at zero vaults).
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
+import { Input } from "../components/primitives/Input";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
 import { inspectInviteCode } from "../lib/invite";
+import { copyText } from "../lib/clipboard";
+import { writeText as clipboardWriteText } from "../platform/clipboardManager";
+import { toast } from "../components/toast/toastStore";
+import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../components/sync/EnrollPhraseCredential";
 
 interface IdentityHomeProps {
   personIdHex: string | null;
-  /** The out-of-band invite code an owner pastes to invite this person. Public
-   *  material only; `null` for a pre-task-11 credential. */
+  /** The out-of-band invite code. Public material remains available while the
+   *  private identity is locked. */
   identityCode: string | null;
   onCreateVault: () => void;
   /** Called after an invite is accepted and a shared vault is unlocked, so the
@@ -41,8 +51,32 @@ export function IdentityHome({
   const [ownerCode, setOwnerCode] = useState("");
   const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const [acceptPhrase, setAcceptPhrase] = useState("");
+  const [acceptPhraseCells, setAcceptPhraseCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+
+  const copyIdentityCode = () => {
+    if (!identityCode) return;
+    setCopyFeedback(null);
+    void copyText(clipboardWriteText, identityCode, {
+      onSuccess: {
+        kind: "toast",
+        run: () => {
+          setCopyFeedback("success");
+          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+        },
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => {
+          setCopyFeedback("error");
+          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
+        },
+      },
+    });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -116,21 +150,47 @@ export function IdentityHome({
             >
               {t("identityHome.shareCodeHeading")}
             </div>
-            <div
+            <Input
               data-testid="identity-home.identity-code"
+              aria-label={t("identityHome.shareCodeHeading")}
+              autoComplete="off"
+              readOnly
+              value={identityCode}
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: "var(--text-xs)",
                 color: "var(--fg-2)",
-                background: "var(--bg-2)",
-                border: "1px solid var(--line-1)",
-                borderRadius: "var(--radius-2)",
-                padding: "var(--space-2)",
-                wordBreak: "break-all",
+                width: "100%",
+                userSelect: "all",
               }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="identity-home.copy-code"
+              onClick={copyIdentityCode}
             >
-              {identityCode}
-            </div>
+              {t("personIdentityCode.copy")}
+            </Button>
+            {copyFeedback === "error" ? (
+              <p
+                data-testid="identity-home.copy-feedback"
+                role="status"
+                aria-live="polite"
+                style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}
+              >
+                {t("personIdentityCode.copyFailed")}
+              </p>
+            ) : copyFeedback === "success" ? (
+              <p
+                data-testid="identity-home.copy-feedback"
+                role="status"
+                aria-live="polite"
+                style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}
+              >
+                {t("personIdentityCode.copied")}
+              </p>
+            ) : null}
             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
               {t("identityHome.shareCodeHint")}
             </div>
@@ -190,8 +250,10 @@ export function IdentityHome({
                       setAccepting(inv.invite_id_hex);
                       setOwnerCode("");
                       setOwnerFingerprint(null);
-                      setConfirmed(false);
-                      setAcceptError(null);
+                       setConfirmed(false);
+                       setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                       setAcceptError(null);
+
                     }}
                   >
                     {t("identityHome.accept")}
@@ -247,31 +309,64 @@ export function IdentityHome({
                             />
                             {t("identityHome.acceptConfirm")}
                           </label>
-                          <textarea
-                            data-testid="identity-home.accept-phrase"
-                            aria-label={t("identityHome.acceptPhraseLabel")}
-                            value={acceptPhrase}
-                            onChange={(e) => {
-                              setAcceptPhrase(e.target.value);
-                              setAcceptError(null);
-                            }}
-                            rows={3}
-                            autoComplete="off"
-                            spellCheck={false}
-                          />
+                           <EnrollPhraseCredential
+                             baseId="identity-home-accept"
+                             label={t("identityHome.acceptPhraseLabel")}
+                             cells={acceptPhraseCells}
+                             onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
+                               setAcceptError(null);
+                               setAcceptPhraseCells((cells) =>
+                                 cells.map((cell, cellIndex) =>
+                                   cellIndex === index
+                                     ? event.target.value.replace(/\s+/g, "")
+                                     : cell,
+                                 ),
+                               );
+                             }}
+                             onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
+                               const tokens = event.clipboardData
+                                 .getData("text")
+                                 .split(/\s+/)
+                                 .filter((token) => token.length > 0);
+                               if (tokens.length < 2) return;
+                               event.preventDefault();
+                               setAcceptError(null);
+                               setAcceptPhraseCells((cells) => {
+                                 const next = [...cells];
+                                 for (
+                                   let i = 0;
+                                   i < tokens.length && index + i < PHRASE_CELL_COUNT;
+                                   i += 1
+                                 ) {
+                                   next[index + i] = tokens[i];
+                                 }
+                                 return next;
+                               });
+                             }}
+                             gridTestId="identity-home.accept-phrase-grid"
+                             cellTestId={(index) =>
+                               index === 0
+                                 ? "identity-home.accept-phrase"
+                                 : `identity-home.accept-phrase-cell-${index + 1}`
+                             }
+                           />
+
                           <Button
                             type="button"
                             variant="primary"
                             data-testid="identity-home.accept-submit"
-                            disabled={!confirmed || acceptPhrase.trim() === ""}
+                             disabled={!confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)}
+
                             onClick={async () => {
                               try {
                                 await personAcceptInvite(
                                   inv.invite_id_hex,
                                   ownerCode.trim(),
-                                  acceptPhrase,
+                                   acceptPhraseCells.join(" "),
+
                                 );
-                                setAcceptPhrase("");
+                                 setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+
                                 onAccepted();
                               } catch {
                                 setAcceptError(t("identityHome.acceptError"));

@@ -4053,7 +4053,7 @@
       "invitationPending": "Ei hyväksytty vielä",
       "invitationsFailed": "Kutsujasi ei voitu ladata.",
       "title": "Valtiointin jäsenet",
-      "personHint": "Avaa jäsenidentiteettisi palautusfraasilla. Se pysyy tällä laitteella, kunnes lukitset valtiointin tai suljet sovelluksen.",
+      "personHint": "Avaa jäsenidentiteettisi palautusfraasilla.",
       "personUnlock": "Avaa jäsenidentiteetti",
       "personReady": "Jäsenidentiteetti avattu.",
       "ownerCodeHint": "Jaa tämä koodi henkilölle, jonka kutsut, jotta he voivat vahvistaa, että valtiointi on sinun. Se sisältää vain julkista tietoa.",
@@ -4872,6 +4872,11 @@
     "recoverIntro": "Onko sinulla jo identiteetti? Anna sen 24-sanainen palautusfraasi.",
     "recovered": "Identiteetti palautettu.",
     "title": "Vain identiteetti"
+  },
+  "personIdentityCode": {
+    "copy": "Kopioi tunnuskoodi",
+    "copied": "Tunnuskoodi kopioitu",
+    "copyFailed": "Tunnuskoodia ei voitu kopioida"
   },
   "identityHome": {
     "createVaultCta": "Luo valtiointi",

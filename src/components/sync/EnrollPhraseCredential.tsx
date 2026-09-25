@@ -3,8 +3,10 @@
 //
 // # Why it is its own module
 //
-// Not for reuse — it has exactly one caller. It is separate so the **web build
-// can substitute it away entirely** (`web/vite.config.ts`, `ABSENT_SCREENS`).
+// Not for reuse alone: it is separate so the **web build can substitute it away
+// entirely** (`web/vite.config.ts`). The member roster reuses this primitive
+// with caller-specific test IDs. Member-vault, identity-only, and migration
+// callers use the same primitive with their own caller-specific test IDs.
 // `decisions.md` 2026-07-26 forbids the recovery phrase from being typed into
 // served code, and enrolment is the third path to it after creation and
 // recovery — the one that is easy to miss, because that screen is about adding
@@ -56,6 +58,11 @@ export interface EnrollPhraseCredentialProps {
   cells: string[];
   onCellChange: (index: number) => (e: ChangeEvent<HTMLInputElement>) => void;
   onCellPaste: (index: number) => (e: ClipboardEvent<HTMLInputElement>) => void;
+  label?: string;
+  hint?: string;
+  disabled?: boolean;
+  gridTestId?: string;
+  cellTestId?: (index: number) => string;
 }
 
 /**
@@ -72,13 +79,24 @@ export function EnrollPhraseCredential({
   cells,
   onCellChange,
   onCellPaste,
+  label,
+  hint,
+  disabled = false,
+  gridTestId = "sync.enroll.phrase-grid",
+  cellTestId = () => "sync.enroll.phrase-cell",
 }: EnrollPhraseCredentialProps) {
   const { t } = useTranslation();
+  const labelId = `${baseId}-label`;
+  const hintId = `${baseId}-hint`;
   return (
     <div style={FIELD}>
-      <span style={LABEL}>{t("sync.enroll.recoveryPhraseLabel")}</span>
-      <p style={HINT}>{t("sync.enroll.recoveryPhraseHint")}</p>
-      <div style={GRID} data-testid="sync.enroll.phrase-grid">
+      <span id={labelId} style={LABEL}>
+        {label ?? t("sync.enroll.recoveryPhraseLabel")}
+      </span>
+      <p id={hintId} style={HINT}>
+        {hint ?? t("sync.enroll.recoveryPhraseHint")}
+      </p>
+      <div style={GRID} data-testid={gridTestId} aria-labelledby={labelId}>
         {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
           const inputId = `${baseId}-cell-${i}`;
           return (
@@ -90,6 +108,7 @@ export function EnrollPhraseCredential({
                 value={cells[i] ?? ""}
                 onChange={onCellChange(i)}
                 onPaste={onCellPaste(i)}
+                disabled={disabled}
                 autoComplete="off"
                 spellCheck={false}
                 autoCapitalize="off"
@@ -97,7 +116,8 @@ export function EnrollPhraseCredential({
                 inputMode="text"
                 style={CELL_INPUT}
                 aria-label={t("sync.enroll.wordAria", { number: i + 1 })}
-                data-testid="sync.enroll.phrase-cell"
+                aria-describedby={hintId}
+                data-testid={cellTestId(i)}
                 data-index={i + 1}
               />
             </label>
