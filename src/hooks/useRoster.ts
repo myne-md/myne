@@ -46,7 +46,7 @@ export interface RosterHook {
   remove: typeof removeMember;
 }
 
-export function useRoster(): RosterHook {
+export function useRoster(personReady: boolean): RosterHook {
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [authority, setAuthority] = useState<VaultAuthority>("member");
   const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
@@ -91,8 +91,9 @@ export function useRoster(): RosterHook {
   // only as the owner (the vault-side list is owner-token authorized), and
   // re-fetch on the same tick that reloads the roster, so an invite shows up.
   useEffect(() => {
-    if (authority !== "owner") {
+    if (!personReady || authority !== "owner") {
       setVaultInvites([]);
+      setVaultInvitesFailed(false);
       return;
     }
     let cancelled = false;
@@ -109,7 +110,7 @@ export function useRoster(): RosterHook {
     return () => {
       cancelled = true;
     };
-  }, [authority, tick]);
+  }, [authority, personReady, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
 

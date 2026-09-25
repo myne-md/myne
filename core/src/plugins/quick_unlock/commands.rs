@@ -526,7 +526,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // means no window exists in which the new slot and an old source
             // are both live.
             crate::plugins::vault_unlock::import_source::close_all(state).await;
-            state
+            let switched_from = state
                 .set_unlocked_locking_others(
                     vault_id,
                     UnlockedVault::owner(
@@ -539,6 +539,17 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                     ),
                 )
                 .await;
+            if matches!(
+                switched_from,
+                crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+            ) {
+                tracing::info!(
+                    event = "vault_locked",
+                    from_slot_kind = "unlocked",
+                    reason = "vault_switch",
+                    "quick-unlock replaced the prior active vault"
+                );
+            }
             // Success resets the consecutive-failure count. The vault is already
             // unlocked (slot installed above), so a failure to persist the reset
             // must NOT surface as an unlock failure — best-effort; a stale counter
@@ -1259,6 +1270,55 @@ mod tests {
             live.take_import_source(source_id).await.is_none(),
             "the source vault's key material must not survive a quick-unlock",
         );
+    }
+
+    #[test]
+    fn quick_unlock_switch_clears_person_session() {
+        rt().block_on(async {
+            let source = ScopedTempDir::new("qu-person-source").unwrap();
+            let target = ScopedTempDir::new("qu-person-target").unwrap();
+            write_sealed_meta(source.path());
+            write_sealed_meta(target.path());
+
+            let state = unlocked_state();
+            seed_unlocked(&state, source.path()).await;
+            state
+                .set_person_identity_and_id(
+                    protocol::PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]),
+                    [0x44u8; 16],
+                )
+                .await;
+            state
+                .set_person_profile(
+                    [0x55u8; 16],
+                    Zeroizing::new([0x66u8; protocol::AEAD_KEY_LEN]),
+                )
+                .await;
+            state.mark_full_unlock_done();
+
+            let setup_state = unlocked_state();
+            seed_unlocked(&setup_state, target.path()).await;
+            let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+            setup_with_dir(target.path(), &setup_state, provider.clone(), &ACCOUNT_HASH)
+                .await
+                .expect("setup");
+
+            quick_unlock_with_dir(
+                target.path(),
+                crate::paths::vault_id_from_root(target.path()),
+                &state,
+                provider,
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
+            )
+            .await
+            .expect("quick unlock");
+
+            assert!(!state.person_identity_unlocked().await);
+            assert!(state.clone_person_profile().await.is_none());
+        });
     }
 
     #[test]

@@ -4177,7 +4177,7 @@
       "invitationPending": "Todavía no aceptada",
       "invitationsFailed": "No se pudieron cargar tus invitaciones.",
       "title": "Miembros de la bóveda",
-      "personHint": "Desbloquea tu identidad de miembro con tu frase de recuperación. Permanece en este dispositivo hasta que bloquees la bóveda o cierres la app.",
+      "personHint": "Desbloquea tu identidad de miembro con tu frase de recuperación.",
       "personUnlock": "Desbloquear identidad de miembro",
       "personReady": "Identidad de miembro desbloqueada.",
       "ownerCodeHint": "Comparte este código con la persona que invitas para que pueda verificar que la bóveda es tuya. Solo contiene información pública.",
@@ -5012,6 +5012,11 @@
     "recoverIntro": "¿Ya tienes una identidad? Introduce su frase de recuperación de 24 palabras.",
     "recovered": "Identidad recuperada.",
     "title": "Solo identidad"
+  },
+  "personIdentityCode": {
+    "copy": "Copiar código de identidad",
+    "copied": "Código de identidad copiado",
+    "copyFailed": "No se pudo copiar el código de identidad"
   },
   "identityHome": {
     "createVaultCta": "Crear una bóveda",

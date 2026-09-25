@@ -4025,7 +4025,7 @@
       "invitationPending": "Bado haijapokelewa",
       "invitationsFailed": "Mkaribisho wako haukuweza kupakiwa.",
       "title": "Wanachama wa hazina",
-      "personHint": "Fungua utambulisho wako wa uwanachama kwa sentensi ya kurejesha. Hukaa kwenye kifaa hadi uziloge hazina na kufunga programu.",
+      "personHint": "Fungua utambulisho wako wa uwanachama kwa sentensi ya kurejesha.",
       "personUnlock": "Fungua utambulisho wa mwanachama",
       "personReady": "Utambulisho wa mwanachama umefunguliwa.",
       "ownerCodeHint": "Shiriki msimbo huu na mtu unayemkaribisha ili aweze kuthibitisha kuwa hazina ni yako. Una taarifa za umma pekee.",
@@ -4843,6 +4843,11 @@
     "recoverIntro": "Tayari una utambulisho? Ingiza sentensi yake ya kurejesha ya maneno 24.",
     "recovered": "Utambulisho umerejeshwa.",
     "title": "Utambulisho pekee"
+  },
+  "personIdentityCode": {
+    "copy": "Nakili msimbo wa utambulisho",
+    "copied": "Msimbo wa utambulisho umenakiliwa",
+    "copyFailed": "Msimbo wa utambulisho haukuweza kunakiliwa"
   },
   "identityHome": {
     "createVaultCta": "Tengeneza hazina",

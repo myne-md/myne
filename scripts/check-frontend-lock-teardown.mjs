@@ -69,6 +69,12 @@ export const LEAVING_PATHS = [
     why: "The frontend lock choke point. Every path that ends a vault session calls it: the Lock button, the vault switch, the StorageLost takeover and the invalid-state fail-closed CTA.",
   },
   {
+    id: "desktop-create",
+    file: "src/App.tsx",
+    fn: "onCreateAutoUnlockSuccess",
+    why: "Direct first-vault creation and create-another completion are vault boundaries; the callback clears the WebView person session before publishing the new stage.",
+  },
+  {
     id: "mobile-lock",
     file: "mobile/src/lib/vault-unlock.ts",
     fn: "lockVault",
@@ -126,6 +132,9 @@ const SKIP_ERASED =
 const SKIP_NO_SPELL_LAYER =
   "mobile compiles `editor/src` and therefore does hold this store, but it runs no spell layer: there is no `spell_enabled` surface and no dictionary plugin under `mobile/src`, so nothing on this client ever puts a word in the set. If a mobile spell surface lands, this skip is what should fail first.";
 
+const SKIP_CREATE =
+  "the create-vault callback has no prior editor session to clear: the old vault, when present, is left through the normal switch path before creation, and this callback only publishes the newly created vault.";
+
 export const TEARDOWN_CALLS = [
   {
     call: "clearAgentForLock",
@@ -139,6 +148,7 @@ export const TEARDOWN_CALLS = [
     // `lockVault` without anything noticing.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock", "mobile-background"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
     },
@@ -180,8 +190,26 @@ export const TEARDOWN_CALLS = [
       "mobile-delete",
     ],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-background":
         "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
+    },
+  },
+  {
+    call: "resetPersonIdentityState",
+    declaredIn: "src/components/sync/personIdentityState.ts",
+    holds: "the process-scoped person identity readiness bit and public owner code",
+     appliesTo: ["desktop-lock", "desktop-switch", "desktop-delete", "desktop-create"],
+     via: {
+       "desktop-switch": { fn: "lockVault", file: "src/lib/vault-unlock.ts" },
+     },
+     skips: {
+      "mobile-lock":
+        "the person identity store is DESKTOP-only in this tree: mobile has no production import of src/components/sync/personIdentityState.ts, so there is no state to clear on the mobile lock path.",
+      "mobile-delete":
+        "the person identity store is DESKTOP-only in this tree: mobile has no production import of src/components/sync/personIdentityState.ts, so there is no state to clear on the mobile delete path.",
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing the process-scoped person readiness bit would discard a still-valid identity for no teardown benefit.",
     },
   },
   {
@@ -198,6 +226,7 @@ export const TEARDOWN_CALLS = [
     // format" argument on this transcript being RAM-only and dropped on lock.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
@@ -219,6 +248,7 @@ export const TEARDOWN_CALLS = [
     // in-session clears where the stash and the flag are still owed.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
@@ -242,6 +272,7 @@ export const TEARDOWN_CALLS = [
     // neither leaving path can speak for it.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
@@ -261,6 +292,7 @@ export const TEARDOWN_CALLS = [
     // callers, which is how it earned an entry rather than a comment.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
@@ -278,6 +310,7 @@ export const TEARDOWN_CALLS = [
     // that produced it (myne-md/myne#601).
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
@@ -301,6 +334,7 @@ export const TEARDOWN_CALLS = [
     // thing it is worth keeping a locked vault's roster in memory for.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
@@ -321,6 +355,7 @@ export const TEARDOWN_CALLS = [
     // session's entries.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
@@ -339,6 +374,7 @@ export const TEARDOWN_CALLS = [
     // hash happened to collide. myne-md/myne#708.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
@@ -358,6 +394,7 @@ export const TEARDOWN_CALLS = [
     // whose content the stash describes.
     appliesTo: ["mobile-lock"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-lock":
         "the store is MOBILE-only (it lives under `mobile/src/lib/`, which the desktop client does not compile), so there is nothing on the desktop paths to clear. Verified by searching the desktop tree for the symbol rather than assumed from the path.",
       "desktop-switch":
@@ -381,6 +418,7 @@ export const TEARDOWN_CALLS = [
     // session is wider than that.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
@@ -393,6 +431,7 @@ export const TEARDOWN_CALLS = [
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
     appliesTo: ["desktop-switch"],
     skips: {
+      "desktop-create": SKIP_CREATE,
       "desktop-lock":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
       "mobile-lock": SKIP_NO_SPELL_LAYER,

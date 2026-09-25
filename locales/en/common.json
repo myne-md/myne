@@ -4013,7 +4013,7 @@
       "invitationPending": "Not accepted yet",
       "invitationsFailed": "Could not load your invitations.",
       "title": "Vault members",
-      "personHint": "Unlock your member identity with your recovery phrase. It stays on this device until you lock the vault or close the app.",
+      "personHint": "Unlock your member identity with your recovery phrase.",
       "personUnlock": "Unlock member identity",
       "personReady": "Member identity unlocked.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
@@ -4584,6 +4584,11 @@
     "recoverIntro": "Already have an identity? Enter its 24-word recovery phrase.",
     "recovered": "Identity recovered.",
     "title": "Identity only"
+  },
+  "personIdentityCode": {
+    "copy": "Copy identity code",
+    "copied": "Identity code copied",
+    "copyFailed": "Couldn't copy the identity code"
   },
   "identityHome": {
     "createVaultCta": "Create a vault",

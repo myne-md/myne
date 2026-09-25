@@ -101,7 +101,7 @@ function wire(): { slotKind: { value: string } } {
       case "plugin:prefs|prefs_read":
         return { auto_lock_seconds: AUTO_LOCK_SECS };
       case "plugin:sync|sync_person_status":
-        return { enrolled: false, person_id_hex: null, identity_code: null };
+        return { enrolled: false, identity_unlocked: false, person_id_hex: null, identity_code: null };
       case "plugin:vault-unlock|lock":
         slotKind.value = "Empty";
         return undefined;

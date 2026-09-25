@@ -7,10 +7,19 @@
 // automatic fetch of those values from the invitee's SCRAM account is the
 // Grill 4 wire contract, so it is not here; the paste path is the complete
 // flow until that lands, and the crypto behind it is identical either way.
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type CSSProperties,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useRoster, type RosterMember } from "../../hooks/useRoster";
 import { startB2bMigration, inspectInviteCode } from "../../lib/invite";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 
 /** The `kind` of a serialized backend error, or `null` for anything else. */
 function syncErrorKind(e: unknown): string | null {
@@ -23,6 +32,16 @@ function syncErrorKind(e: unknown): string | null {
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { Input } from "../primitives/Input";
+import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
+import { buildPhraseCredential } from "./phrase-credential";
+import { toast } from "../toast/toastStore";
+import {
+  getPersonIdentityGeneration,
+  setPersonIdentityState,
+  setPersonIdentityStateForGeneration,
+  usePersonIdentityState,
+} from "./personIdentityState";
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -69,6 +88,7 @@ export function MemberRosterPanel({
 } = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
+  const { ready: personReady, ownerCode } = usePersonIdentityState();
   const {
     members,
     authority,
@@ -84,16 +104,66 @@ export function MemberRosterPanel({
     remove,
     unlockPerson,
     lockPerson,
-  } = useRoster();
-  const [personReady, setPersonReady] = useState(false);
+  } = useRoster(personReady);
   const [personError, setPersonError] = useState(false);
-  const [ownerCode, setOwnerCode] = useState<string | null>(null);
-  const [phrase, setPhrase] = useState("");
+  const [phraseCells, setPhraseCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
 
-  // Removal is live again (myne-md/myne#711 task 14): the invite form and the
+  const copyOwnerCode = () => {
+    if (!ownerCode) return;
+    setCopyFeedback(null);
+    void copyText(clipboardWriteText, ownerCode, {
+      onSuccess: {
+        kind: "toast",
+        run: () => {
+          setCopyFeedback("success");
+          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+        },
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => {
+          setCopyFeedback("error");
+          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
+        },
+      },
+    });
+  };
+
+  const setPhraseCell = (index: number, value: string) => {
+    setPersonError(false);
+    const cleaned = value.replace(/\s+/g, "");
+    setPhraseCells((cells) => cells.map((cell, i) => (i === index ? cleaned : cell)));
+  };
+
+  const handlePhraseCellChange =
+    (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
+      setPhraseCell(index, event.target.value);
+    };
+
+  const handlePhraseCellPaste =
+    (index: number) => (event: ClipboardEvent<HTMLInputElement>) => {
+      const tokens = event.clipboardData
+        .getData("text")
+        .split(/\s+/)
+        .filter((token) => token.length > 0);
+      if (tokens.length < 2) return;
+      event.preventDefault();
+      setPersonError(false);
+      setPhraseCells((cells) => {
+        const next = [...cells];
+        for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
+          next[index + i] = tokens[i];
+        }
+        return next;
+      });
+    };
+
   // removal confirm are the two child dialogs.
   const childDialogOpen = inviteOpen || removeTarget !== null;
   useEffect(() => {
@@ -123,27 +193,36 @@ export function MemberRosterPanel({
       {!personReady ? (
         <div data-testid="member-roster.person-unlock">
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
-          <input
-            data-testid="member-roster.phrase-input"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            aria-label={t("sync.memberRoster.personHint")}
-            value={phrase}
-            onChange={(e) => setPhrase(e.target.value)}
-            style={INPUT_STYLE}
+          <EnrollPhraseCredential
+            baseId="member-roster"
+            label={t("sync.memberRoster.personHint")}
+            cells={phraseCells}
+            onCellChange={handlePhraseCellChange}
+            onCellPaste={handlePhraseCellPaste}
+            gridTestId="member-roster.phrase-grid"
+            cellTestId={(index) =>
+              index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`
+            }
           />
+
           <Button
             type="button"
             variant="primary"
             data-testid="member-roster.person-unlock-button"
+            disabled={!phraseCells.every((cell) => cell.length > 0)}
             onClick={async () => {
+              const unlockGeneration = getPersonIdentityGeneration();
               try {
-                const view = await unlockPerson(phrase);
-                setPhrase("");
+                const view = await unlockPerson(buildPhraseCredential(phraseCells));
+                if (!setPersonIdentityStateForGeneration(unlockGeneration, {
+                  ready: true,
+                  ownerCode: view.identity_code,
+                })) {
+                  return;
+                }
+                setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
                 setPersonError(false);
-                setOwnerCode(view.identity_code);
-                setPersonReady(true);
+                setCopyFeedback(null);
               } catch {
                 setPersonError(true);
               }
@@ -163,15 +242,44 @@ export function MemberRosterPanel({
           {/* The owner's own out-of-band identity code: share it with an invitee
               so they can verify the group package the owner sends. Public
               material only. */}
-          {ownerCode ? (
+          {authority === "owner" && ownerCode ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               <p style={STATUS_STYLE}>{t("sync.memberRoster.ownerCodeHint")}</p>
-              <code
+              <Input
                 data-testid="member-roster.owner-code"
-                style={{ ...CODE_STYLE, wordBreak: "break-all" }}
+                aria-label={t("sync.memberRoster.ownerCodeHint")}
+                autoComplete="off"
+                readOnly
+                value={ownerCode}
+                style={{ ...CODE_STYLE, width: "100%", userSelect: "all" }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                data-testid="member-roster.copy-owner-code"
+                onClick={copyOwnerCode}
               >
-                {ownerCode}
-              </code>
+                {t("personIdentityCode.copy")}
+              </Button>
+              {copyFeedback === "error" ? (
+                <p
+                  data-testid="member-roster.copy-feedback"
+                  role="status"
+                  aria-live="polite"
+                  style={ERROR_STYLE}
+                >
+                  {t("personIdentityCode.copyFailed")}
+                </p>
+              ) : copyFeedback === "success" ? (
+                <p
+                  data-testid="member-roster.copy-feedback"
+                  role="status"
+                  aria-live="polite"
+                  style={STATUS_STYLE}
+                >
+                  {t("personIdentityCode.copied")}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <Button
@@ -179,7 +287,8 @@ export function MemberRosterPanel({
             data-testid="member-roster.person-lock-button"
             onClick={async () => {
               await lockPerson();
-              setPersonReady(false);
+              setCopyFeedback(null);
+              setPersonIdentityState({ ready: false, ownerCode: null });
             }}
           >
             {t("sync.memberRoster.personLock")}
@@ -287,7 +396,7 @@ export function MemberRosterPanel({
         </div>
       ) : null}
 
-      {authority === "owner" && vaultInvitesFailed ? (
+      {authority === "owner" && personReady && vaultInvitesFailed ? (
         <p data-testid="member-roster.invitations-error" role="alert" style={ERROR_STYLE}>
           {t("sync.memberRoster.invitationsFailed")}
         </p>

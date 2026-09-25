@@ -10,11 +10,12 @@
 // Desktop + mobile only: on web `plugin:sync|sync_person_setup` is
 // `Class::Unsupported`, and Welcome is not reached at zero vaults there
 // (`vaultCreation` absent routes to `account-entry`).
-import { useState } from "react";
+import { useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
 import { personSetup, type PersonSetupView } from "../lib/personAccount";
+import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
 
 interface IdentitySetupDialogProps {
   open: boolean;
@@ -28,7 +29,9 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const [recovery, setRecovery] = useState("");
+  const [recoveryCells, setRecoveryCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
   const [result, setResult] = useState<PersonSetupView | null>(null);
 
   async function run(phrase?: string) {
@@ -36,7 +39,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setError(false);
     try {
       setResult(await personSetup(phrase));
-      setRecovery("");
+      setRecoveryCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
     } catch {
       // Never surface the raw backend error: it can carry a stage tag but no
       // secret, and the UI cannot act differently on the variant anyway.
@@ -54,7 +57,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     const created = result !== null;
     setResult(null);
     setError(false);
-    setRecovery("");
+    setRecoveryCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
     onClose();
     if (created) onCreated?.();
   }
@@ -133,28 +136,44 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
             {t("identitySetup.recoverIntro")}
           </div>
-          <textarea
-            data-testid="identity-setup.phrase-input"
-            value={recovery}
-            onChange={(e) => setRecovery(e.target.value)}
-            rows={3}
-            spellCheck={false}
-            autoComplete="off"
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "var(--text-sm)",
-              color: "var(--fg-1)",
-              background: "var(--bg-2)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
-              padding: "var(--space-2)",
-              resize: "none",
+          <EnrollPhraseCredential
+            baseId="identity-setup"
+            label={t("identitySetup.recoverIntro")}
+            disabled={busy}
+            cells={recoveryCells}
+            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
+              setError(false);
+              setRecoveryCells((cells) =>
+                cells.map((cell, cellIndex) =>
+                  cellIndex === index ? event.target.value.replace(/\s+/g, "") : cell,
+                ),
+              );
             }}
+            onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
+              const tokens = event.clipboardData
+                .getData("text")
+                .split(/\s+/)
+                .filter((token) => token.length > 0);
+              if (tokens.length < 2) return;
+              event.preventDefault();
+              setError(false);
+              setRecoveryCells((cells) => {
+                const next = [...cells];
+                for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
+                  next[index + i] = tokens[i];
+                }
+                return next;
+              });
+            }}
+            gridTestId="identity-setup.phrase-grid"
+            cellTestId={(index) =>
+              index === 0 ? "identity-setup.phrase-input" : `identity-setup.phrase-cell-${index + 1}`
+            }
           />
           <Button
             variant="secondary"
-            disabled={busy || recovery.trim() === ""}
-            onClick={() => void run(recovery)}
+            disabled={busy || !recoveryCells.every((cell) => cell.length > 0)}
+            onClick={() => void run(recoveryCells.join(" "))}
             data-testid="identity-setup.recover-cta"
           >
             {t("identitySetup.recoverCta")}

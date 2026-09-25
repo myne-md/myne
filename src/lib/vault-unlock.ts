@@ -21,6 +21,7 @@ import {
   resetTranscripts,
 } from "../editor/attachments/session-caches";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
+import { resetPersonIdentityState } from "../components/sync/personIdentityState";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -161,6 +162,7 @@ export async function lockVault(): Promise<void> {
   // is a coarse-location datum kept per vault everywhere else, and
   // `dialect/src/taskFields.ts` keeps it out of note bytes for that reason.
   teardownStep("resetDateTimeDisplayForLock", () => resetDateTimeDisplayForLock());
+  teardownStep("resetPersonIdentityState", () => resetPersonIdentityState());
   await invoke<void>("plugin:vault-unlock|lock");
 }
 

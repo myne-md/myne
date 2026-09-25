@@ -33,6 +33,7 @@ use std::path::PathBuf;
 
 /// Sealed person-keypair file name under `<app_config_dir>`.
 pub const PERSON_KEYPAIR_FILE: &str = "person_keypair.sealed";
+pub const PERSON_KEY_TRANSITION_FILE: &str = "person_key_transition.pending";
 
 /// Lengths of the sealed-file framing:
 /// `salt(16) || kdf_params(11) || nonce(24) || ct`.
@@ -62,6 +63,40 @@ fn sealed_path(host: &dyn HostCtx) -> Result<PathBuf, PersonIdentityError> {
     host.app_config_dir()
         .map(|d| d.join(PERSON_KEYPAIR_FILE))
         .map_err(|_| PersonIdentityError::Io)
+}
+
+fn pending_transition_path(host: &dyn HostCtx) -> Result<PathBuf, PersonIdentityError> {
+    host.app_config_dir()
+        .map(|d| d.join(PERSON_KEY_TRANSITION_FILE))
+        .map_err(|_| PersonIdentityError::Io)
+}
+
+async fn write_pending_transition(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    bytes: &[u8],
+) -> Result<(), PersonIdentityError> {
+    let dir = host.app_config_dir().map_err(|_| PersonIdentityError::Io)?;
+    io.create_dir_all(&dir)
+        .await
+        .map_err(|_| PersonIdentityError::Io)?;
+    let path = pending_transition_path(host)?;
+    io.write(&path, bytes, WriteOpts::default())
+        .await
+        .map_err(|_| PersonIdentityError::Io)
+}
+
+pub async fn read_pending_person_key_transition(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+) -> Result<Option<Vec<u8>>, PersonIdentityError> {
+    let path = pending_transition_path(host)?;
+    match io.read(&path).await {
+        Ok(bytes) if bytes.is_empty() => Err(PersonIdentityError::CannotDecrypt),
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(None),
+        Err(_) => Err(PersonIdentityError::Io),
+    }
 }
 
 /// Unlock (or first-enroll) the backend-held person identity from the
@@ -97,6 +132,9 @@ pub async fn unlock_person_identity(
         Ok(bytes) => {
             let old = open_sealed_file(&bytes, phrase_normalized, &person_id)?;
             let (new, transition) = migrate_pair(&old, phrase_normalized, &person_id)?;
+            if let Some(ref bytes) = transition {
+                write_pending_transition(host, io, bytes).await?;
+            }
             if transition.is_some() {
                 // Re-seal the derived key so the file is a cache of it. The wrap
                 // salt is fresh and random; the KEY is deterministic.
@@ -113,6 +151,27 @@ pub async fn unlock_person_identity(
         Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
             let pair = enroll_fresh(host, io, phrase_normalized, &person_id).await?;
             Ok((pair, None))
+        }
+        Err(_) => Err(PersonIdentityError::Io),
+    }
+}
+
+pub async fn open_person_identity_without_mutation(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    phrase_normalized: &str,
+) -> Result<PersonKeyPair, PersonIdentityError> {
+    if phrase_normalized.trim().is_empty() {
+        return Err(PersonIdentityError::BadPhrase);
+    }
+    let person_id = person_id_hash(phrase_normalized);
+    let path = sealed_path(host)?;
+    match io.read(&path).await {
+        Ok(bytes) if !is_erased_frame(&bytes) => {
+            open_sealed_file(&bytes, phrase_normalized, &person_id)
+        }
+        Ok(_) | Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+            Err(PersonIdentityError::CannotDecrypt)
         }
         Err(_) => Err(PersonIdentityError::Io),
     }
@@ -290,13 +349,13 @@ pub async fn delete_sealed_file(
             io.write(&path, &vec![0u8; bytes.len()], WriteOpts::default())
                 .await
                 .map_err(|_| PersonIdentityError::Io)?;
-            Ok(())
         }
-        // A genuinely absent file is already erased. Any OTHER read error is
-        // surfaced: swallowing it would report success while the private halves
-        // stay on disk, the one place a silent IO error leaves secret material
-        // behind.
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(()),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {}
+        Err(_) => return Err(PersonIdentityError::Io),
+    }
+    let pending = pending_transition_path(host)?;
+    match io.remove_file(&pending).await {
+        Ok(()) | Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(()),
         Err(_) => Err(PersonIdentityError::Io),
     }
 }
@@ -377,5 +436,32 @@ mod tests {
         let (new, transition) = migrate_pair(&pair, phrase, &person_id).expect("migrate");
         assert_eq!(new.fingerprint(), pair.fingerprint());
         assert!(transition.is_none(), "no migration means no transition");
+    }
+
+    #[test]
+    fn pending_transition_survives_a_device_local_round_trip() {
+        crate::test_support::block_on(async {
+            let temp =
+                crate::test_support::ScopedTempDir::new("person-transition").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(temp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let bytes = vec![1u8, 3, 3, 7];
+            write_pending_transition(&host, &io, &bytes)
+                .await
+                .expect("write");
+            assert_eq!(
+                read_pending_person_key_transition(&host, &io)
+                    .await
+                    .expect("read"),
+                Some(bytes)
+            );
+            delete_sealed_file(&host, &io).await.expect("delete");
+            assert_eq!(
+                read_pending_person_key_transition(&host, &io)
+                    .await
+                    .expect("read"),
+                None
+            );
+        });
     }
 }
