@@ -16,6 +16,34 @@
  * lands. Adding a new right-cluster item means appending its id here (a known
  * id absent from a user's stored order falls back to its position here).
  */
+/**
+ * The toggleable bottom-bar items: id plus the i18n key for its label.
+ *
+ * ONE roster, read by three surfaces now (myne-md/myne#773): the `BottomBar`
+ * gates each element's render on `!hiddenItems.includes(id)`, the bar's
+ * right-click menu maps over it to build its checkable items, and
+ * Settings -> Appearance's bar-customization block does the same. It used to be
+ * a `const` private to `Editor.tsx`, which was fine while the only two readers
+ * lived in that file and stops being fine the moment a third one exists
+ * anywhere else.
+ *
+ * Ids are a closed, non-secret UI vocabulary persisted in
+ * `vault.prefs.hidden_bar_items`. The ORDER here is menu order; display order
+ * is {@link RIGHT_CLUSTER_DEFAULT_ORDER} resolved against the user's stored
+ * sequence, which is a different question and deliberately a different list.
+ */
+export const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
+  { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
+  { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
+  { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
+  { id: "tags", labelKey: "editor.chrome.barItems.tags" },
+  { id: "views", labelKey: "editor.chrome.barItems.views" },
+  { id: "settings", labelKey: "editor.chrome.barItems.settings" },
+  { id: "lock", labelKey: "editor.chrome.barItems.lock" },
+  { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
+  { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
+];
+
 export const RIGHT_CLUSTER_DEFAULT_ORDER: readonly string[] = [
   "save-status",
   "workspace",

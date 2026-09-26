@@ -1,4 +1,13 @@
 // `ModalShell` — the shared chrome for the desktop modal carve-out
+//
+// Appearance lives in `@myne/client-core`'s `components.css` under
+// `.myne-modal-*` (myne-md/myne#773). Two things changed in the move that the
+// inline era could not do from here: the close × gained a hover and focus state
+// (it had NONE — every modal in the app answered a pointer over its × with
+// nothing, on the one control whose job is to be found in a hurry), and the
+// backdrop now takes the themed `--scrim` token instead of a hand-written
+// `rgba(0, 0, 0, 0.4)` that disagreed with the canon on both themes.
+//
 // (`decisions.md` 2026-05-08): backdrop, Esc-dismiss, backdrop-click-dismiss,
 // the `role="dialog"` wrapper, focus trap + focus restore (via `useFocusTrap`,
 // MYND-93 — so `aria-modal="true"` is truthful), and the header (title + close
@@ -62,59 +71,9 @@ interface ModalShellProps {
   children: ReactNode;
 }
 
-const BACKDROP_STYLE: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0, 0, 0, 0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 1000,
-  // Smooth entry (shared with SettingsModal). Reduced-motion zeroes it globally.
-  animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
-};
-
 /** Above the command palette (1500) and quick picker (1600) — for a surface
  *  that can appear without the user having opened it. */
 export const UNSOLICITED_MODAL_Z = 1700;
-
-const HEADER_STYLE: CSSProperties = {
-  height: 56,
-  padding: "0 var(--space-5)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  borderBottom: "1px solid var(--line-1)",
-  flex: "0 0 auto",
-};
-
-const TITLE_STYLE: CSSProperties = {
-  fontSize: "var(--text-xl)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  letterSpacing: "var(--tracking-tight)",
-  color: "var(--fg-1)",
-  margin: 0,
-};
-
-const CLOSE_BUTTON_STYLE: CSSProperties = {
-  background: "none",
-  border: 0,
-  color: "var(--fg-3)",
-  cursor: "pointer",
-  padding: 6,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: "var(--radius-1)",
-};
-
-const BODY_STYLE: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-};
 
 export function ModalShell({
   open,
@@ -161,22 +120,11 @@ export function ModalShell({
 
   if (!open) return null;
 
+  // Only the CALLER-SUPPLIED geometry stays inline; the card's own chrome and
+  // its entry animation live in `components.css` under `.myne-modal-card`.
   const modalStyle: CSSProperties = {
     width,
-    maxWidth: "calc(100vw - var(--space-7))",
     ...(height !== undefined ? { height } : {}),
-    maxHeight: "calc(100vh - var(--space-7))",
-    background: "var(--bg-2)",
-    border: "1px solid var(--line-1)",
-    borderRadius: "var(--radius-2)",
-    boxShadow: "var(--shadow-3)",
-    display: "flex",
-    flexDirection: "column",
-    fontFamily: "var(--font-sans)",
-    color: "var(--fg-1)",
-    overflow: "hidden",
-    // Smooth entry (rise + fade), shared with SettingsModal.
-    animation: "settings-modal-in var(--duration-base) var(--ease-standard)",
   };
 
   return (
@@ -186,7 +134,10 @@ export function ModalShell({
       aria-modal="true"
       aria-labelledby={labelId}
       data-testid={testId}
-      style={zIndex === undefined ? BACKDROP_STYLE : { ...BACKDROP_STYLE, zIndex }}
+      className="myne-modal-backdrop"
+      // The stacking level is the one thing a caller overrides (see `zIndex`
+      // above), so it is the one thing left inline.
+      style={zIndex === undefined ? undefined : { zIndex }}
       onClick={handleBackdropClick}
     >
       <div
@@ -195,11 +146,12 @@ export function ModalShell({
         // on the card rather than the backdrop: a themed dialog should wear the
         // theme, while the dimmed page behind it should not.
         {...ornamentRole("surface")}
+        className="myne-modal-card"
         style={modalStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={HEADER_STYLE}>
-          <h2 id={labelId} style={TITLE_STYLE}>
+        <div className="myne-modal-header">
+          <h2 id={labelId} className="myne-modal-title">
             {title}
           </h2>
           <button
@@ -210,12 +162,12 @@ export function ModalShell({
             // bare `modal-close` remains the default for callers without one.
             data-testid={testId === undefined ? "modal-close" : `${testId}-close`}
             onClick={onClose}
-            style={CLOSE_BUTTON_STYLE}
+            className="myne-modal-close"
           >
             <Icon name="x" size={16} />
           </button>
         </div>
-        <div style={BODY_STYLE}>{children}</div>
+        <div className="myne-modal-body">{children}</div>
       </div>
     </div>
   );

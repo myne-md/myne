@@ -8,6 +8,13 @@
 // approach as the attachments ⋮ menu + UsedInNotesPopover — so it escapes the
 // top bar's wrap container and the surface scroll clipping.
 //
+// Appearance lives in `@myne/client-core`'s `components.css` under
+// `.myne-select-*` (myne-md/myne#773), shared with `SearchableSelect` — the two
+// had independent copies of the same trigger, menu box and option row, which is
+// how they drifted into different hover behaviour for the same visual control.
+// What stays here is the part a stylesheet cannot do: the portal's measured
+// anchor rect, and the active-descendant index the arrow keys move.
+//
 // Keyboard: open on Enter / Space / ↓; ↑/↓ move the active option; Enter
 // selects; Esc closes. Closes on outside-click, on an ANCESTOR/window scroll,
 // and on resize (a fixed menu would desync from the trigger) — but never on the
@@ -61,56 +68,6 @@ interface SelectProps<T extends string> {
   /** Optional `data-testid` on the trigger button (E2E observability). */
   testId?: string;
 }
-
-const TRIGGER_STYLE: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-1)",
-  height: 30,
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "0 var(--space-2)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  transition: "border-color var(--duration-fast) var(--ease-standard)",
-};
-
-const MENU_STYLE: CSSProperties = {
-  position: "fixed",
-  // Above modal surfaces (ModalShell / SettingsModal use z-index 1000): a Select
-  // opened INSIDE the Settings modal must render its menu over the modal, not
-  // behind it — at z-index 60 the options were covered by the modal backdrop and
-  // could not be clicked (the menu is a body-level fixed portal).
-  zIndex: 1100,
-  minWidth: 160,
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
-  padding: "var(--space-1) 0",
-  maxHeight: 280,
-  overflowY: "auto",
-};
-
-const OPTION_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  textAlign: "start",
-  padding: "var(--space-2) var(--space-3)",
-  background: "transparent",
-  border: 0,
-  cursor: "pointer",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-  whiteSpace: "nowrap",
-};
 
 export function Select<T extends string>({
   value,
@@ -261,20 +218,12 @@ export function Select<T extends string>({
         aria-expanded={open}
         aria-label={ariaLabel}
         data-testid={testId}
-        style={{ ...TRIGGER_STYLE, ...style }}
+        className="myne-select-trigger"
+        style={style}
         onClick={(e) => {
           e.stopPropagation();
           if (open) close();
           else openMenu();
-        }}
-        // Hover affordance for the bordered trigger: deepen the border so the
-        // dropdown reads as interactive on pointer-over (an input-like control
-        // shows its hover on the border, not a fill).
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = "var(--line-3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = "var(--line-2)";
         }}
         onKeyDown={onTriggerKeyDown}
       >
@@ -288,8 +237,10 @@ export function Select<T extends string>({
             ref={menuRef}
             role="listbox"
             aria-label={ariaLabel}
+            className="myne-select-menu"
+            // The three MEASURED values, and only those: the menu is a fixed
+            // portal anchored to the trigger's rect, which no stylesheet knows.
             style={{
-              ...MENU_STYLE,
               top: coords.top,
               left: coords.left,
               minWidth: coords.minWidth,
@@ -306,27 +257,23 @@ export function Select<T extends string>({
                   aria-selected={selected}
                   data-testid={testId ? `${testId}-option` : undefined}
                   data-value={opt.value}
-                  style={{
-                    ...OPTION_STYLE,
-                    background: active ? "var(--bg-3)" : "transparent",
-                  }}
+                  className="myne-select-option"
+                  // The ACTIVE DESCENDANT, not a hover: arrow keys move it, and
+                  // the pointer syncs it below so the keyboard and the mouse
+                  // share one highlight rather than lighting two rows. NOT
+                  // `data-active`, which is the app-wide E2E contract for "the
+                  // selected one".
+                  data-highlighted={active ? "true" : "false"}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={(e) => {
                     e.stopPropagation();
                     choose(index);
                   }}
                 >
-                  <span
-                    style={{
-                      width: 16,
-                      display: "inline-flex",
-                      flexShrink: 0,
-                      color: "var(--accent)",
-                    }}
-                  >
+                  <span className="myne-select-option__check">
                     {selected && <Icon name="check" size={14} />}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>{opt.label}</span>
+                  <span className="myne-select-option__label">{opt.label}</span>
                 </button>
               );
             })}

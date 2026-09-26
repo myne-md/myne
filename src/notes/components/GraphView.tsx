@@ -45,6 +45,7 @@ import { GraphSettingsPanel } from "./GraphSettingsPanel";
 import { GraphList } from "./GraphList";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { Icon } from "../../components/primitives/Icon";
+import { Segmented } from "../../components/primitives/Segmented";
 import type { IconName } from "../../lib/icons";
 
 // Lazy-loaded so the d3-force + canvas-renderer chunk stays OUT of the initial
@@ -720,43 +721,42 @@ export function GraphPane() {
                 gap: "var(--space-1)",
               }}
             >
-            {/* The picture and the list are two renderings of ONE model, so this
-                is a reading mode rather than a filter: it narrows nothing.
-                NOT the repo's `<Segmented>`, and the reason is a measured
-                defect rather than a preference: `Segmented` paints its
-                selection as an absolutely-positioned thumb sized from
-                `offsetWidth`, and inside a graph pane that mounts BEFORE its
-                tab is visible that measurement is 0. The selected label then
-                takes `--accent-on` (`#0b0b09` in the dark themes) with no thumb
-                behind it, so the ACTIVE half renders invisible, which is exactly
-                what it did. Painting the accent directly has no measurement in
-                it and cannot fail that way. */}
-            <div
-              role="group"
-              aria-label={t("notes.graph.viewToggleAriaLabel")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                border: "1px solid var(--line-1)",
-                borderRadius: "var(--radius-2)",
-                overflow: "hidden",
-              }}
-            >
-              <ViewHalf
-                testId="editor.graph-view-graph"
-                icon="share-2"
-                label={t("notes.graph.viewGraph")}
-                active={!asList}
-                onClick={() => setAsList(false)}
-              />
-              <ViewHalf
-                testId="editor.graph-view-list"
-                icon="list"
-                label={t("notes.graph.viewList")}
-                active={asList}
-                onClick={() => setAsList(true)}
-              />
-            </div>
+            {/* The picture and the list are two renderings of ONE model, so
+                this is a reading mode rather than a filter: it narrows nothing.
+
+                This used to be a hand-rolled fork of `<Segmented>` and is not
+                any more (myne-md/myne#773). The fork cited a measured defect —
+                `Segmented` sized its thumb from `offsetWidth`, which is 0 in a
+                graph pane that mounts before its tab is visible, so the active
+                half painted `--accent-on` over no thumb and rendered invisible
+                — and that defect was fixed at the primitive in
+                myne-md/myne#727, with a `ResizeObserver` that re-measures when
+                the box changes. The fork outlived its reason and became the
+                thing that looked off-system.
+
+                Its other, unstated reason was DENSITY: this cluster floats on
+                the picture and cannot take a settings-row control. That is now
+                `size="sm"` on the primitive, because a primitive nobody can
+                make dense is a primitive people keep re-implementing.
+
+                The testids are unchanged: `<Segmented>` derives
+                `${testId}-${value}`, so `editor.graph-view` + values
+                `graph`/`list` reproduce `editor.graph-view-graph` and
+                `editor.graph-view-list` exactly. The semantics DID change, for
+                the better: two mutually-exclusive reading modes are a
+                radiogroup (`role="radio"` + `aria-checked`), not two
+                independent toggles (`aria-pressed`). */}
+            <Segmented
+              testId="editor.graph-view"
+              size="sm"
+              ariaLabel={t("notes.graph.viewToggleAriaLabel")}
+              value={asList ? "list" : "graph"}
+              onChange={(v) => setAsList(v === "list")}
+              options={[
+                { value: "graph", label: t("notes.graph.viewGraph"), icon: "share-2" },
+                { value: "list", label: t("notes.graph.viewList"), icon: "list" },
+              ]}
+            />
             {/* ALWAYS rendered, and that is the fix for a dead end rather than a
             cosmetic choice. It used to appear only while the index was stale,
             so on a vault whose index had not changed there was NO way to re-run
@@ -840,55 +840,6 @@ const CONTROL_BASE_STYLE = {
   cursor: "pointer",
   color: "var(--fg-3)",
 } as const;
-
-/**
- * One half of the picture-versus-list switch.
- *
- * The accent is painted DIRECTLY on the active half rather than as a sliding
- * thumb behind it, and that is a bug fix rather than a style choice: the repo's
- * `<Segmented>` sizes its thumb from `offsetWidth`, and a graph pane that mounts
- * before its tab is visible measures 0, so the selected label took
- * `--accent-on` with nothing behind it and the active half rendered invisible
- * (myne-md/myne#727). Nothing here is measured, so nothing here can fail that
- * way.
- */
-function ViewHalf({
-  testId,
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  testId: string;
-  icon: IconName;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-pressed={active}
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--space-1)",
-        fontSize: "var(--text-xs)",
-        padding: "5px var(--space-2)",
-        border: 0,
-        cursor: "pointer",
-        background: active ? "var(--accent)" : "transparent",
-        color: active ? "var(--accent-on)" : "var(--fg-2)",
-      }}
-    >
-      <Icon name={icon} size={12} />
-      {label}
-    </button>
-  );
-}
 
 /** An icon-only control in the cluster. The word lives in the tooltip and the
  *  accessible name, because the cluster has to stay narrow enough to float on

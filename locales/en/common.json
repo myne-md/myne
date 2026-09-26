@@ -391,6 +391,21 @@
   },
   "commands": {
     "actions": {
+      "aiOpenChat": {
+        "label": "Open AI Chat"
+      },
+      "aiRewriteSelection": {
+        "label": "Rewrite selection"
+      },
+      "aiSummarizeNote": {
+        "label": "Summarize note"
+      },
+      "applyCustomTheme": {
+        "label": "Apply custom theme…"
+      },
+      "archiveNote": {
+        "label": "Archive note"
+      },
       "backupVault": {
         "label": "Back up vault…"
       },
@@ -403,29 +418,14 @@
         "vault": "Vault",
         "view": "View"
       },
-      "aiOpenChat": {
-        "label": "Open AI Chat"
+      "closePane": {
+        "label": "Close pane"
       },
-      "toggleLineNumbers": {
-        "label": "Toggle line numbers"
+      "closeTab": {
+        "label": "Close tab"
       },
-      "toggleVimMode": {
-        "label": "Toggle vim keyboard mode"
-      },
-      "toggleSpellCheck": {
-        "label": "Toggle spell check"
-      },
-      "toggleTypewriter": {
-        "label": "Toggle typewriter scrolling"
-      },
-      "toggleDimInactive": {
-        "label": "Toggle dim inactive lines"
-      },
-      "toggleEditorFont": {
-        "label": "Toggle editor font (mono / sans)"
-      },
-      "cycleTextSize": {
-        "label": "Cycle editor text size"
+      "convertWikilinks": {
+        "label": "Convert imported wikilinks in this note…"
       },
       "cycleContentWidth": {
         "label": "Cycle editor content width"
@@ -433,161 +433,29 @@
       "cycleDefaultViewMode": {
         "label": "Cycle default view mode"
       },
-      "toggleTimestamps": {
-        "label": "Toggle sidebar note timestamps"
-      },
-      "toggleArchiving": {
-        "label": "Toggle note archiving"
-      },
-      "toggleAiEnabled": {
-        "label": "Toggle AI features (beta)"
-      },
-      "toggleScreenCapture": {
-        "label": "Toggle screen-capture protection"
-      },
-      "cycleTheme": {
-        "label": "Cycle theme"
-      },
-      "themeLight": {
-        "label": "Theme: Light"
-      },
-      "themeDark": {
-        "label": "Theme: Dark"
-      },
-      "themeAmoled": {
-        "label": "Theme: AMOLED"
-      },
-      "themeSystem": {
-        "label": "Theme: Follow system"
-      },
-      "applyCustomTheme": {
-        "label": "Apply custom theme…"
-      },
-      "splitRight": {
-        "label": "Split pane right"
-      },
-      "splitDown": {
-        "label": "Split pane down"
-      },
-      "closePane": {
-        "label": "Close pane"
-      },
-      "closeTab": {
-        "label": "Close tab"
-      },
-      "nextTab": {
-        "label": "Next tab"
-      },
-      "prevTab": {
-        "label": "Previous tab"
-      },
-      "focusNextPane": {
-        "label": "Focus next pane"
-      },
-      "focusPrevPane": {
-        "label": "Focus previous pane"
-      },
-      "focusSidebarRegion": {
-        "label": "Focus notes sidebar"
-      },
-      "focusEditorRegion": {
-        "label": "Focus editor"
-      },
-      "focusRightPanelRegion": {
-        "label": "Focus right panel"
+      "cycleHeading": {
+        "label": "Cycle heading level"
       },
       "cycleRegion": {
         "label": "Cycle focus between regions"
       },
-      "goBack": {
-        "label": "Go back"
+      "cycleTextSize": {
+        "label": "Cycle editor text size"
       },
-      "goForward": {
-        "label": "Go forward"
-      },
-      "togglePreview": {
-        "label": "Toggle side-by-side preview"
-      },
-      "findInNote": {
-        "label": "Find in note"
-      },
-      "findReplace": {
-        "label": "Find and replace in note"
-      },
-      "newNote": {
-        "label": "New note"
-      },
-      "duplicateNote": {
-        "label": "Duplicate note"
-      },
-      "openInNewWindow": {
-        "label": "Open note in new window"
-      },
-      "archiveNote": {
-        "label": "Archive note"
-      },
-      "renameNote": {
-        "label": "Rename note"
-      },
-      "trashNote": {
-        "label": "Move note to trash"
-      },
-      "toggleFavorite": {
-        "label": "Toggle favorite"
-      },
-      "moveNote": {
-        "label": "Move note to folder…"
-      },
-      "emptyTrash": {
-        "label": "Empty trash"
-      },
-      "showBacklinks": {
-        "label": "Show backlinks"
-      },
-      "showOutline": {
-        "label": "Show outline"
-      },
-      "showUnlinked": {
-        "label": "Show unlinked mentions"
-      },
-      "newFolder": {
-        "label": "New folder"
-      },
-      "openTrash": {
-        "label": "Open trash"
-      },
-      "openArchive": {
-        "label": "Open archive"
-      },
-      "cycleHeading": {
-        "label": "Cycle heading level"
-      },
-      "restoreBackup": {
-        "label": "Restore vault from backup…"
-      },
-      "revealVaultFolder": {
-        "label": "Reveal vault folder in file manager"
-      },
-      "aiSummarizeNote": {
-        "label": "Summarize note"
-      },
-      "aiRewriteSelection": {
-        "label": "Rewrite selection"
-      },
-      "convertWikilinks": {
-        "label": "Convert imported wikilinks in this note…"
+      "cycleTheme": {
+        "label": "Cycle theme"
       },
       "deleteWorkspace": {
         "label": "Delete workspace…"
       },
+      "duplicateNote": {
+        "label": "Duplicate note"
+      },
+      "emptyTrash": {
+        "label": "Empty trash"
+      },
       "exportNoteHtml": {
         "label": "Export note as HTML…"
-      },
-      "exportSelectionImage": {
-        "label": "Export selection as image…",
-        "saved": "Selection saved as an image.",
-        "noSelection": "Select some text first, then export it as an image.",
-        "failed": "Could not export the selection as an image."
       },
       "exportNoteMarkdown": {
         "label": "Export note as Markdown…"
@@ -598,11 +466,44 @@
       "exportNoteTxt": {
         "label": "Export note as Plain Text…"
       },
+      "exportSelectionImage": {
+        "label": "Export selection as image…",
+        "saved": "Selection saved as an image.",
+        "noSelection": "Select some text first, then export it as an image.",
+        "failed": "Could not export the selection as an image."
+      },
       "exportVaultMarkdown": {
         "label": "Export vault as Markdown…"
       },
+      "findInNote": {
+        "label": "Find in note"
+      },
+      "findReplace": {
+        "label": "Find and replace in note"
+      },
+      "focusEditorRegion": {
+        "label": "Focus editor"
+      },
+      "focusNextPane": {
+        "label": "Focus next pane"
+      },
+      "focusPrevPane": {
+        "label": "Focus previous pane"
+      },
+      "focusRightPanelRegion": {
+        "label": "Focus right panel"
+      },
+      "focusSidebarRegion": {
+        "label": "Focus notes sidebar"
+      },
       "foldAll": {
         "label": "Fold all"
+      },
+      "goBack": {
+        "label": "Go back"
+      },
+      "goForward": {
+        "label": "Go forward"
       },
       "importBaseView": {
         "label": "Import .base view…"
@@ -616,11 +517,32 @@
       "manageTemplates": {
         "label": "Manage templates…"
       },
+      "moveNote": {
+        "label": "Move note to folder…"
+      },
+      "newFolder": {
+        "label": "New folder"
+      },
+      "newNote": {
+        "label": "New note"
+      },
       "newNoteFromTemplate": {
         "label": "New note from template…"
       },
+      "nextTab": {
+        "label": "Next tab"
+      },
+      "openArchive": {
+        "label": "Open archive"
+      },
       "openAttachments": {
         "label": "Open attachments…"
+      },
+      "openInNewWindow": {
+        "label": "Open note in new window"
+      },
+      "openPalette": {
+        "label": "Search and run a command…"
       },
       "openSettings": {
         "label": "Open settings…"
@@ -628,29 +550,47 @@
       "openSnapshots": {
         "label": "Snapshots…"
       },
-      "openTodayNote": {
-        "label": "Open today's note"
+      "openThisMonthNote": {
+        "label": "Open this month's note"
       },
       "openThisWeekNote": {
         "label": "Open this week's note"
       },
-      "openThisMonthNote": {
-        "label": "Open this month's note"
+      "openTodayNote": {
+        "label": "Open today's note"
+      },
+      "openTrash": {
+        "label": "Open trash"
+      },
+      "prevTab": {
+        "label": "Previous tab"
       },
       "randomNote": {
         "label": "Open random note"
       },
+      "removeNoteCover": {
+        "label": "Remove note cover"
+      },
+      "renameNote": {
+        "label": "Rename note"
+      },
       "renameWorkspace": {
         "label": "Rename workspace…"
+      },
+      "restoreBackup": {
+        "label": "Restore vault from backup…"
+      },
+      "revealVaultFolder": {
+        "label": "Reveal vault folder in file manager"
       },
       "saveWorkspaceAs": {
         "label": "Save workspace as…"
       },
-      "removeNoteCover": {
-        "label": "Remove note cover"
-      },
       "setNoteCover": {
         "label": "Set note cover…"
+      },
+      "showBacklinks": {
+        "label": "Show backlinks"
       },
       "showGraph": {
         "label": "Show graph view…"
@@ -658,17 +598,56 @@
       "showIsolatedGraph": {
         "label": "Open isolated graph"
       },
-      "showTasks": {
-        "label": "Show tasks"
+      "showOutline": {
+        "label": "Show outline"
       },
       "showTags": {
         "label": "Browse tags…"
       },
+      "showTasks": {
+        "label": "Show tasks"
+      },
+      "showUnlinked": {
+        "label": "Show unlinked mentions"
+      },
       "showViews": {
         "label": "Browse views…"
       },
+      "splitDown": {
+        "label": "Split pane down"
+      },
+      "splitRight": {
+        "label": "Split pane right"
+      },
       "switchWorkspace": {
         "label": "Switch workspace…"
+      },
+      "themeAmoled": {
+        "label": "Theme: AMOLED"
+      },
+      "themeDark": {
+        "label": "Theme: Dark"
+      },
+      "themeLight": {
+        "label": "Theme: Light"
+      },
+      "themeSystem": {
+        "label": "Theme: Follow system"
+      },
+      "toggleAiEnabled": {
+        "label": "Toggle AI features (beta)"
+      },
+      "toggleArchiving": {
+        "label": "Toggle note archiving"
+      },
+      "toggleDimInactive": {
+        "label": "Toggle dim inactive lines"
+      },
+      "toggleEditorFont": {
+        "label": "Toggle editor font (mono / sans)"
+      },
+      "toggleFavorite": {
+        "label": "Toggle favorite"
       },
       "toggleFocus": {
         "label": "Toggle focus mode"
@@ -676,17 +655,41 @@
       "toggleLeftSidebar": {
         "label": "Toggle notes sidebar"
       },
+      "toggleLineNumbers": {
+        "label": "Toggle line numbers"
+      },
+      "togglePreview": {
+        "label": "Toggle side-by-side preview"
+      },
       "toggleReading": {
         "label": "Toggle reading view"
       },
       "toggleRightSidebar": {
         "label": "Toggle backlinks sidebar"
       },
+      "toggleScreenCapture": {
+        "label": "Toggle screen-capture protection"
+      },
       "toggleSource": {
         "label": "Toggle source mode"
       },
+      "toggleSpellCheck": {
+        "label": "Toggle spell check"
+      },
       "toggleStackedTabs": {
         "label": "Toggle stacked tabs"
+      },
+      "toggleTimestamps": {
+        "label": "Toggle sidebar note timestamps"
+      },
+      "toggleTypewriter": {
+        "label": "Toggle typewriter scrolling"
+      },
+      "toggleVimMode": {
+        "label": "Toggle vim keyboard mode"
+      },
+      "trashNote": {
+        "label": "Move note to trash"
       },
       "unfoldAll": {
         "label": "Unfold all"
@@ -2800,10 +2803,23 @@
       "accentHexAria": "Accent color hex value",
       "accentLabel": "Accent color",
       "accentReset": "Reset to theme default",
+      "barCustomize": {
+        "label": "Bottom bar",
+        "helper": "Choose which indicators the bottom bar shows. Hide every one and the bar itself is removed, reclaiming the space. Drag or right-click an item on the bar to reorder it."
+      },
+      "editorFont": "Editor font",
+      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself. Open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
+      "graphSettingsLabel": "Graph appearance",
       "homeQuickActions": "Home quick actions",
+      "openGraph": "Open graph",
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
       "showEditTimesLabel": "Show edit times",
+      "showEditTimesSubtitle": "Timestamps under each note",
+      "sizeL": "L",
+      "sizeM": "M",
+      "sizeS": "S",
+      "sizeXL": "XL",
       "taskMarkerAria": "Show the task marker on task notes",
       "taskMarkerHelper": "Marks notes you have declared as tasks in the sidebar and on their tab.",
       "taskMarkerLabel": "Show task marker",
@@ -2818,16 +2834,7 @@
       "themeLabel": "Theme",
       "themeOptionAria": "{{label}} theme",
       "themeSaveError": "Couldn't save theme. Please try again.",
-      "timestampsSaveError": "Couldn't save preference. Please try again.",
-      "sizeS": "S",
-      "sizeM": "M",
-      "sizeL": "L",
-      "sizeXL": "XL",
-      "editorFont": "Editor font",
-      "showEditTimesSubtitle": "Timestamps under each note",
-      "graphSettingsLabel": "Graph appearance",
-      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself. Open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
-      "openGraph": "Open graph"
+      "timestampsSaveError": "Couldn't save preference. Please try again."
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",

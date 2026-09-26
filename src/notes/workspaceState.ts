@@ -42,6 +42,7 @@ import {
   type TaskView,
 } from "./taskView";
 import type { DetachedEntry } from "./detachedRestore";
+import { TAB_KIND_TAGS, canonicalTabId } from "./tabKinds";
 
 /** Opaque identifier for a pane (leaf or split node). */
 export type PaneId = string;
@@ -168,10 +169,21 @@ export function tasksItem(): WorkspaceItem {
  *  legacy/default kind), so a bare or note-prefixed handle always yields a note
  *  item. */
 export function parseItemKey(key: string): WorkspaceItem {
-  if (key.startsWith("view:")) return { kind: "view", id: key.slice(5) };
-  if (key.startsWith("graph:")) return { kind: "graph", id: GRAPH_TAB_ID };
-  if (key.startsWith("tasks:")) return { kind: "tasks", id: TASKS_TAB_ID };
-  if (key.startsWith("note:")) return { kind: "note", id: key.slice(5) };
+  // Derived from the tab-kind registry (myne-md/myne#773) rather than an arm
+  // per kind. A singleton normalizes to its sentinel whatever the key carried,
+  // which is what keeps "graph:anything" resolving to the one graph tab.
+  const colon = key.indexOf(":");
+  if (colon > 0) {
+    const tag = key.slice(0, colon) as WorkspaceItem["kind"];
+    if ((TAB_KIND_TAGS as readonly string[]).includes(tag)) {
+      return {
+        kind: tag,
+        id: canonicalTabId(tag, key.slice(colon + 1)),
+      } as WorkspaceItem;
+    }
+  }
+  // An unrecognized prefix — or a bare id — is the legacy/default `note` kind,
+  // so a pre-prefix handle still opens the note it names.
   return { kind: "note", id: key };
 }
 

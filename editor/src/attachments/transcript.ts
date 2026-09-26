@@ -183,6 +183,13 @@ export function createTranscriptSection(opts: {
     for (let i = 0; i < TRANSCRIPT_METER_BARS; i++) {
       const bar = document.createElement("span");
       bar.className = "cm-attachment-audio-transcript-bar";
+      // State-carrying motion, so it opts IN to the reduced-motion exemption
+      // (MYND-630, reaffirmed by `design-notes/ui/0618`): the blanket
+      // `animation-duration: 0ms` would freeze a busy meter mid-cycle, which
+      // reads as hung rather than as calm. The exemption slows it to half speed
+      // instead. The default for any new animation stays suppressed — this is
+      // an opt-in, and a decorative one must not take it.
+      bar.setAttribute("data-motion", "essential");
       bar.style.animationDelay = `${i * 90}ms`;
       meter.appendChild(bar);
     }

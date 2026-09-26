@@ -20,6 +20,7 @@
 
 import type { CenterView } from "../screens/centerView";
 import type { WorkspaceItem } from "./workspaceState";
+import { tabKindSpec } from "./tabKinds";
 
 /** The focused pane's active tab kind, or `undefined` for the new-tab chooser
  *  (`activeTab === null`). */
@@ -40,7 +41,14 @@ export function topRightFloatsShown(input: {
     input.centerView !== "attachments" &&
     // Both controls act on the OPEN note: backlinks and the outline describe
     // it, and the "…" menu edits it. A non-note tab has none.
-    input.focusedTabKind === "note" &&
+    //
+    // Asked of the tab-kind registry rather than compared to the literal
+    // `"note"` (myne-md/myne#773): the registry makes every kind ANSWER the
+    // question in its own declaration, where a literal silently gives a new
+    // kind `note`'s answer by omission — and the failure is a backlinks panel
+    // over a surface that has no note, which nothing type-checks.
+    input.focusedTabKind !== undefined &&
+    tabKindSpec(input.focusedTabKind).hasNoteFloats &&
     input.pendingNewTabPaneId !== input.focusedPaneId
   );
 }

@@ -253,7 +253,7 @@ interface SettingsModalProps {
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0, 0, 0, 0.4)",
+  background: "var(--scrim)",
   display: "flex",
   alignItems: "stretch",
   justifyContent: "center",

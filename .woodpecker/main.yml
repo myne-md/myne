@@ -552,6 +552,12 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # The motion canon (myne#772, design-notes/ui/0615): no `ease-in` on a
+      # UI entrance, no `infinite` outside a named+reasoned allowlist, no raw
+      # duration past the 300ms ceiling, no transition on a layout-triggering
+      # property without a recorded reason. Every one of those is invisible to
+      # `tsc`, to eslint and to every test here.
+      - node scripts/check-motion-canon.mjs
       # Token PARITY (myne#478), the opposite question from the ratchet above:
       # does a token anybody names actually exist, and does one name have two
       # independent declarations? Neither half fails to compile and the wrong

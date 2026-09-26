@@ -402,20 +402,36 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     expect(Object.is(canvasModels.at(-1), before)).toBe(true);
   });
 
-  it("paints the ACTIVE half of the view switch instead of a measured thumb", async () => {
-    // `Segmented`'s thumb is sized from `offsetWidth`, which is 0 in a pane that
-    // mounts before its tab is visible; the selected label then takes
-    // `--accent-on` with nothing behind it and the active half renders
-    // invisible. The cluster paints the accent directly instead, so this asserts
-    // a real background on the active half and none on the other.
+  it("uses the SHARED segmented control, with radiogroup semantics", async () => {
+    // This was a hand-rolled fork (`ViewHalf`) until myne-md/myne#773. The fork
+    // existed because `Segmented` sized its thumb from `offsetWidth`, which is 0
+    // in a pane that mounts before its tab is visible, so the selected label
+    // took `--accent-on` over nothing and the active half rendered invisible
+    // (myne-md/myne#727). Two things closed that: #727 added the
+    // `ResizeObserver` that re-measures when the box appears, and #773 gave the
+    // active segment its OWN accent fill beneath the thumb, so a zero-width
+    // thumb costs a transition rather than legibility.
+    //
+    // That fill is a stylesheet rule and jsdom does not apply it, so the visual
+    // half is asserted in `tests/styles/segmentedSelection.test.ts` against the
+    // sheet itself. What is observable HERE is the semantics, and they improved
+    // in the move: two mutually-exclusive reading modes are a radiogroup, not
+    // two independent toggles.
     render(<GraphPane />);
     await settledPane();
     const graphHalf = screen.getByTestId("editor.graph-view-graph");
     const listHalf = screen.getByTestId("editor.graph-view-list");
-    expect(graphHalf.style.background).toContain("var(--accent)");
-    expect(graphHalf.style.color).toContain("var(--accent-on)");
-    expect(listHalf.style.background).not.toContain("var(--accent)");
-    expect(graphHalf.getAttribute("aria-pressed")).toBe("true");
+    expect(graphHalf.getAttribute("role")).toBe("radio");
+    expect(graphHalf.getAttribute("aria-checked")).toBe("true");
+    expect(listHalf.getAttribute("aria-checked")).toBe("false");
+    expect(graphHalf.className).toContain("myne-segmented__segment");
+    // `aria-pressed` is the toggle-button attribute the fork used. Its absence
+    // is the assertion: carrying both would announce the control twice.
+    expect(graphHalf.getAttribute("aria-pressed")).toBeNull();
+    expect(
+      graphHalf.closest('[role="radiogroup"]'),
+      "the segments must sit inside a radiogroup for the roles to mean anything",
+    ).not.toBeNull();
   });
 
   it("queries only the AUTHORED rule's tag once a rule exists", async () => {

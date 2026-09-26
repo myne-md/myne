@@ -671,6 +671,38 @@ const lockVaultAction: CommandAction = {
   },
 };
 
+/**
+ * Open the command palette — from the palette's own rail entry (myne-md/myne#773).
+ *
+ * The palette had no clickable entry point at all before this: `palette.toggle`
+ * lived only in `bindableCatalog.ts` as a keybinding, and the left rail's
+ * roster is derived from `COMMAND_ACTIONS` entries carrying a `ribbon` block,
+ * so it was not absent from the default rail — it could not be pinned to it.
+ *
+ * `visibility` is the interesting half. The action hides while the palette is
+ * open, because a palette row that opens the palette is a no-op that reads as a
+ * broken command, and the rule at the top of this file is that the palette
+ * never exposes an action unavailable in the current state. The RAIL is not
+ * affected: the rail renders a pinned id whatever the palette is doing, and
+ * pressing it while the palette is up re-focuses rather than toggling shut,
+ * which is what a search affordance should do when you press it twice.
+ */
+const openPaletteAction: CommandAction = {
+  id: "palette.open",
+  ribbon: { icon: "search" },
+  get label() {
+    return i18n.t("commands.actions.openPalette.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && !ctx.paletteOpen ? "show" : "hidden",
+  run: (ctx) => {
+    ctx.onOpenPalette();
+  },
+};
+
 const openSettingsAction: CommandAction = {
   id: "app.open-settings",
   ribbon: { icon: "settings" },
@@ -1537,6 +1569,7 @@ const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Obj
 
 const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
+  openPaletteAction,
   openSettingsAction,
   toggleLeftSidebarAction,
   toggleRightSidebarAction,

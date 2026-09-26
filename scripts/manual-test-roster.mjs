@@ -5218,6 +5218,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/settings/AppearancePanel.tsx",
       "src/components/settings/RibbonCustomizeSettings.tsx",
+      "src/components/settings/BarCustomizeSettings.tsx",
       "src/lib/theme.ts",
       "src/styles/tokens.css",
       "mobile/src/lib/themes.ts",
@@ -5233,6 +5234,7 @@ export const ROSTER = Object.freeze([
       "e2e/ornament.e2e.ts",
       "e2e/graph-settings.e2e.ts",
       "e2e/left-ribbon.e2e.ts",
+      "e2e/bottom-bar-empty.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
     ],
     manual: [

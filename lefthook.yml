@@ -323,6 +323,17 @@ pre-commit:
       # A RATCHET: a file's recorded count may fall, never rise.
       run: node scripts/check-token-adoption.mjs
 
+    motion-canon:
+      # myne#772 / design-notes/ui/0615: the motion canon, mechanised. Four
+      # rules, none of which any compiler, lint or test in this tree reports —
+      # a pulsing badge, an `ease-in` entrance, a 620ms hover and a `width`
+      # transition on a per-frame loop all typecheck, render and pass. The
+      # amendment that split motion into a restrained and an expressive tier is
+      # only safe BECAUSE of this file: without it, "expressive, but only where
+      # rare" is an intention, and the tree regresses to whatever the last
+      # author felt like.
+      run: node scripts/check-motion-canon.mjs
+
     token-parity:
       # myne#478: the sibling of `token-adoption` one step up, and they catch
       # opposite failures. That one asks whether a value should have been a
