@@ -25,11 +25,12 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
-  nameNewNote,
+  clickRibbonUntilVisible,
   confirmDeleteWithEnter,
   createNote,
   dismissImporterOffer,
   editorText,
+  nameNewNote,
   reopenNoteAfterReload,
   typeIntoEditor,
   unlockToEditor,
@@ -143,7 +144,7 @@ describeE2E("nc3 soft-trash lifecycle (MYND-223 / MYND-133)", () => {
         await s.waitForGone(testIdSelector("notes.row"));
 
         // Restore from the Trash panel.
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.panel");
         await (await s.byTestId("trash.restore")).click();
         await s.waitForGone(testIdSelector("trash.restore"));
@@ -153,7 +154,7 @@ describeE2E("nc3 soft-trash lifecycle (MYND-223 / MYND-133)", () => {
         // Trash again, then PERMANENT delete — this one confirms.
         await contextMenuPick(s, await s.byTestId("notes.row"), "delete");
         await s.waitForGone(testIdSelector("notes.row"));
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await (await s.byTestId("trash.delete")).click();
         await (await s.byTestId("delete-confirm.confirm")).click();
         await s.waitForGone(testIdSelector("trash.delete"));
@@ -199,7 +200,7 @@ describeE2E("nc5 keyboard Delete confirms before soft-trash (MYND-487)", () => {
         await s.waitForGone(testIdSelector("notes.row"));
 
         // Soft-trash, not gone — the note is recoverable from the Trash panel.
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.panel");
         expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
       },
@@ -271,7 +272,7 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
 
         // The note is IN the trash (soft), not gone (MYND-144 reversal
         // of the old non-empty-delete block).
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.panel");
         expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
       },
@@ -327,7 +328,7 @@ describeE2E("nc7 Enter confirms the folder-delete gate (#628)", () => {
 
         // Soft-trash, not gone. The in-folder note is recoverable, which is
         // what the dialog's own warning copy promises.
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.panel");
         expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
       },

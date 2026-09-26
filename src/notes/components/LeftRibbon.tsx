@@ -11,12 +11,13 @@
 // resolves to `hidden` drops out of the rail and the others reflow, a `disabled`
 // command stays dimmed with its hint, and `show` is live.
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS } from "../../commands";
 import { Icon } from "../../components/primitives/Icon";
 import { hoverSurface, HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
 import { setRibbonItems } from "../../lib/prefs";
+import { VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { usePrefs } from "../../hooks/usePrefs";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { STRIP_HEIGHT } from "./TabStrip";
@@ -116,6 +117,18 @@ export function LeftRibbon({ hidden = false }: { hidden?: boolean }) {
   const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [bgMenu, setBgMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // A pinned command's visibility can depend on a DEVICE-LOCAL pref, which
+  // `usePrefs` (vault prefs) does not carry — so the rail would keep showing a
+  // button whose surface has just been switched off. `views.show` is the one
+  // today (Settings → Editor → Views, myne-md/myne#762); its writer fires this
+  // event for exactly this reason, so re-read on it.
+  const [, bumpDeviceLocal] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const onChange = () => bumpDeviceLocal();
+    window.addEventListener(VIEWS_ENABLED_EVENT, onChange);
+    return () => window.removeEventListener(VIEWS_ENABLED_EVENT, onChange);
+  }, []);
 
   const eligible = useMemo(() => ribbonEligibleIds(), []);
   const byId = useMemo(() => new Map(COMMAND_ACTIONS.map((a) => [a.id, a])), []);

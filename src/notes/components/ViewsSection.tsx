@@ -1,12 +1,16 @@
-// `<ViewsSection>` — the sidebar "Views" entry (Saved Views #4, MYND-274).
+// `<ViewsSection>` — the saved-views flyout (Saved Views #4, MYND-274).
 //
-// A compact nav ROW styled like the Attachments / Trash / Archive footer
-// entries (icon + "Views"), with two hover-revealed controls at its right edge:
-// a create (+) button and a right-caret. Clicking the row (or the caret) opens a
-// FLYOUT to the right — a scrollable, searchable panel listing every saved view
-// — instead of cramming the whole list into the left sidebar. A view opens as a
-// workspace tab on click (`ws.openView`); right-click a row for rename / delete /
-// move / settings; inline-rename lives in the flyout too.
+// It used to be a nav ROW in the notes sidebar, styled like the Attachments /
+// Trash / Archive footer entries, that opened a flyout beside itself. The row is
+// gone (myne-md/myne#762): the `views.show` registry command is the one entry
+// point, pinned on the left ribbon by default and reachable from the palette, so
+// the sidebar footer is no longer a second unremovable copy of the rail.
+//
+// What is left renders nothing of its own and hosts the flyout — a scrollable,
+// searchable panel listing every saved view, with the create (+) control that
+// used to sit on the row now in its header. It still mounts inside the sidebar
+// because the view list and the management dispatches it needs live there; the
+// flyout itself is a body-level portal anchored to whatever invoked it.
 //
 // Design canon: Penpot frame `screen------views--sidebar-section (MYND-274)`.
 // Leading glyph `layout-grid` (saved views render as table/cards/grid).
@@ -35,42 +39,10 @@ import {
   useRevealViewsNonce,
 } from "../views/revealViewsSignal";
 
-// Nav row — mirrors NoteList's FOOTER_ENTRY_STYLE so Views reads as a peer of
-// Attachments / Trash / Archive. Keep the two in step.
-const NAV_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  padding: "var(--space-3) var(--space-4)",
-  border: "none",
-  borderTop: "1px solid var(--line-1)",
-  background: "transparent",
-  color: "var(--fg-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  cursor: "pointer",
-  textAlign: "start",
-  boxSizing: "border-box",
-  transition: HOVER_TRANSITION,
-};
-
-const NAV_LABEL_STYLE: CSSProperties = {
-  flex: "1 1 auto",
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
-
-// The two hover-revealed controls at the row's right edge (create + caret).
-const ROW_ACTIONS_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 2,
-  flexShrink: 0,
-  transition: "opacity var(--duration-fast) var(--ease-standard)",
-};
+/** The left-ribbon button for `views.show`, this flyout's anchor. Selected by
+ *  the rail's own `data-command-id` contract (LeftRibbon), not by a testid, so
+ *  it is a product attribute rather than a test hook. */
+const RIBBON_ANCHOR_SELECTOR = '[data-command-id="views.show"]';
 
 const ICON_BTN_STYLE: CSSProperties = {
   display: "flex",
@@ -295,14 +267,11 @@ export function ViewsSection({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [hovering, setHovering] = useState(false);
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(
     null,
   );
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [highlight, setHighlight] = useState(false);
-  const rowRef = useRef<HTMLDivElement>(null);
   const flyoutRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ left: number; bottom: number }>({
@@ -313,24 +282,26 @@ export function ViewsSection({
   // transition plays (reduced-motion zeroes it globally).
   const [visible, setVisible] = useState(false);
 
-  const openFlyout = () => {
-    setQuery("");
-    setOpen(true);
-  };
-
-  // Anchor the flyout just to the RIGHT of the row and BOTTOM-aligned to it, so
-  // it hangs off the Views row (which sits low in the sidebar) and grows upward
-  // — reading as a popover attached to the row, not floating loose.
+  // Anchor the flyout just to the RIGHT of whatever invoked it and BOTTOM-aligned
+  // to it, so it reads as a popover attached to that control rather than floating
+  // loose. The anchor used to be this component's own sidebar row; with the row
+  // gone (myne-md/myne#762) it is the ribbon's `views.show` button, found in the
+  // DOM rather than threaded through, because the two live in sibling subtrees
+  // and both entry points (ribbon click, palette) come through the same
+  // anchor-less `requestRevealViews` signal. A user who unpinned the button — or
+  // hid the rail — leaves nothing to hang off, so the flyout falls back to the
+  // bottom-left corner of the window, which is where the rail would have been.
   useLayoutEffect(() => {
     if (!open) {
       setVisible(false);
       return;
     }
-    const el = rowRef.current;
-    if (el === null) return;
-    const r = el.getBoundingClientRect();
-    const left = Math.max(8, Math.min(r.right + 6, window.innerWidth - 280 - 8));
-    const bottom = Math.max(8, window.innerHeight - r.bottom);
+    const el = document.querySelector<HTMLElement>(RIBBON_ANCHOR_SELECTOR);
+    const r = el?.getBoundingClientRect();
+    const right = r?.right ?? 8;
+    const anchorBottom = r?.bottom ?? window.innerHeight - 8;
+    const left = Math.max(8, Math.min(right + 6, window.innerWidth - 280 - 8));
+    const bottom = Math.max(8, window.innerHeight - anchorBottom);
     setPos({ left, bottom });
   }, [open]);
 
@@ -354,7 +325,10 @@ export function ViewsSection({
       if (menu !== null) return;
       const target = e.target as Node;
       if (flyoutRef.current?.contains(target)) return;
-      if (rowRef.current?.contains(target)) return;
+      // The ribbon button is the anchor: let ITS click handler run the command
+      // (which toggles), instead of this listener closing the flyout first and
+      // the command immediately reopening it.
+      if ((target as Element).closest?.(RIBBON_ANCHOR_SELECTOR) !== null) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -372,17 +346,18 @@ export function ViewsSection({
     };
   }, [open, menu]);
 
-  // Reveal-on-request (SYNC-7): the BottomBar `editor.views-cta` + `views.show`
-  // palette action fire `requestRevealViews()`. Open the flyout, bring the row
-  // into view, and flash it so the click always lands somewhere visible.
+  // Reveal-on-request (SYNC-7): the ribbon / palette `views.show` action and the
+  // BottomBar `editor.views-cta` all fire `requestRevealViews()`. There is no row
+  // to scroll to or flash any more, so a request simply toggles the flyout — a
+  // second press on the same ribbon button closes it, which is what a rail
+  // toggle is expected to do.
   const nonce = useRevealViewsNonce();
   useEffect(() => {
     if (!consumeRevealViews()) return;
-    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    openFlyout();
-    setHighlight(true);
-    const timer = setTimeout(() => setHighlight(false), 1100);
-    return () => clearTimeout(timer);
+    setOpen((was) => {
+      if (!was) setQuery("");
+      return !was;
+    });
   }, [nonce]);
 
   const filtered = useMemo(() => {
@@ -456,88 +431,8 @@ export function ViewsSection({
     }
   };
 
-  const actionsVisible = hovering || open;
-
   return (
     <>
-      <div
-        ref={rowRef}
-        role="button"
-        tabIndex={0}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t("notes.views.heading")}
-        data-testid="views.section"
-        data-revealed={highlight ? "true" : undefined}
-        onClick={() => (open ? setOpen(false) : openFlyout())}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            openFlyout();
-          }
-        }}
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
-        style={{
-          ...NAV_ROW_STYLE,
-          background:
-            open || highlight
-              ? "var(--paper-3)"
-              : hovering
-                ? "var(--bg-3)"
-                : "transparent",
-          boxShadow: highlight ? "inset 0 0 0 1px var(--accent)" : undefined,
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{ display: "flex", flexShrink: 0, color: "var(--fg-3)" }}
-        >
-          <Icon name="layout-grid" size={15} />
-        </span>
-        <span style={NAV_LABEL_STYLE}>{t("notes.views.heading")}</span>
-        <span
-          style={{
-            ...ROW_ACTIONS_STYLE,
-            opacity: actionsVisible ? 1 : 0,
-            pointerEvents: actionsVisible ? "auto" : "none",
-          }}
-        >
-          <button
-            type="button"
-            data-testid="views.new-button"
-            aria-label={t("notes.views.newView")}
-            title={t("notes.views.newView")}
-            onClick={(e) => {
-              e.stopPropagation();
-              // Creating opens the full filter-builder modal; close the flyout so
-              // it isn't left hanging behind (and its outside-click dismissal
-              // doesn't fight the modal).
-              setOpen(false);
-              onNewView();
-            }}
-            {...hoverSurface()}
-            style={ICON_BTN_STYLE}
-          >
-            <Icon name="file-plus" size={14} />
-          </button>
-          <button
-            type="button"
-            data-testid="views.flyout-toggle"
-            aria-label={t("notes.views.expandViews")}
-            title={t("notes.views.expandViews")}
-            onClick={(e) => {
-              e.stopPropagation();
-              open ? setOpen(false) : openFlyout();
-            }}
-            {...hoverSurface()}
-            style={ICON_BTN_STYLE}
-          >
-            <Icon name="chevron-right" size={14} />
-          </button>
-        </span>
-      </div>
-
       {open &&
         createPortal(
           <div
@@ -570,6 +465,23 @@ export function ViewsSection({
                   if (e.key === "Escape") setOpen(false);
                 }}
               />
+              <button
+                type="button"
+                data-testid="views.new-button"
+                aria-label={t("notes.views.newView")}
+                title={t("notes.views.newView")}
+                onClick={() => {
+                  // Creating opens the full filter-builder modal; close the
+                  // flyout so it isn't left hanging behind (and its
+                  // outside-click dismissal doesn't fight the modal).
+                  setOpen(false);
+                  onNewView();
+                }}
+                {...hoverSurface()}
+                style={ICON_BTN_STYLE}
+              >
+                <Icon name="file-plus" size={14} />
+              </button>
             </div>
             <div style={LIST_STYLE}>
               {filtered.length === 0 ? (
