@@ -19,7 +19,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickUntilVisible,
+  clickRibbonUntilVisible,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -135,7 +135,7 @@ describeE2E("tb2 save current filter as view → appears in the sidebar (Saved V
         // The sidebar Views section starts empty (no saved views yet). The list
         // and its empty state live inside a flyout the nav row opens; both are
         // absent from the screen until it is.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.byTestId("views.empty");
 
         // Open the browser, select #alpha → the "Save as view" affordance shows.
@@ -156,7 +156,7 @@ describeE2E("tb2 save current filter as view → appears in the sidebar (Saved V
         await s.waitForGone(testIdSelector("tags.modal"));
         // The view rows live in the flyout, and saving from the tags browser
         // left it closed. Re-open before counting rows.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },

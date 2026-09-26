@@ -28,18 +28,12 @@ import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
-  archivedRecords,
   liveCache,
-  trashedCount,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
 } from "../sidebarState";
-import {
-  archivedFolderKeys,
-  isNoteFolderArchived,
-  topLevelArchivedFolders,
-} from "../archivedFolders";
+import { archivedFolderKeys } from "../archivedFolders";
 import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
 import { sidebarCommands } from "../sidebarCommands";
@@ -733,37 +727,6 @@ const SIDEBAR_OUTER_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
-// Sidebar footer wrapper — pins the nav entries (Attachments + Trash) to
-// the bottom of the sidebar (MYND-133 / MYND-170).
-const FOOTER_WRAP_STYLE: CSSProperties = {
-  marginTop: "auto",
-  flexShrink: 0,
-};
-
-// Footer nav entry — full-width row with a leading icon (MYND-133 / MYND-170).
-const FOOTER_ENTRY_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  padding: "var(--space-3) var(--space-4)",
-  border: "none",
-  borderTop: "1px solid var(--line-1)",
-  background: "transparent",
-  color: "var(--fg-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  cursor: "pointer",
-  textAlign: "start",
-  transition: HOVER_TRANSITION,
-};
-
-const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
-  marginInlineStart: "auto",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-};
-
 /** The selection live region's box: the shared visually-hidden recipe, plus
  *  the positioning that takes it out of flow.
  *
@@ -1388,20 +1351,12 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   );
   const isEmpty = rows.length === 0 && favRows.length === 0;
 
-  // Trash entry (MYND-133): a sidebar footer showing the trashed-note count,
-  // opening the Trash panel. Visible in both the empty + populated states so a
-  // user can always reach the trash. The count comes from the same value-strict
-  // `trashed:` marker that excludes these notes from the live tree above.
+  // Trash + Archive panels (MYND-133 / MYND-331). Their sidebar-footer rows are
+  // gone (myne-md/myne#762) — the `trash.open` / `archive.open` registry commands
+  // are the entry points, reached from the left ribbon or the palette — but the
+  // panels themselves still mount here, because this is where the note cache and
+  // the folder-management handles they need already live.
   const [trashOpen, setTrashOpen] = useState(false);
-  // Count the value-strict `trashed:` set directly: `live` now also excludes
-  // templates (MYND-186), so the old `cache.size - live.size` delta would
-  // over-count the trash by the template population. Memoized on cache identity
-  // (like `live`) so the scan runs once per mutation, not on every re-render
-  // (NoteList re-renders on selection / rename-toggle, which don't touch cache).
-  const trashCount = useMemo(() => trashedCount(ctx.cache), [ctx.cache]);
-  // Archive entry (MYND-331): sibling to Trash in the footer, opening the
-  // Archive panel. Count from the value-strict `archived:` set (the disjoint
-  // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
   // Palette-gap Wave 4: register the sidebar-owned surfaces so the command
   // palette (a separate subtree) can open them. Cleared on unmount so a
@@ -1416,23 +1371,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       sidebarCommands.newFolder = undefined;
     };
   }, [fm]);
-  // Footer badge = standalone archived notes (value-strict `archived:`, NOT
-  // also inside an archived folder — those show under the folder row) + the
-  // top-level archived folder rows (folder-archive; each counts as one row).
-  const archiveCount = useMemo(() => {
-    const standalone = archivedRecords(ctx.cache).filter(
-      (r) => !isNoteFolderArchived(r.folder, archivedKeys),
-    ).length;
-    return standalone + topLevelArchivedFolders(fm.archivedFolders).length;
-  }, [ctx.cache, archivedKeys, fm.archivedFolders]);
-  // Archive-feature disable toggle (archive-disable, MYND-…): when on, the
-  // archive entry points (footer button, context-menu actions) are hidden. The
-  // viewer footer stays available while any archived note still exists so a note
-  // can never be stranded — but disabling auto-empties the archive, so in the
-  // normal flow `archiveCount` is already 0. `viewsPrefs` is nonce-aware, so the
-  // toggle re-renders these surfaces live.
-  const archiveDisabled = viewsPrefs.archive_disabled ?? false;
-
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
     const handler = makeF2KeydownHandler(ctx);
@@ -1548,58 +1486,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           onSave={handleSaveFilter}
         />
       )}
-      <div style={FOOTER_WRAP_STYLE}>
-        <AttachmentsNavEntry />
-        {/* Trash + Archive share ONE line to compact the footer: each takes
-            half, split by a vertical hairline. When Archive is absent, Trash
-            fills the row. The row's top hairline lives on the wrapper so the two
-            halves keep only the vertical divider between them. */}
-        <div style={{ display: "flex", borderTop: "1px solid var(--line-1)" }}>
-          <button
-            type="button"
-            style={{
-              ...FOOTER_ENTRY_STYLE,
-              borderTop: "none",
-              flex: 1,
-              minWidth: 0,
-              width: "auto",
-            }}
-            {...hoverSurface()}
-            data-testid="notes.trash-open"
-            onClick={() => setTrashOpen(true)}
-            title={t("notes.list.openTrash")}
-          >
-            <Icon name="trash-2" size={15} />
-            <span>{t("notes.list.trash")}</span>
-            {trashCount > 0 && (
-              <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
-            )}
-          </button>
-          {(!archiveDisabled || archiveCount > 0) && (
-            <button
-              type="button"
-              style={{
-                ...FOOTER_ENTRY_STYLE,
-                borderTop: "none",
-                borderInlineStart: "1px solid var(--line-1)",
-                flex: 1,
-                minWidth: 0,
-                width: "auto",
-              }}
-              {...hoverSurface()}
-              data-testid="notes.archive-open"
-              onClick={() => setArchiveOpen(true)}
-              title={t("notes.list.openArchive")}
-            >
-              <Icon name="archive" size={15} />
-              <span>{t("notes.list.archive")}</span>
-              {archiveCount > 0 && (
-                <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
       <ArchivePanel
         open={archiveOpen}
@@ -3384,40 +3270,6 @@ function PopulatedList({
       />
       <Toast message={trashError} onDone={() => setTrashError(null)} variant="error" />
     </div>
-  );
-}
-
-/**
- * Sidebar footer nav entry that opens the attachments library (MYND-170,
- * SYNC-9). The library is a full-pane center-pane view, not a Stage; this
- * entry highlights when that view is active. `useCenterView` returns a
- * no-op fallback outside the Editor's provider, so this row is inert in any
- * isolated NoteList render (tests) rather than crashing.
- */
-function AttachmentsNavEntry() {
-  const { t } = useTranslation();
-  const { view, setView } = useCenterView();
-  const active = view === "attachments";
-  return (
-    <button
-      type="button"
-      style={{
-        ...FOOTER_ENTRY_STYLE,
-        color: active ? "var(--fg-1)" : "var(--fg-2)",
-        background: active ? "var(--paper-3)" : "transparent",
-        fontWeight: active ? 600 : 400,
-      }}
-      {...hoverSurface({
-        restBg: active ? "var(--paper-3)" : "transparent",
-        hoverBg: active ? "var(--paper-3)" : "var(--bg-3)",
-      })}
-      onClick={() => setView("attachments")}
-      title={t("notes.list.openAttachments")}
-      aria-current={active ? "page" : undefined}
-    >
-      <Icon name="paperclip" size={15} />
-      <span>{t("notes.list.attachments")}</span>
-    </button>
   );
 }
 

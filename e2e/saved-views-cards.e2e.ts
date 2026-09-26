@@ -28,6 +28,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   clickUntilVisible,
   createNote,
   dismissImporterOffer,
@@ -86,7 +87,7 @@ describeE2E("svc1 cards view renders live notes as image-less cards (MYND-275)",
         // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
         // is shut but is not interactable, so clicking it silently does nothing.
         // Open the flyout first — the same order the passing spec uses.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await clickUntilVisible(s, "views.new-button", "view-filter.save");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));

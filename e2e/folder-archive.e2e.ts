@@ -20,9 +20,10 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
-  nameNewNote,
+  clickRibbonUntilVisible,
   createNote,
   dismissImporterOffer,
+  nameNewNote,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -96,7 +97,7 @@ describeE2E("fa1 folder-archive lifecycle (folder-archive)", () => {
         await s.waitForGone(testIdSelector("notes.folder-row"));
 
         // The Archive panel lists the folder as a single row.
-        await (await s.byTestId("notes.archive-open")).click();
+        await clickRibbonUntilVisible(s, "archive.open", "archive.panel");
         await s.byTestId("archive.panel");
         await s.byTestId("archive.folder-row");
 
@@ -139,7 +140,7 @@ describeE2E("fa2 archived-folder delete confirm (folder-archive, #202)", () => {
         await s.waitForGone(testIdSelector("notes.folder-row"));
 
         // Open the Archive panel; the folder shows as a single row.
-        await (await s.byTestId("notes.archive-open")).click();
+        await clickRibbonUntilVisible(s, "archive.open", "archive.panel");
         await s.byTestId("archive.panel");
         await s.byTestId("archive.folder-row");
 
@@ -158,7 +159,7 @@ describeE2E("fa2 archived-folder delete confirm (folder-archive, #202)", () => {
 
         // The subtree note is now in Trash (soft-trash, recoverable).
         await (await s.byTestId("archive.close")).click();
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.panel");
         await s.byTestId("trash.restore");
       },
