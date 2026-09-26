@@ -108,6 +108,16 @@ const BTN_CONNECTED: CSSProperties = {
   cursor: "default",
 };
 
+// The re-verify action offered beside the resting "Connected" state. Secondary
+// rather than accent on purpose: it opens the fingerprint gate, it does not
+// commit anything, so the accent stays on the primary "Connect".
+const BTN_SECONDARY: CSSProperties = {
+  ...BTN,
+  background: "var(--bg-2)",
+  color: "var(--fg-1)",
+  border: "1px solid var(--line-1)",
+};
+
 const FP: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontSize: "var(--text-sm)",
@@ -234,6 +244,33 @@ export function EndpointConfig() {
       .finally(() => setBusy(false));
   };
 
+  // Re-open the out-of-band gate for an endpoint this device is ALREADY
+  // connected to — the recovery both device-panel hints tell the user to
+  // perform (myne#756).
+  //
+  // Until this existed that instruction named no reachable control. The hints
+  // say "re-enter the server URL", and re-entering the SAME URL is exactly what
+  // `isConnectedUnedited` below renders as a disabled "Connected", so the
+  // `CertificateChanged` refusal could raise the gate for a URL the user had
+  // edited and never for the one it was written about. The only way through was
+  // to perturb the URL into a different string, which ALSO slipped
+  // `replaces_a_trusted_pin` (it compared URL strings) and adopted the new
+  // certificate with no compare at all — so the missing control did not merely
+  // block the safe path, it left the unsafe one as the only one.
+  //
+  // Deliberately NOT gated on the sync status reporting `CertPinMismatch`. The
+  // device in #756 showed "Server certificate changed" in the sync status and a
+  // plain "the server didn't answer" transport error in the device panel at the
+  // same moment, so a control that appeared only for the known tag would have
+  // been missing precisely when it was needed. Re-verifying a pin costs nothing
+  // when the certificate has not changed — `capture_pin` compares and keeps the
+  // same value — so it is offered whenever there is a pin the user can compare.
+  const reverify = () => {
+    setMsg(null);
+    setExpectedFingerprint("");
+    setConfirmNeeded(true);
+  };
+
   // Decline: back out of an enrollment the user cannot verify. The refused
   // attempt wrote nothing — no endpoint, no pin (`pin_confirm`'s contract) — so
   // this only has to clear the screen and say so plainly, rather than leave the
@@ -312,14 +349,35 @@ export function EndpointConfig() {
             asking them to be careful. */}
         {!confirmNeeded &&
           (isConnectedUnedited ? (
-            <button
-              type="button"
-              disabled
-              style={BTN_CONNECTED}
-              data-testid="sync.endpoint-connect"
-            >
-              {t("sync.endpoint.connected")}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled
+                style={BTN_CONNECTED}
+                data-testid="sync.endpoint-connect"
+              >
+                {t("sync.endpoint.connected")}
+              </button>
+              {/* Only a TOFU pin is the user's to re-verify. A hosted static pin
+                  is pre-vetted at build time and a browser's trust store has no
+                  leaf fingerprint to compare, so neither offers this door. */}
+              {pinSource === "tofu" && (
+                <button
+                  type="button"
+                  onClick={reverify}
+                  disabled={busy}
+                  style={{ ...BTN_SECONDARY, opacity: busy ? 0.6 : 1 }}
+                  {...hoverSurface({
+                    restBg: "var(--bg-2)",
+                    hoverBg: "var(--bg-3)",
+                    disabled: busy,
+                  })}
+                  data-testid="sync.endpoint-reverify"
+                >
+                  {t("sync.endpoint.reverify")}
+                </button>
+              )}
+            </>
           ) : (
             <button
               type="button"
@@ -350,8 +408,10 @@ export function EndpointConfig() {
           {msg}
         </p>
       )}
-      {/* Revealed only once the backend refuses for want of it — see the state
-          declaration for why this is an input rather than a confirm button. */}
+      {/* Revealed when the backend refuses for want of it, and when the user
+          asks to re-verify an endpoint already connected (`reverify`) — see the
+          state declaration for why this is an input rather than a confirm
+          button. */}
       {confirmNeeded && (
         <FingerprintConfirm
           value={expectedFingerprint}

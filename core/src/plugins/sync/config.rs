@@ -420,6 +420,38 @@ pub fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
     pins
 }
 
+/// Do two endpoint URLs name the **same server** — same scheme, host and port?
+///
+/// The question `commands::sync_set_endpoint` has to answer before it decides
+/// whether a re-connect is replacing a pin this device already trusts, and it
+/// is deliberately not `a == b`. [`super::http_transport::parse_endpoint`]
+/// discards everything from the first `/`, `?` or `#`, so `https://h/` and
+/// `https://h` reach an identical socket while comparing unequal as strings;
+/// and DNS is case-insensitive, so `https://H` is the same server as
+/// `https://h`.
+///
+/// Both of those were live bypasses of that guard (myne#756). The trailing
+/// slash was not hypothetical: it was the workaround users reached for when the
+/// UI left them no way to re-verify a rotated certificate, and taking it meant
+/// the new leaf was pinned with **no fingerprint compare at all** — the exact
+/// silent adoption the guard exists to refuse. A guard around a decision this
+/// sharp has to compare what decides the connection, not the string the user
+/// happened to type.
+///
+/// A URL neither side can parse is not the same endpoint as anything, including
+/// itself: an unparseable config is a fault to surface, never a match to act on.
+pub fn same_endpoint(a: &str, b: &str) -> bool {
+    match (
+        super::http_transport::parse_endpoint(a),
+        super::http_transport::parse_endpoint(b),
+    ) {
+        (Some((sa, ha, pa)), Some((sb, hb, pb))) => {
+            sa == sb && pa == pb && ha.eq_ignore_ascii_case(&hb)
+        }
+        _ => false,
+    }
+}
+
 /// Validate an endpoint URL per the A4/TB5 policy. `https` is always allowed;
 /// `http` is allowed only for a loopback host (local E2E / dev server).
 ///
@@ -636,5 +668,68 @@ mod tests {
 
             std::fs::remove_dir_all(&dir).ok();
         });
+    }
+
+    /// `same_endpoint` decides whether a re-connect is replacing a pin this
+    /// device already trusts, so every pair below is a way that decision could
+    /// be got wrong, and the first two are ways it WAS got wrong (myne#756).
+    ///
+    /// The direction that matters is the false NEGATIVE: two URLs that reach
+    /// the same socket answering "different endpoint" is what let a renewed
+    /// certificate be pinned with no fingerprint compare. A false positive is
+    /// the milder failure — a user is asked to verify something they did not
+    /// have to — so both directions are asserted, with the first group carrying
+    /// the weight.
+    #[test]
+    fn same_endpoint_compares_the_socket_not_the_string() {
+        // The workaround that motivated the fix: a path the transport discards.
+        assert!(same_endpoint("https://s.example", "https://s.example/"));
+        assert!(same_endpoint(
+            "https://s.example",
+            "https://s.example/sync?x=1"
+        ));
+        // DNS is case-insensitive; the host is not a case-sensitive string.
+        assert!(same_endpoint("https://S.Example", "https://s.example"));
+        // The default port is the same port, written or not.
+        assert!(same_endpoint("https://s.example", "https://s.example:443"));
+        // Identity, and the loopback http form.
+        assert!(same_endpoint(
+            "http://127.0.0.1:8080",
+            "http://127.0.0.1:8080/"
+        ));
+    }
+
+    #[test]
+    fn same_endpoint_separates_genuinely_different_servers() {
+        assert!(!same_endpoint("https://a.example", "https://b.example"));
+        assert!(!same_endpoint(
+            "https://s.example",
+            "https://s.example:8443"
+        ));
+        // A different scheme is a different connection even to the same name.
+        assert!(!same_endpoint(
+            "https://127.0.0.1:8080",
+            "http://127.0.0.1:8080"
+        ));
+        // A subdomain is not its parent, however similar it reads.
+        assert!(!same_endpoint(
+            "https://sync.example",
+            "https://sync.example.net"
+        ));
+    }
+
+    /// An unparseable URL matches NOTHING, including a byte-identical copy of
+    /// itself. Answering "same" there would let a corrupt stored config be read
+    /// as agreement and a pin replaced on the strength of two strings nobody
+    /// could resolve; answering "different" routes it to the refusal, which is
+    /// the state an operator can see and fix.
+    #[test]
+    fn an_unparseable_endpoint_matches_nothing_not_even_itself() {
+        assert!(!same_endpoint("not a url", "not a url"));
+        assert!(!same_endpoint("not a url", "https://s.example"));
+        assert!(!same_endpoint("https://s.example", "not a url"));
+        // `http` with no explicit port does not parse (`parse_endpoint`
+        // requires one), so it cannot be compared into a match either.
+        assert!(!same_endpoint("http://s.example", "http://s.example"));
     }
 }
