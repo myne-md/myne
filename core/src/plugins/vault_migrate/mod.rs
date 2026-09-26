@@ -1827,6 +1827,91 @@ mod tests {
     /// Build a real `MYV1` v0.1 `vault.meta` sealing `OLD_ROOT` under both
     /// `PASSWORD` and `PHRASE`, and `OLD_ITEMS` under it — the pre-migration
     /// vault the command reads.
+    /// An enrolled device mid-sync on a fresh v0.1 vault: a `notes` directory,
+    /// the vault itself, and a `SyncState` carrying a cursor, a device id, an
+    /// account hash, and a CAS baseline for each of the three root-derived
+    /// singleton sync-ids. Returns those three ids as hex, which is the form
+    /// `SyncState::blobs` is keyed by and the form every assertion wants.
+    ///
+    /// Extracted because two tests rest on exactly this premise, and the shape
+    /// duplicated rather than shared is a shape that drifts: a change to what an
+    /// enrolled device's sync state looks like would have to be made twice, and
+    /// the second copy drifting is invisible because both tests stay green.
+    /// Which of the six seeded singletons `drop_one_baseline` un-seeds. Themes: a
+    /// settings family, so leaving it out is invisible in the loss list and the
+    /// assertion has to name it.
+    const THEME_INDEX: usize = 2;
+
+    async fn seed_enrolled_device_sync_state(
+        io: &StdVaultIo,
+        vault_root: &std::path::Path,
+    ) -> Vec<String> {
+        use crate::plugins::sync::orchestrator::{catalog_sync_id, prefs_sync_id, themes_sync_id};
+        use crate::plugins::sync::state::{write_sync_state, BlobSyncState, SyncState};
+        io.create_dir_all(&vault_root.join("notes")).await.unwrap();
+        build_myv1_vault(io, vault_root).await;
+
+        // All SIX root-derived singletons, because the re-key queues a
+        // tombstone only for an id this device actually pushed ("a singleton
+        // this device never pushed has no baseline and therefore nothing
+        // stranded". Seeding three made the test's own count an artefact of the
+        // fixture while the code under test had six candidates, which is how
+        // three different numbers ended up in three places.
+        let old_ids = [
+            catalog_sync_id(&OLD_ROOT),
+            prefs_sync_id(&OLD_ROOT),
+            themes_sync_id(&OLD_ROOT),
+            crate::plugins::sync::orchestrator::chats_catalog_sync_id(&OLD_ROOT),
+            crate::plugins::sync::orchestrator::agent_memory_catalog_sync_id(&OLD_ROOT),
+            crate::plugins::sync::orchestrator::agent_personality_sync_id(&OLD_ROOT),
+        ];
+        let mut seeded = SyncState {
+            cursor: 42,
+            device_id_hex: Some("aa".repeat(16)),
+            account_hash_hex: Some("bb".repeat(16)),
+            ..SyncState::default()
+        };
+        for id in &old_ids {
+            seeded.blobs.insert(
+                crate::plugins::sync::to_hex(id),
+                BlobSyncState {
+                    version: 7,
+                    content_nonce_hex: "cc".repeat(24),
+                    doc_heads_hex: Vec::new(),
+                },
+            );
+        }
+        write_sync_state(io, vault_root, &seeded).await.unwrap();
+        drop_one_baseline(io, vault_root, &old_ids[THEME_INDEX]).await;
+        old_ids
+            .iter()
+            .map(|id| crate::plugins::sync::to_hex(id.as_slice()))
+            .collect()
+    }
+
+    /// Remove one singleton's CAS baseline, so the fixture covers both halves of the
+    /// rule in `rebase_sync_plane_after_rekey`: a pushed singleton is stranded and
+    /// owes a reclaim tombstone, and one this device never pushed has no baseline
+    /// and therefore nothing stranded.
+    ///
+    /// The index is a named constant rather than a position because the negative arm
+    /// is the one a reader cannot see: the queue length is compared against the
+    /// seeded list, so a fixture that seeds all six makes "no baseline means no
+    /// tombstone" unreachable and the suite stays green with the guard deleted. It
+    /// was reachable at the merge base and a first pass at six removed it.
+    async fn drop_one_baseline(io: &StdVaultIo, vault_root: &std::path::Path, id: &[u8]) {
+        use crate::plugins::sync::state::{read_sync_state, write_sync_state};
+        let mut state = read_sync_state(io, vault_root).await.unwrap();
+        assert!(
+            state
+                .blobs
+                .remove(&crate::plugins::sync::to_hex(id))
+                .is_some(),
+            "precondition: the singleton to leave unseeded was seeded"
+        );
+        write_sync_state(io, vault_root, &state).await.unwrap();
+    }
+
     async fn build_myv1_vault(io: &StdVaultIo, vault_root: &std::path::Path) {
         use protocol::{
             aad_password_wrap, aad_recovery_wrap, aad_vault_items_key_wrap, aead_seal_ctx,
@@ -1989,6 +2074,164 @@ mod tests {
         })
     }
 
+    /// The ABORT unwind covers one of the three durable changes the re-base
+    /// made. (myne-md/myne#750)
+    ///
+    /// `rebase_sync_plane_after_rekey` runs at step (5d) of
+    /// `migrate_vault_notes_on_disk`, before the NTV5 write at (6) which that
+    /// function names the atomic commit point, and it makes three durable
+    /// changes: it arms `rekey_rebase_pending`, it queues an `OrphanTombstone`
+    /// per root-derived singleton, and it drops each of their CAS baselines. The
+    /// abort at `vault_migrate_abort_from_host` restores `legacy/vault.meta` and
+    /// clears the flag. The queue and the dropped baselines outlive it.
+    ///
+    /// The consequence is a data loss, not a bookkeeping drift. After the
+    /// rollback the vault is back on the OLD `root_key`, so the ids those
+    /// tombstones name are live again, and `drain_orphan_tombstones` pushes each
+    /// as `PushBlob { tombstone: true, ciphertext: [] }` at the version the
+    /// dropped baseline held. Every peer that pulls that tombstone drops its own
+    /// `vault.attachments` catalog, `vault.prefs` and `vault.themes`.
+    ///
+    /// Asserted in the REFUSAL direction, so the fix makes these live, and
+    /// IGNORED because the fix is not this branch's. An earlier version of this
+    /// test asserted the defective state and passed, which is worse than no
+    /// test: it certified the data loss as correct and would have gone red at
+    /// the moment someone fixed it. Run it with `cargo test -p myne-core
+    /// -- --ignored an_aborted_migration`. Tracked by myne-md/myne#759.
+    ///
+    /// Why the fix is not written here: clearing the queue is the obvious
+    /// one-liner and it is a HALF fix, because restoring the dropped baselines
+    /// needs the pre-rebase state the abort path does not hold. That is the sync
+    /// plane, which the sizing rule classes as never small however short the
+    /// diff, so it carries its own risk tier and a design step. The issue that
+    /// owns the verdicts does not own a sync-plane change, so the fix needs its
+    /// own issue, and it now has one: myne-md/myne#759.
+    ///
+    /// What this does NOT settle either way: whether the server ACCEPTS that
+    /// push is a CAS-ordering fact and `myne-server` is absent from this
+    /// repository. The assertions are the half this repository owns.
+    /// The precondition of the ignored test below, asserted on its own so it
+    /// RUNS. Inside an `#[ignore]`d test it never executes in `cargo test` or
+    /// in CI, which is the one failure its own comment says it exists to catch:
+    /// a fixture that armed nothing and a fixture that armed six look identical
+    /// from outside a test that does not run.
+    #[test]
+    fn the_rebase_arms_one_tombstone_per_root_derived_singleton() {
+        use crate::plugins::sync::state::read_sync_state;
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-rebase-arms").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            seed_enrolled_device_sync_state(&io, &vault_root).await;
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds");
+
+            let mid = read_sync_state(&io, &vault_root).await.unwrap();
+            assert!(
+                mid.rekey_rebase_pending,
+                "precondition: the re-key armed the re-base flag"
+            );
+            // Five, not six: the fixture un-seeds one singleton so the "no
+            // baseline means nothing stranded" arm stays reachable, and a
+            // precondition that asserted the candidate count would be asserting
+            // the fixture rather than the rule.
+            assert_eq!(
+                mid.pending_orphan_tombstones.len(),
+                5,
+                "precondition: one tombstone per root-derived singleton this device \
+                 pushed, out of six candidates (attachments catalog, prefs, \
+                 themes, conversations catalog, agent-memory catalog, \
+                 personality)"
+            );
+        });
+    }
+
+    #[test]
+    #[ignore = "unfixed: the abort unwinds one of the re-base's durable changes; see myne-md/myne#759"]
+    fn an_aborted_migration_leaves_nothing_aimed_at_a_live_singleton() {
+        use crate::plugins::sync::state::read_sync_state;
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-abort-rebase").unwrap();
+            let host = TestHost::new(tmp.path());
+            let io = StdVaultIo;
+            let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            let old_ids = seed_enrolled_device_sync_state(&io, &vault_root).await;
+
+            let state = VaultRuntimeState::default();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            vault_migrate_from_host(&host, &state, &hooks, PASSWORD, PHRASE, &io)
+                .await
+                .expect("migration succeeds");
+
+            // The re-base armed the queue while the vault was still v0.1. This
+            // is the precondition, and it is asserted LIVE so the ignored
+            // assertions below cannot be reached by a fixture that never armed
+            // anything.
+            // The re-base queues one tombstone per root_key-derived SINGLETON,
+            // and there are six of them, not three: the attachments catalog,
+            // prefs, themes, the conversations catalog, the agent-memory catalog
+            // and the personality directive (myne-md/myne#675, #697). The first
+            // version of this test asserted 3 and the dev note then claimed
+            // "the fixture is smaller than production, and the test says so":
+            // which no comment in the test said. It is the same size.
+            let mid = read_sync_state(&io, &vault_root).await.unwrap();
+            assert_eq!(
+                mid.pending_orphan_tombstones.len(),
+                6,
+                "precondition: the re-base queues one tombstone per root-derived \
+                 singleton, and there are six"
+            );
+
+            vault_migrate_abort_from_host(&host, &state, &hooks, &io)
+                .await
+                .expect("abort succeeds");
+
+            let after = read_sync_state(&io, &vault_root).await.unwrap();
+            // (1) The flag IS unwound today. Asserted so the finding is not read
+            //     as "the abort does nothing".
+            assert!(
+                !after.rekey_rebase_pending,
+                "the armed re-base flag must be cleared by the rollback"
+            );
+            // (2) …the queue is NOT, and must be. The rollback restores the old
+            //     `root_key`, so the ids these tombstones name are live again.
+            assert!(
+                after.pending_orphan_tombstones.is_empty(),
+                "the tombstone queue outlived the premise that made those ids \
+                 orphans: the vault is back on the old root_key, so they are live, \
+                 and draining it deletes them on every peer"
+            );
+            let still_queued: std::collections::BTreeSet<&str> = after
+                .pending_orphan_tombstones
+                .iter()
+                .map(|t| t.blob_id_hex.as_str())
+                .collect();
+            for id in &old_ids {
+                assert!(
+                    !still_queued.contains(id.as_str()),
+                    "a tombstone for a now-live singleton id survived the rollback"
+                );
+            }
+            // (3) The dropped CAS baselines must be restored too, or the local
+            //     view no longer knows the version its own singletons sit at and
+            //     the next push goes out at base_version 0.
+            for id in &old_ids {
+                assert!(
+                    after.blobs.contains_key(id),
+                    "a rolled-back migration left the singleton's CAS baseline \
+                     dropped, so the next push would CAS against version 0"
+                );
+            }
+        })
+    }
+
     /// A migration on a SYNC-ENROLLED device must hand the sync plane over to the
     /// new key generation (myne-md/myne#429).
     ///
@@ -2004,43 +2247,19 @@ mod tests {
     /// falsifiable: removing any single leg leaves the others green.
     #[test]
     fn a_migration_hands_the_sync_plane_to_the_new_key_generation() {
-        use crate::plugins::sync::orchestrator::{catalog_sync_id, prefs_sync_id, themes_sync_id};
-        use crate::plugins::sync::state::{
-            read_sync_state, vault_meta_is_dirty, write_sync_state, BlobSyncState, SyncState,
-        };
+        use crate::plugins::sync::state::{read_sync_state, vault_meta_is_dirty};
         use crate::plugins::vault_unlock::state::VaultRuntimeState;
         block_on(async {
             let tmp = ScopedTempDir::new("vault-migrate-rebase").unwrap();
             let host = TestHost::new(tmp.path());
             let io = StdVaultIo;
             let vault_root = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
-            io.create_dir_all(&vault_root.join("notes")).await.unwrap();
-            build_myv1_vault(&io, &vault_root).await;
-
-            // An enrolled device mid-sync: a cursor, a device id, and CAS
-            // baselines for all three root-derived singleton sync-ids.
-            let mut seeded = SyncState {
-                cursor: 42,
-                device_id_hex: Some("aa".repeat(16)),
-                account_hash_hex: Some("bb".repeat(16)),
-                ..SyncState::default()
-            };
-            let old_ids = [
-                catalog_sync_id(&OLD_ROOT),
-                prefs_sync_id(&OLD_ROOT),
-                themes_sync_id(&OLD_ROOT),
-            ];
-            for id in &old_ids {
-                seeded.blobs.insert(
-                    crate::plugins::sync::to_hex(id),
-                    BlobSyncState {
-                        version: 7,
-                        content_nonce_hex: "cc".repeat(24),
-                        doc_heads_hex: Vec::new(),
-                    },
-                );
-            }
-            write_sync_state(&io, &vault_root, &seeded).await.unwrap();
+            let all_ids_hex = seed_enrolled_device_sync_state(&io, &vault_root).await;
+            // Five of the six: `seed_enrolled_device_sync_state` un-seeds one, so
+            // the tombstone count is the seeded count and the un-seeded id is
+            // named below as the one that owes nothing.
+            let expected_tombstones = all_ids_hex.len() - 1;
+            let theme_hex = &all_ids_hex[THEME_INDEX];
             // The device-local head baseline (`MYH1`), whose integrity is the
             // head's own HMAC under a subkey of the root about to be replaced.
             io.write(
@@ -2077,9 +2296,9 @@ mod tests {
             );
             // (4) The old singletons' CAS baselines describe blobs under sync-ids
             //     this vault no longer derives.
-            for id in &old_ids {
+            for id in &all_ids_hex {
                 assert!(
-                    !after.blobs.contains_key(&crate::plugins::sync::to_hex(id)),
+                    !after.blobs.contains_key(id),
                     "a previous-generation singleton baseline survived the re-key"
                 );
             }
@@ -2094,12 +2313,19 @@ mod tests {
                 .collect();
             assert_eq!(
                 queued.len(),
-                3,
-                "all three re-keyed singletons owe a reclaim tombstone, got {queued:?}"
+                expected_tombstones,
+                "every re-keyed singleton this device had PUSHED owes a reclaim \
+                 tombstone, and the one it never pushed owes none, got {queued:?}"
             );
-            for id in &old_ids {
+            assert!(
+                !queued.contains_key(theme_hex),
+                "a singleton with no baseline was queued: there is no server record \
+                 under that id to reclaim, and a tombstone for it would delete a \
+                 blob the peer still holds"
+            );
+            for id in all_ids_hex.iter().filter(|id| *id != theme_hex) {
                 assert_eq!(
-                    queued.get(&crate::plugins::sync::to_hex(id)),
+                    queued.get(id),
                     Some(&7),
                     "the tombstone must CAS against the version the dropped \
                      baseline held, not 0"
@@ -2112,14 +2338,24 @@ mod tests {
                 .iter()
                 .map(|t| t.content_nonce_hex.as_str())
                 .collect();
-            assert_eq!(nonces.len(), 3, "each tombstone mints its own nonce");
+            assert_eq!(
+                nonces.len(),
+                expected_tombstones,
+                "each tombstone mints its own nonce"
+            );
             assert!(!nonces.contains(&"cc".repeat(24).as_str()));
             // (5) …and the rest of the enrolment is untouched: re-basing is not
             //     re-enrolling, and dropping these would cost the device its
             //     identity and every note's CAS base.
             assert_eq!(after.cursor, 42);
-            assert_eq!(after.device_id_hex, seeded.device_id_hex);
-            assert_eq!(after.account_hash_hex, seeded.account_hash_hex);
+            assert_eq!(
+                after.device_id_hex.as_deref(),
+                Some("aa".repeat(16).as_str())
+            );
+            assert_eq!(
+                after.account_hash_hex.as_deref(),
+                Some("bb".repeat(16).as_str())
+            );
         })
     }
 
