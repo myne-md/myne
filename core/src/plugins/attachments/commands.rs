@@ -2579,6 +2579,7 @@ mod tests {
             items_key_nonce: [8u8; 24],
             enc_items_key: [9u8; 64],
             membership: None,
+            person_binding: None,
         };
         std::fs::write(
             dir.join("vault.meta"),
@@ -2622,6 +2623,7 @@ mod tests {
             items_key_nonce: [8u8; 24],
             enc_items_key: [9u8; 64],
             membership: None,
+            person_binding: None,
         };
         std::fs::write(
             dir.join("vault.meta"),

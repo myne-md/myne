@@ -16,6 +16,7 @@ import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
 import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
+import { IdentityFlow } from "./flows/IdentityFlow";
 import { JoinFlow } from "./flows/JoinFlow";
 import { CreateVaultFlow } from "./flows/CreateVaultFlow";
 import { UnlockFlow } from "./flows/UnlockFlow";
@@ -99,6 +100,8 @@ function StageSwitch() {
   // surfaces (welcome, picker, the editor's vault switcher — myne-mobile#40) and
   // each dispatches its own success action. `null` = no join in flight.
   const [joinFrom, setJoinFrom] = useState<JoinEntry | null>(null);
+  /** The identity-first overlay on the welcome arm (myne-md/myne#768). */
+  const [identityOpen, setIdentityOpen] = useState(false);
 
   /**
    * Land a stage — the single writer of `stage` and its ref mirror.
@@ -211,11 +214,19 @@ function StageSwitch() {
   // the editor is the adaptive multi-pane surface and fills the window.
   switch (stage.name) {
     case "welcome":
+      if (identityOpen) {
+        return (
+          <PhoneColumn>
+            <IdentityFlow onCancel={() => setIdentityOpen(false)} />
+          </PhoneColumn>
+        );
+      }
       return (
         <PhoneColumn>
           <WelcomeFlow
             onCreate={() => dispatch({ type: "create-vault.start" })}
             onJoin={() => setJoinFrom("welcome")}
+            onIdentity={() => setIdentityOpen(true)}
           />
         </PhoneColumn>
       );

@@ -1563,6 +1563,7 @@ fn vault_meta_vectors() {
                     items_key_nonce,
                     enc_items_key,
                     membership: None,
+                    person_binding: None,
                 };
 
                 let actual = serialize_vault_meta(&meta);
@@ -3205,8 +3206,8 @@ fn aad_construction_vectors() {
 fn aad_construction_v0_2_vectors() {
     use protocol::{
         aad_agent_memory_blob_v0_2, aad_membership_blob, aad_membership_roster_blob,
-        aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
-        aad_vault_items_key_wrap_v0_2,
+        aad_password_wrap_v0_2, aad_person_binding_blob, aad_recovery_wrap_v0_2,
+        aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -3280,6 +3281,7 @@ fn aad_construction_v0_2_vectors() {
             }
             "aad_membership_blob" => aad_membership_blob(&account_number_hash()),
             "aad_membership_roster_blob" => aad_membership_roster_blob(&account_number_hash()),
+            "aad_person_binding_blob" => aad_person_binding_blob(&account_number_hash()),
             "aad_person_wrap" => {
                 let fingerprint: [u8; 32] = hex_decode_array(
                     case["input_recipient_fingerprint_hex"]
@@ -3351,13 +3353,14 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 10] = [
+    let required: [&str; 11] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
         "aad_singleton_blob_v0_2",
         "aad_agent_memory_blob_v0_2",
         "aad_membership_blob",
+        "aad_person_binding_blob",
         "aad_membership_roster_blob",
         "aad_person_wrap",
         "aad_person_keypair",
@@ -5997,6 +6000,7 @@ fn vault_meta_v0_2_vectors() {
                     items_key_nonce: hex_decode_array(field(case, id, "input_items_key_nonce_hex")),
                     enc_items_key: hex_decode_array(field(case, id, "input_enc_items_key_hex")),
                     membership: None,
+                    person_binding: None,
                 };
                 let actual = serialize_vault_meta_v0_2(&meta);
                 assert_eq!(
@@ -6124,6 +6128,52 @@ fn vault_meta_v0_2_vectors() {
                     "[{id}] the length field past the 64 KiB cap must reject BEFORE any ciphertext read"
                 );
             }
+            "person_binding_present" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] person-binding meta must parse: {e:?}"));
+                let binding = meta
+                    .person_binding
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] person binding must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let person_id =
+                    protocol::unseal_person_binding(&root_key, binding, &account_number_hash)
+                        .unwrap_or_else(|e| panic!("[{id}] person binding unseal: {e:?}"));
+                assert_eq!(
+                    hex_encode(&*person_id),
+                    field(case, id, "expected_person_id_hex"),
+                    "[{id}] person id hash"
+                );
+            }
+            "person_binding_tampered" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] tampered person binding must parse: {e:?}"));
+                let binding = meta
+                    .person_binding
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] person binding must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                assert!(
+                    protocol::unseal_person_binding(&root_key, binding, &account_number_hash)
+                        .is_err(),
+                    "[{id}] a tampered person binding must fail closed"
+                );
+            }
+            "person_binding_absent" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] absent person binding must parse: {e:?}"));
+                assert!(
+                    meta.person_binding.is_none(),
+                    "[{id}] absent person binding must report None"
+                );
+            }
             other => panic!("[{id}] unknown case_kind {other}"),
         }
     }
@@ -6151,6 +6201,16 @@ fn vault_meta_v0_2_vectors() {
         assert!(
             seen.contains(k),
             "vault-meta/v0.2 must cover roster case_kind {k}"
+        );
+    }
+    for k in [
+        "person_binding_present",
+        "person_binding_tampered",
+        "person_binding_absent",
+    ] {
+        assert!(
+            seen.contains(k),
+            "vault-meta/v0.2 must cover person-binding case_kind {k}"
         );
     }
 }

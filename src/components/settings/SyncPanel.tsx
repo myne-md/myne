@@ -14,6 +14,8 @@ import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
+import { IdentitySetupDialog } from "../IdentitySetupDialog";
+import { personStatus } from "../../lib/personAccount";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
@@ -113,6 +115,17 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus } = useSyncStatus();
+  useEffect(() => {
+    let alive = true;
+    void personStatus()
+      .then((s) => {
+        if (alive) setPersonEnrolled(s.enrolled);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
   const betaTerms = useBetaTermsGate();
@@ -121,6 +134,9 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // matters: the shell's flag outlives this panel, so unmounting with the
   // dialog open would leave Esc gated for every later session.
   const [termsOpen, setTermsOpen] = useState(false);
+  // The later-add identity door (myne-md/myne#768).
+  const [identityOpen, setIdentityOpen] = useState(false);
+  const [personEnrolled, setPersonEnrolled] = useState(false);
   useEffect(() => {
     onDialogOpenChange?.(termsOpen);
     return () => onDialogOpenChange?.(false);
@@ -326,6 +342,24 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
+      {/* Identity block (myne-md/myne#768): a user who owns a vault and skipped
+          the identity door adds one here, beside the endpoint and enrolment
+          surfaces. Absent once an identity exists, because there is then nothing
+          to add and the block would be a permanent offer of a no-op. */}
+      {hasCapability("memberSharing") && !personEnrolled && (
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.identity" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("sync.panel.identity.label")}</span>
+          <p style={HELPER_STYLE}>{t("sync.panel.identity.helper")}</p>
+          <Button
+            variant="secondary"
+            onClick={() => setIdentityOpen(true)}
+            data-testid="sync.panel.add-identity"
+          >
+            {t("sync.panel.identity.cta")}
+          </Button>
+        </div>
+      )}
+
       <div style={BLOCK_STYLE} data-setting-anchor="sync.server" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.server.label")}</span>
         {/* The server helper now renders inside EndpointConfig, directly under
@@ -392,6 +426,12 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         // Declining closes the dialog and leaves the gate standing — the form
         // was never rendered, so there is nothing to take back.
         onCancel={() => setTermsOpen(false)}
+      />
+
+      <IdentitySetupDialog
+        open={identityOpen}
+        onClose={() => setIdentityOpen(false)}
+        onCreated={() => setPersonEnrolled(true)}
       />
 
       {/* What that form is replaced BY for a device that is already waiting

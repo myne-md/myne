@@ -1962,6 +1962,7 @@ mod tests {
             items_key_nonce: items_nonce,
             enc_items_key: enc_items,
             membership: None,
+            person_binding: None,
         };
         io.write(
             &vault_root.join("vault.meta"),

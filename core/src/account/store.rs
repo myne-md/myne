@@ -671,13 +671,51 @@ pub fn stamp_membership_field(
     protocol::serialize_vault_meta_v0_2(&stamped)
 }
 
+/// Stamp the sealed person binding field into a `vault.meta` blob, when absent
+/// (myne-md/myne#768). The sibling of [`stamp_membership_field`]: binds the
+/// vault to a person identity so the identity-first first run can enumerate a
+/// person's vaults and show a vault under its person.
+///
+/// Best-effort by design, like its sibling: returns the new blob when stamped,
+/// or the original bytes unchanged when the field is already present, the vault
+/// is not `NTV5`, or any step failed. A vault's binding is independent of its
+/// account membership, so this never requires `membership` to be present.
+pub fn stamp_person_binding_field(
+    root_key: &[u8; AEAD_KEY_LEN],
+    person_id_hash: &[u8; protocol::PERSON_BINDING_ID_LEN],
+    account_number_hash: &[u8; 16],
+    meta_bytes: &[u8],
+) -> Vec<u8> {
+    let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
+        return meta_bytes.to_vec();
+    };
+    if meta.person_binding.is_some() {
+        return meta_bytes.to_vec();
+    }
+    // The field is NTV5-only, like the membership field.
+    if protocol::meta_version_of(meta_bytes) != Some(protocol::MetaVersion::V0_2) {
+        return meta_bytes.to_vec();
+    }
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    if getrandom::getrandom(&mut nonce).is_err() {
+        return meta_bytes.to_vec();
+    }
+    let Ok(binding) =
+        protocol::seal_person_binding_raw(root_key, person_id_hash, account_number_hash, &nonce)
+    else {
+        return meta_bytes.to_vec();
+    };
+    let mut stamped = meta;
+    stamped.person_binding = Some(binding);
+    protocol::serialize_vault_meta_v0_2(&stamped)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_support::{block_on, ScopedTempDir};
     use crate::vault_io::StdVaultIo;
     use crate::vault_label::fake_keychain::FakeKeychain;
-
     fn account() -> Account {
         Account {
             account_id: [0xAB; ACCOUNT_ID_LEN],
@@ -900,9 +938,76 @@ mod tests {
             items_key_nonce: [0x08; 24],
             enc_items_key: [0x09; 64],
             membership: Some(membership),
+            person_binding: None,
         };
         let bytes = protocol::serialize_vault_meta_v0_2(&base);
         let stamped = stamp_membership_field(&root, &account_id, &hash, &bytes);
+        assert_eq!(stamped, bytes, "already-present field must be a no-op");
+    }
+
+    #[test]
+    fn stamp_person_binding_field_stamps_an_absent_field_without_membership() {
+        // The binding is independent of the membership field: stamping it on a
+        // vault with no membership must produce a base-plus-binding blob whose
+        // reserved byte carries ONLY the binding bit.
+        let root = [0x11; AEAD_KEY_LEN];
+        let person_id = [0x51; protocol::PERSON_BINDING_ID_LEN];
+        let hash = [0x44; 16];
+        let base = protocol::VaultMeta {
+            account_number_hash: hash,
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x01; 16],
+            random_salt_recovery: [0x02; 16],
+            nonce_password_wrap: [0x03; 24],
+            enc_root_key_password: [0x04; 64],
+            nonce_recovery_wrap: [0x05; 24],
+            enc_root_key_recovery: [0x06; 64],
+            items_key_id: [0x07; 16],
+            items_key_nonce: [0x08; 24],
+            enc_items_key: [0x09; 64],
+            membership: None,
+            person_binding: None,
+        };
+        let bytes = protocol::serialize_vault_meta_v0_2(&base);
+        let stamped = stamp_person_binding_field(&root, &person_id, &hash, &bytes);
+        assert_eq!(
+            stamped.len(),
+            protocol::VAULT_META_LEN + protocol::PERSON_BINDING_FIELD_LEN
+        );
+        assert_eq!(stamped[5], protocol::PERSON_BINDING_BIT);
+        let parsed = protocol::parse_vault_meta_v0_2(&stamped).expect("parse");
+        assert!(parsed.membership.is_none(), "membership must stay absent");
+        let b = parsed.person_binding.expect("binding present");
+        assert_eq!(
+            *protocol::unseal_person_binding(&root, &b, &hash).expect("unseal"),
+            person_id
+        );
+    }
+
+    #[test]
+    fn stamp_person_binding_field_is_a_noop_when_already_present() {
+        let root = [0x11; AEAD_KEY_LEN];
+        let person_id = [0x51; protocol::PERSON_BINDING_ID_LEN];
+        let hash = [0x44; 16];
+        let binding =
+            protocol::seal_person_binding_raw(&root, &person_id, &hash, &[0x52; 24]).expect("seal");
+        let base = protocol::VaultMeta {
+            account_number_hash: hash,
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x01; 16],
+            random_salt_recovery: [0x02; 16],
+            nonce_password_wrap: [0x03; 24],
+            enc_root_key_password: [0x04; 64],
+            nonce_recovery_wrap: [0x05; 24],
+            enc_root_key_recovery: [0x06; 64],
+            items_key_id: [0x07; 16],
+            items_key_nonce: [0x08; 24],
+            enc_items_key: [0x09; 64],
+            membership: None,
+            person_binding: Some(binding),
+        };
+        let bytes = protocol::serialize_vault_meta_v0_2(&base);
+        let stamped = stamp_person_binding_field(&root, &person_id, &hash, &bytes);
         assert_eq!(stamped, bytes, "already-present field must be a no-op");
     }
 
@@ -924,6 +1029,7 @@ mod tests {
             items_key_nonce: [0x08; 24],
             enc_items_key: [0x09; 64],
             membership: None,
+            person_binding: None,
         };
         let bytes = protocol::serialize_vault_meta_v0_2(&base);
         let stamped = stamp_membership_field(&root, &account_id, &hash, &bytes);

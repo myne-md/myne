@@ -1028,6 +1028,7 @@ mod enrol_root_key_tests {
             items_key_nonce: [0x51u8; 24],
             enc_items_key: [0u8; 64],
             membership: None,
+            person_binding: None,
         }
     }
 

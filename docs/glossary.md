@@ -2113,6 +2113,18 @@ A person-level server account independent of any vault (`decisions/protocol/0603
 
 Used in: `design-notes/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
 
+### **person identity** &nbsp; 📦 *Product*
+
+The addressable, recoverable person that Myne's first run is now rooted at (myne-md/myne#768, `decisions/ui/0615`). It is the [person account](#person-account) plus the [person keypair](#person-keypair) and the out-of-band [person identity code](#person-identity-code): the thing that can be invited to a vault and that owns zero or more vaults. It is vault-independent, so one identity spans every vault a person owns or belongs to, and it is created before a server-registered account can exist, which is why the first run configures a sync server before creating one. Distinct from a [vault](#vault), whose recovery phrase, account number and `root_key` stay its own, and distinct from the client-side account record, which is device-local grouping and carries no identity.
+
+Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
+
+### **identity-first first run** &nbsp; 📦 *Product*
+
+The zero-vault first-run shape on desktop and mobile in which the person identity is offered before a vault (`decisions/ui/0615`, myne-md/myne#768). It forks between creating an identity and starting with a local vault; the identity arm runs a sync-server step, creates the identity, and lands on the identity home from which a bound vault is created or a pending invite accepted. The identity step is skippable, and a skipped user owns an identity-less vault and can add an identity later from Settings. The web client has no identity-first first run, because identity setup is unsupported there and the browser first run stays at account bootstrap.
+
+Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
+
 ### **person identity code** &nbsp; 🔑 *Identifier*
 
 The out-of-band string a person hands the other party in an invite so it can be

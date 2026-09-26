@@ -1018,6 +1018,48 @@ pub fn aad_membership_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD seal of the vault's **person binding**
+/// field (`vault.meta` §9.3.1 extension, myne-md/myne#768). The field records
+/// which person identity a vault belongs to, so the identity-first first run can
+/// show a vault under its person and a person's vaults can be enumerated.
+///
+/// `NTV5`-only, so stamped with the **v0.2** prefix + version like
+/// [`aad_membership_blob`], whose shape it mirrors exactly. It binds
+/// `account_number_hash` rather than `person_id_hash` for the same reason the
+/// membership field does: the binding is to the VAULT's identity, so a
+/// person-binding field copied from another vault fails AEAD rather than
+/// silently re-labelling which person owns this vault. The sealed plaintext
+/// carries the `person_id_hash`; the AAD carries the vault's salt binding.
+///
+/// The role string is DISTINCT from `"membership-blob"`, `"membership-roster-blob"`
+/// and every person-keypair AAD: the person binding is a third, separate field
+/// sealed under the same `membership_key`, and a role reused across fields
+/// would let a swap between them verify.
+///
+/// Layout (44 bytes):
+///
+/// ```text
+/// "myne.v0.2|"                        10 bytes  (v0.2 AAD prefix, § 10.5)
+/// 0x02                                 1 byte   (protocol_version, § 9.3)
+/// u16_be(19) || "person-binding-blob" 21 bytes  (length-prefixed role, § 5.2)
+/// account_number_hash                 16 bytes  (vault identity binding)
+/// ```
+pub fn aad_person_binding_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PERSON_BINDING_BLOB: &[u8] = b"person-binding-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_PERSON_BINDING_BLOB.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_BINDING_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a pending-capture blob
 /// (`captures/<capture-id>`, `MYK1`, MYND watch-capture; `protocol.md`
 /// § 9.18.3). Unlike every other § 9 blob AAD, it binds NEITHER
@@ -3425,6 +3467,27 @@ mod tests {
                 ("account_number_hash", 16),
             ],
             &role_and_hash_json("membership-blob"),
+            true,
+        );
+        // myne-md/myne#768: the person binding shares the membership_key and
+        // binds the same account_number_hash, but with its own role string, so a
+        // binding field copied from another vault fails AEAD instead of
+        // silently re-labelling which person owns this vault.
+        let aad_person_binding = aad_person_binding_blob(&account_number_hash);
+        emit_case(
+            &mut dump,
+            "aad_person_binding_blob",
+            "aad_person_binding_blob",
+            "AAD bound into the AEAD seal of the vault person binding field (§9.3.1 extension, myne-md/myne#768). Mirrors aad_membership_blob in shape (role + account_number_hash) under the v0.2 domain, sealed under the SAME membership_key, so a person-binding field copied from another vault fails AEAD rather than silently re-labelling which person owns this vault.",
+            &aad_person_binding,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 19),
+                ("account_number_hash", 16),
+            ],
+            &role_and_hash_json("person-binding-blob"),
             true,
         );
         // myne-md/myne#698 (B2B identity substrate): the roster envelope and

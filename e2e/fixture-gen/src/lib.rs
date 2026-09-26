@@ -217,6 +217,7 @@ pub fn build_fixture_in(
         items_key_nonce,
         enc_items_key,
         membership: None,
+        person_binding: None,
     };
 
     Ok(Fixture {

@@ -86,11 +86,16 @@ describe("no credential field blocks paste", () => {
   it("the revealed phrase is selectable, which is what makes copy possible", () => {
     // `userSelect` flips to `text` on reveal; before reveal it is `none`, and
     // that is correct: there is nothing to select behind the blur.
-    const src = code("src/screens/vault-creation/PhraseStep.tsx");
+    //
+    // The reveal lives in the shared `SecretPhraseReveal` as of myne-md/myne#768,
+    // because the identity phrase and the vault phrase get the same protections.
+    // Both callers render the shared control, so the assertion reads the one
+    // implementation rather than a per-screen copy.
+    const src = code("src/components/SecretPhraseReveal.tsx");
     expect(src).toMatch(/userSelect:\s*revealed\s*\?\s*"text"/);
     // And a Copy control exists, so the mechanism does not depend on the user
     // dragging a selection across 24 words.
-    expect(src).toContain('data-testid="create.phrase-copy"');
+    expect(src).toContain('data-testid={`${testIdPrefix}-copy`}');
   });
 });
 

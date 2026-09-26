@@ -13692,6 +13692,7 @@ mod tests {
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
                 membership: None,
+                person_binding: None,
             };
             serialize_vault_meta(&m).to_vec()
         }
@@ -13982,6 +13983,7 @@ mod tests {
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
                 membership: None,
+                person_binding: None,
             };
             protocol::serialize_vault_meta_v0_2(&m).to_vec()
         }
@@ -14043,6 +14045,7 @@ mod tests {
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
                 membership: None,
+                person_binding: None,
             };
             bad.enc_items_key = [0xEE; VAULT_META_WRAPPED_ITEMS_KEY_LEN]; // divergent!
             let server = serialize_vault_meta(&bad).to_vec();
@@ -14778,6 +14781,7 @@ mod tests {
             items_key_nonce: [0x08; protocol::VAULT_META_NONCE_LEN],
             enc_items_key: [0x09; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         }
     }
 

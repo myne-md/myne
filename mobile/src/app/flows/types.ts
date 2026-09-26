@@ -14,6 +14,18 @@ export interface WelcomeFlowProps {
   onCreate: () => void;
   /** Enter the fresh-device sync-join flow ("Connect to my account"). */
   onJoin: () => void;
+  /**
+   * Identity-first door (myne-md/myne#768). Opens the mobile identity flow,
+   * which fronts the sync-server step when none is configured and lands on the
+   * identity home once an identity exists.
+   */
+  onIdentity: () => void;
+}
+
+export interface IdentityFlowProps {
+  /** Leave the flow. From the gate it is the skip path; from the home it
+   *  dismisses the overlay. An identity, once created, is not undone here. */
+  onCancel: () => void;
 }
 
 export interface JoinFlowProps {

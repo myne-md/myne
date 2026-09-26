@@ -98,33 +98,43 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdenti
             marginTop: "var(--space-2)",
           }}
         >
+          {/* The fork (myne-md/myne#768). Identity comes first, because Myne is
+              organised around it: an identity is what makes a person
+              addressable for invites, and one identity spans many vaults. The
+              local-vault door stays one tap away rather than hidden, since an
+              offline vault with no identity is a legitimate choice and the
+              identity can be added later from Settings. The two are visually
+              adjacent and equally reachable; only the order changed. */}
           <Button
             variant="primary"
-            onClick={onCreateVault}
-            data-testid="welcome.create-cta"
+            onClick={() => setIdentityOpen(true)}
+            data-testid="welcome.identity-cta"
           >
-            {t("welcome.createCta")}
+            {t("welcome.startIdentity")}
           </Button>
           <Button
             variant="secondary"
+            onClick={onCreateVault}
+            data-testid="welcome.create-cta"
+          >
+            {t("welcome.startLocal")}
+          </Button>
+
+          <div style={{ height: 1, background: "var(--line-1)", margin: "var(--space-1) 0" }} />
+
+          <Button
+            variant="ghost"
             onClick={onRestoreBackup}
             data-testid="welcome.restore-cta"
           >
             {t("welcome.restoreCta")}
           </Button>
           <Button
-            variant="secondary"
+            variant="ghost"
             onClick={onJoinDevice}
             data-testid="welcome.join-cta"
           >
             {t("welcome.joinCta")}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setIdentityOpen(true)}
-            data-testid="welcome.identity-cta"
-          >
-            {t("welcome.identityCta")}
           </Button>
         </div>
 

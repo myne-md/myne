@@ -32,8 +32,8 @@
 
 use crate::aead::{
     aad_membership_blob, aad_membership_roster_blob, aad_password_wrap_v0_2,
-    aad_recovery_wrap_v0_2, aad_vault_items_key_wrap_v0_2, aead_open_ctx, aead_seal_ctx,
-    AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    aad_person_binding_blob, aad_recovery_wrap_v0_2, aad_vault_items_key_wrap_v0_2, aead_open_ctx,
+    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
 };
 use crate::error::ProtocolError;
 use crate::kdf::{
@@ -42,10 +42,11 @@ use crate::kdf::{
 use crate::subkey::{derive_subkey_v0_2, SubkeyRole};
 use crate::types::{KdfParams, MetaVersion};
 use crate::vault_meta::{
-    parse_vault_meta, serialize_vault_meta, Membership, MembershipRoster, VaultMeta,
+    parse_vault_meta, serialize_vault_meta, Membership, MembershipRoster, PersonBinding, VaultMeta,
     MEMBERSHIP_ACCOUNT_ID_LEN, MEMBERSHIP_CIPHERTEXT_LEN, MEMBERSHIP_FIELD_LEN,
-    MEMBERSHIP_ROSTER_CT_CAP, MEMBERSHIP_ROSTER_NONCE_LEN, VAULT_META_ITEMS_KEY_ID_LEN,
-    VAULT_META_LEN, VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION,
+    MEMBERSHIP_ROSTER_CT_CAP, MEMBERSHIP_ROSTER_NONCE_LEN, PERSON_BINDING_BIT,
+    PERSON_BINDING_CIPHERTEXT_LEN, PERSON_BINDING_FIELD_LEN, PERSON_BINDING_ID_LEN,
+    VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC, VAULT_META_PROTOCOL_VERSION,
     VAULT_META_V0_2_WITH_MEMBERSHIP_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN,
     VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
@@ -216,6 +217,16 @@ pub fn serialize_vault_meta_v0_2(meta: &VaultMeta) -> Vec<u8> {
             }
         }
     }
+    // The person binding is an INDEPENDENT trailing field declared by a BIT in
+    // the reserved byte (myne-md/myne#768), so it combines with any of the three
+    // membership shapes above rather than replacing them. Written LAST, after
+    // whatever membership/roster bytes are present, so its position is
+    // determined by the low bits and the bit only says whether it is there.
+    if let Some(binding) = &meta.person_binding {
+        out[5] |= PERSON_BINDING_BIT;
+        out.extend_from_slice(&binding.nonce);
+        out.extend_from_slice(&binding.enc);
+    }
     out
 }
 
@@ -243,20 +254,42 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         return Err(ProtocolError::InvalidVaultMeta);
     }
     let reserved = bytes[5];
-    if reserved > 0x02 {
+    // Low bits (0x03) are the membership shape: 0x00 none, 0x01 membership,
+    // 0x02 membership + roster. The 0x10 bit declares a trailing person-binding
+    // field (myne-md/myne#768). Any OTHER bit is unallocated and rejected, so a
+    // future generation cannot be silently read as one of these shapes.
+    if reserved & !(0x03 | PERSON_BINDING_BIT) != 0 {
         return Err(ProtocolError::InvalidVaultMeta);
     }
-    let has_membership = reserved >= 0x01;
-    let has_roster = reserved == 0x02;
+    let has_person_binding = reserved & PERSON_BINDING_BIT != 0;
+    let membership_shape = reserved & 0x03;
+    if membership_shape > 0x02 {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    let has_membership = membership_shape >= 0x01;
+    let has_roster = membership_shape == 0x02;
     if has_membership && bytes.len() < VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
         return Err(ProtocolError::InvalidVaultMeta);
     }
-    if !has_membership && bytes.len() != VAULT_META_LEN {
+    if !has_membership && !has_person_binding && bytes.len() != VAULT_META_LEN {
+        return Err(ProtocolError::InvalidVaultMeta);
+    }
+    if !has_membership
+        && has_person_binding
+        && bytes.len() != VAULT_META_LEN + PERSON_BINDING_FIELD_LEN
+    {
         return Err(ProtocolError::InvalidVaultMeta);
     }
 
     // Roster envelope (reserved 0x02 only): 24-byte nonce + u32 BE ciphertext
-    // length + ciphertext, directly after the single-account field.
+    // length + ciphertext, directly after the single-account field. A
+    // person-binding field, when present, follows the roster, so the roster's
+    // expected end is the total length minus that field.
+    let person_binding_len = if has_person_binding {
+        PERSON_BINDING_FIELD_LEN
+    } else {
+        0
+    };
     let roster = if has_roster {
         let base = VAULT_META_V0_2_WITH_MEMBERSHIP_LEN;
         // Envelope order (the serializer's): roster nonce (24) || u32 BE ct
@@ -276,7 +309,7 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
             return Err(ProtocolError::InvalidVaultMeta);
         }
         let ct_start = len_start + 4;
-        let expected = ct_start + ct_len;
+        let expected = ct_start + ct_len + person_binding_len;
         if bytes.len() != expected {
             return Err(ProtocolError::InvalidVaultMeta);
         }
@@ -284,13 +317,14 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         roster_nonce
             .copy_from_slice(&bytes[nonce_start..nonce_start + MEMBERSHIP_ROSTER_NONCE_LEN]);
         let mut enc = alloc::vec::Vec::with_capacity(ct_len);
-        enc.extend_from_slice(&bytes[ct_start..expected]);
+        enc.extend_from_slice(&bytes[ct_start..ct_start + ct_len]);
         Some(MembershipRoster {
             nonce: roster_nonce,
             enc,
         })
     } else {
-        if has_membership && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN {
+        if has_membership && bytes.len() != VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + person_binding_len
+        {
             return Err(ProtocolError::InvalidVaultMeta);
         }
         None
@@ -311,6 +345,15 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
             &bytes[VAULT_META_LEN + AEAD_NONCE_LEN..VAULT_META_LEN + MEMBERSHIP_FIELD_LEN],
         );
         meta.membership = Some(Membership { nonce, enc, roster });
+    }
+
+    if has_person_binding {
+        let start = bytes.len() - PERSON_BINDING_FIELD_LEN;
+        let mut nonce = [0u8; AEAD_NONCE_LEN];
+        nonce.copy_from_slice(&bytes[start..start + AEAD_NONCE_LEN]);
+        let mut enc = [0u8; PERSON_BINDING_CIPHERTEXT_LEN];
+        enc.copy_from_slice(&bytes[start + AEAD_NONCE_LEN..start + PERSON_BINDING_FIELD_LEN]);
+        meta.person_binding = Some(PersonBinding { nonce, enc });
     }
 
     Ok(meta)
@@ -441,6 +484,7 @@ pub fn encode_vault_meta_v0_2_raw(
         items_key_nonce: *items_key_nonce,
         enc_items_key,
         membership: None,
+        person_binding: None,
     };
     let out = serialize_vault_meta_v0_2(&meta);
     debug_assert_eq!(out.len(), VAULT_META_LEN);
@@ -569,6 +613,7 @@ pub fn rewrite_vault_meta_password_side_v0_2(
         items_key_nonce: existing.items_key_nonce,
         enc_items_key: existing.enc_items_key,
         membership: existing.membership.clone(),
+        person_binding: existing.person_binding.clone(),
     };
     Ok(serialize_vault_meta_v0_2(&new_meta))
 }
@@ -700,6 +745,50 @@ pub fn seal_membership_raw(
         enc,
         roster: None,
     })
+}
+
+/// Seal the vault's **person binding** field (myne-md/myne#768): the
+/// `person_id_hash` of the identity this vault belongs to, sealed under the
+/// SAME `membership_key` as the membership field but with its own AAD role
+/// (`aad_person_binding_blob`), so a person-binding field copied from another
+/// vault fails AEAD rather than silently re-labelling which person owns this
+/// vault. `_raw`: the caller supplies the nonce (CSPRNG).
+///
+/// `person_id_hash` is the 16-byte phrase-derived id (`"myne.person-id|"`,
+/// `protocol.md` §3.1).
+pub fn seal_person_binding_raw(
+    root_key: &[u8; AEAD_KEY_LEN],
+    person_id_hash: &[u8; PERSON_BINDING_ID_LEN],
+    account_number_hash: &[u8; 16],
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<PersonBinding, ProtocolError> {
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_person_binding_blob(account_number_hash);
+    let sealed = aead_seal_ctx(&membership_key, nonce, person_id_hash, &aad)?;
+    debug_assert_eq!(sealed.len(), PERSON_BINDING_CIPHERTEXT_LEN);
+    let mut enc = [0u8; PERSON_BINDING_CIPHERTEXT_LEN];
+    enc.copy_from_slice(&sealed);
+    Ok(PersonBinding { nonce: *nonce, enc })
+}
+
+/// Unseal the person id hash from a [`PersonBinding`] field. Returns
+/// [`ProtocolError::AeadFailure`] on a tampered field or a wrong `root_key`
+/// (the field is bound to its vault via `account_number_hash` in the AAD, so a
+/// field copied from another vault fails here).
+pub fn unseal_person_binding(
+    root_key: &[u8; AEAD_KEY_LEN],
+    binding: &PersonBinding,
+    account_number_hash: &[u8; 16],
+) -> Result<Zeroizing<[u8; PERSON_BINDING_ID_LEN]>, ProtocolError> {
+    let membership_key = derive_subkey_v0_2(root_key, SubkeyRole::MembershipKey);
+    let aad = aad_person_binding_blob(account_number_hash);
+    let pt = aead_open_ctx(&membership_key, &binding.nonce, &binding.enc, &aad)?;
+    if pt.len() != PERSON_BINDING_ID_LEN {
+        return Err(ProtocolError::AeadFailure);
+    }
+    let mut out = [0u8; PERSON_BINDING_ID_LEN];
+    out.copy_from_slice(&pt);
+    Ok(Zeroizing::new(out))
 }
 
 /// Seal a B2B roster envelope (b2b-identity-substrate, myne-md/myne#698 task
@@ -1128,6 +1217,125 @@ mod tests {
     }
 
     #[test]
+    fn person_binding_seal_unseal_round_trips() {
+        let person_id = [0x51; PERSON_BINDING_ID_LEN];
+        let nonce = [0x52; AEAD_NONCE_LEN];
+        let binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &nonce).expect("seal");
+        let recovered = unseal_person_binding(&ROOT, &binding, &ACCT).expect("unseal");
+        assert_eq!(*recovered, person_id);
+    }
+
+    #[test]
+    fn person_binding_tamper_fails_closed() {
+        let person_id = [0x51; PERSON_BINDING_ID_LEN];
+        let nonce = [0x52; AEAD_NONCE_LEN];
+        let mut binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &nonce).expect("seal");
+        binding.enc[0] ^= 0x01;
+        assert!(matches!(
+            unseal_person_binding(&ROOT, &binding, &ACCT),
+            Err(ProtocolError::AeadFailure)
+        ));
+    }
+
+    #[test]
+    fn person_binding_binds_account_number_hash() {
+        // A field sealed for one vault must not open under another vault's hash.
+        let person_id = [0x51; PERSON_BINDING_ID_LEN];
+        let nonce = [0x52; AEAD_NONCE_LEN];
+        let binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &nonce).expect("seal");
+        let other_hash = [0xEE; 16];
+        assert!(matches!(
+            unseal_person_binding(&ROOT, &binding, &other_hash),
+            Err(ProtocolError::AeadFailure)
+        ));
+    }
+
+    #[test]
+    fn person_binding_without_membership_round_trips() {
+        // The binding is INDEPENDENT of the membership field: a vault may carry
+        // one with no account membership at all. reserved = 0x10, length is the
+        // base plus one binding field.
+        let person_id = [0x51; PERSON_BINDING_ID_LEN];
+        let nonce = [0x52; AEAD_NONCE_LEN];
+        let binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &nonce).expect("seal");
+
+        let mut meta = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        meta.person_binding = Some(binding);
+
+        let blob = serialize_vault_meta_v0_2(&meta);
+        assert_eq!(blob.len(), VAULT_META_LEN + PERSON_BINDING_FIELD_LEN);
+        assert_eq!(blob[5], PERSON_BINDING_BIT, "only the binding bit is set");
+
+        let parsed = parse_vault_meta_v0_2(&blob).expect("parse NTV5 with binding");
+        assert!(parsed.membership.is_none());
+        let b = parsed.person_binding.expect("binding present");
+        assert_eq!(
+            *unseal_person_binding(&ROOT, &b, &ACCT).expect("unseal"),
+            person_id
+        );
+    }
+
+    #[test]
+    fn person_binding_combines_with_membership() {
+        // reserved = 0x01 | 0x10 = 0x11: membership field then binding field.
+        let account_id = [0xAB; MEMBERSHIP_ACCOUNT_ID_LEN];
+        let membership = seal_membership_raw(&ROOT, &account_id, &ACCT, &[0xCD; AEAD_NONCE_LEN])
+            .expect("seal m");
+        let person_id = [0x51; PERSON_BINDING_ID_LEN];
+        let binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &[0x52; AEAD_NONCE_LEN])
+            .expect("seal b");
+
+        let mut meta = parse_vault_meta_v0_2(&encode()).expect("parse base NTV5");
+        meta.membership = Some(membership);
+        meta.person_binding = Some(binding);
+
+        let blob = serialize_vault_meta_v0_2(&meta);
+        assert_eq!(
+            blob.len(),
+            VAULT_META_V0_2_WITH_MEMBERSHIP_LEN + PERSON_BINDING_FIELD_LEN
+        );
+        assert_eq!(blob[5], 0x01 | PERSON_BINDING_BIT);
+
+        let parsed = parse_vault_meta_v0_2(&blob).expect("parse NTV5 with both");
+        assert_eq!(
+            *unseal_membership(&ROOT, &parsed.membership.expect("membership"), &ACCT)
+                .expect("unseal m"),
+            account_id
+        );
+        assert_eq!(
+            *unseal_person_binding(&ROOT, &parsed.person_binding.expect("binding"), &ACCT)
+                .expect("unseal b"),
+            person_id
+        );
+    }
+
+    #[test]
+    fn pre_feature_reader_rejects_the_person_binding_bit() {
+        // A reader that only knows 0x00/0x01/0x02 sees reserved = 0x10 and must
+        // reject rather than mis-read a trailing field it does not understand.
+        let mut blob = encode().to_vec();
+        blob[5] = PERSON_BINDING_BIT;
+        // The length check rejects this 345-byte blob (a binding flag promises a
+        // field), which is the structural refusal, not a silent absent read.
+        assert!(matches!(
+            parse_vault_meta_v0_2(&blob),
+            Err(ProtocolError::InvalidVaultMeta)
+        ));
+    }
+
+    #[test]
+    fn parse_rejects_unallocated_reserved_bits() {
+        // A bit that is neither a membership shape bit nor the binding bit is
+        // unallocated and must be rejected.
+        let mut blob = encode().to_vec();
+        blob[5] = 0x40;
+        assert!(matches!(
+            parse_vault_meta_v0_2(&blob),
+            Err(ProtocolError::InvalidVaultMeta)
+        ));
+    }
+
+    #[test]
     fn parse_rejects_reserved_byte_above_the_allocated_range() {
         // 0x00/0x01/0x02 are allocated (base / single-account / roster); 0x03 is
         // the first unallocated value the newer-reads-older rule must reject.
@@ -1207,6 +1415,7 @@ mod tests {
             items_key_nonce: [0x62; 24],
             enc_items_key: [0x63; 64],
             membership: None,
+            person_binding: None,
         };
         let ntv5 = serialize_vault_meta_v0_2(&meta);
         assert_eq!(&ntv5[0..4], VAULT_META_V0_2_MAGIC.as_slice());
@@ -1366,6 +1575,78 @@ mod tests {
         std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
         std::println!("    \"tamper_offset\": 369,");
         std::println!("    \"expected_error\": \"aead_failure\"");
+        std::println!("  }},");
+
+        // --- person binding (myne-md/myne#768) ------------------------------
+        // A second, independent sealed field declared by the reserved byte's
+        // 0x10 bit. Distinct byte patterns from the membership cases (person id
+        // 0x71.., nonce 0x72..) so a cross-case diff cannot confuse them.
+        let person_id = [0x71; PERSON_BINDING_ID_LEN];
+        let binding_nonce = [0x72; AEAD_NONCE_LEN];
+        let binding = seal_person_binding_raw(&ROOT, &person_id, &ACCT, &binding_nonce)
+            .expect("seal binding");
+
+        // Binding present, no membership: reserved = 0x10.
+        let mut binding_only = base.clone();
+        binding_only.person_binding = Some(binding.clone());
+        let binding_only_blob = serialize_vault_meta_v0_2(&binding_only);
+        assert_eq!(binding_only_blob[5], PERSON_BINDING_BIT);
+
+        // Binding + membership: reserved = 0x01 | 0x10 = 0x11.
+        let mut both = base.clone();
+        both.membership = Some(membership.clone());
+        both.person_binding = Some(binding.clone());
+        let both_blob = serialize_vault_meta_v0_2(&both);
+        assert_eq!(both_blob[5], 0x01 | PERSON_BINDING_BIT);
+
+        // Tampered binding: flip a ciphertext byte; unseal must fail closed.
+        let mut tampered_binding = binding.clone();
+        tampered_binding.enc[0] ^= 0x01;
+        assert!(unseal_person_binding(&ROOT, &tampered_binding, &ACCT).is_err());
+        let mut tampered_binding_meta = base.clone();
+        tampered_binding_meta.person_binding = Some(tampered_binding);
+        let tampered_binding_blob = serialize_vault_meta_v0_2(&tampered_binding_meta);
+
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/person-binding-present\",");
+        std::println!("    \"description\": \"An NTV5 vault.meta with ONLY the person binding field: reserved byte 0x10 (the independent bit), 345 base bytes + 72 binding bytes. parse_vault_meta_v0_2 must accept it, report membership: None and unseal the person id hash. A vault may be bound to an identity with no account membership.\",");
+        std::println!("    \"case_kind\": \"person_binding_present\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&binding_only_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"expected_person_id_hex\": \"{}\"", hex(&person_id));
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/person-binding-with-membership\",");
+        std::println!("    \"description\": \"The person binding combined with the membership field: reserved byte 0x11 (membership shape bits 0x01 OR the binding bit 0x10). The binding is written after the membership bytes, so its position is determined by the low bits and the bit only says it is there.\",");
+        std::println!("    \"case_kind\": \"person_binding_present\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&both_blob));
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!("    \"expected_person_id_hex\": \"{}\"", hex(&person_id));
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/person-binding-tampered\",");
+        std::println!("    \"description\": \"The binding-only blob with the first binding ciphertext byte flipped. unseal_person_binding must fail closed (AeadFailure), never a partial read.\",");
+        std::println!("    \"case_kind\": \"person_binding_tampered\",");
+        std::println!(
+            "    \"input_blob_hex\": \"{}\",",
+            hex(&tampered_binding_blob)
+        );
+        std::println!("    \"input_root_key_hex\": \"{}\",", hex(&ROOT));
+        std::println!("    \"input_account_number_hash_hex\": \"{}\",", hex(&ACCT));
+        std::println!(
+            "    \"tamper_offset\": {},",
+            VAULT_META_LEN + AEAD_NONCE_LEN
+        );
+        std::println!("    \"expected_error\": \"aead_failure\"");
+        std::println!("  }},");
+        std::println!("  {{");
+        std::println!("    \"vector_id\": \"vault-meta/v0.2/person-binding-absent\",");
+        std::println!("    \"description\": \"A pre-feature NTV5 vault.meta (reserved byte 0x00, no binding). parse_vault_meta_v0_2 must accept it and report person_binding: None, so an old vault reads as unbound rather than failing.\",");
+        std::println!("    \"case_kind\": \"person_binding_absent\",");
+        std::println!("    \"input_blob_hex\": \"{}\",", hex(&absent));
+        std::println!("    \"expected_person_binding\": \"absent\"");
         std::println!("  }}");
         std::println!("]");
     }

@@ -434,6 +434,7 @@ pub(crate) async fn run_post_unlock_pipeline(
     // unlock heals, which bounds it to a regroup cycle rather than damage.
     if let Ok(_stamp_permit) = state.auth_permits().try_acquire() {
         stamp_membership_best_effort(host, state, io, keychain).await;
+        stamp_person_binding_best_effort(host, state, io).await;
     }
 }
 
@@ -517,6 +518,91 @@ async fn stamp_membership_best_effort(
             }
         }
     }
+}
+
+/// The unlock-time person-binding stamp (myne-md/myne#768), the sibling of
+/// [`stamp_membership_best_effort`]: when this device holds a person account and
+/// the active vault is not yet bound to it, seal the `person_id_hash` into
+/// `vault.meta` so the vault knows which identity owns it.
+///
+/// Reads `person-auth.json` (the device-scoped credential, which carries the
+/// person id even when it holds no token) rather than the session, because a
+/// person identity is session-scoped (`decisions/protocol/0612`) and unlock runs
+/// with no person session installed. Best-effort by design, with the same disk
+/// CAS discipline as its sibling.
+async fn stamp_person_binding_best_effort(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+) {
+    if let Some(active) = state.active_vault_id().await {
+        if let (Ok(base), Ok(config_dir)) = (host.app_data_dir(), host.app_config_dir()) {
+            if let Some(root_key) = state.peek_unlocked_root_key_clone().await {
+                // No identity on this device: nothing to bind.
+                let Ok(Some(auth)) = crate::plugins::sync::person_auth::read_person_auth(
+                    io,
+                    &config_dir.join(crate::plugins::sync::person_auth::PERSON_AUTH_FILE),
+                )
+                .await
+                else {
+                    return;
+                };
+                let Ok(person_id) = decode_person_id_hex(&auth.person_id_hex) else {
+                    return;
+                };
+                let meta_path =
+                    crate::paths::vault_root_for_id_from_base(&base, active).join("vault.meta");
+                if let Ok(meta_bytes) = io.read(&meta_path).await {
+                    let stamped = crate::account::store::stamp_person_binding_field(
+                        &root_key,
+                        &person_id,
+                        &protocol::parse_vault_meta_any(&meta_bytes)
+                            .map(|m| m.account_number_hash)
+                            .unwrap_or([0u8; 16]),
+                        &meta_bytes,
+                    );
+                    if stamped != meta_bytes {
+                        if let Ok(current) = io.read(&meta_path).await {
+                            if current == meta_bytes
+                                && io
+                                    .write(
+                                        &meta_path,
+                                        &stamped,
+                                        crate::vault_io::WriteOpts::default(),
+                                    )
+                                    .await
+                                    .is_ok()
+                            {
+                                state
+                                    .refresh_meta_hash_if(
+                                        active,
+                                        crate::vault_meta_hash::vault_meta_sha256(&meta_bytes),
+                                        crate::vault_meta_hash::vault_meta_sha256(&stamped),
+                                    )
+                                    .await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Decode a lowercase-hex `person_id_hex` (32 chars) into its 16 bytes. Returns
+/// an error on any length or nibble problem; the caller treats it as "no
+/// identity to bind" and does nothing.
+fn decode_person_id_hex(hex: &str) -> Result<[u8; protocol::PERSON_BINDING_ID_LEN], ()> {
+    if hex.len() != protocol::PERSON_BINDING_ID_LEN * 2 {
+        return Err(());
+    }
+    let mut out = [0u8; protocol::PERSON_BINDING_ID_LEN];
+    for (i, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
+        let hi = (chunk[0] as char).to_digit(16).ok_or(())?;
+        let lo = (chunk[1] as char).to_digit(16).ok_or(())?;
+        out[i] = ((hi << 4) | lo) as u8;
+    }
+    Ok(out)
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2383,6 +2469,21 @@ mod tests {
     // `ScopedTempDir` is imported at module scope further down (vault_list
     // tests); `use` is order-independent so it is in scope for the
     // rename-recovery tests above.
+
+    #[test]
+    fn decode_person_id_hex_round_trips_and_rejects_bad_input() {
+        // The person id from `person-auth.json` is lowercase hex, 32 chars for
+        // the 16-byte hash (myne-md/myne#768).
+        let id = [
+            0xAB, 0xCD, 0x01, 0x23, 0x45, 0x67, 0x89, 0xEF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+            0x66, 0x77,
+        ];
+        let hex: String = id.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(decode_person_id_hex(&hex), Ok(id));
+        // Wrong length and non-hex are both "no identity to bind".
+        assert!(decode_person_id_hex("abcd").is_err());
+        assert!(decode_person_id_hex(&"zz".repeat(16)).is_err());
+    }
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
