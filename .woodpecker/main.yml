@@ -733,15 +733,6 @@ steps:
       # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
       # since myne-core has no `generate_context!`.
       - cargo clippy -p myne-core --all-targets -- -D warnings
-      # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
-      # other clippy invocation in this file misses it — the slim step is
-      # `-p protocol`, the wasm steps are cross-target, and the line below is
-      # `--no-default-features`. An unused parameter on the AI path survived a
-      # whole merge train that way: the parameters still parse, the command
-      # still succeeded, and no gate compiled the default-features test tree
-      # that would have named them. Same image and warm cache as the line
-      # above, so it costs a lint, not a build.
-      - cargo clippy -p myne-desktop --all-targets -- -D warnings
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
@@ -777,6 +768,33 @@ steps:
       # Also additive and dependency-free; `cargo-test-tauri` still compiles the
       # production arm.
       - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
+      # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
+      # other clippy invocation in this file misses it — the slim step is
+      # `-p protocol`, the wasm steps are cross-target, and the line below is
+      # `--no-default-features`. An unused parameter on the AI path survived a
+      # whole merge train that way: the parameters still parse, the command
+      # still succeeded, and no gate compiled the default-features test tree
+      # that would have named them. Same image and warm cache as the line
+      # above, so it costs a lint, not a build.
+      #
+      # It sits HERE, after the `tauri build`, and it used to sit above it, which
+      # is why this step was red on every push from 2026-09-05 (d1502155) to
+      # 2026-09-26. `src-tauri/build.rs` ends in
+      # `tauri_build::try_build(attributes).unwrap()`, and `tauri_build` resolves
+      # every `bundle.externalBin` entry as a resource path and PANICS when the
+      # file is absent ("resource path `binaries/myne-x86_64-unknown-linux-gnu`
+      # doesn't exist"). `src-tauri/binaries/` is gitignored, and the ONLY line
+      # in this file that stages it is the `pnpm sidecar:release` inside the
+      # `beforeBuildCommand` override above — so a fresh CI checkout has nothing
+      # there when this lint runs first. Locally it never showed: a developer's
+      # `pnpm tauri dev` has staged the arm matching their own host triple.
+      #
+      # Moving the line is the whole fix and it costs no coverage. The
+      # `--no-default-features` clippy at the end of this step was already
+      # downstream of the staging, which is why it kept passing while this one
+      # did not, and both now compile the same test tree against the same
+      # resolved config.
+      - cargo clippy -p myne-desktop --all-targets -- -D warnings
       # Keep the E2E fixture generator compiling on every push. `cargo build
       # --release -p e2e-fixture-gen` inside the old `e2e` step was the ONLY
       # place in CI that touched this workspace member (`cargo-clippy` and
