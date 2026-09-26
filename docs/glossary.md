@@ -504,6 +504,12 @@ Reference: RFC 8439.
 
 The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
+### **characterisation test** &nbsp; 🛠️ *Tooling*
+
+A test whose assertions pin the code's **current** behaviour rather than the behaviour the code should have. See [ignored invariant test](#ignored-invariant-test) for the three shapes this belongs to and when each is the right one; the short form is that a characterisation test is **green while the defect lives**, so one that ships states that the defect is correct.
+
+Used in: `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#750
+
 ### **chat turn** &nbsp; 📦 *Product*
 
 One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
@@ -941,6 +947,14 @@ The user-tunable presets for the editor's reading surface: **text size** (`sm`/`
 
 Used in: `spec/protocol.md` §9.5.2
 
+### **effect half** &nbsp; ⚠️ *Threat*
+
+The half of a security finding that is **what a third party does with the bytes**: whether a provider's front end accepts an injected HTTP header line, whether a peer honours a tombstone for a version it already replaced, whether a browser tab survives a 64 MiB response. It is not observable from this repository, and a finding whose effect half is open cannot be promoted past `needs_validation` no matter how well its source half is closed.
+
+The counterpart is the [source half](#source-half), and the split is what keeps a source-only audit from claiming an outcome it did not measure.
+
+Used in: `docs/dev/audit-nv-verdicts.md`; `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`
+
 ### **ex command** &nbsp; 📦 *Product*
 
 A `:`-prefixed command line in [vim mode](#vim-mode). In Myne it is a **closed dispatch table**, not an interpreter: `:w`/`:x`/`:wq` flush the pending autosave (Myne saves invisibly, so "write" means "persist now"), `:q` closes the note tab, and `:s`/`:%s` substitutes. Commands a vim user is likely to try but Myne deliberately does not implement — `:set`, `:map`/`:nmap`/`:imap`/`:vmap`, `:source`, `:!`, `:e` — are registered **only so they refuse with a message**, never silently. The governing boundary: **no ex command may persist a behaviour definition**, which is what keeps the `:` line from becoming the `.vimrc`-style config-script surface Myne rejects (`decisions.md` 2026-07-25) — the same anti-scripting posture as the [template engine](#template-engine)'s insert-never-evaluate rule. Substitution refuses vim-only regex syntax (`\v`, `\zs`, `\(…\)`, `\1` back-references) rather than translating it: a mistranslation would rewrite the user's note silently, so the failure mode is "not supported", never "we changed something else". Introduced MYND-313. See also [vim mode](#vim-mode), [vim register](#vim-register).
@@ -1343,6 +1357,30 @@ The on-device optical-character-recognition generation of [attachment text extra
 Deliberately **not** an AI feature and **not** behind the AI opt-in — it is search correctness, and gating a background indexer behind a beta toggle would mean it effectively never ran. It therefore ships in every build, including the `--no-default-features` auditable one.
 
 Two limits are honest, measured properties rather than bugs. **Turkish diacritics do not survive reliably** — no available on-device model reproduces them, so the search index carries a diacritic-folded token variant for attachment documents to compensate; the *stored* text is whatever OCR produced. And recognition below a per-word confidence floor is discarded, so an image with no readable text is cached as empty rather than indexed with hallucinated words. (`spec/protocol.md` §9.15; MYND-441)
+
+### **ignored invariant test** &nbsp; 🛠️ *Tooling*
+
+A test that asserts the **invariant a fix must establish**, carries `#[ignore = "unfixed: … see <issue>"]`, and is therefore **red today**. `cargo test` stays green; `cargo test -- --ignored <name>` is the standing record of what is not yet fixed, and the day the fix lands the test is un-ignored and goes green.
+
+It is the third shape in a family of three, and the other two are not interchangeable with it:
+
+- A **regression test** asserts the invariant and **runs**, so it is red before a fix and green after. That direction is why it can be trusted to stay.
+- A **characterisation test** asserts the code's **current** behaviour, so it is **green while the defect lives** and goes **red the moment someone fixes it**. A red suite then reads like a regression, and the person who fixed the defect concludes they broke something. A characterisation test that ships therefore asserts the defect is *correct*, and every fix is gated on rewriting the test that documents it.
+- An **ignored invariant test** asserts the invariant like a regression test but does not run. It is the shape to use when the fix is NOT available in the same change.
+
+Two rules, and the second is the one that is easy to skip:
+
+1. **Prefer fixing the defect.** If the fix is available in the same change, the test should be an ordinary red-then-green regression test.
+2. **When the fix is not available, assert the invariant anyway and mark it `#[ignore]` with a reason naming a tracking issue that is OPEN.** The reason naming an issue that has since closed is the failure mode: on merge the record points at a closed issue and the test reads as an oversight rather than a deferral.
+
+Two things an ignored invariant test does not give you, and both have to be supplied separately:
+
+- **The count rots.** Nothing checks how many there are, so an entry that says "two tests, both red today" is a hand-maintained claim. `scripts/check-ignored-tests.mjs` holds the count and the open-issue requirement for `core/`.
+- **A right direction is not a working fixture.** A test whose fixture cannot reach the defective state passes with the defect present, and reads as rigor. Injection is the only thing that tells them apart: apply the fix, confirm the test turns red, restore. A test that was *supposed* to discriminate and does not is worse than one that was only ever documentation, because the documentation is now false in the direction that looks like coverage.
+
+Run one with `cargo test -p <crate> -- --ignored <name>`.
+
+Used in: `core/src/inference/chatml.rs`, `core/src/plugins/vault_migrate/mod.rs`, `scripts/check-ignored-tests.mjs`; `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#760, myne-md/myne#759
 
 ### **in-note find** &nbsp; 📦 *Product*
 
@@ -2870,6 +2908,14 @@ Used in: `spec/protocol.md` §9.1; `threat-model.md` §7; `decisions.md` 2026-06
 The Phase 2 sync state a device enters when its cursor falls behind the [tombstone horizon](#tombstone-horizon) (it has been offline / silent too long to participate in the per-device-ack [tombstone](#tombstone-horizon) GC). A soft-retired device is dropped from the "must-ack" set so its absence can't pin tombstones forever; on return it cannot resume incrementally and must run a [full-reconcile](#full-reconcile). Reuses the AS16 device-retirement mechanism (also needed for revocation) rather than inventing new state. Distinct from a hard device revocation (per-device token iptal). Phase 2.
 
 Used in: `spec/sync-protocol.md` §11
+
+### **source half** &nbsp; ⚠️ *Threat*
+
+The half of a security finding that is **what Myne does**: the bytes it writes, the values it adopts, the state it leaves behind. It is observable in this repository, by reading or by execution, and it is the half a source-only pass can close.
+
+The counterpart is the [effect half](#effect-half). A closed source half is a real result and it is not a confirmed finding; `docs/dev/audit-nv-verdicts.md` carries one row per lead with the two halves recorded separately for exactly this reason.
+
+Used in: `docs/dev/audit-nv-verdicts.md`; `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`
 
 ### **Source mode** &nbsp; 📦 *Product*
 

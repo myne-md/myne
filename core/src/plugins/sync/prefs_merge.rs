@@ -90,7 +90,6 @@ fn lww_field_keyed<T: Clone + PartialEq>(
     }
     winner.clone()
 }
-
 /// The equal-clock tiebreak key of a value: its serde-JSON encoding, except
 /// that an unset value (`null`) sorts BELOW every present value (empty key).
 /// Without the exception, JSON's `null` (`n` = 0x6E) would byte-compare above
@@ -608,12 +607,41 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         ai_provider: lww!("ai_provider", ai_provider),
         // The one LWW field whose value is `Zeroizing`-wrapped (myne-md/myne#444),
         // so it takes the keyed form for the same reason `saved_views` does: the
-        // tiebreak bytes are NORMATIVE (§10.2 — "the values' canonical
+        // tiebreak bytes are NORMATIVE (§10.2, "the values' canonical
         // encodings"), and the wrapper is this client's memory-hygiene choice,
         // not a change to what the value encodes as. Keyed on `Option<&str>`,
         // which serializes byte-identically to the `Option<String>` every other
-        // implementation holds — so an independent client still picks the same
-        // equal-clock winner, and no copy of the key is made to ask.
+        // implementation holds, so an independent client still picks the same
+        // equal-clock winner and no copy of the key is made to ask.
+        //
+        // It is also the one field a peer can author that a lower-trust reader
+        // turns into request framing: `inference::provider_gate::authorize_remote`
+        // builds an `Authorization` header from this value, and a CR or an LF
+        // inside a credential is the byte that ends an HTTP/1.1 header line.
+        //
+        // NOT shape-checked here, and the absence is the point. A validity
+        // predicate on the LWW winner makes the merged value depend on a rule
+        // this client holds and no peer does, and §10.2 makes the tie-break the
+        // canonical encodings precisely "so both sides converge independently
+        // with no coordination". It also made the `None` arm a fleet-wide write:
+        // §10.2 reserves an LWW write of `None` for revocation, so a shape
+        // refusal was revoking a credential no user revoked, and
+        // `protocol.md` §9.5.2 makes the field `skip_serializing`, so there was
+        // no way back but re-pasting a key the app cannot show.
+        //
+        // A credential carrying a CR or an LF is therefore refused where it is
+        // USED, not where it is merged: `authorize_remote` returns
+        // `NoCredential`, and `http::codec::build_http_request_ext` strips the
+        // writer's interpolated fields behind it. Both have live tests. A
+        // malformed value syncs, is refused on every request, and is replaced by
+        // the next genuine edit, which is §10.2's own repair argument rather
+        // than a new rule. So a malformed value DOES become a device's local
+        // view, and the test beside this comment asserts exactly that; what it
+        // never becomes is a header.
+        //
+        // An earlier version of this comment described a shape filter here that
+        // was removed for the reasons above, and a reader who skims would have
+        // found both statements on the same field. One field, one statement.
         ai_provider_key: lww_field_keyed(
             "ai_provider_key",
             &local.ai_provider_key,
@@ -794,6 +822,7 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
 mod tests {
     use super::*;
     use crate::plugins::sync::prefs_classification::classify;
+    use zeroize::Zeroizing;
 
     fn stamped(view: &mut PrefsView, field: &str, clock: u64) {
         view.field_clocks.insert(field.to_string(), clock);
@@ -1514,6 +1543,41 @@ mod tests {
 
         assert_eq!(after.field_clocks.get("item_colors/work/"), Some(&777));
         assert_eq!(after.field_clocks.get("folder_icons/work/"), Some(&777));
+    }
+
+    /// The merge is a max under §10.2's total order and nothing else, so it
+    /// adopts the clock winner whatever its bytes. This is the regression test
+    /// for the shape filter that was here and was removed: it asserts the
+    /// ABSENCE of a client-local rule, so re-adding one turns it red rather than
+    /// quietly re-introducing a divergence no peer implements. A malformed
+    /// credential is refused where it is used (`provider_gate::authorize_remote`)
+    /// and stripped at the writer (`http::codec::build_http_request_ext`); both
+    /// have their own live tests.
+    #[test]
+    fn the_merge_adopts_the_clock_winner_whatever_its_bytes() {
+        let mut local = PrefsView {
+            ai_provider_key: Some(Zeroizing::new("sk-good".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut local, "ai_provider_key", 100);
+        let mut remote = PrefsView {
+            ai_provider_key: Some(Zeroizing::new("sk-bad\r\nX-Injected: 1".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut remote, "ai_provider_key", 200);
+
+        let ab = merge_prefs(&local, &remote);
+        let ba = merge_prefs(&remote, &local);
+        assert_eq!(
+            ab.ai_provider_key.as_ref().map(|k| k.as_str()),
+            ba.ai_provider_key.as_ref().map(|k| k.as_str()),
+            "both orders must select the same value, or the pair never converges"
+        );
+        assert_eq!(
+            ab.ai_provider_key.as_ref().map(|k| k.as_str()),
+            Some("sk-bad\r\nX-Injected: 1"),
+            "the newer clock wins on its bytes; the merge carries no validity rule"
+        );
     }
 
     #[test]
