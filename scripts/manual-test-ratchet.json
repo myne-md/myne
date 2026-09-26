@@ -596,6 +596,33 @@
      "desktop clients, so the +30 is the whole of 10851 -> 10881. It is",
      "standard, so gatedMinutes is unchanged."
   ],
+  "$comment4": [
+    "CEILING RAISED 10881 -> 10926 by myne-md/myne#756, in the sanctioned",
+    "direction. What added the minutes, named so the raise is an argument",
+    "rather than a number:",
+    "",
+    "  + one core item on settings.panel.sync, 15 minutes on each of the three",
+    "    desktop clients (45 total): rotate a real certificate on a self-hosted",
+    "    server, then re-verify the pin from the UI without editing the URL.",
+    "",
+    "WHY IT IS NOT A SCENARIO. The suite reaches its sync server over loopback",
+    "`http`. There is no TLS terminator, no certificate and no CA in any lane",
+    "here, so nothing in the harness can rotate a leaf or capture a pin from",
+    "one. The half that needs no handshake WAS automated in the same change",
+    "(e2e/sync-cert-reverify.e2e.ts, which seeds a pinned config from disk and",
+    "proves the re-verify control is reachable while Connect rests disabled),",
+    "so this raise buys only the compare against a certificate that really",
+    "changed.",
+    "",
+    "WHY IT IS WORTH 45 MINUTES. myne#756 was a permanent sync outage for every",
+    "self-hoster at every renewal: the panel told the user to re-enter the",
+    "server URL, and the button that would have done it was disabled precisely",
+    "for the URL the instruction named. Nothing in the tree could have caught",
+    "it, and the workaround users found -- perturbing the URL with a trailing",
+    "slash -- ALSO skipped the fingerprint compare and pinned the new",
+    "certificate in silence. An item that would have found both is worth the",
+    "minutes it costs."
+  ],
   "gatedTiers": [
     "core"
   ],
@@ -608,6 +635,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10881,
+  "totalMinutesCeiling": 10926,
   "gatedMinutes": 3837
 }
