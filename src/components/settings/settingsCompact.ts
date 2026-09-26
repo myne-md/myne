@@ -1,7 +1,7 @@
 // Responsive restack for the Settings dialog (#391).
 //
 // Every Settings row is `label · control` laid out by `SettingRow`, and the
-// control cell is `flex-shrink: 0` (a Segmented / Select must not be squeezed).
+// control cell is `flex-shrink: 0` (a Select trigger must not be squeezed).
 // The label is the flexible cell (`min-width: 0`), so as the dialog narrows the
 // label box shrinks toward zero and its text paints OVER the control instead of
 // beside it — every panel has the same failure, the Editor panel worst because

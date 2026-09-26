@@ -62,6 +62,7 @@ import {
   dismissImporterOffer,
   enableDeveloperMode,
   pageSeatInvoke,
+  pickSelect,
   unlockToEditor,
 } from "./support/flows";
 import { KEY, pressKey } from "./support/keyboard";
@@ -152,7 +153,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           expect((await capabilityReport(s)).backend_class).not.toBe("remote");
 
           // ── selecting a provider shows the consent dialog and stores nothing ──
-          await (await s.byTestId("ai.provider-choice-openrouter")).click();
+          await pickSelect(s, "ai.provider-choice", "openrouter");
           await s.waitUntil(
             async () => (await s.byTestIdAll("ai-consent.screen")).at(0) ?? null,
             { label: "the consent dialog", timeoutMs: 15_000 },
@@ -195,7 +196,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           expect((afterEsc.ok as { ai_provider?: unknown }).ai_provider ?? null).toBeNull();
 
           // ── cancel: nothing stored, and the controls come back ──
-          await (await s.byTestId("ai.provider-choice-openrouter")).click();
+          await pickSelect(s, "ai.provider-choice", "openrouter");
           await s.waitUntil(
             async () => (await s.byTestIdAll("ai-consent.cancel")).at(0) ?? null,
             { label: "the consent dialog, reopened", timeoutMs: 15_000 },
@@ -209,7 +210,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           expect((afterCancel.ok as { ai_provider?: unknown }).ai_provider ?? null).toBeNull();
 
           // ── accept: the provider and the consent are stored together ──
-          await (await s.byTestId("ai.provider-choice-openrouter")).click();
+          await pickSelect(s, "ai.provider-choice", "openrouter");
           await s.waitUntil(
             async () => (await s.byTestIdAll("ai-consent.accept")).at(0) ?? null,
             { label: "the accept action", timeoutMs: 15_000 },
@@ -271,7 +272,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           );
 
           // ── revoke by clearing the provider: back to never-configured ──
-          await (await s.byTestId("ai.provider-choice-none")).click();
+          await pickSelect(s, "ai.provider-choice", "none");
           await s.waitUntil(
             async () => ((await s.byTestIdAll("ai.provider-key-input")).length === 0 ? true : null),
             { label: "the key control disappears", timeoutMs: 15_000 },

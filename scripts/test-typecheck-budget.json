@@ -20,8 +20,8 @@
     "tests/commands/command-palette.test.tsx": 7,
     "tests/commands/fold-actions.test.ts": 1,
     "tests/commands/workspaceHotkeysModalGate.test.tsx": 1,
-    "tests/components/AiPanel.test.tsx": 4,
     "tests/components/accountPanel.test.tsx": 1,
+    "tests/components/AiPanel.test.tsx": 4,
     "tests/dialect/_genDialectVectors.test.ts": 1,
     "tests/dialect/_helpers.ts": 2,
     "tests/dialect/civilDate.test.ts": 3,
@@ -37,7 +37,6 @@
     "tests/editor/mermaid-render.test.ts": 3,
     "tests/editor/render-perf.test.ts": 3,
     "tests/editor/taskRecurrence.test.ts": 2,
-    "tests/editor/vim-substitute.test.ts": 1,
     "tests/editor/voice-record-controller.test.ts": 2,
     "tests/hooks/backupSchedulerGate.test.ts": 1,
     "tests/hooks/useDevices.test.ts": 1,
@@ -84,5 +83,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 207
+  "total": 206
 }

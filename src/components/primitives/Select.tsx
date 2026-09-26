@@ -56,6 +56,12 @@ interface SelectProps<T extends string> {
   onChange: (value: T) => void;
   /** Accessible label for the trigger (the surface has no visible <label>). */
   "aria-label"?: string;
+  /** Id of the text explaining the control, for `aria-describedby`. Mirrors the
+   *  prop of the same name on `Segmented`; `SettingRow` hands this id to its
+   *  `control` render function, and a row that converted from `Segmented` to
+   *  `Select` (myne-md/myne#769) would otherwise drop its helper association
+   *  silently — the markup still renders, and only a screen reader notices. */
+  ariaDescribedBy?: string;
   /** Optional style overrides merged onto the trigger button. */
   style?: CSSProperties;
   /** Optional `data-testid` on the trigger button (E2E observability). */
@@ -117,6 +123,7 @@ export function Select<T extends string>({
   options,
   onChange,
   "aria-label": ariaLabel,
+  ariaDescribedBy,
   style,
   testId,
 }: SelectProps<T>) {
@@ -260,7 +267,13 @@ export function Select<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         data-testid={testId}
+        // The SELECTED value, on the trigger, so a test can read the current
+        // choice without opening the menu and without depending on the label's
+        // locale. `Segmented` published this on the active segment; a row that
+        // converts here needs somewhere to keep asserting from (#769).
+        data-value={current?.value}
         style={{ ...TRIGGER_STYLE, ...style }}
         onClick={(e) => {
           e.stopPropagation();
