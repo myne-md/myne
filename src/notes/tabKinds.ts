@@ -35,7 +35,7 @@
 
 import type { IconName } from "../lib/icons";
 import type { WorkspaceItem } from "./workspaceState";
-import { GRAPH_TAB_ID, TASKS_TAB_ID } from "./workspaceState";
+import { ATTACHMENTS_TAB_ID, GRAPH_TAB_ID, TASKS_TAB_ID } from "./workspaceState";
 
 export type TabKind = WorkspaceItem["kind"];
 
@@ -57,30 +57,66 @@ export interface TabKindSpec {
    */
   labelKey?: string;
   /**
-   * Whether the top-right note floats (backlinks / outline / the "…" menu)
-   * belong over this kind. They all act on an OPEN NOTE, so only `note` says
-   * yes. Declared rather than special-cased so a new kind has to answer the
-   * question instead of inheriting `note`'s answer by omission.
+   * Whether this surface is SHOWING A NOTE, so note-scoped chrome applies.
+   *
+   * Two consumers, and they turned out to be asking one question:
+   *   - the top-right floats (backlinks, outline, the "…" menu), which all act
+   *     on the open note;
+   *   - the notes sidebar's selected-row highlight, which claims "this note is
+   *     what you are looking at".
+   *
+   * Both compared against the literal `"note"` in their own file. Declaring it
+   * once means a new kind has to ANSWER, where a literal silently gives it
+   * `note`'s answer by omission — and the failures are a backlinks panel over a
+   * surface with no note behind it, and a sidebar row claiming to be active
+   * while you look at the graph. The second one shipped: the highlight rule
+   * asked whether the attachment library owned the center pane, so it was
+   * correct for the library and wrong for the graph and the task list
+   * (myne-md/myne#773).
    */
-  hasNoteFloats: boolean;
+  showsFocusedNote: boolean;
+  /**
+   * The registry command that opens this kind, when one exists.
+   *
+   * This is what lets the left ribbon show which of its entries is the surface
+   * you are LOOKING at (myne-md/myne#773). Before it, the rail had no active
+   * state at all: pressing Attachments and pressing Graph left the rail
+   * identical, so the one column that is always visible could not tell you
+   * where you were. Declaring the link here rather than as a lookup table in
+   * the component means a new kind wires its own rail state.
+   *
+   * `note` and `view` have none: they are opened by picking an entity, not by
+   * running a command, so no single rail entry corresponds to them.
+   */
+  openCommandId?: string;
 }
 
 export const TAB_KINDS: readonly TabKindSpec[] = [
-  { kind: "note", icon: "file-text", hasNoteFloats: true },
-  { kind: "view", icon: "layout-grid", hasNoteFloats: false },
+  { kind: "note", icon: "file-text", showsFocusedNote: true },
+  { kind: "view", icon: "layout-grid", showsFocusedNote: false },
   {
     kind: "graph",
     singletonId: GRAPH_TAB_ID,
     icon: "share-2",
     labelKey: "notes.pane.graphTab",
-    hasNoteFloats: false,
+    showsFocusedNote: false,
+    openCommandId: "graph.show",
+  },
+  {
+    kind: "attachments",
+    singletonId: ATTACHMENTS_TAB_ID,
+    icon: "paperclip",
+    labelKey: "attachments.library.title",
+    showsFocusedNote: false,
+    openCommandId: "attachments.open",
   },
   {
     kind: "tasks",
     singletonId: TASKS_TAB_ID,
     icon: "list-todo",
     labelKey: "notes.pane.tasksTab",
-    hasNoteFloats: false,
+    showsFocusedNote: false,
+    openCommandId: "tasks.show",
   },
 ];
 
@@ -124,3 +160,14 @@ export function canonicalTabId<K extends TabKind>(kind: K, id: string): TabIdOf<
 
 /** Every registered kind's string tag — the `parseItemKey` prefix vocabulary. */
 export const TAB_KIND_TAGS: readonly TabKind[] = TAB_KINDS.map((s) => s.kind);
+
+/**
+ * The registry command that opens `kind`, or `undefined` when opening it is not
+ * a command (a note, a saved view — you pick an entity, not a surface).
+ *
+ * The inverse direction the left ribbon needs: given the focused tab's kind,
+ * which rail entry should read as current?
+ */
+export function openCommandForKind(kind: TabKind): string | undefined {
+  return tabKindSpec(kind).openCommandId;
+}

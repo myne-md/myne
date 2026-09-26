@@ -208,7 +208,6 @@ export const NOT_A_SURFACE_ROSTER = Object.freeze({
  * other reason in this file, and an entry whose file is gone fails as stale.
  */
 export const NOT_A_SURFACE = Object.freeze({
-  "src/screens/centerView.tsx": "Layout primitive shared by the screens; it renders no surface of its own.",
   "src/screens/editorLayout.tsx": "Layout primitive for the editor screen; covered by the editor entries.",
   "src/screens/layoutClamp.ts": "Pure geometry helper, no rendered surface, covered by unit tests.",
   "src/screens/responsiveCollapse.ts": "Pure breakpoint helper, no rendered surface, covered by unit tests.",

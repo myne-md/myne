@@ -15,7 +15,6 @@ import { describe, expect, it } from "vitest";
 import { topRightFloatsShown } from "../../src/notes/topRightFloats";
 
 const base = {
-  centerView: "editor",
   focusedTabKind: "note",
   pendingNewTabPaneId: null,
   focusedPaneId: "pane-1",
@@ -30,9 +29,12 @@ describe("topRightFloatsShown", () => {
     // THE reported bug. Neither the "…" menu nor the right-sidebar toggle is
     // rendered on a non-note tab, so the tab strip must not reserve their room:
     // reserving it left the caret off the right edge with nothing beside it.
-    // Tab kinds only: the attachments view is a `CenterView`, and it has its
-    // own case below.
-    for (const kind of ["graph", "tasks", "view"] as const) {
+    // Every non-note kind, ATTACHMENTS INCLUDED since myne-md/myne#773 made
+    // the library a tab. It used to need a separate case below, because it was
+    // a `CenterView` — a parallel mechanism this predicate had to ask about
+    // separately — and that separate question is exactly what went stale when a
+    // fourth surface arrived.
+    for (const kind of ["graph", "tasks", "view", "attachments"] as const) {
       expect(
         topRightFloatsShown({ ...base, focusedTabKind: kind }),
         `focusedTabKind=${kind}`,
@@ -56,10 +58,16 @@ describe("topRightFloatsShown", () => {
     ).toBe(false);
   });
 
-  it("is false in the attachments library, which replaces the pane entirely", () => {
-    expect(
-      topRightFloatsShown({ ...base, centerView: "attachments" }),
-    ).toBe(false);
+  it("asks the tab-kind REGISTRY rather than comparing to a literal", () => {
+    // The predicate reads `showsFocusedNote` off the registry, so a new tab kind
+    // has to answer the question in its own declaration. Comparing to the
+    // literal `"note"` would give a new kind note's answer by omission, and the
+    // failure is a backlinks panel floating over a surface with no note behind
+    // it — which nothing type-checks and no existing scenario covers.
+    for (const kind of ["graph", "tasks", "view", "attachments"] as const) {
+      expect(topRightFloatsShown({ ...base, focusedTabKind: kind })).toBe(false);
+    }
+    expect(topRightFloatsShown({ ...base, focusedTabKind: "note" })).toBe(true);
   });
 
   it("is false when a pending chip is open in ANOTHER pane", () => {

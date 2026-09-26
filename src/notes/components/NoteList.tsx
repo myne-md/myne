@@ -62,6 +62,7 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
+import { tabKindSpec } from "../tabKinds";
 import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import type { IconName } from "../../lib/icons";
@@ -98,7 +99,6 @@ import {
   hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
-import { useCenterView } from "../../screens/centerView";
 import { regionOf } from "../../lib/regions";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
@@ -859,16 +859,12 @@ const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
-  // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
-  // pane to the editor — covers the Enter-on-already-selected edge the
-  // `selectedId` effect can't see. No-op outside the Editor provider.
-  const { setView } = useCenterView();
+  // Opening a note used to also have to swap the center view back to the
+  // editor. As a tab it does not: `ctx.open` puts the note in the focused pane,
+  // which replaces whatever tab was there (myne-md/myne#773).
   const openNote = useCallback(
-    (id: NoteId): Promise<unknown> => {
-      setView("editor");
-      return ctx.open(id);
-    },
-    [ctx, setView],
+    (id: NoteId): Promise<unknown> => ctx.open(id),
+    [ctx],
   );
   // Folder-management state + handlers (deliberate_folders set, context menu,
   // create / rename / delete / drag-drop). Owns the deliberate set.
@@ -1762,22 +1758,19 @@ function PopulatedList({
   const folderNotesEnabled = rowPrefs.folder_notes_enabled;
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
   // returns the center pane to the editor. The `selectedId`-keyed effect in
-  // Editor.tsx covers note-to-note switches; this explicit reset also handles
-  // re-clicking the ALREADY-selected note while the Attachments view is open
-  // (no `selectedId` change → that effect wouldn't fire). No-op fallback
-  // outside the Editor provider, so isolated NoteList renders stay inert.
-  const { view, setView } = useCenterView();
   const ws = useWorkspace();
   // Open a note from the sidebar into the workspace (MYND-166). Modifiers /
   // context-menu choose the target: Alt → split to the side; Cmd/Ctrl or
-  // middle → new tab; plain → reuse the focused tab. `setView("editor")` also
-  // covers the re-click-the-already-selected-note-while-Attachments-open edge
-  // the `selectedId` effect can't see (no `selectedId` change → no fire). The
-  // editor mirrors the focused pane's active note back into `selectedId` for
-  // row highlight (Editor.tsx bridge B). No-op fallback outside the providers.
+  // middle → new tab; plain → reuse the focused tab. The editor mirrors the
+  // focused pane's active note back into `selectedId` for row highlight
+  // (Editor.tsx bridge B). No-op fallback outside the providers.
+  //
+  // The `setView("editor")` that used to open this function is gone with the
+  // center-view mechanism (myne-md/myne#773): opening a note in the focused
+  // pane IS the way back from any non-note tab, including the re-click-the-
+  // already-selected-note edge the `selectedId` effect could never see.
   const openNote = useCallback(
     (id: NoteId, opts?: { newTab?: boolean; toSide?: boolean }) => {
-      setView("editor");
       // Plain click → open in the focused pane's CURRENT active tab (reuse);
       // Cmd/Ctrl-click (or middle) → a new tab; Alt-click → split to the
       // side. Re-opening an already-open note reveals it (duplicate-forbid).
@@ -1785,15 +1778,24 @@ function PopulatedList({
       else if (opts?.newTab) ws.openNewTabInFocused(id);
       else ws.openInFocused(id);
     },
-    [ws, setView],
+    [ws],
   );
-  // SYNC-9 exclusive active-state (MYND-164 Fix 1): while the Attachments view
-  // owns the center pane, NO sidebar note row renders its selected highlight —
-  // the Attachments footer entry is the sole active surface. The selection is
-  // preserved in `ctx.selectedId` (so returning to the editor restores it); it
-  // just isn't *shown* as active here. Exactly one of {a note, Attachments} is
-  // highlighted at any time.
-  const noteHighlightActive = view !== "attachments";
+  // Exclusive active-state (MYND-164 Fix 1, generalised by myne-md/myne#773):
+  // a sidebar note row renders its selected highlight only while the focused
+  // tab IS a note. The selection stays in `ctx.selectedId`, so returning to the
+  // note restores it; it just is not SHOWN as active meanwhile.
+  //
+  // The old rule asked whether the attachment library owned the center pane,
+  // which was the only non-note surface that could — so it was correct for the
+  // library and WRONG for the graph and the task list, which could both be
+  // focused while a note row still claimed to be active.
+  //
+  // Asked of the registry rather than compared to the literal `"note"`: the
+  // top-right floats ask the identical question one file over, and a literal in
+  // each is how the two drifted in the first place.
+  const activeKind = ws.focusedLeaf.activeTab?.kind;
+  const noteHighlightActive =
+    activeKind !== undefined && tabKindSpec(activeKind).showsFocusedNote;
 
   const onTreeKeyDown = useMemo(
     () =>

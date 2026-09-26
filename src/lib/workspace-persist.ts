@@ -439,6 +439,18 @@ function parseItem(t: unknown): ParsedItem {
   // **degrade to the default rather than erroring**: an unknown filter name from
   // a future build, or junk in `taskScope`, must not reject the whole workspace
   // blob and lose every open tab.
+  // The attachment library (myne-md/myne#773) — a singleton with no per-tab
+  // state, so it parses exactly like the graph.
+  if (o.kind === "attachments") {
+    return {
+      item: {
+        kind: "attachments",
+        id: canonicalTabId("attachments", o.id),
+        ...pinned,
+        ...viewMode,
+      },
+    };
+  }
   if (o.kind === "tasks") {
     return {
       item: {

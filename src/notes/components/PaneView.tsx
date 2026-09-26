@@ -68,6 +68,7 @@ import { tabKindSpec } from "../tabKinds";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
+import { AttachmentsLibrary } from "../../components/attachments/AttachmentsLibrary";
 import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
@@ -333,6 +334,7 @@ export function PaneView({
   // A tasks-kind active tab renders the vault-wide task list (MYND-616) in place
   // of the note editor - the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
+  const isAttachments = leaf.activeTab?.kind === "attachments";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
   // every SYNC-5 index-change nonce - so a note created/renamed/loaded elsewhere
@@ -1581,6 +1583,18 @@ export function PaneView({
     }
     if (isGraph) {
       return { fill: true, gutters: false, el: <GraphPane /> };
+    }
+    // The attachment library (myne-md/myne#773). `fill` with no gutters, like
+    // the graph: the library owns its own padding and its grid has to reach the
+    // pane edge to fit a sensible number of thumbnails at a narrow split.
+    //
+    // It no longer renders its own title row. That row existed because the
+    // library replaced the whole pane tree, tab strip included, so it had to
+    // reproduce a header; as a tab, the tab strip already carries the paperclip
+    // and the word, and a second copy directly beneath it was the surface
+    // announcing itself twice.
+    if (isAttachments) {
+      return { fill: true, gutters: false, el: <AttachmentsLibrary /> };
     }
     if (isTasks && leaf.activeTab !== null) {
       // The third member of #534's family, found while fixing the graph.
