@@ -552,6 +552,10 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # Primitive adoption (myne#774): a ratchet on hand-rolled interactive
+      # elements. Nothing else reports one — it compiles, renders, and passes
+      # every test, and a reviewer sees one file at a time.
+      - node scripts/check-primitive-adoption.mjs
       # The tooltip convention (myne#775): a ratchet on native `title=` over
       # interactive elements — the native tooltip waits ~1s, ignores the theme
       # and never shows on keyboard focus — plus a hard failure for an icon-only

@@ -188,6 +188,33 @@
   opacity: 0.4;
 }
 
+/* Bordered variant: an icon control that FLOATS on content rather than sitting
+   in chrome, so it needs its own edge to be findable against whatever is
+   behind it. The graph pane's overlay cluster is the first, and it had forked
+   the primitive to get exactly this (myne-md/myne#774).
+
+   Three separately-bounded controls read as three controls, where one box drawn
+   around them read as a single surface with buttons in it (myne-md/myne#727) —
+   which is why the border is per control and not on the group. */
+.myne-icon-btn[data-bordered="true"] {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  color: var(--fg-2);
+}
+.myne-icon-btn[data-bordered="true"]:enabled:hover,
+.myne-icon-btn[data-bordered="true"]:enabled:focus-visible {
+  background: var(--paper-3);
+  border-color: var(--line-2);
+}
+
+/* Toggled ON. Keyed off `aria-pressed` so the painted state and the announced
+   state are the same attribute and cannot drift. */
+.myne-icon-btn[aria-pressed="true"] {
+  background: var(--paper-3);
+  color: var(--fg-1);
+}
+
 
 /* =========================================================================
    Segmented
