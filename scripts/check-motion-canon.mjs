@@ -98,6 +98,47 @@ const DURATION_EXEMPT = new Map([
   ],
 ]);
 
+/**
+ * Files permitted to run a CONTINUOUS `requestAnimationFrame` loop, each with
+ * the reason it is not decoration.
+ *
+ * Rule 2 catches a CSS `animation: … infinite`. It cannot see a rAF loop, which
+ * is the same thing written in JavaScript and is how the most expensive
+ * animations in this tree are actually driven — so the canon's claim that no
+ * unnamed loop survives was true of stylesheets and false of the code, until
+ * this list existed.
+ *
+ * Compared both ways: an entry whose file no longer loops fails as stale.
+ */
+const RAF_LOOP_ALLOWLIST = new Map([
+  [
+    "client-core/src/binaryField.ts",
+    "The brand 01 field behind an empty state (design-notes/ui/0616, named exemption). " +
+      "Pauses on document.hidden and off-screen, paints one static frame under reduced " +
+      "motion, and a process-wide budget caps concurrent instances.",
+  ],
+  [
+    "src/notes/components/PaneView.tsx",
+    "Scroll restoration after a pane swap: it waits for the editor's height to settle " +
+      "across two equal frames, then applies and RETURNS. A 90-frame budget bounds the " +
+      "case that never settles (a short note in a filling body), so it terminates either " +
+      "way — a bounded computation being watched, not an animation.",
+  ],
+  [
+    "src/notes/components/useDragAutoScroll.ts",
+    "Drag auto-scroll: it runs only for the duration of a drag gesture and is cancelled " +
+      "by `stop`, which is wired to `dragend` and `drop` on the window as well as to " +
+      "unmount. Bounded by a gesture the user is actively performing, which is the " +
+      "clearest case of motion the user is driving rather than motion playing at them.",
+  ],
+  [
+    "editor/src/host/notes/GraphCanvas.tsx",
+    "The knowledge-graph force simulation. It runs while the layout is settling and stops " +
+      "itself when it does (design-notes/ui/0600) — a bounded computation being drawn, " +
+      "not an animation being looped.",
+  ],
+]);
+
 /** Properties whose transition lays out and paints on every frame. */
 const LAYOUT_PROPS = [
   "height",
@@ -265,6 +306,7 @@ const findings = [];
 const seenInfinite = new Set();
 const usedDurationExempt = new Set();
 const usedLayoutExempt = new Set();
+const seenRafLoop = new Set();
 
 const { present, missing } = presentSharedRoots(ROOT);
 if (missing.length > 0) {
@@ -365,6 +407,53 @@ for (const root of present) {
       }
     }
 
+    // -- Rule 5: a self-rescheduling requestAnimationFrame loop -------------
+    // The tell is a rAF whose callback re-schedules ITSELF: the call sits
+    // INSIDE the scheduled function's own body. That last clause is the whole
+    // rule and the first version of it was missing — it only checked that the
+    // function was declared earlier in the file, which made every
+    // schedule-once-from-a-handler shape a false positive. Two shipped
+    // examples: `image-zoom-controller.ts`'s `render`, which sets `raf = 0` and
+    // returns, scheduled from a separate `schedule()`; and `widgets.ts`'s
+    // `paint`, scheduled from a pointermove handler. Both are one-shot
+    // coalescers, the opposite of a loop, and a guard that flags them teaches
+    // people to allowlist reflexively.
+    const rafLoopsHere = new Set();
+    for (const m of src.matchAll(/requestAnimationFrame\(\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
+      const fn = m[1];
+      const decl = new RegExp(
+        `(?:function\\s+${fn}\\s*\\(|(?:const|let|var)\\s+${fn}\\s*(?::[^=]*)?=)`,
+      ).exec(src);
+      if (decl === null) continue;
+      const open = src.indexOf("{", decl.index);
+      if (open === -1) continue;
+      // Brace-match the body so "inside" means inside, not merely after.
+      let depth = 1;
+      let i = open + 1;
+      while (i < src.length && depth > 0) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}") depth--;
+        i++;
+      }
+      if (m.index < open || m.index > i) continue;
+      if (rafLoopsHere.has(fn)) continue; // one finding per function, not per call
+      rafLoopsHere.add(fn);
+      seenRafLoop.add(rel);
+      if (RAF_LOOP_ALLOWLIST.has(rel)) continue;
+      findings.push({
+        rel,
+        rule: "raf-loop",
+        detail:
+          `\`${fn}\` re-schedules itself through requestAnimationFrame — a continuous ` +
+          "loop, which PRODUCT.md principle 4 forbids as decoration in either motion tier. " +
+          "If it reports work in flight, or stops itself when a bounded computation or a " +
+          "gesture ends, add it to RAF_LOOP_ALLOWLIST with the reason — and make sure it " +
+          "pauses on document.hidden and off-screen and does not loop under " +
+          "prefers-reduced-motion (design-notes/ui/0616).",
+        line: lineOf(src, m.index),
+      });
+    }
+
     // -- Rule 4: transitioning a layout property ----------------------------
     for (const m of src.matchAll(/\btransition(?:-property)?\s*:/g)) {
       const decl = declValue(src, m.index + m[0].length);
@@ -420,6 +509,20 @@ for (const [key, reason] of DURATION_EXEMPT) {
   }
 }
 
+for (const [rel, reason] of RAF_LOOP_ALLOWLIST) {
+  if (!seenRafLoop.has(rel)) {
+    findings.push({
+      rel: "scripts/check-motion-canon.mjs",
+      rule: "stale-allowlist",
+      detail:
+        `RAF_LOOP_ALLOWLIST excuses \`${rel}\`, which no longer runs a self-rescheduling ` +
+        `requestAnimationFrame loop (or no longer exists). Remove the entry. ` +
+        `(Reason on file: ${reason})`,
+      line: 0,
+    });
+  }
+}
+
 for (const [key, reason] of LAYOUT_EXEMPT) {
   if (!usedLayoutExempt.has(key)) {
     findings.push({
@@ -455,5 +558,6 @@ if (findings.length > 0) {
 
 console.error(
   `motion-canon: ok (${present.length} shared tree(s); ` +
-    `${INFINITE_ALLOWLIST.size} reasoned infinite animation(s))`,
+    `${INFINITE_ALLOWLIST.size} reasoned infinite animation(s), ` +
+    `${RAF_LOOP_ALLOWLIST.size} reasoned rAF loop(s))`,
 );

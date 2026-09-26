@@ -148,7 +148,18 @@ function* walk(dir) {
 }
 
 // ---- collect every import specifier in the tree ---------------------------
-const IMPORT_RE = /(?:^|\n)\s*(?:import|export)[\s\S]{0,200}?from\s+["']([^"']+)["']/g;
+// The `{0,2000}` window, not `{0,200}`: a long NAMED-IMPORT list overruns a
+// short one and the importer then goes uncounted, so a module every panel uses
+// reads as dead. Measured, not guessed — `ArchivePanel.tsx` puts 265 characters
+// between `import` and `from` for `./notePanelStyles`, and `TrashPanel.tsx`
+// puts 282, so both were invisible here. The bug was latent for as long as SOME
+// importer of that module had a short enough import; it surfaced the moment
+// myne-md/myne#776 removed the one that did, which is the worst way to find a
+// guard's blind spot — as a false accusation against an innocent change.
+// A bound is still wanted (an unbounded `[\s\S]*?` would let one `import` reach
+// across the whole file to an unrelated `from`), and 2000 clears the largest
+// import block in the tree by an order of magnitude.
+const IMPORT_RE = /(?:^|\n)\s*(?:import|export)[\s\S]{0,2000}?from\s+["']([^"']+)["']/g;
 const DYNAMIC_RE = /import\(\s*["']([^"']+)["']\s*\)/g;
 const VITEST_MOCK_RE = /vi\.(?:mock|doMock)\(\s*["']([^"']+)["']/g;
 

@@ -736,3 +736,138 @@
 .myne-scrollarea-thumb:hover {
   background: var(--fg-3);
 }
+
+
+/* =========================================================================
+   EmptyState
+   ========================================================================= */
+
+/* One component for every zero state in the app (myne-md/myne#776). Three
+   different situations rendered identically before it, and the middle one was a
+   dead end: an empty vault, a panel FILTERED to nothing, and a load error all
+   showed the same bare sentence — so a user who had filtered a list to zero saw
+   exactly what a user with no notes saw, with nothing to press.
+
+   It is one component at three sizes rather than three components, because a
+   sidebar section, a right-rail tab and a full pane want the same words with
+   different amounts of room. `data-size` is set by the caller. */
+
+.myne-empty {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-3);
+  overflow: hidden;
+  /* A whisper of surface, so the box reads as a considered area rather than a
+     hole. The binary field sits behind this, inside the same rounded box. */
+  background: var(--paper-2);
+  color: var(--fg-2);
+  font-family: var(--font-sans);
+}
+
+/* The `01` field, behind the content. `pointer-events: none` everywhere but the
+   canvas itself would kill the cursor glow, so the canvas keeps them and the
+   content sits above. */
+.myne-empty__field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.myne-empty__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 46ch;
+}
+
+/* The rounded glyph tile. Not a colour badge: the canon bans the
+   lock/shield/green-check cliché, and this is a neutral surface with the
+   accent reserved for the action below. */
+.myne-empty__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-3);
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  color: var(--fg-2);
+  flex: none;
+}
+
+.myne-empty__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-1);
+}
+
+.myne-empty__body-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--fg-2);
+}
+
+/* The echoed query in a filtered-empty state. Monospace and isolated: it is
+   user text quoted back, and a right-to-left note title must not reorder the
+   sentence around it. */
+.myne-empty__query {
+  font-family: var(--font-mono);
+  color: var(--fg-1);
+  unicode-bidi: isolate;
+}
+
+.myne-empty__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* -- Sizes ---------------------------------------------------------------
+   `md` is the default (a right-rail tab, a settings block). `sm` is a sidebar
+   section, where the box is ~220px wide and the glyph plus a headline is all
+   that fits. `lg` is a full centre pane. */
+
+.myne-empty[data-size="sm"] {
+  padding: var(--space-4) var(--space-3);
+  gap: var(--space-2);
+  border-radius: var(--radius-2);
+}
+.myne-empty[data-size="sm"] .myne-empty__glyph { width: 32px; height: 32px; }
+.myne-empty[data-size="sm"] .myne-empty__title { font-size: var(--text-sm); }
+.myne-empty[data-size="sm"] .myne-empty__body-text { font-size: var(--text-xs); }
+
+.myne-empty[data-size="lg"] { padding: var(--space-8) var(--space-5); }
+.myne-empty[data-size="lg"] .myne-empty__glyph { width: 56px; height: 56px; }
+.myne-empty[data-size="lg"] .myne-empty__title { font-size: var(--text-xl); }
+
+/* -- Variants ------------------------------------------------------------
+   Only `error` paints differently. The rest differ in WORDS and in which
+   action they offer, which is the whole point: the three states were visually
+   identical before and that is precisely what made the filtered one a dead
+   end. Giving them four fills would have been solving the wrong half. */
+
+.myne-empty[data-variant="error"] {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
+}
+.myne-empty[data-variant="error"] .myne-empty__glyph {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
+}
