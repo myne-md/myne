@@ -132,11 +132,25 @@ pub fn authorize_remote(prefs: &PrefsView) -> Result<RemoteAuthorization, Engine
     //    more fundamental refusal than "you have not pasted a key" — and
     //    ordering it this way means a user who declines consent is never asked
     //    for a key first.
+    //
+    //    SHAPE as well as presence, which is the fix for a co-member writing a
+    //    header into every other member's request. `ai_provider_key` is
+    //    `Shared(ScalarLww)` and the blob holding it is group-sealed on an NTV6
+    //    vault, so on a shared vault the value can be authored by another roster
+    //    member rather than by this device's own settings. No provider's
+    //    credential format contains a CR or an LF, and those are the bytes that
+    //    end an HTTP/1.1 header line, so `trim`-and-emptiness was never enough.
+    //
+    //    The refusal is `NoCredential`, not a new variant. A credential this
+    //    build cannot use is the same situation as no credential and the user
+    //    fixes both the same way, by pasting the key again. A distinguishable
+    //    "your key contains a control character" would be a new IPC error variant
+    //    and a new TS mirror, for a shape no legitimate key has.
     let key = prefs
         .ai_provider_key
         .as_deref()
         .map(|k| k.trim())
-        .filter(|k| !k.is_empty())
+        .filter(|k| !k.is_empty() && !k.chars().any(|c| c.is_ascii_control()))
         .ok_or(EngineError::NoCredential)?;
 
     Ok(RemoteAuthorization {
@@ -171,19 +185,14 @@ mod tests {
         assert_eq!(auth.key(), "sk-test");
     }
 
-    /// The fourth precondition is a `trim` plus a non-empty filter, and `trim`
-    /// touches only the ends, so an interior CR/LF survives into the
-    /// authorization the request head is built from. This is the chokepoint the
-    /// chain closes at: one shape check here refuses the value for every arm
-    /// downstream, and the field is `Shared(ScalarLww)`, so the value can arrive
-    /// from a vault co-member rather than from this device's own settings.
-    ///
-    /// Asserted in the REFUSAL direction so the fix makes it live, and ignored
-    /// because the fix is not this branch's. Run it with
-    /// `cargo test -p myne-core --features remote-ai -- --ignored
-    /// an_interior_crlf`. myne-md/myne#750.
+    /// The fourth precondition checks shape as well as presence: an interior
+    /// CR/LF is refused here, so the value never becomes an authorization. This
+    /// is the chokepoint the whole chain closes at, and it matters most because
+    /// the field is `Shared(ScalarLww)` with a group-sealed blob, so on a shared
+    /// vault the value can arrive from a co-member rather than from this device's
+    /// own settings. `trim` alone was not enough, because it touches only the
+    /// ends. myne-md/myne#750, myne-md/myne#758.
     #[test]
-    #[ignore = "unfixed: the credential gate checks presence, not shape; see myne-md/myne#750"]
     fn an_interior_crlf_in_the_credential_is_refused() {
         assert!(
             authorize_remote(&PrefsView {

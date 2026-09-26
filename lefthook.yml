@@ -344,6 +344,13 @@ pre-commit:
       # have skipped the hook and been caught only by CI.
       glob: "{src,mobile/src,web/src,editor/src,dialect/src,copy/src,ornaments/src,client-core/src}/**/*.{ts,tsx,css}"
       run: node scripts/check-token-parity.mjs
+    # Unfiltered rather than globbed to `core/**`, and the reason is the one
+    # `check-bundle-record` carries: the two properties that rot are a reason that
+    # stops naming an OPEN issue and a roster that stops matching the tree, and a
+    # docs-only commit that rewrites a decision entry's issue reference is exactly
+    # when the first one goes stale.
+    ignored-tests:
+      run: node scripts/check-ignored-tests.mjs
 
     native-buttons:
       glob: "{src,web/src,editor/src,dialect/src}/**/*.tsx"

@@ -37,6 +37,21 @@ pub fn build_http_request(
 /// [`build_http_request`] with caller-supplied extra headers (the attachment
 /// byte-transport sends `Range` / `Content-Type: application/octet-stream`).
 /// A caller-supplied `Content-Type` suppresses the JSON default.
+///
+/// **Every interpolated value is stripped of ASCII control characters first.**
+/// HTTP/1.1 delimits the request line and each header with CRLF, so a CR or LF
+/// inside a value is framing, not data: it terminates the line it sits on and
+/// whatever follows is a header the receiver parses as its own. Nothing between
+/// a synced preference and this function used to reject one, so a value a vault
+/// co-member could author reached the head verbatim.
+///
+/// Stripping rather than refusing is deliberate. This function's signature
+/// returns a request, and changing it to a `Result` reaches every caller, while
+/// a stripped value degrades to a request the far side rejects: a mangled
+/// credential is a 401, which is the outcome a control here should produce. The
+/// chokepoint that refuses the value outright is
+/// `inference::provider_gate::authorize_remote`; this is the layer behind it,
+/// for a caller that has not been through the gate.
 pub fn build_http_request_ext(
     method: HttpMethod,
     path: &str,
@@ -53,16 +68,23 @@ pub fn build_http_request_ext(
         HttpMethod::Delete => "DELETE",
     };
     let mut head = String::new();
-    head.push_str(&format!("{verb} {path} HTTP/1.1\r\n"));
-    head.push_str(&format!("Host: {host}\r\n"));
+    head.push_str(&format!("{verb} {} HTTP/1.1\r\n", strip_http_control(path)));
+    head.push_str(&format!("Host: {}\r\n", strip_http_control(host)));
     if let Some(t) = token {
-        head.push_str(&format!("Authorization: Bearer {t}\r\n"));
+        head.push_str(&format!(
+            "Authorization: Bearer {}\r\n",
+            strip_http_control(t)
+        ));
     }
     let caller_content_type = extra_headers
         .iter()
         .any(|(n, _)| n.eq_ignore_ascii_case("content-type"));
     for (name, value) in extra_headers {
-        head.push_str(&format!("{name}: {value}\r\n"));
+        head.push_str(&format!(
+            "{}: {}\r\n",
+            strip_http_control(name),
+            strip_http_control(value)
+        ));
     }
     if !body.is_empty() && !caller_content_type {
         head.push_str("Content-Type: application/json\r\n");
@@ -71,6 +93,19 @@ pub fn build_http_request_ext(
     let mut out = head.into_bytes();
     out.extend_from_slice(body);
     out
+}
+
+/// Drop every ASCII control character (C0 and DEL) from a value bound for the
+/// request head. The request line, `Host`, every header name, every header value
+/// and the bearer all pass through here, because the framing rule is the same
+/// for each: a control character is a delimiter, not content.
+///
+/// No `Cow`, deliberately: the values are short, so an allocation per field
+/// costs nothing measurable, and it keeps the signature free of a lifetime
+/// parameter. Tab goes too, because a bare tab in a header value is legal HTTP
+/// but carries no meaning in anything this crate sends.
+fn strip_http_control(v: &str) -> String {
+    v.chars().filter(|c| !c.is_ascii_control()).collect()
 }
 
 /// Why an incremental response read failed.
@@ -502,21 +537,183 @@ mod tests {
     /// request head and inspects none of them, so a CR/LF inside the bearer
     /// terminates the header line it sits on.
     ///
-    /// Asserted in the REFUSAL direction, so the day the writer starts
-    /// validating this becomes a live regression test rather than a test that
-    /// goes red at the moment the defect is fixed. Ignored because the chokepoint
-    /// this branch does not own is upstream of the writer: `ai_provider_key` is
-    /// `Shared(ScalarLww)`, so a vault co-member can author the value that
-    /// reaches here, and a shape check in `authorize_remote` closes that. Run it
-    /// with `cargo test -p myne-core -- --ignored a_crlf_in_the_bearer`.
-    /// myne-md/myne#750.
+    /// The writer is the layer BEHIND the credential gate, and it is where the
+    /// guarantee actually holds: `build_http_request_ext` strips ASCII control
+    /// characters from every value it interpolates, so a CR or LF cannot become
+    /// a header terminator whichever caller reaches it. A co-member can author
+    /// `ai_provider_key` (it is `Shared(ScalarLww)` and the blob is group-sealed),
+    /// so "no legitimate key contains one" is a fact about providers rather than
+    /// about this code. myne-md/myne#750, myne-md/myne#758.
     ///
-    /// What this does NOT settle either way: whether any far side accepts the
-    /// result. The providers are third-party HTTP/1.1 implementations, so the
-    /// effect half is not observable from this repository. What IS observable
-    /// is that Myne emits the bytes, which is the half it owns.
+    /// What this does NOT settle, and still does not: whether any far side
+    /// accepts a request head built this way. The providers are third-party
+    /// HTTP/1.1 implementations, so that half is not observable from this
+    /// repository. What IS observable is that Myne does not emit the bytes,
+    /// which is the half it owns.
+    /// Every position `build_http_request_ext` interpolates, one case each.
+    ///
+    /// Table-driven over all five rather than one case for the bearer, because
+    /// the bearer alone left four of them unmeasured: this review removed the
+    /// strip from the request line, from `Host`, and from both the header name
+    /// and the header value, one at a time, and the whole `myne-core` suite
+    /// stayed green in every case. A single-position test cannot tell a control
+    /// that covers five fields from one that covers the field it names, which is
+    /// the difference between a doc comment and a gate.
+    ///
+    /// Each case is built twice, once with the payload and once with a benign
+    /// value in the same slot, and the two heads must have the same line
+    /// STRUCTURE. Comparing against the benign twin rather than a hand-counted
+    /// total is what keeps the assertion honest as the builder's own headers
+    /// change.
     #[test]
-    #[ignore = "unfixed: the request writer interpolates the bearer unvalidated; see myne-md/myne#750"]
+    fn no_interpolated_position_carries_a_control_character_into_the_head() {
+        // The doubled CRLF is the payload that matters: one CRLF ends a line and
+        // the next begins a header the receiver parses as its own.
+        let evil = "x\r\nX-Injected: 1";
+        let benign = "x";
+        let no_headers: &[(&str, &str)] = &[];
+
+        let cases: Vec<(&str, String, String)> = vec![
+            (
+                "request line",
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    &format!("/v1/heads{evil}"),
+                    "sync.example",
+                    no_headers,
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    &format!("/v1/heads{benign}"),
+                    "sync.example",
+                    no_headers,
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+            ),
+            (
+                "host",
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    &format!("sync.example{evil}"),
+                    no_headers,
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    &format!("sync.example{benign}"),
+                    no_headers,
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+            ),
+            (
+                "bearer",
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    no_headers,
+                    &[],
+                    Some(&format!("sk-test{evil}")),
+                ))
+                .into_owned(),
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    no_headers,
+                    &[],
+                    Some(&format!("sk-test{benign}")),
+                ))
+                .into_owned(),
+            ),
+            (
+                "header name",
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    &[(evil, "1")],
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    &[(benign, "1")],
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+            ),
+            (
+                "header value",
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    &[("x-test", evil)],
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+                String::from_utf8_lossy(&build_http_request_ext(
+                    HttpMethod::Get,
+                    "/v1/heads",
+                    "sync.example",
+                    &[("x-test", benign)],
+                    &[],
+                    None,
+                ))
+                .into_owned(),
+            ),
+        ];
+
+        // What the strip guarantees is FRAMING, not erasure: the control
+        // characters are removed, so the tail of the payload stays on the line
+        // it was written into and cannot become a header of its own. Asserting
+        // the payload's text is absent would be a stronger claim than the code
+        // makes, and the wrong one to gate on: `sk-x\r\nX: 1` becoming
+        // `sk-xX: 1` is a mangled credential, which is a 401, and it is still
+        // one line.
+        for (position, evil_head, benign_head) in cases {
+            let evil_lines: Vec<&str> = evil_head.lines().collect();
+            let benign_lines: Vec<&str> = benign_head.lines().collect();
+            assert_eq!(
+                evil_lines.len(),
+                benign_lines.len(),
+                "{position}: the payload opened a line. head = {evil_head:?}"
+            );
+            // The sharp form of the same property, and the one that reads as
+            // the attack it prevents: a header the receiver parses as its own.
+            // It is deliberately NOT the payload's text being absent. A stripped
+            // header NAME mangles rather than vanishes, so that line reads
+            // `xX-Injected: 1: 1` and is an unusable header the receiver ignores
+            // or answers 400, which is the outcome a control here should
+            // produce. What must not happen is the payload's header name
+            // starting a line of its own.
+            for line in &evil_lines {
+                assert!(
+                    !line.starts_with("X-Injected"),
+                    "{position}: the payload opened a header line: {line:?} in {evil_head:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn a_crlf_in_the_bearer_cannot_terminate_the_authorization_line() {
         let req = build_http_request_ext(
             HttpMethod::Post,

@@ -443,6 +443,20 @@ steps:
     commands:
       - node scripts/check-i18n-coverage.mjs --check
 
+  # ─── A deferral must name an issue, and the roster must match the tree ──────
+  # No `when:` filter, for the reason bundle-record, twin-inventory,
+  # manual-test-roster and i18n-coverage carry none: the properties that rot here
+  # are a `#[ignore = "unfixed: … see myne-md/myne#N"]` reason that stops naming
+  # an OPEN issue, and a roster that stops matching the tree. Both arrive with a
+  # commit that touches only a decision entry, and `*code-paths` excludes
+  # `docs/**`, so inside `pnpm-build` this guard would be skipped by exactly the
+  # commit class it exists for. Node builtins only: no `pnpm install`, which is
+  # what lets it sit outside the serial desktop chain without lengthening it.
+  ignored-tests:
+    image: node:25
+    commands:
+      - node scripts/check-ignored-tests.mjs
+
   pnpm-build:
     image: node:25
     when: *code-paths
@@ -1536,6 +1550,11 @@ steps:
       # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody
       # is paged for is a gate that stays red.
       - name: i18n-coverage
+        optional: true
+      # Unfiltered for the same reason, listed for the same one: a deferral reason
+      # that stops naming an open issue is a decision-entry edit away, and a gate
+      # nobody is paged for is a gate that stays red.
+      - name: ignored-tests
         optional: true
       - name: web-build
         optional: true
