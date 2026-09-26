@@ -401,7 +401,9 @@ describe("Command palette action registry", () => {
       find("views.show").visibility(
         makeContext({
           stageName: "editor",
-          prefs: { saved_views: [{ id: "v1", name: "V", view_type: "cards", filters: { kind: "all" } }] },
+          prefs: {
+            saved_views: [{ id: "v1", name: "V", view_type: "cards", filters: { kind: "all" } }],
+          } as CommandContext["prefs"],
         }),
       ),
     ).toBe("show");
