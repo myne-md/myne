@@ -130,7 +130,6 @@ const VERDICTS = {
   },
 
   // ── ported: nothing platform-specific ──────────────────────────────────
-  "centerView.tsx": { verdict: "ported", note: "Pure view-state union." },
   "editorLayout.tsx": { verdict: "ported", note: "Pure layout state + persistence through the shared prefs." },
   "layoutClamp.ts": { verdict: "ported", note: "Pure arithmetic." },
   "responsiveCollapse.ts": { verdict: "ported", note: "Pure width thresholds; a browser resizes the same way." },

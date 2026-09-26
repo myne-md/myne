@@ -917,6 +917,9 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
       "e2e/attachments-library.e2e.ts",
+      // myne-md/myne#773: the library is a TAB, and the left ribbon marks it
+      // current. Both were impossible while it was a CenterView.
+      "e2e/attachments-tab.e2e.ts",
       "e2e/attachment-cleanup.e2e.ts",
       "e2e/attachment-zoom.e2e.ts",
       // myne-md/myne#604: an embed alone on its line draws as a block and

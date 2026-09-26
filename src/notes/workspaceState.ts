@@ -61,6 +61,14 @@ export const GRAPH_TAB_ID = "graph";
  *  "open tasks" idempotent - a reveal, never a second tab (MYND-616). */
 export const TASKS_TAB_ID = "tasks";
 
+/** The attachment library is the third singleton (myne-md/myne#773, epic #772).
+ *  It used to be a `CenterView` - a SECOND, parallel center-pane swap mechanism
+ *  that replaced the whole pane tree and bypassed the tab model entirely. That
+ *  is why the left ribbon could not know it was open, why it could not be
+ *  split beside a note, and why closing it had to route through a bespoke
+ *  `onClose` instead of closing a tab. */
+export const ATTACHMENTS_TAB_ID = "attachments";
+
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
  * buffer renders. `"live"` is the default WYSIWYG editing surface; `"reading"`
@@ -99,6 +107,18 @@ export type WorkspaceItem =
    * on its defaults stays byte-identical to a pre-feature descriptor. The
    * descriptor is opaque to the storage codec - no format change.
    */
+  /**
+   * The attachment library (myne-md/myne#773). A singleton like the graph and
+   * the task list, and carrying no per-tab state of its own: its sort, filter
+   * and search are session state inside the component, which is the same
+   * decision the graph made.
+   */
+  | {
+      kind: "attachments";
+      id: typeof ATTACHMENTS_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+    }
   | {
       kind: "tasks";
       id: typeof TASKS_TAB_ID;
@@ -162,6 +182,11 @@ export function graphItem(): WorkspaceItem {
 /** The vault-wide task-list tab item (singleton - see [`TASKS_TAB_ID`]). */
 export function tasksItem(): WorkspaceItem {
   return { kind: "tasks", id: TASKS_TAB_ID };
+}
+
+/** The attachment-library tab item (singleton - see [`ATTACHMENTS_TAB_ID`]). */
+export function attachmentsItem(): WorkspaceItem {
+  return { kind: "attachments", id: ATTACHMENTS_TAB_ID };
 }
 
 /** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`

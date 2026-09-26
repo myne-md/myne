@@ -45,6 +45,7 @@ import {
   shouldMirrorSelection,
   shouldOpenIntoFocusedPane,
 } from "../notes/selectionBridges";
+import { openCommandForKind } from "../notes/tabKinds";
 import { CommandPalette } from "../components/CommandPalette";
 import { LeftRibbon } from "../notes/components/LeftRibbon";
 import { ribbonCommands } from "../notes/ribbonCommands";
@@ -256,9 +257,7 @@ import {
 import { useIsFullscreen } from "../hooks/useIsFullscreen";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
-import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
-import { CenterViewProvider, type CenterView } from "./centerView";
 import {
   WorkspaceProvider,
   panesNotSettledMessage,
@@ -1073,7 +1072,6 @@ function EditorChrome({
   const onReadout = useCallback((r: PaneReadout) => setReadout(r), []);
   // MYND-170 (SYNC-9): which surface the center pane shows. The shell +
   // sidebars persist; only this region swaps.
-  const [centerView, setCenterView] = useState<CenterView>("editor");
 
   // Resizable/collapsible sidebar layout (MYND-137). Widths + collapse
   // flags are persisted to vault.prefs and clamped on load; `rowRef`
@@ -1186,7 +1184,6 @@ function EditorChrome({
   // controls that were not there and its caret floated a control's width off the
   // right edge (myne-md/myne#727).
   const topRightFloatsShown = topRightFloats({
-    centerView,
     focusedTabKind: ws.focusedLeaf.activeTab?.kind,
     pendingNewTabPaneId: ws.pendingNewTabPaneId,
     focusedPaneId: ws.focusedPaneId,
@@ -1288,14 +1285,10 @@ function EditorChrome({
   // mutually exclusive in the active highlight - opening one deactivates the
   // other. Skips the initial mount so a fresh editor doesn't redundantly
   // re-assert "editor" (it already starts there).
-  const selectionInitRef = useRef(true);
-  useEffect(() => {
-    if (selectionInitRef.current) {
-      selectionInitRef.current = false;
-      return;
-    }
-    setCenterView("editor");
-  }, [ctx.selectedId]);
+  // Selecting a note used to have to swap the center view back to the editor,
+  // because the attachment library replaced the whole pane tree. As a tab it
+  // does not: `ctx.open` puts the note in the focused pane, which IS the way
+  // back (myne-md/myne#773).
 
   // MYND-173: the generic file-card's "Reveal in library" action fires a window
   // event (the card lives in a CM6 widget, outside React). Open the attachments
@@ -1303,10 +1296,10 @@ function EditorChrome({
   // question) - this opens the library unfocused, which is the sanctioned
   // first-cut fallback.
   useEffect(() => {
-    const onReveal = () => setCenterView("attachments");
+    const onReveal = () => ws.openAttachments();
     window.addEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
     return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
-  }, []);
+  }, [ws]);
 
   // MYND-424: the background sync loop emits `sync://changed` after writing
   // pulled notes to disk. Reload the sidebar + the open note so incoming edits
@@ -2163,10 +2156,6 @@ function EditorChrome({
     deleteWorkspace(snapshot.activeId);
   }, [ws, deleteWorkspace]);
 
-  const centerViewValue = useMemo(
-    () => ({ view: centerView, setView: setCenterView }),
-    [centerView],
-  );
 
   // myne#681 task 2 (SYNC-11): terminal "deleted elsewhere" state for a detached
   // window whose note was deleted from another surface. Every hook above has run,
@@ -2209,7 +2198,6 @@ function EditorChrome({
   }
 
   return (
-    <CenterViewProvider value={centerViewValue}>
     <div
       data-focus-active={focusActive ? "true" : undefined}
       // focus-mode (MYND-348): dim / typewriter gates = focus active && the pref
@@ -2265,7 +2253,18 @@ function EditorChrome({
         {/* Left ribbon (myne-md/myne#699): a far-left icon column independent of
             the notes sidebar, so collapsing the tree does not hide it. Hidden in
             focus mode and under the width-forced collapse. */}
-        <LeftRibbon hidden={focusActive || detached || forced.forceLeftCollapsed} />
+        <LeftRibbon
+          hidden={focusActive || detached || forced.forceLeftCollapsed}
+          // Derived from the FOCUSED TAB, never from rail-local state
+          // (myne-md/myne#773). The rail had no active state at all before
+          // this, which is why pressing Attachments and pressing Graph left it
+          // looking identical — on the one column that is always visible.
+          currentCommandId={
+            ws.focusedLeaf.activeTab === null
+              ? undefined
+              : openCommandForKind(ws.focusedLeaf.activeTab.kind)
+          }
+        />
         <SidebarBootstrap />
         {/* Always mounted (even when collapsed) so the width collapse/expand
             animates instead of popping - SidebarPane drives the width 0↔open
@@ -2335,78 +2334,29 @@ function EditorChrome({
             flexDirection: "column",
           }}
         >
-        {centerView === "attachments" ? (
-          // Attachments is a full-center view with no tab strip; give it a
-          // matching drag-region clearance row so its toolbar clears the
-          // floated toggles + traffic lights.
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              // Allow this column to shrink below content height so the nested
-              // AttachmentsLibrary scroll area is bounded (flexbox min-height
-              // trap - the strip is fixed, the library fills + scrolls).
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              {...dragRegionProps()}
-              style={{
-                height: STRIP_HEIGHT,
-                flexShrink: 0,
-                background: "var(--paper-2)",
-                borderBottom: "1px solid var(--line-1)",
-                display: "flex",
-                alignItems: "center",
-                // Clear the floated left toggle + traffic lights when the left
-                // sidebar is collapsed (they float over this pane's top-left).
-                paddingInlineStart: leftCollapsed ? leftClearance : "var(--space-4)",
-                paddingInlineEnd: "var(--space-4)",
-              }}
-            >
-              {/* The Attachments title rides the top clearance/tab-strip row so
-                  it reads as the surface's header, with the row's border between
-                  it and the toolbar below. */}
-              <span
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 15,
-                  fontWeight: "var(--weight-semibold)",
-                  color: "var(--fg-1)",
-                }}
-              >
-                {t("attachments.library.title")}
-              </span>
-            </div>
-            <AttachmentsLibrary onClose={() => setCenterView("editor")} />
-          </div>
-        ) : (
-          <PaneTree
-            node={ws.root}
-            focusedPaneId={ws.focusedPaneId}
-            onReadout={onReadout}
-            leftInset={leftCollapsed ? leftClearance : 0}
-            // The clearance is reserved for the two controls that FLOAT in the
-            // top-right corner, so it is only owed when they are there. On a
-            // non-note tab (the graph, the task list, a saved view) neither is
-            // rendered, there is no note for either to act on, and reserving
-            // their room anyway left the tab strip's caret sitting a control's
-            // width off the right edge with empty space beside it
-            // (myne-md/myne#727). The strip's padding already transitions on the
-            // sidebar's own curve, so the caret slides rather than jumping when
-            // the focused tab changes kind.
-            rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
-          />
-        )}
+        <PaneTree
+          node={ws.root}
+          focusedPaneId={ws.focusedPaneId}
+          onReadout={onReadout}
+          leftInset={leftCollapsed ? leftClearance : 0}
+          // The clearance is reserved for the two controls that FLOAT in the
+          // top-right corner, so it is only owed when they are there. On a
+          // non-note tab (the graph, the task list, a saved view) neither is
+          // rendered, there is no note for either to act on, and reserving
+          // their room anyway left the tab strip's caret sitting a control's
+          // width off the right edge with empty space beside it
+          // (myne-md/myne#727). The strip's padding already transitions on the
+          // sidebar's own curve, so the caret slides rather than jumping when
+          // the focused tab changes kind.
+          rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
+        />
         </div>
-        {centerView !== "attachments" &&
-          // Same condition as the right toggle: a non-note tab has no note for
-          // the backlinks/outline sidebar to describe, so it is not shown - and
-          // the sidebar can never be left open with its toggle gone
-          // (myne-md/myne#656 review).
-          ws.focusedLeaf.activeTab?.kind === "note" && (
+        {/* A non-note tab has no note for the backlinks/outline sidebar to
+            describe, so it is not shown - and the sidebar can never be left
+            open with its toggle gone (myne-md/myne#656 review). The attachment
+            library used to need a second clause here; as a tab its kind is
+            simply not "note" (myne-md/myne#773). */}
+        {ws.focusedLeaf.activeTab?.kind === "note" && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
@@ -2717,7 +2667,6 @@ function EditorChrome({
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onReopen={() => setPaletteOpen(true)}
-        centerView={centerView}
         setToast={setToast}
         onImportObsidian={() => {
           setPaletteOpen(false);
@@ -2741,7 +2690,7 @@ function EditorChrome({
         }}
         onOpenAttachments={() => {
           setPaletteOpen(false);
-          setCenterView("attachments");
+          ws.openAttachments();
         }}
         onOpenSettings={() => {
           setPaletteOpen(false);
@@ -2976,7 +2925,6 @@ function EditorChrome({
           reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}
       <RemoteMergeHint />
     </div>
-    </CenterViewProvider>
   );
 }
 
@@ -3178,9 +3126,6 @@ type CommandPaletteHostProps = {
   /** Re-open the palette - used to pop back from a QuickPicker sub-flow on
    *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
   onReopen: () => void;
-  /** Which surface the center pane shows - the note-actions "…" menu hides on
-   *  the attachments view (it acts on the focused note, absent there). */
-  centerView: CenterView;
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;

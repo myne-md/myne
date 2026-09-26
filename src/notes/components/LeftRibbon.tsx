@@ -69,6 +69,23 @@ const RAIL_ITEM_STYLE: CSSProperties = {
   display: "flex",
   justifyContent: "center",
 };
+/** The current-surface indicator: an accent bar on the rail's inline-start
+ *  edge, the conventional nav-rail "you are here". Drawn on the ITEM rather
+ *  than the button so it reaches the rail edge, and kept distinct from the
+ *  button's background because that is already the drag/hover channel — two
+ *  states sharing one paint is how a dragged item would read as the current
+ *  surface. */
+const CURRENT_BAR_STYLE: CSSProperties = {
+  position: "absolute",
+  insetInlineStart: 0,
+  top: 4,
+  bottom: 4,
+  width: 2,
+  borderRadius: "var(--radius-1)",
+  background: "var(--accent)",
+  pointerEvents: "none",
+};
+
 const DROP_LINE_STYLE: CSSProperties = {
   position: "absolute",
   left: 0,
@@ -92,7 +109,11 @@ const RAIL_DIVIDER_STYLE: CSSProperties = {
   pointerEvents: "none",
 };
 
-function buttonStyle(dimmed: boolean, active: boolean): CSSProperties {
+function buttonStyle(
+  dimmed: boolean,
+  active: boolean,
+  current: boolean,
+): CSSProperties {
   return {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
@@ -102,18 +123,36 @@ function buttonStyle(dimmed: boolean, active: boolean): CSSProperties {
     flexShrink: 0,
     border: 0,
     borderRadius: "var(--radius-1)",
-    background: active ? "var(--bg-3)" : "transparent",
-    color: dimmed ? "var(--fg-3)" : "var(--fg-2)",
+    background: active || current ? "var(--bg-3)" : "transparent",
+    // The current surface's glyph takes full-strength ink, so the rail reads at
+    // a glance rather than only on close inspection of a 2px bar.
+    color: dimmed ? "var(--fg-3)" : current ? "var(--fg-1)" : "var(--fg-2)",
     cursor: dimmed ? "default" : "pointer",
     opacity: dimmed ? 0.5 : 1,
     transition: HOVER_TRANSITION,
   };
 }
 
-export function LeftRibbon({ hidden = false }: { hidden?: boolean }) {
+export function LeftRibbon({
+  hidden = false,
+  currentCommandId,
+}: {
+  hidden?: boolean;
+  /**
+   * The registry command whose SURFACE is the focused tab, or `undefined` when
+   * the focused tab is a note or a saved view (neither is opened by a rail
+   * entry). Derived by the caller from `ws.focusedLeaf.activeTab?.kind` through
+   * `openCommandForKind`, so the rail never keeps its own idea of where you
+   * are — which is the bug: the rail had NO active state, so pressing
+   * Attachments and pressing Graph left it identical (myne-md/myne#773).
+   */
+  currentCommandId?: string;
+}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const [dragId, setDragId] = useState<string | null>(null);
+  const isCurrent = (id: string): boolean =>
+    currentCommandId !== undefined && currentCommandId === id;
   const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [bgMenu, setBgMenu] = useState<{ x: number; y: number } | null>(null);
@@ -227,12 +266,17 @@ export function LeftRibbon({ hidden = false }: { hidden?: boolean }) {
         const showDrop = dropAt?.id === id;
         return (
           <div key={id} style={RAIL_ITEM_STYLE}>
+            {isCurrent(id) && <span aria-hidden style={CURRENT_BAR_STYLE} />}
             {showDrop && dropAt.edge === "before" && <span aria-hidden style={{ ...DROP_LINE_STYLE, top: -1 }} />}
             {showDrop && dropAt.edge === "after" && <span aria-hidden style={{ ...DROP_LINE_STYLE, bottom: -1 }} />}
             <button
               type="button"
               title={action.kbd !== undefined ? `${label} (${action.kbd})` : label}
               aria-label={label}
+              // `page` rather than `true`: the rail is navigation between
+              // surfaces, and a screen reader saying "current page" is the
+              // right sentence for "this is the one you are looking at".
+              aria-current={isCurrent(id) ? "page" : undefined}
               aria-disabled={dimmed || undefined}
               disabled={dimmed}
               draggable
@@ -253,7 +297,10 @@ export function LeftRibbon({ hidden = false }: { hidden?: boolean }) {
                 setMenu({ id, x: e.clientX, y: e.clientY });
               }}
               {...hover}
-              style={{ ...buttonStyle(dimmed, dragId === id), opacity: dragId === id ? 0.4 : dimmed ? 0.5 : 1 }}
+              style={{
+                ...buttonStyle(dimmed, dragId === id, isCurrent(id)),
+                opacity: dragId === id ? 0.4 : dimmed ? 0.5 : 1,
+              }}
               data-testid="editor.ribbon.button"
               data-command-id={id}
               data-visibility={vis}

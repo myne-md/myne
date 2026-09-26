@@ -45,6 +45,7 @@ import {
   focusedLeaf,
   graphItem,
   tasksItem,
+  attachmentsItem,
   listSlots,
   noteItem,
   openInFocusedTab,
@@ -296,6 +297,8 @@ export type WorkspaceApi = {
   /** Open (or reveal) the vault-wide task list - a singleton tab, like the
    *  graph, so calling twice reveals rather than duplicating (MYND-616). */
   openTasks: () => void;
+  /** Open (or reveal) the attachment-library tab (myne-md/myne#773). */
+  openAttachments: () => void;
   /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
   setTaskViewState: (paneId: PaneId, next: TaskView) => void;
@@ -620,24 +623,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setPending],
   );
-  const openGraph = useCallback(() => {
-    const wasPending = pendingRef.current;
-    setPending(null);
-    setState((s) =>
-      wasPending !== null && wasPending === s.focusedPaneId
-        ? openInNewTab(s, graphItem())
-        : openInFocusedTab(s, graphItem()),
-    );
-  }, [setPending]);
-  const openTasks = useCallback(() => {
-    const wasPending = pendingRef.current;
-    setPending(null);
-    setState((s) =>
-      wasPending !== null && wasPending === s.focusedPaneId
-        ? openInNewTab(s, tasksItem())
-        : openInFocusedTab(s, tasksItem()),
-    );
-  }, [setPending]);
+  /**
+   * Open (or reveal) a SINGLETON tab. One implementation for every singleton
+   * kind — the graph, the task list, the attachment library — because they were
+   * three byte-identical copies differing only in which item they built
+   * (myne-md/myne#773). The duplicate-forbid invariant does the "reveal, never a
+   * second tab" half; what this owns is the pending-new-tab case, where the user
+   * opened the "+" chooser and picking a surface must fill THAT tab rather than
+   * replacing whatever was focused behind it.
+   */
+  const openSingleton = useCallback(
+    (item: WorkspaceItem) => {
+      const wasPending = pendingRef.current;
+      setPending(null);
+      setState((s) =>
+        wasPending !== null && wasPending === s.focusedPaneId
+          ? openInNewTab(s, item)
+          : openInFocusedTab(s, item),
+      );
+    },
+    [setPending],
+  );
+  const openGraph = useCallback(() => openSingleton(graphItem()), [openSingleton]);
+  const openTasks = useCallback(() => openSingleton(tasksItem()), [openSingleton]);
+  const openAttachments = useCallback(
+    () => openSingleton(attachmentsItem()),
+    [openSingleton],
+  );
   const setTaskViewState = useCallback(
     (paneId: PaneId, next: TaskView) => {
       setState((s) => setTaskViewStateOp(s, paneId, next));
@@ -897,6 +909,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
+      openAttachments,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,
@@ -953,6 +966,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
+      openAttachments,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,

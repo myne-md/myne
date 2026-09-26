@@ -16,6 +16,7 @@ import {
   tabKindSpec,
 } from "../../src/notes/tabKinds";
 import {
+  ATTACHMENTS_TAB_ID,
   GRAPH_TAB_ID,
   TASKS_TAB_ID,
   itemKey,
@@ -28,7 +29,13 @@ describe("the registry covers the union", () => {
     // Hand-listed on purpose: this array IS the assertion. Widening the union
     // without registering the kind must fail HERE, and a derived list would
     // derive the same omission.
-    const unionKinds: WorkspaceItem["kind"][] = ["note", "view", "graph", "tasks"];
+    const unionKinds: WorkspaceItem["kind"][] = [
+      "note",
+      "view",
+      "graph",
+      "tasks",
+      "attachments",
+    ];
     expect([...TAB_KIND_TAGS].sort()).toEqual([...unionKinds].sort());
     for (const kind of unionKinds) {
       expect(() => tabKindSpec(kind), `${kind} is unregistered`).not.toThrow();
@@ -55,9 +62,9 @@ describe("the registry covers the union", () => {
     // The floats act on an open NOTE. A new kind that forgets to answer would
     // inherit `note`'s answer if this were a literal comparison, and the
     // failure is a backlinks panel over a surface with no note behind it.
-    expect(tabKindSpec("note").hasNoteFloats).toBe(true);
+    expect(tabKindSpec("note").showsFocusedNote).toBe(true);
     for (const spec of TAB_KINDS.filter((s) => s.kind !== "note")) {
-      expect(spec.hasNoteFloats, `${spec.kind} must not claim note floats`).toBe(false);
+      expect(spec.showsFocusedNote, `${spec.kind} must not claim note floats`).toBe(false);
     }
   });
 });
@@ -79,6 +86,7 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
       { kind: "view", id: "v1" },
       { kind: "graph", id: GRAPH_TAB_ID },
       { kind: "tasks", id: TASKS_TAB_ID },
+      { kind: "attachments", id: ATTACHMENTS_TAB_ID },
     ];
     for (const item of items) {
       expect(parseItemKey(itemKey(item))).toEqual(item);

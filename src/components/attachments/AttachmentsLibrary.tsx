@@ -1,6 +1,6 @@
-// Attachments library surface (MYND-170 / MYND-164) — a full-pane center-pane
-// view (SYNC-9: an in-editor view toggle; the shell + sidebars persist; NOT a
-// modal, NOT a new Stage). Browse / search / sort / filter the vault's
+// Attachments library surface (MYND-170 / MYND-164) — a full-pane TAB body
+// (SYNC-9 shipped it as an in-editor view toggle; myne-md/myne#773 made it a
+// tab. The shell + sidebars persist; NOT a modal, NOT a new Stage). Browse / search / sort / filter the vault's
 // attachments, preview thumbnails (hover-preview → shared lightbox), see
 // "used in N notes", and act via a per-item ⋮ menu: preview, rename, delete.
 //
@@ -8,9 +8,12 @@
 // insert-into-note action (there is no focused editor while it's open — the
 // `emitAttachmentEmbed` insert path stays available in the editor itself).
 //
-// Mounted by `Editor.tsx` when the center view is "attachments". Lives
-// inside `<SidebarStateProvider>` so it can read the note-title cache + the
-// `open` action (jump-to-note target).
+// Rendered by `PaneView` as the body of an `attachments` TAB (myne-md/myne#773).
+// It used to be a `CenterView` — a second, parallel center-pane swap that
+// replaced the whole pane tree — which is why the left ribbon could not know it
+// was open and why it could not sit beside a note in a split. Lives inside
+// `<SidebarStateProvider>` so it can read the note-title cache + the `open`
+// action (jump-to-note target).
 //
 // Design canon: monochrome + iron-blue accent, 1px hairlines, no card
 // shadows, Inter UI / JetBrains Mono for ids, sentence-case, no emoji.
@@ -115,12 +118,15 @@ const TRANSCRIBE_TOAST_KEY: Readonly<
 interface AttachmentsLibraryProps {
   /**
    * Return to the editor view. The library is a SCREEN, not a modal — there
-   * is no × affordance; the user leaves by selecting a note in the sidebar
-   * (which resets the center view). This callback survives only for the
-   * jump-to-note path (clicking a "used in N notes" entry), which opens the
-   * note AND swaps the center pane back to the editor.
+   * is no × affordance; the user leaves by selecting another tab, or by
+   * jumping to a note from a "used in N notes" entry — which opens the note in
+   * this pane and therefore replaces this tab with it.
+   *
+   * There is no `onClose` any more (myne-md/myne#773). It existed because the
+   * library was a `CenterView` — a parallel center-pane swap outside the tab
+   * model — so jumping to a note had to ALSO tell the shell to swap back. As a
+   * tab, opening the note in the focused pane is the whole operation.
    */
-  onClose: () => void;
 }
 
 // ---- layout tokens --------------------------------------------------------
@@ -299,7 +305,7 @@ const CLEAN_NOTICE_STYLE: CSSProperties = {
   zIndex: 10,
 };
 
-export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
+export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // AI opt-in gate for the per-item Transcribe action (voice-to-text MYND-552,
@@ -650,10 +656,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   const handleJump = useCallback(
     (id: NoteId) => {
+      // Opening the note in the focused pane REPLACES this tab with it, which
+      // is what "jump to the note" means. No second call is needed.
       void ctx.open(id).catch(() => {});
-      onClose(); // jumping to a note returns to the editor view
     },
-    [ctx, onClose],
+    [ctx],
   );
 
   // ---- render ------------------------------------------------------------
