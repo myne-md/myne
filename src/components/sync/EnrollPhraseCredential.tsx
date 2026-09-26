@@ -27,12 +27,25 @@ export const PHRASE_CELL_COUNT = 24;
 const FIELD: CSSProperties = { display: "flex", flexDirection: "column", gap: "var(--space-2)" };
 const LABEL: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--fg-2)" };
 const HINT: CSSProperties = { fontSize: "var(--text-xs)", color: "var(--fg-3)", margin: 0 };
+// `minmax(0, 1fr)`, not `1fr`: a `1fr` track is `minmax(auto, 1fr)`, and the
+// `auto` floor is each cell's MIN-CONTENT width — a text input's intrinsic
+// width (`size`, 20 characters), which `min-width: 0` on the input does not
+// reduce, because that only moves the floor rather than the content size. Four
+// of those overflowed the panel and pushed the fourth column (words 4/8/12/16/
+// 20/24) off the right edge, unreachable in every surface that mounts this
+// grid. Zero floors the track; `minWidth: 0` on the wrap lets the item shrink
+// to it (myne-md/myne#764).
 const GRID: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "var(--space-2)",
 };
-const CELL_WRAP: CSSProperties = { display: "flex", alignItems: "center", gap: "var(--space-1)" };
+const CELL_WRAP: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  minWidth: 0,
+};
 const CELL_NUMBER: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",

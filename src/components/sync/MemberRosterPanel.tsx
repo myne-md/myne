@@ -68,6 +68,33 @@ const STATUS_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
+/** A section's own vertical rhythm. The panel's two identity blocks are plain
+ *  divs, so without this the primary button sits flush against the phrase grid's
+ *  last row (myne-md/myne#764). */
+const SECTION_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  alignSelf: "stretch",
+};
+
+/** The `EndpointConfig` server-URL row, which the identity code deliberately
+ *  matches: the field takes the flexible width and its actions sit BESIDE it as
+ *  compact buttons, rather than a full-width copy button with a second one on a
+ *  line of its own below (myne-md/myne#764). */
+const FIELD_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
+/** Actions in a `FIELD_ROW_STYLE` row keep their label on one line and never
+ *  give ground to the field. */
+const ROW_ACTION_STYLE: CSSProperties = {
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+};
+
 const ERROR_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--danger)",
@@ -187,15 +214,37 @@ export function MemberRosterPanel({
     );
   }
 
+  // The one lock control, rendered either inside the identity-code row (owner,
+  // beside Copy) or on its own line (a member has no code to show). Declared
+  // once so the two arms cannot drift apart.
+  const lockButton = (
+    <Button
+      type="button"
+      data-testid="member-roster.person-lock-button"
+      style={ROW_ACTION_STYLE}
+      onClick={async () => {
+        await lockPerson();
+        setCopyFeedback(null);
+        setPersonIdentityState({ ready: false, ownerCode: null });
+      }}
+    >
+      {t("sync.memberRoster.personLock")}
+    </Button>
+  );
+
   return (
     <div data-testid="member-roster">
       {/* Step 1: the person identity. One unlock per process. */}
       {!personReady ? (
-        <div data-testid="member-roster.person-unlock">
+        <div data-testid="member-roster.person-unlock" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
+          {/* No `label` override: this panel's own sentence above is the
+              explanation, and passing the same key here rendered it a SECOND
+              time as the grid's field label (myne-md/myne#764). The primitive's
+              default label ("Recovery phrase") plus its default hint carry the
+              field itself. */}
           <EnrollPhraseCredential
             baseId="member-roster"
-            label={t("sync.memberRoster.personHint")}
             cells={phraseCells}
             onCellChange={handlePhraseCellChange}
             onCellPaste={handlePhraseCellPaste}
@@ -237,30 +286,38 @@ export function MemberRosterPanel({
           ) : null}
         </div>
       ) : (
-        <div data-testid="member-roster.person-ready">
+        <div data-testid="member-roster.person-ready" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personReady")}</p>
           {/* The owner's own out-of-band identity code: share it with an invitee
               so they can verify the group package the owner sends. Public
               material only. */}
           {authority === "owner" && ownerCode ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <>
               <p style={STATUS_STYLE}>{t("sync.memberRoster.ownerCodeHint")}</p>
-              <Input
-                data-testid="member-roster.owner-code"
-                aria-label={t("sync.memberRoster.ownerCodeHint")}
-                autoComplete="off"
-                readOnly
-                value={ownerCode}
-                style={{ ...CODE_STYLE, width: "100%", userSelect: "all" }}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                data-testid="member-roster.copy-owner-code"
-                onClick={copyOwnerCode}
-              >
-                {t("personIdentityCode.copy")}
-              </Button>
+              {/* The `EndpointConfig` server-URL row's shape: the code takes the
+                  flexible width and both actions sit beside it, so a 180-hex
+                  code and two controls share one line instead of three
+                  (myne-md/myne#764). */}
+              <div style={FIELD_ROW_STYLE}>
+                <Input
+                  data-testid="member-roster.owner-code"
+                  aria-label={t("sync.memberRoster.ownerCodeHint")}
+                  autoComplete="off"
+                  readOnly
+                  value={ownerCode}
+                  style={{ ...CODE_STYLE, flex: 1, minWidth: 0, userSelect: "all" }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="member-roster.copy-owner-code"
+                  style={ROW_ACTION_STYLE}
+                  onClick={copyOwnerCode}
+                >
+                  {t("personIdentityCode.copy")}
+                </Button>
+                {lockButton}
+              </div>
               {copyFeedback === "error" ? (
                 <p
                   data-testid="member-roster.copy-feedback"
@@ -280,19 +337,10 @@ export function MemberRosterPanel({
                   {t("personIdentityCode.copied")}
                 </p>
               ) : null}
-            </div>
-          ) : null}
-          <Button
-            type="button"
-            data-testid="member-roster.person-lock-button"
-            onClick={async () => {
-              await lockPerson();
-              setCopyFeedback(null);
-              setPersonIdentityState({ ready: false, ownerCode: null });
-            }}
-          >
-            {t("sync.memberRoster.personLock")}
-          </Button>
+            </>
+          ) : (
+            lockButton
+          )}
         </div>
       )}
 
@@ -369,7 +417,7 @@ export function MemberRosterPanel({
           exists from invite time, so this list is how the owner tells an
           accepted invite from one nobody has claimed yet. */}
       {authority === "owner" && vaultInvites.length > 0 ? (
-        <div data-testid="member-roster.invitations">
+        <div data-testid="member-roster.invitations" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.invitationsHeading")}</p>
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {vaultInvites.map((inv) => (
