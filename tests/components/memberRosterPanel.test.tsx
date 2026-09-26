@@ -102,7 +102,45 @@ describe("MemberRosterPanel phrase input", () => {
     }
   });
 
+  // #764: the panel's own `personHint` sentence AND the grid's field label were
+  // the same i18n key, so the user read it twice. Asserted on the rendered
+  // count, not on the absence of the `label` prop, because the prop is one of
+  // several ways to produce the duplicate.
+  it("states the unlock instruction once, not once per text slot", () => {
+    render(<MemberRosterPanel />);
+    try {
+      const panel = screen.getByTestId("member-roster");
+      const statements = Array.from(panel.querySelectorAll("p, span")).filter(
+        (node) => node.textContent === "sync.memberRoster.personHint",
+      );
+      expect(statements).toHaveLength(1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  // #764: a `1fr` track is `minmax(auto, 1fr)`, and the `auto` floor is each
+  // cell's min-content width — a text input's intrinsic `size` width, which
+  // `min-width: 0` on the input alone does not reduce. Four of those overflowed
+  // the panel and pushed words 4/8/12/16/20/24 off the right edge. Both halves
+  // are asserted because either one alone still overflows.
+  it("keeps the phrase grid inside its container at any panel width", () => {
+    render(<MemberRosterPanel />);
+    try {
+      const grid = screen.getByTestId("member-roster.phrase-grid") as HTMLElement;
+      expect(grid.style.gridTemplateColumns).toBe("repeat(4, minmax(0, 1fr))");
+      const wraps = Array.from(grid.children) as HTMLElement[];
+      expect(wraps).toHaveLength(24);
+      for (const wrap of wraps) {
+        expect(wrap.style.minWidth).toBe("0px");
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it("still accepts typing after the label is added", () => {
+
     render(<MemberRosterPanel />);
     try {
       const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
