@@ -74,6 +74,21 @@ fi
 # rather than against every host: `docs/web-bundle-hashes.md`.
 if [ "${1:-}" = "--verify" ]; then
   echo "== reproducibility check: two cold builds, separate target dirs =="
+
+  # A shared compiler cache must not serve either of these two builds. The two
+  # SEPARATE target dirs above exist for one reason — a rebuild that reuses
+  # cached artefacts compares a build against itself and passes without proving
+  # anything — and a machine-wide cache keyed on compilation inputs satisfies
+  # that exact shape across two unrelated directories, which is why it is
+  # switched off here and only here. Measured on this machine with the store
+  # empty: build A stored 327 MiB and build B reported "201 hits, 0 misses,
+  # avoiding 2m 42s of compiler time", so the second build compiled nothing and
+  # the check had degenerated into comparing a real build to a cache restore.
+  #
+  # The ordinary (non-`--verify`) build path stays cached; `wasm-repro-check.sh`
+  # execs this branch, so CI gets the same bypass without its own copy of it.
+  export MBX_DISABLE=1
+
   tmp_a="$(mktemp -d)"
   tmp_b="$(mktemp -d)"
   trap 'rm -rf "$tmp_a" "$tmp_b"' EXIT
