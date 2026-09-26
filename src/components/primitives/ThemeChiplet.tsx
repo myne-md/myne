@@ -8,6 +8,9 @@
 //
 // Decorative by definition — the colors are the content, and the theme's name
 // is always rendered next to it — so it is `aria-hidden`.
+//
+// The chiplet chrome lives in `@myne/client-core`'s `components.css` under
+// `.myne-chiplet`; only the swatch fills are inline, because those are the data.
 
 import type { CSSProperties } from "react";
 import type { ThemePreview } from "../../lib/themes";
@@ -49,16 +52,6 @@ function displaySafeColor(value: string): string | null {
   return DISPLAY_SAFE_COLOR.test(value.trim()) ? value : null;
 }
 
-const CHIPLET_STYLE: CSSProperties = {
-  display: "flex",
-  width: 40,
-  height: 28,
-  borderRadius: "var(--radius-1)",
-  overflow: "hidden",
-  border: "1px solid var(--line-2)",
-  flex: "0 0 auto",
-};
-
 interface ThemeChipletProps {
   preview: ThemePreview;
   /** Overrides merged over the default chiplet chrome (size, radius, border). */
@@ -75,7 +68,7 @@ export function ThemeChiplet({ preview, style, ...rest }: ThemeChipletProps) {
     preview.line,
   ];
   return (
-    <span style={{ ...CHIPLET_STYLE, ...style }} aria-hidden="true" {...rest}>
+    <span className="myne-chiplet" style={style} aria-hidden="true" {...rest}>
       {swatches.map((color, i) => {
         // A value we will not paint renders as an empty cell rather than being
         // dropped, so the swatch count stays stable and a hostile palette looks
@@ -84,7 +77,11 @@ export function ThemeChiplet({ preview, style, ...rest }: ThemeChipletProps) {
         return (
           <span
             key={i}
-            style={safe === null ? { flex: 1 } : { flex: 1, background: safe }}
+            className="myne-chiplet__swatch"
+            // The colour is the component's DATA — a theme's own value, already
+            // through `displaySafeColor` — so it stays inline. The chrome
+            // around it moved to `components.css` (myne-md/myne#773).
+            style={safe === null ? undefined : { background: safe }}
             data-unsafe={safe === null && color !== "" ? "true" : undefined}
           />
         );

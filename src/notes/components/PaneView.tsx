@@ -64,6 +64,7 @@ import {
   type LeafPane,
   type SplitDirection,
 } from "../workspaceState";
+import { tabKindSpec } from "../tabKinds";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
@@ -1878,9 +1879,11 @@ export function PaneView({
         titleOf={(key) => {
           const it = parseItemKey(key);
           if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;
-          // Graph tab: the whole-vault graph is a singleton with a fixed label.
-          if (it.kind === "graph") return t("notes.pane.graphTab");
-          if (it.kind === "tasks") return t("notes.pane.tasksTab");
+          // A singleton kind (the graph, the task list) carries a fixed label
+          // key in the tab-kind registry, so this arm covers every one of them
+          // and a new singleton needs no edit here (myne-md/myne#773).
+          const labelKey = tabKindSpec(it.kind).labelKey;
+          if (labelKey !== undefined) return t(labelKey);
           // View tab: label by the saved view's name (MYND-274), not its raw id.
           // A blank name shows "Untitled view" (the sidebar's label rule); an
           // unknown id (a stale tab for a deleted view) falls back to null.
@@ -1899,9 +1902,12 @@ export function PaneView({
         }}
         iconOf={(key) => {
           const it = parseItemKey(key);
-          if (it.kind === "view") return "layout-grid";
-          if (it.kind === "graph") return "share-2";
-          if (it.kind === "tasks") return "list-todo";
+          // Every non-note kind takes its glyph straight from the registry
+          // (myne-md/myne#773). `note` falls through, because a note's glyph
+          // depends on the NOTE (drawing, task, bookmark) rather than on its
+          // tab kind — which is exactly the distinction the registry's default
+          // cannot make and the lines below can.
+          if (it.kind !== "note") return tabKindSpec(it.kind).icon;
           // url-bookmark (SYNC-16): a note carrying an unmanaged `source:`
           // provenance key is a clipped link-only bookmark → bookmark glyph;
           // every ordinary note keeps the default `file-text`.

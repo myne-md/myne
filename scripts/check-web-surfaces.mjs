@@ -147,6 +147,10 @@ const V = {
     "adapted",
     "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
   ],
+  "src/components/settings/BarCustomizeSettings.tsx": [
+    "ported",
+    "Prefs-backed (myne-md/myne#773), the visibility half of the bottom-bar vocabulary. The bar renders from the same shared src/ tree on web and each item carries its own data guard, so hiding one behaves identically here. It is also the reason the bar is allowed to disappear at all: the bar's own right-click menu is the only other place visibility can be changed, so on every client this block is the route back.",
+  ],
   "src/components/settings/RibbonCustomizeSettings.tsx": [
     "ported",
     "Prefs-backed (myne-md/myne#699). The rail itself renders from the same shared src/ tree on web, and the commands it pins carry their own per-state guards, so the customization roster behaves identically here.",

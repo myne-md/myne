@@ -155,6 +155,10 @@ describe("Command palette action registry", () => {
       "note.trash",
       "notes.random",
       "notes.toggle-archiving",
+      // myne-md/myne#773: the palette's own entry. It had none — `palette.toggle`
+      // was a keybinding only, and the left rail derives its roster from actions
+      // carrying a `ribbon` block, so the palette could not be pinned to it.
+      "palette.open",
       "pane.close",
       "pane.focus-next",
       "pane.focus-prev",

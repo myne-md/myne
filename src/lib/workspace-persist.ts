@@ -11,11 +11,10 @@ import { invoke } from "../platform/core";
 import { decodeGraphSettings, encodeGraphSettings } from "../notes/graphSettings";
 import { decodeTaskDisplay, encodeTaskDisplay } from "../notes/taskDisplay";
 import type { DetachedEntry } from "../notes/detachedRestore";
+import { canonicalTabId } from "../notes/tabKinds";
 import {
   collectLeaves,
   findLeaf,
-  GRAPH_TAB_ID,
-  TASKS_TAB_ID,
   itemKey,
   sameItem,
   wrapAsSingleSlot,
@@ -428,7 +427,12 @@ function parseItem(t: unknown): ParsedItem {
   // The whole-vault graph (MYND-198) is a singleton tab; its id is the fixed
   // sentinel, so any persisted id normalizes to a canonical graph item.
   if (o.kind === "graph") {
-    return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned, ...viewMode } };
+    // `canonicalTabId` rather than the sentinel inline (myne-md/myne#773): the
+    // tab-kind registry owns which kinds are singletons and what their one id
+    // is, so this reader cannot drift from the strip that renders them.
+    return {
+      item: { kind: "graph", id: canonicalTabId("graph", o.id), ...pinned, ...viewMode },
+    };
   }
   // The vault-wide task list (MYND-616) - a singleton like the graph, plus two
   // pieces of per-tab session state. Both are read-when-present and
@@ -439,7 +443,7 @@ function parseItem(t: unknown): ParsedItem {
     return {
       item: {
         kind: "tasks",
-        id: TASKS_TAB_ID,
+        id: canonicalTabId("tasks", o.id),
         ...pinned,
         ...viewMode,
         ...parseTaskView(o),

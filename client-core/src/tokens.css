@@ -147,6 +147,12 @@
   /* Danger *fill* for destructive buttons, a clear red, distinct from the
      text-tuned `--danger` (which is light on a dark theme and washes out a fill). */
   --danger-solid:  #a8322a;
+  /* The ink that sits ON `--danger-solid`, the `--accent-on` of the danger
+     family. It was a literal `#fff` inside the danger button, which is a
+     genuine token gap rather than a style choice: a theme that retunes
+     `--danger-solid` to a pale red has no way to darken the label with it, so
+     the one combination a theme can produce is white-on-pale. (myne-md/myne#773) */
+  --danger-on:     #ffffff;
   --danger-soft:   #f5e7e5;
   --warning:       #8a6a1f;
   --warning-soft:  #f5efde;
@@ -249,6 +255,18 @@
   --shadow-2: 0 2px 4px rgba(11,11,9,0.06), 0 4px 12px rgba(11,11,9,0.08);
   --shadow-3: 0 8px 16px rgba(11,11,9,0.08), 0 16px 40px rgba(11,11,9,0.12);
 
+  /* The modal scrim — the ONE translucent surface in the product, and it has no
+     blur (`DESIGN.md`, the No-Glass Rule).
+
+     It had no token until myne-md/myne#773 and was hand-written as
+     `rgba(0, 0, 0, 0.4)` in eight files, which drifted from the canon in two
+     ways at once. The canon specifies `rgba(11,11,9,0.4)` on light — the INK
+     colour at 40%, warm, consistent with paper-and-ink — where the literal was
+     pure black; and `rgba(0,0,0,0.6)` on dark, where the literal stayed at 0.4
+     and barely separated a modal from an already-near-black page. Both values
+     here are the canon's, adopted on the merits. */
+  --scrim: rgba(11, 11, 9, 0.4);
+
   /* -- Radii ---------------------------------------------------------- */
   --radius-1: 3px;
   --radius-2: 6px;
@@ -291,12 +309,89 @@
   --space-8:  64px;
   --space-9:  96px;
 
+  /* -- Control geometry ------------------------------------------------
+     The measurements the shared component layer (`components.css`) paints its
+     primitives from. They live HERE rather than as literals over there for the
+     reason the whole token layer exists: a custom theme can set a token and
+     cannot rewrite a rule, so a padding written into `components.css` would be
+     as unreachable to a theme as one written into an inline style — which is
+     the exact failure `scripts/check-token-adoption.mjs` was built to stop, and
+     it catches `padding:` and `gap:` in a stylesheet as readily as in a style
+     object.
+
+     These are off the `--space-*` scale on purpose and must stay off it: they
+     are the shipped control sizes (a 7/14 button, a 6/16 segment) and rounding
+     them onto the scale would resize every control in the app. The scale is for
+     LAYOUT between things; this is the geometry inside one thing. */
+  --control-pad-y:  7px;
+  --control-pad-x:  14px;
+  --control-gap:    6px;
+  --field-pad-y:    8px;
+  --field-pad-x:    10px;
+  --segment-pad-y:  6px;
+  --segment-pad-x:  16px;
+  /* The dense segmented variant, for a control floating on content. */
+  --segment-pad-y-sm: 5px;
+  /* The padding ring around a bare icon control (a modal's close ×),
+     which is its hit area as much as its look. */
+  --icon-btn-pad:   6px;
+
   /* -- Motion --------------------------------------------------------- */
+  /* Two tiers, and the split is the whole point (myne-md/myne#772; the
+     `PRODUCT.md` principle-4 amendment and `docs/decisions/ui/` entry are the
+     normative statement, this is its value layer).
+
+     The RESTRAINED tier below is the default and covers almost everything: a
+     hover, a focus, a panel, a disclosure. Nothing here changed, so every
+     existing transition keeps its exact timing.
+
+     The EXPRESSIVE tier exists for the handful of moments that are rare enough
+     to earn presence — a surface arriving for the first time, a shared element
+     travelling between two places, a gesture the user is still holding. It is
+     opt-in per call site and it is NOT a licence to animate more things: the
+     frequency rule is unchanged and still outranks it (a keyboard-initiated or
+     100+/day action gets no motion at all, whichever tier is in scope).
+
+     `prefers-reduced-motion` zeroes both tiers globally, in each client's own
+     shell sheet. */
   --ease-standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
   --ease-out:      cubic-bezier(0.0, 0.0, 0.2, 1.0);
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 260ms;
+
+  /* Expressive tier. */
+
+  /* A press must read as INSTANT — this is feedback, not animation. Anything
+     slower and the control feels like it is deciding whether to respond. */
+  --duration-instant: 80ms;
+
+  /* The one duration over the 300ms UI ceiling, and it is deliberately named so
+     a reviewer has to notice it. Legitimate ONLY for a large surface or a
+     shared-element travel, where the distance genuinely takes longer to read.
+     A 380ms hover is a bug; `check-motion-canon.mjs` treats this token as the
+     exemption and still flags a raw >300ms literal. */
+  --duration-slower: 380ms;
+
+  /* Emphasized decelerate: leaves fast, settles slow. For an entrance that
+     should land with weight rather than merely appear. */
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+
+  /* A spring, expressed as a sampled `linear()` easing so it costs no
+     dependency and stays interruptible by the compositor. Mild overshoot
+     (~4%) — enough to read as physical, not enough to read as bouncy.
+     `@supports` guards it below: a WebView without `linear()` would otherwise
+     invalidate the declaration and silently fall back to the CSS default
+     `ease`, which is an ease-IN-out and is exactly the curve the canon blocks
+     on entrances. The fallback therefore has to be stated, not inherited. */
+  --ease-spring: var(--ease-emphasized);
+
+  /* Stagger, with a HARD cap. A per-item delay makes a cascade read as one
+     gesture; an uncapped one makes the last item arrive after the user has
+     already moved on. Multiply the step by the index, then clamp to the max —
+     a 40-row list staggers over 120ms, not 720ms. */
+  --stagger-step: 18ms;
+  --stagger-max: 120ms;
 
   /* -- Dark palette source values (MYND-110) -------------------------- */
   /* Single source for the dark token VALUES. The two application blocks
@@ -470,6 +565,29 @@
   --_shadow-3-amoled: var(--_shadow-3-dark);
 }
 
+/* `--ease-spring` upgrades to a real sampled spring only where `linear()` is
+   supported (WebKit 17.4+, Chrome 113+, Firefox 112+). The `:root` declaration
+   above resolves it to `--ease-emphasized` unconditionally, so a WebView
+   without `linear()` gets a strong decelerate rather than an invalid
+   declaration — which would fall back to the CSS-initial `ease`, an ease-IN-out
+   and the one curve the canon blocks on an entrance. Declaring the fallback and
+   then overriding it is the only ordering that degrades correctly; an
+   `@supports not` arm would leave the unsupported case with no value at all.
+
+   Sampled from a critically-under-damped spring (stiffness 180, damping 22,
+   mass 1) at 60 Hz, settling by ~380ms with roughly 4% overshoot. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(
+      0, 0.0088, 0.0332, 0.0716, 0.1216, 0.1809, 0.2474, 0.3193, 0.3948,
+      0.4726, 0.5513, 0.6299, 0.7073, 0.7828, 0.8557, 0.9254, 0.9915,
+      1.0294, 1.0393, 1.0413, 1.0376, 1.0303, 1.0212, 1.0117, 1.0029,
+      0.9993, 0.9977, 0.9975, 0.9982, 0.9992, 1
+    );
+  }
+}
+
+
 /* =========================================================================
    Theme application (MYND-110), pure CSS, no JS.
 
@@ -560,6 +678,7 @@
   --shadow-1: var(--_shadow-1-dark);
   --shadow-2: var(--_shadow-2-dark);
   --shadow-3: var(--_shadow-3-dark);
+  --scrim:    rgba(0, 0, 0, 0.6);
 }
 
 /* AMOLED, explicit pure-black choice (overrides the OS). Like Dark, an
@@ -642,6 +761,7 @@
   --shadow-1: var(--_shadow-1-amoled);
   --shadow-2: var(--_shadow-2-amoled);
   --shadow-3: var(--_shadow-3-amoled);
+  --scrim:    rgba(0, 0, 0, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -721,5 +841,6 @@
     --shadow-1: var(--_shadow-1-dark);
     --shadow-2: var(--_shadow-2-dark);
     --shadow-3: var(--_shadow-3-dark);
+    --scrim:    rgba(0, 0, 0, 0.6);
   }
 }

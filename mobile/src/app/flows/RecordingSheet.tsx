@@ -137,8 +137,16 @@ export function RecordingSheet({
             flex: "none",
             borderRadius: "50%",
             background: "var(--danger)",
+            // A STATIC dot. It pulsed via `myne-rec-pulse` until
+            // `docs/decisions/ui/0618`, which keeps principle 4's
+            // no-pulsing-state-indicators clause whole across both motion
+            // tiers. The `mmss(elapsedMs)` timer immediately to its right ticks
+            // once a second and is the liveness signal — information rather
+            // than decoration — so the pulse was a wordless second copy of what
+            // the number already said. Opacity still carries the
+            // recording-vs-paused distinction, which is a state difference the
+            // dot legitimately encodes.
             opacity: phase === "recording" ? 1 : 0.4,
-            animation: phase === "recording" ? "myne-rec-pulse 1.2s ease-in-out infinite" : undefined,
           }}
         />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 16, color: "var(--fg-1)", minWidth: 46 }}>{mmss(elapsedMs)}</span>
@@ -186,7 +194,6 @@ export function RecordingSheet({
           </button>
         )}
       </div>
-      <style>{"@keyframes myne-rec-pulse{0%,100%{opacity:1}50%{opacity:0.35}}"}</style>
     </Sheet>
   );
 }

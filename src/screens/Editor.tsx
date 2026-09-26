@@ -175,6 +175,7 @@ import {
 } from "../notes/components/NoteActionsMenu";
 import { dragEdgeX, insertionLineStyleX } from "../notes/components/reorderDnd";
 import {
+  BAR_ITEMS,
   RIGHT_CLUSTER_DEFAULT_ORDER,
   resolveBarOrder,
   reorderByDrop,
@@ -350,18 +351,6 @@ function useVimMode(): string | null {
   }, []);
   return mode;
 }
-
-const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
-  { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
-  { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
-  { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
-  { id: "tags", labelKey: "editor.chrome.barItems.tags" },
-  { id: "views", labelKey: "editor.chrome.barItems.views" },
-  { id: "settings", labelKey: "editor.chrome.barItems.settings" },
-  { id: "lock", labelKey: "editor.chrome.barItems.lock" },
-  { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
-  { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
-];
 
 // There is deliberately NO left cluster and NO graph launcher here any more.
 // myne-md/myne#396 asked for a bottom-left launcher and this branch shipped one;
@@ -3717,6 +3706,13 @@ function CommandPaletteHost({
         });
       },
       onLock: onLockFlushed,
+      // The palette's own entry point (myne-md/myne#773). Both values are
+      // already props of this host — `onReopen` exists so a cancelled
+      // QuickPicker sub-flow pops back to the palette, and re-opening it from
+      // the rail is the same operation — so the action needed no new plumbing,
+      // only a name in the context.
+      onOpenPalette: onReopen,
+      paletteOpen: open,
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
@@ -3783,6 +3779,8 @@ function CommandPaletteHost({
       onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,
+      onReopen,
+      open,
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
@@ -5487,6 +5485,30 @@ function BottomBar({
     rendered.push({ id, node });
   }
   const visibleIds = rendered.map((r) => r.id);
+
+  // The preview-companion toggle is pinned OUTSIDE the `BAR_ITEMS` vocabulary
+  // (see `barItemsOrder.ts`): it is contextual rather than configurable, and the
+  // bar is the only place it lives. So it counts toward the bar being occupied —
+  // dropping the bar while it is live would strand an affordance with nowhere
+  // else to go.
+  const companionPinned = showPreview && onTogglePreview !== undefined;
+
+  // NOTHING to show: no bar at all, rather than an empty 28px strip with a
+  // hairline under the editor (myne-md/myne#773). Two things about this are
+  // deliberate.
+  //
+  // It keys off what actually RENDERED, not off `hidden_bar_items.length === 9`.
+  // Several renderers already return `null` on a data condition — `vim-mode`
+  // when vim is off, `save-status` under `hideSaveStatus`, `view-mode` with no
+  // active note tab — so "the user hid everything" and "nothing here applies
+  // right now" arrive at the same place and should look the same.
+  //
+  // And the items are restorable from Settings -> Appearance, not only from this
+  // bar's own right-click menu. That is a precondition of this early return
+  // rather than a nicety: before it existed, the menu that un-hides an item WAS
+  // the bar, so hiding the ninth item would have deleted the only route back and
+  // made the setting unrecoverable from the UI that set it.
+  if (rendered.length === 0 && !companionPinned) return null;
 
   return (
     <div
