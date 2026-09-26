@@ -87,6 +87,7 @@ fn build_vault(dir: &Path, password: &str) -> ([u8; 32], [u8; 32], [u8; 16], Met
         items_key_nonce: nonce_items,
         enc_items_key: enc_items.as_slice().try_into().expect("64 bytes"),
         membership: None,
+        person_binding: None,
     };
     std::fs::create_dir_all(dir.join("notes")).expect("notes dir");
     std::fs::write(

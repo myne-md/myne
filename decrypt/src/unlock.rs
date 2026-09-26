@@ -278,6 +278,7 @@ mod tests {
             items_key_nonce: nonce_items,
             enc_items_key: enc_items.as_slice().try_into().expect("64 bytes"),
             membership: None,
+            person_binding: None,
         };
         let bytes = protocol::serialize_vault_meta_v0_2(&meta);
         let phrase_normalized = phrase.join_normalized().to_string();

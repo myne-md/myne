@@ -261,6 +261,13 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "screens",
     "IdentityHome",
   ),
+  [path.join(repoRoot, "src", "components", "IdentitySetupDialog")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "IdentitySetupDialog",
+  ),
   [path.join(repoRoot, "src", "lib", "personAccount")]: path.join(
     repoRoot,
     "web",

@@ -708,6 +708,14 @@ const ROSTER = [
       "Byte-identical. Generation parameters are a security property, not a preference: a weaker generator on one client is a weaker generator, full stop.",
   },
   {
+    a: "src/lib/personAccount.ts",
+    b: "mobile/src/lib/personAccount.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "IPC wrapper and DTO mirror over the shared person-account sync core, the chats-twin shape (myne-md/myne#768). Desktop's wrapper is async and carries AcceptedInviteView; mobile's is a sync 1:1 port of the six `sync_person_*` commands plus inspectInviteCode and PersonStatusView. Mobile calls only setup/status/list-invites today; the four member-vault bindings are recorded in scripts/ipc-binding-callers.json as the unbuilt mobile surface, which is a per-command absence question rather than a divergence in the wrapper shape.",
+  },
+  {
     a: "src/lib/prefs.ts",
     b: "mobile/src/lib/prefs.ts",
     verdict: "decision",

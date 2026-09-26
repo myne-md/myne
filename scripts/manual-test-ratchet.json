@@ -579,22 +579,22 @@
     "items), so the merged ceiling is 10817 + 24. The two branches cover",
     "disjoint roster entries. Written out rather than bumped, so the number",
     "stays an argument.",
-     "CEILING RAISED 10841 -> 10851 by myne-md/myne#745, in the sanctioned",
-     "direction: the identity-only home copy control is a new surface on the",
-     "two desktop clients without an automated lane. The Linux E2E scenario",
-     "now drives the enrolled zero-vault route and successful clipboard write,",
-     "while the component test drives the failure callback; macOS and Windows",
-     "have no driver lane and a real platform clipboard rejection remains an",
-     "OS event source. The item is 5 minutes on each of 2 clients, so the +10",
-     "is the whole of 10841 -> 10851. It is standard, so gatedMinutes is",
-     "unchanged.",
-     "CEILING RAISED 10851 -> 10881 by myne-md/myne#743-745 for the real",
-     "two-person invite acceptance and member-vault re-unlock walk. The existing",
-     "member-roster E2E scenario proves the local form and failure path, but no",
-     "lane provisions two live person accounts and drives the member vault",
-     "across a real relay. The new manual item is 10 minutes on each of three",
-     "desktop clients, so the +30 is the whole of 10851 -> 10881. It is",
-     "standard, so gatedMinutes is unchanged."
+    "CEILING RAISED 10841 -> 10851 by myne-md/myne#745, in the sanctioned",
+    "direction: the identity-only home copy control is a new surface on the",
+    "two desktop clients without an automated lane. The Linux E2E scenario",
+    "now drives the enrolled zero-vault route and successful clipboard write,",
+    "while the component test drives the failure callback; macOS and Windows",
+    "have no driver lane and a real platform clipboard rejection remains an",
+    "OS event source. The item is 5 minutes on each of 2 clients, so the +10",
+    "is the whole of 10841 -> 10851. It is standard, so gatedMinutes is",
+    "unchanged.",
+    "CEILING RAISED 10851 -> 10881 by myne-md/myne#743-745 for the real",
+    "two-person invite acceptance and member-vault re-unlock walk. The existing",
+    "member-roster E2E scenario proves the local form and failure path, but no",
+    "lane provisions two live person accounts and drives the member vault",
+    "across a real relay. The new manual item is 10 minutes on each of three",
+    "desktop clients, so the +30 is the whole of 10851 -> 10881. It is",
+    "standard, so gatedMinutes is unchanged."
   ],
   "$comment4": [
     "CEILING RAISED 10881 -> 10926 by myne-md/myne#756, in the sanctioned",
@@ -621,7 +621,8 @@
     "it, and the workaround users found -- perturbing the URL with a trailing",
     "slash -- ALSO skipped the fingerprint compare and pinned the new",
     "certificate in silence. An item that would have found both is worth the",
-    "minutes it costs."
+    "minutes it costs.",
+    "CEILING RAISED 10926 -> 11066 by myne-md/myne#768, in the sanctioned direction: a new surface that genuinely needs a human, on four clients with no automated UI lane. What added the minutes, named so the raise is an argument: + the identity-first first run on the three desktop clients, 20 minutes each (60 total), core. The re-hide on window blur and on tab-hidden needs a real window losing focus or a real tab switch, which no harness produces, and the pinned certificate fingerprint needs a real TLS server whose leaf the runner can compare. The component tests assert hidden-until-revealed and the capability caveats; what a person checks is the walk-away behaviour itself. + the mobile identity flow on ios and android, 40 minutes each (80 total), core. Two real devices on one network with a configured server, a real 24-word ceremony and a real invite relay are all outside the flow-logic tier, which drives mocks against no device. Both items are core, so the gate WIDENS: the release now waits on a human having walked the identity-first route on macOS, Windows, iOS and Android. That is the point. The feature changes the ROUTE to a vault and makes a server a precondition of the identity path, on four clients whose only eyes would otherwise be the Linux WebKitGTK container and a mocked Chromium flow tier. gatedMinutes is NOT edited: the rule is that gating may not fall by more than total does, and both rose."
   ],
   "gatedTiers": [
     "core"
@@ -635,6 +636,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10926,
+  "totalMinutesCeiling": 11066,
   "gatedMinutes": 3837
 }

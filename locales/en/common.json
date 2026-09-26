@@ -3904,6 +3904,11 @@
         "previewTitle": "Recovered note",
         "restoreCta": "Restore"
       },
+      "identity": {
+        "label": "Identity",
+        "helper": "An identity lets people invite you to a vault, and lets one identity own several vaults.",
+        "cta": "Add an identity"
+      },
       "server": {
         "helper": "Enter the same server URL on every device. For a self-hosted server use its <1>https://</1> address; verify the certificate fingerprint matches across your devices.",
         "label": "Sync server"
@@ -4576,6 +4581,52 @@
     "switchVaultLabel": "Switch vault",
     "vaultFallback": "Vault {{n}}"
   },
+  "firstRun": {
+    "server": {
+      "heading": "Choose a sync server",
+      "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
+      "notConfigured": "Enter a server address above and press Connect to continue.",
+      "back": "Back",
+      "continue": "Continue"
+    }
+  },
+  "identityFlow": {
+    "title": "Create an identity",
+    "lead": "An identity lets people invite you to a vault, and lets one identity own many vaults. It needs a sync server to hold your encrypted notes and reach you.",
+    "start": "Create an identity",
+    "skip": "Not now, use this device only",
+    "back": "Back",
+    "serverUnreachable": "Couldn't reach that server. Check the address and try again.",
+    "createFailed": "Could not create the identity. Check the sync server and try again.",
+    "server": {
+      "title": "Choose a sync server",
+      "lead": "Your notes stay encrypted on this device before they leave it. The server only stores ciphertext.",
+      "urlLabel": "Server address",
+      "connect": "Connect",
+      "connecting": "Connecting…"
+    },
+    "create": {
+      "title": "Create your identity",
+      "lead": "This creates one identity for you. It creates no vault and stores no notes.",
+      "cta": "Create identity",
+      "working": "Creating…"
+    },
+    "phrase": {
+      "title": "Save your identity phrase",
+      "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
+      "reveal": "Reveal",
+      "ack": "I have saved these 24 words somewhere safe.",
+      "continue": "Continue"
+    },
+    "home": {
+      "title": "Your identity",
+      "lead": "People can invite you to a vault. You do not need to own a vault to be invited.",
+      "codeLabel": "Your identity code",
+      "invitesHeading": "Invitations",
+      "noInvites": "No invitations yet.",
+      "inviteHint": "Open this invite from the vault picker to join with your identity phrase."
+    }
+  },
   "identitySetup": {
     "createCta": "Create an identity",
     "doneCta": "Done",
@@ -4615,6 +4666,8 @@
     "title": "Your identity"
   },
   "welcome": {
+    "startIdentity": "Create an identity",
+    "startLocal": "Create a local vault instead",
     "createCta": "Create new vault",
     "headlineLine1": "Encrypted markdown notes.",
     "headlineLine2": "No email at signup.",

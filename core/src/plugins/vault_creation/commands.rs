@@ -955,6 +955,11 @@ fn build_vault_meta(
         items_key_nonce,
         enc_items_key,
         membership,
+        // The person binding is stamped by a later step once the vault is
+        // bound to an identity (myne-md/myne#768); a vault created without one
+        // omits the field, which is the absent-tolerant case the parser
+        // accepts.
+        person_binding: None,
     })
 }
 

@@ -16,6 +16,8 @@ import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
 import { personSetup, type PersonSetupView } from "../lib/personAccount";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
+import { SecretPhraseReveal, useLocalPhraseReveal } from "./SecretPhraseReveal";
+import { FirstRunServerStep, useHasSyncEndpoint } from "./sync/FirstRunServerStep";
 
 interface IdentitySetupDialogProps {
   open: boolean;
@@ -33,6 +35,16 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
   const [result, setResult] = useState<PersonSetupView | null>(null);
+  // The identity phrase gets the same display protections the vault phrase gets
+  // (myne-md/myne#768): hidden until revealed, re-hidden on a walk-away. Local
+  // state rather than a reducer, because this dialog owns no step machine.
+  const reveal = useLocalPhraseReveal();
+  // Identity creation registers a person account at a sync endpoint, so it
+  // cannot succeed without one. When the device has none, the dialog fronts the
+  // first-run server step rather than letting the user press Create and read a
+  // generic error naming a fix they cannot perform from here (myne-md/myne#768).
+  const hasEndpoint = useHasSyncEndpoint();
+  const [serverAcknowledged, setServerAcknowledged] = useState(false);
 
   async function run(phrase?: string) {
     setBusy(true);
@@ -77,22 +89,19 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
               <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
                 {t("identitySetup.phraseWarning")}
               </div>
-              <div
-                data-testid="identity-setup.phrase"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "var(--text-sm)",
-                  lineHeight: 1.8,
-                  color: "var(--fg-1)",
-                  background: "var(--bg-2)",
-                  border: "1px solid var(--line-1)",
-                  borderRadius: "var(--radius-2)",
-                  padding: "var(--space-3)",
-                  userSelect: "all",
-                }}
-              >
-                {result.phrase}
-              </div>
+              {/* The phrase arrives as one space-joined string from the backend;
+                  split it for the shared reveal, which renders the numbered grid.
+                  Same protections as the vault phrase, and deliberately no
+                  type-back (`decisions/ui/0615`). */}
+              <SecretPhraseReveal
+                phrase={result.phrase.split(" ")}
+                revealed={reveal.revealed}
+                onReveal={reveal.onReveal}
+                onHide={reveal.onHide}
+                testIdPrefix="identity-setup.phrase"
+                gridTestId="identity-setup.phrase"
+                saveFilename="myne-identity-phrase.txt"
+              />
             </>
           ) : (
             <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
@@ -117,6 +126,11 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             {t("identitySetup.doneCta")}
           </Button>
         </div>
+      ) : !hasEndpoint && !serverAcknowledged ? (
+        <FirstRunServerStep
+          onConnected={() => setServerAcknowledged(true)}
+          onBack={close}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>

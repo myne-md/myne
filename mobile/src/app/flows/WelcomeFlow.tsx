@@ -7,7 +7,7 @@ import type { WelcomeFlowProps } from "./types";
 
 /** 01 · Welcome — wired. Routes into create / join. Surfaces a repair banner
  *  when a partial-fail vault_delete left orphan residue behind (MYND-159). */
-export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
+export function WelcomeFlow({ onCreate, onJoin, onIdentity }: WelcomeFlowProps) {
   const { t } = useTranslation();
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
@@ -86,7 +86,8 @@ export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
         {repairMsg && (
           <div style={{ fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
         )}
-        <Button onClick={onCreate}>{t("welcome.create")}</Button>
+        <Button onClick={onIdentity}>{t("welcome.startIdentity")}</Button>
+        <Button variant="ghost" onClick={onCreate}>{t("welcome.startLocal")}</Button>
         <Button variant="ghost" onClick={onJoin}>
           {t("welcome.connect")}
         </Button>

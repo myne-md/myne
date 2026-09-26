@@ -109,6 +109,27 @@ pub const MEMBERSHIP_ROSTER_FIELD_CAP: usize =
 /// 345 base bytes + 72 membership bytes.
 pub const VAULT_META_V0_2_WITH_MEMBERSHIP_LEN: usize = VAULT_META_LEN + MEMBERSHIP_FIELD_LEN;
 
+/// Length of the sealed person-id-hash carried by the person binding field
+/// (`vault.meta` §9.3.1 extension, myne-md/myne#768): `person_id_hash` is a
+/// 16-byte truncated SHA-256 (`"myne.person-id|" || phrase`), same width as the
+/// 16-byte membership account id.
+pub const PERSON_BINDING_ID_LEN: usize = 16;
+
+/// Length of the sealed person-binding ciphertext: 16-byte person id hash +
+/// 32-byte CTX commitment tag.
+pub const PERSON_BINDING_CIPHERTEXT_LEN: usize = 48;
+
+/// Total length of the person binding field: 24-byte nonce + 48-byte ciphertext.
+pub const PERSON_BINDING_FIELD_LEN: usize = AEAD_NONCE_LEN + PERSON_BINDING_CIPHERTEXT_LEN;
+
+/// The `reserved`-byte bit (NTV5 only) that declares a person binding field is
+/// present. Deliberately a BIT rather than a new whole value: the person binding
+/// is independent of the membership field, so it combines with the existing
+/// `0x00`/`0x01`/`0x02` membership shapes instead of enumerating all of them.
+/// A pre-feature reader that only knows `0x00`/`0x01`/`0x02` sees a value
+/// greater than `0x02` and rejects rather than mis-reading a trailing field.
+pub const PERSON_BINDING_BIT: u8 = 0x10;
+
 /// The sealed vault membership field (`vault.meta` §9.3.1): the account id of
 /// the account this vault belongs to, AEAD-sealed under `membership_key`.
 ///
@@ -132,6 +153,23 @@ pub struct Membership {
     /// and a pre-B2B reader that predates this field reads the vault
     /// normally with the account id alone (the 0580 back-compat rule).
     pub roster: Option<MembershipRoster>,
+}
+
+/// The sealed vault **person binding** field (`vault.meta` §9.3.1 extension,
+/// myne-md/myne#768): the `person_id_hash` of the identity this vault belongs
+/// to, AEAD-sealed under the SAME `membership_key` as the membership field but
+/// with its own AAD role (`aad_person_binding_blob`).
+///
+/// Carried in the NTV5 trailing extension, declared by the `PERSON_BINDING_BIT`
+/// in the `reserved` byte. Like [`Membership`] it holds the sealed bytes and the
+/// seal happens at the call site (which holds `root_key`); the `person_id_hash`
+/// is recovered with [`crate::vault_meta_v0_2::unseal_person_binding`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonBinding {
+    /// 192-bit nonce used to AEAD-seal the person id hash.
+    pub nonce: [u8; AEAD_NONCE_LEN],
+    /// 48-byte blob: 16-byte `person_id_hash` ciphertext + 32-byte CTX tag.
+    pub enc: [u8; PERSON_BINDING_CIPHERTEXT_LEN],
 }
 
 /// The B2B roster extension carried inside `vault.meta` (NTV5 `reserved`
@@ -190,6 +228,11 @@ pub struct VaultMeta {
     /// vault is unmigrated (no account membership). `NTV5`-only: the `MYV1`
     /// serializer never emits it and the `MYV1` parser never reads it.
     pub membership: Option<Membership>,
+    /// The sealed person binding field (`vault.meta` §9.3.1 extension,
+    /// myne-md/myne#768), `None` when the vault is not bound to a person
+    /// identity. `NTV5`-only, like `membership`, and independent of it: a vault
+    /// may carry a person binding with or without an account membership.
+    pub person_binding: Option<PersonBinding>,
 }
 
 /// Serialize `meta` to its 345-byte canonical on-disk form (spec § 9.3).
@@ -290,6 +333,7 @@ pub fn parse_vault_meta(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         items_key_nonce,
         enc_items_key,
         membership: None,
+        person_binding: None,
     })
 }
 
@@ -354,6 +398,7 @@ pub fn rewrite_vault_meta_password_side(
         items_key_nonce: existing.items_key_nonce,
         enc_items_key: existing.enc_items_key,
         membership: existing.membership.clone(),
+        person_binding: existing.person_binding.clone(),
     };
 
     Ok(serialize_vault_meta(&new_meta))
@@ -416,6 +461,7 @@ mod tests {
             items_key_nonce: [0x90; VAULT_META_NONCE_LEN],
             enc_items_key: [0xA0; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         }
     }
 
@@ -588,6 +634,7 @@ mod tests {
             items_key_nonce: [0x88; VAULT_META_NONCE_LEN],
             enc_items_key: [0x99; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         }
     }
 
@@ -1027,6 +1074,7 @@ mod tests {
             items_key_nonce: [0xE2; VAULT_META_NONCE_LEN],
             enc_items_key: [0xE3; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         };
 
         let canonical = serialize_vault_meta(&meta);
@@ -1200,6 +1248,7 @@ mod tests {
             items_key_nonce: [0xE2; VAULT_META_NONCE_LEN],
             enc_items_key: [0xE3; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         };
         let canonical = serialize_vault_meta(&meta);
         let _ = parse_vault_meta(&canonical).expect("canonical fixture must parse");

@@ -2497,6 +2497,42 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "identity.first-run",
+    title: "Identity-first first run: fork, server step, identity phrase",
+    paths: [
+      "src/screens/Welcome.tsx",
+      "src/components/IdentitySetupDialog.tsx",
+      "src/components/SecretPhraseReveal.tsx",
+      "src/components/sync/FirstRunServerStep.tsx",
+      "src/components/sync/EndpointConfig.tsx",
+      "src/screens/IdentityHome.tsx",
+      "mobile/src/app/flows/WelcomeFlow.tsx",
+      "mobile/src/app/flows/IdentityFlow.tsx",
+      "mobile/src/lib/personAccount.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
+    automatedBy: [
+      "e2e/member-roster.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that connecting shows the pinned certificate fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm no type-back challenge is asked for the identity phrase.",
+        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the pinned fingerprint needs a real TLS server whose leaf certificate the runner can compare.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 20,
+        tier: "core",
+      },
+      {
+        see: "On a phone, take the identity door from the welcome screen, configure a server, create an identity, write the 24 words down, and confirm the flow lands on the identity home showing the identity code and any pending invites. Then, from a second device, invite this identity to a vault and confirm the invite appears in the home's list.",
+        whyNotAutomated: "Two real devices on one network with a configured server, a real recovery phrase ceremony and a real invite relay are all outside the harness; the mobile flow-logic tier drives mocks and no device.",
+        clients: ["ios", "android"],
+        estimateMin: 40,
+        tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "enrolment.qr-scan",
     title: "QR device enrolment camera",
     paths: [

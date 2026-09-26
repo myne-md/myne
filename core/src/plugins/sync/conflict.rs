@@ -1493,6 +1493,7 @@ mod tests {
             items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
             enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
             membership: None,
+            person_binding: None,
         }
     }
 
