@@ -34,6 +34,14 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
+// The SINGLE type authority (markdown-dialect.md 3.6.4). Consumed, never
+// re-derived: its own header states siblings consume this typing and never
+// redefine it, and a second opinion here would be a second answer the query
+// engine and this widget could disagree on (myne-md/myne#777).
+import {
+  coerceSourceScalar,
+  type PropertyType,
+} from "../host/notes/propertyTyping";
 import { writableMember } from "../host";
 import { readNoteId } from "../note-identity";
 import { catalogChanged, catalogField } from "../attachments/catalog";
@@ -57,6 +65,29 @@ import i18n from "@myne/editor/i18n";
 /** Testid for the promoted note-title field (myne#653). Exported so the desktop
  *  E2E helper and the pane's focus-on-create effect name it once. */
 export const TITLE_FIELD_TESTID = "editor.frontmatter-title";
+
+/**
+ * Whether `raw` is a date the platform's own date input will accept: a real
+ * calendar date, ranges and all, in the `YYYY-MM-DD` form that control takes.
+ *
+ * Deliberately stricter than the type authority's recogniser and deliberately
+ * NOT a replacement for it — the two answer different questions. The authority
+ * asks what kind of value this is, for the index and the query engine, and
+ * answers on shape because that is what the published vectors pin. This asks
+ * whether a `<input type="date">` can hold it without discarding it.
+ */
+export function isCalendarDate(raw: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+  if (m === null) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  // Round-trip through Date to reject 31 April and a non-leap 29 February,
+  // which the range check above lets through.
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return (
+    dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
+  );
+}
 
 /** Testid for the "Add cover" control on the promoted title row. */
 export const ADD_COVER_TESTID = "editor.cover-add";
@@ -262,10 +293,30 @@ class PropertiesWidget extends WidgetType {
   }
 
   /** The drag-handle glyph shared by every row (visual only). */
-  private makeIcon(): HTMLElement {
+  /**
+   * The row's leading glyph, which now NAMES the property's type rather than
+   * repeating the same `≡` down the whole list (myne-md/myne#777).
+   *
+   * Text glyphs rather than the `Icon` component on purpose: this is a
+   * CodeMirror widget built from raw DOM, with no React in reach, and pulling
+   * the icon set in here would mean shipping a second renderer for it.
+   */
+  private makeIcon(type?: PropertyType): HTMLElement {
     const icon = document.createElement("span");
     icon.className = "cm-fm-properties-icon";
-    icon.textContent = "≡";
+    icon.dataset.propertyType = type ?? "unknown";
+    icon.textContent =
+      type === "date"
+        ? "◫"
+        : type === "number"
+          ? "#"
+          : type === "checkbox"
+            ? "☑"
+            : type === "list"
+              ? "⋮"
+              : "≡";
+    // Decorative: the key is right beside it and is the accessible name.
+    icon.setAttribute("aria-hidden", "true");
     return icon;
   }
 
@@ -297,12 +348,46 @@ class PropertiesWidget extends WidgetType {
   private renderRow(view: EditorView, prop: SimpleProperty): HTMLElement {
     const row = document.createElement("div");
     row.className = "cm-fm-properties-row";
-    row.appendChild(this.makeIcon());
+
+    // The property's TYPE, from the one authority that owns the question
+    // (`propertyTyping.ts`, markdown-dialect.md 3.6.4, pinned by the
+    // `property-coercion` golden vectors). It was already computed for Saved
+    // Views and ignored here, so every scalar rendered as a plain text input:
+    // a date was a text field, a checkbox was a text field, and a number was a
+    // text field that accepted "banana" (myne-md/myne#777).
+    //
+    // Consuming it rather than re-deriving is not a preference — the file's own
+    // header states that siblings consume this typing and never redefine it,
+    // and a second opinion about what `2026-01-02` is would be a second answer
+    // the query engine and the widget could disagree on.
+    const typed = coerceSourceScalar(prop.value);
+
+    row.appendChild(this.makeIcon(typed.type));
     row.appendChild(this.makeKeyInput(view, prop.key));
 
     const valueInput = document.createElement("input");
-    valueInput.type = "text";
+    // A NATIVE date input silently refuses a value it cannot parse: the field
+    // renders empty and the user's text looks lost. The type authority's date
+    // recogniser is shape-only (`\d{4}-\d{2}-\d{2}` and friends), so
+    // `2026-13-45` types as `date` — correct for the index, which is answering
+    // "what kind of thing is this", and dangerous here, which is answering
+    // "what control can hold it".
+    //
+    // That recogniser is pinned by the published `property-coercion` vectors
+    // and is not this widget's to change. The widget's job is to refuse the
+    // native control for a value the native control would eat.
+    const nativeDateOk = typed.type === "date" && isCalendarDate(prop.value);
+    // `date` and `number` get the native control for their type: a date picker
+    // and a numeric field with the platform's own affordances, rather than a
+    // text box the user has to know the format of. `checkbox` is handled
+    // separately below because its VALUE lives in `.checked`, not `.value`.
+    valueInput.type = nativeDateOk
+      ? "date"
+      : typed.type === "number"
+        ? "number"
+        : "text";
     valueInput.className = "cm-fm-properties-value";
+    valueInput.dataset.propertyType = typed.type;
     valueInput.value = prop.value;
     valueInput.spellcheck = false;
     valueInput.autocomplete = "off";
@@ -319,6 +404,22 @@ class PropertiesWidget extends WidgetType {
         valueInput.blur();
       }
     });
+    if (typed.type === "checkbox") {
+      // A boolean rendered as a text field is the clearest case of the widget
+      // ignoring what it already knew: the user had to type the word `true`.
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.className = "cm-fm-properties-checkbox";
+      box.dataset.propertyType = "checkbox";
+      box.checked = typed.value === "true";
+      box.setAttribute("aria-label", prop.key);
+      box.addEventListener("change", () => {
+        this.commitValue(view, prop.key, box.checked ? "true" : "false");
+      });
+      row.appendChild(box);
+      return row;
+    }
+
     row.appendChild(valueInput);
 
     return row;
