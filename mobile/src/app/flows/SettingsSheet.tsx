@@ -2099,6 +2099,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         ) : (
           <button
             onClick={goBack}
+            // Icon-only: the chevron is the whole control, so without this it
+            // is announced as "button" and nothing else — on the only way back
+            // out of a settings sub-panel (myne-md/myne#775). WCAG 2.2 AA
+            // 4.1.2, which `PRODUCT.md` commits to.
+            aria-label={t("common.back")}
             style={{
               display: "flex",
               alignItems: "center",

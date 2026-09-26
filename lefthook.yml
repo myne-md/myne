@@ -323,8 +323,17 @@ pre-commit:
       # A RATCHET: a file's recorded count may fall, never rise.
       run: node scripts/check-token-adoption.mjs
 
+    tooltip-convention:
+      # myne#775: the native `title=` tooltip waits ~1s, renders as an unstyled
+      # OS chip that ignores the theme, clips at the window edge and never shows
+      # on keyboard focus — and it had beaten the component written to replace
+      # it 262 to 3. A ratchet on that, plus a HARD failure for an icon-only
+      # control with no accessible name, which is WCAG 2.2 AA 4.1.2 rather than
+      # a matter of polish.
+      run: node scripts/check-tooltip-convention.mjs
+
     motion-canon:
-      # myne#772 / design-notes/ui/0615: the motion canon, mechanised. Four
+      # myne#772 / design-notes/ui/0616: the motion canon, mechanised. Four
       # rules, none of which any compiler, lint or test in this tree reports —
       # a pulsing badge, an `ease-in` entrance, a 620ms hover and a `width`
       # transition on a per-frame loop all typecheck, render and pass. The
