@@ -916,6 +916,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/attachments-library.e2e.ts",
       // myne-md/myne#773: the library is a TAB, and the left ribbon marks it
       // current. Both were impossible while it was a CenterView.
@@ -2845,6 +2848,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/graph-tab.e2e.ts",
       "e2e/graph-settings.e2e.ts",
       "e2e/graph-color-groups.e2e.ts",
@@ -3668,6 +3674,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/archive.e2e.ts",
       "e2e/folder-archive.e2e.ts",
     ],
@@ -3789,6 +3798,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/notes.e2e.ts",
       "e2e/palette-empty-trash.e2e.ts",
       "e2e/folder-archive.e2e.ts",
@@ -3890,6 +3902,8 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
       "e2e/a11y-axe.e2e.ts",
+      // myne-md/myne#775: the axe gate reaches this surface now.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/keyboard-nav-onboarding.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
     ],
@@ -5919,6 +5933,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/task-panel.e2e.ts",
       "e2e/task-chips.e2e.ts",
       "e2e/task-recurrence.e2e.ts",
