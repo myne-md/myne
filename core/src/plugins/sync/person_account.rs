@@ -96,114 +96,141 @@ pub async fn person_setup_from_host(
     let person_id = protocol::person_id_hash(&normalized);
     let generation = state.person_session_generation().await;
 
-    // Derive + seal + hold the identity. An absent sealed file is first
-    // enrolment; `unlock_person_identity` returns a signed transition record
-    // when a legacy CSPRNG identity migrated.
-    let (pair, mut transition) =
-        crate::account::person_identity::unlock_person_identity(host, io, &normalized)
-            .await
-            .map_err(|e| {
-                use crate::account::person_identity::PersonIdentityError as E;
-                match e {
-                    E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
-                    E::Io | E::Csprng => SyncDeviceError::Transport,
-                }
-            })?;
-    if transition.is_none() {
-        transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
-            .await
-            .map_err(|_| SyncDeviceError::Transport)?;
-    }
-    let fingerprint_hex = crate::account::person_identity::hex_lower(pair.fingerprint());
+    // Did THIS call create the sealed keypair? Asked BEFORE enrolling, because
+    // the answer cannot be read off the result and because a pre-existing
+    // sealed file is the user's ONLY copy of an identity that may already be
+    // shared: erasing it would destroy a live identity rather than clean up
+    // after a failure.
+    let sealed_before = crate::account::person_identity::sealed_keypair_present(host, io).await;
 
-    // The person SCRAM secret. The server never sees it.
-    let secret = protocol::derive_person_server_auth_key(
-        &normalized,
-        &person_id,
-        &protocol::DEFAULT_V0_1_KDF_PARAMS,
-    )
-    .map_err(|_| SyncDeviceError::Internal)?;
+    // Everything that can fail after the seal is ONE unit, so the erase below
+    // has exactly one exit to cover. The defect this closes was a failure path
+    // that returned without cleaning up, and a single block removes the class
+    // rather than the instance: a future early return added inside it is covered
+    // by construction, which is the property a per-site cleanup cannot offer.
+    //
+    // `CreateVault` states the same rule as normative for the create flow
+    // (src/screens/CreateVault.tsx — "The failure path erases. Anything that
+    // goes wrong before the phrase is shown leaves nothing behind"). A keypair
+    // sealed to a fingerprint other vaults' `itemsKey` wraps are bound to is
+    // exactly the orphan class that skipping this would leave behind.
+    let view = async move {
+        // Derive + seal + hold the identity. An absent sealed file is first
+        // enrolment; `unlock_person_identity` returns a signed transition record
+        // when a legacy CSPRNG identity migrated.
+        let (pair, mut transition) =
+            crate::account::person_identity::unlock_person_identity(host, io, &normalized)
+                .await
+                .map_err(|e| {
+                    use crate::account::person_identity::PersonIdentityError as E;
+                    match e {
+                        E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
+                        E::Io | E::Csprng => SyncDeviceError::Transport,
+                    }
+                })?;
+        if transition.is_none() {
+            transition =
+                crate::account::person_identity::read_pending_person_key_transition(host, io)
+                    .await
+                    .map_err(|_| SyncDeviceError::Transport)?;
+        }
+        let fingerprint_hex = crate::account::person_identity::hex_lower(pair.fingerprint());
 
-    // The device-scoped endpoint (a vault-less identity still has one).
-    let cfg_path = super::config::config_path_from_host(host, io)
-        .await
+        // The person SCRAM secret. The server never sees it.
+        let secret = protocol::derive_person_server_auth_key(
+            &normalized,
+            &person_id,
+            &protocol::DEFAULT_V0_1_KDF_PARAMS,
+        )
         .map_err(|_| SyncDeviceError::Internal)?;
-    let cfg = super::config::read_config(io, &cfg_path)
-        .await
-        .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
-    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
-    let outcome: EnrollOutcome =
-        crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
-            let transport = super::http_transport::build_transport(&url, pins)
-                .map_err(|_| SyncDeviceError::Transport)?;
-            register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
-                .map_err(|_| SyncDeviceError::Transport)
-        })
-        .await
-        .map_err(|_| SyncDeviceError::Internal)??;
+        // The device-scoped endpoint (a vault-less identity still has one).
+        let cfg_path = super::config::config_path_from_host(host, io)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let cfg = super::config::read_config(io, &cfg_path)
+            .await
+            .map_err(|_| SyncDeviceError::NotConfigured)?;
+        let pins = super::config::config_pins(&cfg);
+        let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
-    // The token only arrives when the server approved this device; a pending
-    // device has none. The credential file is written EITHER WAY, because the
-    // public halves it now carries are what the identity home renders as the
-    // out-of-band invite code, and those exist from setup (task 11).
-    let public = pair.public_half();
-    let identity_code = super::invite::encode_person_identity_code(&person_id, &public);
-    let auth = PersonAuth {
-        person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-        device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
-        token_hex: if outcome.approved && !outcome.token.is_empty() {
-            crate::account::person_identity::hex_lower(&outcome.token)
-        } else {
-            String::new()
-        },
-        kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
-        ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
-        mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
-    };
+        let outcome: EnrollOutcome =
+            crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
+                let transport = super::http_transport::build_transport(&url, pins)
+                    .map_err(|_| SyncDeviceError::Transport)?;
+                register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
+                    .map_err(|_| SyncDeviceError::Transport)
+            })
+            .await
+            .map_err(|_| SyncDeviceError::Internal)??;
 
-    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
-        pair,
-        person_id,
-        profile: None,
-        transition,
-    };
-    let installed_generation = generation.wrapping_add(1);
-    if !state
-        .install_person_session_if_generation(generation, install)
-        .await
-    {
-        return Err(SyncDeviceError::Transport);
-    }
-    let path = match person_auth_path(host, io).await {
-        Ok(path) => path,
-        Err(_) => {
+        // The token only arrives when the server approved this device; a pending
+        // device has none. The credential file is written EITHER WAY, because the
+        // public halves it now carries are what the identity home renders as the
+        // out-of-band invite code, and those exist from setup (task 11).
+        let public = pair.public_half();
+        let identity_code = super::invite::encode_person_identity_code(&person_id, &public);
+        let auth = PersonAuth {
+            person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+            device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
+            token_hex: if outcome.approved && !outcome.token.is_empty() {
+                crate::account::person_identity::hex_lower(&outcome.token)
+            } else {
+                String::new()
+            },
+            kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+            ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+            mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        };
+
+        let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+            pair,
+            person_id,
+            profile: None,
+            transition,
+        };
+        let installed_generation = generation.wrapping_add(1);
+        if !state
+            .install_person_session_if_generation(generation, install)
+            .await
+        {
+            return Err(SyncDeviceError::Transport);
+        }
+        let path = match person_auth_path(host, io).await {
+            Ok(path) => path,
+            Err(_) => {
+                let _ = state
+                    .clear_person_session_if_generation(installed_generation)
+                    .await;
+                return Err(SyncDeviceError::Internal);
+            }
+        };
+        if write_person_auth(io, &path, &auth).await.is_err() {
             let _ = state
                 .clear_person_session_if_generation(installed_generation)
                 .await;
             return Err(SyncDeviceError::Internal);
         }
-    };
-    if write_person_auth(io, &path, &auth).await.is_err() {
-        let _ = state
-            .clear_person_session_if_generation(installed_generation)
-            .await;
-        return Err(SyncDeviceError::Internal);
-    }
 
-    Ok(PersonSetupView {
-        // The phrase is returned ONCE, at generation, for display. Never log it.
-        phrase: if generated {
-            Some((*phrase).clone())
-        } else {
-            None
-        },
-        fingerprint_hex,
-        person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-        identity_code,
-        approved: outcome.approved,
-    })
+        Ok(PersonSetupView {
+            // The phrase is returned ONCE, at generation, for display. Never log it.
+            phrase: if generated {
+                Some((*phrase).clone())
+            } else {
+                None
+            },
+            fingerprint_hex,
+            person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+            identity_code,
+            approved: outcome.approved,
+        })
+    }
+    .await;
+
+    if view.is_err() && !sealed_before {
+        let _ = crate::account::person_identity::delete_sealed_file(host, io).await;
+    }
+    view
 }
 
 /// IPC wrapper (desktop + mobile). `phrase: None` = create a new identity.
@@ -1671,5 +1698,146 @@ mod tests {
             b"".to_vec(),
         );
         revoke_member_request(&gone, "o", "aa", "bb").expect("idempotent");
+    }
+
+    // A generated phrase is shown ONCE, on success, so a keypair sealed for a
+    // setup that then failed is a keypair nobody holds the phrase for. Left on
+    // disk it is worse than absent: the next "Create an identity" mints a
+    // DIFFERENT phrase, `open_sealed_file` refuses that, and the failure the
+    // user sees is indistinguishable from the one they just had. Observed on a
+    // real fresh install (#766), where the failure is `NotConfigured` because
+    // desktop has no sync-server input at zero vaults.
+    #[test]
+    fn a_failed_generated_setup_leaves_no_sealed_keypair_and_is_not_poisoned() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-setup-fail").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            // The app config directory exists on a real install (Tauri creates
+            // it at startup); the seal writes into it, so the harness asks the
+            // production resolver for it rather than inventing a path.
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            // No sync config on this device at all: `read_config` answers a
+            // default, whose `endpoint_url` is `None`.
+            // `let..else` rather than `expect_err`: `PersonSetupView` carries the
+            // generated phrase, and it deliberately has no `Debug` to print.
+            let Err(first) = person_setup_from_host(&host, &io, &state, None).await else {
+                panic!("a device with no sync endpoint must not complete a setup");
+            };
+            assert_eq!(first, SyncDeviceError::NotConfigured);
+
+            assert!(
+                !crate::account::person_identity::sealed_keypair_present(&host, &io).await,
+                "a setup that failed before the phrase was shown must not leave a \
+                 sealed keypair behind: nothing can ever open it"
+            );
+
+            // The observable consequence, stated as the property rather than as
+            // the error string: a second attempt reaches the SAME endpoint
+            // failure instead of turning into `BadRequest`, which is what a
+            // leftover sealed file does to it.
+            let Err(second) = person_setup_from_host(&host, &io, &state, None).await else {
+                panic!("the endpoint is still unconfigured, so this must fail too");
+            };
+            assert_eq!(
+                second,
+                SyncDeviceError::NotConfigured,
+                "a retry must fail where the first attempt failed, not earlier"
+            );
+        });
+    }
+
+    // The other side of the gate, and the reason it is not `generated` or
+    // `is_err()` alone: a keypair this device ALREADY held is the user's only
+    // copy of an identity that may already be shared with other vaults. A
+    // recover that fails on the endpoint must leave it exactly as it found it.
+    #[test]
+    fn a_failed_recovery_keeps_the_sealed_keypair_the_device_already_held() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-setup-keep").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            let phrase = protocol::generate_recovery_phrase()
+                .expect("csprng")
+                .join_normalized();
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            // Seed a live identity the way an earlier successful setup would.
+            crate::account::person_identity::unlock_person_identity(&host, &io, &normalized)
+                .await
+                .expect("seed a sealed keypair");
+            assert!(
+                crate::account::person_identity::sealed_keypair_present(&host, &io).await,
+                "the seeded identity is on disk"
+            );
+
+            let Err(err) =
+                person_setup_from_host(&host, &io, &state, Some(phrase.as_str().to_owned())).await
+            else {
+                panic!("a device with no sync endpoint must not complete a setup");
+            };
+            assert_eq!(err, SyncDeviceError::NotConfigured);
+
+            assert!(
+                crate::account::person_identity::sealed_keypair_present(&host, &io).await,
+                "a failed recover must NOT erase an identity this device already held: \
+                 it is the user's only copy, and other vaults' wraps are sealed to its \
+                 fingerprint"
+            );
+        });
+    }
+
+    // The leg the other two cannot see, and the reason the gate is "did THIS
+    // call seal it" rather than `generated` (= `phrase.is_none()`).
+    //
+    // On a device that already holds an identity, pressing "Create an identity"
+    // is `phrase: None`, so `generated` is TRUE — and the call still seals
+    // nothing: `unlock_person_identity` takes the `Ok(bytes)` arm, refuses the
+    // freshly generated phrase, and returns `BadRequest`. An erase gated on
+    // `generated` therefore fires on a setup that created nothing and destroys
+    // the identity the device was already holding. #766's own fix would have
+    // shipped that.
+    #[test]
+    fn a_generated_create_on_a_device_that_already_held_an_identity_keeps_it() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-setup-held").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            let phrase = protocol::generate_recovery_phrase()
+                .expect("csprng")
+                .join_normalized();
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            crate::account::person_identity::unlock_person_identity(&host, &io, &normalized)
+                .await
+                .expect("seed a sealed keypair");
+
+            // `None` = the "Create an identity" button, on a device that is not
+            // empty. The phrase it generates is necessarily not the seeded one.
+            let Err(err) = person_setup_from_host(&host, &io, &state, None).await else {
+                panic!("a second create cannot open the sealed keypair it did not write");
+            };
+            assert_eq!(err, SyncDeviceError::BadRequest);
+
+            assert!(
+                crate::account::person_identity::sealed_keypair_present(&host, &io).await,
+                "a create that sealed nothing must not erase the identity already here"
+            );
+        });
     }
 }

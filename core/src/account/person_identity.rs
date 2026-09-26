@@ -334,6 +334,34 @@ async fn enroll_fresh(
     Ok(pair)
 }
 
+/// Whether this device already holds a **recoverable** sealed keypair, i.e.
+/// whether [`unlock_person_identity`] would re-open an existing identity rather
+/// than enrol a fresh one.
+///
+/// The question a caller actually needs is "did *I* create that file?", and it
+/// cannot be read off [`unlock_person_identity`]'s result: a fresh enrolment and
+/// a legacy-CSPRNG re-enrol are indistinguishable from outside it, and only the
+/// file itself distinguishes them. So this is asked BEFORE enrolling.
+///
+/// Two answers are deliberately chosen to fail safe toward *keeping* an
+/// identity. A frame [`delete_sealed_file`] erased counts as ABSENT, so a
+/// forget-then-reunlock still re-enrols instead of reporting a phantom one. An
+/// unreadable-but-present frame counts as PRESENT, so a caller gating an erase
+/// on `!sealed_keypair_present(...)` declines to erase what it could not read —
+/// and `unlock_person_identity` surfaces that read error rather than overwriting
+/// it, which is the "default-on-error-reaching-a-write" shape its own comment on
+/// the `Ok(bytes)` arm warns against.
+pub async fn sealed_keypair_present(host: &dyn HostCtx, io: &dyn VaultIo) -> bool {
+    let Ok(path) = sealed_path(host) else {
+        return true;
+    };
+    match io.read(&path).await {
+        Ok(bytes) => !is_erased_frame(&bytes),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => false,
+        Err(_) => true,
+    }
+}
+
 /// Delete the sealed person-keypair file (person off-boarding from this
 /// device). The in-memory identity is dropped by the caller holding the
 /// state lock. VaultIo exposes no delete: overwrite with zeros and leave

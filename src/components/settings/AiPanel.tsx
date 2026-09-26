@@ -87,7 +87,7 @@ import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
   BLOCK_STYLE,
-  FOLDER_TEXTAREA_STYLE,
+  MULTILINE_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
   PANEL_ROOT_STYLE,
@@ -1381,7 +1381,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           rows={3}
           spellCheck={false}
           placeholder={t("settings.ai.excludedPlaceholder")}
-          style={FOLDER_TEXTAREA_STYLE}
+          style={MULTILINE_STYLE}
         />
         <p style={HELPER_STYLE}>{t("settings.ai.excludedHelper")}</p>
       </div>

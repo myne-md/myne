@@ -2,7 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { getToasts, resetToasts } from "../../src/components/toast/toastStore";
-import { resetPersonIdentityState } from "../../src/components/sync/personIdentityState";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 
 const writeTextMock = vi.hoisted(() => vi.fn());
 const unlockPersonMock = vi.hoisted(() => vi.fn());
@@ -196,6 +199,66 @@ describe.each(surfaces)("$name", (surface) => {
     expect(getToasts()[0].message).toBe("personIdentityCode.copyFailed");
     expect(screen.getByTestId(surface.feedbackTestId).textContent).toBe("personIdentityCode.copyFailed");
   });
+});
+
+describe("identity-code textareas are themed", () => {
+  // #767. Both fields are the two ends of ONE handshake — the owner pastes the
+  // invitee's code in the roster, the invitee pastes the owner's code on their
+  // identity home — and both shipped unstyled, so the WebView painted its
+  // default white field with black text on a dark panel. Asserted over BOTH in
+  // one table so the pair cannot drift: fixing one and forgetting the other
+  // still leaves a user staring at a white box.
+  //
+  // The property is "carries the theme's own surface and ink", not a list of
+  // declarations: `background`/`color` are what a UA default overrides, and
+  // they are the two that go blank the moment the style prop is dropped.
+  const fields = [
+    {
+      name: "member roster invite box",
+      testId: "member-roster.invite-code",
+      open: async () => {
+        // The invite control is owner-only AND needs an unlocked identity, so
+        // the state is set BEFORE the render rather than driving 24 cells and
+        // a backend round trip to reach the same place.
+        setPersonIdentityState({ ready: true, ownerCode: OWNER_CODE });
+        render(<MemberRosterPanel />);
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("member-roster.invite-button"));
+        });
+      },
+    },
+    {
+      name: "identity home accept box",
+      testId: "identity-home.accept-owner-code",
+      open: async () => {
+        personListInvitesMock.mockResolvedValue([
+          { invite_id_hex: "invite-1", vault_account_hash_hex: "aa".repeat(16), claimed: false },
+        ]);
+        render(
+          <IdentityHome
+            personIdHex={"99".repeat(16)}
+            identityCode={IDENTITY_CODE}
+            onCreateVault={() => {}}
+            onAccepted={() => {}}
+          />,
+        );
+        await screen.findByTestId("identity-home.invite-row");
+        fireEvent.click(screen.getByTestId("identity-home.accept-open"));
+      },
+    },
+  ] as const;
+
+  for (const field of fields) {
+    it(`paints the ${field.name} from tokens, not the UA default`, async () => {
+      await field.open();
+
+      const box = screen.getByTestId(field.testId) as HTMLTextAreaElement;
+      expect(box.style.background).toBe("var(--paper-2)");
+      expect(box.style.color).toBe("var(--fg-1)");
+      expect(box.style.borderRadius).toBe("var(--radius-1)");
+      expect(box.style.resize).toBe("vertical");
+    });
+  }
 });
 
 describe("IdentityHome invite phrase", () => {

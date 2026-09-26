@@ -18,6 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
+import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
@@ -275,6 +276,7 @@ export function IdentityHome({
                           setAcceptError(null);
                         }}
                         rows={3}
+                        style={MULTILINE_STYLE}
                       />
                       {ownerFingerprint === null ? (
                         <Button
