@@ -33,6 +33,7 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
+import { MULTILINE_STYLE } from "../settings/panel-styles";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
 import { buildPhraseCredential } from "./phrase-credential";
 import { toast } from "../toast/toastStore";
@@ -98,12 +99,6 @@ const ROW_ACTION_STYLE: CSSProperties = {
 const ERROR_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--danger)",
-};
-
-const INPUT_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  width: "100%",
 };
 
 export function MemberRosterPanel({
@@ -641,7 +636,7 @@ function InviteMemberModal({
           setInspectError(false);
         }}
         rows={4}
-        style={INPUT_STYLE}
+        style={MULTILINE_STYLE}
       />
       {fingerprint === null ? (
         <Button

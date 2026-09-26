@@ -56,7 +56,7 @@ import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
-  FOLDER_TEXTAREA_STYLE,
+  MULTILINE_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
 } from "./panel-styles";
@@ -323,7 +323,7 @@ export function CliAccessSettings({
           rows={3}
           spellCheck={false}
           placeholder={t("settings.cliAccess.excludedPlaceholder")}
-          style={FOLDER_TEXTAREA_STYLE}
+          style={MULTILINE_STYLE}
         />
         <p style={HELPER_STYLE}>{t("settings.cliAccess.excludedHelper")}</p>
       </div>

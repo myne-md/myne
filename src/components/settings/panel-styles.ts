@@ -94,9 +94,22 @@ export const ERROR_STYLE: CSSProperties = {
   color: "var(--danger)",
 };
 
-/** One folder per line, mono — the excluded-folders editor shape shared by
- *  the AI panel and the CLI terminal-access block. */
-export const FOLDER_TEXTAREA_STYLE: CSSProperties = {
+/** The multi-line text field shape: one value per line, monospace, resizable
+ *  vertically. Carries every colour and metric from the shared tokens, so a
+ *  textarea never falls back to the WebView's default white field on a dark
+ *  panel (#767).
+ *
+ *  Its users are the excluded-folders editors (the AI panel and the CLI
+ *  terminal-access block) and the two B2B identity-code fields — the invite box
+ *  in the member roster and the accept box on the identity home, which are the
+ *  two ends of one handshake and were BOTH unstyled. They were two unstyled
+ *  `<textarea>`s and one private copy in `MemorySection`, so the drift this
+ *  closes is the same one `panel-styles.ts`'s own header describes for the
+ *  setting row: a shape re-assembled per call site instead of composed from.
+ *
+ *  `marginTop` is here rather than at the call sites because moving it would
+ *  shift the two editors it predates. */
+export const MULTILINE_STYLE: CSSProperties = {
   marginTop: "var(--space-1)",
   width: "100%",
   resize: "vertical",
