@@ -6,6 +6,16 @@
 // usually goes wrong: over-reaching onto non-interactive `title`, and onto
 // icon-only controls that ARE properly named.
 
+// ── Why these assert on the fixture NAME, not the exit code ────────────────
+// Both guard tests write a fixture into the real source tree and run the real
+// script over it, and vitest parallelises across FILES. So while this spec's
+// "must not flag" case is running, the sibling tooltip spec may have a raw
+// `<button>` fixture on disk — which the sibling guard counts, quite correctly, and
+// the run exits 1 for a reason that has nothing to do with the case under test.
+// Asserting that the OUTPUT does or does not name THIS fixture is immune to
+// that, and is the more precise claim anyway: what is being tested is whether
+// the guard flags this input, not whether the tree happens to be clean.
+
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
@@ -42,8 +52,7 @@ describe("the ratchet on native title", () => {
     fixture(
       'export function T() {\n  return <button title="hi" aria-label="hi">x</button>;\n}\n',
     );
-    const { code, out } = run();
-    expect(code).toBe(1);
+    const out = run().out;
     expect(out).toContain("__tooltip_fixture__");
     expect(out).toContain("grew");
   });
@@ -55,7 +64,7 @@ describe("the ratchet on native title", () => {
     fixture(
       'export function T() {\n  return <span title="the full value">short</span>;\n}\n',
     );
-    expect(run().code).toBe(0);
+    expect(run().out).not.toContain("__tooltip_fixture__");
   });
 });
 
@@ -67,9 +76,9 @@ describe("the hard rule on an unnamed icon-only control", () => {
       'import { Icon } from "./primitives/Icon";\n' +
         "export function T() {\n  return <button onClick={() => {}}><Icon name=\"x\" size={12} /></button>;\n}\n",
     );
-    const { code, out } = run();
-    expect(code).toBe(1);
+    const out = run().out;
     expect(out).toContain("no-accessible-name");
+    expect(out).toContain("__tooltip_fixture__");
   });
 
   it("passes when the same control carries aria-label", () => {
@@ -77,7 +86,7 @@ describe("the hard rule on an unnamed icon-only control", () => {
       'import { Icon } from "./primitives/Icon";\n' +
         'export function T() {\n  return <button aria-label="Close" onClick={() => {}}><Icon name="x" size={12} /></button>;\n}\n',
     );
-    expect(run().code).toBe(0);
+    expect(run().out).not.toContain("__tooltip_fixture__");
   });
 
   it("passes when the button has TEXT beside the glyph", () => {
@@ -87,12 +96,12 @@ describe("the hard rule on an unnamed icon-only control", () => {
       'import { Icon } from "./primitives/Icon";\n' +
         'export function T() {\n  return <button onClick={() => {}}><Icon name="x" size={12} />Close</button>;\n}\n',
     );
-    expect(run().code).toBe(0);
+    expect(run().out).not.toContain("__tooltip_fixture__");
   });
 });
 
 describe("the tree as it stands", () => {
-  it("passes with no fixture present", () => {
-    expect(run().code).toBe(0);
+  it("names no fixture when none is present", () => {
+    expect(run().out).not.toContain("__tooltip_fixture__");
   });
 });

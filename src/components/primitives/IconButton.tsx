@@ -16,6 +16,7 @@
 // migration with its own issue, not a side effect of the CSS move.
 
 import { Icon } from "./Icon";
+import { Tooltip } from "./Tooltip";
 import type { IconName } from "../../lib/icons";
 import { MIN_TARGET } from "./targetSize";
 
@@ -30,6 +31,25 @@ interface IconButtonProps {
   disabled?: boolean;
   /** E2E observability hook (`data-testid`), SYNC-8 curated-prop pattern. */
   testId?: string;
+  /**
+   * Draw the control's own border and surface, for an icon control that floats
+   * ON content rather than sitting in chrome. The graph pane's overlay cluster
+   * had forked this component to get it (myne-md/myne#774) — a primitive nobody
+   * can adapt is a primitive people keep re-implementing.
+   */
+  bordered?: boolean;
+  /** Toggled-on state. Emits `aria-pressed`, which is also what paints it. */
+  active?: boolean;
+  /** Emits `aria-expanded`, for a control that opens a panel or menu. */
+  expanded?: boolean;
+  /**
+   * Show the label in a `<Tooltip>` rather than the native `title`
+   * (myne-md/myne#775: ~1s delay, unstyled OS chip, clips at the window edge,
+   * never appears on keyboard focus). Opt-in for now because wrapping every
+   * call site in a portal-backed tooltip changes layout, and the conversion is
+   * a ratchet rather than a flag day.
+   */
+  tooltip?: boolean;
 }
 
 export function IconButton({
@@ -39,11 +59,18 @@ export function IconButton({
   iconSize = 16,
   disabled = false,
   testId,
+  bordered = false,
+  active,
+  expanded,
+  tooltip = false,
 }: IconButtonProps) {
-  return (
+  const button = (
     <button
       type="button"
       className="myne-icon-btn"
+      data-bordered={bordered ? "true" : undefined}
+      aria-pressed={active}
+      aria-expanded={expanded}
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
@@ -52,9 +79,13 @@ export function IconButton({
       // rail, and this file's rule is that layout lives at the call site.
       style={MIN_TARGET}
       aria-label={label}
-      title={label}
+      // The native attribute stays only on the un-tooltipped path, and only
+      // until the call sites convert; `check-tooltip-convention.mjs` records
+      // this file as exempt with that reason.
+      title={tooltip ? undefined : label}
     >
       <Icon name={icon} size={iconSize} />
     </button>
   );
+  return tooltip ? <Tooltip label={label}>{button}</Tooltip> : button;
 }

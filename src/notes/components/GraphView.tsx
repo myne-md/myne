@@ -44,9 +44,13 @@ import { useWorkspace } from "../workspaceContext";
 import { GraphSettingsPanel } from "./GraphSettingsPanel";
 import { GraphList } from "./GraphList";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
-import { Icon } from "../../components/primitives/Icon";
 import { Segmented } from "../../components/primitives/Segmented";
-import type { IconName } from "../../lib/icons";
+// The cluster's icon controls are the SHARED primitive now (myne-md/myne#774).
+// This file carried a local `IconButton` because the primitive had no bordered
+// variant — a floating control needs its own edge to be findable against
+// whatever is behind it — so the variant moved to the primitive instead. Its
+// `title` becomes a `<Tooltip>` in the same move (myne-md/myne#775).
+import { IconButton as ClusterButton } from "../../components/primitives/IconButton";
 
 // Lazy-loaded so the d3-force + canvas-renderer chunk stays OUT of the initial
 // bundle (vision.md "separate, lazy-loaded"; SYNC-8 TB9 posture). The app's
@@ -769,7 +773,9 @@ export function GraphPane() {
             Icon-only since the cluster has to stay narrow enough to sit on the
             picture: the tooltip carries the word, and the glyph is the circular
             arrow that means "again". */}
-        <IconButton
+        <ClusterButton
+          bordered
+          tooltip
           testId="editor.graph-relayout"
           icon="refresh-cw"
           label={stale ? t("notes.graph.refreshTitle") : t("notes.graph.relayoutTitle")}
@@ -783,7 +789,9 @@ export function GraphPane() {
             floats over the canvas, that half is load-bearing, because a panel
             that took width from the canvas would resize it and re-run the
             layout. */}
-        <IconButton
+        <ClusterButton
+          bordered
+          tooltip
           testId="editor.graph-settings-gear"
           icon="settings"
           label={t("notes.graph.settings.openTitle")}
@@ -828,62 +836,3 @@ export function GraphPane() {
 /** The floating cluster's controls are ONE control vocabulary, so they are one
  *  style object: a chip, a switch half and an icon button differ only in what
  *  they act on, and a second copy of these properties is how they drift apart. */
-const CONTROL_BASE_STYLE = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-1)",
-  fontSize: 12,
-  padding: "3px 8px",
-  border: 0,
-  background: "transparent",
-  cursor: "pointer",
-  color: "var(--fg-3)",
-} as const;
-
-/** An icon-only control in the cluster. The word lives in the tooltip and the
- *  accessible name, because the cluster has to stay narrow enough to float on
- *  the picture. */
-function IconButton({
-  testId,
-  icon,
-  label,
-  onClick,
-  active,
-  expanded,
-}: {
-  testId: string;
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  expanded?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-label={label}
-      title={label}
-      aria-expanded={expanded}
-      onClick={onClick}
-      aria-pressed={active}
-      style={{
-        ...CONTROL_BASE_STYLE,
-        width: 28,
-        height: 28,
-        padding: 0,
-        // Its OWN border, now that the group's surrounding box is gone: three
-        // separately-bounded controls read as three controls, where one box
-        // around them read as a single surface with buttons in it
-        // (myne-md/myne#727).
-        border: "1px solid var(--line-1)",
-        borderRadius: "var(--radius-2)",
-        background: active ? "var(--paper-3)" : "var(--bg-1)",
-        color: active ? "var(--fg-1)" : "var(--fg-2)",
-      }}
-    >
-      <Icon name={icon} size={14} />
-    </button>
-  );
-}
