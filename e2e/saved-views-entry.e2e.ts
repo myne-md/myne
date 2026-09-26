@@ -26,8 +26,10 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   clickUntilVisible,
   dismissImporterOffer,
+  ribbonSelector,
   setViewsEnabled,
   unlockToEditor,
 } from "./support/flows";
@@ -77,7 +79,7 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
 
         // Views is a compact nav ROW; its list lives in a right-flyout opened by
         // clicking the row. Open it → empty-state hint (zero views).
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.byTestId("views.empty");
 
         // Create a view from the flyout's create (+) button (visible while the
@@ -89,7 +91,7 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host"); // the new view opened as a tab
         // Re-open the flyout → the new view is a row.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "first view row appears" },
@@ -123,7 +125,7 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
         await clickUntilVisible(s, "views.new-button", "view-filter.save");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 2 ? true : null),
           { label: "second view row appears" },
@@ -149,7 +151,7 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
 
         // Delete one view → the list drops to a single row. Re-open the flyout
         // first (clicking a row above closed it).
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         const labels = await viewRowLabels(s);
         await openRowMenu(s, labels[0]!);
         await (
@@ -191,19 +193,24 @@ describeE2E("sv2 Views feature toggle gates the sidebar entry (#230)", () => {
         // became a timeout.
         await s.byTestId("notes.new-menu");
 
-        // Default: 0 views + untouched pref → the entry is hidden.
+        // The entry point is the rail button now, not a sidebar nav row
+        // (myne-md/myne#762), so that is what the toggle has to govern: the
+        // flyout it opens does not mount while Views is off, and a rail button
+        // that does nothing is worse than no button.
+        //
+        // Default: 0 views + untouched pref → hidden.
         expect(
-          (await s.byTestIdAll("views.section")).length,
+          (await s.findElements(ribbonSelector("views.show"))).length,
           "Views entry is hidden by default on a fresh vault",
         ).toBe(0);
 
-        // Enable via Settings → Editor → the nav row appears.
+        // Enable via Settings → Editor → the rail button appears.
         await setViewsEnabled(s, true);
-        await s.waitForElement(testIdSelector("views.section"));
+        await s.waitForElement(ribbonSelector("views.show"));
 
-        // Disable again → the row is gone (hidden, not merely inert).
+        // Disable again → it is gone (hidden, not merely inert).
         await setViewsEnabled(s, false);
-        await s.waitForGone(testIdSelector("views.section"));
+        await s.waitForGone(ribbonSelector("views.show"));
       },
     );
   });

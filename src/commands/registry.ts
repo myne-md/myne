@@ -284,4 +284,11 @@ export const RIBBON_DEFAULT_IDS: readonly string[] = [
   "note.new",
   "daily.open-today",
   "periodic.open-this-week",
+  // The four nav entries the notes sidebar used to pin to its own footer
+  // (myne-md/myne#762). They were always registry commands; the footer was a
+  // second, unremovable copy of the rail, so the rail is now the only one.
+  "views.show",
+  "attachments.open",
+  "trash.open",
+  "archive.open",
 ];

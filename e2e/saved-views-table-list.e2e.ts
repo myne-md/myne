@@ -35,6 +35,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   clickUntilVisible,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
@@ -116,7 +117,7 @@ async function createAllPagesView(s: Session): Promise<void> {
   // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
   // is shut but is not interactable, so clicking it silently does nothing.
   // Open the flyout first — the same order the passing spec uses.
-  await clickUntilVisible(s, "views.section", "views.flyout");
+  await clickRibbonUntilVisible(s, "views.show", "views.flyout");
   await clickUntilVisible(s, "views.new-button", "view-filter.modal");
   await (await s.byTestId("view-filter.save")).click();
   await s.waitForGone(testIdSelector("view-filter.modal"));
@@ -124,7 +125,7 @@ async function createAllPagesView(s: Session): Promise<void> {
   await s.byTestId("view.cards"); // default view type before the switch
   // The view rows live in the flyout, and the create click CLOSED it.
   // Re-open before counting rows.
-  await clickUntilVisible(s, "views.section", "views.flyout");
+  await clickRibbonUntilVisible(s, "views.show", "views.flyout");
   await s.waitUntil(
     async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
     { label: "saved view appears in the sidebar" },

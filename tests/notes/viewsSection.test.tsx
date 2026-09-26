@@ -1,31 +1,43 @@
 // @vitest-environment jsdom
 //
-// Unit tests for the sidebar "Views" entry (Saved Views #4, MYND-274).
-// Views is a compact nav row; its list lives in a right-flyout opened by
-// clicking the row (or its caret). Rows / empty-state / rename all live inside
-// that flyout, so tests open it first. Pure component — no IPC.
+// Unit tests for the saved-views flyout (Saved Views #4, MYND-274).
+// The component used to render a sidebar nav row that opened the flyout beside
+// itself; the row is gone (myne-md/myne#762) and `requestRevealViews()` — what
+// the `views.show` ribbon button and the palette both fire — is the only way in.
+// Rows / empty-state / rename all live inside the flyout, so tests open it
+// first. Pure component — no IPC.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ViewsSection } from "../../src/notes/components/ViewsSection";
+import {
+  requestRevealViews,
+  __resetRevealViewsForTest,
+} from "../../src/notes/views/revealViewsSignal";
 import type { SavedView } from "../../src/lib/prefs";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  __resetRevealViewsForTest();
+});
 
 function view(id: string, name: string): SavedView {
   return { id, name, view_type: "cards", filters: { kind: "all" } };
 }
 
-/** Open the flyout by clicking the nav row (the primary affordance). */
+/** Open the flyout the way the product does — the reveal signal the `views.show`
+ *  command fires. It toggles, so call it once per open. */
 function openFlyout() {
-  fireEvent.click(screen.getByTestId("views.section"));
+  act(() => {
+    requestRevealViews();
+  });
 }
 
 describe("ViewsSection", () => {
-  it("is a compact row; the list + empty-state live in the flyout", () => {
+  it("renders nothing until revealed; the list + empty-state live in the flyout", () => {
     render(<ViewsSection views={[]} onOpenView={vi.fn()} onNewView={vi.fn()} />);
-    // Collapsed by default: nothing but the row is in the DOM.
-    expect(screen.getByTestId("views.section")).toBeTruthy();
+    // Closed by default, and with the nav row gone that means NOTHING in the DOM
+    // — the component is a flyout host, not a sidebar entry.
     expect(screen.queryByTestId("views.flyout")).toBeNull();
     expect(screen.queryByTestId("views.empty")).toBeNull();
     // Opening the flyout reveals the quiet empty-state hint.
@@ -66,16 +78,22 @@ describe("ViewsSection", () => {
     expect(onOpenView).toHaveBeenCalledWith("v1");
   });
 
-  it("the + button triggers onNewView (no flyout needed)", () => {
+  it("the + button lives in the flyout header and triggers onNewView", () => {
     const onNewView = vi.fn();
     render(
       <ViewsSection views={[]} onOpenView={vi.fn()} onNewView={onNewView} />,
     );
+    // It used to sit on the nav row, reachable without opening anything; with
+    // the row gone it moved into the flyout's search header.
+    expect(screen.queryByTestId("views.new-button")).toBeNull();
+    openFlyout();
     fireEvent.click(screen.getByTestId("views.new-button"));
     expect(onNewView).toHaveBeenCalledTimes(1);
+    // Creating opens the filter-builder modal, so the flyout gets out of the way.
+    expect(screen.queryByTestId("views.flyout")).toBeNull();
   });
 
-  it("toggling the row closes the flyout", () => {
+  it("a second reveal toggles the flyout closed", () => {
     render(
       <ViewsSection
         views={[view("v1", "Books")]}
@@ -85,7 +103,7 @@ describe("ViewsSection", () => {
     );
     openFlyout();
     expect(screen.getByTestId("views.row")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("views.section")); // toggle closed
+    openFlyout(); // the same ribbon button pressed again
     expect(screen.queryByTestId("views.row")).toBeNull();
   });
 

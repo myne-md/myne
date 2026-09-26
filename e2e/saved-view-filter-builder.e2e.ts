@@ -26,8 +26,9 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  createNote,
+  clickRibbonUntilVisible,
   clickUntilVisible,
+  createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   pageSeatInvoke,
@@ -87,7 +88,7 @@ describeE2E("vf1 filter builder create / empty-save / edit-entry / cancel (MYND-
 
         // The Views list — and its empty state — live inside a flyout the nav
         // row opens; both are absent from the screen until it is open.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.byTestId("views.empty");
 
         // "+ New view" opens the builder EMPTY — it no longer creates a blank
@@ -103,7 +104,7 @@ describeE2E("vf1 filter builder create / empty-save / edit-entry / cancel (MYND-
         await s.byTestId("editor.view-host");
         // The view rows live in the flyout, and saving CLOSED it (the create
         // click dismisses it). Re-open before counting rows.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },
@@ -154,7 +155,7 @@ describeE2E("vf2 filter builder condition composition (MYND-282)", () => {
         // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
         // is shut but is not interactable, so clicking it silently does nothing.
         // Open the flyout first — the same order the passing spec uses.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.add-condition-first")).click();
         await s.byTestId("view-filter.condition");
@@ -172,7 +173,7 @@ describeE2E("vf2 filter builder condition composition (MYND-282)", () => {
         await s.byTestId("editor.view-host");
         // The view rows live in the flyout, and saving CLOSED it (the create
         // click dismisses it). Re-open before counting rows.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "filtered view appears in the sidebar" },
@@ -224,7 +225,7 @@ describeE2E("vf3 filter builder property condition (key + op + value)", () => {
         // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
         // is shut but is not interactable, so clicking it silently does nothing.
         // Open the flyout first — the same order the passing spec uses.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.add-condition-first")).click();
         await s.byTestId("view-filter.condition");
@@ -254,7 +255,7 @@ describeE2E("vf3 filter builder property condition (key + op + value)", () => {
         );
         // The view rows live in the flyout, and saving CLOSED it (the create
         // click dismisses it). Re-open before counting rows.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "property view appears in the sidebar" },

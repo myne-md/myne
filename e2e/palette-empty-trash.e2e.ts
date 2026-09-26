@@ -29,6 +29,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   confirmDeleteWithEnter,
   createNote,
   dismissImporterOffer,
@@ -69,7 +70,7 @@ async function readConfirmCopy(s: Session): Promise<{ title: string; body: strin
  *  rows (the purge/cancel outcome), then close it. Gated on `trash.panel`
  *  first so a zero count can never pass vacuously against a closed panel. */
 async function expectTrashCount(s: Session, count: number): Promise<void> {
-  await (await s.byTestId("notes.trash-open")).click();
+  await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
   await s.byTestId("trash.panel");
   await s.waitUntil(
     async () => ((await s.byTestIdAll("trash.restore")).length === count ? true : null),

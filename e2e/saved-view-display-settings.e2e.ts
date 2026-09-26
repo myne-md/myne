@@ -28,6 +28,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   clickUntilVisible,
   dismissImporterOffer,
   setViewsEnabled,
@@ -83,7 +84,7 @@ async function rowMenuAction(
     async () => {
       const rows = await s.byTestIdAll("views.row");
       if (rows.length === 0) {
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         return null;
       }
       for (const r of rows) {
@@ -124,13 +125,13 @@ describeE2E("vd1 cards view display settings — cover image + aspect round-trip
         // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
         // is shut but is not interactable, so clicking it silently does nothing.
         // Open the flyout first — the same order the passing spec uses.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         // The view rows live in the flyout, and the create click CLOSED it.
         // Re-open before counting rows.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
           { label: "saved view appears in the sidebar" },

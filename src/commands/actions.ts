@@ -44,6 +44,7 @@ import {
 } from "../lib/prefs";
 import { applyTheme } from "../lib/theme";
 import { screenCaptureOverrideIsActive } from "../hooks/useScreenCaptureOverride";
+import { viewsEnabled } from "../lib/viewsEnabled";
 import i18n from "../i18n";
 
 /** Next element after `current` (or `fallback` when unset) in a cyclic list. */
@@ -576,13 +577,29 @@ const openTrashAction = notesAction(
   "commands.actions.openTrash.label",
   () => runInSidebar(() => sidebarCommands.openTrash?.()),
   false,
+  "trash-2",
 );
-const openArchiveAction = notesAction(
-  "archive.open",
-  "commands.actions.openArchive.label",
-  () => runInSidebar(() => sidebarCommands.openArchive?.()),
-  false,
-);
+const openArchiveAction: CommandAction = {
+  id: "archive.open",
+  ribbon: { icon: "archive" },
+  get label() {
+    return i18n.t("commands.actions.openArchive.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.notes");
+  },
+  // Gated on `archive_disabled` the same way `note.archive` is (myne-md/myne#762).
+  // The sidebar footer used to keep an Archive row while any archived note still
+  // existed, so nothing could be stranded; that row is gone and the rail is the
+  // entry point now. Disabling the feature auto-empties the archive, so the
+  // stranded case is unreachable in the normal flow, and re-enabling the toggle
+  // is what reaches anything a hand-edited pref left behind.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && !(ctx.prefs.archive_disabled ?? false)
+      ? "show"
+      : "hidden",
+  run: () => runInSidebar(() => sidebarCommands.openArchive?.()),
+};
 
 const cycleHeadingAction: CommandAction = {
   id: "editor.cycle-heading",
@@ -1275,10 +1292,18 @@ const showViewsAction: CommandAction = {
   get category() {
     return i18n.t("commands.actions.category.editor");
   },
-  // Editor-only, like the other navigation entries. The Saved Views surface is
-  // reached often, so it ALSO has a persistent BottomBar affordance (SYNC-7
-  // dual-entry, Saved Views #4) — the palette action is one of two entry points.
-  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  // Editor-only, like the other navigation entries, AND behind the Views feature
+  // toggle (Settings → Editor). That second half arrived with myne-md/myne#762:
+  // the flyout used to be opened by a sidebar row that the same toggle hid, so
+  // turning Views off took the entry point with it. The row is gone and this
+  // command is the entry point, and the flyout it opens does not mount while the
+  // toggle is off — so without the gate the rail would carry a button that does
+  // nothing. `viewsEnabled` is device-local (localStorage, not `vault.prefs`),
+  // hence the back-compat `hasViews` argument rather than a plain pref read.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && viewsEnabled((ctx.prefs.saved_views?.length ?? 0) > 0)
+      ? "show"
+      : "hidden",
   run: (ctx) => {
     ctx.onShowViews();
   },

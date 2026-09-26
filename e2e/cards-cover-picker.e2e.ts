@@ -25,6 +25,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   clickUntilVisible,
   dismissImporterOffer,
   setViewsEnabled,
@@ -62,7 +63,7 @@ describeE2E("vc1 cards cover picker — choose an existing image as a card cover
         // "+ New view" lives INSIDE the Views flyout: it renders while the flyout
         // is shut but is not interactable, so clicking it silently does nothing.
         // Open the flyout first — the same order the passing spec uses.
-        await clickUntilVisible(s, "views.section", "views.flyout");
+        await clickRibbonUntilVisible(s, "views.show", "views.flyout");
         await clickUntilVisible(s, "views.new-button", "view-filter.modal");
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));

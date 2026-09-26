@@ -17,10 +17,12 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickRibbonUntilVisible,
   closeSettings,
   createNote,
   dismissImporterOffer,
   openSettings,
+  ribbonSelector,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -73,7 +75,7 @@ describeE2E("ar1 archive lifecycle (MYND-331)", () => {
         await s.waitForGone(testIdSelector("notes.row"));
 
         // Restore from the Archive panel → the row re-enters the live tree.
-        await (await s.byTestId("notes.archive-open")).click();
+        await clickRibbonUntilVisible(s, "archive.open", "archive.panel");
         await s.byTestId("archive.panel");
         await (await s.byTestId("archive.restore")).click();
         await s.waitForGone(testIdSelector("archive.restore"));
@@ -84,13 +86,13 @@ describeE2E("ar1 archive lifecycle (MYND-331)", () => {
         // (archive ⊥ trash; permanent purge stays a Trash-panel step).
         await contextMenuPick(s, await s.byTestId("notes.row"), "archive");
         await s.waitForGone(testIdSelector("notes.row"));
-        await (await s.byTestId("notes.archive-open")).click();
+        await clickRibbonUntilVisible(s, "archive.open", "archive.panel");
         await (await s.byTestId("archive.delete")).click();
         await s.waitForGone(testIdSelector("archive.delete"));
         await (await s.byTestId("archive.close")).click();
 
         // The note now lives in the Trash, not the Archive.
-        await (await s.byTestId("notes.trash-open")).click();
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
         await s.byTestId("trash.restore");
         await (await s.byTestId("trash.close")).click();
       },
@@ -179,11 +181,11 @@ describeE2E("ar3 disabling archiving empties the archive (archive-disable)", () 
         await dismissImporterOffer(s);
         await createNote(s, "Ar\u015Fiv Aday\u0131");
 
-        // Archive the note \u2192 it leaves the live tree; the Archive footer button
-        // is now present (one archived note).
+        // Archive the note \u2192 it leaves the live tree; the Archive ribbon button
+        // is present (the feature is on).
         await contextMenuPick(s, await s.byTestId("notes.row"), "archive");
         await s.waitForGone(testIdSelector("notes.row"));
-        await s.byTestId("notes.archive-open");
+        await s.waitForElement(ribbonSelector("archive.open"));
 
         // Disable archiving from Settings \u2192 Editor. The toggle starts "On"
         // (archiving enabled); clicking it empties the Archive first, then
@@ -202,9 +204,10 @@ describeE2E("ar3 disabling archiving empties the archive (archive-disable)", () 
         await closeSettings(s);
 
         // The archived note is back in the live tree (auto-unarchived) and the
-        // Archive footer button is gone (archive empty + feature disabled).
+        // Archive ribbon button is gone \u2014 `archive.open` resolves to `hidden`
+        // while the feature is off, so the rail drops it and the others reflow.
         await s.byTestId("notes.row");
-        await s.waitForGone(testIdSelector("notes.archive-open"));
+        await s.waitForGone(ribbonSelector("archive.open"));
       },
     );
   });
