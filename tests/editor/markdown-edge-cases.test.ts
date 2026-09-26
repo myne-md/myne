@@ -37,6 +37,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { toggleWrap } from "../../src/editor/wrap-toggle";
+import { assertParsedState } from "./_parse-budget";
 
 type ToggleResult = { doc: string; selection: { from: number; to: number } };
 
@@ -82,6 +83,7 @@ function applyToggleMd(
     selection: EditorSelection.single(selectionFrom, selectionTo),
     extensions: [markdown({ base: markdownLanguage })],
   });
+  assertParsedState(state);
   let nextState = state;
   const cmd = toggleWrap(open, close);
   cmd({
@@ -107,6 +109,7 @@ function parseNodes(doc: string): ParsedNode[] {
     doc,
     extensions: [markdown({ base: markdownLanguage })],
   });
+  assertParsedState(state);
   const tree = syntaxTree(state);
   const nodes: ParsedNode[] = [];
   tree.iterate({
