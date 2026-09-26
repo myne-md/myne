@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import { SidebarSearchRow } from "./SidebarSearchRow";
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
@@ -1508,8 +1509,14 @@ function EmptyState({
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
+        {/* The `NOTES` heading that used to sit here is gone (myne-md/myne#773).
+            It labelled a region that can only ever contain notes, directly
+            under the vault picker that already says where you are — a row of
+            chrome carrying no information, on the surface with the least room
+            to spare. The space now holds the app's only clickable route into
+            the command palette. */}
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
+          <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <NotesActionsMenu
@@ -2886,8 +2893,14 @@ function PopulatedList({
         </div>
       )}
       <div style={HEADER_ROW_STYLE}>
+        {/* The `NOTES` heading that used to sit here is gone (myne-md/myne#773).
+            It labelled a region that can only ever contain notes, directly
+            under the vault picker that already says where you are — a row of
+            chrome carrying no information, on the surface with the least room
+            to spare. The space now holds the app's only clickable route into
+            the command palette. */}
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
+          <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <NotesActionsMenu
