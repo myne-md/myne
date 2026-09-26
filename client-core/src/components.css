@@ -779,7 +779,29 @@
    sidebar section, a right-rail tab and a full pane want the same words with
    different amounts of room. `data-size` is set by the caller. */
 
+/* Entrance, and the only NEW motion this epic added rather than fixed.
+   It passes the frequency gate that rejects most candidates: an empty state is
+   rare by construction — you see it when something is empty — and it is a
+   destination rather than a transient, so it is worth arriving rather than
+   appearing. `--ease-emphasized` leaves fast and settles slow, which is what
+   makes a surface land with weight instead of merely fading up.
+
+   The global `prefers-reduced-motion` rule zeroes the duration, so this needs
+   no arm of its own. The rise is 8px, small enough that nothing reads as
+   sliding: the eye registers arrival, not travel. */
+@keyframes myne-empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .myne-empty {
+  animation: myne-empty-in var(--duration-base) var(--ease-emphasized);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -809,7 +831,14 @@
   z-index: 0;
 }
 
+/* The content follows the box by one stagger step, so the card arrives and its
+   contents settle into it rather than the whole thing moving as one slab. ONE
+   step, not a per-child cascade: there are three children, and staggering them
+   individually would take longer than the entrance itself — which is the
+   failure `--stagger-max` exists to bound. */
 .myne-empty__body {
+  animation: myne-empty-in var(--duration-base) var(--ease-emphasized) var(--stagger-step)
+    both;
   position: relative;
   z-index: 1;
   display: flex;
@@ -897,4 +926,77 @@
 .myne-empty[data-variant="error"] .myne-empty__glyph {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
+}
+
+
+/* =========================================================================
+   Skeleton
+   ========================================================================= */
+
+/* The loading convention, stated once (myne-md/myne#778, epic #772 lane 7d).
+   Three cases, three answers, and the rule is about WHAT IS KNOWN rather than
+   about taste:
+
+     under ~200ms  -> nothing at all. A spinner that flashes for three frames
+                      reads as a glitch, and the pause it replaced read as
+                      nothing. Showing it makes the app feel slower, not more
+                      responsive.
+     known layout  -> a skeleton. The shape of the answer is already known, so
+                      draw it: the content arrives INTO its own outline instead
+                      of pushing the page around when it lands.
+     unknown/blocking -> the spinner or a progress bar. `<Spinner>` carries
+                      `data-motion="essential"` semantics (MYND-630) precisely
+                      because a frozen progress indicator reads as hung.
+
+   The shimmer is a LOOP, and it is admitted under the same clause as the other
+   two indeterminate indicators: it reports that work is in flight, and it stops
+   when the work does because the element is replaced by the content. It carries
+   `data-motion="essential"` so reduced motion slows it rather than freezing a
+   grey box the user cannot interpret. */
+
+@keyframes myne-skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.myne-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: var(--radius-1);
+  /* Content-shaped by default: a line of text. Callers size it. */
+  height: 1em;
+}
+
+/* The sweep is a pseudo-element translating across a clipped box — `transform`
+   only, so it composites — rather than an animated background-position, which
+   repaints the whole box every frame. */
+.myne-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--fg-3) 12%, transparent),
+    transparent
+  );
+  animation: myne-skeleton-sweep 1.4s var(--ease-standard) infinite;
+}
+
+/* A block of lines, the common case: the last one short, because a paragraph's
+   last line is. Without it a skeleton reads as a table rather than as text. */
+.myne-skeleton[data-lines] {
+  height: auto;
+}
+.myne-skeleton__line {
+  height: 1em;
+  margin-bottom: var(--space-2);
+  background: var(--bg-3);
+  border-radius: var(--radius-1);
+}
+.myne-skeleton__line:last-child {
+  width: 62%;
+  margin-bottom: 0;
 }

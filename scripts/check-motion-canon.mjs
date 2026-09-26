@@ -72,6 +72,14 @@ const INFINITE_ALLOWLIST = new Map([
       "work is in flight — indeterminate progress, not decoration.",
   ],
   [
+    "myne-skeleton-sweep",
+    "The loading skeleton's shimmer. Indeterminate progress in the same sense as the " +
+      "three below: it reports that work is in flight and STOPS when the work does, " +
+      "because the element is replaced by the content it was standing in for. Carries " +
+      "data-motion=\"essential\", so reduced motion slows it rather than freezing a grey " +
+      "box the user has no way to interpret.",
+  ],
+  [
     "cm-attachment-transcript-pulse",
     "The transcription busy meter. Same class as the two above; it animates " +
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",
