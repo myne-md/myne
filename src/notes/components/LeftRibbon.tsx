@@ -24,6 +24,9 @@ import { STRIP_HEIGHT } from "./TabStrip";
 import { dragRegionProps } from "../../screens/titlebar";
 import { resolveRibbonItems, ribbonEligibleIds } from "../ribbonItems";
 import { ribbonCommands } from "../ribbonCommands";
+import { Tooltip } from "../../components/primitives/Tooltip";
+import { BINDABLE_COMMANDS } from "../../commands/bindableCatalog";
+import { effectiveChords } from "../../commands/keymap";
 import { reorderByDrop, moveBarItem } from "../barItemsOrder";
 
 /** Column width in px. Slim, icon-only; the design canon has no rail token. */
@@ -153,6 +156,20 @@ export function LeftRibbon({
   const [dragId, setDragId] = useState<string | null>(null);
   const isCurrent = (id: string): boolean =>
     currentCommandId !== undefined && currentCommandId === id;
+
+  // The EFFECTIVE chord, not `action.kbd` — which the registry's own doc calls
+  // "display only, NOT a binding source of truth" and which is a hand-written
+  // string that cannot follow a rebind. The rail is a column of glyphs whose
+  // entire vocabulary is otherwise invisible, so the tooltip is where this app
+  // teaches its shortcuts; teaching the wrong one is worse than teaching none,
+  // which is why an unbound command shows no caps rather than a guess.
+  const chordFor = (id: string): string | undefined => {
+    const bindable = BINDABLE_COMMANDS.find((c) => c.id === id);
+    if (bindable === undefined) return undefined;
+    const defaults: Record<string, string[]> = {};
+    for (const c of BINDABLE_COMMANDS) defaults[c.id] = c.defaultBindings;
+    return effectiveChords(id, defaults, prefs.keymap)[0];
+  };
   const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [bgMenu, setBgMenu] = useState<{ x: number; y: number } | null>(null);
@@ -269,9 +286,9 @@ export function LeftRibbon({
             {isCurrent(id) && <span aria-hidden style={CURRENT_BAR_STYLE} />}
             {showDrop && dropAt.edge === "before" && <span aria-hidden style={{ ...DROP_LINE_STYLE, top: -1 }} />}
             {showDrop && dropAt.edge === "after" && <span aria-hidden style={{ ...DROP_LINE_STYLE, bottom: -1 }} />}
+            <Tooltip label={label} kbd={chordFor(id)} placement="bottom">
             <button
               type="button"
-              title={action.kbd !== undefined ? `${label} (${action.kbd})` : label}
               aria-label={label}
               // `page` rather than `true`: the rail is navigation between
               // surfaces, and a screen reader saying "current page" is the
@@ -307,6 +324,7 @@ export function LeftRibbon({
             >
               <Icon name={action.ribbon!.icon} size={ICON_SIZE} />
             </button>
+            </Tooltip>
           </div>
         );
       })}

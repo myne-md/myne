@@ -22,10 +22,21 @@ import {
   type ReactElement,
 } from "react";
 import { createPortal } from "react-dom";
+import { formatChord } from "../../commands/chord";
 
 interface TooltipProps {
   /** The visible label. Empty/undefined → the trigger renders with no tooltip. */
   label?: string;
+  /**
+   * A canonical chord string (`Mod-k`) rendered as keycaps after the label.
+   *
+   * The tooltip is where a keyboard-first app teaches its shortcuts, and an
+   * icon-only control is where the user most needs telling — the left ribbon is
+   * a column of glyphs whose whole vocabulary is otherwise invisible. Pass the
+   * EFFECTIVE binding (`effectiveChords`), never the in-code default: a hint
+   * that keeps promising a chord the user has rebound is worse than no hint.
+   */
+  kbd?: string;
   /** Preferred side; flips to the other if it would leave the viewport. */
   placement?: "top" | "bottom";
   /** Hover dwell before showing (ms). Focus shows immediately. Default 350. */
@@ -55,6 +66,7 @@ const BUBBLE_STYLE: CSSProperties = {
 
 export function Tooltip({
   label,
+  kbd,
   placement = "top",
   delayMs = 350,
   children,
@@ -142,6 +154,21 @@ export function Tooltip({
             }}
           >
             {label}
+            {kbd !== undefined && (
+              // Inverted chip: the keycaps' own `--paper-3`/`--line-2` would
+              // vanish against `--fg-1`, so they are re-tinted here rather than
+              // in `Keycaps`, which is correct on every OTHER surface.
+              <span
+                aria-hidden="true"
+                style={{
+                  marginInlineStart: 8,
+                  opacity: 0.75,
+                  fontFeatureSettings: '"tnum"',
+                }}
+              >
+                {formatChord(kbd)}
+              </span>
+            )}
           </div>,
           document.body,
         )}
