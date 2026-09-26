@@ -60,6 +60,8 @@ import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
 import { EmptyState } from "../primitives/EmptyState";
+import { Skeleton } from "../primitives/Skeleton";
+import { VISUALLY_HIDDEN as visuallyHidden } from "../primitives/visuallyHidden";
 import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -271,19 +273,6 @@ const GRID_STYLE: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
   gap: "var(--space-4)",
   paddingTop: "var(--space-4)",
-};
-
-const CENTER_MESSAGE_STYLE: CSSProperties = {
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-3)",
-  color: "var(--fg-3)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  textAlign: "center",
 };
 
 // ---- main component -------------------------------------------------------
@@ -902,7 +891,40 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
 
       <div style={SCROLL_STYLE}>
         {isLoading ? (
-          <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.decrypting")}</div>
+          // The library's layout is KNOWN before its contents are — a grid of
+          // uniform tiles, or a list of uniform rows — so it draws itself and
+          // the attachments arrive into it (myne-md/myne#778). It used to show
+          // the word "Decrypting…" centred in an empty pane, which told the
+          // user the wait was happening and nothing about what was coming, then
+          // shoved the page around when it landed.
+          //
+          // The word stays, in a live region, because the skeleton is
+          // `aria-hidden` and a screen-reader user would otherwise be told
+          // nothing at all.
+          <div data-testid="attachments.loading">
+            <span style={visuallyHidden} role="status" aria-live="polite">
+              {t("attachments.library.decrypting")}
+            </span>
+            <div
+              style={
+                view === "grid"
+                  ? GRID_STYLE
+                  : { display: "flex", flexDirection: "column", gap: "var(--space-1)" }
+              }
+              aria-hidden="true"
+            >
+              {Array.from({ length: 8 }, (_, i) => (
+                <Skeleton
+                  key={i}
+                  style={
+                    view === "grid"
+                      ? { height: 132, borderRadius: "var(--radius-2)" }
+                      : { height: 44, borderRadius: "var(--radius-2)" }
+                  }
+                />
+              ))}
+            </div>
+          </div>
         ) : isEmpty ? (
           <LibraryEmpty
             mode="empty"
