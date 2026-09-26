@@ -5,7 +5,7 @@
 // the context packet the issue-triage skill reasons over: labels, milestones,
 // the dedup corpus (relevance search + open issues), and the issue templates.
 // Everything here is a GitHub REST call and pure string shaping — no LLM. The
-// classifier (classify.mjs) consumes the packet; the side effects (apply-verdict.mjs)
+// classifier (classify-jev.mjs) consumes the packet; the side effects (apply-verdict.mjs)
 // consume the verdict. This split is what keeps the skill a pure function.
 //
 // Why this is not n8n any more: the triage workflow moved from n8n on the VPS to a
@@ -106,7 +106,9 @@ function relevanceQuery(title) {
 async function getLabels() {
   try {
     const items = await gh(`/repos/${t.owner}/${t.repo}/labels?per_page=100`);
-    return (items || []).map((i) => i && i.name).filter(Boolean);
+    return (items || [])
+      .filter((i) => i && i.name)
+      .map((i) => ({ name: i.name, description: i.description || '' }));
   } catch { return []; }
 }
 
@@ -186,8 +188,17 @@ const [labels, milestones, openIssues, related, templates] = await Promise.all([
   getLabels(), getMilestones(), getOpenIssues(), searchRelated(), parseTemplates(),
 ]);
 
-const labelNames = labels;
+const labelEntries = labels;
+const labelNames = labelEntries.map((l) => l.name);
 const group = (p) => labelNames.filter((n) => n.startsWith(p));
+// The descriptions go into the packet as their own map rather than replacing the name arrays,
+// because two consumers read this packet: the classifier builds Jev `criteria` out of
+// name -> description (a bare label name tells the model nothing it does not already infer from
+// the name), while apply-verdict needs the plain name lists to validate against. Keeping the
+// arrays as arrays means the second consumer does not have to know about the first.
+const labelDescriptions = Object.fromEntries(
+  labelEntries.filter((l) => l.description).map((l) => [l.name, l.description]),
+);
 
 let corpus = [];
 try {
@@ -234,6 +245,7 @@ const packet = {
     repo: t.repo,
     issue_types_enabled: ['Task', 'Bug', 'Feature'],
     labels: { type: group('type:'), area: group('area:'), status: group('status:'), meta: group('meta:'), roadmap: group('roadmap:') },
+    label_descriptions: labelDescriptions,
     milestones, next_milestone: nextMilestone,
   },
   dedup_corpus: corpus,

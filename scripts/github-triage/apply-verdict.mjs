@@ -4,14 +4,19 @@
 //
 // Reads the classifier's verdict and applies it to GitHub via the myne-bot token:
 // label PATCH, comment, duplicate close, GraphQL transferIssue, sub-issue links.
-// The LLM never sees this code and never touches GitHub — this script owns every
+// The model never sees this code and never touches GitHub — this script owns every
 // write, exactly as n8n did. The verdict is model output (free text in several
 // fields), so every value is validated against what the packet offered before it
 // becomes an API call.
 //
+// Two rules here exist because of a measured incident, myne-md/myne#472, where the
+// bot undid fields the creating skill had just set: a PATCH of `labels` REPLACES
+// the whole set and a `milestone: null` CLEARS the milestone, so both the label
+// list and the milestone field are unioned / omitted rather than replaced.
+//
 // Env:
 //   TRIAGE_PACKET     the packet+meta JSON written by build-packet.mjs
-//   TRIAGE_VERDICT    the verdict JSON written by classify.mjs
+//   TRIAGE_VERDICT    the verdict JSON written by classify-jev.mjs
 //   MYNE_BOT_PAT      the token for every GitHub write (org-wide myne-bot)
 
 import { readFileSync } from 'node:fs';
@@ -94,16 +99,61 @@ else if (dup.is_duplicate && (dup.confidence || 0) >= threshold && dup.of_issue)
 else if (dup.is_duplicate && (dup.confidence || 0) >= 0.5 && dup.of_issue) action = 'dup_flag';
 else action = 'triage';
 
-// Milestone string → number: only emit a milestone the packet actually carries.
-const ms = (packet.repo_context?.milestones || []).find((m) => m && m.title === cls.milestone);
-const milestoneNumber = ms ? ms.number : null;
+// --- milestone -------------------------------------------------------------
+// "A milestone is never left empty" is the tracker's rule
+// (agent-tooling/reference/github-issues.md), so the milestone is DERIVED here
+// rather than read off the verdict, and a repo with open milestones always
+// gets one. Highest OPEN version wins by numeric compare, not string order:
+// v0.10 is above v0.5, and a shipped release is routinely left open, so the
+// LOWEST open milestone is not where work is landing.
+function compareVersionKeys(a, b) {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] ?? 0, y = b[i] ?? 0;
+    if (x !== y) return x - y;
+  }
+  return 0;
+}
 
-const labels = [];
-if (cls.type_label) labels.push(cls.type_label);
-for (const a of (cls.area_labels || [])) labels.push(a);
+function currentMilestone() {
+  const open = (packet.repo_context?.milestones || []).filter((m) => m && m.state === 'open');
+  let best = null;
+  let bestKey = null;
+  for (const m of open) {
+    const hit = String(m.title).match(/(\d+(?:\.\d+)*)/);
+    if (!hit) continue;
+    const key = hit[1].split('.').map(Number);
+    if (!bestKey || compareVersionKeys(key, bestKey) > 0) { best = m; bestKey = key; }
+  }
+  return best;
+}
+
+const milestoneNumber = currentMilestone() ? currentMilestone().number : null;
+
+// OMITTED rather than sent as `milestone: null`. A null milestone CLEARS one the
+// issue already carries, which is the same class of damage as the label strip
+// below: the bot silently undoing a field the creating skill had set.
+const msField = milestoneNumber ? { milestone: milestoneNumber } : {};
+
+// Org issue types are opt-in per repo; sending `type` where none are enabled
+// makes GitHub reject the PATCH and take the whole triage pass with it.
+const typesEnabled = (packet.repo_context?.issue_types_enabled || []).length > 0;
+const typeField = typesEnabled ? { type: cls.issue_type || null } : {};
+
+// --- labels ----------------------------------------------------------------
+// A UNION with what the issue already carries. A PATCH of `labels` replaces the
+// WHOLE set, so building this from the verdict alone deleted the `area:` and
+// `status:` labels `gh issue create` had just set. Measured on myne-md/myne#472:
+// milestone and `area: desktop` set at 09:50, both removed by the bot at 09:51.
+const existing = Array.isArray(meta.existingLabels) ? meta.existingLabels : [];
 const statuses = (cls.status_labels && cls.status_labels.length) ? cls.status_labels : ['status: triage'];
-for (const s of statuses) labels.push(s);
-if (cls.roadmap_label) labels.push(cls.roadmap_label);
+const labels = [...new Set([
+  ...existing,
+  cls.type_label,
+  ...(cls.area_labels || []),
+  ...statuses,
+  cls.roadmap_label,
+].filter(Boolean))];
 const dupLabels = ['meta: duplicate'];
 
 const comment = v.comment_en || '';
@@ -126,8 +176,10 @@ async function addSubIssues() {
 async function transferIssue(targetRepo) {
   // Pre-labels on the SOURCE issue before the transfer (GitHub transfer preserves
   // them, but only labels the target already has survive — so send the shared type
-  // label and status: triage, nothing repo-specific).
-  const pre = { labels: [cls.type_label, 'status: triage'].filter(Boolean) };
+  // label and status: triage, nothing repo-specific). Union with what is already
+  // there: this PATCH replaces the label set, so a bare list would strip the
+  // `area:` labels the creating skill set here.
+  const pre = { labels: [...new Set([...existing, cls.type_label, 'status: triage'].filter(Boolean))] };
   await patchIssue(pre);
 
   // The transfer itself is a GraphQL mutation, as in n8n's Move: transfer issue.
@@ -145,13 +197,19 @@ try {
     if (comment) await commentIssue(comment);
     await transferIssue(v.target_repo);
   } else if (action === 'dup_close') {
+    // No milestone key on this branch, and deliberately so: a closed duplicate is
+    // not work any release is going to ship, so counting it against v0.x would
+    // overstate the release. An EXISTING milestone is still left untouched,
+    // because omitting the key is not the same as clearing it.
     await patchIssue({ labels: [...labels, ...dupLabels], state: 'closed', state_reason: 'not_planned' });
     if (comment) await commentIssue(comment);
   } else if (action === 'dup_flag') {
-    await patchIssue({ labels: [...labels, ...dupLabels] });
+    // Kept open, so it stays real work: it carries a milestone like any other open
+    // issue on a repo that has them.
+    await patchIssue({ labels: [...labels, ...dupLabels], ...msField, ...typeField });
     if (comment) await commentIssue(comment);
   } else {
-    await patchIssue({ labels, milestone: milestoneNumber, type: cls.issue_type || null });
+    await patchIssue({ labels, ...msField, ...typeField });
     if (comment) await commentIssue(comment);
   }
 
