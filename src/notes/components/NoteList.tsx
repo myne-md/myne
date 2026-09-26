@@ -63,6 +63,8 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
+import { Button } from "../../components/primitives/Button";
+import { EmptyState as ZeroState } from "../../components/primitives/EmptyState";
 import { tabKindSpec } from "../tabKinds";
 import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
@@ -695,24 +697,6 @@ const EMPTY_WRAPPER_STYLE: CSSProperties = {
   textAlign: "center",
   gap: 14,
   minWidth: 0,
-};
-
-const EMPTY_COPY_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-};
-
-const EMPTY_CTA_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)",
-  color: "var(--accent-on)",
-  background: "var(--accent)",
-  border: 0,
-  padding: "10px 14px",
-  borderRadius: "var(--radius-2)",
-  cursor: "pointer",
 };
 
 const SIDEBAR_OUTER_STYLE: CSSProperties = {
@@ -1534,11 +1518,26 @@ function EmptyState({
           onCancel={fm.cancelNewFolder}
         />
       )}
+      {/* The first thing a new user sees in this app. It used to be the string
+          "No notes yet." above a button — true, and saying nothing about what
+          the surface is for. It is also the one zero state in the sidebar that
+          is a DESTINATION rather than a transient, which is why it carries the
+          brand field and the filtered states below do not. */}
       <div style={EMPTY_WRAPPER_STYLE}>
-        <div style={EMPTY_COPY_STYLE}>{t("notes.list.emptyState")}</div>
-        <button type="button" onClick={onCreate} style={EMPTY_CTA_STYLE}>
-          {t("notes.list.createFirstNote")}
-        </button>
+        <ZeroState
+          variant="firstRun"
+          icon="file-text"
+          title={t("notes.list.emptyState")}
+          body={t("notes.list.emptyBody")}
+          size="sm"
+          field
+          testId="notes.empty-state"
+          action={
+            <Button variant="primary" icon="file-plus" onClick={onCreate}>
+              {t("notes.list.createFirstNote")}
+            </Button>
+          }
+        />
       </div>
     </div>
   );

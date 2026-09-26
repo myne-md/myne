@@ -59,6 +59,7 @@ import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
 import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
 import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -903,15 +904,17 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
         {isLoading ? (
           <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.decrypting")}</div>
         ) : isEmpty ? (
-          <EmptyState
+          <LibraryEmpty
             mode="empty"
             loadError={loadError}
             importing={importing}
             onImport={() => void handleImport()}
+            onRetry={() => void refresh()}
           />
         ) : isNoMatch ? (
-          <EmptyState
+          <LibraryEmpty
             mode="no-results"
+            query={query}
             onClearSearch={() => {
               setQuery("");
               setTypeFilter("all");
@@ -1115,75 +1118,102 @@ function ToolbarActionButton({
 
 // ---- empty state ----------------------------------------------------------
 
-// Two distinct zero states share one centered layout:
-//   • "empty"      — the catalog itself is empty → paperclip + import CTA.
-//   • "no-results" — the catalog is non-empty but the active query / type filter
-//                    matches nothing → search icon + a "Clear search" reset.
-type EmptyStateProps =
+// THREE distinct zero states, on the shared `<EmptyState>` since
+// myne-md/myne#776:
+//
+//   • firstRun — the catalog itself is empty. Import is the way out.
+//   • filtered — the catalog has items but the query / type filter matches
+//                nothing. The query is ECHOED BACK and clearing it is the way
+//                out. This is the state that was a dead end everywhere else in
+//                the app: "no results" with no sight of what was searched and
+//                nothing to press.
+//   • error    — the catalog could not be read. Previously this shared the
+//                firstRun branch, so a failure to DECRYPT the catalog rendered
+//                as "No attachments yet" beside an Import button: the one
+//                sentence guaranteed to be wrong, offering the one action that
+//                cannot help.
+type LibraryEmptyProps =
   | {
       mode: "empty";
       loadError: boolean;
       importing: boolean;
       onImport: () => void;
+      onRetry: () => void;
     }
   | {
       mode: "no-results";
+      query: string;
       onClearSearch: () => void;
     };
 
-function EmptyState(props: EmptyStateProps) {
+function LibraryEmpty(props: LibraryEmptyProps) {
   const { t } = useTranslation();
 
   if (props.mode === "no-results") {
     return (
-      <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-results">
-        <Icon name="search" size={40} style={{ color: "var(--fg-3)" }} />
-        <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
-          {t("attachments.library.emptyNoResultsTitle")}
-        </div>
-        <button
-          type="button"
-          onClick={props.onClearSearch}
-          data-testid="attachments.empty-clear-search"
-          {...hoverSurface()}
-          style={{
-            background: "transparent",
-            border: 0,
-            padding: "var(--space-1) var(--space-2)",
-            borderRadius: "var(--radius-1)",
-            cursor: "pointer",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-            color: "var(--accent)",
-            transition: HOVER_TRANSITION,
-          }}
-        >
-          {t("attachments.library.emptyClearSearch")}
-        </button>
-      </div>
+      <EmptyState
+        variant="filtered"
+        icon="search"
+        title={t("attachments.library.emptyNoResultsTitle")}
+        body={
+          props.query.trim() === ""
+            ? t("attachments.library.emptyFilteredBody")
+            : t("attachments.library.emptyFilteredBodyQuery")
+        }
+        query={props.query.trim() === "" ? undefined : props.query}
+        testId="attachments.empty-no-results"
+        action={
+          <Button
+            variant="secondary"
+            icon="x"
+            onClick={props.onClearSearch}
+            data-testid="attachments.empty-clear-search"
+          >
+            {t("attachments.library.emptyClearSearch")}
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (props.loadError) {
+    return (
+      <EmptyState
+        variant="error"
+        icon="circle-alert"
+        title={t("attachments.library.emptyLoadError")}
+        body={t("attachments.library.emptyLoadErrorBody")}
+        testId="attachments.empty-load-error"
+        action={
+          <Button variant="secondary" icon="refresh-cw" onClick={props.onRetry}>
+            {t("attachments.library.emptyRetry")}
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-attachments">
-      <Icon name="paperclip" size={40} style={{ color: "var(--fg-3)" }} />
-      <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
-        {props.loadError
-          ? t("attachments.library.emptyLoadError")
-          : t("attachments.library.emptyNoAttachments")}
-      </div>
-      <div>{t("attachments.library.emptyImportHint")}</div>
-      <Button
-        variant="secondary"
-        icon="download"
-        onClick={props.onImport}
-        disabled={props.importing}
-      >
-        {props.importing
-          ? t("attachments.library.importing")
-          : t("attachments.library.importFile")}
-      </Button>
-    </div>
+    <EmptyState
+      variant="firstRun"
+      icon="paperclip"
+      title={t("attachments.library.emptyNoAttachments")}
+      body={t("attachments.library.emptyImportHint")}
+      field
+      testId="attachments.empty-no-attachments"
+      action={
+        <Button
+          variant="primary"
+          icon="download"
+          onClick={props.onImport}
+          disabled={props.importing}
+        >
+          {props.importing
+            ? t("attachments.library.importing")
+            : t("attachments.library.importFile")}
+        </Button>
+      }
+    />
   );
 }
 

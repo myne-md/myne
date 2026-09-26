@@ -18,14 +18,6 @@
     "reason": "Same step title on account entry and recover; one step, two flows."
   },
   {
-    "value": "No attachments match your search.",
-    "keys": [
-      "attachments.library.emptyNoResultsTitle",
-      "attachments.library.noMatch"
-    ],
-    "reason": "Same empty-search string as the library title and empty state on one screen; shared copy, accepted."
-  },
-  {
     "value": "Transcription failed. Please try again.",
     "keys": [
       "attachments.library.transcribeFailed",
