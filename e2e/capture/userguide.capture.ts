@@ -40,6 +40,8 @@ import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
   clickNewMenuItem,
+  clickRibbonUntilVisible,
+  clickUntilVisible,
   closeSettings,
   dismissImporterOffer,
   enableDeveloperModeInSettings,
@@ -991,9 +993,10 @@ runner(
       });
 
       // ---- Frame: trash (a soft-deleted note in the Trash panel) ----
-      // notes.e2e.ts nc3: context delete soft-trashes (no confirm); the footer
-      // notes.trash-open opens trash.panel. Use a throwaway so later frames keep
-      // their notes.
+      // notes.e2e.ts nc3: context delete soft-trashes (no confirm); the ribbon's
+      // `trash.open` button opens trash.panel (myne-md/myne#762 replaced the
+      // sidebar footer row with it). Use a throwaway so later frames keep their
+      // notes.
       await frame(
         s,
         "trash",
@@ -1002,8 +1005,7 @@ runner(
         async () => {
           await createNote(s, "Old draft");
           await rowContextAction(s, "Old draft", "delete");
-          await (await s.byTestId("notes.trash-open")).click();
-          await s.byTestId("trash.panel", { timeoutMs: 8000 });
+          await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
           await s.byTestId("trash.restore", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -1014,8 +1016,8 @@ runner(
       });
 
       // ---- Frame: archive (a note kept out of the working set) ----
-      // archive.e2e.ts ar1: context archive removes from the tree; footer
-      // notes.archive-open opens archive.panel. Throwaway note (safe anywhere).
+      // archive.e2e.ts ar1: context archive removes from the tree; the ribbon's
+      // `archive.open` button opens archive.panel. Throwaway note (safe anywhere).
       await frame(
         s,
         "archive",
@@ -1024,8 +1026,7 @@ runner(
         async () => {
           await createNote(s, "Archived draft");
           await rowContextAction(s, "Archived draft", "archive");
-          await (await s.byTestId("notes.archive-open")).click();
-          await s.byTestId("archive.panel", { timeoutMs: 8000 });
+          await clickRibbonUntilVisible(s, "archive.open", "archive.panel");
           await s.byTestId("archive.restore", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -1267,7 +1268,10 @@ runner(
         "editor-and-writing/saved-views",
         "The saved-view builder, where conditions filter and group which notes a view shows.",
         async () => {
-          await (await s.byTestId("views.new-button", { timeoutMs: 8000 })).click();
+          // The + now lives in the flyout header rather than on a sidebar nav
+          // row (myne-md/myne#762), so the flyout has to be open to reach it.
+          await clickRibbonUntilVisible(s, "views.show", "views.flyout");
+          await clickUntilVisible(s, "views.new-button", "view-filter.modal");
           // The "New view" builder dialog IS the saved-views illustration —
           // rendering a saved view would require saving it first. Capture the
           // dialog, then dismiss it below so it never blocks later frames.

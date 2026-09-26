@@ -392,11 +392,25 @@ describe("Command palette action registry", () => {
   });
 
   it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {
-    expect(find("views.show").visibility(makeContext({ stageName: "editor" }))).toBe(
-      "show",
-    );
+    // Also behind the Views feature toggle since myne-md/myne#762, and the
+    // toggle's back-compat default is "on when the vault already has views", so
+    // a vault WITH a saved view is the `show` case. This file runs on the node
+    // environment, where `readViewsEnabledPref` catches the missing
+    // localStorage and answers `null` — exactly the untouched-pref state.
+    expect(
+      find("views.show").visibility(
+        makeContext({
+          stageName: "editor",
+          prefs: { saved_views: [{ id: "v1", name: "V", view_type: "cards", filters: { kind: "all" } }] },
+        }),
+      ),
+    ).toBe("show");
     expect(
       find("views.show").visibility(makeContext({ stageName: "welcome" })),
+    ).toBe("hidden");
+    // Views off (no saved views, pref untouched) → no entry point on the rail.
+    expect(
+      find("views.show").visibility(makeContext({ stageName: "editor" })),
     ).toBe("hidden");
     const onShowViews = vi.fn();
     void find("views.show").run(makeContext({ onShowViews }));

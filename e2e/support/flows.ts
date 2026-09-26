@@ -1131,6 +1131,41 @@ export async function clickUntilTrue(
   }
 }
 
+/**
+ * A left-ribbon button, addressed by the registry command it runs.
+ *
+ * The rail renders every pinned command under one testid
+ * (`editor.ribbon.button`) and distinguishes them by `data-command-id`, so a
+ * scenario cannot reach a specific button through `byTestId` at all. Both
+ * attributes are product markup (`LeftRibbon.tsx`), not test-only hooks.
+ */
+export function ribbonSelector(commandId: string): string {
+  return `[data-testid="editor.ribbon.button"][data-command-id="${commandId}"]`;
+}
+
+/**
+ * Click a ribbon button until the surface it opens is on screen.
+ *
+ * `clickUntilVisible`'s ribbon twin, and it exists because the sidebar footer
+ * entries these scenarios used to click (`notes.trash-open`,
+ * `notes.archive-open`, the Views nav row) are gone \u2014 the rail is the entry
+ * point now (myne-md/myne#762). The re-click discipline is the same and matters
+ * for the same reason: a first click can land before the rail is wired.
+ */
+export async function clickRibbonUntilVisible(
+  session: Session,
+  commandId: string,
+  revealedTestId: string,
+): Promise<void> {
+  await clickUntilTrue(session, ribbonSelector(commandId), {
+    done: async () => (await session.byTestIdAll(revealedTestId)).length > 0,
+    label: `ribbon ${commandId} reveals ${revealedTestId}`,
+    what: "clickRibbonUntilVisible",
+    trigger: `ribbon[${commandId}]`,
+    outcome: `[${revealedTestId}]`,
+  });
+}
+
 /** Open the sidebar's "+" menu and click one of its entries.
  *
  *  #230 folded the separate new-note and new-folder buttons into a single `+`
