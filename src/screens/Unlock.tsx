@@ -83,7 +83,7 @@ import {
   ctaHover,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
-import { AUTH_BODY_STYLE, AUTH_TITLE_STYLE, AuthShell } from "./AuthShell";
+import { AuthHeading, AuthShell } from "./AuthShell";
 import { Button } from "../components/primitives/Button";
 import { InlineSubmitField } from "../components/primitives/InlineSubmitField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
@@ -417,6 +417,13 @@ const BACK_LINK_STYLE: CSSProperties = {
   // Pulled left by its own padding so the label's first letter lines up with
   // the heading beneath it rather than sitting a gutter to its right.
   marginInlineStart: "calc(var(--control-pad-x) * -1)",
+  // And pulled UP, against `VIEW_STYLE`'s section gap. This is not a section:
+  // it is the escape from the question the heading asks, so it belongs against
+  // that heading rather than a full 24px above it, floating between the
+  // wordmark and the title with equal claim on both. The button's own vertical
+  // padding covers most of the distance, so what is left after this is about a
+  // line of air — a lead-in rather than a block.
+  marginBlockEnd: "calc(var(--space-4) * -1)",
 };
 
 const RECOVER_LINK_STYLE: CSSProperties = {
@@ -767,11 +774,10 @@ export function Unlock({
         </Button>
       )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={AUTH_TITLE_STYLE}>{t("unlock.title")}</h1>
       {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
           to "enter your password" (MYND — the primary surface is not a password
           when quick-unlock owns the screen). */}
-      <p style={AUTH_BODY_STYLE}>
+      <AuthHeading title={t("unlock.title")}>
         {t(
           surface === "quick"
             ? quickMethod === "biometric"
@@ -779,7 +785,7 @@ export function Unlock({
               : "unlock.subtitlePin"
             : "unlock.subtitle",
         )}
-      </p>
+      </AuthHeading>
       {/* Quick-unlock (PIN / Touch ID) — the primary surface when the probe
           above says it is redeemable and the user hasn't opted out (MYND-329,
           MYND-558). The password escape hatch sits one click below it:

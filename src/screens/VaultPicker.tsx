@@ -54,7 +54,7 @@ import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
-import { AuthShell } from "./AuthShell";
+import { AuthHeading, AuthShell } from "./AuthShell";
 import { HOVER_TRANSITION } from "../components/primitives/hoverSurface";
 import { IconButton } from "../components/primitives/IconButton";
 import { Spinner } from "../components/Spinner";
@@ -184,16 +184,6 @@ function accountErrorCopy(
 // CenteredCard family (same envelope as the Unlock card) but pinned to the
 // frame's 440px width + 24px section gap, so this is a local card rather
 // than the shared <CenteredCard> (which is 480px / `--space-4` gap).
-
-const HEADING_STYLE: CSSProperties = {
-  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
-  flexShrink: 0,
-  margin: 0,
-  fontSize: "var(--text-2xl)",
-  lineHeight: "var(--leading-snug)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  color: "var(--ink-0)",
-};
 
 const SUBLINE_STYLE: CSSProperties = {
   // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
@@ -386,9 +376,19 @@ const CHEVRON_STYLE: CSSProperties = {
 function PickerCard({
   children,
   actions,
+  subline,
 }: {
-  children: ReactNode;
+  /** The body under the heading. Optional: the empty state is its heading and
+   *  its subline and nothing else — a list of nothing is not a list. */
+  children?: ReactNode;
   actions?: ReactNode;
+  /** The line under "Choose a vault". Rendered INSIDE the heading group so it
+   *  sits against the title it explains rather than a section-gap away from
+   *  it — it was a sibling of the list, which put it as far from the heading
+   *  as the whole list was from both. Three callers, three different lines:
+   *  the roster's subline, the empty state's, and the loading state, which
+   *  passes none because a spinner is not a description. */
+  subline?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -401,7 +401,7 @@ function PickerCard({
       enter="back"
       actions={actions}
     >
-      <h1 style={HEADING_STYLE}>{t("vaultPicker.heading")}</h1>
+      <AuthHeading title={t("vaultPicker.heading")}>{subline}</AuthHeading>
       {children}
     </AuthShell>
   );
@@ -653,6 +653,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
     // the create path so the user is never stranded.
     return (
       <PickerCard
+        subline={t("vaultPicker.noneLoaded")}
         actions={
           <CreateAnother
             onClick={onCreateAnother}
@@ -660,9 +661,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
             onJoinDevice={onJoinDevice}
           />
         }
-      >
-        <p style={SUBLINE_STYLE}>{t("vaultPicker.noneLoaded")}</p>
-      </PickerCard>
+      />
     );
   }
 
@@ -762,6 +761,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
 
   return (
     <PickerCard
+      subline={t("vaultPicker.subline")}
       actions={
         <CreateAnother
           onClick={onCreateAnother}
@@ -770,7 +770,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
         />
       }
     >
-      <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
       {accountsError !== null && (
         <p
           role="alert"

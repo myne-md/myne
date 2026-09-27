@@ -114,4 +114,28 @@ describe("the way back sits with the question it answers", () => {
     );
     void container;
   });
+
+  it("sits against the heading rather than a full section above it", async () => {
+    // The content column's `gap` is the distance between SECTIONS, and the
+    // back control is not one: it is the escape from the question the heading
+    // asks. At the full gap it floated midway between the wordmark and the
+    // title with equal claim on both, and the screen read as three evenly
+    // spaced strangers.
+    renderWithTwoVaults();
+    const back = await screen.findByTestId("unlock.back-to-picker");
+    const pull = back.style.marginBlockEnd;
+    expect(pull, "the back control takes the whole section gap").toBeTruthy();
+    // Negative, i.e. it pulls UP against that gap. A positive margin here adds
+    // to the distance, which is the defect wearing the fix's clothes.
+    expect(pull.includes("-1") || pull.trimStart().startsWith("-"), pull).toBe(true);
+
+    // And the heading's own pair is tighter still, so the three distances on
+    // this screen are unequal by construction: lead-in, title+subtitle, form.
+    const heading = screen.getByRole("heading", { level: 1 });
+    const group = heading.parentElement as HTMLElement;
+    expect(group.style.gap, "the title and its subtitle are a section apart").toBe(
+      "var(--space-1)",
+    );
+    expect(group.querySelector("p"), "the subtitle is outside the group").not.toBeNull();
+  });
 });

@@ -111,7 +111,20 @@ describe("VaultPicker at a vault count that overflows the window", () => {
     const actions = header.lastElementChild as HTMLElement;
     expect(actions.contains(screen.getByTestId("picker.create-cta"))).toBe(true);
     expect(actions.style.flexShrink).toBe("0");
-    expect(screen.getByRole("heading").style.flexShrink).toBe("0");
+    // The heading's GROUP, not the `<h1>`. The title and its subtitle are one
+    // block now (they were two siblings a section-gap apart), so the group is
+    // the flex item the column sizes — `flex-shrink` on a child of it means
+    // nothing, which is the same trap the Tooltip wrapper sprang one screen
+    // over. The `<h1>` is asserted to be inside it, or "the group does not
+    // shrink" would be true of a group that no longer holds the heading.
+    const heading = screen.getByRole("heading");
+    const group = heading.parentElement as HTMLElement;
+    expect(group.style.flexDirection, "the heading is not in a group").toBe("column");
+    expect(group.style.flexShrink).toBe("0");
+    // And the pair really is tighter than the section gap it used to sit in.
+    const subline = group.querySelector("p");
+    expect(subline, "the subtitle left the group").not.toBeNull();
+    expect(group.style.gap).toBe("var(--space-1)");
   });
 });
 
