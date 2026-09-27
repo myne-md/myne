@@ -1575,28 +1575,21 @@
   box-sizing: border-box;
 }
 
-/* The pane's top row: the narrow arm's rail toggle and the live run's
-   indicator, and nothing else since the heading went.
+/* The pane's top row holds ONE thing now: the narrow arm's rail toggle.
 
-   **Hidden when it holds neither**, which at wide widths with no run in
-   flight is the ordinary case. The alternative is a row that is empty and
-   still a flex item, so it still takes the parent's `gap` — a reserved band
-   of blank pane whose height is explained by nothing on screen. It cannot be
-   decided in the component: whether the toggle counts is a container-width
-   question, and React does not know the container's width. */
+   The heading went first ("Agent" under a tab that says Agent), then the run
+   indicator, which moved to the word it modifies — the transcript's own
+   "Working" line — and to the tab. So at wide widths this row has nothing in
+   it at all, and an empty flex item still takes the parent's `gap`: a
+   reserved band of blank pane whose height is explained by nothing on screen.
+   Hidden here, restored in the narrow arm below.
+
+   It cannot be decided in the component: whether the toggle counts is a
+   container-width question, and React does not know the container's width.
+   That is also what makes this simpler than it was — the row's visibility
+   used to depend on a live run as well, which is a second, unrelated reason
+   for the pane to shift under the user mid-run. */
 .myne-agent__header { display: none; }
-
-/* Two arms and no `:has()`. A `:has()` arm would have read better — "show the
-   row when it has a visible child" — and an engine that does not support it
-   drops the WHOLE selector list, taking the run indicator's arm with it. */
-.myne-agent[data-agent-running="true"] .myne-agent__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
 
 .myne-agent__body {
   flex: 1;

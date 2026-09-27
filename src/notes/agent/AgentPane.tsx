@@ -21,7 +21,7 @@
 // workspace (`setAgentViewState`), so a rail row, a palette verb and the
 // panel's exit all take the same path.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PaneId } from "../workspaceState";
@@ -31,7 +31,6 @@ import { useWorkspace } from "../workspaceContext";
 import { AgentHubList } from "./AgentHubList";
 import { AgentConversationView } from "./AgentConversationView";
 import { Button } from "../../components/primitives/Button";
-import { AgentRunOrb } from "./AgentRunOrb";
 import { useAgent } from "./agentStore";
 import { startNewConversation } from "../ai/startNewConversation";
 
@@ -42,16 +41,14 @@ import { startNewConversation } from "../ai/startNewConversation";
    narrow arm — and an inline style cannot be conditioned on a container width.
    The inset moved with it so the pane's box is described in one place. */
 
-/** The orb plus the word it means. They are one object, so they sit in one
- *  box: an indicator that can drift away from its own label is an indicator
- *  that can end up beside somebody else's. */
-const RUN_LABEL_STYLE: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-2)",
-};
+/* **The run indicator is NOT here any more.** It was: this row carried the
+   orb and the word "Working" while a run was in flight. Two things were wrong
+   with that and the second is the one that matters. It made the row appear and
+   disappear, so the whole pane shifted down when a run started; and it is a
+   peripheral place, at the top of a surface whose centre already says
+   "Working" on the turn itself. The orb now sits beside THAT word
+   (`ConversationSurface`) and in the tab, for a run you have walked away
+   from (`AgentTabIcon`). `ORB_ANIMATING_BUDGET` is 2 and those are the two. */
 
 export interface AgentPaneProps {
   /** The leaf pane this tab lives in, so a view change is written to the right
@@ -212,19 +209,6 @@ export function AgentPane({
         >
           {railOpen ? t("agent.focus.title") : t("agent.hub.historyLabel")}
         </Button>
-        {/* The run indicator: present only while a run is active, and it stops
-            when the run stops (myne-md/myne#771, the named motion-canon
-            exemption). Decorative and `aria-hidden` — which is only honest
-            while the meaning is stated in WORDS beside it, so the label is part
-            of the exemption rather than a caption on it. Without it the one
-            thing reporting a multi-minute wait would be a 14px shape no screen
-            reader ever reaches. */}
-        {running ? (
-          <span style={RUN_LABEL_STYLE} data-testid="agent.run-label">
-            <AgentRunOrb />
-            {t("agent.progress.working")}
-          </span>
-        ) : null}
       </div>
 
       <div className="myne-agent__body">
