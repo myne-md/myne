@@ -143,6 +143,10 @@ const V = {
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
   ],
+  "src/components/settings/RecoveryDrillRow.tsx": [
+    "ported",
+    "The recovery drill (myne-md/myne#468), and it renders unchanged on web because the web client HAS phrase recovery: `plugin:vault-recover|verify_recovery_phrase` is on the wasm dispatcher's DISPATCHED roster beside `recover_with_phrase`, so the row works rather than sitting there reporting an error. No capability gate for the same reason, and no `developer_mode` gate because a first-time user is exactly who it is for.",
+  ],
   "src/components/settings/ReminderSettings.tsx": [
     "adapted",
     "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",

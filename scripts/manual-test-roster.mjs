@@ -6499,6 +6499,12 @@ export const ROSTER = Object.freeze([
       "src/screens/VaultRecover.tsx",
       "src/lib/vault-recover.ts",
       "src/lib/bip39-normalize.ts",
+      // The Settings-side phrase CHECK (myne-md/myne#468): same crypto, same
+      // non-distinguishing failure, opposite precondition — it runs on an
+      // unlocked vault. Claimed by this entry rather than by a new one because
+      // what a human verifies about it is the same keyboard hazard the item
+      // below already describes.
+      "src/components/settings/RecoveryDrillRow.tsx",
       "src-tauri/src/plugins/vault_recover/",
       "core/src/plugins/vault_recover/",
     ],
@@ -6506,12 +6512,13 @@ export const ROSTER = Object.freeze([
     automatedBy: [
       "e2e/vault-recovery.e2e.ts",
       "e2e/recovery-drill.e2e.ts",
+      "e2e/recovery-phrase-check.e2e.ts",
       "e2e/keyboard-nav-onboarding.e2e.ts",
       "e2e/change-password.e2e.ts",
     ],
     manual: [
       {
-        see: "With the OS set to a non-English keyboard and macOS \"Correct spelling automatically\" plus \"Use smart quotes\" left ON, type a real 24-word phrase into the grid one cell at a time. Confirm no word is silently rewritten or capitalised by the OS, and that Submit reaches the password-reset step rather than reporting a wrong phrase.",
+        see: "With the OS set to a non-English keyboard and macOS \"Correct spelling automatically\" plus \"Use smart quotes\" left ON, type a real 24-word phrase into the grid one cell at a time. Confirm no word is silently rewritten or capitalised by the OS, and that Submit reaches the password-reset step rather than reporting a wrong phrase. Then repeat the same typing into Settings, Privacy, \"Check your recovery phrase\" on an unlocked vault, and confirm it reports the phrase as VALID: that field takes the whole phrase as one string rather than 24 cells, so a smart-quote or an autocorrected word lands differently there, and a false negative from the CHECK is worse than one from recovery — it tells a user with a good phrase that their backup is broken.",
         whyNotAutomated: "Every keystroke in the suite arrives through the W3C Actions API, which bypasses the OS keyboard layout and produces no OS autocorrect or text-substitution event; a phrase mangled by the OS is byte-identically indistinguishable from a wrong phrase by design, so the failure surfaces only as a user permanently locked out.",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 8,

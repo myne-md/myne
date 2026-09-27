@@ -318,6 +318,11 @@ pub const DISPATCHED: &[&str] = &[
     // chained password reset.
     "plugin:vault-recover|recover_with_phrase",
     "plugin:vault-recover|complete_recovery",
+    // The recovery DRILL (myne-md/myne#468). Dispatched for the same reason the
+    // two above are, and it is strictly less: read-only, no slot transition, no
+    // write. The Settings row that calls it renders on every client, so leaving
+    // it Pending would have the browser answer "couldn't run the check" forever.
+    "plugin:vault-recover|verify_recovery_phrase",
     // The two halves of the pending-approval wait (MYND-635), which the web
     // entry screen has always called and this roster has never carried.
     //

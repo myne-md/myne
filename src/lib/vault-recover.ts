@@ -90,3 +90,35 @@ export async function completeRecovery(
     newPassword,
   });
 }
+
+/**
+ * The recovery DRILL: does this phrase still open the vault that is open now?
+ *
+ * Read-only. The backend derives `recovery_wrap_key`, attempts the AEAD-open of
+ * `enc_root_key_recovery`, discards whatever it gets, and answers. It does NOT
+ * start a recovery — no `Slot::Recovering`, no password reset demanded of a user
+ * who was only checking — and it writes nothing.
+ *
+ * `false` is an ANSWER, not an error, and it is deliberately one answer for
+ * three cases: a wrong phrase, ANOTHER vault's phrase, and structurally invalid
+ * input all return `false`. That falls out of the crypto rather than being
+ * imposed, since the tag being checked belongs to THIS vault's recovery section.
+ * The caller must not narrow it either — naming a mismatched position would let
+ * a wrong phrase be corrected one word at a time.
+ *
+ * Rejects (rather than resolving `false`) when the vault is locked
+ * (`SlotNotUnlocked`), when another auth operation holds the shared
+ * `auth_permits` budget (`RecoveryInProgress`), or when `vault.meta` cannot be
+ * read or parsed (`IoError` / `InvalidVaultMeta`). That last distinction is the
+ * point of not collapsing everything into a boolean: "your phrase is wrong" is a
+ * false statement about a corrupt vault file, and would send a user looking for
+ * a phrase that is fine.
+ *
+ * Costs one full Argon2id derivation at production parameters, so the caller
+ * owns a pending state for the duration.
+ */
+export async function verifyRecoveryPhrase(phrase: string): Promise<boolean> {
+  return await invoke<boolean>("plugin:vault-recover|verify_recovery_phrase", {
+    phrase,
+  });
+}

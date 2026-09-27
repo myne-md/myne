@@ -1856,6 +1856,46 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // The recovery DRILL (myne-md/myne#468). Dispatched rather than left
+        // `Pending`, because the web client HAS phrase recovery — the arm above
+        // is the proof — so a web user holds a phrase and must be able to check
+        // it. Refusing here would render the Settings row on every client and
+        // have it answer "couldn't run the check" on one of them forever.
+        //
+        // Nothing needs porting: it reuses `derive_root_key_from_phrase`, the
+        // same function the arm above calls, reads through the same IO seam, and
+        // runs the KDF through `task::run_blocking`, whose wasm arm is what makes
+        // the arm above work at all. It writes nothing and touches no slot, so it
+        // is strictly less than that arm already does.
+        "plugin:vault-recover|verify_recovery_phrase" => {
+            use myne_core::plugins::vault_recover::commands::verify_recovery_phrase_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                phrase: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match verify_recovery_phrase_from_host(
+                a.phrase,
+                crate::session::state(),
+                host_ctx(),
+                vault_io(),
+            )
+            .await
+            {
+                Ok(verified) => Outcome::ok(&verified),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // The mandatory chained step (`recovery-flow.md` §4.1). Not optional and
         // not skippable: a recovered vault whose password was never reset would
         // leave the user with no way in next time, which is the trap the spec
