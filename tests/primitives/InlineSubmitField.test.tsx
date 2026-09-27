@@ -77,19 +77,28 @@ describe("the wait is reported without a label to report it in", () => {
     expect((screen.getByTestId("field.input") as HTMLInputElement).disabled).toBe(true);
   });
 
-  it("marks the sweep state-carrying so reduced motion slows it, not stops it", () => {
-    // MYND-630. A frozen progress indicator on the unlock screen reads as the
-    // app having died mid-attempt, which is the one reading it must never have.
+  it("reports the wait ONCE, in the button, and claims no motion exemption", () => {
+    // The rule used to sweep under the field while Argon2id ran, carrying
+    // `data-motion="essential"` so reduced motion slowed it rather than
+    // freezing it. Every condition the canon asks was met; what it never had
+    // was a job, because the submit already becomes the app's shared spinner
+    // for the same wait, on the control the user just pressed
+    // (`design-notes/ui/0626`).
     const { container } = render(<Field value="hunter2" busy />);
     const row = container.querySelector(".myne-inline-field") as HTMLElement;
+    // `data-busy` stays: the field reads it to lock itself and to drop the
+    // resting rule's focus treatment. It is a state flag, not an animation.
     expect(row.getAttribute("data-busy")).toBe("true");
-    expect(row.getAttribute("data-motion")).toBe("essential");
+    // The exemption does not. Nothing on this row carries state through motion
+    // now, so an exemption here would be an exemption for nothing.
+    expect(row.getAttribute("data-motion")).toBeNull();
+    // And the one indicator is really there — "no sweep" must not be satisfied
+    // by a field that reports the wait nowhere at all.
+    const submit = container.querySelector(".myne-inline-field__submit") as HTMLElement;
+    expect(submit.querySelector("svg, [class*=spinner], [style*=border]")).not.toBeNull();
   });
 
   it("carries neither attribute at rest", () => {
-    // The sweep is not idle decoration: at rest there is nothing in flight to
-    // report, and a row permanently marked essential would exempt a still
-    // element from the reduced-motion rule for no reason.
     const { container } = render(<Field value="hunter2" />);
     const row = container.querySelector(".myne-inline-field") as HTMLElement;
     expect(row.getAttribute("data-busy")).toBeNull();

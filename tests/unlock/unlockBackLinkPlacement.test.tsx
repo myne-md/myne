@@ -188,41 +188,26 @@ describe("the way back sits with the question it answers", () => {
     expect(below!.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("carries the brand field behind it, with the scrim that makes it legible", async () => {
-    // The field is what ties these screens to the rest of the app — every zero
-    // state in the product carries it (`design-notes/ui/0625`). Three rounds
-    // of adjusting the spacing inside the column never touched the complaint,
-    // because the problem was the page around the column.
+  it("carries NO brand field: privacy is the default, not the topic", () => {
+    // The `01` field went behind these screens for one commit
+    // (`design-notes/ui/0625`) and was withdrawn the same day by `0626`. A
+    // vault-unlock screen is the one moment the user is being asked for a
+    // credential, and a field of ones and zeroes behind a password box is
+    // "encryption as theme" arriving as texture instead of as a padlock —
+    // which `PRODUCT.md`'s anti-references refuse by name.
     const { container } = renderWithTwoVaults();
-    await screen.findByTestId("unlock.back-to-picker");
     const main = container.querySelector("main") as HTMLElement;
-    const field = main.querySelector("canvas.myne-auth__field");
-    expect(field, "no brand field on the auth shell").not.toBeNull();
-    // Decoration, and it has to say so: every word the user needs is in the
-    // column, and a canvas announced to a screen reader is a canvas claiming
-    // to mean something.
-    expect(field!.getAttribute("aria-hidden")).toBe("true");
-    // The region clips it and is its containing block, or the digits run up
-    // under the wordmark.
-    expect(main.style.position).toBe("relative");
-    expect(main.style.overflow).toBe("hidden");
-
-    // The scrim is part of the decision rather than an implementation detail:
-    // without it the digits run through a password placeholder, on the one
-    // screen where the user cannot see what they typed. Read from the sheet,
-    // because jsdom applies no stylesheet and resolves no `::before`.
+    expect(main.querySelector("canvas"), "the brand field is back").toBeNull();
+    // And the region does not still carry the clipping it needed for one.
+    expect(main.style.overflow).not.toBe("hidden");
     const css = readFileSync(
       resolve(process.cwd(), "client-core/src/components.css"),
       "utf8",
     );
-    const at = css.indexOf(".myne-auth-view::before {");
-    expect(at, "the field ships without its scrim").toBeGreaterThan(-1);
-    const block = css.slice(at, css.indexOf("\n}", at));
-    expect(block).toContain("radial-gradient");
-    // `--paper`, not `--paper-2`: the auth shell has no card fill, so a
-    // card-coloured scrim paints a visible cloud instead of a fade.
-    expect(block, block).toMatch(/var\(--paper\)/);
-    expect(block, block).not.toMatch(/var\(--paper-2\)/);
+    expect(css, "the field's rules outlived the field").not.toContain(
+      ".myne-auth__field",
+    );
+    expect(css, "the scrim outlived the field").not.toContain(".myne-auth-view::before");
   });
 
   it("offers the alternatives as one row, with destruction below a rule", async () => {

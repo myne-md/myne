@@ -84,16 +84,6 @@ const INFINITE_ALLOWLIST = new Map([
     "The transcription busy meter. Same class as the two above; it animates " +
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",
   ],
-  [
-    "myne-inline-field-sweep",
-    "The unlock field's in-flight rule (myne-md/myne#773). Argon2id runs for seconds " +
-      "on the pre-unlock screen, and this is the only thing on a deboxed row that can " +
-      "say so now the CTA is an icon rather than a button with a spinner in it. " +
-      "Indeterminate progress: it starts on submit and stops when the attempt " +
-      "resolves, either into the editor or into an error banner. Carries " +
-      "data-motion=\"essential\", because a frozen sweep on a screen the user is " +
-      "waiting on reads as a hang, which is the one reading it must never have.",
-  ],
 ]);
 
 /**

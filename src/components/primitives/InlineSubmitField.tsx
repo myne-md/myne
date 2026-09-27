@@ -16,13 +16,13 @@
 // cannot see what they typed, so a moving layout is the only feedback they get
 // and it is the wrong feedback.
 //
-// ── The rule carries the wait ──────────────────────────────────────────────
-// Argon2id runs for seconds here. The old CTA said so with a spinner beside its
-// label; an icon button has no label to sit beside, so the rule takes the job
-// and runs an indeterminate sweep. That sweep is a named exemption in
-// `scripts/check-motion-canon.mjs` and carries `data-motion="essential"`, which
-// is MYND-630's rule: reduced motion SLOWS state-carrying motion rather than
-// freezing it, because a stopped progress indicator reads as a crash.
+// ── The wait is the button's, and only the button's ────────────────────────
+// Argon2id runs for seconds here, and for one round the rule carried that with
+// an indeterminate sweep travelling under the field. It is gone
+// (`design-notes/ui/0626`): the submit already turns into the app's shared
+// spinner, on the control the user just pressed, which is where their
+// attention is. Two indicators for one wait is one too many, and a bar
+// crossing the field read as a page loading rather than as a key turning.
 
 import {
   useId,
@@ -80,10 +80,6 @@ export function InlineSubmitField({
         className="myne-inline-field"
         data-focused={focused ? "true" : undefined}
         data-busy={busy ? "true" : undefined}
-        // State-carrying, so reduced motion slows the sweep rather than
-        // stopping it (MYND-630). On the one screen where a stalled indicator
-        // would read as the app having died mid-unlock.
-        data-motion={busy ? "essential" : undefined}
       >
         <span className="myne-inline-field__well">
           <input

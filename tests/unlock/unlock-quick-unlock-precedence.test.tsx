@@ -187,11 +187,11 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     // going quiet.
     //
     // WHERE it says so moved with the deboxed row (myne-md/myne#773): the
-    // submit is an icon button now, so there is no label for a spinner to sit
-    // beside, and the report is the button's accessible NAME plus the field's
-    // sweeping rule. That makes the accessible name load-bearing rather than
-    // decorative — it is the only channel a screen-reader user has on a screen
-    // whose normal case is several seconds of nothing happening.
+    // submit is an icon button, so the report is the button's accessible NAME
+    // plus the spinner that replaces its arrow. That makes the accessible name
+    // load-bearing rather than decorative — it is the only channel a
+    // screen-reader user has on a screen whose normal case is several seconds
+    // of nothing happening.
     let releaseRedeem: () => void = () => {};
     invokeMock.mockImplementation((cmd) => {
       if (cmd === STATUS_CMD) {
@@ -214,12 +214,19 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
 
     await waitFor(() => expect(submit.getAttribute("aria-label")).toBe("Decrypting…"));
     expect((submit as HTMLButtonElement).disabled).toBe(true);
-    // The rule sweeps, and it is marked state-carrying so reduced motion slows
-    // it rather than freezing it — a stopped progress indicator on THIS screen
-    // reads as the app having died mid-unlock (MYND-630).
+    // The row still says it is busy — the field reads that to lock itself and
+    // to drop the resting rule's focus treatment.
     const row = submit.parentElement as HTMLElement;
     expect(row.getAttribute("data-busy")).toBe("true");
-    expect(row.getAttribute("data-motion")).toBe("essential");
+    // And there is exactly ONE indicator for the wait, in the button. The rule
+    // used to sweep as well (`design-notes/ui/0626` withdrew it): two
+    // indicators for one wait, and the one that went read as a page loading
+    // rather than as a key turning. `data-motion` went with it — nothing on
+    // this row carries state through motion any more, so a reduced-motion
+    // exemption here would be an exemption for nothing.
+    expect(row.getAttribute("data-motion")).toBe(null);
+    expect(submit.querySelector(".myne-spinner, [class*=spinner]") ?? submit.firstElementChild)
+      .not.toBeNull();
     // The field is locked too, so a second PIN cannot race the in-flight derive.
     expect((screen.getByTestId("unlock.quick-pin-input") as HTMLInputElement).disabled).toBe(
       true,
