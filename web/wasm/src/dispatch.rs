@@ -4111,28 +4111,14 @@ mod tests {
 
     /// Block on a future without a runtime.
     ///
-    /// The router's arms are `async` but none of them awaits anything that can
-    /// pend — they are `async` because the ported commands will be. A hand-rolled
-    /// poll is enough and avoids pulling a test-only executor into the crate.
-    fn block_on<F: std::future::Future>(mut fut: F) -> F::Output {
-        use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-        // A waker that does nothing: correct only because nothing here pends.
-        // If a future ever returns `Pending`, this panics rather than hanging —
-        // a loud failure beats a test that never finishes.
-        const VTABLE: RawWakerVTable = RawWakerVTable::new(
-            |_| RawWaker::new(std::ptr::null(), &VTABLE),
-            |_| {},
-            |_| {},
-            |_| {},
-        );
-        let waker = unsafe { Waker::from_raw(RawWaker::new(std::ptr::null(), &VTABLE)) };
-        let mut cx = Context::from_waker(&waker);
-        // SAFETY: `fut` is owned by this frame and never moved after pinning.
-        let mut fut = unsafe { std::pin::Pin::new_unchecked(&mut fut) };
-        match fut.as_mut().poll(&mut cx) {
-            Poll::Ready(v) => v,
-            Poll::Pending => panic!("dispatch future pended; the router has no pending arms yet"),
-        }
+    /// The router's arms are `async` but none of them is meant to await
+    /// anything that suspends — they are `async` because the ported commands
+    /// will be. Shared with the sync-loop tests, and it re-polls rather than
+    /// panicking on the first `Pending`: the arms read the same process-wide
+    /// slot `RwLock` this module's own `vault_lock` arm writes, so a parallel
+    /// test can make a reader pend briefly. See `crate::test_support`.
+    fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+        crate::test_support::block_on(fut, "dispatch")
     }
 
     #[test]
