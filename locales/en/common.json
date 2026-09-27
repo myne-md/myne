@@ -1165,6 +1165,8 @@
       "rightPanel": {
         "aiChat": {
           "agentTurn": {
+            "honestyExpand": "Show the full note",
+            "honestyCollapse": "Shorten the note",
             "noAnswer": "The agent stopped without an answer. Try asking again, or rephrase it.",
             "newNotes_one": "{{count}} new note.",
             "newNotes_other": "{{count}} new notes.",

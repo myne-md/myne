@@ -44,7 +44,8 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
-import { Segmented } from "../../components/primitives/Segmented";
+import { Select, type SelectOption } from "../../components/primitives/Select";
+import { Spinner } from "../../components/Spinner";
 import {
   agentCancel,
   agentCapability,
@@ -112,7 +113,6 @@ export function ChatComposer({
   const { t, i18n } = useTranslation();
   // Whether the scope picker is expanded. Collapsed by default: the scope shows
   // as text with a control to change it, so the ordinary run reads as one line.
-  const [pickerOpen, setPickerOpen] = useState(false);
   // The permission mode lives in the run store rather than here: it is
   // session-scoped and has to be dropped by the same lock teardown that drops
   // the run, which a component's own state cannot be.
@@ -222,11 +222,13 @@ export function ChatComposer({
   // every streamed token.
   const scopeSelected = useMemo(() => [attached ?? ""], [attached]);
 
-  // `Segmented` measures its thumb in a layout effect keyed on `options`, so a
-  // literal forces a synchronous layout read AND a second commit on every
-  // render. During streaming that is once per token, to move a thumb that has
-  // not moved.
-  const permissionOptions = useMemo(
+  // Memoized for the same reason every options list on this surface is: the
+  // transcript re-renders once per streamed token, and a fresh array identity
+  // per render is a fresh identity handed to every consumer downstream. (It was
+  // `Segmented`'s layout-effect thumb measurement that made it load-bearing
+  // rather than tidy; the control is a `<Select>` now and the habit is still
+  // right.)
+  const permissionOptions: readonly SelectOption<"ask" | "auto">[] = useMemo(
     () => [
       { value: "ask", label: t("agent.composer.permissionAsk") },
       { value: "auto", label: t("agent.composer.permissionAuto") },
@@ -343,93 +345,89 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      {/* The user-originated scope control, and the size it resolves to.
-          Unconditional: this used to be Edit-mode only, because Ask grounded on
-          the whole vault index and had nothing for the user to grant, and
-          `docs/decisions/ai/0524` then gave the tab ONE mode. Every message is a
-          run now, so every message has a scope and the control belongs on screen
-          for all of them. The comment is corrected rather than deleted because
-          the Edit-mode wording outlived the modes by long enough for
-          `agent-run.e2e.ts` to keep driving a control that no longer existed
-          (myne-md/myne#596). */}
-      <div style={ROW_STYLE}>
-          <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
-          {/* **The picker is one step back, and the scope is not** (issue A).
-              The common run is the open note, and reading a dropdown before
-              typing is friction for a choice almost nobody changes. What may
-              NOT move is the control itself or the count beside it:
-              `docs/decisions/ai/0518` point 1 requires a user-originated scope
-              control on the composer, because removing it routes every
-              folder-scale run through the model-originated expansion instead,
-              which is the injection-reachable path. So this changes prominence
-              and nothing else, and the count below still renders whenever a
-              folder is attached. */}
-          {pickerOpen ? (
-            <SearchableSelect
-              testId="ai.composer-scope"
-              aria-label={t("agent.composer.scopeLabel")}
-              options={scopeOptions}
-              selected={scopeSelected}
-              onChange={(next) => {
-                setAttached(next[0] ? next[0] : null);
-                setPickerOpen(false);
-              }}
-            />
-          ) : (
-            <>
-              <span data-testid="ai.composer-scope-current" style={CAPTION_STYLE}>
-                {attached ?? t("agent.composer.scopeOpenNote")}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                data-testid="ai.composer-scope-change"
-                onClick={() => setPickerOpen(true)}
-              >
-                {t("agent.composer.scopeChange")}
-              </Button>
-            </>
-          )}
-          {/* **A failed preview says so rather than showing nothing.** An
-              absent count reads as "no folder attached", and the count before
-              sending is part of the mitigation `docs/decisions/ai/0515` names,
-              not a nicety. The expansion dialog already distinguishes "could
-              not find out" from "zero" for the same reason. */}
-          {preview === "failed" ? (
-            <span data-testid="ai.composer-scope-unavailable" style={CAPTION_STYLE}>
-              {t("agent.composer.scopeCountUnavailable")}
-            </span>
-          ) : null}
-          {attached !== null && preview !== null && preview !== "failed" ? (
-            <>
-              <span data-testid="ai.composer-scope-count" style={CAPTION_STYLE}>
-                {t("agent.composer.scopeCount", { count: preview.noteCount })}
-              </span>
-              {preview.excludedCount > 0 ? (
-                <span data-testid="ai.composer-scope-excluded" style={CAPTION_STYLE}>
-                  {t("agent.scope.excluded", { count: preview.excludedCount })}
-                </span>
-              ) : null}
-            </>
-          ) : null}
-      </div>
+      {/* **One control row** (myne-md/myne#771). The scope and the permission
+          mode were two full-width rows — a caption, a value and a Change button
+          on one; a segmented control spanning the panel on the other — which in
+          a 280px side panel is a quarter of the surface spent on two choices
+          almost nobody changes per message.
 
-      {/* **The permission control** (myne-md/myne#551). Unconditional, for the
-          reason the scope row above states: this used to be Edit-mode only
-          because Ask proposed nothing and had nothing to decide, and
-          `docs/decisions/ai/0524` then gave the tab ONE mode. What the
-          automatic side is bounded by is stated where it is enforced
-          (`autoApplyRun`), not here. The summary is that it stays inside the
-          scope the user approved and that a removal still needs its own act,
-          because the host refuses one inside a bulk approval whatever the
-          caller sends. */}
-      <Segmented
-        testId="ai.composer-permission"
-        ariaLabel={t("agent.composer.permissionLabel")}
-        value={agent.autoApply ? "auto" : "ask"}
-        onChange={(v) => setAutoApply(v === "auto")}
-        options={permissionOptions}
-      />
+          The scope control itself may NOT be removed, and this does not remove
+          it: `docs/decisions/ai/0518` point 1 requires a user-originated scope
+          control on the composer, because taking it away routes every
+          folder-scale run through the model-originated expansion instead, which
+          is the injection-reachable path. What changes is that it costs one row
+          instead of two, and one click instead of two. */}
+      <div style={ROW_STYLE}>
+        {/* **The picker is the control, not a disclosure over one.** It used to
+            render a caption plus a Change button, and pressing Change REPLACED
+            them with this same `SearchableSelect` — whose trigger you then
+            pressed to open the menu. Two clicks and a layout shift to reach a
+            control that already is a disclosure, in service of an argument
+            ("reading a dropdown before typing is friction") that the two-step
+            version cost more of than the dropdown ever did. */}
+        <SearchableSelect
+          testId="ai.composer-scope"
+          aria-label={t("agent.composer.scopeLabel")}
+          options={scopeOptions}
+          selected={scopeSelected}
+          placeholder={t("agent.composer.scopeOpenNote")}
+          onChange={(next) => setAttached(next[0] ? next[0] : null)}
+        />
+
+        {/* **The permission mode is a dropdown, not a segmented control**
+            (myne-md/myne#771). A segment is for a choice you flip often enough
+            that both options should be one click away; this one is set once and
+            left, and it was spending a full panel-width row saying so. What the
+            automatic side is bounded by is stated where it is enforced
+            (`autoApplyRun`), not here: it stays inside the scope the user
+            approved, and a removal still needs its own act because the host
+            refuses one inside a bulk approval whatever the caller sends. */}
+        <Select
+          testId="ai.composer-permission"
+          aria-label={t("agent.composer.permissionLabel")}
+          value={agent.autoApply ? "auto" : "ask"}
+          onChange={(v: "ask" | "auto") => setAutoApply(v === "auto")}
+          options={permissionOptions}
+        />
+
+        {/* **A failed preview says so rather than showing nothing.** An absent
+            count reads as "no folder attached", and the count before sending is
+            part of the mitigation `docs/decisions/ai/0515` names, not a nicety.
+            The expansion dialog already distinguishes "could not find out" from
+            "zero" for the same reason. */}
+        {preview === "failed" ? (
+          <span data-testid="ai.composer-scope-unavailable" style={CAPTION_STYLE}>
+            {t("agent.composer.scopeCountUnavailable")}
+          </span>
+        ) : null}
+        {attached !== null && preview !== null && preview !== "failed" ? (
+          <>
+            <span data-testid="ai.composer-scope-count" style={CAPTION_STYLE}>
+              {t("agent.composer.scopeCount", { count: preview.noteCount })}
+            </span>
+            {preview.excludedCount > 0 ? (
+              <span data-testid="ai.composer-scope-excluded" style={CAPTION_STYLE}>
+                {t("agent.scope.excluded", { count: preview.excludedCount })}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+
+        {/* The probe's progress, here rather than inside the Send button.
+            The button's label grew to "Checking the model… (2/3)", which in a
+            flex row with a `flex: 1` textarea meant the input collapsed to
+            three characters wide mid-keystroke — the user's own text squeezed
+            out of the way by a status about the model. A caption in a row that
+            already exists costs nothing and moves nothing. */}
+        {probing && probeAt !== null ? (
+          <span data-testid="ai.composer-probe-at" style={CAPTION_STYLE}>
+            {t("agent.composer.checkingAt", {
+              attempt: probeAt.attempt,
+              of: probeAt.of,
+            })}
+          </span>
+        ) : null}
+      </div>
 
       <form
         onSubmit={(e) => {
@@ -483,18 +481,14 @@ export function ChatComposer({
             data-testid="ai.composer-send"
             disabled={blocked}
           >
-            {probing
-              ? // **The count, once the host has reported one.** The plain label
-                // is still what the first frames show, because the first attempt
-                // has not been announced yet at the moment Send is pressed, and a
-                // "0 of 3" would be a number describing nothing.
-                probeAt === null
-                ? t("agent.composer.checking")
-                : t("agent.composer.checkingAt", {
-                    attempt: probeAt.attempt,
-                    of: probeAt.of,
-                  })
-              : t("editor.chrome.rightPanel.aiChat.send")}
+            {/* The label does NOT change with the probe. It did, and the label
+                it changed to was long enough to collapse the textarea beside
+                it: a button that resizes while you are typing into the control
+                it is stealing width from. The spinner says work is in flight,
+                the count is in the row above, and the button stays the size it
+                was. */}
+            {probing ? <Spinner size={14} style={{ borderWidth: 2 }} /> : null}
+            {t("editor.chrome.rightPanel.aiChat.send")}
           </Button>
         )}
       </form>

@@ -78,6 +78,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+import { AI_CHAT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import {
@@ -1165,5 +1166,101 @@ describe("AiChatTab: the panel's exit to the deep surface", () => {
       button.textContent?.trim(),
       "an icon-only control's name is its aria-label, not its contents",
     ).toBe("");
+  });
+});
+
+describe("AiChatTab: telling the two speakers apart", () => {
+  // A transcript at panel width is a column of near-identical blocks, and the
+  // one distinction that matters — what YOU said against what a model said
+  // about your notes — was the weakest signal on the surface: two adjacent
+  // greys, distinguished further only by an alignment a long wrapped turn
+  // erases, under a caption in `--text-xs`.
+  //
+  // Driven through the STORE, like every other transcript case in this file: a
+  // turn is what is under test, not the path that produced one.
+
+  function twoTurns(): HTMLElement[] {
+    const token = sendChatMessage("what does tf:drive do");
+    appendChatToken(token, "It is the **one-command orchestrator**.");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+    return screen.getAllByTestId("ai.turn");
+  }
+
+  it("gives the user's side the accent and the model's the paper", () => {
+    const [user, assistant] = twoTurns();
+    expect(user!.getAttribute("data-role")).toBe("user");
+    expect(user!.style.background).toContain("var(--accent-soft)");
+    expect(user!.style.border).toContain("var(--accent)");
+    // The model's side stays neutral deliberately: the accent is the app's
+    // emphasis colour, and lending it to model output would emphasise the one
+    // thing this surface's own honesty note says may be wrong.
+    expect(assistant!.style.background).not.toContain("var(--accent-soft)");
+    expect(assistant!.style.background).toContain("var(--paper-2)");
+  });
+
+  it("puts a glyph beside each speaker's name, hidden from a reader", () => {
+    // The word already names the speaker. A screen reader announcing "image,
+    // robot, Assistant" is the same fact twice with a guess in the middle.
+    const turns = twoTurns();
+    for (const turn of turns) {
+      const glyph = turn.querySelector("svg");
+      expect(glyph, "the speaker has no glyph").not.toBeNull();
+      expect(
+        glyph!.closest("[aria-hidden='true']"),
+        "the glyph is announced to a screen reader",
+      ).not.toBeNull();
+    }
+  });
+
+  it("renders the model's markdown and leaves the user's text alone", () => {
+    // Only the model wrote markdown on purpose. Re-interpreting what the user
+    // typed would mean a message containing `*` coming back italic.
+    const [user, assistant] = twoTurns();
+    expect(assistant!.querySelector("strong")?.textContent).toBe(
+      "one-command orchestrator",
+    );
+    expect(user!.textContent).toContain("what does tf:drive do");
+    expect(user!.querySelector("strong")).toBeNull();
+  });
+});
+
+describe("AiChatTab: the honesty note costs a line, not a third of the panel", () => {
+  // Load-bearing copy, pinned by full-literal equality. It is CLAMPED once
+  // there is a conversation, never hidden: the text is in the DOM either way,
+  // so it is present to a screen reader, to a text search and to the three
+  // tests earlier in this file that assert its exact wording.
+
+  it("is fully expanded while the transcript is empty", () => {
+    // The moment the claim is being made. Clamping it here would be hiding it.
+    render(<AiChatTab />);
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBeNull();
+    expect(screen.queryByTestId("ai.honesty-toggle")).toBeNull();
+  });
+
+  it("clamps once there is a conversation, and offers the way back", () => {
+    const token = sendChatMessage("hello");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBe("true");
+    const toggle = screen.getByTestId("ai.honesty-toggle");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(toggle);
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBeNull();
+    expect(screen.getByTestId("ai.honesty-toggle").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps the whole sentence in the DOM while clamped", () => {
+    // Clamped, not conditionally rendered. `-webkit-line-clamp` hides overflow
+    // visually and changes nothing about what is there — which is what makes
+    // reducing its height a layout decision rather than a copy one.
+    const token = sendChatMessage("hello");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+    const note = screen.getByTestId("ai.honesty-note");
+    expect(note.getAttribute("data-clamped")).toBe("true");
+    expect(note.textContent).toBe(AI_CHAT_HONESTY_NOTE);
   });
 });

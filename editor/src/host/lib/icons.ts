@@ -76,6 +76,16 @@ export const ICON_PATHS = {
   // `file-plus` and read as "pictures" rather than as "make one".
   "image-plus":
     '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+  // The two speakers in a conversation (myne-md/myne#771). A transcript read at
+  // panel width is a column of near-identical blocks, and the caption alone —
+  // "You" / "Assistant" in `--text-xs` — is the smallest possible difference
+  // between two things that must never be confused: what you said, and what a
+  // model said about your notes.
+  //
+  // `bot` is Lucide's, and it is a machine rather than a sparkle or a wand:
+  // `PRODUCT.md` bans hype AI framing, and a glyph is copy.
+  bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   command:
     '<path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>',
   "panel-right":

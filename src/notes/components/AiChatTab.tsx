@@ -196,6 +196,21 @@ export function AiChatTab({
   const [historyOpen, setHistoryOpen] = useState(false);
   // Memory popover (myne-md/myne#697): tab-local boolean like the history modal.
   const [memoryOpen, setMemoryOpen] = useState(false);
+  /**
+   * Whether the user has expanded the honesty note back open.
+   *
+   * Session state, not a pref: the note is clamped because a reader has just
+   * read it, and "just" resets when the panel is remounted. Persisting a
+   * dismissal would make the claim something a user turns off once, which is
+   * not what a threat-model-bounded sentence is for.
+   */
+  const [honestyOpen, setHonestyOpen] = useState(false);
+  /**
+   * Clamped exactly when there is a conversation AND the user has not opened it
+   * back up. An empty transcript is the moment the claim is being made, so it
+   * is never clamped there — which is also why no persisted dismissal exists.
+   */
+  const honestyClamped = chat.turns.length > 0 && !honestyOpen;
   // The surface reports the frame facts the header dresses. Lifted rather than
   // rendered in the surface, because the agent tab does not show either of them.
   const [surfaceStatus, setSurfaceStatus] = useState<ConversationSurfaceStatus>({
@@ -329,14 +344,61 @@ export function AiChatTab({
       </div>
       {/* Honest framing (task 13): rendered VERBATIM (load-bearing copy, never
           i18n'd) — a weak on-device model is fallible, so the user is told to
-          verify against the cited notes. Must not over-claim. */}
+          verify against the cited notes. Must not over-claim.
+
+          **It is clamped once there is a conversation, never hidden**
+          (myne-md/myne#771). At panel width the sentence is three lines, and it
+          sat above the transcript on every render: a permanent third of the
+          surface spent re-telling a reader something they were told when they
+          arrived. It stays FULLY EXPANDED while the transcript is empty, which
+          is the moment the claim is being made, and clamps to one line after
+          the first turn with a control that expands it again.
+
+          The text is in the DOM either way — clamped, not conditionally
+          rendered — so it is present to a screen reader, to a text search and
+          to `tests/components/AiChatTab.test.tsx`, which asserts the exact
+          wording. What is reduced is how much room a sentence the user has read
+          takes from the thing they came for. */}
       {ready && (
-        <p
-          data-testid="ai.honesty-note"
-          style={{ fontSize: "var(--text-xs)", lineHeight: 1.4, color: "var(--fg-3)", margin: 0 }}
-        >
-          {aiChatHonestyNote(activeProviderName)}
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-1)" }}>
+          <p
+            data-testid="ai.honesty-note"
+            data-clamped={honestyClamped ? "true" : undefined}
+            style={{
+              fontSize: "var(--text-xs)",
+              lineHeight: 1.4,
+              color: "var(--fg-3)",
+              margin: 0,
+              flex: 1,
+              minWidth: 0,
+              ...(honestyClamped
+                ? {
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical" as const,
+                    WebkitLineClamp: 1,
+                    overflow: "hidden",
+                  }
+                : {}),
+            }}
+          >
+            {aiChatHonestyNote(activeProviderName)}
+          </p>
+          {chat.turns.length > 0 ? (
+            <IconButton
+              icon={honestyOpen ? "chevron-up" : "chevron-down"}
+              label={t(
+                honestyOpen
+                  ? "editor.chrome.rightPanel.aiChat.honestyCollapse"
+                  : "editor.chrome.rightPanel.aiChat.honestyExpand",
+              )}
+              tooltip
+              iconSize={12}
+              expanded={honestyOpen}
+              testId="ai.honesty-toggle"
+              onClick={() => setHonestyOpen((open) => !open)}
+            />
+          ) : null}
+        </div>
       )}
 
       {/* The conversation itself, shared with the agent tab. Gated on
