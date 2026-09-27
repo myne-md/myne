@@ -62,8 +62,8 @@ import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import {
   listVaults,
   orderByLastUnlock,
-  stableVaultNumber,
 } from "../lib/vault-list";
+import { vaultDisplayName } from "../lib/vaultDisplayName";
 import {
   listAccounts,
   renameAccount,
@@ -122,33 +122,6 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
   }
 }
 
-/**
- * Display name for a row. Real label when `vault_list()` returned one
- * (`label !== null`: cached from a this-session unlock, or read from this
- * device's sealed label store, myne-md/myne#411); otherwise the neutral
- * fallback "Vault N".
- *
- * **N is a stable per-vault number, not the row's position.** It used to be
- * `index + 1` over a list ordered by last unlock, so the name a user was asked
- * to remember moved every time they opened a vault: unlock Vault 3 and it
- * becomes Vault 1. `stableVaultNumber` derives it from the `VaultId` instead
- * (see its docstring for the rule and what it costs). The fallback still
- * surfaces no vault-identifying string, and the LIST keeps its last-unlock
- * ordering (SYNC-7). Only the number stopped following it.
- *
- * The fallback string is resolved through the caller's `t` so it stays
- * reactive.
- */
-function rowLabel(
-  vault: VaultSummary,
-  vaults: readonly VaultSummary[],
-  t: TFunction,
-): string {
-  return (
-    vault.label ??
-    t("vaultPicker.vaultFallback", { n: stableVaultNumber(vaults, vault.id) })
-  );
-}
 
 /**
  * The account label for a group header, or `null` when the vaults in that group
@@ -794,7 +767,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
               <VaultRow
                 key={vault.id}
                 vault={vault}
-                label={rowLabel(vault, state.vaults, t)}
+                label={vaultDisplayName(vault, state.vaults, t)}
                 meta={lastUnlockText(vault.last_unlock, t)}
                 onSelect={onSelect}
                 onContextMenu={(v, pos) => setMenu({ vault: v, x: pos.x, y: pos.y })}
