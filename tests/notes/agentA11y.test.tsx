@@ -15,6 +15,10 @@ const chatsList = vi.fn();
 const chatsRename = vi.fn();
 const chatsDelete = vi.fn();
 vi.mock("../../src/lib/chats", () => ({
+  // The roster notifier the wrappers fire (myne-md/myne#771). Mocked to a
+  // no-op unsubscribe: what these files drive is the list, not the signal, and
+  // a module mock that omits an export makes the importer throw at load.
+  subscribeConversationRoster: () => () => {},
   chatsList: (...a: unknown[]) => chatsList(...a),
   chatsRename: (...a: unknown[]) => chatsRename(...a),
   chatsDelete: (...a: unknown[]) => chatsDelete(...a),

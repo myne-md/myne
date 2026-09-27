@@ -60,7 +60,7 @@
       "scopeChange": "Change",
       "scopeOpenNote": "This note",
       "scopeChoose": "Choose a folder",
-      "needsScope": "Pick a folder above, or open a note, so the agent has something to work on.",
+      "needsScope": "Pick a folder below, or open a note, so the agent has something to work on.",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",

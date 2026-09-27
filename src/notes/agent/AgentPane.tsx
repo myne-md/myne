@@ -45,7 +45,7 @@ import { startNewConversation } from "../ai/startNewConversation";
  *
  * The inset is ASYMMETRIC, and deliberately. Vertically it is `--space-4`,
  * because the header has a tab strip above it and the composer has a status
- * bar below. Horizontally it is `--space-2`: the pane is narrow before it is
+ * bar below. Horizontally it is `--space-1`: the pane is narrow before it is
  * anything else — the rail takes 248px of it and the conversation lives in
  * what remains — so side padding is width taken from the two columns that
  * need it, to separate them from edges the pane already has.
@@ -56,7 +56,7 @@ const ROOT_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  padding: "var(--space-4) var(--space-2)",
+  padding: "var(--space-4) var(--space-1)",
   boxSizing: "border-box",
 };
 

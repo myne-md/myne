@@ -24,6 +24,10 @@ vi.mock("../../src/notes/workspaceContext", () => ({
 }));
 
 vi.mock("../../src/lib/chats", () => ({
+  // The roster notifier the wrappers fire (myne-md/myne#771). Mocked to a
+  // no-op unsubscribe: what these files drive is the list, not the signal, and
+  // a module mock that omits an export makes the importer throw at load.
+  subscribeConversationRoster: () => () => {},
   chatsList: mockChatsList,
   chatsRename: vi.fn(),
   chatsDelete: vi.fn(),
