@@ -552,6 +552,10 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # The pointer-target floor (myne#775, WCAG 2.2 AA SC 2.5.8). axe covers
+      # this rule only where a scenario renders the surface; this reads every
+      # declaration, including on screens no scenario opens.
+      - node scripts/check-target-size.mjs
       # Primitive adoption (myne#774): a ratchet on hand-rolled interactive
       # elements. Nothing else reports one — it compiles, renders, and passes
       # every test, and a reviewer sees one file at a time.
