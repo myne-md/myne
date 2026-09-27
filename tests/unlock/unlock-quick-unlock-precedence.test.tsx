@@ -186,12 +186,12 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     // wait. Hold the redeem open and pin that the screen says so instead of
     // going quiet.
     //
-    // WHERE it says so moved with the deboxed row (myne-md/myne#773): the
-    // submit is an icon button, so the report is the button's accessible NAME
-    // plus the spinner that replaces its arrow. That makes the accessible name
-    // load-bearing rather than decorative — it is the only channel a
-    // screen-reader user has on a screen whose normal case is several seconds
-    // of nothing happening.
+    // The report is the button: its LABEL changes to say what is happening and
+    // a spinner sits beside it, which is the same thing every other long
+    // action in the app does (myne-md/myne#773 put the auth screens on the
+    // app's own `<Input>` and `<Button>`). The label is load-bearing rather
+    // than decorative — it is the only channel a screen-reader user has on a
+    // screen whose normal case is several seconds of nothing happening.
     let releaseRedeem: () => void = () => {};
     invokeMock.mockImplementation((cmd) => {
       if (cmd === STATUS_CMD) {
@@ -212,21 +212,18 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     const submit = screen.getByTestId("unlock.quick-pin-submit");
     fireEvent.click(submit);
 
-    await waitFor(() => expect(submit.getAttribute("aria-label")).toBe("Decrypting…"));
+    await waitFor(() => expect(submit.textContent).toContain("Decrypting…"));
     expect((submit as HTMLButtonElement).disabled).toBe(true);
-    // The row still says it is busy — the field reads that to lock itself and
-    // to drop the resting rule's focus treatment.
-    const row = submit.parentElement as HTMLElement;
-    expect(row.getAttribute("data-busy")).toBe("true");
-    // And there is exactly ONE indicator for the wait, in the button. The rule
-    // used to sweep as well (`docs/decisions/ui/0626` withdrew it): two
-    // indicators for one wait, and the one that went read as a page loading
-    // rather than as a key turning. `data-motion` went with it — nothing on
-    // this row carries state through motion any more, so a reduced-motion
-    // exemption here would be an exemption for nothing.
-    expect(row.getAttribute("data-motion")).toBe(null);
-    expect(submit.querySelector(".myne-spinner, [class*=spinner]") ?? submit.firstElementChild)
+    // Exactly ONE indicator for the wait, and it is in the button. A sweeping
+    // rule under the field used to report it as well (`docs/decisions/ui/0626`
+    // withdrew it): two indicators for one wait, and the one that went read as
+    // a page loading rather than as a key turning.
+    expect(submit.firstElementChild, "the button reports the wait with words alone")
       .not.toBeNull();
+    const row = submit.parentElement as HTMLElement;
+    // No motion exemption survives anywhere on the row: nothing here carries
+    // state through motion now, so one would be an exemption for nothing.
+    expect(row.getAttribute("data-motion")).toBe(null);
     // The field is locked too, so a second PIN cannot race the in-flight derive.
     expect((screen.getByTestId("unlock.quick-pin-input") as HTMLInputElement).disabled).toBe(
       true,
