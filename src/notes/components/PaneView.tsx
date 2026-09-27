@@ -1682,8 +1682,19 @@ export function PaneView({
       };
     }
     if (isAgent && leaf.activeTab !== null) {
-      // The agent hub (myne-md/myne#771). It fills like the tasks pane and keeps
-      // gutters: it is a reading/app content surface, not a canvas.
+      // The agent hub (myne-md/myne#771). It fills like the tasks pane and
+      // takes NO gutters.
+      //
+      // **The pane owns its own inset, and it cannot while this is true.** The
+      // gutter here is `0 24px`, which is the reading measure a flowing note
+      // wants and is far too much for a surface whose left column is a 248px
+      // rail: 48px of the pane's width goes to nothing, on the narrowest thing
+      // in the app. Worse, it is invisible from the pane's own stylesheet —
+      // two rounds of editing `.myne-agent`'s padding changed nothing on
+      // screen, because the value being looked at was never the one producing
+      // the gutter. So the inset lives in ONE place, `components.css`, where
+      // the rail's and the conversation's own paddings are, and the pane is
+      // handed the full width to spend.
       //
       // **`folders` is not optional here, whatever its type says.** It was
       // omitted, so the agent tab's scope picker offered exactly one entry —
@@ -1694,7 +1705,7 @@ export function PaneView({
       // opening the tab and typing.
       return {
         fill: true,
-        gutters: true,
+        gutters: false,
         el: (
           <AgentPane paneId={leaf.id} item={leaf.activeTab} folders={agentFolders} />
         ),

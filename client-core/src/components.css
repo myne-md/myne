@@ -1559,13 +1559,19 @@
      next attempt and it went too far the other way: at `--space-1` the
      content sat against the pane's top edge with no breathing room at all.
 
-     What the pane actually wants is room ABOVE and BELOW, where the tab strip
-     and the status bar are, and as little as possible to either SIDE, where
-     every pixel is width taken from two columns that are already narrow —
-     248px of rail plus whatever the conversation gets. So the inline inset is
-     ZERO: the rail's own rows carry their padding and the conversation column
-     carries its own, and the pane adds nothing on top of them. */
-  padding: var(--space-3) 0;
+     Both of those were measured against the wrong thing. `PaneView` was
+     wrapping the agent tab in its reading gutter, `0 24px`, so the side inset
+     on screen was 24px whatever this rule said and neither edit moved it. The
+     gutter is gone (`PaneView`'s agent branch takes `gutters: false`) and this
+     is now the only inset the pane has, which is what makes a value here worth
+     arguing about.
+
+     Equal on all four sides, at the smallest step that still reads as an
+     inset. The pane is the narrowest surface in the app — 248px of rail plus
+     whatever the conversation gets — so side room is width taken from two
+     columns that need it, and the rail's rows and the conversation's bubbles
+     carry their own padding inside this. */
+  padding: var(--space-3);
   box-sizing: border-box;
 }
 
