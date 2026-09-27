@@ -45,6 +45,7 @@ import { GraphSettingsPanel } from "./GraphSettingsPanel";
 import { GraphList } from "./GraphList";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { Segmented } from "../../components/primitives/Segmented";
+import { Select } from "../../components/primitives/Select";
 // The cluster's icon controls are the SHARED primitive now (myne-md/myne#774).
 // This file carried a local `IconButton` because the primitive had no bordered
 // variant — a floating control needs its own edge to be findable against
@@ -148,6 +149,26 @@ export function GraphPane() {
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [buildNonce, setBuildNonce] = useState(0);
   const [buildTrigger, setBuildTrigger] = useState(0);
+  /**
+   * Whether the last build produced nodes but NO links — the signature of a
+   * build that ran before the vault index was ready.
+   *
+   * The nodes come from the sidebar's note cache and the links come from the
+   * vault INDEX, and those are populated by different paths. On unlock,
+   * `vaultIndices.ts` sweeps every stale note (`for (const id of stale) await
+   * reindexNote(id)`), so on a cold start the index fills in PROGRESSIVELY. A
+   * graph tab restored into that window builds against a half-empty index and
+   * gets every note and none of its connections — which is what a user sees as
+   * "the graph loaded as a field of grey dots with no edges".
+   *
+   * It then stayed that way. The build effect deliberately does not depend on
+   * the note cache (SYNC-14: an ordinary edit must not re-scatter a laid-out
+   * graph), so nothing rebuilt; `stale` only lit the Refresh button and waited
+   * to be pressed.
+   */
+  const prematureRef = useRef(false);
+  /** Whether the one automatic recovery below has already been spent. */
+  const autoRebuiltRef = useRef(false);
   const [overlay, setOverlay] = useState<GraphOverlay>({
     model: null,
     colors: NO_NODE_COLORS,
@@ -221,6 +242,9 @@ export function GraphPane() {
           });
       const [, m] = await Promise.all([hydrate, build()]);
       if (cancelled) return;
+      // A build that came back with NODES but no EDGES, in a view that should
+      // have some, was almost certainly premature — see `prematureRef`.
+      prematureRef.current = m.nodes.length > 0 && m.edges.length === 0;
       setBuildNonce(getIndexNonce());
       setModel(m);
       setLayoutNonce((n) => n + 1); // one bump per (re)build — the flashbang probe
@@ -357,6 +381,21 @@ export function GraphPane() {
   // SYNC-14: stale when the index changed since the layout was built. The
   // expensive re-layout is gated to an explicit refresh, never the nonce.
   const stale = indexNonce !== buildNonce;
+
+  // Recover from a premature build, ONCE per mount.
+  //
+  // Deliberately not a general "rebuild when the index changes": that is
+  // exactly what SYNC-14 refused, and for a good reason — a graph that
+  // re-scatters itself every time you edit a note is worse than a stale one.
+  // This fires only in the state where the picture is unambiguously wrong
+  // (nodes, zero links) and only once, so a vault that genuinely has no links
+  // costs a single extra build and then stops. Everything else still waits for
+  // an explicit Refresh.
+  useEffect(() => {
+    if (!stale || !prematureRef.current || autoRebuiltRef.current) return;
+    autoRebuiltRef.current = true;
+    setBuildTrigger((n) => n + 1);
+  }, [stale]);
 
   // --- Bootstrapping the first model (myne-md/myne#727) ------------------
   // Reported twice as "the graph pane opens and never loads": the first time as
@@ -632,7 +671,10 @@ export function GraphPane() {
             All and the chip is gone (myne-md/myne#727). It sits leftmost
             because it is the outermost decision: what the picture is OF, before
             how it is drawn. */}
-        <select
+        <Select
+          testId="editor.graph-filter"
+          aria-label={t("notes.graph.filterSelectAriaLabel")}
+          style={{ maxWidth: 190 }}
           value={
             filter.kind === "tag"
               ? `tag:${filter.key}`
@@ -642,8 +684,38 @@ export function GraphPane() {
                   ? ORPHANS_FILTER_VALUE
                   : ""
           }
-          onChange={(e) => {
-            const value = e.target.value;
+          options={[
+            { value: "", label: t("notes.graph.filterAll") },
+            // The isolated view has no permanent entry: task 14 moved it to the
+            // palette, and the header is not where a once-in-a-while view
+            // lives. It is rendered ONLY while it IS the current value, so the
+            // control tells the truth about what is on screen without becoming
+            // a way to enter the view. (The native `<select>` this replaced had
+            // to do the same for a harder reason: it cannot display a value
+            // with no matching option and silently falls back to the first,
+            // which left it reading "All" over a different picture.)
+            ...(filter.kind === "orphans"
+              ? [
+                  {
+                    value: ORPHANS_FILTER_VALUE,
+                    label: t("notes.graph.filterIsolated"),
+                  },
+                ]
+              : []),
+            ...(ctx.selectedId !== null
+              ? [
+                  {
+                    value: LOCAL_FILTER_VALUE,
+                    label: t("notes.graph.filterAroundNote"),
+                  },
+                ]
+              : []),
+            ...tags.map((tag) => ({
+              value: `tag:${tag.key}`,
+              label: `#${tag.display} (${tag.subtreeCount})`,
+            })),
+          ]}
+          onChange={(value) => {
             if (value === "") setFilter({ kind: "all" });
             else if (value === LOCAL_FILTER_VALUE) {
               if (ctx.selectedId !== null) {
@@ -651,43 +723,7 @@ export function GraphPane() {
               }
             } else setFilter({ kind: "tag", key: value.slice("tag:".length) });
           }}
-          aria-label={t("notes.graph.filterSelectAriaLabel")}
-          data-testid="editor.graph-filter"
-          style={{
-            fontSize: 12,
-            maxWidth: 190,
-            padding: "3px 6px",
-            background: "var(--bg-1)",
-            color: "var(--fg-2)",
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-2)",
-          }}
-        >
-          <option value="">{t("notes.graph.filterAll")}</option>
-          {/* The isolated view has no entry here, because task 14 moved it to
-              the palette and the header is not where a once-in-a-while view
-              lives. But a `<select>` cannot display a value with no matching
-              option, it silently falls back to the first one, so opening that
-              view from the palette would leave this control reading "All" while
-              the picture showed something else. The option is rendered ONLY
-              while it is the current value: the control tells the truth, and it
-              still cannot be used to ENTER the view. */}
-          {filter.kind === "orphans" && (
-            <option value={ORPHANS_FILTER_VALUE}>
-              {t("notes.graph.filterIsolated")}
-            </option>
-          )}
-          {ctx.selectedId !== null && (
-            <option value={LOCAL_FILTER_VALUE}>
-              {t("notes.graph.filterAroundNote")}
-            </option>
-          )}
-          {tags.map((tag) => (
-            <option key={tag.key} value={`tag:${tag.key}`}>
-              {`#${tag.display} (${tag.subtreeCount})`}
-            </option>
-          ))}
-        </select>
+        />
         {filter.kind === "local" && (
           <button
             type="button"
