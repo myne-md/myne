@@ -344,28 +344,62 @@ describe("AiChatTab resting cause", () => {
   const chip = () => screen.getByTestId("ai.chrome-status");
   const body = () => screen.getByTestId("ai.status-no-model");
 
+  /**
+   * The degraded region NAMES the fault and then explains it (task 11 of
+   * myne-md/myne#771). It used to be a bare sentence in `--fg-3`, with the name
+   * carried only by the header chip a glance away — so the transcript said why
+   * without saying what. `toContain` rather than `toBe` because the region now
+   * holds both, and both are asserted: a title that stopped matching its chip
+   * would put two different names for one fault on one screen.
+   */
+  function expectsFault(titleKey: string, bodyKey: string): void {
+    expect(chip().textContent).toBe(titleKey);
+    expect(body().textContent, "the fault is not named where it is explained").toContain(
+      titleKey,
+    );
+    expect(body().textContent).toContain(bodyKey);
+  }
+
   it("says no provider when nothing is set up", () => {
     surfaceState = { kind: "unavailable", cause: "no_model" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusNoModel");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.noModelHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusNoModel",
+      "editor.chrome.rightPanel.aiChat.noModelHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("no-provider");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("no-provider");
   });
 
   it("says not answering when the configured backend is unreachable", () => {
     surfaceState = { kind: "unavailable", cause: "unreachable" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnreachable");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unreachableHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusUnreachable",
+      "editor.chrome.rightPanel.aiChat.unreachableHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("unreachable");
   });
 
   it("says unavailable when the build has no local AI at all", () => {
     surfaceState = { kind: "absent" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnavailable");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unavailableHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusUnavailable",
+      "editor.chrome.rightPanel.aiChat.unavailableHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("unavailable");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("unavailable");
   });
 
   it("keeps the three apart — no two render the same sentence", () => {
@@ -1079,5 +1113,57 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
     });
     fireEvent.keyDown(screen.getByTestId("ai.composer-input"), { key: "Enter" });
     expect(agentStart).not.toHaveBeenCalled();
+  });
+});
+
+describe("AiChatTab: the panel's exit to the deep surface", () => {
+  // Task 10 of myne-md/myne#771. The panel is the shallow end — one
+  // conversation, no list, no history chrome — and this control is the way out
+  // of it into the agent tab, focused on the open note.
+  //
+  // It shipped wired and untested: `tsc` is content either way, the button
+  // renders whether or not the callback is reachable, and the failure mode is
+  // a control that does nothing. The panel is a sibling subtree of the
+  // workspace controller, so "the callback is threaded" is the whole risk.
+
+  it("offers the control only when the panel has somewhere to send you", () => {
+    // The prop is optional, and absent is a real case: the panel is rendered in
+    // tests and in surfaces with no workspace behind them. Offering an exit
+    // that goes nowhere is worse than not offering one.
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.focus-agent")).toBeNull();
+    cleanup();
+
+    render(<AiChatTab onFocusAgent={() => {}} />);
+    expect(screen.getByTestId("ai.focus-agent")).toBeTruthy();
+  });
+
+  it("calls back exactly once when pressed", () => {
+    const onFocusAgent = vi.fn();
+    render(<AiChatTab onFocusAgent={onFocusAgent} />);
+    fireEvent.click(screen.getByTestId("ai.focus-agent"));
+    expect(onFocusAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it("is reachable and operable from the keyboard", () => {
+    // It is an icon-only control in a row of icon-only controls, so it is
+    // exactly the kind that ends up mouse-only by accident.
+    const onFocusAgent = vi.fn();
+    render(<AiChatTab onFocusAgent={onFocusAgent} />);
+    const button = screen.getByTestId("ai.focus-agent") as HTMLButtonElement;
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.disabled).toBe(false);
+    button.focus();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("names itself, since its glyph does not", () => {
+    render(<AiChatTab onFocusAgent={() => {}} />);
+    const button = screen.getByTestId("ai.focus-agent");
+    expect(button.getAttribute("aria-label")?.length ?? 0).toBeGreaterThan(0);
+    expect(
+      button.textContent?.trim(),
+      "an icon-only control's name is its aria-label, not its contents",
+    ).toBe("");
   });
 });

@@ -29,6 +29,7 @@ import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
+import { EmptyState } from "../../components/primitives/EmptyState";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { agentLastRun, agentUndo } from "../../lib/agent-run";
@@ -103,6 +104,25 @@ function degradedBodyKey(cause: string, t: TFn): string {
       return t("editor.chrome.rightPanel.aiChat.unavailableHint");
     default:
       return t("editor.chrome.rightPanel.aiChat.noModelHint");
+  }
+}
+
+/** The NAME of a degraded resting cause — the fault, before the sentence that
+ *  explains it. The header's status chip carried this alone, one glance away
+ *  from the body text, so the transcript region said why without saying what.
+ *  A total switch for the same reason `degradedBodyKey` is one. */
+function degradedTitleKey(cause: string, t: TFn): string {
+  switch (cause) {
+    case "off":
+      return t("editor.chrome.rightPanel.aiChat.statusOff");
+    case "no-provider":
+      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
+    case "unreachable":
+      return t("editor.chrome.rightPanel.aiChat.statusUnreachable");
+    case "unavailable":
+      return t("editor.chrome.rightPanel.aiChat.statusUnavailable");
+    default:
+      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
   }
 }
 
@@ -594,20 +614,38 @@ export function ConversationSurface({
             )}
           </div>
         ) : (
-          <p
-            data-testid={degraded ? "ai.status-no-model" : "ai.empty-transcript"}
-            {...(restingCause === undefined ? {} : { "data-ai-cause": restingCause })}
-            style={{
-              fontSize: "var(--text-sm)",
-              lineHeight: 1.5,
-              color: "var(--fg-3)",
-              margin: 0,
-            }}
-          >
-            {degraded
-              ? degradedBodyKey(restingCause ?? "no-provider", t)
-              : t("editor.chrome.rightPanel.aiChat.empty")}
-          </p>
+          // The shared zero state rather than a bare sentence in `--fg-3`
+          // (task 11 of myne-md/myne#771). Two situations were rendering as one
+          // shape: "nothing has happened yet", which is the resting state of a
+          // working panel, and "this cannot work", which is a fault the user
+          // may be able to clear. A paragraph cannot tell them apart, and the
+          // second one needs a name for the fault before the sentence
+          // explaining it — which is what the status chip in the header was
+          // carrying alone, one glance away from the text that explains it.
+          //
+          // `rest` puts `data-ai-cause` on the same element as the testid: the
+          // degradation E2E reads the cause AND the body text off one node.
+          <EmptyState
+            variant={degraded ? "error" : "firstRun"}
+            icon={degraded ? "circle-alert" : "message-square"}
+            size="sm"
+            title={
+              degraded
+                ? degradedTitleKey(restingCause ?? "no-provider", t)
+                : t("editor.chrome.rightPanel.aiChat.emptyTitle")
+            }
+            body={
+              degraded
+                ? degradedBodyKey(restingCause ?? "no-provider", t)
+                : t("editor.chrome.rightPanel.aiChat.empty")
+            }
+            testId={degraded ? "ai.status-no-model" : "ai.empty-transcript"}
+            rest={
+              restingCause === undefined
+                ? undefined
+                : ({ "data-ai-cause": restingCause } as Record<string, string>)
+            }
+          />
         )}
       </div>
 
