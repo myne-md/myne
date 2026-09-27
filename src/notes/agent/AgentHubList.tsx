@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
 import { Tooltip } from "../../components/primitives/Tooltip";
 import { EmptyState } from "../../components/primitives/EmptyState";
@@ -54,14 +55,45 @@ function relativeDay(updatedAt: number, locale: string, timeZone: string | null)
   });
 }
 
+/**
+ * A rail row: the title on one line, its meta and actions on the next.
+ *
+ * It was ONE line holding a title, an anchor pill, a date and two text buttons
+ * ("Rename", "Delete"). At the rail's 248px that is far more than fits, and
+ * because `LIST_STYLE` sets `overflow-y: auto` — which per spec computes
+ * `overflow-x` to `auto` as well — the whole list scrolled SIDEWAYS. The user
+ * saw rows shifted half out of view with a horizontal scrollbar under them.
+ *
+ * Two lines is what a 248px column can hold. The list also pins
+ * `overflow-x: hidden` now, so a future row that outgrows it truncates rather
+ * than reintroducing the scroll.
+ */
 const ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "stretch",
+  gap: "var(--space-1)",
+  padding: "var(--space-2)",
+  borderRadius: "var(--radius-2)",
+  border: "1px solid var(--line-1)",
+  textAlign: "left",
+  minWidth: 0,
+};
+
+/** The title line: the label, and the actions that act on it. */
+const ROW_TOP_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  minWidth: 0,
+};
+
+/** The meta line: what it is about, and when it was last used. */
+const ROW_META_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
-  padding: "var(--space-2)",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-1)",
-  textAlign: "left",
+  minWidth: 0,
 };
 
 const TITLE_STYLE: CSSProperties = {
@@ -96,7 +128,13 @@ const LIST_STYLE: CSSProperties = {
   flexDirection: "column",
   gap: "var(--space-1)",
   overflowY: "auto",
+  // Explicit, and load-bearing: setting `overflow-y` alone computes
+  // `overflow-x` to `auto` rather than leaving it `visible`, so a row wider
+  // than the rail gave the whole list a horizontal scrollbar. A history rail
+  // that scrolls sideways is a history rail nobody can read at a glance.
+  overflowX: "hidden",
   minHeight: 0,
+  minWidth: 0,
   flex: 1,
 };
 
@@ -427,79 +465,88 @@ export function AgentHubList({
               // jobs.
               aria-current={row.id === activeId ? "true" : undefined}
             >
-              {/* The row's own label ellipsizes, so the full title has to be
-                  reachable somewhere — through `<Tooltip>` rather than the
-                  native attribute, which waits ~1s, ignores the theme, clips at
-                  the window edge and never appears on keyboard focus
-                  (`scripts/check-tooltip-convention.mjs`). The button keeps its
-                  text as its accessible name; the tooltip is visual only. */}
-              {/* The row's title is the row's PRIMARY target, so it stays a
-                  plain button with a text style rather than becoming a
-                  `<Button>`: a ghost button's padding and hover fill would turn
-                  a list of titles into a list of chips. Recorded rather than
-                  converted, which is what `check-primitive-adoption.mjs` asks
-                  for when an element genuinely is not a primitive. */}
-              <Tooltip label={row.title}>
-                <button
-                  type="button"
-                  data-testid="agent.hub-open"
-                  onClick={() => void handleOpen(row.id)}
-                  style={TITLE_STYLE}
-                >
-                  {row.title}
-                </button>
-              </Tooltip>
-              {/* The note the conversation is anchored to, when it is
-                  (myne-md/myne#771 story 10). This is what makes "on this
-                  note" legible in the Hub, distinct from a vault-general
-                  conversation. */}
-              {row.note_id !== undefined ? (
-                // `.myne-pill`, not the hand-rolled border/radius/padding it
-                // was re-deriving — and not `.myne-chiplet`, which it was given
-                // first: that class is a 40x28 THEME SWATCH with hidden
-                // overflow, so a text label in it is a label nobody can read.
-                // Right instinct, wrong class. The native `title` it carried
-                // repeated its own visible label, which is the one tooltip that
-                // says nothing.
-                <button
-                  type="button"
-                  className="myne-pill"
-                  data-interactive={onOpenNote === undefined ? undefined : "true"}
-                  data-testid="agent.hub-anchor"
-                  data-note-id={row.note_id}
-                  disabled={onOpenNote === undefined}
-                  onClick={() => onOpenNote?.(row.note_id!)}
-                >
-                  <Icon name="file-text" size={12} />
-                  {t("agent.hub.anchorLabel")}
-                </button>
-              ) : null}
-              <span style={META_STYLE}>{relativeDay(row.updated_at, locale, timeZone)}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                data-testid="agent.hub-rename"
-                aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
-                onClick={() => {
-                  setDeletingId(null);
-                  setDraft(row.title);
-                  setRenamingId(row.id);
-                }}
-              >
-                {t("editor.chrome.rightPanel.aiChat.historyRename")}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                data-testid="agent.hub-delete"
-                aria-label={t("editor.chrome.rightPanel.aiChat.historyDelete")}
-                onClick={() => {
-                  setRenamingId(null);
-                  setDeletingId(row.id);
-                }}
-              >
-                {t("editor.chrome.rightPanel.aiChat.historyDelete")}
-              </Button>
+              <div style={ROW_TOP_STYLE}>
+                {/* The row's own label ellipsizes, so the full title has to be
+                    reachable somewhere — through `<Tooltip>` rather than the
+                    native attribute, which waits ~1s, ignores the theme, clips
+                    at the window edge and never appears on keyboard focus
+                    (`scripts/check-tooltip-convention.mjs`). The button keeps
+                    its text as its accessible name; the tooltip is visual only.
+
+                    Its title is the row's PRIMARY target, so it stays a plain
+                    button with a text style rather than becoming a `<Button>`:
+                    a ghost button's padding and hover fill would turn a list of
+                    titles into a list of chips. Recorded rather than converted,
+                    which is what `check-primitive-adoption.mjs` asks for when
+                    an element genuinely is not a primitive. */}
+                <Tooltip label={row.title}>
+                  <button
+                    type="button"
+                    data-testid="agent.hub-open"
+                    onClick={() => void handleOpen(row.id)}
+                    style={TITLE_STYLE}
+                  >
+                    {row.title}
+                  </button>
+                </Tooltip>
+                {/* Icon-only, and that is what makes the row fit: "Rename" and
+                    "Delete" as words are most of a 248px rail on their own,
+                    which is how the list came to scroll sideways. They carry
+                    their labels as tooltips and as accessible names, per the
+                    epic's tooltip convention. */}
+                <IconButton
+                  icon="pencil"
+                  iconSize={14}
+                  label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                  tooltip
+                  testId="agent.hub-rename"
+                  onClick={() => {
+                    setDeletingId(null);
+                    setDraft(row.title);
+                    setRenamingId(row.id);
+                  }}
+                />
+                <IconButton
+                  icon="trash-2"
+                  iconSize={14}
+                  label={t("editor.chrome.rightPanel.aiChat.historyDelete")}
+                  tooltip
+                  testId="agent.hub-delete"
+                  onClick={() => {
+                    setRenamingId(null);
+                    setDeletingId(row.id);
+                  }}
+                />
+              </div>
+              <div style={ROW_META_STYLE}>
+                {/* The note the conversation is anchored to, when it is
+                    (myne-md/myne#771 story 10). This is what makes "on this
+                    note" legible in the Hub, distinct from a vault-general
+                    conversation.
+
+                    `.myne-pill`, not the hand-rolled border/radius/padding it
+                    was re-deriving — and not `.myne-chiplet`, which it was
+                    given first: that class is a 40x28 THEME SWATCH with hidden
+                    overflow, so a text label in it is a label nobody can read.
+                    Right instinct, wrong class. */}
+                {row.note_id !== undefined ? (
+                  <button
+                    type="button"
+                    className="myne-pill"
+                    data-interactive={onOpenNote === undefined ? undefined : "true"}
+                    data-testid="agent.hub-anchor"
+                    data-note-id={row.note_id}
+                    disabled={onOpenNote === undefined}
+                    onClick={() => onOpenNote?.(row.note_id!)}
+                  >
+                    <Icon name="file-text" size={12} />
+                    {t("agent.hub.anchorLabel")}
+                  </button>
+                ) : null}
+                <span style={META_STYLE}>
+                  {relativeDay(row.updated_at, locale, timeZone)}
+                </span>
+              </div>
             </div>
           )}
         </div>

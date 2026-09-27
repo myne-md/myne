@@ -33,13 +33,31 @@ import { AgentConversationView } from "./AgentConversationView";
 import { Button } from "../../components/primitives/Button";
 import { AgentRunOrb } from "./AgentRunOrb";
 import { useAgent } from "./agentStore";
+import { startNewConversation } from "../ai/startNewConversation";
 
+/**
+ * The pane's own box.
+ *
+ * `PaneView` hands a tab body the full pane with no inset — correct for a note,
+ * where the editor owns its own margins, and wrong for a surface built out of
+ * controls: the heading sat flush against the tab strip and the rail's first
+ * button touched the pane's left edge.
+ *
+ * The inset is ASYMMETRIC, and deliberately. Vertically it is `--space-4`,
+ * because the header has a tab strip above it and the composer has a status
+ * bar below. Horizontally it is `--space-2`: the pane is narrow before it is
+ * anything else — the rail takes 248px of it and the conversation lives in
+ * what remains — so side padding is width taken from the two columns that
+ * need it, to separate them from edges the pane already has.
+ */
 const ROOT_STYLE: CSSProperties = {
   height: "100%",
   minHeight: 0,
   display: "flex",
   flexDirection: "column",
-  gap: "var(--space-2)",
+  gap: "var(--space-3)",
+  padding: "var(--space-4) var(--space-2)",
+  boxSizing: "border-box",
 };
 
 const HEADER_STYLE: CSSProperties = {
@@ -161,11 +179,20 @@ export function AgentPane({
     [ws, paneId],
   );
 
-  /** Start a fresh conversation, about the note the user has open if any. */
-  const newConversation = useCallback(
-    () => openConversationInPane({ noteId: ws.focusedNoteId }),
-    [openConversationInPane, ws.focusedNoteId],
-  );
+  /**
+   * Start a fresh conversation, about the note the user has open if any.
+   *
+   * **Both halves.** It wrote the workspace state and nothing else, so the tab
+   * forgot which conversation it was showing while the chat store went on
+   * holding the previous transcript — the screen did not change, and the button
+   * read as broken because it very nearly was. `startNewConversation` is the
+   * panel's own sequence, shared: cancel the run host-side FIRST, then clear
+   * the transcript and the store.
+   */
+  const newConversation = useCallback(() => {
+    startNewConversation();
+    openConversationInPane({ noteId: ws.focusedNoteId });
+  }, [openConversationInPane, ws.focusedNoteId]);
 
   // The Hub's anchor chip opens the note in the workspace; the user reads the
   // conversation and the note it changed side by side.

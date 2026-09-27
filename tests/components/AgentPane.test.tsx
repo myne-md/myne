@@ -48,6 +48,7 @@ vi.mock("../../src/lib/useDateTimeDisplay", () => ({
 }));
 
 import { AgentPane } from "../../src/notes/agent/AgentPane";
+import { getChat, sendChatMessage } from "../../src/notes/ai/chatStore";
 import { AGENT_TAB_ID } from "../../src/notes/workspaceState";
 
 beforeEach(() => {
@@ -196,5 +197,45 @@ describe("AgentPane: focus follows the conversation, not a view", () => {
     expect(
       (screen.getByTestId("agent.pane").getAttribute("aria-label") ?? "").length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("AgentPane: New conversation clears the transcript, not just the state", () => {
+  // The defect: it wrote the workspace state and nothing else. The tab forgot
+  // which conversation it was showing while the CHAT STORE went on holding the
+  // previous transcript — so the screen did not change and the button read as
+  // broken, because it very nearly was.
+  //
+  // `tsc` is content, the state write happens, and a test that only checked
+  // `setAgentViewState` would have passed against exactly this.
+
+  it("clears the open transcript", async () => {
+    sendChatMessage("an earlier question");
+    expect(getChat().turns.length).toBeGreaterThan(0);
+
+    render(
+      <AgentPane paneId="p1" item={{ kind: "agent", id: AGENT_TAB_ID }} />,
+    );
+    // The rail loads its roster asynchronously, so the control is not there on
+    // the first frame — it renders the loading line instead.
+    fireEvent.click(await screen.findByTestId("agent.hub-new"));
+
+    expect(getChat().turns, "the previous conversation is still on screen").toHaveLength(
+      0,
+    );
+  });
+
+  it("writes the workspace state too, so the tab forgets its selection", async () => {
+    // Both halves. Clearing the store without dropping the selection would
+    // leave the tab pointing at a conversation whose transcript is gone, and
+    // the reopen effect would pull it straight back.
+    render(
+      <AgentPane
+        paneId="p1"
+        item={{ kind: "agent", id: AGENT_TAB_ID, agentView: { conversationId: "c-7" } }}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("agent.hub-new"));
+    expect(mockSetAgentViewState).toHaveBeenCalledWith("p1", {});
   });
 });

@@ -1556,6 +1556,11 @@
   min-height: 0;
   display: flex;
   gap: var(--space-4);
+  /* Or a long conversation's own width floors the whole row and the rail
+     stops shrinking with the pane. A flex item's automatic minimum is
+     `min-content`, which for a transcript is whatever its longest unbreakable
+     token happens to be. */
+  min-width: 0;
 }
 
 .myne-agent__rail {
@@ -1566,7 +1571,10 @@
   flex-direction: column;
   gap: var(--space-2);
   /* A hairline rather than a fill: the rail and the conversation are one
-     surface with a division in it, not two cards side by side. */
+     surface with a division in it, not two cards side by side. The padding
+     before the divider matches the gap after it (`--space-3` against the
+     body's `--space-4` less the 1px rule), so the line sits between two equal
+     margins rather than reading as the edge of a card. */
   border-inline-end: 1px solid var(--line-1);
   padding-inline-end: var(--space-3);
 }
