@@ -1550,15 +1550,22 @@
   height: 100%;
   min-height: 0;
   gap: var(--space-2);
-  /* A UNIFORM inset. It was `--space-4` vertically against `--space-1`
-     horizontally, on the argument that the pane has a tab strip above and a
-     status bar below and is narrow before it is anything else. What that
-     produced is a band of empty pane above the rail four times the gutter
-     beside it, so the content read as pushed down rather than inset — and the
-     band existed to clear a heading that is now gone. Equal on all four sides
-     is the honest version of "just off the edge", and the columns keep the
-     width. */
-  padding: var(--space-1);
+  /* Asymmetric, and the asymmetry runs the opposite way to the one this
+     replaced.
+
+     It was `--space-4` vertically against `--space-1` horizontally, which put
+     a band of empty pane above the rail four times the gutter beside it — a
+     band that existed to clear a heading. Equal on all four sides was the
+     next attempt and it went too far the other way: at `--space-1` the
+     content sat against the pane's top edge with no breathing room at all.
+
+     What the pane actually wants is room ABOVE and BELOW, where the tab strip
+     and the status bar are, and as little as possible to either SIDE, where
+     every pixel is width taken from two columns that are already narrow —
+     248px of rail plus whatever the conversation gets. So the inline inset is
+     ZERO: the rail's own rows carry their padding and the conversation column
+     carries its own, and the pane adds nothing on top of them. */
+  padding: var(--space-3) 0;
   box-sizing: border-box;
 }
 

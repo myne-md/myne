@@ -314,18 +314,30 @@ describe("AgentPane: the pane's top row", () => {
     expect(text.slice(arm, end)).toContain("display: flex");
   });
 
-  it("insets the pane equally on all four sides", () => {
-    // The ask behind it: the content should sit the same distance from every
-    // edge. It was `--space-4` top and bottom against `--space-1` left and
-    // right, which read as pushed down rather than inset.
+  it("spends its inset vertically and none of it on the sides", () => {
+    // The pane has a tab strip above it and a status bar below, so room there
+    // is room the content needs; horizontally every pixel is width taken from
+    // a 248px rail and whatever the conversation gets beside it. Both wrong
+    // shapes have shipped — `--space-4` against `--space-1`, then equal on all
+    // four sides — so what is pinned is the RELATION, not a number, which is
+    // the thing that keeps being got backwards.
     const text = css();
     const open = text.indexOf(".myne-agent {");
     const end = text.indexOf("\n}", open);
     const rule = text.slice(open, end);
     const padding = /padding:\s*([^;]+);/.exec(rule)?.[1]?.trim();
     expect(padding, "the pane declares no padding").toBeTruthy();
-    // One value: four different ones written out would satisfy a looser check
-    // while being exactly the asymmetry this replaced.
-    expect(padding!.split(/\s+/), padding).toHaveLength(1);
+    const parts = padding!.split(/\s+/);
+    // Two values, block then inline. One value is the equal-sided version;
+    // three or four is a per-edge inset nobody asked for.
+    expect(parts, padding).toHaveLength(2);
+    const [block, inline] = parts as [string, string];
+    // The inline half is nothing at all, and it is written as `0` rather than
+    // a token so there is no scale step to creep back up.
+    expect(inline, padding).toBe("0");
+    // And the block half is not also nothing: a `0 0` would satisfy every
+    // assertion above while removing the inset this test is about.
+    expect(block, padding).not.toBe("0");
+    expect(block, padding).toMatch(/^var\(--space-[2-9]\)$/);
   });
 });
