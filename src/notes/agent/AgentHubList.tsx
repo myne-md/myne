@@ -33,6 +33,7 @@ import {
   chatsDelete,
   chatsList,
   chatsRename,
+  subscribeConversationRoster,
   type ConversationListRow,
 } from "../../lib/chats";
 import { clearChatPersistForLock, openConversation } from "../ai/chatPersist";
@@ -123,6 +124,14 @@ const ERROR_STYLE: CSSProperties = {
   margin: 0,
 };
 
+/** The rail's two non-list controls, on one row. */
+const RAIL_HEADER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  minWidth: 0,
+};
+
 const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -140,9 +149,10 @@ const LIST_STYLE: CSSProperties = {
 
 
 export interface AgentHubListProps {
-  /** Open an existing conversation in the main column. The pane owns the
-   *  workspace write, so the rail does not reach into it. */
-  onOpenFocus: (next: { conversationId?: string }) => void;
+  /** Open an existing conversation in the main column, carrying the note it is
+   *  anchored to. The pane owns the workspace write, so the rail does not reach
+   *  into it. */
+  onOpenFocus: (next: { conversationId?: string; noteId?: string | null }) => void;
   /** Start a fresh conversation. Separate from `onOpenFocus` because they are
    *  different acts: one selects, the other creates, and collapsing them into
    *  "open with no id" is how a New-chat button ends up reopening the last one. */
@@ -202,18 +212,35 @@ export function AgentHubList({
     }
   }, []);
 
+  // Load once, then follow the roster.
+  //
+  // **The subscription is the half that was missing.** This list loaded on
+  // mount and nothing told it anything afterwards, so a conversation created by
+  // SENDING a message did not appear in the rail beside the reply that created
+  // it — the user watched an answer arrive into a history that claimed there
+  // was nothing there. It came back on the next mount, which made it look like
+  // a refresh problem rather than a missing wire.
+  //
+  // `subscribeConversationRoster` fires from the three chats wrappers
+  // themselves, so a future write site cannot forget to announce: the
+  // announcement is in the path, not beside it.
   useEffect(() => {
     let cancelled = false;
-    void chatsList().then(
-      (list) => {
-        if (!cancelled) setRows(byUpdatedDesc(list));
-      },
-      () => {
-        if (!cancelled) setError(true);
-      },
-    );
+    const load = (): void => {
+      void chatsList().then(
+        (list) => {
+          if (!cancelled) setRows(byUpdatedDesc(list));
+        },
+        () => {
+          if (!cancelled) setError(true);
+        },
+      );
+    };
+    load();
+    const unsubscribe = subscribeConversationRoster(load);
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -226,10 +253,16 @@ export function AgentHubList({
           return;
         }
       }
-      // Opening a row moves the tab to Focus on that conversation.
-      onOpenFocus({ conversationId: id });
+      // **With the note it is anchored to.** It opened by id alone, so the
+      // anchor was dropped on the way in: a conversation whose every turn says
+      // "Working on: This note" came back with no scope at all, and the
+      // composer asked the user to choose a folder for a conversation that had
+      // been about a note the whole time. The row already knows — `note_id` is
+      // on the catalog row and is why the anchor chip renders beside it.
+      const row = (rows ?? []).find((r) => r.id === id);
+      onOpenFocus({ conversationId: id, noteId: row?.note_id ?? null });
     },
-    [onOpenFocus],
+    [onOpenFocus, rows],
   );
 
   const commitRename = useCallback(
@@ -359,29 +392,46 @@ export function AgentHubList({
           Conditional on a note being open for the same reason the empty
           state's action is: a run needs a scope the host will accept, and with
           no note open there is none. */}
-      {/* New chat, unconditional. It was gated on a note being open, because
-          starting one meant opening a view that needed a scope; a conversation
-          is its own subject now, and what still needs a note is SENDING, which
-          the composer refuses on its own. Gating the button here refused the
-          screen one layer too early. */}
-      {onNewConversation !== undefined && (
-        <Button
-          variant="secondary"
-          icon="plus"
-          onClick={onNewConversation}
-          data-testid="agent.hub-new"
-        >
-          {t("agent.hub.newConversation")}
-        </Button>
-      )}
-      <Input
-        type="search"
-        data-testid="agent.hub-search"
-        aria-label={t("agent.hub.searchLabel")}
-        placeholder={t("agent.hub.searchPlaceholder")}
-        value={query}
-        onChange={(e) => setQuery(e.currentTarget.value)}
-      />
+      {/* **The search and New chat share a row.** They were stacked, which in a
+          248px rail spent two full rows on the two controls that are not the
+          list — and the list is what the rail is for.
+
+          New chat is icon-only and ACCENT: it is the one thing on this surface
+          that creates something, and everything else here opens, renames or
+          deletes what already exists. It was gated on a note being open, which
+          was right while starting a conversation meant opening a view that
+          needed a scope; a conversation is its own subject now, and what still
+          needs a note is SENDING, which the composer refuses on its own.
+
+          `<Button variant="primary" icon>` rather than `<IconButton>`: the
+          primitive has no accent arm, and it is the fill that carries "this is
+          the one that makes something". Its label is the tooltip AND the
+          accessible name, per the epic's convention — an icon-only control
+          with no name is a guess. */}
+      <div style={RAIL_HEADER_STYLE}>
+        <Input
+          type="search"
+          data-testid="agent.hub-search"
+          aria-label={t("agent.hub.searchLabel")}
+          placeholder={t("agent.hub.searchPlaceholder")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ flex: 1, minWidth: 0 }}
+        />
+        {onNewConversation !== undefined && (
+          <Tooltip label={t("agent.hub.newConversation")}>
+            <Button
+              variant="primary"
+              icon="plus"
+              aria-label={t("agent.hub.newConversation")}
+              data-testid="agent.hub-new"
+              onClick={onNewConversation}
+              style={{ flex: "none" }}
+            />
+          </Tooltip>
+        )}
+      </div>
+
       {visible.length === 0 ? (
         // A filtered-to-nothing list is NOT an empty vault: it echoes the query
         // and offers the way back. `<PanelEmptyState>` cannot say that — it is

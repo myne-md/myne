@@ -37,6 +37,8 @@ vi.mock("../../src/lib/agent-run", () => ({
   agentPreviewGrant: (...a: unknown[]) => agentPreviewGrant(...a),
 }));
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
 import { getChat, __resetChatForTest } from "../../src/notes/ai/chatStore";
@@ -650,6 +652,27 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
     expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
       true,
     );
+  });
+
+  it("points the right WAY at the control it names", () => {
+    // The sentence said "above" while the settings row sat under the composer:
+    // they moved down in this same epic and the copy was written against where
+    // they used to be. A direction in copy is a fact about the layout, and
+    // nothing else in the tree compares the two — the string renders, the row
+    // renders, and only a reader looking in the wrong place finds out.
+    noteless();
+    type("selam");
+    const line = screen.getByTestId("ai.composer-needs-scope");
+    const picker = screen.getByTestId("ai.composer-scope");
+    const pickerIsBelow =
+      (line.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    // The catalog is stubbed to echo keys here, so the English wording is read
+    // from `locales/en` directly: what is under test is that the word and the
+    // DOM order agree, which a key alone cannot say.
+    const english: string = JSON.parse(
+      readFileSync(resolve(process.cwd(), "locales/en/common.json"), "utf8"),
+    ).agent.composer.needsScope;
+    expect(english.includes(pickerIsBelow ? "below" : "above"), english).toBe(true);
   });
 
   it("stops saying it once a folder is chosen, and Send comes alive", () => {

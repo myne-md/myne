@@ -8,7 +8,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const { mockChatsList, mockChatsRename, mockChatsDelete, mockOpenConversation } =
   vi.hoisted(() => ({
@@ -18,7 +18,24 @@ const { mockChatsList, mockChatsRename, mockChatsDelete, mockOpenConversation } 
     mockOpenConversation: vi.fn(),
   }));
 
+/**
+ * The roster notifier the chats wrappers fire (myne-md/myne#771).
+ *
+ * A real registry rather than a no-op: the rail's whole subscription is under
+ * test here, and a stub returning nothing would let it pass with no listener
+ * at all. `announceRoster()` is what a create, a rename or a delete does from
+ * inside `src/lib/chats.ts`.
+ */
+const rosterListeners = new Set<() => void>();
+function announceRoster(): void {
+  for (const listener of [...rosterListeners]) listener();
+}
+
 vi.mock("../../src/lib/chats", () => ({
+  subscribeConversationRoster: (listener: () => void) => {
+    rosterListeners.add(listener);
+    return () => rosterListeners.delete(listener);
+  },
   chatsList: mockChatsList,
   chatsRename: mockChatsRename,
   chatsDelete: mockChatsDelete,
@@ -44,6 +61,7 @@ function row(id: string, title: string, updatedAt: number) {
 }
 
 beforeEach(() => {
+  rosterListeners.clear();
   mockChatsList.mockReset();
   mockChatsRename.mockReset();
   mockChatsDelete.mockReset();
@@ -85,13 +103,37 @@ describe("AgentHubList", () => {
     expect(screen.queryByTestId("agent.hub-empty")).toBeNull();
   });
 
-  it("opens a conversation and moves the tab to Focus on it", async () => {
+  it("opens a conversation and shows it, carrying its anchor", async () => {
+    // **With the note it is anchored to.** It opened by id alone, so the
+    // anchor was dropped on the way in: a conversation whose every turn said
+    // "Working on: This note" came back with no scope, and the composer asked
+    // the user to choose a folder for a conversation that had been about a
+    // note the whole time. The row already knows — `note_id` is on the catalog
+    // row and is why the anchor chip renders beside it.
+    mockChatsList.mockResolvedValue([{ ...row("c1", "One", 1), note_id: "n-9" }]);
+    const onOpenFocus = vi.fn();
+    render(<AgentHubList onOpenFocus={onOpenFocus} />);
+    fireEvent.click((await screen.findAllByTestId("agent.hub-open"))[0]!);
+    await waitFor(() =>
+      expect(onOpenFocus).toHaveBeenCalledWith({
+        conversationId: "c1",
+        noteId: "n-9",
+      }),
+    );
+    expect(mockOpenConversation).toHaveBeenCalledWith("c1");
+  });
+
+  it("says so plainly when a conversation has no anchor", async () => {
+    // `null`, not absent: the pane writes the whole view from this call, so an
+    // omitted key and an explicit "about no note" have to be the same thing or
+    // a vault-general conversation would inherit the previous one's note.
     mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
     const onOpenFocus = vi.fn();
     render(<AgentHubList onOpenFocus={onOpenFocus} />);
     fireEvent.click((await screen.findAllByTestId("agent.hub-open"))[0]!);
-    await waitFor(() => expect(onOpenFocus).toHaveBeenCalledWith({ conversationId: "c1" }));
-    expect(mockOpenConversation).toHaveBeenCalledWith("c1");
+    await waitFor(() =>
+      expect(onOpenFocus).toHaveBeenCalledWith({ conversationId: "c1", noteId: null }),
+    );
   });
 
   it("renames through the command and re-fetches", async () => {
@@ -305,5 +347,37 @@ describe("AgentHubList: a 248px rail is what the row has to fit in", () => {
     const list = screen.getByTestId("agent.hub-list");
     expect(list.style.overflowX).toBe("hidden");
     expect(list.style.minWidth).toBe("0px");
+  });
+});
+
+describe("AgentHubList: the rail follows the roster", () => {
+  // It loaded on mount and nothing told it anything afterwards, so a
+  // conversation created by SENDING a message did not appear in the list
+  // beside the reply that created it. It came back on the next mount, which is
+  // what made it read as a refresh quirk rather than a missing subscription.
+
+  it("re-reads when the roster changes", async () => {
+    mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
+    render(<AgentHubList onOpenFocus={() => {}} />);
+    await screen.findByTestId("agent.hub-list");
+    expect(mockChatsList).toHaveBeenCalledTimes(1);
+
+    mockChatsList.mockResolvedValue([row("c2", "Two", 2), row("c1", "One", 1)]);
+    await act(async () => {
+      announceRoster();
+    });
+    await waitFor(() => expect(screen.getAllByTestId("agent.hub-row")).toHaveLength(2));
+  });
+
+  it("stops listening when it unmounts", async () => {
+    // A rail that keeps its listener is a `setState` after unmount on every
+    // later write, for the life of the session.
+    mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
+    const { unmount } = render(<AgentHubList onOpenFocus={() => {}} />);
+    await screen.findByTestId("agent.hub-list");
+    unmount();
+    const before = mockChatsList.mock.calls.length;
+    announceRoster();
+    expect(mockChatsList.mock.calls.length).toBe(before);
   });
 });

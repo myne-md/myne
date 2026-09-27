@@ -442,7 +442,14 @@ export function ChatComposer({
 
           Only when there is something to send: a scope missing while the box
           is empty is not yet a problem, and a line that appears before the
-          user has typed is a scolding. */}
+          user has typed is a scolding.
+
+          It sits between the input and the control row it points at, and the
+          copy says "below" — the settings moved UNDER the composer in this
+          same epic and the sentence was written against where they used to be.
+          A direction in copy is a fact about the layout, so it belongs beside
+          the layout rather than in a catalog nobody re-reads when a row moves.
+          `tests/components/ChatComposer.test.tsx` pins the pair. */}
       {grant === null && !empty && !busy ? (
         <p data-testid="ai.composer-needs-scope" style={CAPTION_STYLE}>
           {t("agent.composer.needsScope")}
