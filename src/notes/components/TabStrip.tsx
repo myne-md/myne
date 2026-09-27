@@ -138,6 +138,16 @@ export type TabStripProps = {
   colorOf?: (id: string) => string | undefined;
   /** Leading icon for a tab handle (note vs view, MYND-274). Default file-text. */
   iconOf?: (id: string) => IconName;
+  /** A LIVE glyph for a tab handle, overriding `iconOf` when it returns one
+   *  (myne-md/myne#771). The agent tab uses it to show its run indicator in
+   *  place of its resting icon while a run is in flight.
+   *
+   *  A node rather than a second icon name, because what goes in the slot is
+   *  not an icon: it is a small subscribed component, so the store change that
+   *  makes it move re-renders one 14px leaf instead of the pane that owns the
+   *  strip. Returning `undefined` is the ordinary case and falls straight
+   *  through to `iconOf`. */
+  iconNodeOf?: (id: string) => ReactNode | undefined;
   /** Whether a tab handle is PINNED (tab-modes / MYND-320): a pinned tab shows a
    *  pin affordance, hides its × close, and offers Unpin in its right-click
    *  menu. Absent ⇒ no tab pinned. */
@@ -188,6 +198,7 @@ export function TabStrip({
   titleOf,
   colorOf,
   iconOf,
+  iconNodeOf,
   isPinned,
   onTogglePin,
   stacked = false,
@@ -310,6 +321,7 @@ export function TabStrip({
             title={titleOf(id)}
             colorSlot={colorOf?.(id)}
             icon={iconOf?.(id) ?? "file-text"}
+            iconNode={iconNodeOf?.(id)}
             active={id === activeTab}
             dirty={id === activeTab && activeDirty}
             pinned={isPinned?.(id) ?? false}
@@ -475,6 +487,8 @@ type TabProps = {
   paneId: string;
   title: string | null;
   icon: IconName;
+  /** Rendered in the glyph slot instead of `icon` when present. */
+  iconNode?: ReactNode;
   /** Colour-label slot; tints the icon (MYND-627). */
   colorSlot?: string;
   active: boolean;
@@ -504,6 +518,7 @@ function Tab({
   paneId,
   title,
   icon,
+  iconNode,
   colorSlot,
   active,
   dirty,
@@ -698,6 +713,7 @@ function Tab({
     >
       <span
         aria-hidden="true"
+        data-testid="tab.glyph"
         style={{
           display: "flex",
           width: 14,
@@ -716,11 +732,16 @@ function Tab({
             }}
           />
         ) : (
-          <Icon
-            name={icon}
-            size={13}
-            style={colorSlot ? { color: labelColorVar(colorSlot) } : undefined}
-          />
+          // The dirty dot still wins, and that ordering is deliberate: a live
+          // glyph reports something in flight, the dot reports something not
+          // yet on disk, and only one of those is about losing work.
+          (iconNode ?? (
+            <Icon
+              name={icon}
+              size={13}
+              style={colorSlot ? { color: labelColorVar(colorSlot) } : undefined}
+            />
+          ))
         )}
       </span>
       <span

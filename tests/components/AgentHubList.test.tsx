@@ -381,3 +381,34 @@ describe("AgentHubList: the rail follows the roster", () => {
     expect(mockChatsList.mock.calls.length).toBe(before);
   });
 });
+
+describe("AgentHubList: the row's actions sit at the far edge", () => {
+  it("pushes them there with a rule the title's wrapper cannot swallow", async () => {
+    // `TITLE_STYLE` carries `flex: 1` and it was not enough: the title button
+    // is inside a `<Tooltip>`, so the row's flex item is the TOOLTIP's wrapper
+    // and the grow sits on a child of it, where the free space never reaches.
+    // The actions ended up hugging the end of each title, landing in a
+    // different place on every row.
+    //
+    // Asserted on the ACTIONS' own container rather than on the title's flex,
+    // because that is the property: wherever the title's markup goes next, the
+    // pair stays at the edge.
+    mockChatsList.mockResolvedValue([row("c-1", "hi", 100)]);
+    render(<AgentHubList onOpenFocus={() => {}} />);
+    const actions = await screen.findByTestId("agent.hub-row-actions");
+    expect(actions.style.marginInlineStart, "not pushed to the edge").toBe("auto");
+    // Both controls, or aligning it moves one and leaves the other behind.
+    // `contains` rather than `parentElement`, because each IconButton is
+    // itself inside a tooltip wrapper — which is the very indirection that
+    // broke the title's `flex: 1` in the first place.
+    expect(actions.contains(screen.getByTestId("agent.hub-rename"))).toBe(true);
+    expect(actions.contains(screen.getByTestId("agent.hub-delete"))).toBe(true);
+    // It must not itself grow, or the pair absorbs the row's slack and ends up
+    // back beside the title.
+    // `flexGrow` rather than the `flex` shorthand: the DOM normalises
+    // `flex: none` to `0 0 auto`, and the assertion that matters is the grow
+    // term — a pair that grows absorbs the row's slack and lands back beside
+    // the title, which is the defect, not the spelling.
+    expect(actions.style.flexGrow, "the actions grow").toBe("0");
+  });
+});

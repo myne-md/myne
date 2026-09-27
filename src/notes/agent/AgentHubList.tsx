@@ -44,7 +44,11 @@ function byUpdatedDesc(rows: ConversationListRow[]): ConversationListRow[] {
   return [...rows].sort((a, b) => b.updated_at - a.updated_at);
 }
 
-function relativeDay(updatedAt: number, locale: string, timeZone: string | null): string {
+function relativeDay(
+  updatedAt: number,
+  locale: string,
+  timeZone: string | null,
+): string {
   const date = new Date(updatedAt);
   const now = new Date();
   const sameYear = date.getFullYear() === now.getFullYear();
@@ -112,6 +116,29 @@ const TITLE_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
+/**
+ * The row's two actions, pushed to the far edge.
+ *
+ * `TITLE_STYLE` already carries `flex: 1`, and it was not enough: the title
+ * button is wrapped in a `<Tooltip>`, so the FLEX ITEM is the tooltip's
+ * wrapper and the `flex: 1` sits on a child of it, where the row's free space
+ * never reaches. The result is the actions hugging the end of the title —
+ * "hi ✏🗑" — so the two controls land in a different place on every row and
+ * a column of them reads as ragged rather than as a column.
+ *
+ * `margin-inline-start: auto` is the fix rather than fixing the title's flex,
+ * because it holds however the title is wrapped: a tooltip, a badge, a second
+ * label later. `flex: none` so the pair never shrinks into each other on a
+ * narrow rail — the title is what ellipsizes.
+ */
+const ROW_ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  flex: "none",
+  marginInlineStart: "auto",
+};
+
 const META_STYLE: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
@@ -147,12 +174,14 @@ const LIST_STYLE: CSSProperties = {
   flex: 1,
 };
 
-
 export interface AgentHubListProps {
   /** Open an existing conversation in the main column, carrying the note it is
    *  anchored to. The pane owns the workspace write, so the rail does not reach
    *  into it. */
-  onOpenFocus: (next: { conversationId?: string; noteId?: string | null }) => void;
+  onOpenFocus: (next: {
+    conversationId?: string;
+    noteId?: string | null;
+  }) => void;
   /** Start a fresh conversation. Separate from `onOpenFocus` because they are
    *  different acts: one selects, the other creates, and collapsing them into
    *  "open with no id" is how a New-chat button ends up reopening the last one. */
@@ -275,7 +304,9 @@ export function AgentHubList({
       try {
         await chatsRename(id, title);
         setRenamingId(null);
-        setAnnouncement(t("agent.hub.renamedAnnouncement", { name: draft.trim() }));
+        setAnnouncement(
+          t("agent.hub.renamedAnnouncement", { name: draft.trim() }),
+        );
         await refresh();
       } catch {
         setError(true);
@@ -359,10 +390,20 @@ export function AgentHubList({
   // empty returns, so `rows` is narrowed to a real array.
   const q = query.trim().toLowerCase();
   const visible =
-    q.length === 0 ? rows : rows.filter((r) => r.title.toLowerCase().includes(q));
+    q.length === 0
+      ? rows
+      : rows.filter((r) => r.title.toLowerCase().includes(q));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", flex: 1, minHeight: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-2)",
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
       {/* The announcement channel. `polite` rather than `assertive`: these are
           confirmations of something the user just did, not interruptions.
           Always MOUNTED, never conditionally rendered — a live region that
@@ -454,69 +495,96 @@ export function AgentHubList({
           }
         />
       ) : (
-    <div data-testid="agent.hub-list" style={LIST_STYLE}>
-      {visible.map((row) => (
-        <div key={row.id} data-testid="agent.hub-row" data-conversation-id={row.id}>
-          {deletingId === row.id ? (
-            <div style={{ ...ROW_STYLE, flexDirection: "column", alignItems: "stretch" }}>
-              <p style={{ ...ERROR_STYLE, color: "var(--fg-1)", margin: 0, fontWeight: "var(--weight-medium)" }}>
-                {t("editor.chrome.rightPanel.aiChat.historyDeleteTitle")}
-              </p>
-              <p style={{ ...ERROR_STYLE, color: "var(--fg-1)", margin: 0 }}>
-                {t("editor.chrome.rightPanel.aiChat.historyDeleteBody")}
-              </p>
-              <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  data-testid="agent.hub-delete-cancel"
-                  onClick={() => setDeletingId(null)}
-                >
-                  {t("editor.chrome.rightPanel.aiChat.historyCancel")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  data-testid="agent.hub-delete-confirm"
-                  onClick={() => void commitDelete(row.id)}
-                >
-                  {t("editor.chrome.rightPanel.aiChat.historyDelete")}
-                </Button>
-              </div>
-            </div>
-          ) : renamingId === row.id ? (
-            <div style={ROW_STYLE}>
-              <Input
-                data-testid="agent.hub-rename-input"
-                aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
-                value={draft}
-                onChange={(e) => setDraft(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void commitRename(row.id);
-                  if (e.key === "Escape") setRenamingId(null);
-                }}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                data-testid="agent.hub-rename-confirm"
-                onClick={() => void commitRename(row.id)}
-              >
-                {t("editor.chrome.rightPanel.aiChat.historyRename")}
-              </Button>
-            </div>
-          ) : (
+        <div data-testid="agent.hub-list" style={LIST_STYLE}>
+          {visible.map((row) => (
             <div
-              style={ROW_STYLE}
-              data-active={row.id === activeId ? "true" : "false"}
-              // The conversation currently open in the surface. `aria-current`
-              // is what carries that to a reader; `data-active` paints it and
-              // carries nothing. They were one attribute doing one of the two
-              // jobs.
-              aria-current={row.id === activeId ? "true" : undefined}
+              key={row.id}
+              data-testid="agent.hub-row"
+              data-conversation-id={row.id}
             >
-              <div style={ROW_TOP_STYLE}>
-                {/* The row's own label ellipsizes, so the full title has to be
+              {deletingId === row.id ? (
+                <div
+                  style={{
+                    ...ROW_STYLE,
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <p
+                    style={{
+                      ...ERROR_STYLE,
+                      color: "var(--fg-1)",
+                      margin: 0,
+                      fontWeight: "var(--weight-medium)",
+                    }}
+                  >
+                    {t("editor.chrome.rightPanel.aiChat.historyDeleteTitle")}
+                  </p>
+                  <p
+                    style={{ ...ERROR_STYLE, color: "var(--fg-1)", margin: 0 }}
+                  >
+                    {t("editor.chrome.rightPanel.aiChat.historyDeleteBody")}
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "var(--space-2)",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      data-testid="agent.hub-delete-cancel"
+                      onClick={() => setDeletingId(null)}
+                    >
+                      {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      data-testid="agent.hub-delete-confirm"
+                      onClick={() => void commitDelete(row.id)}
+                    >
+                      {t("editor.chrome.rightPanel.aiChat.historyDelete")}
+                    </Button>
+                  </div>
+                </div>
+              ) : renamingId === row.id ? (
+                <div style={ROW_STYLE}>
+                  <Input
+                    data-testid="agent.hub-rename-input"
+                    aria-label={t(
+                      "editor.chrome.rightPanel.aiChat.historyRename",
+                    )}
+                    value={draft}
+                    onChange={(e) => setDraft(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitRename(row.id);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    data-testid="agent.hub-rename-confirm"
+                    onClick={() => void commitRename(row.id)}
+                  >
+                    {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  style={ROW_STYLE}
+                  data-active={row.id === activeId ? "true" : "false"}
+                  // The conversation currently open in the surface. `aria-current`
+                  // is what carries that to a reader; `data-active` paints it and
+                  // carries nothing. They were one attribute doing one of the two
+                  // jobs.
+                  aria-current={row.id === activeId ? "true" : undefined}
+                >
+                  <div style={ROW_TOP_STYLE}>
+                    {/* The row's own label ellipsizes, so the full title has to be
                     reachable somewhere — through `<Tooltip>` rather than the
                     native attribute, which waits ~1s, ignores the theme, clips
                     at the window edge and never appears on keyboard focus
@@ -529,47 +597,53 @@ export function AgentHubList({
                     titles into a list of chips. Recorded rather than converted,
                     which is what `check-primitive-adoption.mjs` asks for when
                     an element genuinely is not a primitive. */}
-                <Tooltip label={row.title}>
-                  <button
-                    type="button"
-                    data-testid="agent.hub-open"
-                    onClick={() => void handleOpen(row.id)}
-                    style={TITLE_STYLE}
-                  >
-                    {row.title}
-                  </button>
-                </Tooltip>
-                {/* Icon-only, and that is what makes the row fit: "Rename" and
+                    <Tooltip label={row.title}>
+                      <button
+                        type="button"
+                        data-testid="agent.hub-open"
+                        onClick={() => void handleOpen(row.id)}
+                        style={TITLE_STYLE}
+                      >
+                        {row.title}
+                      </button>
+                    </Tooltip>
+                    {/* Icon-only, and that is what makes the row fit: "Rename" and
                     "Delete" as words are most of a 248px rail on their own,
                     which is how the list came to scroll sideways. They carry
                     their labels as tooltips and as accessible names, per the
                     epic's tooltip convention. */}
-                <IconButton
-                  icon="pencil"
-                  iconSize={14}
-                  label={t("editor.chrome.rightPanel.aiChat.historyRename")}
-                  tooltip
-                  testId="agent.hub-rename"
-                  onClick={() => {
-                    setDeletingId(null);
-                    setDraft(row.title);
-                    setRenamingId(row.id);
-                  }}
-                />
-                <IconButton
-                  icon="trash-2"
-                  iconSize={14}
-                  label={t("editor.chrome.rightPanel.aiChat.historyDelete")}
-                  tooltip
-                  testId="agent.hub-delete"
-                  onClick={() => {
-                    setRenamingId(null);
-                    setDeletingId(row.id);
-                  }}
-                />
-              </div>
-              <div style={ROW_META_STYLE}>
-                {/* The note the conversation is anchored to, when it is
+                    <div style={ROW_ACTIONS_STYLE} data-testid="agent.hub-row-actions">
+                      <IconButton
+                        icon="pencil"
+                        iconSize={14}
+                        label={t(
+                          "editor.chrome.rightPanel.aiChat.historyRename",
+                        )}
+                        tooltip
+                        testId="agent.hub-rename"
+                        onClick={() => {
+                          setDeletingId(null);
+                          setDraft(row.title);
+                          setRenamingId(row.id);
+                        }}
+                      />
+                      <IconButton
+                        icon="trash-2"
+                        iconSize={14}
+                        label={t(
+                          "editor.chrome.rightPanel.aiChat.historyDelete",
+                        )}
+                        tooltip
+                        testId="agent.hub-delete"
+                        onClick={() => {
+                          setRenamingId(null);
+                          setDeletingId(row.id);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={ROW_META_STYLE}>
+                    {/* The note the conversation is anchored to, when it is
                     (myne-md/myne#771 story 10). This is what makes "on this
                     note" legible in the Hub, distinct from a vault-general
                     conversation.
@@ -579,29 +653,31 @@ export function AgentHubList({
                     given first: that class is a 40x28 THEME SWATCH with hidden
                     overflow, so a text label in it is a label nobody can read.
                     Right instinct, wrong class. */}
-                {row.note_id !== undefined ? (
-                  <button
-                    type="button"
-                    className="myne-pill"
-                    data-interactive={onOpenNote === undefined ? undefined : "true"}
-                    data-testid="agent.hub-anchor"
-                    data-note-id={row.note_id}
-                    disabled={onOpenNote === undefined}
-                    onClick={() => onOpenNote?.(row.note_id!)}
-                  >
-                    <Icon name="file-text" size={12} />
-                    {t("agent.hub.anchorLabel")}
-                  </button>
-                ) : null}
-                <span style={META_STYLE}>
-                  {relativeDay(row.updated_at, locale, timeZone)}
-                </span>
-              </div>
+                    {row.note_id !== undefined ? (
+                      <button
+                        type="button"
+                        className="myne-pill"
+                        data-interactive={
+                          onOpenNote === undefined ? undefined : "true"
+                        }
+                        data-testid="agent.hub-anchor"
+                        data-note-id={row.note_id}
+                        disabled={onOpenNote === undefined}
+                        onClick={() => onOpenNote?.(row.note_id!)}
+                      >
+                        <Icon name="file-text" size={12} />
+                        {t("agent.hub.anchorLabel")}
+                      </button>
+                    ) : null}
+                    <span style={META_STYLE}>
+                      {relativeDay(row.updated_at, locale, timeZone)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          ))}
         </div>
-      ))}
-    </div>
       )}
     </div>
   );
