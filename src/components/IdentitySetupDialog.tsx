@@ -10,11 +10,20 @@
 // Desktop + mobile only: on web `plugin:sync|sync_person_setup` is
 // `Class::Unsupported`, and Welcome is not reached at zero vaults there
 // (`vaultCreation` absent routes to `account-entry`).
-import { useState, type ChangeEvent, type ClipboardEvent } from "react";
+//
+// A device can already hold a recoverable sealed identity with no token
+// (`sealed_keypair_present`, myne-md/myne#780). In that state Create generates a
+// fresh phrase that cannot open the sealed frame it did not write, so the
+// backend answers `AlreadyHeldIdentity` and the old dialog showed a generic
+// error blaming the sync server. This dialog reads the status up front and, when
+// an identity is held, offers Recover plus an explicit destructive forget
+// instead of a Create that is guaranteed to fail.
+import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
-import { personSetup, type PersonSetupView } from "../lib/personAccount";
+import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
+import { personLock } from "../lib/invite";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
 import { SecretPhraseReveal, useLocalPhraseReveal } from "./SecretPhraseReveal";
 import { FirstRunServerStep, useHasSyncEndpoint } from "./sync/FirstRunServerStep";
@@ -27,14 +36,35 @@ interface IdentitySetupDialogProps {
   onCreated?: () => void;
 }
 
+/** Which failure the single error slot is showing. */
+type ErrorKind = "generic" | "alreadyHeld" | "notConfigured";
+
+/**
+ * Read the serialized `SyncDeviceError::kind` off a rejected invoke. The plugin
+ * rejects with a `{ kind }` object; anything else collapses to the generic arm.
+ */
+function errorKindOf(error: unknown): ErrorKind {
+  const kind =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { kind?: unknown }).kind
+      : undefined;
+  if (kind === "AlreadyHeldIdentity") return "alreadyHeld";
+  if (kind === "NotConfigured") return "notConfigured";
+  return "generic";
+}
+
+const emptyRecoveryCells = (): string[] =>
+  Array.from({ length: PHRASE_CELL_COUNT }, () => "");
+
 export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupDialogProps) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  const [recoveryCells, setRecoveryCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
+  const [error, setError] = useState<ErrorKind | null>(null);
+  const [recoveryCells, setRecoveryCells] = useState<string[]>(emptyRecoveryCells);
   const [result, setResult] = useState<PersonSetupView | null>(null);
+  // True when a sealed identity exists on this device even if it never enrolled.
+  const [heldIdentity, setHeldIdentity] = useState(false);
+  const [confirmForget, setConfirmForget] = useState(false);
   // The identity phrase gets the same display protections the vault phrase gets
   // (myne-md/myne#768): hidden until revealed, re-hidden on a walk-away. Local
   // state rather than a reducer, because this dialog owns no step machine.
@@ -46,19 +76,57 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   const hasEndpoint = useHasSyncEndpoint();
   const [serverAcknowledged, setServerAcknowledged] = useState(false);
 
+  // Read the held-identity state whenever the dialog is opened, so a device
+  // that already holds a sealed keypair (from an earlier session or another
+  // B2B flow) is steered to Recover rather than offered a doomed Create.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void personStatus()
+      .then((status) => {
+        if (alive) setHeldIdentity(status.sealed_keypair_present);
+      })
+      .catch(() => {
+        /* probe failed: keep the default Create affordance and let the
+           backend's typed error surface the held-identity case instead. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
   async function run(phrase?: string) {
     setBusy(true);
-    setError(false);
+    setError(null);
     try {
       setResult(await personSetup(phrase));
-      setRecoveryCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-    } catch {
-      // Never surface the raw backend error: it can carry a stage tag but no
-      // secret, and the UI cannot act differently on the variant anyway.
-      setError(true);
+      setRecoveryCells(emptyRecoveryCells());
+      setConfirmForget(false);
+    } catch (e) {
+      const kind = errorKindOf(e);
+      // A stale status probe: the backend still holds an identity. Reveal the
+      // forget path rather than only a generic error.
+      if (kind === "alreadyHeld") setHeldIdentity(true);
+      setError(kind);
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Forget the held identity on this device, then create a fresh one. */
+  async function forgetAndCreate() {
+    setConfirmForget(false);
+    setBusy(true);
+    setError(null);
+    try {
+      await personLock(true);
+      setHeldIdentity(false);
+    } catch {
+      setError("generic");
+      setBusy(false);
+      return;
+    }
+    await run();
   }
 
   function close() {
@@ -68,11 +136,19 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     // and unmount this dialog before `result.phrase` ever renders.
     const created = result !== null;
     setResult(null);
-    setError(false);
-    setRecoveryCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+    setError(null);
+    setRecoveryCells(emptyRecoveryCells());
+    setConfirmForget(false);
     onClose();
     if (created) onCreated?.();
   }
+
+  const errorKey =
+    error === "notConfigured"
+      ? "identitySetup.errorNotConfigured"
+      : error === "alreadyHeld"
+        ? "identitySetup.errorAlreadyHeld"
+        : "identitySetup.error";
 
   return (
     <ModalShell
@@ -133,17 +209,31 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
-            {t("identitySetup.intro")}
-          </div>
-          <Button
-            variant="primary"
-            disabled={busy}
-            onClick={() => void run()}
-            data-testid="identity-setup.create-cta"
-          >
-            {t("identitySetup.createCta")}
-          </Button>
+          {heldIdentity ? (
+            // A held identity cannot be opened by a freshly generated phrase, so
+            // Create is replaced by the notice + Recover, with an explicit
+            // destructive forget for a user who does not have the phrase.
+            <div
+              data-testid="identity-setup.held"
+              style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}
+            >
+              {t("identitySetup.heldIntro")}
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
+                {t("identitySetup.intro")}
+              </div>
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => void run()}
+                data-testid="identity-setup.create-cta"
+              >
+                {t("identitySetup.createCta")}
+              </Button>
+            </>
+          )}
 
           <div style={{ height: 1, background: "var(--line-1)", margin: "var(--space-1) 0" }} />
 
@@ -156,7 +246,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             disabled={busy}
             cells={recoveryCells}
             onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
-              setError(false);
+              setError(null);
               setRecoveryCells((cells) =>
                 cells.map((cell, cellIndex) =>
                   cellIndex === index ? event.target.value.replace(/\s+/g, "") : cell,
@@ -170,7 +260,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
                 .filter((token) => token.length > 0);
               if (tokens.length < 2) return;
               event.preventDefault();
-              setError(false);
+              setError(null);
               setRecoveryCells((cells) => {
                 const next = [...cells];
                 for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
@@ -192,6 +282,54 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           >
             {t("identitySetup.recoverCta")}
           </Button>
+
+          {heldIdentity ? (
+            confirmForget ? (
+              <div
+                data-testid="identity-setup.forget-confirm"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--space-2)",
+                  border: "1px solid var(--danger)",
+                  borderRadius: "var(--radius-2)",
+                  padding: "var(--space-3)",
+                }}
+              >
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
+                  {t("identitySetup.forgetWarning")}
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => setConfirmForget(false)}
+                    data-testid="identity-setup.forget-cancel"
+                  >
+                    {t("identitySetup.forgetCancel")}
+                  </Button>
+                  <div style={{ flex: 1 }} />
+                  <Button
+                    variant="danger"
+                    disabled={busy}
+                    onClick={() => void forgetAndCreate()}
+                    data-testid="identity-setup.forget-confirm-cta"
+                  >
+                    {t("identitySetup.forgetConfirm")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => setConfirmForget(true)}
+                data-testid="identity-setup.forget-cta"
+              >
+                {t("identitySetup.forgetCta")}
+              </Button>
+            )
+          ) : null}
         </div>
       )}
 
@@ -201,7 +339,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           role="alert"
           style={{ marginTop: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--danger)" }}
         >
-          {t("identitySetup.error")}
+          {t(errorKey)}
         </div>
       ) : null}
     </ModalShell>

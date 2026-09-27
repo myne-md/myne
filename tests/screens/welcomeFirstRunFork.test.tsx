@@ -24,6 +24,13 @@ vi.mock("../../src/lib/personAccount", () => ({
     identity_code: "c",
     approved: true,
   }),
+  personStatus: vi.fn().mockResolvedValue({
+    enrolled: false,
+    identity_unlocked: false,
+    person_id_hex: null,
+    identity_code: null,
+    sealed_keypair_present: false,
+  }),
 }));
 
 vi.mock("../../src/platform/core", () => ({

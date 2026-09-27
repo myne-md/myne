@@ -15,13 +15,15 @@ import {
   personSetup,
   personStatus,
   personListInvites,
+  personLock,
   type PersonSetupView,
   type InviteSummary,
 } from "../../lib/personAccount";
 import { syncSetEndpoint } from "../../lib/sync";
+import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import type { IdentityFlowProps } from "./types";
 
-type Step = "gate" | "server" | "create" | "phrase" | "home";
+type Step = "gate" | "held" | "server" | "create" | "phrase" | "home";
 
 /** A labelled monospace field, the same shape `JoinFlow` uses for server and
  *  account input. Local because `JoinFlow`'s copy is not exported. */
@@ -139,6 +141,11 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
           setPersonIdHex(s.person_id_hex);
           setIdentityCode(s.identity_code);
           setStep("home");
+        } else if (s.sealed_keypair_present) {
+          // A sealed identity this device cannot open with a fresh phrase
+          // (myne-md/myne#780): offer to forget it rather than loop through a
+          // create that is guaranteed to fail.
+          setStep("held");
         } else {
           setStep("gate");
         }
@@ -182,6 +189,36 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     }
   }, [serverUrl, t]);
 
+  // The hosted door: write the Myne server and let the first connection pin its
+  // leaf (TOFU). No pre-vetted pin is claimed (myne-md/myne#781).
+  const connectHosted = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await syncSetEndpoint(HOSTED_SYNC_ORIGIN);
+      setStep("create");
+    } catch {
+      setError(t("identityFlow.serverUnreachable"));
+    } finally {
+      setBusy(false);
+    }
+  }, [t]);
+
+  // Forget a held identity this device cannot open with a fresh phrase, so a
+  // create can proceed (myne-md/myne#780).
+  const forgetHeld = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await personLock(true);
+      setStep("gate");
+    } catch {
+      setError(t("identityFlow.createFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [t]);
+
   const createIdentity = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -214,6 +251,14 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     <ScreenScroll>
       <FlowHeader label={t("identityFlow.server.title")} onBack={onCancel} />
       <Lead>{t("identityFlow.server.lead")}</Lead>
+      <Button
+        onClick={() => void connectHosted()}
+        disabled={busy}
+        data-testid="identity-flow.server-myne-sync"
+      >
+        {t("identityFlow.server.useMyneSync")}
+      </Button>
+      <Lead>{t("identityFlow.server.selfHostedHint")}</Lead>
       <MonoField
         label={t("identityFlow.server.urlLabel")}
         value={serverUrl}
@@ -227,6 +272,24 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
         {busy ? t("identityFlow.server.connecting") : t("identityFlow.server.connect")}
       </Button>
       <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.server-back">
+        {t("identityFlow.back")}
+      </Button>
+    </ScreenScroll>
+  );
+
+  const renderHeld = () => (
+    <ScreenScroll>
+      <FlowHeader label={t("identityFlow.held.title")} onBack={onCancel} />
+      <Lead>{t("identityFlow.held.lead")}</Lead>
+      {error ? <Banner kind="warning">{error}</Banner> : null}
+      <Button
+        onClick={() => void forgetHeld()}
+        disabled={busy}
+        data-testid="identity-flow.held-forget"
+      >
+        {t("identityFlow.held.forget")}
+      </Button>
+      <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.held-cancel">
         {t("identityFlow.back")}
       </Button>
     </ScreenScroll>
@@ -386,6 +449,7 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
   return (
     <Screen style={{ padding: 0 }}>
       {step === "gate" && renderGate()}
+      {step === "held" && renderHeld()}
       {step === "server" && renderServer()}
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}

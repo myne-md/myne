@@ -49,6 +49,14 @@ export interface PersonStatusView {
   person_id_hex: string | null;
   /** The out-of-band public identity code; available while the private identity is locked. */
   identity_code: string | null;
+  /**
+   * Whether this device holds a recoverable sealed person keypair, even with no
+   * token issued (myne-md/myne#780). `enrolled` is false in that state, so the
+   * app shows Welcome, but "Create an identity" cannot open the sealed frame it
+   * did not write. The first-run dialog reads this to steer to Recover or an
+   * explicit forget.
+   */
+  sealed_keypair_present: boolean;
 }
 
 /** Device-local probe; no network. Drives the identity-only home. */
