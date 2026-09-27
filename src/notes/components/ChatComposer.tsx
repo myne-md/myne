@@ -283,6 +283,10 @@ export function ChatComposer({
         },
         i18n.language || null,
         onNotesWritten,
+        // Anchor the conversation to the note when the run is about one note
+        // (myne-md/myne#771). A folder or multi-note run is vault-general and
+        // gets no anchor, which is what the Hub renders as "not anchored".
+        grant.kind === "notes" && grant.value.length === 1 ? grant.value[0]! : null,
       );
     } finally {
       setBusy(false);

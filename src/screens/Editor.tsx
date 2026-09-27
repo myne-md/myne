@@ -3564,6 +3564,12 @@ function CommandPaletteHost({
         })().catch(() => {});
       },
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
+      // The agent hub, on its vault-general view (myne-md/myne#771). Opening
+      // the tab is the workspace controller's job; the palette only asks.
+      onOpenAgentVault: () => paletteWs.openAgent(),
+      // The agent hub on the open note's Focus view. The note is read from the
+      // workspace (the focused pane's active tab), so it follows a split.
+      onOpenAgentNote: () => paletteWs.openAgentOnNote(paletteWs.focusedNoteId ?? undefined),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3-4): reveal the render target, grab the focused pane's live view
       // via the `getActiveEditorView` registry (the palette pattern), then drive
@@ -4493,6 +4499,7 @@ function RightSidebar({
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const notes = useResolverNotes();
   const {
     prefs,
@@ -4776,6 +4783,10 @@ function RightSidebar({
             }}
             openNoteId={selectedId}
             folders={agentFolders}
+            // The panel-to-deep-surface exit (myne-md/myne#771): reveal the
+            // agent tab on the open note's Focus view. The workspace controller
+            // owns the reveal; without a note it lands on the Hub.
+            onFocusAgent={() => ws.openAgentOnNote(selectedId ?? undefined)}
             // An undo rewrites notes out-of-band of any pane's autosave, the
             // same shape a sync pull has, so it reuses the same blanket bump.
             // Each pane applies its own dirty guard, so this never clobbers

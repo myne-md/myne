@@ -171,6 +171,8 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 first_turn_payload: String,
                 #[serde(default)]
                 requested_id_hex: Option<String>,
+                #[serde(default)]
+                note_id: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -188,6 +190,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::hooks(),
                 &a.first_turn_payload,
                 a.requested_id_hex.as_deref(),
+                a.note_id.as_deref(),
             )
             .await
             {

@@ -984,6 +984,57 @@ const aiOpenChatAction: CommandAction = {
   },
 };
 
+// Open the agent tab on its vault-general Hub (myne-md/myne#771). The pair of
+// agent entries exists so "work on my vault" and "work on this note" are two
+// deliberate choices; the scope word in each label carries the difference, which
+// is what makes them distinguishable BEFORE either is invoked.
+const aiOpenAgentVaultAction: CommandAction = {
+  id: "ai.open-agent-vault",
+  get label() {
+    return i18n.t("commands.actions.aiOpenAgentVault.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  // The ONE pinnable agent item (myne-md/myne#771). It opens the agent tab on
+  // whatever view it was last left on: the reveal keeps an open tab's
+  // `agentView`, so a tab left in Focus comes back in Focus and a fresh one is
+  // born on the Hub. That is the "last-used view" behaviour without a second
+  // preference to keep in step.
+  ribbon: { icon: "message-square" },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onOpenAgentVault();
+  },
+};
+
+// Open the agent tab on its Focus view for the open note (myne-md/myne#771).
+// Needs a note, like the summarize/rewrite actions; without one the handler
+// lands on the Hub rather than a Focus with nothing behind it.
+const aiOpenAgentNoteAction: CommandAction = {
+  id: "ai.open-agent-note",
+  get label() {
+    return i18n.t("commands.actions.aiOpenAgentNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onOpenAgentNote();
+  },
+};
+
 // Summarize the open note / selection (note-summarization MYND-409). Per-note
 // AI action: needs a selected note (the exportNote pattern) AND ai_enabled AND
 // developer_mode. In the editor with a note, mode on, but AI off → disabled
@@ -1515,6 +1566,8 @@ const deleteWorkspaceAction: CommandAction = {
 const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Object.freeze({
   "ai.toggle-enabled": "localAi",
   "ai.open-chat": "localAi",
+  "ai.open-agent-vault": "localAi",
+  "ai.open-agent-note": "localAi",
   "ai.summarize-note": "localAi",
   "ai.rewrite-selection": "localAi",
   "app.toggle-screen-capture": "screenCaptureProtection",
@@ -1667,6 +1720,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   restoreBackupAction,
   revealVaultFolderAction,
   aiOpenChatAction,
+  aiOpenAgentVaultAction,
+  aiOpenAgentNoteAction,
   aiSummarizeNoteAction,
   aiRewriteSelectionAction,
 ]);

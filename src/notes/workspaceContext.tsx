@@ -47,6 +47,8 @@ import {
   tasksItem,
   attachmentsItem,
   templatesItem,
+  agentItem,
+  AGENT_TAB_ID,
   listSlots,
   noteItem,
   openInFocusedTab,
@@ -60,6 +62,7 @@ import {
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
   setTaskViewState as setTaskViewStateOp,
+  setAgentViewState as setAgentViewStateOp,
   resolveTaskView,
   taskViewToPersisted,
   splitPane,
@@ -75,6 +78,7 @@ import {
   type PaneId,
   type SplitDirection,
   type ViewId,
+  type PersistedAgentView,
   type WorkspaceItem,
   type WorkspaceNode,
   type WorkspaceSlot,
@@ -312,6 +316,18 @@ export type WorkspaceApi = {
    *  written before the container-level field existed, where the panel falls
    *  back to the tab's own persisted view (myne-md/myne#656 review). */
   taskViewIsSet: boolean;
+  /** Open (or reveal) the agent hub - a singleton tab like the graph and the
+   *  task list, born on its Hub view (myne-md/myne#771). */
+  openAgent: () => void;
+  /** Open (or reveal) the agent tab on a note, in its Focus view. Without a
+   *  note id the focused pane's open note is used. */
+  openAgentOnNote: (noteId?: NoteId) => void;
+  /** Persist the agent tab's view (Hub or Focus, and which note) WITH the tab.
+   *  Session state, per tab, never a preference. */
+  setAgentViewState: (paneId: PaneId, next: PersistedAgentView) => void;
+  /** The focused pane's open note id, or `null`. The agent tab's Focus view and
+   *  the "open agent on note" verb both need it. */
+  focusedNoteId: NoteId | null;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -666,6 +682,46 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setContainer],
   );
+  // ── the agent tab (myne-md/myne#771) ──────────────────────────────────────
+  // The reveal, born on the Hub. A singleton like the graph and the task list,
+  // so a second call reveals rather than duplicating. The PENDING VIEW is applied
+  // here (rather than left in a module slot) because this is where the item is
+  // built: the tab is born carrying the view the caller asked for.
+  const openAgentInternal = useCallback(
+    (view: PersistedAgentView | null) => {
+      const wasPending = pendingRef.current;
+      setPending(null);
+      setState((s) => {
+        const item: WorkspaceItem = view === null
+          ? agentItem()
+          : { kind: "agent", id: AGENT_TAB_ID, ...(view.view === "focus" ? { agentView: view } : {}) };
+        return wasPending !== null && wasPending === s.focusedPaneId
+          ? openInNewTab(s, item)
+          : openInFocusedTab(s, item);
+      });
+    },
+    [setPending],
+  );
+  const openAgent = useCallback(() => openAgentInternal(null), [openAgentInternal]);
+  const openAgentOnNote = useCallback(
+    (noteId?: NoteId) => {
+      // The caller (a palette action) passes the open note from its own
+      // `CommandContext`. A call with no note is a call with nothing to focus,
+      // so it lands on the Hub rather than a Focus with no note behind it.
+      if (noteId === undefined || noteId === "") {
+        openAgentInternal(null);
+        return;
+      }
+      openAgentInternal({ view: "focus", noteId });
+    },
+    [openAgentInternal],
+  );
+  const setAgentViewState = useCallback(
+    (paneId: PaneId, next: PersistedAgentView) => {
+      setState((s) => setAgentViewStateOp(s, paneId, next));
+    },
+    [],
+  );
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
       setPending(null);
@@ -860,6 +916,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
+  // The focused pane's open note, or `null`. The agent tab's Focus view and the
+  // "open agent on note" verb both read it (myne-md/myne#771).
+  const focusedNoteId: NoteId | null =
+    focused.activeTab !== null && focused.activeTab.kind === "note"
+      ? focused.activeTab.id
+      : null;
   // Stable identity for the staging-effect dep in Editor.tsx: resolveTaskView
   // builds a fresh object per call, so exposing its result directly would
   // re-fire staging on every render (myne-md/myne#656 review). Keyed on the
@@ -918,6 +980,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openTasks,
       openAttachments,
       openTemplates,
+      openAgent,
+      openAgentOnNote,
+      setAgentViewState,
+      focusedNoteId,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,

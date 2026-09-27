@@ -17,6 +17,7 @@ import {
 } from "../../src/notes/tabKinds";
 import {
   ATTACHMENTS_TAB_ID,
+  AGENT_TAB_ID,
   GRAPH_TAB_ID,
   TASKS_TAB_ID,
   TEMPLATES_TAB_ID,
@@ -37,6 +38,7 @@ describe("the registry covers the union", () => {
       "tasks",
       "attachments",
       "templates",
+      "agent",
     ];
     expect([...TAB_KIND_TAGS].sort()).toEqual([...unionKinds].sort());
     for (const kind of unionKinds) {
@@ -56,6 +58,7 @@ describe("the registry covers the union", () => {
   it("derives singleton-ness from the sentinel rather than a second list", () => {
     expect(isSingletonTabKind("graph")).toBe(true);
     expect(isSingletonTabKind("tasks")).toBe(true);
+    expect(isSingletonTabKind("agent")).toBe(true);
     expect(isSingletonTabKind("note")).toBe(false);
     expect(isSingletonTabKind("view")).toBe(false);
   });
@@ -75,6 +78,7 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
   it("normalizes a singleton's id to its sentinel", () => {
     expect(canonicalTabId("graph", "whatever-was-stored")).toBe(GRAPH_TAB_ID);
     expect(canonicalTabId("tasks", "whatever-was-stored")).toBe(TASKS_TAB_ID);
+    expect(canonicalTabId("agent", "whatever-was-stored")).toBe(AGENT_TAB_ID);
   });
 
   it("leaves a per-entity id alone", () => {
@@ -90,6 +94,7 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
       { kind: "tasks", id: TASKS_TAB_ID },
       { kind: "attachments", id: ATTACHMENTS_TAB_ID },
       { kind: "templates", id: TEMPLATES_TAB_ID },
+      { kind: "agent", id: AGENT_TAB_ID },
     ];
     for (const item of items) {
       expect(parseItemKey(itemKey(item))).toEqual(item);
@@ -105,6 +110,10 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
     // well as from storage, so it must be total. The id keeps its prefix here
     // because the whole string is treated as the note id — which is the legacy
     // behaviour and is what keeps a colon-containing note id working.
-    expect(parseItemKey("agent:xyz")).toEqual({ kind: "note", id: "agent:xyz" });
+    //
+    // The prefix must be one the registry does NOT know: `agent:xyz` was this
+    // test's example until `agent` became a registered kind (myne-md/myne#771),
+    // which is exactly the failure this case exists to catch one level up.
+    expect(parseItemKey("widget:xyz")).toEqual({ kind: "note", id: "widget:xyz" });
   });
 });

@@ -665,7 +665,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "IPC wrapper and DTO mirror over the shared chats core, the attachments-twin shape: six commands plus the two error-kind unions plus ConversationEntry. Both sides register the full subset the shared ACL grants, so unlike attachments there is no per-command absence question here: the wrapper shape is one answer. Its error taxonomy overlaps myne-md/myne#475.",
+      "IPC wrapper and DTO mirror over the shared chats core, the attachments-twin shape: six commands plus the two error-kind unions plus ConversationEntry. Both sides register the full subset the shared ACL grants, so unlike attachments there is no per-command absence question here: the wrapper shape is one answer. Its error taxonomy overlaps myne-md/myne#475. The pair stays in lockstep and did through myne-md/myne#771's `note_id`, on both halves: the DTO field, because a mirror missing a field the synced data carries is a type that lies about the bytes, and the `chatsCreate` parameter, because a wrapper that omits an argument the one host command takes is a second, narrower contract wearing the same name. Mobile has no caller for the parameter today and that is not a reason to drop it — the drift ratchet refuses a grown set precisely so \"we will add it when we need it\" cannot be recorded as a decision.",
   },
   {
     a: "src/lib/memory.ts",

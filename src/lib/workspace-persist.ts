@@ -20,6 +20,7 @@ import {
   wrapAsSingleSlot,
   type LeafPane,
   type NamedWorkspaces,
+  type PersistedAgentView,
   type PersistedTaskView,
   type ViewMode,
   type WorkspaceItem,
@@ -400,6 +401,34 @@ function parseTaskView(o: Record<string, unknown>): { taskView?: PersistedTaskVi
   return Object.keys(v).length > 0 ? { taskView: v } : {};
 }
 
+/**
+ * The persisted agent-tab view, defensively (myne-md/myne#771).
+ *
+ * Field-by-field, omit-when-default: a malformed or unknown value degrades to
+ * the Hub rather than rejecting the whole workspace blob and losing every open
+ * tab. A `focus` with no note id is incoherent (Focus needs a note), so it
+ * degrades to the Hub.
+ */
+function parseAgentView(o: Record<string, unknown>): { agentView?: PersistedAgentView } {
+  const raw =
+    typeof o.agentView === "object" && o.agentView !== null
+      ? (o.agentView as Record<string, unknown>)
+      : {};
+  const noteId = typeof raw.noteId === "string" && raw.noteId !== "" ? raw.noteId : undefined;
+  const conversationId =
+    typeof raw.conversationId === "string" && raw.conversationId !== ""
+      ? raw.conversationId
+      : undefined;
+
+  if (raw.view === "focus" && noteId !== undefined) {
+    const v: PersistedAgentView = { view: "focus", noteId };
+    if (conversationId !== undefined) v.conversationId = conversationId;
+    return { agentView: v };
+  }
+  // Everything else is the Hub, which is the omit-when-default value.
+  return {};
+}
+
 function parseItem(t: unknown): ParsedItem {
   if (typeof t === "string") return { item: { kind: "note", id: t } };
   if (typeof t !== "object" || t === null) return "invalid";
@@ -471,6 +500,21 @@ function parseItem(t: unknown): ParsedItem {
         ...pinned,
         ...viewMode,
         ...parseTaskView(o),
+      },
+    };
+  }
+  // The agent hub (myne-md/myne#771) - a singleton like the graph and the task
+  // list, plus its per-tab view. Read-when-present and **degrade to the Hub**
+  // rather than erroring: an unknown view name from a future build must not
+  // reject the whole workspace blob and lose every open tab.
+  if (o.kind === "agent") {
+    return {
+      item: {
+        kind: "agent",
+        id: canonicalTabId("agent", o.id),
+        ...pinned,
+        ...viewMode,
+        ...parseAgentView(o),
       },
     };
   }

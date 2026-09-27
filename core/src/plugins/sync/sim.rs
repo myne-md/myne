@@ -1323,6 +1323,7 @@ fn chats_concurrent_append_converges_no_ping_pong() {
         title: "taxes".to_string(),
         updated_at: 100,
         version: 1,
+        note_id: None,
     };
     let write_catalog = |d: &Device, map: &ChatsCatalogMap| {
         let plaintext = serde_json::to_vec(map).unwrap();

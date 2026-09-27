@@ -75,6 +75,7 @@ import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
 import { TasksPane } from "./TasksPane";
+import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
 import { useTagSuggestions } from "../useTagSuggestions";
 import { acceptTagIntoView } from "../ai/acceptTagIntoView";
@@ -337,6 +338,10 @@ export function PaneView({
   const isTasks = leaf.activeTab?.kind === "tasks";
   const isAttachments = leaf.activeTab?.kind === "attachments";
   const isTemplates = leaf.activeTab?.kind === "templates";
+  // An agent-kind active tab renders the agent hub (myne-md/myne#771) in place of
+  // the note editor - the same first-class-tab pattern the graph and tasks tabs
+  // established, and what makes "open the agent" a reveal rather than a second tab.
+  const isAgent = leaf.activeTab?.kind === "agent";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
   // every SYNC-5 index-change nonce - so a note created/renamed/loaded elsewhere
@@ -1665,6 +1670,15 @@ export function PaneView({
         fill: true,
         gutters: true,
         el: <TasksPane paneId={leaf.id} item={leaf.activeTab} />,
+      };
+    }
+    if (isAgent && leaf.activeTab !== null) {
+      // The agent hub (myne-md/myne#771). It fills like the tasks pane and keeps
+      // gutters: it is a reading/app content surface, not a canvas.
+      return {
+        fill: true,
+        gutters: true,
+        el: <AgentPane paneId={leaf.id} item={leaf.activeTab} />,
       };
     }
     if (loading) {

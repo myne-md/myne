@@ -64,6 +64,11 @@ export interface ConversationEntry {
   title: string;
   updated_at: number;
   version: number;
+  /** The note this conversation is anchored to, when it is (myne-md/myne#771).
+   *  Absent for a vault-general conversation. A field on the existing row, not a
+   *  new blob family: the roster already syncs, so the Hub lists anchors without
+   *  reading each conversation file. */
+  note_id?: string;
 }
 
 /**
@@ -95,10 +100,15 @@ export async function chatsCreate(
   // instead of minting a duplicate conversation. Optional so older callers
   // keep working (backend mints).
   requestedIdHex?: string,
+  // The note this conversation is anchored to, when it is (myne-md/myne#771).
+  // Optional and additive: a conversation created without it is vault-general,
+  // which is the Hub's own case.
+  noteId?: string | null,
 ): Promise<string> {
   return await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
     ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
+    ...(noteId !== undefined && noteId !== null ? { noteId } : {}),
   });
 }
 

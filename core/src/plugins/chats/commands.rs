@@ -63,6 +63,23 @@ pub struct ConversationEntry {
     /// `max(observed) + 1` on any mutation of this key; absent ≡ 0).
     #[serde(default, skip_serializing_if = "is_zero_u64")]
     pub version: u64,
+    /// The note this conversation is anchored to, when it is (myne-md/myne#771).
+    /// A **field on the existing row, not a new blob family**: the roster already
+    /// syncs Class-1, so the Hub can list and link every note-anchored
+    /// conversation without reading each conversation file. `None` for a
+    /// vault-general conversation.
+    ///
+    /// **Additive and backward-compatible**: the field is `Option` with
+    /// `skip_serializing_if`, so a conversation written before this existed
+    /// reads back with `None`, and a reader that does not know the field keeps
+    /// the row it already understood. The canonical-JSON key order is
+    /// alphabetical (§ 9.23), so `note_id` sorts between `deleted_at` and
+    /// `title`; serde emits struct fields in declaration order, and
+    /// `serde_json`'s default map is a `BTreeMap`-ordered pass only when the
+    /// `preserve_order` feature is off, which is the case here, so the emitted
+    /// key order stays canonical whatever this declaration order is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_id: Option<String>,
 }
 
 fn is_zero_u64(v: &u64) -> bool {
@@ -401,6 +418,7 @@ pub async fn chats_create_with_dir(
     first_turn_payload: &str,
     now_unix_millis: u64,
     requested_id_hex: Option<&str>,
+    note_id: Option<&str>,
 ) -> Result<String, ChatsMutateError> {
     let _guard = lock_write().await;
     validate_turn_payload(first_turn_payload)?;
@@ -426,6 +444,7 @@ pub async fn chats_create_with_dir(
             wanted.to_string(),
             first_turn_payload,
             now_unix_millis,
+            note_id,
         )
         .await;
     }
@@ -443,6 +462,7 @@ pub async fn chats_create_with_dir(
         conversation_id_hex,
         first_turn_payload,
         now_unix_millis,
+        note_id,
     )
     .await
 }
@@ -461,6 +481,7 @@ async fn create_with_id(
     conversation_id_hex: String,
     first_turn_payload: &str,
     now_unix_millis: u64,
+    note_id: Option<&str>,
 ) -> Result<String, ChatsMutateError> {
     let title = derive_title(first_turn_payload);
 
@@ -482,6 +503,7 @@ async fn create_with_id(
             title,
             updated_at: now_unix_millis,
             version: 1,
+            note_id: note_id.map(|s| s.to_string()),
         },
     );
     // The file is on disk before its catalog row: a catalog-write failure
@@ -886,6 +908,7 @@ pub async fn chats_create_from_host(
     hooks: &Hooks,
     first_turn_payload: &str,
     requested_id_hex: Option<&str>,
+    note_id: Option<&str>,
 ) -> Result<String, ChatsMutateError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
@@ -904,6 +927,7 @@ pub async fn chats_create_from_host(
             first_turn_payload,
             now,
             requested_id_hex,
+            note_id,
         )
         .await;
     }
@@ -915,6 +939,7 @@ pub async fn chats_create_from_host(
         first_turn_payload,
         now,
         requested_id_hex,
+        note_id,
     )
     .await
 }
@@ -1044,6 +1069,7 @@ pub async fn chats_create<R: Runtime>(
     hooks: State<'_, Hooks>,
     first_turn_payload: String,
     requested_id_hex: Option<String>,
+    note_id: Option<String>,
 ) -> Result<String, ChatsMutateError> {
     chats_create_from_host(
         &TauriHost::new(app),
@@ -1052,6 +1078,7 @@ pub async fn chats_create<R: Runtime>(
         hooks.inner(),
         &first_turn_payload,
         requested_id_hex.as_deref(),
+        note_id.as_deref(),
     )
     .await
 }
@@ -1213,6 +1240,7 @@ mod tests {
                 FIRST_TURN,
                 1_000,
                 None,
+                None,
             ))
             .expect("create");
         // 32-char lowercase hex UUIDv7.
@@ -1253,6 +1281,7 @@ mod tests {
                 FIRST_TURN,
                 1_000,
                 Some(wanted),
+                None,
             ))
             .expect("create");
         assert_eq!(first, wanted);
@@ -1265,6 +1294,7 @@ mod tests {
                 FIRST_TURN,
                 1_000,
                 Some(wanted),
+                None,
             ))
             .expect("retry adopts");
         assert_eq!(second, wanted);
@@ -1302,6 +1332,7 @@ mod tests {
                 FIRST_TURN,
                 1_000,
                 None,
+                None,
             ))
             .expect("create");
         let second = r#"{"turns":[{"id":"c1-1","kind":"text","role":"user","text":"q"},{"id":"c1-2","kind":"text","role":"assistant","text":"a"}]}"#;
@@ -1338,6 +1369,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
                 None,
             ))
             .expect("create");
@@ -1398,6 +1430,7 @@ mod tests {
                 FIRST_TURN,
                 1_000,
                 None,
+                None,
             ))
             .expect("create");
         rt().block_on(chats_rename_with_dir(
@@ -1429,6 +1462,7 @@ mod tests {
             FIRST_TURN,
             1_000,
             None,
+            None,
         ))
         .expect("create");
         // Corrupt the catalog bytes (not the header: a byte in the middle of
@@ -1453,6 +1487,7 @@ mod tests {
                 FIRST_TURN,
                 2_000,
                 None,
+                None,
             ))
             .unwrap_err();
         assert_eq!(err, ChatsMutateError::CatalogUnreadable);
@@ -1472,6 +1507,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
                 None,
             ))
             .unwrap_err();
@@ -1495,6 +1531,7 @@ mod tests {
                 r#"{"turns":[{"id":"a1","kind":"text","role":"user","text":"first"}]}"#,
                 1_000,
                 None,
+                None,
             ))
             .expect("create a");
         let b = rt()
@@ -1505,6 +1542,7 @@ mod tests {
                 &hooks,
                 r#"{"turns":[{"id":"b1","kind":"text","role":"user","text":"second"}]}"#,
                 2_000,
+                None,
                 None,
             ))
             .expect("create b");
@@ -1570,6 +1608,7 @@ mod tests {
                 &state,
                 &hooks,
                 FIRST_TURN,
+                None,
                 None,
             ))
             .expect("member create");

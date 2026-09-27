@@ -45,6 +45,18 @@ export interface ConversationEntry {
   title: string;
   updated_at: number;
   version: number;
+  /** The note this conversation is anchored to, when it is (myne-md/myne#771).
+   *  Absent for a vault-general conversation.
+   *
+   *  Mirrored here even though mobile has no way to SET it: this is a mirror of
+   *  the Rust type, the rows sync, and a row written on a computer arrives here
+   *  carrying the field. A mirror that is missing a field the data has is a type
+   *  that lies about the bytes — the next mobile surface wanting to show the
+   *  anchor would reach for a cast, which is how a mirror stops being one.
+   *
+   *  The create-side `noteId` parameter is deliberately NOT mirrored: anchoring
+   *  happens where a note is open beside an agent run, and mobile has neither. */
+  note_id?: string;
 }
 
 /** Mirror of Rust `ConversationListRow`: what `chatsList` returns. */
@@ -69,10 +81,21 @@ export async function chatsCreate(
   firstTurnPayload: string,
   // Client-minted id for idempotent retry (same contract as desktop).
   requestedIdHex?: string,
+  // The note this conversation is anchored to, when it is (myne-md/myne#771).
+  // Optional and additive: a conversation created without it is vault-general.
+  //
+  // Mobile has no caller that passes it today — anchoring happens where a note
+  // is open beside an agent run, and mobile has neither. It is here because the
+  // wrapper is a mirror of ONE host command, and a mirror that omits an argument
+  // is a second, narrower contract wearing the same name: the next mobile
+  // surface that needs to anchor would either add the parameter and find the
+  // two files had drifted for months, or reach past the wrapper to `invoke`.
+  noteId?: string | null,
 ): Promise<string> {
   return await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
     ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
+    ...(noteId !== undefined && noteId !== null ? { noteId } : {}),
   });
 }
 

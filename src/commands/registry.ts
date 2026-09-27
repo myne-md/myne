@@ -56,6 +56,17 @@ export type CommandContext = {
    */
   onOpenAiChat: () => void;
   /**
+   * Reveal the agent tab, on its vault-general Hub view (myne-md/myne#771).
+   * The scope word in the label is what makes it distinguishable from the
+   * note-scoped sibling before the user invokes either.
+   */
+  onOpenAgentVault: () => void;
+  /**
+   * Reveal the agent tab, on its Focus view for the OPEN note (myne-md/myne#771).
+   * A call with no open note lands on the Hub, which the handler decides.
+   */
+  onOpenAgentNote: () => void;
+  /**
    * Summarize the open note / selection (note-summarization MYND-409). Runs the
    * local `Engine.infer` on a RAM-assembled prompt and renders ephemerally in
    * the AI Chat tab; blocked for a note in an `ai_excluded_folders` folder
