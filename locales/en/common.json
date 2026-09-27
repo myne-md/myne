@@ -4358,22 +4358,10 @@
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "I have saved my account number where I can find it later.",
-      "back": "Back",
-      "commit": "Create vault",
-      "committing": "Saving…",
       "copied": "Copied",
       "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
-      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-      "eyebrow": "Step 4 of 4: account number",
-      "heading": "Save your account number.",
-      "intro": "This is your bearer token. Treat it like cash.",
-      "saveAsFile": "Save as file",
-      "saveFailed": "Couldn't save the file. Copy the number instead, or write it down.",
-      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read.",
-      "shownOnceBody": "Save it now. Myne cannot recover it for you. Required to register for sync later.",
-      "shownOnceEmphasis": "This is shown only once."
+      "saveAsFile": "Save as file"
     },
     "briefing": {
       "back": "Back",
@@ -4402,8 +4390,9 @@
     },
     "confirm": {
       "back": "Back",
-      "continue": "Continue",
-      "eyebrow": "Step 3 of 4: confirm phrase",
+      "commit": "Create vault",
+      "committing": "Saving…",
+      "eyebrowLabel": "confirm phrase",
       "heading": "Type back four words from your phrase.",
       "intro": "We'll ask for specific positions to verify you saved it.",
       "mismatch": "Doesn't match word #{{pos}}.",
@@ -4413,11 +4402,6 @@
       "caption": "This takes a moment.",
       "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
       "heading": "Encrypting your vault"
-    },
-    "provisioning": {
-      "heading": "Creating your account",
-      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
-      "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "errors": {
       "accountNumberInvalid": {
@@ -4493,6 +4477,34 @@
         "body": "Try again with less content."
       }
     },
+    "kit": {
+      "accountFor": "Account number — when you add another device",
+      "back": "Back",
+      "continue": "I've saved this, confirm phrase",
+      "copied": "The kit is on your clipboard. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
+      "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the kit stays on it until you copy something else.",
+      "copy": "Copy",
+      "copyFailed": "Couldn't copy. Use “Save recovery kit” instead.",
+      "documentTitle": "Myne recovery kit",
+      "downloadStarted": "Sent to your browser's downloads. Check the kit arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
+      "eyebrowLabel": "recovery kit",
+      "heading": "Your recovery kit.",
+      "intro": "The file you are about to save is exactly this. It is shown once.",
+      "phraseFor": "Recovery phrase — if you forget your password",
+      "save": "Save recovery kit",
+      "saveFailed": "Couldn't save the file. Copy the kit instead, or write both parts down.",
+      "savedToFile": "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read.",
+      "whyEnglish": "The words are English in every language. They are part of the BIP-39 standard, so any Myne client can read a phrase written by any other one. Do not translate them: translated words are not in the wordlist, and the phrase would stop working."
+    },
+    "name": {
+      "back": "Back",
+      "continue": "Continue",
+      "eyebrowLabel": "name your vault",
+      "heading": "What should we call this vault?",
+      "helper": "The name is stored encrypted with the vault, so only you can read it. You can change it later, or hide vault names entirely, in Settings.",
+      "intro": "You will see this name on the lock screen and in your vault list.",
+      "placeholder": "Personal"
+    },
     "orchestrator": {
       "closePrompt": {
         "cancelLabel": "Cancel",
@@ -4511,28 +4523,28 @@
     },
     "password": {
       "back": "Back",
-      "eyebrow": "Step 1 of 4: master password",
+      "eyebrowLabel": "master password",
       "heading": "Create vault",
       "helperLead": "Myne does not store your password or recovery phrase.",
       "submit": "Generate recovery phrase"
     },
     "phrase": {
-      "back": "Back",
       "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
-      "continue": "I've saved this, confirm phrase",
       "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the words stay on it until you copy something else.",
       "copy": "Copy",
-      "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-      "eyebrow": "Step 2 of 4: recovery phrase",
-      "heading": "Write down these 24 words.",
-      "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline: paper, password manager, hardware wallet. Treat it like cash.",
+      "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "reveal": "Reveal phrase",
       "saveAsFile": "Save as file",
       "saveFailed": "Couldn't save the file. Copy the words instead, or write them down.",
       "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read."
+    },
+    "provisioning": {
+      "heading": "Creating your account",
+      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
+      "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "ready": {
       "backedUp": "Backed up ✓",
@@ -4549,7 +4561,8 @@
     },
     "sessionLost": {
       "startOver": "Start over"
-    }
+    },
+    "stepIndicator": "Step {{n}} of {{total}}: {{label}}"
   },
   "vaultPicker": {
     "accountFallback": "Account",

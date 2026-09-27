@@ -145,17 +145,18 @@ const VERDICTS = {
   // roster's job is to notice a NEW file, and a prefix rule would swallow one —
   // which is exactly what happened to `ProvisioningStep.tsx`, added by that same
   // change and caught by this gate rather than by a reviewer.
-  "vault-creation/AccountStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/BriefingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ConfirmStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/EncryptingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/index.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/PasswordStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
-  "vault-creation/PhraseStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/KitStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/NameStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ReadyStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/reducer.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/SessionLostStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/step-shell.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/stepOrder.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ReadyLocalArtefacts.tsx": {
     verdict: "excluded",
     marker: "create.ready-backup-now",

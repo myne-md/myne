@@ -373,6 +373,10 @@ const V = {
     "ported",
     "The copy-policy chokepoint (myne-md/myne#390). Runs on web as written because it holds no transport: the platform write, the clear and the error sink are all injected, and the module imports nothing at all. On web the injected write IS `web/src/platform/clipboardManager.ts`, so the same code makes the same decision about what the user is told and only the byte-mover underneath it differs. The `os-managed` clear arm is mobile-only and simply has no web caller; the `host` arm's clear is the web dispatcher's refusal, exactly as `secret-export.ts` below describes.",
   ],
+  "src/lib/recovery-kit.ts": [
+    "ported",
+    "A pure function from strings to one string: the recovery kit's file contents. No host call, no filesystem, no clipboard — the writing is `secret-export.ts` below, which is where the web adaptation lives. So the browser produces byte-identical kit text to the desktop, which is the point: a kit saved on one client has to be readable by the recovery flow on another.",
+  ],
   "src/lib/secret-export.ts": [
     "adapted",
     "Both halves adapt rather than one shipping and one being substituted, and the note that said otherwise was falsified on three clauses at once by `decisions.md` 2026-08-15 (entry 0514). Save-as-file takes the browser-download arm where `nativeSaveAs` is absent; the clipboard copy takes the `none` clear strategy where `clipboardAutoClear` is absent, so it writes and reports and schedules nothing. Its secret callers are the two creation steps, which are no longer substituted: creation ships on web.",

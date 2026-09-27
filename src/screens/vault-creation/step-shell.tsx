@@ -5,10 +5,12 @@
 // the simplify pass.
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import { stageRootStyle } from "../../components/primitives/stageRoot";
 import { scrollRegionStyle, useScrollEdges } from "../../hooks/useScrollEdges";
+import { stepPosition, type NumberedStep } from "./stepOrder";
 
 interface StepLayoutProps {
   width?: number;
@@ -127,5 +129,39 @@ export function StepHeading({ centered, children }: StepHeadingProps) {
     >
       {children}
     </div>
+  );
+}
+
+interface StepCounterProps {
+  /** Which numbered step this is. The number comes from `NUMBERED_STEPS`. */
+  step: NumberedStep;
+  /** Leading glyph, as `<StepEyebrow>`. */
+  icon?: IconName;
+  /**
+   * The step's own name, ALREADY translated by the caller.
+   *
+   * Passed in rather than looked up from `step`, and that is deliberate:
+   * `check-i18n.mjs` proves a key exists by scanning for a static `t("literal")`,
+   * so a table mapping steps to key strings here would put four load-bearing keys
+   * outside the only check that reads them. Each step spells its own key.
+   */
+  label: string;
+  testId?: string;
+}
+
+/**
+ * The `Step N of M: <label>` eyebrow.
+ *
+ * `vaultCreation.stepIndicator` is one interpolated string, so a translator
+ * chooses the wording and the separator once and the numbers arrive from
+ * `stepOrder.ts`. See that file for why they are not in the string.
+ */
+export function StepCounter({ step, icon, label, testId }: StepCounterProps) {
+  const { t } = useTranslation();
+  const { n, total } = stepPosition(step);
+  return (
+    <StepEyebrow icon={icon} testId={testId}>
+      {t("vaultCreation.stepIndicator", { n, total, label })}
+    </StepEyebrow>
   );
 }

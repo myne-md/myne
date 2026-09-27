@@ -79,6 +79,37 @@ async function passBriefing(session: Session): Promise<void> {
   await cont.click();
 }
 
+/**
+ * Reach the password step from the create-account entry, whichever screens sit
+ * in front of it.
+ *
+ * Two of them do since myne-md/myne#468: the first-run briefing, which appears
+ * only on a first run, and the vault-name step, which always does. Branching on
+ * which one is showing rather than assuming an order is what this whole suite
+ * does at every entry, because the browser client's route into creation depends
+ * on what the container already holds.
+ */
+async function reachPasswordStep(session: Session): Promise<void> {
+  const first = await waitForAnyTestId(
+    session,
+    ["create.briefing", "create.name-input"],
+    30_000,
+  );
+  if (first === "create.briefing") {
+    await passBriefing(session);
+  }
+  // The name step. A name is typed rather than skipped: it heads the recovery
+  // kit and the file the kit saves, so an empty one exercises the branch where
+  // nothing is written.
+  const name = await session.byTestId("create.name-input", { timeoutMs: 30_000 });
+  await name.scrollIntoView();
+  await name.sendKeys("Web Kasa");
+  const nameNext = await session.byTestId("create.name-continue");
+  await nameNext.scrollIntoView();
+  await nameNext.click();
+  await session.byTestId("create.password-input", { timeoutMs: 30_000 });
+}
+
 describeE2E("web account creation", () => {
   it("offers a create door on the entry screen, which the old rule forbade", async () => {
     // The affordance itself is the reversal made visible. Until 2026-08-15 a
@@ -122,16 +153,9 @@ describeE2E("web account creation", () => {
         await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
         await (await browser.session.byTestId("account-entry.create-account")).click();
 
-        // Briefing, then the password. The briefing is first-run only and is
-        // owed to a browser user exactly as much as to a desktop one.
-        const first = await waitForAnyTestId(
-          browser.session,
-          ["create.briefing", "create.password-input"],
-          30_000,
-        );
-        if (first === "create.briefing") {
-          await passBriefing(browser.session);
-        }
+        // Briefing (first-run only, and owed to a browser user exactly as much
+        // as to a desktop one), then the vault name, then the password.
+        await reachPasswordStep(browser.session);
         await (
           await browser.session.byTestId("create.password-input", { timeoutMs: 30_000 })
         ).sendKeys(PASSWORD);
@@ -192,14 +216,7 @@ describeE2E("web account creation", () => {
         await openApp(browser.session, server.origin);
         await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
         await (await browser.session.byTestId("account-entry.create-account")).click();
-        const first = await waitForAnyTestId(
-          browser.session,
-          ["create.briefing", "create.password-input"],
-          30_000,
-        );
-        if (first === "create.briefing") {
-          await passBriefing(browser.session);
-        }
+        await reachPasswordStep(browser.session);
         await (
           await browser.session.byTestId("create.password-input", { timeoutMs: 30_000 })
         ).sendKeys(PASSWORD);
