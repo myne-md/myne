@@ -451,6 +451,18 @@ function parseItem(t: unknown): ParsedItem {
       },
     };
   }
+  // The template library (myne-md/myne#779) — a singleton with no per-tab
+  // state, so it parses exactly like the graph and the attachment library.
+  if (o.kind === "templates") {
+    return {
+      item: {
+        kind: "templates",
+        id: canonicalTabId("templates", o.id),
+        ...pinned,
+        ...viewMode,
+      },
+    };
+  }
   if (o.kind === "tasks") {
     return {
       item: {

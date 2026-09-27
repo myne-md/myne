@@ -19,6 +19,7 @@ import {
   ATTACHMENTS_TAB_ID,
   GRAPH_TAB_ID,
   TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
   itemKey,
   parseItemKey,
   type WorkspaceItem,
@@ -35,6 +36,7 @@ describe("the registry covers the union", () => {
       "graph",
       "tasks",
       "attachments",
+      "templates",
     ];
     expect([...TAB_KIND_TAGS].sort()).toEqual([...unionKinds].sort());
     for (const kind of unionKinds) {
@@ -87,6 +89,7 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
       { kind: "graph", id: GRAPH_TAB_ID },
       { kind: "tasks", id: TASKS_TAB_ID },
       { kind: "attachments", id: ATTACHMENTS_TAB_ID },
+      { kind: "templates", id: TEMPLATES_TAB_ID },
     ];
     for (const item of items) {
       expect(parseItemKey(itemKey(item))).toEqual(item);

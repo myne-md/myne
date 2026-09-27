@@ -69,6 +69,7 @@ import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
 import { AttachmentsLibrary } from "../../components/attachments/AttachmentsLibrary";
+import { TemplatesManager } from "../../components/TemplatesManager";
 import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
@@ -335,6 +336,7 @@ export function PaneView({
   // of the note editor - the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
   const isAttachments = leaf.activeTab?.kind === "attachments";
+  const isTemplates = leaf.activeTab?.kind === "templates";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
   // every SYNC-5 index-change nonce - so a note created/renamed/loaded elsewhere
@@ -1595,6 +1597,26 @@ export function PaneView({
     // announcing itself twice.
     if (isAttachments) {
       return { fill: true, gutters: false, el: <AttachmentsLibrary /> };
+    }
+    // The template library (myne-md/myne#779). Gutters STAY: unlike the graph
+    // and the attachment grid, this is a text list, and a text list 8px from
+    // the edge of a full-width pane is the compact this product says it is not.
+    if (isTemplates) {
+      return {
+        fill: true,
+        gutters: true,
+        el: (
+          <TemplatesManager
+            open
+            onClose={() => {}}
+            onOpenNote={(id) => {
+              // Opening a template REPLACES this tab with it, which is what
+              // "open" means in a pane. No separate close.
+              void ctx.open(id).catch(() => {});
+            }}
+          />
+        ),
+      };
     }
     if (isTasks && leaf.activeTab !== null) {
       // The third member of #534's family, found while fixing the graph.
