@@ -2584,7 +2584,7 @@
       "viewTypeTable": "Table"
     },
     "welcome": {
-      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nWe're glad you're here. To learn more about Myne, visit https://myne.md\n",
+      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
       "title": "Welcome to Myne"
     },
     "workspace": {
