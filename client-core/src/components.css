@@ -1000,3 +1000,69 @@
   width: 62%;
   margin-bottom: 0;
 }
+
+
+/* =========================================================================
+   Drop indicator
+   ========================================================================= */
+
+/* One vocabulary for "the dragged thing lands HERE" (myne-md/myne#778).
+   Three reorder surfaces had grown three treatments — the left ribbon, the
+   ribbon roster in Settings, and the toolbar roster beside it — so the same
+   gesture answered differently depending on which list you were in.
+
+   TWO variants, because one of those differences was a decision rather than
+   drift, and flattening it would have reintroduced a rendering bug:
+
+     line   an absolutely-positioned bar between rows. The default, and the
+            clearer signal: it sits in the gap and points at a position.
+     inset  an inset box-shadow plus a soft fill on the row itself. For a list
+            whose rows are rounded and dark, where a positioned bar cannot be
+            drawn without a border — and WKWebView renders a 2px transparent
+            border on a rounded dark row as a visible light line (recorded in
+            `ToolbarCustomizeSettings.tsx` from a QA screenshot). An inset
+            shadow adds nothing to the box, so rows never reflow when it
+            appears.
+
+   Both are `--accent`, both are 2px, and neither animates: a drop indicator is
+   feedback about where the pointer IS, and motion on it would lag the thing it
+   is reporting. */
+
+.myne-drop-line {
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-1);
+  pointer-events: none;
+  z-index: 1;
+}
+.myne-drop-line[data-edge="before"] { top: -1px; }
+.myne-drop-line[data-edge="after"] { bottom: -1px; }
+
+/* The vertical twin, for a row of horizontally-arranged items (a tab strip). */
+.myne-drop-line[data-axis="inline"] {
+  inset-inline: auto;
+  inset-block: 0;
+  width: 2px;
+  height: auto;
+}
+
+.myne-drop-row[data-edge="before"] {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+.myne-drop-row[data-edge="after"] {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Under forced colours the accent becomes the system canvas and the indicator
+   disappears — on feedback whose entire job is to be seen mid-gesture. */
+@media (forced-colors: active) {
+  .myne-drop-line,
+  .myne-drop-row[data-edge] {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}

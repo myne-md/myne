@@ -233,6 +233,26 @@ function scrub(src) {
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
+/**
+ * Read a file that may vanish between the walk and the read.
+ *
+ * The walk collects paths and the reads happen afterwards, so anything that
+ * writes or deletes in the tree meanwhile — a build, a formatter, another
+ * process — can make `readFileSync` throw ENOENT and take the whole guard down
+ * with a stack trace instead of a verdict. A guard that crashes is worse than
+ * one that fails: the failure at least says what is wrong.
+ *
+ * Found by this guard's own spec, which writes fixtures into the real tree
+ * while a sibling spec does the same in a parallel worker.
+ */
+function readOrSkip(file) {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 async function walk(dir, out) {
   let entries;
   try {
@@ -329,7 +349,9 @@ for (const root of present) {
   const files = await walk(join(ROOT, root), []);
   for (const file of files) {
     const rel = relative(ROOT, file);
-    const src = scrub(readFileSync(file, "utf8"));
+    const raw = readOrSkip(file);
+    if (raw === null) continue;
+    const src = scrub(raw);
 
     // -- Rule 1: ease-in as a curve -----------------------------------------
     // `(?!-out)` is the whole subtlety: `ease-in-out` is a legitimate curve for
