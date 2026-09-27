@@ -45,6 +45,9 @@ vi.mock("../../src/hooks/useRoster", () => ({
     invite: vi.fn().mockResolvedValue(null),
     vaultInvites: [],
     vaultInvitesFailed: false,
+    // Shared, so the invite box is reachable without the migration confirmation
+    // (myne-md/myne#783).
+    shared: true,
     removing: false,
     remove: vi.fn().mockResolvedValue(undefined),
   }),

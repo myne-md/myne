@@ -20,15 +20,6 @@ import { useRoster, type RosterMember } from "../../hooks/useRoster";
 import { startB2bMigration, inspectInviteCode } from "../../lib/invite";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
-
-/** The `kind` of a serialized backend error, or `null` for anything else. */
-function syncErrorKind(e: unknown): string | null {
-  if (e && typeof e === "object" && "kind" in e) {
-    const kind = (e as { kind: unknown }).kind;
-    if (typeof kind === "string") return kind;
-  }
-  return null;
-}
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
@@ -122,16 +113,22 @@ export function MemberRosterPanel({
     invite,
     vaultInvites,
     vaultInvitesFailed,
+    shared,
     removing,
     remove,
     unlockPerson,
     lockPerson,
+    reload,
   } = useRoster(personReady);
   const [personError, setPersonError] = useState(false);
   const [phraseCells, setPhraseCells] = useState<string[]>(() =>
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
   const [inviteOpen, setInviteOpen] = useState(false);
+  // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
+  // vault (myne-md/myne#783). The migration is permanent, so it is an explicit
+  // step rather than a hidden retry.
+  const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
@@ -550,6 +547,15 @@ export function MemberRosterPanel({
         </p>
       ) : null}
 
+      {/* An unshared vault says so once, plainly, instead of leaving the reader
+          to infer it from an error line. `shared` is the roster view's
+          `group_key_epoch`, so this is a state and not a guess. */}
+      {authority === "owner" && personReady && !shared ? (
+        <p data-testid="member-roster.unshared" style={STATUS_STYLE}>
+          {t("sync.memberRoster.unsharedNotice")}
+        </p>
+      ) : null}
+
       {/* Step 3: invite. Owner-only: a member is never shown an admin
           control they cannot use (the backend refuses with `NotOwner`). */}
       {authority === "owner" ? (
@@ -558,10 +564,64 @@ export function MemberRosterPanel({
           variant="primary"
           data-testid="member-roster.invite-button"
           disabled={!personReady || inviting}
-          onClick={() => setInviteOpen(true)}
+          onClick={() => {
+            // An `NTV5` vault gains the group tier on its first invite, which is
+            // PERMANENT. Say so BEFORE the form, rather than letting the user
+            // submit and infer it from a hidden retry (myne-md/myne#783).
+            if (!shared) {
+              setShareConfirmOpen(true);
+              return;
+            }
+            setInviteOpen(true);
+          }}
         >
           {t("sync.memberRoster.invite")}
         </Button>
+      ) : null}
+
+      {shareConfirmOpen ? (
+        <div
+          data-testid="member-roster.share-confirm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("sync.memberRoster.shareConfirmTitle")}
+          style={SECTION_STYLE}
+        >
+          <p style={STATUS_STYLE}>{t("sync.memberRoster.shareConfirmTitle")}</p>
+          <p data-testid="sync.memberRoster.shareConfirmBody" style={STATUS_STYLE}>
+            {t("sync.memberRoster.shareConfirmBody")}
+          </p>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button
+              type="button"
+              data-testid="member-roster.share-cancel"
+              disabled={inviting}
+              onClick={() => setShareConfirmOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              data-testid="member-roster.share-confirm-cta"
+              disabled={inviting}
+              onClick={async () => {
+                const vaultLabel = prefs.label ?? t("sync.memberRoster.untitledVault");
+                try {
+                  await startB2bMigration(vaultLabel);
+                } catch {
+                  setActionError(t("sync.memberRoster.shareFailed"));
+                  return;
+                }
+                reload();
+                setShareConfirmOpen(false);
+                setInviteOpen(true);
+              }}
+            >
+              {t("sync.memberRoster.shareConfirmCta")}
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {inviteOpen ? (
@@ -578,22 +638,11 @@ export function MemberRosterPanel({
               vaultLabel,
               createdAtSecs: Math.floor(Date.now() / 1000),
             };
+            // The vault is shared by now (the migration ran in the confirmation
+            // step), so this is a plain invite. Any failure is reported as-is:
+            // the retired hidden retry turned a real error into a second
+            // attempt the user could not see or reason about.
             try {
-              await invite(args);
-              setInviteOpen(false);
-              return;
-            } catch (e) {
-              // The first B2B action on a pre-B2B vault migrates it to NTV6.
-              // The backend refuses the invite with `MigrationRequired` until
-              // that commit, so run the explicit migration and retry ONCE. Any
-              // other failure is reported as-is.
-              if (syncErrorKind(e) !== "MigrationRequired") {
-                setActionError(t("sync.memberRoster.inviteFailed"));
-                return;
-              }
-            }
-            try {
-              await startB2bMigration(vaultLabel);
               await invite(args);
               setInviteOpen(false);
             } catch {
