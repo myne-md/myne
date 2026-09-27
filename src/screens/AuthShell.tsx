@@ -1,0 +1,152 @@
+// The deboxed pre-unlock page (myne-md/myne#773).
+//
+// Before this, the vault picker and the unlock screen were each a bordered card
+// floating in the middle of an otherwise empty window. Two frames around one
+// question, with the app's own name printed inside the inner one — so the
+// window looked like a container for a dialog rather than like the app.
+//
+// Deboxed: the window IS the surface. The wordmark sits top-left, where an
+// application's name sits; the actions sit top-right, where an application's
+// actions sit; and the middle holds only the thing the user came to do —
+// choosing a vault, or opening one.
+//
+// ── One shell, two screens, because the transition is between them ─────────
+// The picker and the unlock screen are separate stages in `App.tsx`, so moving
+// from one to the other unmounts the first and mounts the second. That is what
+// makes an enter animation the honest shape here rather than a cross-fade: the
+// outgoing view is already gone, and holding it alive to fade it out would mean
+// keeping a mounted password form on screen after the user has left it.
+//
+// The direction is the caller's to state, because only the caller knows which
+// way the user is going: choosing a vault goes forward, the back link goes
+// back, and a shell that guessed from mount order would get the back link
+// wrong every time.
+//
+// ── What it deliberately does not do ───────────────────────────────────────
+// It holds no state, reads no prefs and makes no host call. Every screen that
+// mounts it is PRE-UNLOCK, where the rule is that nothing on screen may be
+// derived from vault content (`src/AGENTS.md`); a shell with a data dependency
+// would be the easiest place in the tree to break that without noticing.
+
+import type { CSSProperties, ReactNode } from "react";
+import { MyneMark } from "../components/primitives/MyneMark";
+import { stageRootStyle } from "../components/primitives/stageRoot";
+
+/** Which way the user is travelling, so the entrance moves with them. */
+export type AuthEnter = "forward" | "back";
+
+const ROOT_STYLE: CSSProperties = {
+  ...stageRootStyle,
+  flexDirection: "column",
+  // The shell owns the whole window, so it stretches rather than centring; the
+  // MAIN region below does the centring.
+  alignItems: "stretch",
+  justifyContent: "flex-start",
+  background: "var(--paper)",
+  fontFamily: "var(--font-sans)",
+};
+
+// Generous horizontal padding, which is most of what makes a top bar read as
+// page chrome rather than as a toolbar: chrome sits at the window's margins,
+// a toolbar sits in a band. `--space-7` against the old card's `--space-6`.
+const HEADER_STYLE: CSSProperties = {
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-4)",
+  padding: "var(--space-5) var(--space-7)",
+};
+
+const BRAND_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  minWidth: 0,
+};
+
+const WORDMARK_STYLE: CSSProperties = {
+  fontSize: "var(--text-lg)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  letterSpacing: "var(--tracking-tight)",
+  color: "var(--fg-1)",
+};
+
+const ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  flexShrink: 0,
+};
+
+const MAIN_STYLE: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  // Symmetric with the header's inline padding so the centred column lines up
+  // with the wordmark's margin at narrow widths.
+  padding: "0 var(--space-7) var(--space-7)",
+};
+
+const VIEW_STYLE: CSSProperties = {
+  width: "100%",
+  maxWidth: 480,
+  // Bounded by what the main region was given: the vault list inside is the
+  // only thing allowed to scroll, and it cannot if this grows to fit instead.
+  maxHeight: "100%",
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-5)",
+};
+
+export function AuthShell({
+  actions,
+  enter = "forward",
+  children,
+  testId,
+}: {
+  /** Top-right controls. Icon buttons — this is chrome, not a form. */
+  actions?: ReactNode;
+  enter?: AuthEnter;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div style={ROOT_STYLE} data-testid={testId}>
+      <header style={HEADER_STYLE}>
+        <div style={BRAND_STYLE}>
+          <MyneMark size={26} />
+          <span style={WORDMARK_STYLE}>Myne</span>
+        </div>
+        {actions != null && <div style={ACTIONS_STYLE}>{actions}</div>}
+      </header>
+      <main style={MAIN_STYLE}>
+        {/* The animation is keyed off an attribute rather than a class alone so
+            the two directions are one rule pair in `components.css` and the
+            reduced-motion arm there covers both without knowing about either. */}
+        <div className="myne-auth-view" data-enter={enter} style={VIEW_STYLE}>
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export const AUTH_TITLE_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-3xl)",
+  lineHeight: "var(--leading-snug)",
+  letterSpacing: "var(--tracking-tight)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
+
+export const AUTH_BODY_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-base)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--fg-2)",
+};

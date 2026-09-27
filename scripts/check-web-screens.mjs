@@ -102,6 +102,10 @@ const VERDICTS = {
     verdict: "adapted",
     note: "Ships whole; affordances the platform cannot honour are omitted through the capability descriptor rather than by a fork (task 27).",
   },
+  "AuthShell.tsx": {
+    verdict: "ported",
+    note: "The deboxed pre-unlock page shell (myne-md/myne#773) shared by the vault picker and the unlock screen. Layout, a wordmark and an actions slot — it holds no state, reads no prefs and makes no host call, which is deliberate rather than incidental: every screen that mounts it is pre-unlock, where nothing on screen may derive from vault content, and a shell with a data dependency would be the easiest place in the tree to break that unnoticed.",
+  },
   "Unlock.tsx": {
     verdict: "adapted",
     note: "Ships whole; the fail-closed CTA is the platform exit seam (task 95) and the restore door is capability-gated (task 70).",
