@@ -85,6 +85,7 @@ import {
 } from "../components/primitives/CenteredCard";
 import { AuthHeading, AuthShell } from "./AuthShell";
 import { Button } from "../components/primitives/Button";
+import { Icon } from "../components/primitives/Icon";
 import { InlineSubmitField } from "../components/primitives/InlineSubmitField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
 import { SuspicionBanner } from "../components/SuspicionBanner";
@@ -383,11 +384,12 @@ const INFO_BANNER_STYLE: CSSProperties = {
 // the full Button danger variant (which would compete visually with
 // the primary Unlock CTA).
 const DELETE_VAULT_LINK_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
   background: "transparent",
   border: 0,
   padding: 0,
-  marginTop: "var(--space-1)",
-  alignSelf: "center",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
@@ -426,17 +428,55 @@ const BACK_LINK_STYLE: CSSProperties = {
   marginBlockEnd: "calc(var(--space-4) * -1)",
 };
 
+/**
+ * The secondary actions under the field, as ONE row (myne-md/myne#773).
+ *
+ * They were three centred links stacked down the page — "Use PIN instead",
+ * "Forgot your password?", "Delete this vault" — at near-identical weight,
+ * one of them destructive and red. Three equal offers under a single question
+ * reads as a menu the user has to work through, and it is the reason this
+ * screen looked unfinished next to the rest of the app: the field above it is
+ * one confident line, and everything below it was a list.
+ *
+ * A row, because they are ALTERNATIVES to the same act rather than steps.
+ * `flex-wrap` because they are translated: German runs long and two of these
+ * strings are sentences, so the row folds rather than clipping.
+ */
+const ALT_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "var(--space-1) var(--space-4)",
+  marginTop: "var(--space-2)",
+};
+
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
   padding: 0,
-  marginTop: "var(--space-2)",
-  alignSelf: "center",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
   color: "var(--accent)",
   cursor: "pointer",
+};
+
+/**
+ * The last-resort zone, below a hairline.
+ *
+ * Deleting the vault is not a third way to open it, and a red link sitting an
+ * equal gap under two blue ones said that it was. The rule is the whole
+ * device: it separates a destructive act from the alternatives above it
+ * without shouting, and it is a `--line-1` hairline because that is the only
+ * way a surface earns division here.
+ */
+const DANGER_ZONE_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  marginTop: "var(--space-4)",
+  paddingTop: "var(--space-4)",
+  borderTop: "1px solid var(--line-1)",
 };
 
 export function Unlock({
@@ -849,42 +889,52 @@ export function Unlock({
               ) : undefined
             }
           />
-          {/* Way back to the quick surface the user traded away — rendered only
-              when quick-unlock is still redeemable, so an exhausted or
-              unconfigured credential is never re-offered. */}
-          {quickMethod != null && !decrypting && (
-            <button
-              type="button"
-              onClick={() => setPasswordRevealed(false)}
-              style={RECOVER_LINK_STYLE}
-              data-testid="unlock.use-quick-unlock-link"
-            >
-              {quickMethod === "biometric"
-                ? t("unlock.useBiometricInstead", {
-                    biometric: t("settings.quickUnlock.methodTouchId"),
-                  })
-                : t("unlock.unlockWithPinInstead")}
-            </button>
-          )}
+          {/* The two alternatives to typing this password, on one row. The
+              first is the way back to the quick surface the user traded away,
+              rendered only while quick-unlock is still redeemable so an
+              exhausted or unconfigured credential is never re-offered. */}
           {!decrypting && (
-            <button
-              type="button"
-              onClick={onStartRecovery}
-              style={RECOVER_LINK_STYLE}
-              data-testid="unlock.recovery-link"
-            >
-              {t("unlock.recoveryLink")}
-            </button>
+            <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
+              {quickMethod != null && (
+                <button
+                  type="button"
+                  onClick={() => setPasswordRevealed(false)}
+                  style={RECOVER_LINK_STYLE}
+                  data-testid="unlock.use-quick-unlock-link"
+                >
+                  {quickMethod === "biometric"
+                    ? t("unlock.useBiometricInstead", {
+                        biometric: t("settings.quickUnlock.methodTouchId"),
+                      })
+                    : t("unlock.unlockWithPinInstead")}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onStartRecovery}
+                style={RECOVER_LINK_STYLE}
+                data-testid="unlock.recovery-link"
+              >
+                {t("unlock.recoveryLink")}
+              </button>
+            </div>
           )}
+          {/* Below the rule: destroying the vault is not a third way to open
+              it. The `trash-2` glyph is the canon's own requirement rather
+              than decoration — `PRODUCT.md` says colour is never the sole
+              channel, and this was a red word with nothing beside it. */}
           {!decrypting && (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "request-delete-vault" })}
-              style={DELETE_VAULT_LINK_STYLE}
-              data-testid="unlock.delete-link"
-            >
-              {t("unlock.deleteLink")}
-            </button>
+            <div style={DANGER_ZONE_STYLE}>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "request-delete-vault" })}
+                style={DELETE_VAULT_LINK_STYLE}
+                data-testid="unlock.delete-link"
+              >
+                <Icon name="trash-2" size={14} />
+                {t("unlock.deleteLink")}
+              </button>
+            </div>
           )}
         </form>
       )}
