@@ -135,6 +135,18 @@ A simple, modern file-encryption format and library by Filippo Valsorda. Myne do
 Used in: `decisions.md` 2026-04-28 (age/rage cited as the boring-crypto precedent for the RustCrypto stack); `spec/protocol.md` §2
 Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
+### **agent focus** &nbsp; 📦 *Product*
+
+The second of the [agent hub](#agent-hub) tab's two views: ONE [conversation](#conversation), shown beside the note it is anchored to, with the run's live state and the full [conversational AI chat](#conversational-ai-chat) surface. Reached by opening a row in the hub, by the "Agent: open on note" palette verb, or by the light panel's one exit control. It is a VIEW of the tab rather than a second tab: the tab's `agentView` chooses between them, which is what makes revealing an open tab keep the view the user left it on. It is **not a full-window mode** — the tab sits in the pane tree like any other, so a note stays open beside it, which is the whole reason the surface is a tab (`decisions/ai/0620`). Distinct from the light panel, which also shows one conversation: the panel is the shallow end, with no list, no search and no history chrome.
+
+Used in: `decisions/ai/0620`
+
+### **agent hub** &nbsp; 📦 *Product*
+
+The deep surface for [agentic note editing](#agentic-note-editing): a singleton workspace tab listing every [conversation](#conversation) in the vault, newest first, searchable, each row openable, renameable and deletable, and each carrying its [note anchor](#note-anchor) when it has one. The tab has two views — the hub list and [agent focus](#agent-focus) — and the duplicate-forbid invariant makes "open the agent" a reveal rather than a second tab, from the palette, the ribbon and the panel alike. It is **not a stage** (it does not take the window, and a note stays open beside it), **not a modal** (you browse it rather than answer it, `decisions/ui/0619`), and **not a replacement for the light AI panel**, which keeps its place in the right panel's vocabulary as the shallow end of a depth pair. Behind the same `developer_mode` + `ai_enabled` gate as every other `ai.*` surface (`decisions/ai/0622`).
+
+Used in: `decisions/ai/0620`; `decisions/ai/0622`
+
 ### **agent memory** &nbsp; 📦 *Product*
 
 *(Alias: `vault.agent-memory`, `memories/<id>`; the memory roster and its per-entry blobs.)*
@@ -1236,6 +1248,14 @@ public half; neither `root_key` nor a root-derived membership key participates.
 Used in: `docs/spec/protocol.md` §9.3.3
 
 
+### **run indicator** &nbsp; 📦 *Product*
+
+*(Alias: the orb.)*
+
+The small animated mark on the [agent hub](#agent-hub) tab that says a run is in flight, beside the word that says the same thing. It animates only while the run is RUNNING — not while a settled run's view is still open — pauses when the tab is hidden or the mark is off-screen, holds one static frame under `prefers-reduced-motion`, and is `aria-hidden`, because the state's meaning is in the text next to it. It is a **named exemption** in the motion canon rather than a permitted pattern: `PRODUCT.md` principle 4 forbids a pulsing state indicator, `decisions/ui/0618` established the by-name mechanism, and `scripts/check-motion-canon.mjs` knows both of its keyframes (`decisions/ai/0621`). It is **not a spinner** — a spinner says "waiting for IO" and turns at IO's pace; this reports a model working — and **not a progress bar**: nothing about an agent run is measurable in advance.
+
+Used in: `decisions/ai/0621`; `decisions/ui/0618`
+
 ### **roster continuity** &nbsp; 📋 *Protocol*
 
 A live roster row's identity-continuity state in an `NTV6` group roster:
@@ -1868,6 +1888,14 @@ Used in: `spec/protocol.md` §5.3
 ### **native-messaging host** &nbsp; 📋 *Protocol*
 
 The small Rust stdio host in the Tauri core that receives a keyless clip handoff from the [browser clipper](#browser-clipper) and pipes it into the existing `note_create` / `attachment_import` pipeline. Allowlists the exact extension ID and treats every handed-off byte as hostile input (size caps, UTF-8 validation, no path traversal, re-sniffed MIME, rate limits). Defines trust boundary TB10.
+
+### **note anchor** &nbsp; 📦 *Product*
+
+*(Alias: `ConversationEntry.note_id`.)*
+
+The note a [conversation](#conversation) is about, when it is about one: an optional note id on the conversation's catalog row, written at creation when a run starts with a single note in its [agent scope](#agent-scope). A field on the existing row rather than a new blob family, deliberately — the catalog already syncs, so the [agent hub](#agent-hub) lists anchors without opening every conversation file. A conversation without one is **vault-general**, which is the hub's own case and not a degraded state. The anchor is a label, never a permission: it says what a conversation was about and grants nothing, and what a run may touch is the [agent scope](#agent-scope) alone.
+
+Used in: `protocol.md` §9.23; `decisions/ai/0620`
 
 ### **note-task** &nbsp; 📦 *Product*
 
