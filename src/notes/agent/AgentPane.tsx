@@ -35,45 +35,12 @@ import { AgentRunOrb } from "./AgentRunOrb";
 import { useAgent } from "./agentStore";
 import { startNewConversation } from "../ai/startNewConversation";
 
-/**
- * The pane's own box.
- *
- * `PaneView` hands a tab body the full pane with no inset — correct for a note,
- * where the editor owns its own margins, and wrong for a surface built out of
- * controls: the heading sat flush against the tab strip and the rail's first
- * button touched the pane's left edge.
- *
- * The inset is ASYMMETRIC, and deliberately. Vertically it is `--space-4`,
- * because the header has a tab strip above it and the composer has a status
- * bar below. Horizontally it is `--space-1`: the pane is narrow before it is
- * anything else — the rail takes 248px of it and the conversation lives in
- * what remains — so side padding is width taken from the two columns that
- * need it, to separate them from edges the pane already has.
- */
-const ROOT_STYLE: CSSProperties = {
-  height: "100%",
-  minHeight: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-3)",
-  padding: "var(--space-4) var(--space-1)",
-  boxSizing: "border-box",
-};
-
-const HEADER_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-2)",
-  flexWrap: "wrap",
-  rowGap: "var(--space-1)",
-};
-
-const HEADING_STYLE: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)",
-  color: "var(--fg-2)",
-};
+/* The pane's inset and its header live in `components.css` (`.myne-agent`,
+   `.myne-agent__header`). They were inline here, and the header could not
+   stay: whether it takes any space at all is a question only the container
+   query can answer — it holds the rail toggle, which exists solely in the
+   narrow arm — and an inline style cannot be conditioned on a container width.
+   The inset moved with it so the pane's box is described in one place. */
 
 /** The orb plus the word it means. They are one object, so they sit in one
  *  box: an indicator that can drift away from its own label is an indicator
@@ -221,25 +188,30 @@ export function AgentPane({
       ref={rootRef}
       tabIndex={-1}
       aria-label={t("agent.hub.title")}
-      style={ROOT_STYLE}
     >
-      <div style={HEADER_STYLE}>
-        <div style={HEADING_STYLE}>
-          {/* The rail toggle, visible only in the narrow arm (the CSS decides,
-              not this file). It is rendered unconditionally so the header does
-              not reflow when a pane is dragged across the threshold. */}
-          <Button
-            variant="ghost"
-            icon={railOpen ? "message-square" : "list"}
-            className="myne-agent__rail-toggle"
-            onClick={() => setRailOpen((open) => !open)}
-            aria-expanded={railOpen}
-            data-testid="agent.rail-toggle"
-          >
-            {railOpen ? t("agent.focus.title") : t("agent.hub.historyLabel")}
-          </Button>
-          {t("agent.hub.title")}
-        </div>
+      {/* **No heading.** The word "Agent" sat at the top of a pane whose TAB
+          already reads "Agent", one line above it — a label naming the thing
+          the user just clicked to get here. What is left in this row is the
+          two things that are not restatements: the narrow arm's rail toggle
+          and the live run's indicator. When neither applies the row is not
+          there at all (`components.css`), so the rail starts where the pane
+          starts rather than below a reserved band. The accessible name is
+          unchanged: it is the root's `aria-label`, which is where a region's
+          name belongs. */}
+      <div className="myne-agent__header" data-testid="agent.header">
+        {/* The rail toggle, visible only in the narrow arm (the CSS decides,
+            not this file). It is rendered unconditionally so the header does
+            not reflow when a pane is dragged across the threshold. */}
+        <Button
+          variant="ghost"
+          icon={railOpen ? "message-square" : "list"}
+          className="myne-agent__rail-toggle"
+          onClick={() => setRailOpen((open) => !open)}
+          aria-expanded={railOpen}
+          data-testid="agent.rail-toggle"
+        >
+          {railOpen ? t("agent.focus.title") : t("agent.hub.historyLabel")}
+        </Button>
         {/* The run indicator: present only while a run is active, and it stops
             when the run stops (myne-md/myne#771, the named motion-canon
             exemption). Decorative and `aria-hidden` — which is only honest

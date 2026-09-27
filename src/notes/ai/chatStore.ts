@@ -498,6 +498,47 @@ function notifySettled(): void {
 // two overlapping runs can never interleave.
 let runEpoch = 0;
 
+/**
+ * Monotonic CONVERSATION epoch: bumped once per conversation BOUNDARY — the
+ * transcript being wiped (`clearChat`, `discardChat`) or replaced with another
+ * conversation's turns (`hydrateChatTurns`, which is what `openConversation`
+ * calls).
+ *
+ * **Why it is not `runEpoch`.** That one bumps on those three too, and also on
+ * every SEND: a follow-up message inside the same conversation is a new run and
+ * not a new conversation. A consumer that reset per-conversation state on it
+ * would throw that state away between two messages the user sees as one thread.
+ *
+ * **What it is for.** The composer's attached scope is per conversation and
+ * lives in the composer's own `useState`, which outlives a conversation switch
+ * because nothing remounts it — the rail swaps the transcript under a composer
+ * that stays exactly where it is. So a folder attached in one conversation was
+ * still attached in the next one, and in the one after that: every new chat
+ * started scoped to a folder the user picked once, silently, with the previous
+ * conversation's grant (myne-md/myne#771). The transcript is what changed, so
+ * the transcript is what says so.
+ */
+let conversationEpoch = 0;
+
+/** The current conversation-boundary count. */
+export function getConversationEpoch(): number {
+  return conversationEpoch;
+}
+
+/** Bump it and tell the store's subscribers.
+ *
+ *  Notifies DIRECTLY rather than leaning on the dispatch beside every call
+ *  site: `dispatchChat` returns early when the reducer hands back the same
+ *  state, and CLEARED over an already-empty transcript does exactly that. That
+ *  is not a corner — it is "new conversation" pressed twice, or pressed on a
+ *  fresh tab — and on that path the boundary would be invisible to everything
+ *  watching. A second notify from the dispatch that follows is free:
+ *  `useSyncExternalStore` re-renders on the VALUE, not on the call. */
+function bumpConversationEpoch(): void {
+  conversationEpoch += 1;
+  for (const l of listeners) l();
+}
+
 /** Current store snapshot (referentially stable until a dispatch). */
 export function getChat(): ChatState {
   return current;
@@ -631,6 +672,7 @@ export function clearChat(): void {
   // note's anchor (myne-md/myne#771).
   pendingAnchorNoteId = null;
   runEpoch += 1;
+  bumpConversationEpoch();
   dispatchChat({ type: "CLEARED" });
 }
 
@@ -647,6 +689,7 @@ export function discardChat(): void {
   activeConversationId = null;
   pendingAnchorNoteId = null;
   runEpoch += 1;
+  bumpConversationEpoch();
   dispatchChat({ type: "CLEARED" });
 }
 
@@ -654,6 +697,7 @@ export function discardChat(): void {
  *  Bumps the epoch so anything older than the hydrate cannot mutate it. */
 export function hydrateChatTurns(turns: ChatTurn[]): void {
   runEpoch += 1;
+  bumpConversationEpoch();
   dispatchChat({ type: "HYDRATED", turns });
 }
 
@@ -666,6 +710,7 @@ export function __resetChatForTest(): void {
   listeners.clear();
   turnSeq = 0;
   runEpoch = 0;
+  conversationEpoch = 0;
 }
 
 /** Subscribe to store changes; returns an unsubscribe. */
@@ -679,4 +724,14 @@ export function subscribeChat(listener: () => void): () => void {
 /** React binding: the live transcript, re-rendering on every dispatch. */
 export function useChat(): ChatState {
   return useSyncExternalStore(subscribeChat, getChat, getChat);
+}
+
+/** React binding: the conversation-boundary count. A component holding state
+ *  that belongs to ONE conversation keys an effect on it. */
+export function useConversationEpoch(): number {
+  return useSyncExternalStore(
+    subscribeChat,
+    getConversationEpoch,
+    getConversationEpoch,
+  );
 }

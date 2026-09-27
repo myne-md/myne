@@ -41,7 +41,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
-import { getChat, __resetChatForTest } from "../../src/notes/ai/chatStore";
+import {
+  clearChat,
+  getChat,
+  hydrateChatTurns,
+  sendChatMessage,
+  __resetChatForTest,
+} from "../../src/notes/ai/chatStore";
 
 const PASSING = {
   passed: true,
@@ -688,5 +694,100 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
     expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+});
+
+describe("ChatComposer — the attached scope belongs to one conversation", () => {
+  // The reported defect (myne-md/myne#771): "it persists the same exact note
+  // between chats". A folder attached once stayed attached for every later
+  // conversation, because nothing remounts this composer when the transcript
+  // is swapped under it — so the grant a user chose for ONE question silently
+  // became the standing grant for every question after it, which is the
+  // opposite of the user-originated scope `docs/decisions/ai/0518` point 1
+  // requires.
+
+  function attachProjects(): void {
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    fireEvent.click(
+      screen
+        .getAllByTestId("ai.composer-scope-option")
+        .find((o) => o.getAttribute("data-value") === "Projects")!,
+    );
+    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
+  }
+
+  it("drops the folder when a new conversation is started", () => {
+    mount();
+    attachProjects();
+    act(() => {
+      clearChat();
+    });
+    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
+  });
+
+  it("drops the folder when another conversation is opened", () => {
+    // `openConversation` replaces the transcript through `hydrateChatTurns`,
+    // which is the boundary this keys on. The id never passes through the
+    // composer, so a fix keyed on an id would not see this at all.
+    mount();
+    attachProjects();
+    act(() => {
+      hydrateChatTurns([
+        { id: "t1", kind: "text", role: "user", text: "önceki" },
+      ]);
+    });
+    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
+  });
+
+  it("actually SENDS under the dropped scope, not merely relabels the trigger", () => {
+    // The trigger's text and the grant handed to the host are two different
+    // values, and only the second one decides what the model reads. A reset
+    // that moved the label and left `attached` would pass the two tests above.
+    mount();
+    attachProjects();
+    act(() => {
+      clearChat();
+    });
+    type("what is this");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    return waitFor(() => {
+      expect(agentStart).toHaveBeenCalledWith(
+        "what is this",
+        { kind: "notes", value: ["n1"] },
+        "en",
+        expect.any(Array),
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+  });
+
+  it("KEEPS the folder across a message inside the same conversation", () => {
+    // The other direction, and the one that says why this is a conversation
+    // epoch rather than the run epoch sitting beside it in the same module.
+    // `runEpoch` bumps on every SEND too, so a reset keyed on it would throw
+    // the user's scope away between two messages they read as one thread —
+    // and the three tests above would all still pass.
+    mount();
+    attachProjects();
+    act(() => {
+      sendChatMessage("ilk mesaj");
+    });
+    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
+  });
+
+  it("crosses the boundary even when the transcript was already empty", () => {
+    // "New conversation" on a fresh tab dispatches CLEARED over an empty
+    // store, and `dispatchChat` returns early when the reducer hands back the
+    // same state — so a boundary announced only by that dispatch is invisible
+    // on exactly the path a user takes when they pick a scope, change their
+    // mind, and press New again.
+    mount();
+    expect(getChat().turns.length).toBe(0);
+    attachProjects();
+    act(() => {
+      clearChat();
+    });
+    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
   });
 });

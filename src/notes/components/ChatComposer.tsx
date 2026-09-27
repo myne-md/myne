@@ -63,6 +63,7 @@ import {
   useAgent,
 } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
+import { useConversationEpoch } from "../ai/chatStore";
 import { CAPTION_STYLE } from "./sharedStyles";
 
 export interface ChatComposerProps {
@@ -200,6 +201,32 @@ export function ChatComposer({
       live = false;
     };
   }, [attached]);
+
+  /**
+   * The attached scope belongs to ONE conversation (myne-md/myne#771).
+   *
+   * Nothing remounts this composer when the conversation changes: the rail
+   * swaps the transcript above it and the composer stays exactly where it is,
+   * so `attached` — a folder the user picked once — was still attached in the
+   * next conversation, and the one after that. Every new chat silently started
+   * inside the previous chat's grant, which is the opposite of what
+   * `docs/decisions/ai/0518` point 1 asks of this control: the scope must be
+   * user-originated FOR THIS RUN, and a value inherited from a conversation
+   * the user has walked away from is not that.
+   *
+   * Keyed on the conversation epoch rather than on a conversation ID, because
+   * the boundary is not always an id change: "New conversation" moves from a
+   * conversation to NO conversation, and the first message of the fresh one
+   * then binds an id without any boundary having been crossed. The epoch is
+   * bumped exactly at the three transcript boundaries and nowhere else.
+   *
+   * It does NOT clear the typed message. A draft is what the user is holding
+   * in their hands; the scope is what the app would have done with it.
+   */
+  const conversationEpoch = useConversationEpoch();
+  useEffect(() => {
+    setAttached(null);
+  }, [conversationEpoch]);
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
   // rather than counted from newlines, so a long wrapped line grows too.
