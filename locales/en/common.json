@@ -1181,7 +1181,7 @@
           "askSubmit": "Ask",
           "assistant": "Assistant",
           "emptyTitle": "Nothing here yet",
-      "empty": "Summaries, answers and suggestions appear here as you ask for them.",
+          "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
           "gettingReadyHint": "Preparing your notes for AI. One moment.",
@@ -4320,6 +4320,7 @@
       "metaChangedExternally": "Vault was modified in another session. Please unlock again."
     },
     "title": "Unlock your vault.",
+    "titleNamed": "Unlock {{vault}}.",
     "vaultUnreadable": "Vault file is unreadable. Restore from a backup.",
     "unlockFailedGeneric": "Couldn't unlock. Please try again.",
     "biometricTooManyAttempts": "Too many {{biometric}} attempts. Use your password.",

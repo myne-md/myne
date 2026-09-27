@@ -63,6 +63,7 @@
 import { invoke } from "../platform/core";
 import {
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -93,6 +94,8 @@ import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
 import { listVaults, soleVaultId } from "../lib/vault-list";
+import { vaultDisplayNameById } from "../lib/vaultDisplayName";
+import type { VaultSummary } from "../types/vault-summary";
 import { memberVaultStatus } from "../lib/personAccount";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
@@ -514,21 +517,46 @@ export function Unlock({
   // auto-lock reaches the vault selector too, not only a picker-reached unlock.
   // Probed on mount (fresh after any lock; the picker is a meaningful
   // destination only with another vault to switch to).
-  const [otherVaultsExist, setOtherVaultsExist] = useState(false);
+  const [vaults, setVaults] = useState<readonly VaultSummary[]>([]);
   useEffect(() => {
     let cancelled = false;
     void listVaults().then(
       (res) => {
-        if (!cancelled) setOtherVaultsExist("ok" in res && res.ok.length >= 2);
+        if (!cancelled) setVaults("ok" in res ? res.ok : []);
       },
       () => {
-        if (!cancelled) setOtherVaultsExist(false);
+        if (!cancelled) setVaults([]);
       },
     );
     return () => {
       cancelled = true;
     };
   }, []);
+  const otherVaultsExist = vaults.length >= 2;
+
+  /**
+   * The name of the vault being opened, or `null`.
+   *
+   * **The heading names it rather than asking for "your vault".** You arrive
+   * here from a list of named vaults and the screen forgot which one you
+   * picked — the one question it exists to ask was the only thing on it that
+   * did not say what it was about.
+   *
+   * `null` is a real state and not a defensive branch: the sole-vault path
+   * reaches this screen with no `vaultId` at all, and a list that failed to
+   * load is empty. Both keep the generic title, because a screen that invents
+   * a number is worse than one that does not name the vault.
+   *
+   * Most users will read the FALLBACK ("Vault 4") rather than a stored name:
+   * `VaultSummary.label` is null for a vault this session has not unlocked,
+   * and null again when "hide vault names" is on. That is the correct
+   * outcome in both cases and needs no branch here — the option erases the
+   * name at the source rather than leaving it for a surface to filter.
+   */
+  const vaultName = useMemo(
+    () => vaultDisplayNameById(vaultId, vaults, t),
+    [vaultId, vaults, t],
+  );
 
   // A B2B member vault has no password: it is opened from the member's recovery
   // phrase (myne-md/myne#711 task 25). Probed once; when true the password form
@@ -821,7 +849,13 @@ export function Unlock({
       {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
           to "enter your password" (MYND — the primary surface is not a password
           when quick-unlock owns the screen). */}
-      <AuthHeading title={t("unlock.title")}>
+      <AuthHeading
+        title={
+          vaultName === null
+            ? t("unlock.title")
+            : t("unlock.titleNamed", { vault: vaultName })
+        }
+      >
         {t(
           surface === "quick"
             ? quickMethod === "biometric"

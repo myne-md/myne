@@ -425,6 +425,10 @@ const V = {
     "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
+  "src/lib/vaultDisplayName.ts": [
+    "ported",
+    "Pure naming: a vault's label, or the neutral `Vault N` fallback derived from `stableVaultNumber`. No IPC, no host. It runs as written on web, where the one constant vault per origin means the fallback is always `Vault 1` — correct rather than degraded, since there is no list to rank it against.",
+  ],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [
     "ported",
