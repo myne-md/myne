@@ -491,14 +491,26 @@ export const ROSTER = Object.freeze([
       "editor/src/accessible-name.ts",
       "editor/src/fold-announce.ts",
       "docs/dev/accessibility-checklist.md",
+      // The forced-colors repair (myne-md/myne#775). Two sheets, because each
+      // client owns its own copy of the focus rule being repaired.
+      "src/styles/tokens.css",
+      "mobile/src/styles/tokens.css",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
       // The parts that CAN be measured. Everything below is what is left.
       "e2e/a11y-keyboard.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
+      "e2e/a11y-axe-surfaces.e2e.ts",
     ],
     manual: [
+      {
+        see: "Turn Windows high contrast on (Settings > Accessibility > Contrast themes, or Left Alt + Left Shift + Print Screen) and tab through the editor, the left ribbon, the tab strip, Settings and the command palette. Confirm EVERY focused control shows a visible outline in the theme's own highlight colour, with a gap between the outline and the control's edge. Then check the toggled controls specifically: an on/off switch in Settings, the selected half of the graph's Graph/List switch, and the ribbon entry for the surface you are on must each look different from their unselected neighbours rather than identical. Finally confirm no text has become invisible and every control still has a visible boundary.",
+        whyNotAutomated: "Forced-colors mode is a Windows compositor feature. The desktop E2E lane is a Linux container running WebKitGTK and the web lane is Chromium on the same runner, so no harness in this repository can enter the mode at all; jsdom has no rendering and therefore no `forced-colors` media query to match. `tests/a11y/forcedColors.test.ts` asserts the repair is present in both stylesheets, which catches its deletion, and cannot observe whether the operating system then paints it.",
+        clients: ["desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
       {
         see: "The mobile screen-reader and external-keyboard pass: run every row of mobile/docs/dev/device-matrix.md section 12 under VoiceOver on iOS (12.1 to 12.6, 12.8 to 12.11) and write the result into that table with the device model, OS build and screen-reader version. The rows cover whether each tappable row is announced as a BUTTON named by its own text, whether the folder chevron's state is spoken (it is a CSS rotation, so state is the only cue), whether Space activates without scrolling the list, and whether the palette scrim is silent rather than an unnamed full-screen button.",
         whyNotAutomated: "Neither CI lane builds for iOS: the desktop suite is a Linux container against WebKitGTK and the web lane is Chromium, so no harness in this repository launches an iOS runtime at all, and VoiceOver's spoken output is not exposed to WebDriver on any platform. `mobile/tests/a11y-tappable.test.tsx` holds the markup in both directions and markup is not the question here.",

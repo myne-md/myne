@@ -309,7 +309,26 @@
     "frame or timing observation at all, and the reduced-motion gate it CAN assert",
     "is the opposite question. gatedMinutes is unchanged: the item is",
     "standard-tier, so this widens what a human checks without widening the",
-    "blocking gate."
+    "blocking gate.",
+    "",
+    "RAISE, 2026-09-27, 11066 -> 11076 (myne-md/myne#775). Ten minutes, one item,",
+    "desktop-windows: tab through the app under Windows high contrast and confirm",
+    "focus is visible.",
+    "",
+    "The argument, because a raise is a hand edit precisely so that one has to be",
+    "made. The app's focus indicator is `outline: none` plus a `box-shadow` ring,",
+    "and `forced-colors: active` STRIPS box-shadow while leaving `outline: none`",
+    "standing — so in Windows high contrast the app removed the platform's own",
+    "focus indicator and then had its replacement removed from under it. Every",
+    "control, for exactly the users who most need it. WCAG 2.2 AA 2.4.7.",
+    "",
+    "It is a manual item rather than a scenario because no harness in this",
+    "repository can enter the mode: the desktop E2E lane is a Linux container on",
+    "WebKitGTK, the web lane is Chromium on the same runner, and jsdom has no",
+    "rendering and therefore no media query to match. tests/a11y/forcedColors.test.ts",
+    "holds the repair in both stylesheets so its DELETION is caught; whether the OS",
+    "then paints it is the part a person has to look at. Ten minutes is the whole",
+    "cost of knowing, on a client with zero automated UI coverage of any kind."
   ],
   "$comment2": [
     "CEILING RAISED 9822 -> 9846 by myne-md/myne#456, in the sanctioned direction.",
@@ -636,6 +655,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11066,
+  "totalMinutesCeiling": 11076,
   "gatedMinutes": 3837
 }
