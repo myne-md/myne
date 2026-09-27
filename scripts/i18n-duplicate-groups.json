@@ -369,22 +369,6 @@
     "reason": "Same copy-failed notice on the account-number and phrase steps; one event, one string."
   },
   {
-    "value": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-    "keys": [
-      "vaultCreation.account.downloadStarted",
-      "vaultCreation.phrase.downloadStarted"
-    ],
-    "reason": "Same download-arrived notice on the account-number and phrase steps of vault creation; one event, one string."
-  },
-  {
-    "value": "Saved. It is a plain text file, so keep it somewhere only you can read.",
-    "keys": [
-      "vaultCreation.account.savedToFile",
-      "vaultCreation.phrase.savedToFile"
-    ],
-    "reason": "Same save-to-file confirmation on the account-number and phrase steps; one event, one string."
-  },
-  {
     "value": "Before you create your vault",
     "keys": [
       "vaultCreation.briefing.eyebrow",
