@@ -314,30 +314,44 @@ describe("AgentPane: the pane's top row", () => {
     expect(text.slice(arm, end)).toContain("display: flex");
   });
 
-  it("spends its inset vertically and none of it on the sides", () => {
-    // The pane has a tab strip above it and a status bar below, so room there
-    // is room the content needs; horizontally every pixel is width taken from
-    // a 248px rail and whatever the conversation gets beside it. Both wrong
-    // shapes have shipped — `--space-4` against `--space-1`, then equal on all
-    // four sides — so what is pinned is the RELATION, not a number, which is
-    // the thing that keeps being got backwards.
+  it("declares ONE inset, equal on all four sides", () => {
+    // Three shapes have now shipped — `--space-4` against `--space-1`, then
+    // `--space-1` all round, then `--space-3` against `0` — and the reason it
+    // kept being got wrong is the test below this one, not this one.
     const text = css();
     const open = text.indexOf(".myne-agent {");
     const end = text.indexOf("\n}", open);
     const rule = text.slice(open, end);
     const padding = /padding:\s*([^;]+);/.exec(rule)?.[1]?.trim();
     expect(padding, "the pane declares no padding").toBeTruthy();
-    const parts = padding!.split(/\s+/);
-    // Two values, block then inline. One value is the equal-sided version;
-    // three or four is a per-edge inset nobody asked for.
-    expect(parts, padding).toHaveLength(2);
-    const [block, inline] = parts as [string, string];
-    // The inline half is nothing at all, and it is written as `0` rather than
-    // a token so there is no scale step to creep back up.
-    expect(inline, padding).toBe("0");
-    // And the block half is not also nothing: a `0 0` would satisfy every
-    // assertion above while removing the inset this test is about.
-    expect(block, padding).not.toBe("0");
-    expect(block, padding).toMatch(/^var\(--space-[2-9]\)$/);
+    // One value, and not zero: two values is the asymmetry, `0` is no inset.
+    expect(padding!.split(/\s+/), padding).toHaveLength(1);
+    expect(padding, padding).toMatch(/^var\(--space-[1-9]\)$/);
+  });
+
+  it("is the ONLY inset the pane gets, because PaneView adds no gutter", () => {
+    // The finding two rounds of edits cost. `PaneView` wraps a tab body in
+    // `0 24px` when its descriptor says `gutters: true` — the reading measure
+    // a flowing note wants — and the agent tab took it. So the side inset on
+    // screen was 24px whatever `.myne-agent` said, and editing that rule twice
+    // changed nothing visible while both the code and its comment described a
+    // value that was never reaching the screen.
+    //
+    // Nothing else in the tree compares the two: the descriptor typechecks,
+    // the stylesheet is valid, and the pane renders. Read from the source
+    // because the descriptor is a branch of a `useMemo` over a tab union that
+    // a component test cannot reach a single arm of.
+    const pane = readFileSync(
+      resolve(process.cwd(), "src/notes/components/PaneView.tsx"),
+      "utf8",
+    );
+    const at = pane.indexOf("<AgentPane");
+    expect(at, "PaneView no longer mounts the agent pane").toBeGreaterThan(-1);
+    // Back to the `return {` that owns it, then read that object's `gutters`.
+    const open = pane.lastIndexOf("return {", at);
+    expect(open, "the agent branch returns no descriptor").toBeGreaterThan(-1);
+    const descriptor = pane.slice(open, at);
+    const gutters = /gutters:\s*(true|false)/.exec(descriptor)?.[1];
+    expect(gutters, descriptor).toBe("false");
   });
 });
