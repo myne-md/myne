@@ -42,8 +42,24 @@ import { join, relative } from "node:path";
 
 import { presentSharedRoots } from "./lib/shared-roots.mjs";
 
-const ROOT = new URL("..", import.meta.url).pathname;
-const RECORD = join(ROOT, "scripts/tooltip-adoption.json");
+/**
+ * The tree to scan. Defaults to the repository; `MYNE_GUARD_ROOT` overrides it.
+ *
+ * TEST-ONLY, and it earns its keep. A guard spec has to put a defective file
+ * somewhere the guard will read it, and the obvious place — the real `src/` —
+ * means the spec MUTATES the shared tree while every other spec that scans it
+ * runs in a parallel worker. That is not theoretical: it produced intermittent
+ * failures in `webScreens.test.ts` and `compileTimeDefines.test.ts`, neither of
+ * which has anything to do with this guard, roughly one run in six.
+ *
+ * With this, a spec builds a scratch tree and points the guard at it, so
+ * fixtures are invisible to everything else. Production never sets it.
+ */
+const ROOT =
+  process.env.MYNE_GUARD_ROOT !== undefined
+    ? `${process.env.MYNE_GUARD_ROOT}/`
+    : new URL("..", import.meta.url).pathname;
+const RECORD = join(new URL("..", import.meta.url).pathname, "scripts/tooltip-adoption.json");
 
 /** Elements a pointer or a keyboard can act on. */
 const INTERACTIVE = ["button", "a", "input", "select", "textarea", "summary"];
@@ -70,6 +86,26 @@ function scrub(src) {
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/**
+ * Read a file that may vanish between the walk and the read.
+ *
+ * The walk collects paths and the reads happen afterwards, so anything that
+ * writes or deletes in the tree meanwhile — a build, a formatter, another
+ * process — can make `readFileSync` throw ENOENT and take the whole guard down
+ * with a stack trace instead of a verdict. A guard that crashes is worse than
+ * one that fails: the failure at least says what is wrong.
+ *
+ * Found by this guard's own spec, which writes fixtures into the real tree
+ * while a sibling spec does the same in a parallel worker.
+ */
+function readOrSkip(file) {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 async function walk(dir, out) {
@@ -142,7 +178,9 @@ if (missing.length > 0) {
 for (const root of present) {
   for (const file of await walk(join(ROOT, root), [])) {
     const rel = relative(ROOT, file);
-    const src = scrub(readFileSync(file, "utf8"));
+    const raw = readOrSkip(file);
+    if (raw === null) continue;
+    const src = scrub(raw);
     let n = 0;
     for (const { tag, attrs, index } of openingTags(src)) {
       const interactive =

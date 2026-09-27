@@ -41,15 +41,6 @@ const ROW_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
-/** Straight accent drop line, not a rounded inset shadow. */
-const DROP_STYLE: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  height: 2,
-  background: "var(--accent)",
-  pointerEvents: "none",
-};
 const GRIP_STYLE: CSSProperties = {
   cursor: "grab",
   color: "var(--fg-3)",
@@ -151,6 +142,26 @@ export function RibbonCustomizeSettings() {
     };
   }, [eligible]);
 
+  /**
+   * Set when the picker closes by a route that owes focus back to the Add
+   * button (Escape). Consumed by the effect below AFTER the close has
+   * rendered, which is the part that cannot be done from the key handler.
+   */
+  const [restoreFocus, setRestoreFocus] = useState(false);
+
+  useEffect(() => {
+    if (!restoreFocus || pickerOpen) return;
+    setRestoreFocus(false);
+    // The Add button is a shared primitive with no ref forwarding; reach it by
+    // its testid, which doubles as the stable selector. By now the picker is
+    // gone and this node is the one that will survive.
+    sectionRef.current
+      ?.querySelector<HTMLButtonElement>(
+        '[data-testid="settings.ribbon-customize.add"]',
+      )
+      ?.focus();
+  }, [restoreFocus, pickerOpen]);
+
   // Click-away closes the dropdown. Escape closes it too and returns focus
   // to the Add button that opened it, so keyboard users are not dropped.
   useEffect(() => {
@@ -162,14 +173,20 @@ export function RibbonCustomizeSettings() {
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        // Close, and ASK for focus back — do not take it here. Focusing
+        // synchronously inside this handler races the re-render that
+        // `setPickerOpen(false)` schedules: React tears the picker down
+        // afterwards, and if reconciliation replaces the Add button's DOM node
+        // the focus we just set goes with it and the keyboard user lands on
+        // `<body>` with the panel behind them (myne-md/myne#775).
+        //
+        // It failed roughly one run in six under a loaded parallel suite, which
+        // is exactly what a scheduling race looks like from the outside — and
+        // on a slow machine it is not a test artefact, it is a keyboard user
+        // being dropped. The effect below restores focus once the close has
+        // actually rendered.
+        setRestoreFocus(true);
         setPickerOpen(false);
-        // The Add button is a shared primitive with no ref forwarding; reach
-        // it by its testid, which doubles as the stable selector.
-        sectionRef.current
-          ?.querySelector<HTMLButtonElement>(
-            '[data-testid="settings.ribbon-customize.add"]',
-          )
-          ?.focus();
       }
     }
     document.addEventListener("mousedown", onDown);
@@ -335,8 +352,8 @@ export function RibbonCustomizeSettings() {
               data-testid="settings.ribbon-customize.row"
               data-item-id={id}
             >
-              {dropEdge === "before" && <span aria-hidden style={{ ...DROP_STYLE, top: -1 }} />}
-              {dropEdge === "after" && <span aria-hidden style={{ ...DROP_STYLE, bottom: -1 }} />}
+              {dropEdge === "before" && <span aria-hidden style={undefined} />}
+              {dropEdge === "after" && <span aria-hidden style={undefined} />}
               <span style={GRIP_STYLE} aria-hidden="true">
                 ⠿
               </span>

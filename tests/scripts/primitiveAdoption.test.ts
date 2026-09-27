@@ -18,18 +18,29 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT: string = fileURLToPath(new URL("../..", import.meta.url));
-const FIXTURE: string = `${ROOT}src/components/__primitive_fixture__.tsx`;
+const FIXTURE_NAME = "__primitive_fixture__.tsx";
+let scratch: string | null = null;
 
 function run(): { code: number; out: string } {
   try {
     const out: string = execFileSync(
       "node",
       ["scripts/check-primitive-adoption.mjs"],
-      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env:
+          scratch === null
+            ? process.env
+            : { ...process.env, MYNE_GUARD_ROOT: scratch },
+      },
     );
     return { code: 0, out };
   } catch (e) {
@@ -38,12 +49,45 @@ function run(): { code: number; out: string } {
   }
 }
 
+/**
+ * Build a throwaway tree the guard can scan, and put `body` in it as a `.tsx`
+ * file under `src/components/`.
+ *
+ * The guard is pointed at this via `MYNE_GUARD_ROOT` rather than at the real
+ * repository, so a fixture is invisible to every OTHER spec scanning `src/` in
+ * a parallel worker. Writing into the real tree instead produced intermittent
+ * failures in two unrelated guard specs, roughly one run in six.
+ *
+ * Every shared root has to exist or the guard refuses to walk a partial tree —
+ * which is itself correct behaviour, and is why they are all created empty.
+ */
+function scratchTree(body: string): string {
+  const dir: string = mkdtempSync(join(tmpdir(), "guard-fixture-"));
+  for (const root of [
+    "src",
+    "editor/src",
+    "dialect/src",
+    "copy/src",
+    "client-core/src",
+    "ornaments/src",
+    "web/src",
+    "mobile/src",
+  ]) {
+    mkdirSync(join(dir, root), { recursive: true });
+  }
+  mkdirSync(join(dir, "src", "components"), { recursive: true });
+  writeFileSync(join(dir, "src", "components", FIXTURE_NAME), body, "utf8");
+  return dir;
+}
+
 function fixture(body: string): void {
-  writeFileSync(FIXTURE, body, "utf8");
+  if (scratch !== null) rmSync(scratch, { recursive: true, force: true });
+  scratch = scratchTree(body);
 }
 
 afterEach(() => {
-  rmSync(FIXTURE, { force: true });
+  if (scratch !== null) rmSync(scratch, { recursive: true, force: true });
+  scratch = null;
 });
 
 describe("the ratchet catches a new hand-rolled control", () => {

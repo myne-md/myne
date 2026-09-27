@@ -89,15 +89,6 @@ const CURRENT_BAR_STYLE: CSSProperties = {
   pointerEvents: "none",
 };
 
-const DROP_LINE_STYLE: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  height: 2,
-  background: "var(--accent)",
-  pointerEvents: "none",
-  zIndex: 1,
-};
 
 /** The divider, drawn explicitly so it starts exactly at `STRIP_HEIGHT` (below
  *  the traffic lights) instead of being a border on a box whose bounds are easy
@@ -284,8 +275,12 @@ export function LeftRibbon({
         return (
           <div key={id} style={RAIL_ITEM_STYLE}>
             {isCurrent(id) && <span aria-hidden style={CURRENT_BAR_STYLE} />}
-            {showDrop && dropAt.edge === "before" && <span aria-hidden style={{ ...DROP_LINE_STYLE, top: -1 }} />}
-            {showDrop && dropAt.edge === "after" && <span aria-hidden style={{ ...DROP_LINE_STYLE, bottom: -1 }} />}
+            {showDrop && dropAt.edge === "before" && (
+              <span aria-hidden className="myne-drop-line" data-edge="before" />
+            )}
+            {showDrop && dropAt.edge === "after" && (
+              <span aria-hidden className="myne-drop-line" data-edge="after" />
+            )}
             <Tooltip label={label} kbd={chordFor(id)} placement="bottom">
             <button
               type="button"

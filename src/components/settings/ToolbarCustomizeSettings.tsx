@@ -45,18 +45,6 @@ const ROW_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
-// Drop indicator drawn as an inset accent bar via boxShadow — unlike a border it
-// doesn't add to the box size, so rows never reflow when it appears and there is
-// no partial-transparent-border artifact (WKWebView renders a 2px transparent
-// top/bottom border on a rounded dark row as a light line — QA screenshot).
-const DROP_BEFORE_STYLE: CSSProperties = {
-  boxShadow: "inset 0 2px 0 0 var(--accent)",
-  background: "var(--accent-soft)",
-};
-const DROP_AFTER_STYLE: CSSProperties = {
-  boxShadow: "inset 0 -2px 0 0 var(--accent)",
-  background: "var(--accent-soft)",
-};
 const GRIP_STYLE: CSSProperties = {
   cursor: "grab",
   color: "var(--fg-3)",
@@ -228,19 +216,23 @@ export function ToolbarCustomizeSettings() {
         control={
           <div data-testid="settings.toolbar-customize" style={LIST_STYLE}>
             {fullOrder.map((id, i) => {
-              const dropStyle =
-                dropAt?.id === id
-                  ? dropAt.edge === "before"
-                    ? DROP_BEFORE_STYLE
-                    : DROP_AFTER_STYLE
-                  : null;
+              // The INSET drop indicator (`.myne-drop-row` in the shared
+              // component layer, myne-md/myne#778). Inset rather than a
+              // positioned bar, and that is a recorded decision rather than a
+              // preference: these rows are rounded and dark, and WKWebView
+              // renders a 2px transparent border on one as a visible light
+              // line (QA screenshot). An inset shadow adds nothing to the box,
+              // so rows never reflow when it appears.
+              const dropEdge = dropAt?.id === id ? dropAt.edge : undefined;
               const isFirst = i === 0;
               const isLast = i === fullOrder.length - 1;
               const isPending = PENDING_SET.has(id);
               return (
                 <div
                   key={id}
-                  style={{ ...ROW_STYLE, ...dropStyle, opacity: dragId === id ? 0.4 : 1 }}
+                  className="myne-drop-row"
+                  data-edge={dropEdge}
+                  style={{ ...ROW_STYLE, opacity: dragId === id ? 0.4 : 1 }}
                   draggable
                   onDragStart={() => setDragId(id)}
                   onDragEnd={() => {
