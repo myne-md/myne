@@ -86,7 +86,7 @@ import {
 import { AuthHeading, AuthShell } from "./AuthShell";
 import { Button } from "../components/primitives/Button";
 import { Icon } from "../components/primitives/Icon";
-import { InlineSubmitField } from "../components/primitives/InlineSubmitField";
+import { CredentialField } from "../components/primitives/CredentialField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
@@ -866,7 +866,7 @@ export function Unlock({
           data-testid="unlock.form"
           data-vault-id={vaultId}
         >
-          <InlineSubmitField
+          <CredentialField
             value={password}
             onChange={(value) => dispatch({ type: "set-password", value })}
             busy={decrypting}

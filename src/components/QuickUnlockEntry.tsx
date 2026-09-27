@@ -34,7 +34,7 @@ import {
   quickUnlockWithPin,
   type QuickUnlockMethod,
 } from "../lib/quick-unlock";
-import { InlineSubmitField } from "./primitives/InlineSubmitField";
+import { CredentialField } from "./primitives/CredentialField";
 import { ctaStyle } from "./primitives/CenteredCard";
 import { Spinner } from "./Spinner";
 import { isQuickUnlockError } from "../types/quick-unlock-error";
@@ -196,7 +196,7 @@ export function QuickUnlockEntry({
               is why the two surfaces must not diverge here: a user who swaps
               between them with "Use password instead" would otherwise watch the
               screen change shape for a choice that changes only the credential. */}
-          <InlineSubmitField
+          <CredentialField
             value={pin}
             onChange={setPin}
             busy={busy}
