@@ -1386,6 +1386,61 @@
    Auth shell — the deboxed pre-unlock page (myne-md/myne#773)
    ========================================================================= */
 
+/* ── The pre-unlock surface's brand field ───────────────────────────────────
+   The `01` field, behind the auth screens, at the same weight it carries on
+   every zero state in the app (`docs/decisions/ui/0625`).
+
+   It is the one thing that makes these screens look like they belong to Myne.
+   Before it they were a form on an empty page: the wordmark in the corner and
+   nothing else on a `--paper` expanse, which is why the unlock screen read as
+   a login page bolted to the front of the product rather than as its door.
+
+   The field is DECORATION here exactly as it is in an empty state — every word
+   the user needs is in the column above it, and under `forced-colors` a canvas
+   paints nothing at all, which is the honest test of that claim. */
+.myne-auth__field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  /* Read back by `binaryField.ts` through `getComputedStyle().color`, the one
+     place this field's ink is stated. Same contract as `.myne-empty__field`. */
+  color: var(--fg-1);
+}
+
+/* The scrim that suppresses the field behind the words and dissolves back into
+   it. Not cosmetic and not optional: without it the digits run straight
+   through a password placeholder, on the one screen where the user cannot see
+   what they typed and the text is the only thing they have.
+
+   `--paper` rather than `--paper-2`, because the auth shell has no card fill —
+   it sits directly on the page, so the scrim takes the page's own colour or it
+   paints a visible cloud instead of a fade. */
+/* The content column sits ABOVE the field, and is the `::before`'s containing
+   block. Both halves are here rather than in `VIEW_STYLE`: a stacking context
+   split between an inline style and a stylesheet is the kind of thing that
+   works until somebody edits one of them. */
+.myne-auth-view {
+  position: relative;
+  z-index: 1;
+}
+
+.myne-auth-view::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -18% -20%;
+  background: radial-gradient(
+    64% 60% at 50% 50%,
+    var(--paper) 0%,
+    var(--paper) 38%,
+    color-mix(in srgb, var(--paper) 55%, transparent) 62%,
+    transparent 80%
+  );
+}
+
 /* The picker and the unlock screen were each a bordered card floating in the
    middle of an empty window, which put a frame around the one thing on screen
    and left the app's own name inside it. Deboxed: the window IS the surface,

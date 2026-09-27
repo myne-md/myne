@@ -15,6 +15,8 @@
 // noticing until it was on screen.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>();
@@ -155,25 +157,97 @@ describe("the way back sits with the question it answers", () => {
     const view = main.querySelector(".myne-auth-view") as HTMLElement;
     expect(view, "no content column").not.toBeNull();
 
+    // The spacers BRACKET the column. Located by position around it rather
+    // than by counting `main`'s children: the brand field is a sibling too,
+    // and a count would have to be edited every time the region grows a
+    // decoration, which is a test that tracks the DOM instead of the rule.
     const kids = Array.from(main.children) as HTMLElement[];
-    expect(kids.length, "the bias is not two spacers around the column").toBe(3);
-    expect(kids[1]).toBe(view);
+    const at = kids.indexOf(view);
+    expect(at, "the column is not in the main region").toBeGreaterThan(0);
+    const above = kids[at - 1]!;
+    const below = kids[at + 1];
+    expect(below, "nothing below the column to balance it").toBeTruthy();
     // The ratio, and its direction: more room below than above is what puts
     // the block high. Equal spacers would just be centring again.
-    const above = Number(kids[0]!.style.flexGrow);
-    const below = Number(kids[2]!.style.flexGrow);
-    expect(above, "the spacer above does not grow").toBeGreaterThan(0);
-    expect(below, `${below} below vs ${above} above`).toBeGreaterThan(above);
+    const growAbove = Number(above.style.flexGrow);
+    const growBelow = Number(below!.style.flexGrow);
+    expect(growAbove, "the spacer above does not grow").toBeGreaterThan(0);
+    expect(growBelow, `${growBelow} below vs ${growAbove} above`).toBeGreaterThan(
+      growAbove,
+    );
     // Basis zero, which is what makes the bias a preference rather than a
     // reservation. `flex: 1` shorthand sets `flex-basis: 0%`.
-    expect(kids[0]!.style.flexBasis).toBe("0%");
-    expect(kids[2]!.style.flexBasis).toBe("0%");
+    expect(above.style.flexBasis).toBe("0%");
+    expect(below!.style.flexBasis).toBe("0%");
     // And no `vh` reservation crept back in beside them.
     expect(main.style.paddingBlockEnd ?? "").not.toMatch(/vh/);
     expect(main.style.padding ?? "").not.toMatch(/vh/);
     // The spacers are decoration; a screen reader must not meet two blank
     // groups on either side of the form.
-    expect(kids[0]!.getAttribute("aria-hidden")).toBe("true");
-    expect(kids[2]!.getAttribute("aria-hidden")).toBe("true");
+    expect(above.getAttribute("aria-hidden")).toBe("true");
+    expect(below!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("carries the brand field behind it, with the scrim that makes it legible", async () => {
+    // The field is what ties these screens to the rest of the app — every zero
+    // state in the product carries it (`docs/decisions/ui/0625`). Three rounds
+    // of adjusting the spacing inside the column never touched the complaint,
+    // because the problem was the page around the column.
+    const { container } = renderWithTwoVaults();
+    await screen.findByTestId("unlock.back-to-picker");
+    const main = container.querySelector("main") as HTMLElement;
+    const field = main.querySelector("canvas.myne-auth__field");
+    expect(field, "no brand field on the auth shell").not.toBeNull();
+    // Decoration, and it has to say so: every word the user needs is in the
+    // column, and a canvas announced to a screen reader is a canvas claiming
+    // to mean something.
+    expect(field!.getAttribute("aria-hidden")).toBe("true");
+    // The region clips it and is its containing block, or the digits run up
+    // under the wordmark.
+    expect(main.style.position).toBe("relative");
+    expect(main.style.overflow).toBe("hidden");
+
+    // The scrim is part of the decision rather than an implementation detail:
+    // without it the digits run through a password placeholder, on the one
+    // screen where the user cannot see what they typed. Read from the sheet,
+    // because jsdom applies no stylesheet and resolves no `::before`.
+    const css = readFileSync(
+      resolve(process.cwd(), "client-core/src/components.css"),
+      "utf8",
+    );
+    const at = css.indexOf(".myne-auth-view::before {");
+    expect(at, "the field ships without its scrim").toBeGreaterThan(-1);
+    const block = css.slice(at, css.indexOf("\n}", at));
+    expect(block).toContain("radial-gradient");
+    // `--paper`, not `--paper-2`: the auth shell has no card fill, so a
+    // card-coloured scrim paints a visible cloud instead of a fade.
+    expect(block, block).toMatch(/var\(--paper\)/);
+    expect(block, block).not.toMatch(/var\(--paper-2\)/);
+  });
+
+  it("offers the alternatives as one row, with destruction below a rule", async () => {
+    // Three centred links at near-identical weight, one of them destructive
+    // and red, is what made this screen read as a menu to work through. They
+    // are alternatives to the same act, so they are a row; deleting the vault
+    // is not a third way to open it, so it is not in that row.
+    renderWithTwoVaults();
+    const recovery = await screen.findByTestId("unlock.recovery-link");
+    const row = screen.getByTestId("unlock.alt-row");
+    expect(row.contains(recovery), "the alternatives are not on the row").toBe(true);
+    expect(row.style.display).toBe("flex");
+    // It wraps, or a long translation clips: two of these strings are
+    // sentences and German runs long.
+    expect(row.style.flexWrap).toBe("wrap");
+
+    const del = screen.getByTestId("unlock.delete-link");
+    expect(row.contains(del), "destruction is offered as an alternative").toBe(false);
+    // Below a rule, which is the whole device: it separates without shouting.
+    const zone = del.parentElement as HTMLElement;
+    expect(zone.style.borderTop, "nothing separates the destructive act").toContain(
+      "var(--line-1)",
+    );
+    // And paired with a glyph. `PRODUCT.md`: colour is never the sole channel,
+    // and this was a red word with nothing beside it.
+    expect(del.querySelector("svg"), "the danger is colour alone").not.toBeNull();
   });
 });
