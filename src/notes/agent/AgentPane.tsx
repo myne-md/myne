@@ -121,6 +121,16 @@ export function AgentPane({
   const openFocus = useCallback(
     (next: { noteId?: string | null; conversationId?: string | null }) => {
       const noteId = next.noteId ?? ws.focusedNoteId ?? null;
+      // A silent return, and it is correct HERE while being the wrong thing to
+      // rely on: a run needs a scope, `defaultGrantFor` resolves that to the
+      // open note or to `null`, and the host refuses a vault-wide grant, so
+      // there is genuinely nothing to open Focus on.
+      //
+      // What it must never be is the only place that knows. The Hub is told the
+      // same fact (`focusedNoteId`) and withholds the control rather than
+      // offering one that lands here and does nothing — a button that silently
+      // fails is worse than an absent one, because the user concludes the
+      // feature is broken rather than that they have a step to do first.
       if (noteId === null || noteId === "") return;
       ws.setAgentViewState(paneId, {
         view: "focus",
@@ -180,6 +190,10 @@ export function AgentPane({
         <AgentHubList
           onOpenFocus={openFocus}
           onOpenNote={openNote}
+          // What a NEW conversation would be about. The Hub cannot ask the
+          // workspace itself — it is a list, and giving it the controller would
+          // make every future list reach for one.
+          focusedNoteId={ws.focusedNoteId}
           {...(folders === undefined ? {} : { folders })}
           {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
           {...(onRunUndone === undefined ? {} : { onRunUndone })}
