@@ -85,28 +85,6 @@ const INFINITE_ALLOWLIST = new Map([
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",
   ],
   [
-    "myne-orb-breathe",
-    "The agent run orb's halo (myne-md/myne#771 task 12, the second named entry " +
-      "of the bounded-state-indication class after the 01 field). An agent step can " +
-      "run for tens of seconds producing nothing, and a surface with no indicator is " +
-      "indistinguishable from one that has silently stopped. Bounded by the run: the " +
-      "animation is opt-in through `data-run=\"active\"`, so a resting orb is a static " +
-      "frame by construction rather than by a rule that has to remember to switch " +
-      "something off. Pauses on document.hidden and off-screen through " +
-      "animation-play-state, which holds the frame and costs nothing. Deliberately " +
-      "does NOT take the data-motion=\"essential\" slow-it-down arm: the run's status " +
-      "is spelled out in words beside it, so under reduced motion holding still " +
-      "costs the user nothing — unlike the unlock field's sweep, which is the only " +
-      "thing on its screen saying work is in flight.",
-  ],
-  [
-    "myne-orb-turn",
-    "The same orb's ring. A second keyframe rather than one, because the two report " +
-      "different things and a single animation cannot: the halo's breath is the " +
-      "run's pulse and the ring's turn is its progress through a step. Same bounds, " +
-      "same pause conditions, same reduced-motion arm as `myne-orb-breathe` above.",
-  ],
-  [
     "myne-inline-field-sweep",
     "The unlock field's in-flight rule (myne-md/myne#773). Argon2id runs for seconds " +
       "on the pre-unlock screen, and this is the only thing on a deboxed row that can " +
