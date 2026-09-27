@@ -345,11 +345,81 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      {/* **One control row** (myne-md/myne#771). The scope and the permission
-          mode were two full-width rows — a caption, a value and a Change button
-          on one; a segmented control spanning the panel on the other — which in
-          a 280px side panel is a quarter of the surface spent on two choices
-          almost nobody changes per message.
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          // While a run works the button below is Stop, so this form never
+          // submits: only the button stops a run, never a stray Enter from
+          // typing the next message.
+          if (running) return;
+          void submit();
+        }}
+        style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-2)" }}
+      >
+        <textarea
+          ref={inputRef}
+          data-testid="ai.composer-input"
+          rows={1}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sends, Shift+Enter breaks the line. `isComposing` is the
+            // load-bearing half: an IME commits its candidate with Enter, so
+            // without it a Turkish, Japanese or Korean user sends the first
+            // syllable they meant to accept. While a run works Enter does
+            // nothing: stopping is the button's job, never a keystroke typed
+            // into the next message.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              if (running) return;
+              void submit();
+            }
+          }}
+          placeholder={t("agent.composer.placeholder")}
+          aria-label={t("agent.composer.placeholder")}
+          disabled={busy}
+          style={INPUT_STYLE}
+        />
+        {running ? (
+          <Button
+            type="button"
+            variant="secondary"
+            data-testid="ai.composer-stop"
+            disabled={runId === null}
+            onClick={stop}
+          >
+            {t("agent.progress.cancel")}
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            variant="primary"
+            data-testid="ai.composer-send"
+            disabled={blocked}
+          >
+            {/* The label does NOT change with the probe. It did, and the label
+                it changed to was long enough to collapse the textarea beside
+                it: a button that resizes while you are typing into the control
+                it is stealing width from. The spinner says work is in flight,
+                the count is in the row above, and the button stays the size it
+                was. */}
+            {probing ? <Spinner size={14} style={{ borderWidth: 2 }} /> : null}
+            {t("editor.chrome.rightPanel.aiChat.send")}
+          </Button>
+        )}
+      </form>
+
+      {/* **One control row, UNDER the input** (myne-md/myne#771). The scope and
+          the permission mode were two full-width rows ABOVE it — a caption, a
+          value and a Change button on one; a segmented control spanning the
+          panel on the other — which in a 280px side panel is a quarter of the
+          surface spent on two choices almost nobody changes per message, sat
+          between the transcript and the thing you came to type in.
+
+          Below the input rather than above it, because that is the order the
+          two are used in: you type, and the settings are what you glance at
+          before sending. Above, they were two rows of chrome to read past on
+          the way to the composer, every time.
 
           The scope control itself may NOT be removed, and this does not remove
           it: `docs/decisions/ai/0518` point 1 requires a user-originated scope
@@ -428,70 +498,6 @@ export function ChatComposer({
           </span>
         ) : null}
       </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          // While a run works the button below is Stop, so this form never
-          // submits: only the button stops a run, never a stray Enter from
-          // typing the next message.
-          if (running) return;
-          void submit();
-        }}
-        style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-2)" }}
-      >
-        <textarea
-          ref={inputRef}
-          data-testid="ai.composer-input"
-          rows={1}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter sends, Shift+Enter breaks the line. `isComposing` is the
-            // load-bearing half: an IME commits its candidate with Enter, so
-            // without it a Turkish, Japanese or Korean user sends the first
-            // syllable they meant to accept. While a run works Enter does
-            // nothing: stopping is the button's job, never a keystroke typed
-            // into the next message.
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              if (running) return;
-              void submit();
-            }
-          }}
-          placeholder={t("agent.composer.placeholder")}
-          aria-label={t("agent.composer.placeholder")}
-          disabled={busy}
-          style={INPUT_STYLE}
-        />
-        {running ? (
-          <Button
-            type="button"
-            variant="secondary"
-            data-testid="ai.composer-stop"
-            disabled={runId === null}
-            onClick={stop}
-          >
-            {t("agent.progress.cancel")}
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            variant="primary"
-            data-testid="ai.composer-send"
-            disabled={blocked}
-          >
-            {/* The label does NOT change with the probe. It did, and the label
-                it changed to was long enough to collapse the textarea beside
-                it: a button that resizes while you are typing into the control
-                it is stealing width from. The spinner says work is in flight,
-                the count is in the row above, and the button stays the size it
-                was. */}
-            {probing ? <Spinner size={14} style={{ borderWidth: 2 }} /> : null}
-            {t("editor.chrome.rightPanel.aiChat.send")}
-          </Button>
-        )}
-      </form>
     </div>
   );
 }
