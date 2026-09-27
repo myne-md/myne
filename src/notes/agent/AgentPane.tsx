@@ -12,7 +12,7 @@
 // the ONE place the view is written to the workspace (`setAgentViewState`), so a
 // Hub row opening Focus and a palette verb opening Focus take the same path.
 
-import { useCallback, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PaneId } from "../workspaceState";
@@ -90,6 +90,32 @@ export function AgentPane({
   // the fact in.
   const running = useAgent().running;
 
+  /**
+   * Focus restoration across the hub↔focus change (task 13 of
+   * myne-md/myne#771).
+   *
+   * The two views are different subtrees, so switching unmounts the control
+   * that was focused and React gives focus back to `<body>` — the keyboard
+   * user is standing outside the pane with the whole app behind them, and
+   * their next Tab starts from the top of the document. That is the same
+   * defect myne-md/myne#775 fixed on the ribbon's Escape path, one surface
+   * over.
+   *
+   * The pane takes focus itself rather than guessing at a control: which
+   * control is right differs per view and per state (an empty hub has no rows,
+   * a focus view may have no note button), and a container that is focusable
+   * and labelled is somewhere a reader can orient from. It is focused only
+   * when the view CHANGES, never on first mount, or opening the tab would
+   * steal the caret from whatever opened it.
+   */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const lastView = useRef(view.view);
+  useEffect(() => {
+    if (lastView.current === view.view) return;
+    lastView.current = view.view;
+    rootRef.current?.focus();
+  }, [view.view]);
+
   // One writer for the view, used by Hub rows and (through the palette verbs)
   // by anything that reveals the tab on a particular note.
   const openFocus = useCallback(
@@ -123,6 +149,12 @@ export function AgentPane({
       // the pane knows whether a run is in flight, and that is the fact an E2E
       // wants to wait on.
       data-agent-running={running ? "true" : undefined}
+      // `-1`: reachable programmatically for the restoration above, never a
+      // Tab stop of its own. A container in the tab order is a stop that does
+      // nothing, on every pass through the pane.
+      ref={rootRef}
+      tabIndex={-1}
+      aria-label={view.view === "hub" ? t("agent.hub.title") : t("agent.focus.title")}
       style={ROOT_STYLE}
     >
       <div style={HEADER_STYLE}>

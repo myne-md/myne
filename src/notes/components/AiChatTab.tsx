@@ -40,7 +40,7 @@ import {
 import { clearChat, useChat } from "../ai/chatStore";
 import { agentCancel } from "../../lib/agent-run";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
-import { Button } from "../../components/primitives/Button";
+import { IconButton } from "../../components/primitives/IconButton";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatHistoryModal } from "./ChatHistoryModal";
@@ -109,13 +109,6 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
   rowGap: "var(--space-1)",
 };
 
-/** Icon-only header buttons (History, Memory, New chat). Text labels cost a
- *  third of a 280px sidebar; the meanings are stable enough for icons with
- *  the translated label kept as the accessible name. */
-const HEADER_ICON_BUTTON_STYLE: CSSProperties = {
-  padding: "var(--space-1)",
-  flexShrink: 0,
-};
 
 /** Optional handlers the Editor wires; absent in isolation (e.g. tests). */
 export interface AiChatTabProps {
@@ -229,47 +222,40 @@ export function AiChatTab({
           {t("editor.chrome.rightPanel.tabs.aiChat")}
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <Button
-            type="button"
-            variant="ghost"
+          <IconButton
             icon="clock"
-            aria-label={t("editor.chrome.rightPanel.aiChat.history")}
-            title={t("editor.chrome.rightPanel.aiChat.history")}
-            data-testid="ai.history-button"
+            label={t("editor.chrome.rightPanel.aiChat.history")}
+            tooltip
+            expanded={historyOpen}
+            testId="ai.history-button"
             onClick={() => setHistoryOpen(true)}
-            style={HEADER_ICON_BUTTON_STYLE}
           />
-          <Button
-            type="button"
-            variant="ghost"
+          <IconButton
             icon="bookmark"
-            aria-label={t("editor.chrome.rightPanel.aiChat.memory")}
-            title={t("editor.chrome.rightPanel.aiChat.memory")}
-            data-testid="ai.memory-button"
+            label={t("editor.chrome.rightPanel.aiChat.memory")}
+            tooltip
+            // A disclosure, so it says whether it is open. It is a toggle in
+            // behaviour and was silent about it: a screen-reader user pressed
+            // it twice and heard the same thing both times.
+            expanded={memoryOpen}
+            testId="ai.memory-button"
             onClick={() => setMemoryOpen((open) => !open)}
-            style={HEADER_ICON_BUTTON_STYLE}
           />
           {onFocusAgent !== undefined ? (
-            <Button
-              type="button"
-              variant="ghost"
+            <IconButton
               icon="maximize-2"
-              aria-label={t("editor.chrome.rightPanel.aiChat.focusAgent")}
-              title={t("editor.chrome.rightPanel.aiChat.focusAgent")}
-              data-testid="ai.focus-agent"
+              label={t("editor.chrome.rightPanel.aiChat.focusAgent")}
+              tooltip
+              testId="ai.focus-agent"
               onClick={onFocusAgent}
-              style={HEADER_ICON_BUTTON_STYLE}
             />
           ) : null}
           {chat.turns.length > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              data-testid="ai.new-chat"
-              style={HEADER_ICON_BUTTON_STYLE}
+            <IconButton
+              testId="ai.new-chat"
               icon="plus"
-              aria-label={t("editor.chrome.rightPanel.aiChat.newChat")}
-              title={t("editor.chrome.rightPanel.aiChat.newChat")}
+              label={t("editor.chrome.rightPanel.aiChat.newChat")}
+              tooltip
               onClick={() => {
                 // **Stop what it is clearing, host side, before clearing it.**
                 // Forgetting a run is not stopping one: an abandoned one still
@@ -292,14 +278,11 @@ export function AiChatTab({
               can host, which is New chat and a switched conversation. It hands
               the run id to the surface, which owns the confirm. */}
           {surfaceStatus.undoRunId !== null && !surfaceStatus.undoHosted ? (
-            <Button
-              type="button"
-              variant="ghost"
-              data-testid="ai.revert-fallback"
-              style={HEADER_ICON_BUTTON_STYLE}
+            <IconButton
+              testId="ai.revert-fallback"
               icon="rotate-ccw"
-              aria-label={t("editor.chrome.rightPanel.aiChat.revertRun")}
-              title={t("editor.chrome.rightPanel.aiChat.revertRun")}
+              label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+              tooltip
               onClick={() => setFallbackRevertRunId(surfaceStatus.undoRunId)}
             />
           ) : null}

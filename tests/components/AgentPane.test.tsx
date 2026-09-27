@@ -101,3 +101,69 @@ describe("AgentPane", () => {
     expect(mockSetAgentViewState).toHaveBeenCalledWith("p1", { view: "hub" });
   });
 });
+
+describe("AgentPane: focus survives the view change", () => {
+  // Task 13 of myne-md/myne#771. The hub and the focus view are different
+  // subtrees, so switching unmounts whatever the keyboard user was standing on
+  // and React hands focus back to `<body>` — outside the pane, with the whole
+  // app behind them, and their next Tab starting from the top of the document.
+  // Exactly the defect myne-md/myne#775 fixed on the ribbon's Escape path.
+  //
+  // Nothing else reports it: the click works, the view changes, the pane
+  // renders. Only a keyboard user finds out.
+
+  function renderAt(view: "hub" | "focus") {
+    return render(
+      <AgentPane
+        paneId="p1"
+        item={
+          view === "hub"
+            ? { kind: "agent", id: AGENT_TAB_ID }
+            : {
+                kind: "agent",
+                id: AGENT_TAB_ID,
+                agentView: { view: "focus", noteId: "n-9" },
+              }
+        }
+      />,
+    );
+  }
+
+  it("does not take focus on first mount", () => {
+    // Opening the tab must not steal the caret from whatever opened it — the
+    // palette, the ribbon, a hub row. This is the half that a naive "focus on
+    // render" gets wrong, and it is the half the user would actually notice.
+    renderAt("hub");
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("takes focus when the view changes under it", () => {
+    const { rerender } = renderAt("hub");
+    rerender(
+      <AgentPane
+        paneId="p1"
+        item={{
+          kind: "agent",
+          id: AGENT_TAB_ID,
+          agentView: { view: "focus", noteId: "n-9" },
+        }}
+      />,
+    );
+    const pane = screen.getByTestId("agent.pane");
+    expect(document.activeElement, "the keyboard user was dropped on <body>").toBe(pane);
+  });
+
+  it("is focusable but not a Tab stop", () => {
+    // A container in the tab order is a stop that does nothing, paid on every
+    // pass through the pane.
+    renderAt("hub");
+    expect(screen.getByTestId("agent.pane").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("names itself, since it is now somewhere focus can land", () => {
+    renderAt("hub");
+    expect(
+      (screen.getByTestId("agent.pane").getAttribute("aria-label") ?? "").length,
+    ).toBeGreaterThan(0);
+  });
+});

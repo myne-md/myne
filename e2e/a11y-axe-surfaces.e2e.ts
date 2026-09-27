@@ -29,7 +29,13 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  enableAi,
+  enableDeveloperMode,
+  runPaletteAction,
+  unlockToEditor,
+} from "./support/flows";
 import { runAxeInPage, formatAxe } from "./support/axe";
 import type { Session } from "./support/webdriver";
 
@@ -142,6 +148,46 @@ describeE2E("AXS-5 the Archive panel has no WCAG 2.2 AA violations", () => {
         await runRail(s, "archive.open");
         await s.byTestId("archive.panel", { timeoutMs: 15_000 });
         const violations = await runAxeInPage(s, '[data-testid="archive.panel"]');
+        expect(violations, formatAxe(violations)).toEqual([]);
+      },
+    );
+  });
+});
+
+describeE2E("AXS-6 the agent tab has no WCAG 2.2 AA violations", () => {
+  it("axe is clean on the agent Hub, including its first-run empty state", async () => {
+    // Vault-count precondition: 1. Task 13 of myne-md/myne#771.
+    //
+    // It goes through the PALETTE rather than the rail, unlike its four
+    // neighbours above: the agent's ribbon entry is pin-eligible and NOT in
+    // `RIBBON_DEFAULT_IDS`, so a fresh vault's rail does not carry it and
+    // `runRail` would click nothing and then time out on an element that was
+    // never going to appear — which reads as a broken surface rather than as a
+    // scenario asking for the wrong door.
+    //
+    // Both gates have to be opened, and in this order: `developer_mode` decides
+    // whether the action is VISIBLE in the palette at all, `ai_enabled` decides
+    // whether it is invokable rather than disabled. Opening only the first
+    // finds the entry and cannot press it.
+    //
+    // A seeded vault has no conversations, so this lands on the Hub's
+    // `firstRun` empty state — which carries the `01` canvas, and the canvas
+    // being `aria-hidden` with its meaning in text is exactly the kind of claim
+    // a gate should check rather than a comment assert.
+    let fixture!: SeededVault;
+    await scenario(
+      "axs6-agent",
+      { seed: (dir) => { fixture = seedVault(dir); } },
+      async (app) => {
+        const s = await ready(app, fixture.password);
+        await enableDeveloperMode(s);
+        await enableAi(s);
+        // The third argument is the palette QUERY, not an option: the picker
+        // filters before it can be clicked.
+        await runPaletteAction(s, "ai.open-agent-vault", "agent");
+        await s.byTestId("agent.pane", { timeoutMs: 15_000 });
+        await s.byTestId("agent.hub-empty", { timeoutMs: 15_000 });
+        const violations = await runAxeInPage(s, '[data-testid="agent.pane"]');
         expect(violations, formatAxe(violations)).toEqual([]);
       },
     );
