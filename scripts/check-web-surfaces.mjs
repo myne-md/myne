@@ -253,6 +253,11 @@ const V = {
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",
   ],
+  "src/lib/backup-drill-line.ts": [
+    "excluded",
+    "The post-backup drill line's one-time dismissal store (myne-md/myne#468). Its only importer is `BackupExportModal`, which web substitutes, so it leaves the bundle with it.",
+    "myne.backup.drill-line-seen",
+  ],
   "src/lib/backup-schedule.ts": [
     "excluded",
     "The schedule engine and its `plugin:backup|*` names; reachable only through substituted modules.",

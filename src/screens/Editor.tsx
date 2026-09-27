@@ -2585,7 +2585,10 @@ function EditorChrome({
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
-        onShowToast={showToastMessage}
+        onOpenDrill={() => {
+          setBackupExportOpen(false);
+          openSettings("privacy", "privacy.recovery-drill");
+        }}
       />
       <VaultExportModal
         open={vaultExportOpen}
