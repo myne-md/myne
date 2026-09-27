@@ -117,3 +117,8 @@ pub mod session;
 /// necessity (it crosses the wasm boundary on every failing call), and a comment
 /// saying "keep these in sync" is not a mechanism.
 pub mod opfs_contract;
+
+/// The shared `block_on` the host-build test modules drive their futures with.
+/// Test-only: it is a no-op executor, not a runtime this crate ships.
+#[cfg(test)]
+mod test_support;
