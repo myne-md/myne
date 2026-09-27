@@ -752,7 +752,6 @@ export function GraphPane() {
                 independent toggles (`aria-pressed`). */}
             <Segmented
               testId="editor.graph-view"
-              size="sm"
               ariaLabel={t("notes.graph.viewToggleAriaLabel")}
               value={asList ? "list" : "graph"}
               onChange={(v) => setAsList(v === "list")}

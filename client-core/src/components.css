@@ -201,6 +201,10 @@
   border: 1px solid var(--line-1);
   border-radius: var(--radius-2);
   color: var(--fg-2);
+  /* A bordered control needs breathing room INSIDE its border or the glyph
+     reads as jammed against it. The borderless variant does not: its hit area
+     is the whole square and there is no edge for the glyph to crowd. */
+  padding: var(--icon-btn-pad);
 }
 .myne-icon-btn[data-bordered="true"]:enabled:hover,
 .myne-icon-btn[data-bordered="true"]:enabled:focus-visible {
@@ -456,7 +460,12 @@
   background: var(--bg-1);
   border: 1px solid var(--line-2);
   border-radius: var(--radius-2);
-  padding: 0 var(--space-2);
+  /* `--control-pad-x`, the BUTTON's horizontal padding, not `--space-2`. The
+     two sat beside each other in the graph toolbar at 14px and 8px and the
+     dropdown read as cramped next to its neighbours — the same control
+     vocabulary at two different densities, which is the thing the shared layer
+     exists to stop. Height already matched; only the inset was off. */
+  padding: 0 var(--control-pad-x);
   cursor: pointer;
   white-space: nowrap;
   transition: border-color var(--duration-fast) var(--ease-standard);
@@ -836,6 +845,34 @@
    step, not a per-child cascade: there are three children, and staggering them
    individually would take longer than the entrance itself — which is the
    failure `--stagger-max` exists to bound. */
+/* A scrim that locally suppresses the `01` field behind the words, then
+   dissolves back into it — soft radial falloff, no box edge.
+
+   This was missing from the port and it is not cosmetic: without it the digits
+   run straight through the headline and the body copy, and the text is genuinely
+   hard to read at card size. The website carries the same construct for the
+   same reason (`.hero-copy::before`), and porting the canvas without it was an
+   incomplete port rather than a simplification.
+
+   `--paper-2` is the card's own fill, so the scrim reads as the field fading
+   out behind the text rather than as a visible blob over it. Only drawn when a
+   field is actually present — `:has()` keeps a fieldless card from paying for a
+   gradient that suppresses nothing. */
+.myne-empty:has(.myne-empty__field) .myne-empty__body::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -22% -14%;
+  background: radial-gradient(
+    62% 58% at 50% 50%,
+    var(--paper-2) 0%,
+    var(--paper-2) 34%,
+    color-mix(in srgb, var(--paper-2) 55%, transparent) 58%,
+    transparent 78%
+  );
+}
+
 .myne-empty__body {
   animation: myne-empty-in var(--duration-base) var(--ease-emphasized) var(--stagger-step)
     both;
@@ -909,6 +946,13 @@
 .myne-empty[data-size="sm"] .myne-empty__glyph { width: 32px; height: 32px; }
 .myne-empty[data-size="sm"] .myne-empty__title { font-size: var(--text-sm); }
 .myne-empty[data-size="sm"] .myne-empty__body-text { font-size: var(--text-xs); }
+/* No field at sidebar width. The grid is a fixed 15px cell, so in a 248px box
+   the digits are a dense texture directly behind the words rather than a
+   backdrop behind a headline — it fights the copy instead of setting it off.
+   The caller may still pass `field`; this is the size deciding it cannot use
+   one, which is the kind of judgement a component should make for its caller
+   rather than push back onto every call site. */
+.myne-empty[data-size="sm"] .myne-empty__field { display: none; }
 
 .myne-empty[data-size="lg"] { padding: var(--space-8) var(--space-5); }
 .myne-empty[data-size="lg"] .myne-empty__glyph { width: 56px; height: 56px; }

@@ -228,6 +228,36 @@ export const REHEAT_ALPHA = 0.3;
  *  simulation up towards a permanent full-energy state. */
 export const REHEAT_ALPHA_MAX = 0.8;
 
+/**
+ * The alpha the simulation is HELD at for the duration of a drag.
+ *
+ * A drag used to call `reheat()` on every pointermove, which raised alpha to
+ * `REHEAT_ALPHA` and reset the tick budget each time. Between moves it decayed
+ * again, so the neighbours advanced in pulses — the graph lurched after the
+ * pointer instead of following it, which is what reads as staggering.
+ *
+ * Holding a floor is d3's own `alphaTarget` pattern: the simulation stays warm
+ * at a constant, modest temperature for the whole gesture, so every frame
+ * advances the neighbours by a similar amount and the motion is continuous.
+ * Lower than `REHEAT_ALPHA` deliberately — this is a sustained warmth, not a
+ * kick, and a kick repeated sixty times a second is the bug.
+ */
+export const DRAG_ALPHA = 0.12;
+
+/**
+ * How far the held node moves toward the pointer each tick, 0..1.
+ *
+ * It used to be pinned EXACTLY to the pointer, which makes it infinitely stiff:
+ * its neighbours are yanked by the link force rather than pulled, and the node
+ * itself has no weight. Easing it means the node trails the cursor slightly and
+ * catches up when you slow down — the grabbed thing has mass, and the rest of
+ * the graph is drawn along instead of snapped.
+ *
+ * 0.28 is roughly a 3-frame lag at 60Hz: enough to feel like something is being
+ * pulled, short enough that the node is never far from where you are pointing.
+ */
+export const DRAG_FOLLOW = 0.28;
+
 type SimNode = {
   id: string;
   /** See `LayoutRequest.nodes[].radius`. Absent when the request omitted it;
@@ -271,6 +301,15 @@ export interface LayoutSimulation {
   /** Hold a node where an interaction put it (d3's `fx`/`fy`), so the rest of
    *  the simulation moves around it. */
   hold(id: string, x: number, y: number): void;
+  /**
+   * Hold the simulation warm for the duration of a gesture (or let it cool).
+   *
+   * Separate from `reheat` because they are different shapes: a reheat is an
+   * impulse for a discrete event, this is a sustained floor for a continuous
+   * one. Calling reheat every frame — which is what a drag used to do — is an
+   * impulse train, and it lurches.
+   */
+  dragWarm(on: boolean): void;
   /** Release a held node, so the link force pulls it back through its
    *  connections. This is what makes a drag a spring rather than a placement. */
   release(id: string): void;
@@ -373,16 +412,26 @@ export function createLayoutSimulation(req: LayoutRequest): LayoutSimulation {
 
   const ids: readonly string[] = ordered.map((n) => n.id);
   let cycleTicks = 0;
+  let dragging = false;
 
   return {
     ids,
     step(ticks) {
       sim.tick(ticks);
       cycleTicks += ticks;
+      // Re-assert the floor AFTER ticking: `sim.tick` applies `alphaDecay`, so
+      // without this the temperature sags across a long gesture and the graph
+      // grows sluggish exactly as the user keeps dragging.
+      if (dragging) sim.alpha(Math.max(sim.alpha(), DRAG_ALPHA));
     },
     ticks: () => cycleTicks,
     alpha: () => sim.alpha(),
-    settled: () => sim.alpha() < ALPHA_MIN || cycleTicks >= MAX_TICKS_PER_CYCLE,
+    // Never settled mid-gesture: the budget exists to stop a runaway cycle, and
+    // a drag the user is still performing is not one. Without this the tick
+    // budget expires partway through a long drag and the neighbours simply stop
+    // following, which reads as the graph going dead in your hand.
+    settled: () =>
+      !dragging && (sim.alpha() < ALPHA_MIN || cycleTicks >= MAX_TICKS_PER_CYCLE),
     reheat() {
       const raised = Math.max(sim.alpha(), REHEAT_ALPHA);
       sim.alpha(Math.min(raised, REHEAT_ALPHA_MAX));
@@ -390,9 +439,30 @@ export function createLayoutSimulation(req: LayoutRequest): LayoutSimulation {
     },
     hold(id, x, y) {
       const n = byId.get(id);
-      if (n) {
+      if (!n) return;
+      // EASE toward the pointer rather than snapping onto it. A node pinned
+      // exactly to the cursor is infinitely stiff: the link force yanks its
+      // neighbours instead of pulling them, and the node itself reads as
+      // weightless. See DRAG_FOLLOW.
+      //
+      // The first call of a gesture has no previous hold to ease from, so it
+      // lands exactly — otherwise the node would visibly slide in from
+      // wherever it last sat.
+      if (n.fx == null || n.fy == null) {
         n.fx = x;
         n.fy = y;
+        return;
+      }
+      n.fx += (x - n.fx) * DRAG_FOLLOW;
+      n.fy += (y - n.fy) * DRAG_FOLLOW;
+    },
+    dragWarm(on) {
+      dragging = on;
+      if (on) {
+        // Enter at the floor rather than below it, so the first frame of a
+        // gesture moves as much as the last.
+        sim.alpha(Math.max(sim.alpha(), DRAG_ALPHA));
+        cycleTicks = 0;
       }
     },
     release(id) {
@@ -453,4 +523,5 @@ export type LayoutWorkerCommand =
   | { kind: "start"; request: LayoutRequest }
   | { kind: "reheat" }
   | { kind: "hold"; id: string; x: number; y: number }
-  | { kind: "release"; id: string };
+  | { kind: "release"; id: string }
+  | { kind: "dragWarm"; on: boolean };
