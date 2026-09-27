@@ -28,6 +28,7 @@ import {
   clickNewItem,
   closeSettings,
   dismissImporterOffer,
+  enableAi,
   enableDeveloperModeInSettings,
   openSettings,
   runPaletteAction,
@@ -173,6 +174,20 @@ runner(
         await sleep(500);
       });
 
+      // **And the AI opt-in, which developer mode alone does not give.**
+      // `ai.open-agent-vault`'s `visibility` is `disabled` — not `hidden` —
+      // when `aiEnabled` is false, so the palette LISTS the verb and clicking
+      // it does nothing. That is correct product behaviour and it is why two
+      // runs of this spec waited out the pane's whole budget with the row
+      // right there on screen: the capture was reading "the row exists" as
+      // "the row works".
+      await safe("ai opt-in", async () => {
+        await enableAi(s);
+        await sleep(400);
+        await closeSettings(s);
+        await sleep(600);
+      });
+
       await frame(
         s,
         "05-agent",
@@ -180,10 +195,21 @@ runner(
           "conversation, and the composer's scope and permission controls under " +
           "the input rather than above it.",
         async () => {
-          await runPaletteAction(s, "ai.open-agent-vault", "agent");
+          // RE-RUN the palette action until the pane is up, rather than
+          // running it once and waiting. `runPaletteAction` finds the row and
+          // clicks it exactly once, and a click that misses leaves nothing to
+          // retry — which is the single most common shape behind a timeout
+          // that reads like a dead surface (`e2e/AGENTS.md` says so by name,
+          // and the first run of this spec photographed the open palette).
+          for (let attempt = 0; attempt < 3; attempt++) {
+            await runPaletteAction(s, "ai.open-agent-vault", "agent");
+            const [pane] = await s.byTestIdAll("agent.pane");
+            if (pane !== undefined) break;
+            await sleep(1500);
+          }
           await s.byTestId("agent.pane", { timeoutMs: 20_000 });
           // The rail loads its roster over IPC after the pane mounts.
-          await sleep(900);
+          await sleep(1200);
         },
       );
 
