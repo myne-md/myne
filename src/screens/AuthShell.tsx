@@ -28,8 +28,7 @@
 // derived from vault content (`src/AGENTS.md`); a shell with a data dependency
 // would be the easiest place in the tree to break that without noticing.
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import { mountBinaryField } from "@myne/client-core/binaryField";
+import type { CSSProperties, ReactNode } from "react";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 
@@ -81,11 +80,6 @@ const ACTIONS_STYLE: CSSProperties = {
 };
 
 const MAIN_STYLE: CSSProperties = {
-  // The field is absolutely positioned against this region, so it must be the
-  // containing block. It also clips the field to the region rather than to the
-  // window, which keeps the digits out from under the wordmark.
-  position: "relative",
-  overflow: "hidden",
   flex: 1,
   minHeight: 0,
   display: "flex",
@@ -149,16 +143,6 @@ export function AuthShell({
   children: ReactNode;
   testId?: string;
 }) {
-  const fieldRef = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const el = fieldRef.current;
-    if (el === null) return;
-    const handle = mountBinaryField(el);
-    // Not optional: the handle owns a rAF loop, an IntersectionObserver, a
-    // visibilitychange listener and a slot in the process-wide animation
-    // budget. Leaking one leaks all of them and starves every later field.
-    return () => handle.destroy();
-  }, []);
 
   return (
     <div style={ROOT_STYLE} data-testid={testId}>
@@ -170,12 +154,6 @@ export function AuthShell({
         {actions != null && <div style={ACTIONS_STYLE}>{actions}</div>}
       </header>
       <main style={MAIN_STYLE}>
-        {/* The brand's `01` field, the same one every zero state in the app
-            carries (`docs/decisions/ui/0625`). Decoration: every word the user
-            needs is in the column above it, which is also what keeps these
-            screens readable under `forced-colors`, where a canvas paints
-            nothing at all. */}
-        <canvas ref={fieldRef} className="myne-auth__field" aria-hidden="true" />
         {align === "upper" && <div style={SPACER_ABOVE_STYLE} aria-hidden="true" />}
         {/* The animation is keyed off an attribute rather than a class alone so
             the two directions are one rule pair in `components.css` and the
