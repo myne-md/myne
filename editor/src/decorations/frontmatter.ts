@@ -156,14 +156,25 @@ class PropertiesWidget extends WidgetType {
     // could race — see decisions.md 2026-05-15 save-handler discipline).
     container.appendChild(this.renderTitleField(view));
 
+    // The key/value block is drawn as a TABLE — one bordered, rounded surface
+    // holding its own header, its rows and the control that adds one
+    // (myne-md/myne#773). It used to be three siblings of the note title with
+    // nothing around them, so a reader saw a heading, some aligned text and a
+    // link, and nothing said those three things were one structure or where it
+    // ended. The note title stays OUTSIDE, because it is the note's, not a row
+    // of its frontmatter.
+    const table = document.createElement("div");
+    table.className = "cm-fm-properties-table";
+    container.appendChild(table);
+
     const title = document.createElement("div");
     title.className = "cm-fm-properties-title";
     title.textContent = i18n.t("editor.frontmatter.propertiesLabel");
-    container.appendChild(title);
+    table.appendChild(title);
 
     const list = document.createElement("div");
     list.className = "cm-fm-properties-list";
-    container.appendChild(list);
+    table.appendChild(list);
 
     for (const prop of this.properties) {
       // `title` is surfaced by the promoted field above — don't repeat it
@@ -197,7 +208,7 @@ class PropertiesWidget extends WidgetType {
       e.preventDefault();
       this.addProperty(view);
     });
-    container.appendChild(addBtn);
+    table.appendChild(addBtn);
 
     return container;
   }

@@ -488,14 +488,34 @@ const CSS = `
   box-shadow: none !important;
   background: var(--paper-2, #f3f1eb);
 }
+/* The Properties TABLE (myne-md/myne#773): one bordered, rounded surface around
+   the header, the rows and the add control, so the block reads as a structure
+   with an inside and an outside rather than as three loose siblings under the
+   note title. The note title is deliberately not in here.
+
+   A hairline and a whisper of surface, not a card: this sits at the head of
+   every note with frontmatter, so anything heavier competes with the prose it
+   introduces. The same pair .myne-empty uses, for the same reason. */
+.cm-fm-properties-table {
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2, 6px);
+  background: var(--paper-2, #f3f1eb);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
 .cm-fm-properties-title {
-  font-size: 1em;
+  font-size: 0.929em;
   font-weight: var(--weight-semibold);
-  color: var(--fg-1);
-  margin-bottom: 10px;
+  color: var(--fg-2);
+  /* A header BAND, which is what makes the rows below read as rows of one
+     table rather than as the first thing under a label. */
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-1);
+  letter-spacing: var(--tracking-tight, 0);
 }
 .cm-fm-properties-list {
   display: grid;
+  padding: var(--space-2) var(--space-3);
   /* minmax(0, …) on both flexible tracks, not the bare 160px / 1fr this used to
      be. A grid track's automatic minimum is min-content, so the value column
      floored at its input's intrinsic width and the whole grid at roughly 370px
@@ -628,8 +648,11 @@ const CSS = `
   border-radius: var(--radius-1, 3px);
 }
 .cm-fm-properties-add {
-  margin-top: 10px;
-  margin-left: var(--space-5);
+  /* Inside the table, under its last row and aligned with the key column, so
+     it reads as "add a row to THIS" rather than as a control that happens to
+     follow. The old 10px top margin was spacing between siblings; inside a
+     bordered surface that gap is the table's own bottom padding. */
+  margin: 0 0 var(--space-2) calc(var(--space-3) + 24px + var(--space-2) - 6px);
 }
 .cm-fm-properties-add:hover,
 .cm-fm-add-cover:hover {
