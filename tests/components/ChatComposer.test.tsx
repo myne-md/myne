@@ -592,3 +592,78 @@ describe("ChatComposer: the empty input is one row", () => {
     });
   });
 });
+
+describe("ChatComposer: with no note open, it says so and offers the way out", () => {
+  // The dead end a user actually hit. In the AGENT TAB the tab is usually the
+  // focused pane, so there is no open note — and the picker's one entry was an
+  // unconditional "This note". It named something that did not exist, resolved
+  // to `null`, and left Send permanently disabled with no other scope in the
+  // list to pick instead.
+  //
+  // A control lying about its own value is worse than one with nothing in it:
+  // the user reads "This note" and concludes the app is broken rather than
+  // that they have a choice to make.
+
+  function noteless(folders: readonly string[] = ["Projects", "Archive"]) {
+    render(
+      <ChatComposer openNoteId={null} folders={folders} />,
+    );
+  }
+
+  it("does not offer 'This note' when there is none", () => {
+    noteless();
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    const labels = screen
+      .getAllByTestId("ai.composer-scope-option")
+      .map((o) => o.getAttribute("data-value"));
+    expect(labels, "the open-note entry is still offered").not.toContain("");
+    expect(labels).toEqual(["Projects", "Archive"]);
+  });
+
+  it("still offers it when there IS one", () => {
+    // The gate is on the NOTE, not on the surface: the light panel has one
+    // open almost always, and removing the entry there would take away the
+    // common case's default.
+    render(<ChatComposer openNoteId="n-1" folders={["Projects"]} />);
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    expect(
+      screen.getAllByTestId("ai.composer-scope-option").map((o) => o.getAttribute("data-value")),
+    ).toContain("");
+  });
+
+  it("names the choice rather than a value it does not have", () => {
+    noteless();
+    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain(
+      "agent.composer.scopeOpenNote",
+    );
+  });
+
+  it("says why Send is off, once there is something to send", () => {
+    // A greyed button and nothing else reads as a broken app. A scope missing
+    // while the box is EMPTY is not yet a problem, so the line waits for the
+    // user to have typed — a scolding that arrives before the mistake is a
+    // scolding about nothing.
+    noteless();
+    expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
+    type("selam");
+    expect(screen.getByTestId("ai.composer-needs-scope")).toBeTruthy();
+    expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+
+  it("stops saying it once a folder is chosen, and Send comes alive", () => {
+    noteless();
+    type("selam");
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    fireEvent.click(
+      screen
+        .getAllByTestId("ai.composer-scope-option")
+        .find((o) => o.getAttribute("data-value") === "Projects")!,
+    );
+    expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
+    expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+});

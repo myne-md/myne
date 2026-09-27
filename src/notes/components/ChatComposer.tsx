@@ -219,12 +219,26 @@ export function ChatComposer({
     if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
   }, [message]);
 
+  /**
+   * The scope choices.
+   *
+   * **The open-note entry is offered only when there IS one** (myne-md/myne#771).
+   * It was unconditional and labelled "This note", so in the agent tab — where
+   * the tab is usually the focused pane and no note is open — the picker's one
+   * entry named something that did not exist, resolved to `null`, and left Send
+   * permanently disabled with no other scope in the list to pick instead. A
+   * control lying about its own value is worse than one with nothing in it:
+   * the user reads "This note" and concludes the app is broken rather than
+   * that they have a choice to make.
+   */
   const scopeOptions = useMemo(
     () => [
-      { value: "", label: t("agent.composer.scopeOpenNote") },
+      ...(openNoteId !== null && openNoteId !== ""
+        ? [{ value: "", label: t("agent.composer.scopeOpenNote") }]
+        : []),
       ...folders.map((f) => ({ value: f, label: f })),
     ],
-    [folders, t],
+    [folders, openNoteId, t],
   );
   // `SearchableSelect` memoizes its selected set and its trigger summary on this
   // array's identity, so a literal would rebuild both on every keystroke and on
@@ -418,6 +432,23 @@ export function ChatComposer({
         )}
       </form>
 
+      {/* **A disabled Send says why** (myne-md/myne#771). A run needs a scope
+          the host will accept: `defaultGrantFor` resolves it to the open note
+          or to `null`, and a vault-wide grant is refused outright
+          (`is_root_grant`). So with no note open and no folder chosen there is
+          genuinely nothing to run against — and the surface said so with a
+          greyed button and nothing else, which reads as a broken app rather
+          than as a choice the user has not made yet.
+
+          Only when there is something to send: a scope missing while the box
+          is empty is not yet a problem, and a line that appears before the
+          user has typed is a scolding. */}
+      {grant === null && !empty && !busy ? (
+        <p data-testid="ai.composer-needs-scope" style={CAPTION_STYLE}>
+          {t("agent.composer.needsScope")}
+        </p>
+      ) : null}
+
       {/* **One control row, UNDER the input** (myne-md/myne#771). The scope and
           the permission mode were two full-width rows ABOVE it — a caption, a
           value and a Change button on one; a segmented control spanning the
@@ -449,7 +480,15 @@ export function ChatComposer({
           aria-label={t("agent.composer.scopeLabel")}
           options={scopeOptions}
           selected={scopeSelected}
-          placeholder={t("agent.composer.scopeOpenNote")}
+          // The placeholder is what the trigger reads when nothing is chosen,
+          // so it names the CHOICE rather than a value: with no note open there
+          // is nothing selected and "This note" would be the same lie the
+          // option list used to tell.
+          placeholder={
+            openNoteId !== null && openNoteId !== ""
+              ? t("agent.composer.scopeOpenNote")
+              : t("agent.composer.scopeChoose")
+          }
           onChange={(next) => setAttached(next[0] ? next[0] : null)}
         />
 

@@ -350,6 +350,15 @@ export function PaneView({
   // reference only when the set actually changed, so an unrelated bump no longer
   // reconfigures this pane's editor (myne#217).
   const notes = useLiveResolverNotes();
+  // Every folder that holds a note, for the agent tab's scope picker. Memoized
+  // because `notes` changes identity on every save and this sorts; the right
+  // panel's own copy gates on its tab being open for the same reason, and the
+  // gate here is the pane's kind, checked where it is used.
+  const agentFolders = useMemo(
+    () =>
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+    [notes],
+  );
   const indexNonce = useIndexNonce();
   // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
   // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
@@ -1675,10 +1684,20 @@ export function PaneView({
     if (isAgent && leaf.activeTab !== null) {
       // The agent hub (myne-md/myne#771). It fills like the tasks pane and keeps
       // gutters: it is a reading/app content surface, not a canvas.
+      //
+      // **`folders` is not optional here, whatever its type says.** It was
+      // omitted, so the agent tab's scope picker offered exactly one entry —
+      // "This note" — and in the agent tab there usually IS no open note: the
+      // tab is the focused pane. So the scope resolved to `null`, the host
+      // refuses a run without one, Send sat disabled, and the only alternative
+      // scope the picker exists to offer was not in it. A dead end reachable by
+      // opening the tab and typing.
       return {
         fill: true,
         gutters: true,
-        el: <AgentPane paneId={leaf.id} item={leaf.activeTab} />,
+        el: (
+          <AgentPane paneId={leaf.id} item={leaf.activeTab} folders={agentFolders} />
+        ),
       };
     }
     if (loading) {
