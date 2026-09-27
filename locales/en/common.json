@@ -4027,6 +4027,12 @@
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
       "personLock": "Lock member identity",
       "personError": "That phrase did not open a member identity.",
+      "identityForgetCta": "Forget this identity on this device",
+      "identityForgetCheckbox": "I understand this identity will be removed from this device.",
+      "identityForgetConfirm": "Forget identity",
+      "identityForgetCancel": "Keep it",
+      "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
+      "identityForgetError": "Could not forget the identity. Try again.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
       "inviteCodeLabel": "Member identity code",
       "inspect": "Check fingerprint",
@@ -4638,7 +4644,10 @@
       "codeLabel": "Your identity code",
       "invitesHeading": "Invitations",
       "noInvites": "No invitations yet.",
-      "inviteHint": "Open this invite from the vault picker to join with your identity phrase."
+      "inviteHint": "Open this invite from the vault picker to join with your identity phrase.",
+      "forgetHeading": "This device",
+      "forget": "Forget this identity on this device",
+      "forgetCheckbox": "I understand this identity will be removed from this device. The server account survives and the phrase recovers it."
     }
   },
   "identitySetup": {
@@ -4682,6 +4691,12 @@
     "acceptPhraseLabel": "Your recovery phrase",
     "acceptError": "The invite could not be accepted.",
     "acceptInvalid": "That is not a valid owner identity code.",
+    "forgetCancel": "Keep it",
+    "forgetCheckbox": "I understand this identity will be removed from this device.",
+    "forgetConfirm": "Forget identity",
+    "forgetCta": "Forget this identity on this device",
+    "forgetError": "Could not forget the identity. Try again.",
+    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it.",
     "shareCodeHeading": "Your invite code",
     "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",
     "title": "Your identity"

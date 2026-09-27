@@ -22,7 +22,7 @@ import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
-import { inspectInviteCode } from "../lib/invite";
+import { inspectInviteCode, personLock } from "../lib/invite";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
@@ -37,6 +37,9 @@ interface IdentityHomeProps {
   /** Called after an invite is accepted and a shared vault is unlocked, so the
    *  app re-probes into the editor. */
   onAccepted: () => void;
+  /** Called after this device's identity is forgotten, so the app re-probes to
+   *  the Welcome screen (myne-md/myne#782). */
+  onForgotten: () => void;
 }
 
 export function IdentityHome({
@@ -44,6 +47,7 @@ export function IdentityHome({
   identityCode,
   onCreateVault,
   onAccepted,
+  onForgotten,
 }: IdentityHomeProps) {
   const { t } = useTranslation();
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
@@ -57,6 +61,27 @@ export function IdentityHome({
   );
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+  // Forget-this-identity-on-this-device (myne-md/myne#782). A short
+  // acknowledgement gates the destructive button; the warning above it is the
+  // only place the consequence is stated.
+  const [forgetOpen, setForgetOpen] = useState(false);
+  const [forgetAck, setForgetAck] = useState(false);
+  const [forgetBusy, setForgetBusy] = useState(false);
+  const [forgetError, setForgetError] = useState(false);
+
+  const forgetIdentity = async () => {
+    setForgetBusy(true);
+    setForgetError(false);
+    try {
+      // Erases the sealed keypair and the device token; the server account
+      // survives and is recoverable with the phrase on another device.
+      await personLock(true);
+      onForgotten();
+    } catch {
+      setForgetError(true);
+      setForgetBusy(false);
+    }
+  };
 
   const copyIdentityCode = () => {
     if (!identityCode) return;
@@ -397,6 +422,86 @@ export function IdentityHome({
             {t("identityHome.createVaultCta")}
           </Button>
         </div>
+
+        {/* Forget this identity on this device. Device-local only: the server
+            account and any vault it owns or joined are untouched, and the
+            phrase recovers the identity elsewhere. */}
+        {forgetOpen ? (
+          <div
+            data-testid="identity-home.forget-confirm"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+              border: "1px solid var(--danger)",
+              borderRadius: "var(--radius-2)",
+              padding: "var(--space-3)",
+            }}
+          >
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
+              {t("identityHome.forgetWarning")}
+            </div>
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-1)",
+              }}
+            >
+              <input
+                type="checkbox"
+                data-testid="identity-home.forget-ack"
+                checked={forgetAck}
+                onChange={(e) => setForgetAck(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+              />
+              {t("identityHome.forgetCheckbox")}
+            </label>
+            {forgetError ? (
+              <p
+                data-testid="identity-home.forget-error"
+                role="alert"
+                style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
+              >
+                {t("identityHome.forgetError")}
+              </p>
+            ) : null}
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Button
+                variant="ghost"
+                disabled={forgetBusy}
+                onClick={() => {
+                  setForgetOpen(false);
+                  setForgetAck(false);
+                }}
+                data-testid="identity-home.forget-cancel"
+              >
+                {t("identityHome.forgetCancel")}
+              </Button>
+              <div style={{ flex: 1 }} />
+              <Button
+                variant="danger"
+                disabled={!forgetAck || forgetBusy}
+                onClick={() => void forgetIdentity()}
+                data-testid="identity-home.forget-confirm-cta"
+              >
+                {t("identityHome.forgetConfirm")}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Button
+              variant="ghost"
+              onClick={() => setForgetOpen(true)}
+              data-testid="identity-home.forget-cta"
+            >
+              {t("identityHome.forgetCta")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

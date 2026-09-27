@@ -135,6 +135,28 @@ export function MemberRosterPanel({
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+  // Forget this device's person identity (myne-md/myne#782). `lockPerson` is a
+  // session lock; the `true` argument is the off-boarding erase.
+  const [forgetOpen, setForgetOpen] = useState(false);
+  const [forgetAck, setForgetAck] = useState(false);
+  const [forgetBusy, setForgetBusy] = useState(false);
+  const [forgetError, setForgetError] = useState(false);
+
+  const forgetIdentity = async () => {
+    setForgetBusy(true);
+    setForgetError(false);
+    try {
+      await lockPerson(true);
+      setCopyFeedback(null);
+      setPersonIdentityState({ ready: false, ownerCode: null });
+      setForgetOpen(false);
+      setForgetAck(false);
+    } catch {
+      setForgetError(true);
+    } finally {
+      setForgetBusy(false);
+    }
+  };
 
   const copyOwnerCode = () => {
     if (!ownerCode) return;
@@ -335,6 +357,89 @@ export function MemberRosterPanel({
             </>
           ) : (
             lockButton
+          )}
+
+          {/* Forget this device's identity entirely (myne-md/myne#782): erases
+              the sealed keypair and the device token. Device-local; the server
+              account and any vault it owns or joined are untouched. */}
+          {forgetOpen ? (
+            <div
+              data-testid="member-roster.forget-confirm"
+              style={{
+                marginTop: "var(--space-2)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-2)",
+                border: "1px solid var(--danger)",
+                borderRadius: "var(--radius-2)",
+                padding: "var(--space-3)",
+              }}
+            >
+              <p data-testid="member-roster.forget-warning" style={{ ...STATUS_STYLE, margin: 0 }}>
+                {t("sync.memberRoster.identityForgetWarning")}
+              </p>
+              <label
+                style={{
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  alignItems: "center",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--fg-1)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  data-testid="member-roster.forget-ack"
+                  checked={forgetAck}
+                  onChange={(e) => setForgetAck(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+                />
+                {t("sync.memberRoster.identityForgetCheckbox")}
+              </label>
+              {forgetError ? (
+                <p data-testid="member-roster.forget-error" style={{ ...ERROR_STYLE, margin: 0 }}>
+                  {t("sync.memberRoster.identityForgetError")}
+                </p>
+              ) : null}
+              <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={forgetBusy}
+                  onClick={() => {
+                    setForgetOpen(false);
+                    setForgetAck(false);
+                    setForgetError(false);
+                  }}
+                  data-testid="member-roster.forget-cancel"
+                >
+                  {t("sync.memberRoster.identityForgetCancel")}
+                </Button>
+                <div style={{ flex: 1 }} />
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={!forgetAck || forgetBusy}
+                  onClick={() => void forgetIdentity()}
+                  data-testid="member-roster.forget-confirm-cta"
+                >
+                  {t("sync.memberRoster.identityForgetConfirm")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              style={{ ...ROW_ACTION_STYLE, marginTop: "var(--space-2)" }}
+              onClick={() => {
+                setForgetOpen(true);
+                setForgetError(false);
+              }}
+              data-testid="member-roster.forget-cta"
+            >
+              {t("sync.memberRoster.identityForgetCta")}
+            </Button>
           )}
         </div>
       )}

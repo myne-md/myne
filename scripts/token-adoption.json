@@ -60,7 +60,7 @@
   "src/notes/components/TaskListPanel.tsx": 2,
   "src/notes/components/UnlinkedMentionsSection.tsx": 10,
   "src/notes/components/ViewSettings.tsx": 3,
-  "src/notes/components/ViewsSection.tsx": 3,
+  "src/notes/components/ViewsSection.tsx": 2,
   "src/notes/components/notePanelStyles.ts": 9,
   "src/notes/components/reorderDnd.ts": 2,
   "src/notes/import/ImportSourcePicker.tsx": 1,

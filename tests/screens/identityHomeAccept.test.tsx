@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personListInvites = vi.hoisted(() => vi.fn());
+const personLock = vi.hoisted(() => vi.fn());
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -23,6 +24,7 @@ vi.mock("../../src/lib/personAccount", () => ({
 
 vi.mock("../../src/lib/invite", () => ({
   inspectInviteCode: vi.fn(),
+  personLock,
 }));
 
 vi.mock("../../src/lib/clipboard", () => ({ copyText: vi.fn() }));
@@ -33,6 +35,7 @@ import { IdentityHome } from "../../src/screens/IdentityHome";
 
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
+  personLock.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => cleanup());
@@ -45,6 +48,7 @@ describe("IdentityHome accept path", () => {
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
+        onForgotten={() => {}}
       />,
     );
     await waitFor(() => expect(personListInvites).toHaveBeenCalled());
@@ -61,6 +65,7 @@ describe("IdentityHome accept path", () => {
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
+        onForgotten={() => {}}
       />,
     );
     const open = await screen.findByTestId("identity-home.accept-open");
@@ -69,5 +74,34 @@ describe("IdentityHome accept path", () => {
     // the fingerprint and confirms before the phrase step.
     expect(await screen.findByTestId("identity-home.accept-owner-code")).toBeTruthy();
     expect(screen.getByTestId("identity-home.accept-inspect")).toBeTruthy();
+  });
+
+  // myne-md/myne#782: the identity can be forgotten from the home, gated on a
+  // short acknowledgement, and the parent is told so it can re-probe.
+  it("forgets this device's identity behind an acknowledgement", async () => {
+    const onForgotten = vi.fn();
+    render(
+      <IdentityHome
+        personIdHex="person"
+        identityCode="code"
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={onForgotten}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+    const confirm = (await screen.findByTestId(
+      "identity-home.forget-confirm-cta",
+    )) as HTMLButtonElement;
+    // Gated until the acknowledgement is ticked.
+    expect(confirm.disabled).toBe(true);
+
+    fireEvent.click(screen.getByTestId("identity-home.forget-ack"));
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(personLock).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(onForgotten).toHaveBeenCalled());
   });
 });
