@@ -791,9 +791,13 @@ function EditorChrome({
   // Panel Settings should open on (myne-md/myne#699): the left ribbon's
   // "Customize ribbon…" asks for Appearance; every other entry point clears it.
   const [settingsPanel, setSettingsPanel] = useState<PanelId | null>(null);
+  // The setting to land ON, not merely the panel it lives in. A panel is nine
+  // blocks tall and "Customize ribbon…" used to drop the user at the top of it.
+  const [settingsAnchor, setSettingsAnchor] = useState<string | null>(null);
   const openSettings = useCallback(
-    (panel: PanelId | null = null) => {
+    (panel: PanelId | null = null, anchor: string | null = null) => {
       setSettingsPanel(panel);
+      setSettingsAnchor(anchor);
       setSettingsOpen(true);
     },
     [setSettingsOpen],
@@ -801,7 +805,8 @@ function EditorChrome({
   // The rail is a sibling subtree, so its right-click entry reaches Settings
   // through the service locator.
   useEffect(() => {
-    ribbonCommands.customizeRibbon = () => openSettings("appearance");
+    ribbonCommands.customizeRibbon = () =>
+      openSettings("appearance", "appearance.ribbon");
     return () => {
       ribbonCommands.customizeRibbon = undefined;
     };
@@ -2543,6 +2548,7 @@ function EditorChrome({
         vaultId={vaultId}
         open={settingsOpen}
         initialPanel={settingsPanel ?? undefined}
+        initialAnchor={settingsAnchor ?? undefined}
         onClose={() => setSettingsOpen(false)}
         onShowToast={showToastMessage}
         onForceRelock={onForceRelock}

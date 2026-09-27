@@ -54,7 +54,10 @@ import {
   flattenGroups,
   groupResultsByPanel,
 } from "./settings/search/resultsGrouping";
-import type { SettingsIndexEntry } from "./settings/search/settingsSearchIndex";
+import {
+  SETTINGS_SEARCH_INDEX,
+  type SettingsIndexEntry,
+} from "./settings/search/settingsSearchIndex";
 import {
   SettingsCompactContext,
   useSettingsCompactObserver,
@@ -202,6 +205,21 @@ interface SettingsModalProps {
    * Re-applied on every open, so a gear reopen after a rail reopen starts from
    * this value again (or Account when undefined). */
   initialPanel?: PanelId;
+  /**
+   * A `SETTINGS_SEARCH_INDEX` id to scroll to and flash once that panel has
+   * mounted — the same landing the settings SEARCH performs when a result is
+   * picked, offered to the entry points that already know what they are for.
+   *
+   * Landing on the panel alone is not landing on the setting. "Customize
+   * ribbon…" opened Appearance at the top and left the user to find the ribbon
+   * block among nine others, which is the failure a deep link exists to
+   * prevent; the machinery to finish the job was already here and had one
+   * caller, the search box (myne-md/myne#773).
+   *
+   * An id nothing in the index carries is ignored, so this degrades to the
+   * plain panel switch rather than throwing.
+   */
+  initialAnchor?: string;
   /** Storage → "Back up vault…" (MYND-56): closes Settings, opens the
    *  export progress modal (engine MYND-32). */
   onBackupVault?: () => void;
@@ -414,6 +432,7 @@ export function SettingsModal({
   open,
   onClose,
   initialPanel,
+  initialAnchor,
   onBackupVault,
   onRestoreBackup,
   onExportVault,
@@ -469,6 +488,15 @@ export function SettingsModal({
   const [pendingScroll, setPendingScroll] = useState<SettingsIndexEntry | null>(
     null,
   );
+  // A deep link (`initialAnchor`) is the same request a picked search result
+  // makes, so it goes through the same one channel rather than growing a second
+  // scroll path beside it. Re-armed on every open, so a second visit from the
+  // same entry point lands in the same place instead of only the first.
+  useEffect(() => {
+    if (!open || initialAnchor === undefined) return;
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === initialAnchor);
+    if (entry !== undefined) setPendingScroll(entry);
+  }, [open, initialAnchor]);
   const searching = query.trim() !== "";
   // Order the matches into the SAME panel-clustered sequence the results list
   // renders (group-then-flatten). The scorer (fuzzyFilter, via searchSettings)

@@ -65,6 +65,28 @@ describe("frontmatter widget: presence", () => {
     expect(titleInput(m).value).toBe("Hi");
   });
 
+  it("draws the key/value block as one table, with the note title outside it", () => {
+    // The shape the border is painted on (myne-md/myne#773). Before this the
+    // header, the rows and the add control were three siblings of the note
+    // title with nothing around them, so nothing said where the structure
+    // began or ended — and a border on the container would have boxed the note
+    // title in with its own frontmatter, which it is not part of.
+    m = mount("---\ntitle: Hi\nstatus: draft\n---\nbody\n");
+    const table = m.host.querySelector(".cm-fm-properties-table");
+    expect(table, "no table element to paint a border on").not.toBeNull();
+    for (const cls of [
+      ".cm-fm-properties-title",
+      ".cm-fm-properties-list",
+      ".cm-fm-properties-add",
+    ]) {
+      expect(table!.querySelector(cls), `${cls} is outside the table`).not.toBeNull();
+    }
+    expect(
+      table!.querySelector(".cm-fm-properties-name"),
+      "the note title belongs to the note, not to its frontmatter table",
+    ).toBeNull();
+  });
+
   it("a doc with no frontmatter renders no widget", () => {
     m = mount("just body text\nno yaml here\n");
     expect(widget(m)).toBeNull();
