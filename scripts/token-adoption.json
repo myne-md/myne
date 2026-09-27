@@ -74,7 +74,7 @@
   "src/screens/vault-creation/step-shell.tsx": 2,
   "src/screens/vault-recover/PasswordResetStep.tsx": 2,
   "src/screens/vault-recover/PhraseEntryStep.tsx": 2,
-  "editor/src/attachments/styles.ts": 12,
+  "editor/src/attachments/styles.ts": 13,
   "editor/src/decorations/drawing-embed.ts": 4,
   "editor/src/floating-styles.ts": 20,
   "editor/src/host/notes/GraphCanvas.tsx": 6,

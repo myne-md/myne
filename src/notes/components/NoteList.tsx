@@ -598,10 +598,16 @@ function NotesActionsBar({
 
 /** Leading group: the collapse chevron + the "Notes" eyebrow, kept together
  *  so the header stays a clean two-group `space-between` row (MYND-137). */
+/** The header's leading half: the search row, which takes everything the
+ *  create buttons do not. `HEADER_ROW_STYLE` is `space-between`, so without
+ *  the grow this box sized to its content and the gap between the two halves
+ *  was dead space rather than the search field. */
 const HEADER_LEAD_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
+  flex: 1,
+  minWidth: 0,
 };
 
 /** "Favorites" eyebrow row — pinned above the "Notes" header (MYND-183). Same

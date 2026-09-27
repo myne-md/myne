@@ -69,6 +69,22 @@ interface TooltipProps {
    * hover inside the warm window below. Default {@link DEFAULT_DELAY_MS}.
    */
   delayMs?: number;
+  /**
+   * Let the wrapper GROW inside a flex row, instead of sizing to its child.
+   *
+   * The wrapper is a real element between the caller's flex container and the
+   * trigger, so a `flex: 1` written on the TRIGGER lands on a child of the
+   * flex item and the row's free space never reaches it. The control then
+   * hugs its own text, which is silent: the tooltip works, the button works,
+   * and the layout is simply wrong in a way nothing reports.
+   *
+   * It has cost two controls in one epic — the agent rail's row actions and
+   * the sidebar's search row — so it is an opt-in prop rather than a note in
+   * a comment. Off by default: every other call site wraps something that
+   * should size to its content, and growing them would stretch icon buttons
+   * across their toolbars.
+   */
+  stretch?: boolean;
   children: ReactElement;
 }
 
@@ -137,6 +153,7 @@ export function Tooltip({
   kbd,
   placement = "top",
   delayMs = DEFAULT_DELAY_MS,
+  stretch = false,
   children,
 }: TooltipProps) {
   const wrapRef = useRef<HTMLSpanElement>(null);
@@ -230,7 +247,11 @@ export function Tooltip({
     <>
       <span
         ref={wrapRef}
-        style={{ display: "inline-flex", alignItems: "center" }}
+        style={
+          stretch
+            ? { display: "flex", alignItems: "center", flex: 1, minWidth: 0 }
+            : { display: "inline-flex", alignItems: "center" }
+        }
         onMouseEnter={(e) => open(e.clientX)}
         // While open the bubble rides the pointer; while still dwelling this
         // keeps the pending open aimed at where the cursor actually is, so the
