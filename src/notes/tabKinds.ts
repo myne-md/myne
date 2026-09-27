@@ -35,12 +35,53 @@
 
 import type { IconName } from "../lib/icons";
 import type { WorkspaceItem } from "./workspaceState";
-import {
-  ATTACHMENTS_TAB_ID,
-  GRAPH_TAB_ID,
-  TASKS_TAB_ID,
-  TEMPLATES_TAB_ID,
-} from "./workspaceState";
+// ── The singleton sentinels live HERE, not in `workspaceState` ──────────────
+// They were declared in `workspaceState` and imported, which made the registry
+// and the state module circular: `workspaceState` imports `TAB_KIND_TAGS` and
+// `canonicalTabId` from here, and this file imported the sentinels from there.
+// At module-init time the sentinels were still `undefined` when `TAB_KINDS` was
+// built, so every `singletonId` was `undefined`, `isSingletonTabKind` was false
+// for all of them, and `canonicalTabId("graph", "junk")` returned `"junk"`
+// instead of the sentinel — a stored `graph:junk` handle resolved to a
+// nonexistent tab. TypeScript cannot see it (the binding is live, just unset),
+// no guard checked it, and the registry's own tests passed because they called
+// `canonicalTabId` directly with a sentinel that was by then set.
+//
+// Declaring the constants in the registry and re-exporting them from
+// `workspaceState` keeps the public names where they were while removing the
+// cycle: this module now owns its own values.
+//
+// ALL of them, not the three the cycle was first noticed through. The
+// attachment library and the template library were declared in `workspaceState`
+// and were live bindings into the same cycle; leaving two behind would have
+// meant a registry whose singleton ids were correct for three kinds and
+// `undefined` for two, which is the original defect wearing a smaller mask.
+
+/** The whole-vault graph: exactly one per workspace, so its id is a fixed
+ *  sentinel and the global duplicate-forbid invariant makes "open graph"
+ *  idempotent — a reveal, never a second tab. */
+export const GRAPH_TAB_ID = "graph";
+
+/** The vault-wide task list. Same singleton rule. */
+export const TASKS_TAB_ID = "tasks";
+
+/** The attachment library (myne-md/myne#773, epic #772). It used to be a
+ *  `CenterView` — a SECOND, parallel centre-pane swap mechanism that replaced
+ *  the whole pane tree and bypassed the tab model entirely. That is why the
+ *  left ribbon could not know it was open, why it could not be split beside a
+ *  note, and why closing it had to route through a bespoke `onClose`. */
+export const ATTACHMENTS_TAB_ID = "attachments";
+
+/** The note-template library (myne-md/myne#779). One library per vault, so
+ *  opening it twice reveals the first. It was a MODAL, which
+ *  `docs/decisions/ui/0619` classifies as the wrong shape for it: you browse a
+ *  template library, rename in it and delete from it, and none of that is a
+ *  question the app is asking you. */
+export const TEMPLATES_TAB_ID = "templates";
+
+/** The agent hub (myne-md/myne#771). One hub per vault; the per-tab
+ *  `agentView` decides whether it shows the hub list or a focused run. */
+export const AGENT_TAB_ID = "agent";
 
 export type TabKind = WorkspaceItem["kind"];
 
@@ -130,6 +171,24 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     labelKey: "notes.pane.tasksTab",
     showsFocusedNote: false,
     openCommandId: "tasks.show",
+  },
+  {
+    kind: "agent",
+    singletonId: AGENT_TAB_ID,
+    // `message-square`, the same plain speech bubble the right-panel AI tab
+    // uses. NOT a sparkle/wand glyph (PRODUCT.md bans hype AI framing, and the
+    // icons file carries that note beside both entries).
+    icon: "message-square",
+    labelKey: "notes.pane.agentTab",
+    // The note floats (backlinks / outline / the "…" menu) act on an OPEN NOTE,
+    // and the agent tab is vault-general, so it does not carry them. The field
+    // was `hasNoteFloats` when this entry was written against the lane-0
+    // commit; it is `showsFocusedNote` now, which says the same thing from the
+    // reader's side rather than the float's.
+    showsFocusedNote: false,
+    // The rail's "you are here" state reads this, so the agent's ribbon entry
+    // lights up while its tab is the focused one — the reason the field exists.
+    openCommandId: "ai.open-agent-vault",
   },
 ];
 

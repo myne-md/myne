@@ -29,6 +29,23 @@
     "title": "Enter your account number"
   },
   "agent": {
+    "hub": {
+      "title": "Agent",
+      "loading": "Loading conversations…",
+      "loadFailed": "Your conversations could not be loaded just now.",
+      "emptyTitle": "No conversations yet",
+      "anchorLabel": "On a note",
+      "searchLabel": "Search conversations",
+      "searchPlaceholder": "Search conversations…",
+      "noMatchTitle": "No matches",
+      "noMatchBody": "No conversation matches “{{query}}”. Clear the search to see them all.",
+      "emptyBody": "Ask the agent to change or create notes. Every conversation you start is listed here, including the ones tied to a single note."
+    },
+    "focus": {
+      "title": "Agent on note",
+      "backToHub": "All conversations",
+      "openNote": "Open note"
+    },
     "composer": {
       "placeholder": "Ask the AI to change these notes",
       "scopeLabel": "Working on",
@@ -397,6 +414,12 @@
     "actions": {
       "aiOpenChat": {
         "label": "Open AI Chat"
+      },
+      "aiOpenAgentVault": {
+        "label": "Agent: open on vault"
+      },
+      "aiOpenAgentNote": {
+        "label": "Agent: open on note"
       },
       "aiRewriteSelection": {
         "label": "Rewrite selection"
@@ -1188,6 +1211,7 @@
           "revertConfirmBody": "Notes this run changed go back to how they were before it. Notes it created stay where they are.",
           "persistWarning": "Saving to the vault failed. Your messages are still here and will be retried.",
           "memory": "Memory",
+          "focusAgent": "Open in agent tab",
           "memoryPopoverTitle": "What the assistant remembers",
           "memoryPopoverEmpty": "Nothing remembered yet.",
           "memoryPopoverDelete": "Delete",
@@ -2322,6 +2346,7 @@
     "pane": {
       "graphTab": "Graph",
       "tasksTab": "Tasks",
+      "agentTab": "Agent",
       "loading": "Loading…",
       "untitledView": "Untitled view"
     },

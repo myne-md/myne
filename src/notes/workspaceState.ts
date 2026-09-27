@@ -42,7 +42,28 @@ import {
   type TaskView,
 } from "./taskView";
 import type { DetachedEntry } from "./detachedRestore";
-import { TAB_KIND_TAGS, canonicalTabId } from "./tabKinds";
+import {
+  AGENT_TAB_ID,
+  ATTACHMENTS_TAB_ID,
+  GRAPH_TAB_ID,
+  TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
+  TAB_KIND_TAGS,
+  canonicalTabId,
+} from "./tabKinds";
+
+// The singleton sentinels are DECLARED in the tab-kind registry (myne-md/myne#773)
+// and re-exported here, where every caller already imported them from. See the
+// registry's own note: declaring them here made the two modules circular, and at
+// init time every `singletonId` was `undefined`, so no persisted singleton id was
+// ever normalized to its sentinel.
+export {
+  AGENT_TAB_ID,
+  ATTACHMENTS_TAB_ID,
+  GRAPH_TAB_ID,
+  TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
+} from "./tabKinds";
 
 /** Opaque identifier for a pane (leaf or split node). */
 export type PaneId = string;
@@ -53,28 +74,12 @@ export type ViewId = string;
 
 /** The whole-vault graph is a singleton tab: there is exactly one graph per
  *  workspace, so its id is a fixed sentinel (the global duplicate-forbid
- *  invariant then makes "open graph" idempotent - a reveal, never a 2nd tab). */
-export const GRAPH_TAB_ID = "graph";
+ *  invariant then makes "open graph" idempotent - a reveal, never a 2nd tab).
+ *  Declared in the tab-kind registry; see the re-export note above. */
 
-/** The vault-wide task list is a singleton tab too, for the same reason the
- *  graph is: there is exactly one per workspace, so a fixed sentinel id makes
- *  "open tasks" idempotent - a reveal, never a second tab (MYND-616). */
-export const TASKS_TAB_ID = "tasks";
-
-/** The attachment library is the third singleton (myne-md/myne#773, epic #772).
- *  It used to be a `CenterView` - a SECOND, parallel center-pane swap mechanism
- *  that replaced the whole pane tree and bypassed the tab model entirely. That
- *  is why the left ribbon could not know it was open, why it could not be
- *  split beside a note, and why closing it had to route through a bespoke
- *  `onClose` instead of closing a tab. */
-export const ATTACHMENTS_TAB_ID = "attachments";
-
-/** The note-template library (myne-md/myne#779). A singleton like the rest: it
- *  is one library per vault, so opening it twice reveals the first. It was a
- *  MODAL, which `docs/decisions/ui/0619` classifies as the wrong shape for it —
- *  you browse a template library, rename in it and delete from it, and none of
- *  that is a question the app is asking you. */
-export const TEMPLATES_TAB_ID = "templates";
+/** The attachment library and the template library are singletons too, and
+ *  they are declared in the tab-kind registry with the rest; see the re-export
+ *  note above for why every one of them lives there. */
 
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
@@ -139,7 +144,35 @@ export type WorkspaceItem =
       pinned?: boolean;
       viewMode?: ViewMode;
       taskView?: PersistedTaskView;
+    }
+  /**
+   * The agent hub (myne-md/myne#771). A singleton like the graph and the task
+   * list. `agentView` is **per-tab session state** in the same sense
+   * `taskView` is: whether the tab is showing the vault-wide Hub or one note's
+   * Focus is where you are, not a preference. It carries the conversation it is
+   * showing so a Focus tab survives a reload on the same note.
+   *
+   * **Omit-when-default**, so a Hub tab is byte-identical to a descriptor from
+   * before this kind existed. The descriptor is opaque to the storage codec.
+   */
+  | {
+      kind: "agent";
+      id: typeof AGENT_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+      agentView?: PersistedAgentView;
     };
+
+/** The persisted delta of the agent tab's view (myne-md/myne#771). Absent means
+ *  the Hub. Omitting a `focus` view with no note is the Hub by construction, so
+ *  the object is absent entirely when the tab is on its default. */
+export type PersistedAgentView = {
+  view: "hub" | "focus";
+  /** The note whose conversation Focus is showing, when `view` is `focus`. */
+  noteId?: string;
+  /** The conversation Focus is showing, when one is selected. */
+  conversationId?: string;
+};
 
 /**
  * The persisted delta of a `TaskView`. Every key is omit-when-default, so the
@@ -206,6 +239,11 @@ export function attachmentsItem(): WorkspaceItem {
 /** The template-library tab item (singleton - see [`TEMPLATES_TAB_ID`]). */
 export function templatesItem(): WorkspaceItem {
   return { kind: "templates", id: TEMPLATES_TAB_ID };
+}
+
+/** The agent hub tab item (singleton - see [`AGENT_TAB_ID`]). */
+export function agentItem(): WorkspaceItem {
+  return { kind: "agent", id: AGENT_TAB_ID };
 }
 
 /** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`
@@ -843,6 +881,58 @@ export function resolveTaskView(p: PersistedTaskView | undefined): TaskView {
 export function taskViewOf(item: WorkspaceItem): TaskView {
   if (item.kind !== "tasks") return DEFAULT_TASK_VIEW;
   return resolveTaskView(item.taskView);
+}
+
+/**
+ * The agent tab's view as a live value (myne-md/myne#771). Absent means the
+ * Hub, so the fallback is the default rather than an error.
+ */
+export function agentViewOf(item: WorkspaceItem): PersistedAgentView {
+  if (item.kind !== "agent") return { view: "hub" };
+  return item.agentView ?? { view: "hub" };
+}
+
+/**
+ * Set the agent tab's view, omit-when-default (myne-md/myne#771): a Hub view
+ * DROPS the key so an untouched agent tab serializes byte-identical to a
+ * descriptor from before the kind existed. `undefined` returned from the
+ * to-persisted helper is what triggers the drop.
+ */
+export function setAgentViewState(
+  state: WorkspaceState,
+  paneId: PaneId,
+  view: PersistedAgentView,
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (t.kind !== "agent") return t;
+    const rest: Record<string, unknown> = { ...t };
+    delete rest.agentView;
+    const v = agentViewToPersisted(view);
+    if (v !== undefined) rest.agentView = v;
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) => ({
+      ...leaf,
+      tabs: leaf.tabs.map(apply),
+      activeTab: leaf.activeTab === null ? null : apply(leaf.activeTab),
+    })),
+  };
+}
+
+/** The persisted delta of an agent view, or `undefined` when it is the Hub (the
+ *  default) or a Focus with no note (incoherent, so also the default). */
+export function agentViewToPersisted(
+  view: PersistedAgentView,
+): PersistedAgentView | undefined {
+  if (view.view !== "focus") return undefined;
+  if (view.noteId === undefined || view.noteId === "") return undefined;
+  const v: PersistedAgentView = { view: "focus", noteId: view.noteId };
+  if (view.conversationId !== undefined && view.conversationId !== "") {
+    v.conversationId = view.conversationId;
+  }
+  return v;
 }
 
 /**

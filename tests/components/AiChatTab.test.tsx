@@ -959,9 +959,14 @@ describe("AiChatTab: the shape of a chat", () => {
     const composer = screen.getByTestId("ai.composer");
     const transcript = screen.getByTestId("ai.transcript");
 
-    // The composer is the tab's LAST child, which is what keeps it under the
-    // reader's hands instead of somewhere down a page that scrolls as a whole.
-    expect(tab.lastElementChild).toBe(composer);
+    // **The composer is the surface's LAST child** (myne-md/myne#771), which is
+    // what keeps it under the reader's hands instead of somewhere down a page
+    // that scrolls as a whole. The conversation body moved out of the tab into
+    // the shared `ConversationSurface`, so the tab's own last child is that
+    // surface; the invariant is unchanged and follows the composer's parent.
+    const surface = composer.parentElement!;
+    expect(surface.lastElementChild).toBe(composer);
+    expect(tab.contains(surface)).toBe(true);
 
     // …and the region that scrolls is the transcript's own container, not the
     // tab. A tab that scrolled as one would carry the composer off screen the

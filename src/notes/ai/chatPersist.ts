@@ -27,8 +27,10 @@ import {
   type ConversationListRow,
 } from "../../lib/chats";
 import {
+  clearPendingAnchorNoteId,
   getActiveConversationId,
   getChat,
+  getPendingAnchorNoteId,
   hydrateChatTurns,
   setActiveConversationId,
   setChatPersister,
@@ -373,6 +375,10 @@ export interface ChatPersistSnapshot {
    *  same id, so a create that succeeded server-side is adopted rather than
    *  duplicated. */
   clientId: string;
+  /** The note this conversation is anchored to, captured at snapshot time
+   *  (myne-md/myne#771). Read by the create path; ignored once the conversation
+   *  exists, because an anchor is immutable for the life of a conversation. */
+  noteId: string | null;
 }
 
 let persistSeq = 0;
@@ -402,8 +408,10 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
   }
   try {
     if (snap.id === null) {
-      const created = await chatsCreate(snap.payload, snap.clientId);
+      const created = await chatsCreate(snap.payload, snap.clientId, snap.noteId);
       setActiveConversationId(created);
+      // The anchor rode the create; a second conversation starts clean.
+      clearPendingAnchorNoteId();
       lastPersisted = { id: created, payload: snap.payload, seq: snap.seq };
     } else {
       await chatsAppendTurn(snap.id, snap.payload);
@@ -423,7 +431,7 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
     // (a create replays as a create). Dropped by `clearChatPersistForLock`
     // on the vault-leaving paths: the lock wipe is total, and a replay that
     // crossed a vault switch would write vault A's turns into vault B's store.
-    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch, clientId: snap.clientId };
+    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch, clientId: snap.clientId, noteId: snap.noteId };
     setLagging(true);
     if (attempt < PERSIST_RETRIES) {
       if (retryTimer !== null) clearTimeout(retryTimer);
@@ -469,6 +477,7 @@ export function installChatPersistence(): void {
       seq: ++persistSeq,
       epoch: persistWipeEpoch,
       clientId: crypto.randomUUID().replace(/-/g, ""),
+      noteId: getPendingAnchorNoteId(),
     };
     void enqueueSnapshot(0, snap).catch(() => {
       // Unreachable (persistSnapshotOnce catches internally); kept so the
@@ -510,6 +519,10 @@ export function clearChatPersistForLock(): void {
  * failure leaves the live transcript exactly as it was.
  */
 export async function openConversation(id: string): Promise<"opened" | "failed"> {
+  // Opening an existing conversation is not creating one, so any pending
+  // anchor from a run that never persisted is not this conversation's
+  // (myne-md/myne#771).
+  clearPendingAnchorNoteId();
   let payload: string;
   try {
     payload = await chatsRead(id);
@@ -559,9 +572,10 @@ export async function hydrateActiveConversation(): Promise<void> {
     } else
     try {
       if (stash.id === null) {
-        const created = await chatsCreate(stash.payload, stash.clientId);
+        const created = await chatsCreate(stash.payload, stash.clientId, stash.noteId);
         const turns = parseTranscript(stash.payload);
         setActiveConversationId(created);
+        clearPendingAnchorNoteId();
         lastPersisted = { id: created, payload: stash.payload, seq: stash.seq };
         if (turns !== null) hydrateChatTurns(turns);
       } else {

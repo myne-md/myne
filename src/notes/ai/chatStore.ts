@@ -438,6 +438,38 @@ export function setActiveConversationId(id: string | null): void {
   activeConversationId = id;
 }
 
+/**
+ * The note the NEXT conversation should be anchored to (myne-md/myne#771).
+ *
+ * The anchor is part of the conversation's catalog row, written at CREATE time,
+ * so the note is captured before the first persist and read by `chatPersist`
+ * when it calls `chatsCreate`. Held here rather than passed through the persist
+ * queue because the queue's snapshot is captured at notify time from module
+ * state, and the anchor must survive a retry exactly as the client id does.
+ *
+ * Cleared when a conversation binds (`setActiveConversationId`) and on the
+ * vault-leaving paths, so an anchor set for a conversation that was never
+ * created cannot leak into the next one.
+ */
+let pendingAnchorNoteId: string | null = null;
+
+/** Set (or clear) the note the next created conversation is anchored to. */
+export function setPendingAnchorNoteId(noteId: string | null): void {
+  pendingAnchorNoteId = noteId;
+}
+
+/** Read the pending anchor without clearing it (the persist path reads it on
+ *  every attempt of the same snapshot). */
+export function getPendingAnchorNoteId(): string | null {
+  return pendingAnchorNoteId;
+}
+
+/** Clear the pending anchor once a conversation has been created with it, or on
+ *  any vault-leaving path. */
+export function clearPendingAnchorNoteId(): void {
+  pendingAnchorNoteId = null;
+}
+
 // The persistence listener: called after every terminal reduce (finalize,
 // fail, stop, agent settle/fail) and once from `clearChat` after settling a
 // cut-off stream. Fire-and-forget by contract: the implementation
@@ -594,6 +626,10 @@ export function clearChat(): void {
     notifySettled();
   }
   activeConversationId = null;
+  // A new chat is a new conversation, so it starts with no anchor. Without
+  // this, starting a fresh chat on a different note would keep the previous
+  // note's anchor (myne-md/myne#771).
+  pendingAnchorNoteId = null;
   runEpoch += 1;
   dispatchChat({ type: "CLEARED" });
 }
@@ -609,6 +645,7 @@ export function clearChat(): void {
  */
 export function discardChat(): void {
   activeConversationId = null;
+  pendingAnchorNoteId = null;
   runEpoch += 1;
   dispatchChat({ type: "CLEARED" });
 }
@@ -623,6 +660,7 @@ export function hydrateChatTurns(turns: ChatTurn[]): void {
 /** Test-only reset so the module store doesn't leak across tests. */
 export function __resetChatForTest(): void {
   activeConversationId = null;
+  pendingAnchorNoteId = null;
   persister = null;
   current = CHAT_INITIAL;
   listeners.clear();
