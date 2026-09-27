@@ -37,11 +37,11 @@ import {
   useAiRetrievalState,
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
-import { clearChat, useChat } from "../ai/chatStore";
-import { agentCancel } from "../../lib/agent-run";
+import { useChat } from "../ai/chatStore";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Tooltip } from "../../components/primitives/Tooltip";
+import { startNewConversation } from "../ai/startNewConversation";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatHistoryModal } from "./ChatHistoryModal";
@@ -50,7 +50,6 @@ import {
   ConversationSurface,
   type ConversationSurfaceStatus,
 } from "../ai/ConversationSurface";
-import { clearAgent, useAgent } from "../agent/agentStore";
 
 /** Why the chat surface is at rest, as a fixed identifier — never content
  *  (#191 task 3). `ready` covers both "working" and "still asking the host":
@@ -198,7 +197,6 @@ export function AiChatTab({
   const ready = aiEnabled && !noModel;
 
   const chat = useChat();
-  const agent = useAgent();
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
   // only while open so every opening re-fetches the roster.
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -302,21 +300,11 @@ export function AiChatTab({
               icon="plus"
               label={t("editor.chrome.rightPanel.aiChat.newChat")}
               tooltip
-              onClick={() => {
-                // **Stop what it is clearing, host side, before clearing it.**
-                // Forgetting a run is not stopping one: an abandoned one still
-                // settles later through `settleRunIntoChat`, which repopulates
-                // the store and pops the review of a conversation the user just
-                // deleted. `clearAgent()` below bumps the run epoch, so a reply
-                // is dropped instead of repopulating the store.
-                if (agent.view !== null) void agentCancel(agent.view.runId);
-                // The transcript and the open run together. NOT
-                // `clearAgentForLock`: the undo offer describes notes already
-                // written to the vault, and a new conversation does not un-write
-                // them.
-                clearChat();
-                clearAgent();
-              }}
+              // The whole sequence — cancel the run host-side, then clear the
+              // transcript and the store — lives in `startNewConversation`,
+              // because the agent hub needs the same act and its ordering is
+              // load-bearing. Two copies is how one of them loses the cancel.
+              onClick={startNewConversation}
             />
           ) : null}
           {/* The fallback revert offer (myne-md/myne#741). Shown only when the

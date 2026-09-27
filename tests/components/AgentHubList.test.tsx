@@ -243,3 +243,67 @@ describe("AgentHubList: the rail starts conversations", () => {
     expect((rows[0]!.firstElementChild as HTMLElement).getAttribute("aria-current")).toBeNull();
   });
 });
+
+describe("AgentHubList: a 248px rail is what the row has to fit in", () => {
+  // The row held a title, an anchor pill, a date and two TEXT buttons
+  // ("Rename", "Delete") on one line. That is far more than 248px, and because
+  // the list sets `overflow-y: auto` — which per spec computes `overflow-x` to
+  // `auto` rather than leaving it `visible` — the whole history scrolled
+  // SIDEWAYS. Rows shifted half out of view with a scrollbar under them.
+
+  async function rows() {
+    mockChatsList.mockResolvedValue([
+      {
+        id: "c1",
+        title: "a conversation with a title long enough to need ellipsizing",
+        updated_at: 2,
+        created_at: 1,
+        version: 1,
+        note_id: "n1",
+      },
+    ]);
+    render(<AgentHubList onOpenFocus={vi.fn()} onOpenNote={vi.fn()} />);
+    return await screen.findByTestId("agent.hub-row");
+  }
+
+  it("stacks the title over its meta rather than running them along one line", async () => {
+    const row = await rows();
+    const box = row.firstElementChild as HTMLElement;
+    expect(box.style.flexDirection, "the row is still one line").toBe("column");
+  });
+
+  it("ellipsizes the title instead of widening the row", async () => {
+    await rows();
+    const title = screen.getByTestId("agent.hub-open");
+    expect(title.style.textOverflow).toBe("ellipsis");
+    expect(title.style.whiteSpace).toBe("nowrap");
+    expect(title.style.minWidth, "a flex item floors at its content width").toBe("0px");
+  });
+
+  it("makes the two row actions icon-only", async () => {
+    // As words they are most of the rail on their own. They keep their labels
+    // as tooltips and as accessible names, per the epic's tooltip convention —
+    // so what is lost is width, not meaning.
+    await rows();
+    for (const id of ["agent.hub-rename", "agent.hub-delete"]) {
+      const button = screen.getByTestId(id);
+      expect(button.querySelector("svg"), `${id} has no glyph`).not.toBeNull();
+      expect(button.textContent?.trim(), `${id} still carries its word`).toBe("");
+      expect(
+        (button.getAttribute("aria-label") ?? "").length,
+        `${id} is an unnamed glyph`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("pins the list's horizontal overflow shut", async () => {
+    // `overflow-y: auto` alone computes `overflow-x: auto`, so this is not
+    // redundant with the default — it is the whole fix. A future row that
+    // outgrows the rail truncates rather than bringing the sideways scroll
+    // back.
+    await rows();
+    const list = screen.getByTestId("agent.hub-list");
+    expect(list.style.overflowX).toBe("hidden");
+    expect(list.style.minWidth).toBe("0px");
+  });
+});
