@@ -28,7 +28,7 @@ import {
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
-import { syncConfigSeed } from "./support/multi-device";
+import { pinnedHttpsConfigSeed, syncConfigSeed } from "./support/multi-device";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -216,5 +216,27 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     } finally {
       await server.teardown();
     }
+  });
+
+  it("a vault-less device with a saved server can still choose a self-hosted server", async () => {
+    // Vault-count precondition: 0. A saved endpoint is not a vault or an identity.
+    await scenario(
+      "mr4-first-run-server-recovery",
+      { seedConfig: pinnedHttpsConfigSeed() },
+      async (app) => {
+        await (await app.session.byTestId("welcome.identity-cta")).click();
+        await app.session.byTestId("identity-setup.create-cta");
+        await (await app.session.byTestId("identity-setup.change-server")).click();
+        await app.session.byTestId("first-run-server.myne-sync");
+        await (await app.session.byTestId("first-run-server.self-hosted")).click();
+        await app.session.byTestId("sync.endpoint-config");
+        await app.session.byTestId("sync.endpoint-reverify");
+        const continueButton = await app.session.byTestId("first-run-server.continue");
+        expect(await continueButton.attribute("disabled")).not.toBeNull();
+        await (await app.session.byTestId("first-run-server.back")).click();
+        await (await app.session.byTestId("first-run-server.back")).click();
+        await app.session.byTestId("identity-setup.create-cta");
+      },
+    );
   });
 });

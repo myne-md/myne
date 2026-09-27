@@ -92,6 +92,32 @@ describe("IdentitySetupDialog", () => {
     expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
   });
 
+  it("offers both server choices without Settings when a vault-less device has an old endpoint", async () => {
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+    fireEvent.click(await screen.findByTestId("identity-setup.change-server"));
+
+    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
+    expect(screen.getByTestId("first-run-server.self-hosted")).toBeTruthy();
+    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
+    fireEvent.click(screen.getByTestId("first-run-server.self-hosted"));
+    expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("first-run-server.back"));
+    fireEvent.click(screen.getByTestId("first-run-server.back"));
+    expect(screen.getByTestId("identity-setup.recover-cta")).toBeTruthy();
+  });
+
+  it("keeps a pin failure distinct and provides recovery from the identity form", async () => {
+    personSetup.mockRejectedValue({ kind: "CertPinMismatch" });
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+    fireEvent.click(await screen.findByTestId("identity-setup.create-cta"));
+
+    expect((await screen.findByTestId("identity-setup.error")).textContent).toBe(
+      "identitySetup.errorCertPinMismatch",
+    );
+    fireEvent.click(screen.getByTestId("identity-setup.change-server"));
+    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
+  });
+
   // myne-md/myne#780: a device that already holds a sealed identity is offered
   // Recover plus an explicit forget, never a Create that cannot open the frame.
   it("offers recover and an explicit forget when an identity is already held", async () => {

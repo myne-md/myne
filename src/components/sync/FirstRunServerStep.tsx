@@ -31,6 +31,7 @@ import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
 import { EndpointConfig } from "./EndpointConfig";
+import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 
@@ -40,6 +41,8 @@ interface FirstRunServerStepProps {
   onConnected: () => void;
   /** Abandon the step. The caller decides where Back leads. */
   onBack: () => void;
+  /** An existing endpoint must be reconnected before the user continues. */
+  requireConnection?: boolean;
 }
 
 /**
@@ -65,16 +68,18 @@ export function useHasSyncEndpoint(): boolean {
   return hasEndpoint;
 }
 
-export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepProps) {
+export function FirstRunServerStep({ onConnected, onBack, requireConnection = false }: FirstRunServerStepProps) {
   const { t } = useTranslation();
   // Which door is open. `choose` is the fork itself; `self-hosted` is the URL
   // form behind the second door.
   const [mode, setMode] = useState<"choose" | "self-hosted">("choose");
   const [hostedBusy, setHostedBusy] = useState(false);
   const [hostedError, setHostedError] = useState(false);
-  // Re-read after the user connects, otherwise the Continue button would stay
-  // disabled over an endpoint the control just accepted. A local remount key is
-  // enough: `EndpointConfig` owns the connect call and its own success state.
+  const [hostedPinError, setHostedPinError] = useState<"changed" | "mismatch" | null>(null);
+  const [expectedFingerprint, setExpectedFingerprint] = useState("");
+  const [confirmNeeded, setConfirmNeeded] = useState(false);
+  // The endpoint control reports a successful connection before Continue can
+  // advance. A saved endpoint alone is insufficient in the repair flow.
   const [configured, setConfigured] = useState(false);
   const hasEndpoint = useHasSyncEndpoint();
   // The beta-terms gate stands at every door that first enables sync
@@ -84,7 +89,7 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
   const betaTerms = useBetaTermsGate();
   const [termsOpen, setTermsOpen] = useState(false);
 
-  const connected = configured || hasEndpoint;
+  const connected = configured || (!requireConnection && hasEndpoint);
 
   // Gate the CONTINUE on the terms, not the connect: the endpoint control writes
   // the device-local config, which is not itself the consenting act. Identity
@@ -104,15 +109,25 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
   const connectHosted = () => {
     setHostedBusy(true);
     setHostedError(false);
+    setHostedPinError(null);
     void invoke("plugin:sync|sync_set_endpoint", {
       endpointUrl: HOSTED_SYNC_ORIGIN,
-      confirmedFingerprint: null,
+      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then(() => {
+        setConfirmNeeded(false);
         setConfigured(true);
         advance();
       })
-      .catch(() => setHostedError(true))
+      .catch((e: unknown) => {
+        const refusal = fingerprintGateRefusal(e);
+        if (refusal !== null) {
+          setConfirmNeeded(true);
+          setHostedPinError(refusal === "FingerprintMismatch" ? "mismatch" : "changed");
+        } else {
+          setHostedError(true);
+        }
+      })
       .finally(() => setHostedBusy(false));
   };
 
@@ -137,14 +152,16 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
           </div>
         </div>
 
-        <Button
-          variant="primary"
-          disabled={hostedBusy}
-          onClick={connectHosted}
-          data-testid="first-run-server.myne-sync"
-        >
-          {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
-        </Button>
+        {!confirmNeeded && (
+          <Button
+            variant="primary"
+            disabled={hostedBusy}
+            onClick={connectHosted}
+            data-testid="first-run-server.myne-sync"
+          >
+            {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
+          </Button>
+        )}
         <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
           {t("firstRun.server.myneSyncHint")}
         </div>
@@ -165,6 +182,32 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
           >
             {t("firstRun.server.hostedError")}
           </p>
+        )}
+
+        {hostedPinError && (
+          <p role="alert" data-testid="first-run-server.pin-error" style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }}>
+            {t(hostedPinError === "mismatch" ? "sync.endpoint.confirmFingerprintMismatch" : "sync.endpoint.certificateChanged")}
+          </p>
+        )}
+        {confirmNeeded && (
+          <>
+            <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+              {t("firstRun.server.hostedFingerprintHelp")}
+            </p>
+            <FingerprintConfirm
+              value={expectedFingerprint}
+              onChange={setExpectedFingerprint}
+              onConfirm={connectHosted}
+              onDecline={() => {
+                setConfirmNeeded(false);
+                setHostedPinError(null);
+                setExpectedFingerprint("");
+              }}
+              confirmLabel={t("firstRun.server.myneSync")}
+              confirmDisabled={hostedBusy}
+              testIdPrefix="first-run-server"
+            />
+          </>
         )}
 
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
@@ -208,7 +251,7 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
         </div>
       </div>
 
-      <EndpointConfig />
+      <EndpointConfig onConnected={() => setConfigured(true)} onEdit={() => setConfigured(false)} />
 
       {!connected && (
         <p

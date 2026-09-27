@@ -165,7 +165,7 @@ pub async fn person_setup_from_host(
                 let transport = super::http_transport::build_transport(&url, pins)
                     .map_err(|_| SyncDeviceError::Transport)?;
                 register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
-                    .map_err(|_| SyncDeviceError::Transport)
+                    .map_err(SyncDeviceError::from)
             })
             .await
             .map_err(|_| SyncDeviceError::Internal)??;

@@ -4602,6 +4602,7 @@
       "selfHosted": "Use my own server",
       "connecting": "Connecting…",
       "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
+      "hostedFingerprintHelp": "For Myne Sync, get the current certificate fingerprint from another trusted device or through an independently verified Myne support channel. Do not use a fingerprint supplied by the failed connection.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
@@ -4656,10 +4657,12 @@
     }
   },
   "identitySetup": {
+    "changeServer": "Change or verify sync server",
     "createCta": "Create an identity",
     "doneCta": "Done",
     "error": "Could not set up the identity. Try again.",
     "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
+    "errorCertPinMismatch": "The server certificate has changed. Verify the server certificate before creating or recovering your identity.",
     "errorNotConfigured": "Could not set up the identity. Check that a sync server is configured, then try again.",
     "forgetCancel": "Keep it",
     "forgetConfirm": "Forget and create new",
