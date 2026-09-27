@@ -20,7 +20,7 @@ import { openUrl } from "../../platform/opener";
 import { pickFiles, readPickedSmallText } from "../../platform/filePicker";
 import type { PickedFile } from "@myne/editor";
 import { Button } from "../primitives/Button";
-import { Icon } from "../primitives/Icon";
+import { EmptyState } from "../primitives/EmptyState";
 import { ThemeChiplet } from "../primitives/ThemeChiplet";
 import { BLOCK_STYLE, ERROR_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import {
@@ -86,12 +86,6 @@ const ACTIONS_STYLE: CSSProperties = {
   flexDirection: "row",
   alignItems: "center",
   gap: "var(--space-2)",
-};
-
-const EMPTY_STYLE: CSSProperties = {
-  ...HELPER_STYLE,
-  marginTop: "var(--space-3)",
-  fontStyle: "italic",
 };
 
 /** One custom-theme list row: name + the 5-swatch preview derived from its
@@ -254,33 +248,32 @@ export function CustomThemesSection({
       <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
 
       {rows.length === 0 ? (
-        <div
-          data-testid="settings.custom-theme-empty"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "var(--space-2)",
-            padding: "var(--space-6) var(--space-3)",
-            textAlign: "center",
-          }}
-        >
-          <span aria-hidden="true" style={{ display: "flex", color: "var(--fg-3)" }}>
-            <Icon name="palette" size={30} />
-          </span>
-          <p style={{ ...EMPTY_STYLE, margin: 0 }}>
-            {translate("settings.customThemes.empty")}
-          </p>
-          <Button
-            variant="ghost"
-            icon="globe"
-            style={{ color: "var(--accent)" }}
-            onClick={() => void openUrl("https://myne.md/themes/")}
-            data-testid="settings.custom-theme-browse"
-          >
-            {translate("settings.customThemes.browseButton")}
-          </Button>
-        </div>
+        // The shared zero state, at `sm` (myne-md/myne#773). It carries the
+        // `01` field like every other, which it did not for one round: the
+        // argument was that a brand animation inside a scrolling settings
+        // column pulls the eye off the setting above it. What changed is the
+        // animation — the glow came off the cursor and onto a slow randomized
+        // orbit, so the field no longer flares wherever the pointer goes and
+        // there is nothing in it to catch an eye that is reading past it.
+        <EmptyState
+          variant="firstRun"
+          icon="palette"
+          size="sm"
+          title={translate("settings.customThemes.emptyTitle")}
+          body={translate("settings.customThemes.empty")}
+          testId="settings.custom-theme-empty"
+          action={
+            <Button
+              variant="ghost"
+              icon="globe"
+              style={{ color: "var(--accent)" }}
+              onClick={() => void openUrl("https://myne.md/themes/")}
+              data-testid="settings.custom-theme-browse"
+            >
+              {translate("settings.customThemes.browseButton")}
+            </Button>
+          }
+        />
       ) : (
         <div style={LIST_STYLE}>
           {rows.map((row) => {

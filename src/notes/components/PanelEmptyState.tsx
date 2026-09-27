@@ -11,6 +11,16 @@
 // is not a filtered result; it is the collection in its resting state, which is
 // what `firstRun` means — "there is nothing here yet, and here is what would
 // put something here".
+//
+// ── It FILLS the panel ─────────────────────────────────────────────────────
+// Both callers are 560 × min(78vh, 720px) modals, not sidebar sections. The
+// first version of this adapter said "these panels are sidebar-width" and asked
+// for `sm`, which was simply wrong about its own callers: the result was a
+// ~200px bordered card pinned to the top of a 700px modal with the rest of the
+// modal empty below it, so the box the user was looking at and the box the
+// state was drawn in were two different rectangles with two different borders.
+// `fill` makes the modal body the state — one border, the modal's own, and the
+// `01` field across the whole of it.
 
 import { EmptyState } from "../../components/primitives/EmptyState";
 import type { IconName } from "../../lib/icons";
@@ -32,9 +42,8 @@ export function PanelEmptyState({
       icon={icon}
       title={title}
       body={body}
-      // `sm`: these panels are sidebar-width, where the full card's padding
-      // would leave the words in a column two or three per line.
-      size="sm"
+      size="md"
+      fill
       testId={testId}
     />
   );

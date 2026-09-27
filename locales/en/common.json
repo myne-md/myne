@@ -2962,7 +2962,8 @@
       "confirm": "Confirm",
       "delete": "Delete",
       "deleteError": "Couldn't delete that theme. Please try again.",
-      "empty": "No custom themes yet. Import a theme file to get started.",
+      "emptyTitle": "No custom themes yet",
+      "empty": "Import a theme file, or browse the gallery to find one.",
       "error": {
         "aColorFallback": "a color",
         "invalidFile": "Invalid theme file.",
@@ -3280,7 +3281,8 @@
     "memory": {
       "heading": "What the assistant remembers",
       "helper": "Facts the AI learned from working with you. It writes them itself (at most one per run); you see and can correct every one. Entries sync to your other devices and stay encrypted.",
-      "empty": "Nothing remembered yet. Entries appear here when the assistant learns something during a run.",
+      "emptyTitle": "Nothing remembered yet",
+      "empty": "Entries appear here when the assistant learns something during a run.",
       "editLabel": "Edit",
       "deleteLabel": "Delete",
       "save": "Save",

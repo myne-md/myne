@@ -147,3 +147,49 @@ function walk(dir: string, out: string[]): void {
     }
   }
 }
+
+describe("the zero state carries the brand, in both directions of the ramp", () => {
+  it("states the field's ink ONCE, in CSS, where a theme can reach it", () => {
+    // The canvas reads this back with `getComputedStyle().color`. Deleting it
+    // does not break the read — the canvas simply inherits `--fg-2` from the
+    // card — which is precisely why it needs an assertion: the field would keep
+    // painting, in a colour nobody chose, and only a screenshot would say so.
+    expect(ruleBody(SHEET, ".myne-empty__field {")).toContain("color: var(--fg-1)");
+  });
+
+  it("no longer suppresses the field at sidebar size", () => {
+    // `display: none` on the `sm` field made the one surface a new user sees
+    // first — an empty note list — the one surface with no brand on it.
+    expect(
+      SHEET.includes('.myne-empty[data-size="sm"] .myne-empty__field'),
+      "the sm suppression is back",
+    ).toBe(false);
+  });
+});
+
+describe("a zero state that owns its surface stops drawing a card on one", () => {
+  it("drops the border and the fill, and takes the height offered", () => {
+    // The Archive modal is the case: a ~200px bordered card pinned to the top
+    // of a 700px modal, with the rest of the modal empty underneath, so the box
+    // the user sees and the box the state draws are two different rectangles.
+    // Stretching the card instead would nest two rounded rectangles of the same
+    // radius with nothing between them, which reads as a rendering fault.
+    const body = ruleBody(SHEET, '.myne-empty[data-fill="true"] {');
+    expect(body).toContain("flex: 1");
+    expect(body).toContain("border: none");
+    expect(body).toContain("background: transparent");
+  });
+
+  it("moves the scrim onto the surface the filled state actually sits on", () => {
+    // The scrim's job is to look like the field fading out behind the words. It
+    // does that by being the SURFACE colour, so a filled state keeping the
+    // card's `--paper-2` would paint a card-coloured cloud on a `--paper` modal
+    // — visible as a blob, which is the one thing a scrim must never be.
+    expect(SHEET).toContain(
+      '.myne-empty[data-fill="true"] .myne-empty__body::before',
+    );
+    expect(
+      ruleBody(SHEET, '.myne-empty[data-fill="true"] .myne-empty__body::before'),
+    ).toContain("--myne-empty-scrim: var(--paper)");
+  });
+});

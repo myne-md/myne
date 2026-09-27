@@ -1221,7 +1221,6 @@ function LibraryEmpty(props: LibraryEmptyProps) {
       icon="paperclip"
       title={t("attachments.library.emptyNoAttachments")}
       body={t("attachments.library.emptyImportHint")}
-      field
       testId="attachments.empty-no-attachments"
       action={
         <Button

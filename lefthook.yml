@@ -349,7 +349,7 @@ pre-commit:
       run: node scripts/check-tooltip-convention.mjs
 
     motion-canon:
-      # myne#772 / design-notes/ui/0616: the motion canon, mechanised. Four
+      # myne#772 / design-notes/ui/0618: the motion canon, mechanised. Four
       # rules, none of which any compiler, lint or test in this tree reports —
       # a pulsing badge, an `ease-in` entrance, a 620ms hover and a `width`
       # transition on a per-frame loop all typecheck, render and pass. The

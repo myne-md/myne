@@ -569,7 +569,7 @@ function NotesActionsBar({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
       <IconButton
-        icon="image"
+        icon="image-plus"
         iconSize={15}
         label={t("notes.list.newDrawingMenu")}
         testId="notes.new-drawing"
@@ -1457,7 +1457,6 @@ function EmptyState({
           title={t("notes.list.emptyState")}
           body={t("notes.list.emptyBody")}
           size="sm"
-          field
           testId="notes.empty-state"
           action={
             <Button variant="primary" icon="file-plus" onClick={onCreate}>
