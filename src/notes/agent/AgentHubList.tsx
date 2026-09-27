@@ -36,7 +36,6 @@ import {
 } from "../../lib/chats";
 import { clearChatPersistForLock, openConversation } from "../ai/chatPersist";
 import { discardChat, getActiveConversationId } from "../ai/chatStore";
-import { PanelEmptyState } from "../components/PanelEmptyState";
 
 /** Newest first: the list order, applied to every fetch path. */
 function byUpdatedDesc(rows: ConversationListRow[]): ConversationListRow[] {
@@ -103,9 +102,22 @@ const LIST_STYLE: CSSProperties = {
 
 
 export interface AgentHubListProps {
-  /** Open the given conversation in the tab's Focus view. The pane owns the
-   *  workspace write, so the Hub does not reach into it. */
-  onOpenFocus: (next: { conversationId: string }) => void;
+  /** Open a conversation in the tab's Focus view — an existing one by id, or a
+   *  NEW one by passing neither. The pane owns the workspace write, so the Hub
+   *  does not reach into it. */
+  onOpenFocus: (next: { conversationId?: string }) => void;
+  /**
+   * The note a new conversation would be about, or `null` when none is open.
+   *
+   * The Hub has to know, because starting a conversation is not always
+   * possible: an agent run needs a scope, `defaultGrantFor` resolves that to
+   * the open note or to `null`, and the host REFUSES a vault-wide grant
+   * outright (`is_root_grant`). So with no note open there is nothing a new
+   * conversation could run against, and the honest surface says which of the
+   * two situations the user is in rather than offering a control that silently
+   * does nothing.
+   */
+  focusedNoteId?: string | null;
   /** Open the note a conversation is anchored to, in the workspace. */
   onOpenNote?: (noteId: string) => void;
   /** Folders the composer can attach as a run scope (passed through to Focus). */
@@ -116,7 +128,11 @@ export interface AgentHubListProps {
   onRunUndone?: (noteIds: readonly string[]) => void;
 }
 
-export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
+export function AgentHubList({
+  onOpenFocus,
+  onOpenNote,
+  focusedNoteId = null,
+}: AgentHubListProps) {
   const { t } = useTranslation();
   const { locale, timeZone } = useDateTimeDisplay();
   const [rows, setRows] = useState<ConversationListRow[] | null>(null);
@@ -233,14 +249,42 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
     );
   }
   if (rows.length === 0) {
-    // First-run: explain what the agent is and offer a first action. Not the
-    // same screen as a broken provider, which is the panel's business.
+    // First-run: explain what the agent is and OFFER THE FIRST ACTION. It did
+    // not, for a round, and that is the exact dead end `<EmptyState>` exists to
+    // prevent — a `firstRun` state whose whole job is to offer the thing that
+    // creates the first thing. `<PanelEmptyState>` cannot carry an action at
+    // all, so using it here meant a screen that explained what conversations
+    // are and gave the user no way to have one.
+    //
+    // The action is conditional because the capability is: a run needs a scope,
+    // and with no note open there is none the host would accept. So the two
+    // situations get two different bodies rather than one button that works
+    // sometimes.
     return (
-      <PanelEmptyState
+      <EmptyState
+        variant="firstRun"
         icon="message-square"
+        size="sm"
+        fill
         title={t("agent.hub.emptyTitle")}
-        body={t("agent.hub.emptyBody")}
+        body={
+          focusedNoteId === null
+            ? t("agent.hub.emptyNeedsNote")
+            : t("agent.hub.emptyBody")
+        }
         testId="agent.hub-empty"
+        action={
+          focusedNoteId === null ? undefined : (
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => onOpenFocus({})}
+              data-testid="agent.hub-new"
+            >
+              {t("agent.hub.newConversation")}
+            </Button>
+          )
+        }
       />
     );
   }
@@ -275,6 +319,24 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
       >
         {announcement}
       </span>
+      {/* Start a new one, above the list. Without this the Hub is a surface you
+          can only ever CONTINUE from: the empty state's action disappears the
+          moment there is one conversation, and a user with a single old chat
+          would have no way to begin a second from here.
+
+          Conditional on a note being open for the same reason the empty
+          state's action is: a run needs a scope the host will accept, and with
+          no note open there is none. */}
+      {focusedNoteId !== null && (
+        <Button
+          variant="secondary"
+          icon="plus"
+          onClick={() => onOpenFocus({})}
+          data-testid="agent.hub-new"
+        >
+          {t("agent.hub.newConversation")}
+        </Button>
+      )}
       <Input
         type="search"
         data-testid="agent.hub-search"

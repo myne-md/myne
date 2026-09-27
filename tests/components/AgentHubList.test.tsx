@@ -149,3 +149,63 @@ describe("AgentHubList", () => {
     expect(mockChatsList).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("AgentHubList: the Hub can start a conversation", () => {
+  // The defect this is written against SHIPPED, and it was invisible to every
+  // gate: the Hub's first-run state explained what conversations are and gave
+  // the user no way to have one. `<PanelEmptyState>` cannot carry an action at
+  // all, so the surface whose entire job is "offer the thing that creates the
+  // first thing" had nothing to press.
+  //
+  // Behind it was a second one. `openFocus` returns silently when no note is
+  // focused — correctly, because a run needs a scope and the host refuses a
+  // vault-wide grant — so a start control that ignored that would land there
+  // and do nothing. A button that silently fails is worse than an absent one:
+  // the user concludes the feature is broken rather than that they have a step
+  // to do first.
+
+  it("offers the first action when a note is open", async () => {
+    mockChatsList.mockResolvedValue([]);
+    render(<AgentHubList onOpenFocus={vi.fn()} focusedNoteId="n-1" />);
+    await screen.findByTestId("agent.hub-empty");
+    expect(screen.getByTestId("agent.hub-new")).toBeTruthy();
+  });
+
+  it("starts a NEW conversation, not an existing one", async () => {
+    const onOpenFocus = vi.fn();
+    mockChatsList.mockResolvedValue([]);
+    render(<AgentHubList onOpenFocus={onOpenFocus} focusedNoteId="n-1" />);
+    await screen.findByTestId("agent.hub-empty");
+    screen.getByTestId("agent.hub-new").click();
+    // No `conversationId`: the pane reads that as "open Focus on the note" and
+    // the composer's first send creates the conversation. Passing one here
+    // would reopen whichever chat happened to be last.
+    expect(onOpenFocus).toHaveBeenCalledWith({});
+  });
+
+  it("withholds the control, and says why, when no note is open", async () => {
+    mockChatsList.mockResolvedValue([]);
+    render(<AgentHubList onOpenFocus={vi.fn()} focusedNoteId={null} />);
+    const empty = await screen.findByTestId("agent.hub-empty");
+    expect(screen.queryByTestId("agent.hub-new")).toBeNull();
+    // And the body is the OTHER sentence — the one naming the step to do
+    // first. Offering no control and no explanation is the dead end again.
+    // This file stubs i18n to echo keys, so the assertion is on WHICH key: the
+    // needs-a-note sentence, not the general "here is what conversations are"
+    // one that reads as an invitation with nothing to accept.
+    expect(empty.textContent).toContain("agent.hub.emptyNeedsNote");
+    expect(empty.textContent).not.toContain("agent.hub.emptyBody");
+  });
+
+  it("offers it above a NON-empty list too", async () => {
+    // Otherwise the Hub is a surface you can only ever CONTINUE from: the empty
+    // state's action disappears the moment there is one conversation, and a
+    // user with a single old chat would have no way to begin a second.
+    mockChatsList.mockResolvedValue([
+      { id: "c1", title: "An old chat", updated_at: 2, created_at: 1, version: 1 },
+    ]);
+    render(<AgentHubList onOpenFocus={vi.fn()} focusedNoteId="n-1" />);
+    await screen.findByTestId("agent.hub-row");
+    expect(screen.getByTestId("agent.hub-new")).toBeTruthy();
+  });
+});
