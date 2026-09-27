@@ -127,6 +127,7 @@ const surfaces = [
           identityCode={IDENTITY_CODE}
           onCreateVault={() => {}}
           onAccepted={() => {}}
+          onForgotten={() => {}}
         />,
       ),
     prepare: async () => {},
@@ -240,6 +241,7 @@ describe("identity-code textareas are themed", () => {
             identityCode={IDENTITY_CODE}
             onCreateVault={() => {}}
             onAccepted={() => {}}
+            onForgotten={() => {}}
           />,
         );
         await screen.findByTestId("identity-home.invite-row");
@@ -278,6 +280,7 @@ describe("IdentityHome invite phrase", () => {
         identityCode={IDENTITY_CODE}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
+        onForgotten={() => {}}
       />,
     );
 

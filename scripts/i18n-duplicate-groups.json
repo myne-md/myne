@@ -361,12 +361,45 @@
     "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
   },
   {
+    "value": "Couldn't reach that server. Check the address and try again.",
+    "keys": [
+      "identityFlow.serverUnreachable",
+      "sync.settings.connectError"
+    ],
+    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
+  },
+  {
     "value": "Double-check this number. It doesn't look right.",
     "keys": [
       "join.accountHint",
       "sync.settings.accountNumberHint"
     ],
     "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
+  },
+  {
+    "value": "Forget this identity on this device",
+    "keys": [
+      "identityFlow.home.forget",
+      "identityHome.forgetCta",
+      "sync.memberRoster.identityForgetCta"
+    ],
+    "reason": "Deliberate verbatim sharing: the identity home and the member-roster panel both need the SAME short label for the same destructive action, and one wording keeps the three surfaces(both, and mobile) from drifting. Rewording per surface would invent a difference the user does not have."
+  },
+  {
+    "value": "I understand this identity will be removed from this device.",
+    "keys": [
+      "identityHome.forgetCheckbox",
+      "sync.memberRoster.identityForgetCheckbox"
+    ],
+    "reason": "Deliberate verbatim sharing: the acknowledgement checkbox gates the same destructive action on the identity home and the member-roster panel, so the sentence a user must understand is one sentence. Two wordings would mean one surface under-warns relative to the other."
+  },
+  {
+    "value": "Could not forget the identity. Try again.",
+    "keys": [
+      "identityHome.forgetError",
+      "sync.memberRoster.identityForgetError"
+    ],
+    "reason": "Deliberate verbatim sharing of a non-distinguishing failure line for the same action on two surfaces; a per-surface rewrite would vary a string whose whole point is to say one thing."
   },
   {
     "value": "Couldn't copy. Use \"Save as file\" instead.",
@@ -447,13 +480,5 @@
       "vaultPicker.accountUnreadable"
     ],
     "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
-  },
-  {
-    "value": "Couldn't reach that server. Check the address and try again.",
-    "keys": [
-      "identityFlow.serverUnreachable",
-      "sync.settings.connectError"
-    ],
-    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
   }
 ]
