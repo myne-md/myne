@@ -55,11 +55,21 @@ export const STRIP_HEIGHT = 38;
 
 
 /** Base strip layout. Per-pane: each pane owns its own strip atop its editor
- *  body. A `--line-1` bottom hairline runs the FULL strip width — the editor's
- *  top edge — continuously (the active tab sits on it, Obsidian-style; the
- *  line does NOT break under it). A small top inset gives the tabs breathing
- *  room. Fixed height; fills the pane width. `paddingLeft`/`paddingRight` are
- *  overridden per-instance to clear the corner window controls (insets). */
+ *  body. A `--line-1` bottom hairline runs the strip width — the editor's top
+ *  edge — and the ACTIVE tab BREAKS it: the tab's own side hairlines run down
+ *  into the gap, so the tab reads as one continuous surface with the note body
+ *  beneath it rather than as a card resting on a closed lid (myne-md/myne#773).
+ *
+ *  This file used to say, in this comment, that the line does not break under
+ *  the tab and that not breaking it was the Obsidian look. It is the opposite:
+ *  Obsidian breaks it, and the reason is legibility rather than taste — an
+ *  unbroken rule under the active tab draws a closed box around the tab, and a
+ *  closed box says "this is a chip", not "this is the thing you are looking
+ *  at". The gap is what makes a tab strip read as tabs.
+ *
+ *  A small top inset gives the tabs breathing room. Fixed height; fills the
+ *  pane width. `paddingLeft`/`paddingRight` are overridden per-instance to
+ *  clear the corner window controls (insets). */
 const STRIP_BASE_PADDING_LEFT = 6;
 /** Top inset that gives the tabs breathing room. Named rather than inlined
  *  because the strip's own buttons offset against it to land on the title-bar
@@ -552,9 +562,10 @@ function Tab({
   };
 
   // Obsidian-style tabs: the active tab is a rounded-top card with a top/side
-  // hairline, sitting ON the strip's full-width bottom line (which runs left→
-  // right continuously, NOT broken under the tab). It has NO bottom border, so
-  // it reads as open toward the body beneath the line. Inactive tabs recede —
+  // hairline, and it BREAKS the strip's bottom line — it hangs 1px past the
+  // strip's content box and paints that last pixel in its own fill, so the rule
+  // stops at one side hairline and resumes at the other. That is what joins the
+  // tab to the note body under it. Inactive tabs recede —
   // transparent, dimmed `--fg-3`, lower opacity, no border. Tabs shrink
   // (ellipsizing their title) as the pane narrows, then the row scrolls once
   // they hit their content floor.
@@ -578,6 +589,18 @@ function Tab({
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
     borderInlineEnd:
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
+    // The gap in the strip's rule. `marginBottom: -1` hangs the tab one pixel
+    // past the strip's content box — which is exactly where the strip paints
+    // its `border-bottom` — and the bottom border repaints that pixel in the
+    // tab's own fill. A child paints after its parent's background AND border,
+    // so no z-index is needed; the order is the cascade's, not ours.
+    //
+    // Only the ACTIVE tab does this. An inactive tab is transparent, so a
+    // transparent bottom border there would erase nothing and a filled one
+    // would punch a hole in the rule under a tab that is not open.
+    ...(active
+      ? { marginBottom: -1, borderBottom: "1px solid var(--bg-1)" }
+      : null),
     background: active
       ? "var(--bg-1)"
       : stacked

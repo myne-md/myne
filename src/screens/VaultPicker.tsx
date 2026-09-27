@@ -53,9 +53,10 @@ import { useTranslation } from "react-i18next";
 import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
-import { MyneMark } from "../components/primitives/MyneMark";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
-import { stageRootStyle } from "../components/primitives/stageRoot";
+import { AuthShell } from "./AuthShell";
+import { HOVER_TRANSITION } from "../components/primitives/hoverSurface";
+import { IconButton } from "../components/primitives/IconButton";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import {
@@ -184,45 +185,6 @@ function accountErrorCopy(
 // frame's 440px width + 24px section gap, so this is a local card rather
 // than the shared <CenteredCard> (which is 480px / `--space-4` gap).
 
-// The stage envelope is shared; `stageRoot.ts` carries the 38px reasoning and
-// the ancestor contract it replaces `100vh` with.
-const ROOT_STYLE: CSSProperties = {
-  ...stageRootStyle,
-  background: "var(--paper)",
-  fontFamily: "var(--font-sans)",
-  padding: "var(--space-6)",
-};
-
-const CARD_STYLE: CSSProperties = {
-  width: 440,
-  maxWidth: "100%",
-  // Never taller than the space it was given. Without this the card grows to fit
-  // however many vaults exist and takes the overflow off-screen with it.
-  maxHeight: "100%",
-  minHeight: 0,
-  background: "var(--paper-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-6)",
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-5)",
-};
-
-const BRAND_ROW_STYLE: CSSProperties = {
-  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
-  flexShrink: 0,
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-3)",
-};
-
-const WORDMARK_STYLE: CSSProperties = {
-  fontSize: "var(--text-xl)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  color: "var(--ink-0)",
-};
-
 const HEADING_STYLE: CSSProperties = {
   // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
   flexShrink: 0,
@@ -261,6 +223,21 @@ const LIST_STYLE: CSSProperties = {
   ...fillingScrollRegionStyle,
 };
 
+/**
+ * A vault row. Hover rings it in the ACCENT (myne-md/myne#773) rather than
+ * stepping the neutral border from `--line-1` to `--line-2`.
+ *
+ * The neutral step was a change nobody could see: two adjacent greys, on a
+ * 60px row, behind a fill that was also changing. On this screen the row is
+ * the only thing to press, and the accent is the app's one "this is the
+ * live one" colour — so the row under the pointer should wear it, the same
+ * way every other selectable thing in the app does.
+ *
+ * The border is a BORDER at both states rather than a box-shadow ring,
+ * deliberately: a shadow ring would change the row's optical size on hover and
+ * a 60px row in a scrolling list would appear to breathe as the pointer moved
+ * down it. The colour changes; the geometry does not.
+ */
 function rowStyle(hovered: boolean): CSSProperties {
   return {
     display: "flex",
@@ -272,11 +249,12 @@ function rowStyle(hovered: boolean): CSSProperties {
     boxSizing: "border-box",
     padding: "var(--space-3) var(--space-4)",
     borderRadius: "var(--radius-2)",
-    background: hovered ? "var(--paper-3)" : "var(--paper)",
-    border: `1px solid ${hovered ? "var(--line-2)" : "var(--line-1)"}`,
+    background: hovered ? "var(--accent-soft)" : "var(--paper)",
+    border: `1px solid ${hovered ? "var(--accent)" : "var(--line-1)"}`,
     cursor: "pointer",
     textAlign: "start",
     fontFamily: "var(--font-sans)",
+    transition: HOVER_TRANSITION,
   };
 }
 
@@ -392,82 +370,43 @@ const CHEVRON_STYLE: CSSProperties = {
 
 // ── Create-another affordance (divider + chip-less accent action) ─────────
 
-const DIVIDER_STYLE: CSSProperties = {
-  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
-  flexShrink: 0,
-  height: 1,
-  border: 0,
-  margin: 0,
-  background: "var(--line-1)",
-};
-
-const CREATE_LINK_STYLE: CSSProperties = {
-  flexShrink: 0,
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  alignSelf: "flex-start",
-  background: "transparent",
-  border: 0,
-  padding: "var(--space-2) var(--space-1)",
-  borderRadius: "var(--radius-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--accent)",
-  cursor: "pointer",
-};
 
 /** Card chrome shared by every render state (loading / failed / loaded). */
-function PickerCard({ children }: { children: ReactNode }) {
+/**
+ * The picker's page (myne-md/myne#773). Deboxed: the wordmark and the three
+ * actions are page chrome in the shell's top bar, and the middle holds the
+ * heading and the vault list and nothing else.
+ *
+ * `actions` is optional because two of the three callers below are degenerate
+ * states — loading, and "no vaults loaded" — and offering "create another"
+ * beside a spinner would be offering a second thing to do before the first has
+ * resolved. The empty state passes them, because there it is the ONLY thing to
+ * do and a user with no vaults and no create button is stranded.
+ */
+function PickerCard({
+  children,
+  actions,
+}: {
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
-    <div style={ROOT_STYLE} data-testid="picker.root">
-      <div style={CARD_STYLE}>
-        <div style={BRAND_ROW_STYLE}>
-          <MyneMark size={36} />
-          <span style={WORDMARK_STYLE}>Myne</span>
-        </div>
-        <h1 style={HEADING_STYLE}>{t("vaultPicker.heading")}</h1>
-        {children}
-      </div>
-    </div>
+    <AuthShell
+      testId="picker.root"
+      // Leaving a vault for the list is going BACK, and the vault picker is
+      // where a lock, an auto-lock and the unlock screen's back control all
+      // arrive. The one route in that is not a step backwards — cold boot —
+      // has nothing on screen before it to move away from.
+      enter="back"
+      actions={actions}
+    >
+      <h1 style={HEADING_STYLE}>{t("vaultPicker.heading")}</h1>
+      {children}
+    </AuthShell>
   );
 }
 
-/** One accent-tinted picker action link (create / restore share the style). */
-function PickerActionLink({
-  onClick,
-  icon,
-  label,
-  testId,
-}: {
-  onClick: () => void;
-  icon: Parameters<typeof Icon>[0]["name"];
-  label: string;
-  testId: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
-      onBlur={() => setHovered(false)}
-      data-testid={testId}
-      style={{
-        ...CREATE_LINK_STYLE,
-        background: hovered ? "var(--accent-soft)" : "transparent",
-      }}
-    >
-      <Icon name={icon} size={16} />
-      <span>{label}</span>
-    </button>
-  );
-}
 
 /** The divider + picker actions — shared by loaded + failed. "Restore from
  *  backup" sits next to "Create another vault" (SYNC-5 KeepBoth door:
@@ -475,6 +414,20 @@ function PickerActionLink({
  *  "Add this device to an account" beside both (myne#221: the join door has to
  *  be offered wherever creation is, or it is reachable on a fresh machine and
  *  nowhere else). */
+/**
+ * The three ways to get a vault onto this device, as top-right page chrome.
+ *
+ * They were a divider and three full-width accent links under the vault list,
+ * which put three calls to action below the one list the screen exists to
+ * present — and on a device with enough vaults to scroll, they sat below the
+ * fold of the thing they were competing with. As icon buttons in the top bar
+ * they are available without arguing with the list, which is the trade a
+ * secondary action should make.
+ *
+ * Icon-only, so each carries its label as a tooltip AND as its accessible
+ * name: `tooltip` on `<IconButton>` is the convention that keeps those two the
+ * same string rather than two strings that drift.
+ */
 function CreateAnother({
   onClick,
   onRestoreBackup,
@@ -487,23 +440,25 @@ function CreateAnother({
   const { t } = useTranslation();
   return (
     <>
-      <hr style={DIVIDER_STYLE} />
-      <PickerActionLink
-        onClick={onClick}
+      <IconButton
         icon="plus"
         label={t("vaultPicker.createAnother")}
+        tooltip
+        onClick={onClick}
         testId="picker.create-cta"
       />
-      <PickerActionLink
-        onClick={onJoinDevice}
+      <IconButton
         icon="link"
         label={t("vaultPicker.joinDevice")}
+        tooltip
+        onClick={onJoinDevice}
         testId="picker.join-cta"
       />
-      <PickerActionLink
-        onClick={onRestoreBackup}
+      <IconButton
         icon="download"
         label={t("vaultPicker.restoreFromBackup")}
+        tooltip
+        onClick={onRestoreBackup}
         testId="picker.restore-cta"
       />
     </>
@@ -697,13 +652,16 @@ export function VaultPicker({ onSelect, onCreateAnother,
     // vaults, so an empty/failed list is an exotic transient state. Offer
     // the create path so the user is never stranded.
     return (
-      <PickerCard>
+      <PickerCard
+        actions={
+          <CreateAnother
+            onClick={onCreateAnother}
+            onRestoreBackup={onRestoreBackup}
+            onJoinDevice={onJoinDevice}
+          />
+        }
+      >
         <p style={SUBLINE_STYLE}>{t("vaultPicker.noneLoaded")}</p>
-        <CreateAnother
-          onClick={onCreateAnother}
-          onRestoreBackup={onRestoreBackup}
-          onJoinDevice={onJoinDevice}
-        />
       </PickerCard>
     );
   }
@@ -803,7 +761,15 @@ export function VaultPicker({ onSelect, onCreateAnother,
   };
 
   return (
-    <PickerCard>
+    <PickerCard
+      actions={
+        <CreateAnother
+          onClick={onCreateAnother}
+          onRestoreBackup={onRestoreBackup}
+          onJoinDevice={onJoinDevice}
+        />
+      }
+    >
       <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
       {accountsError !== null && (
         <p
@@ -842,11 +808,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
           </Fragment>
         ))}
       </div>
-      <CreateAnother
-        onClick={onCreateAnother}
-        onRestoreBackup={onRestoreBackup}
-        onJoinDevice={onJoinDevice}
-      />
       {renaming !== null && (
         <form onSubmit={commitRename} style={RENAME_FORM_STYLE}>
           <input

@@ -19,7 +19,7 @@
 // asserted together rather than one per test.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const listVaults = vi.fn();
 
@@ -73,13 +73,19 @@ describe("VaultPicker at a vault count that overflows the window", () => {
     });
   });
 
-  it("bounds the card and makes the LIST the only scroller", async () => {
+  it("bounds the centre column and makes the LIST the only scroller", async () => {
+    // The screen is deboxed since myne-md/myne#773, so the bounded box is the
+    // shell's centre column rather than a card — but the invariant is the one
+    // that mattered before and the reason is unchanged: the vault count is
+    // unbounded, nothing in the chain above scrolls, and a column that grows to
+    // fit takes its overflow off the bottom of the window with it.
     const root = await renderPicker();
-    const card = root.firstElementChild as HTMLElement;
-    expect(card.style.maxHeight).toBe("100%");
+    const view = root.querySelector(".myne-auth-view") as HTMLElement;
+    expect(view, "the shell's centre column is gone").not.toBeNull();
+    expect(view.style.maxHeight).toBe("100%");
     // `min-height: auto` on a flex item refuses to shrink below its content, so
     // without this the maxHeight above has nothing to act on.
-    expect(card.style.minHeight).toBe("0px");
+    expect(view.style.minHeight).toBe("0px");
 
     const list = screen.getAllByTestId("picker.vault-row")[0]!.parentElement!;
     expect(list.style.overflowY).toBe("auto");
@@ -88,11 +94,58 @@ describe("VaultPicker at a vault count that overflows the window", () => {
 
   it("keeps the heading and the three actions out of the shrink", async () => {
     // If the chrome shrank too, a tall list would compress the heading and the
-    // footer instead of scrolling, so the same rows are lost in a different way.
-    await renderPicker();
+    // actions instead of scrolling, so the same rows are lost in a different
+    // way. The three actions moved into the shell's top bar, which is where
+    // they are now held out of the shrink — as a row, rather than one button at
+    // a time. They must still be REACHABLE at any vault count, which is most of
+    // what moving them out of the list's column bought.
+    const root = await renderPicker();
     for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
-      expect(screen.getByTestId(testId).style.flexShrink).toBe("0");
+      expect(screen.getByTestId(testId), `${testId} is gone`).toBeTruthy();
     }
+    const header = root.querySelector("header") as HTMLElement;
+    expect(header.style.flexShrink, "the top bar must not compress").toBe("0");
+    // The actions row, not the button: an icon button that carries a tooltip is
+    // wrapped by the tooltip's own span, so the button's parent is that wrapper
+    // rather than the row. Reaching for the row by position says what is meant.
+    const actions = header.lastElementChild as HTMLElement;
+    expect(actions.contains(screen.getByTestId("picker.create-cta"))).toBe(true);
+    expect(actions.style.flexShrink).toBe("0");
     expect(screen.getByRole("heading").style.flexShrink).toBe("0");
+  });
+});
+
+describe("the row under the pointer wears the accent", () => {
+  it("rings the hovered row in the accent, not a second grey", async () => {
+    // The neutral `--line-1` → `--line-2` step it replaced was a change nobody
+    // could see: two adjacent greys, on a 60px row, behind a fill that was also
+    // changing. On this screen the row is the only thing to press.
+    await renderPicker();
+    const row = screen.getAllByTestId("picker.vault-row")[0]!;
+    expect(row.style.border).toContain("var(--line-1)");
+
+    fireEvent.mouseEnter(row);
+    expect(row.style.border, "hover must reach for the accent").toContain(
+      "var(--accent)",
+    );
+    expect(row.style.background).toContain("var(--accent-soft)");
+
+    fireEvent.mouseLeave(row);
+    expect(row.style.border).toContain("var(--line-1)");
+  });
+
+  it("does not change the row's geometry on hover", () => {
+    // A box-shadow ring would change the row's optical size, and a 60px row in
+    // a scrolling list would appear to breathe as the pointer ran down it. The
+    // colour changes; the geometry does not.
+    return renderPicker().then(() => {
+      const row = screen.getAllByTestId("picker.vault-row")[0]!;
+      const before = { h: row.style.height, p: row.style.padding, r: row.style.borderRadius };
+      fireEvent.mouseEnter(row);
+      expect(row.style.height).toBe(before.h);
+      expect(row.style.padding).toBe(before.p);
+      expect(row.style.borderRadius).toBe(before.r);
+      expect(row.style.boxShadow, "a ring would resize the row").toBe("");
+    });
   });
 });

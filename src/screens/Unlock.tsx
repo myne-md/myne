@@ -83,7 +83,9 @@ import {
   ctaHover,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
-import { Spinner } from "../components/Spinner";
+import { AUTH_BODY_STYLE, AUTH_TITLE_STYLE, AuthShell } from "./AuthShell";
+import { Button } from "../components/primitives/Button";
+import { InlineSubmitField } from "../components/primitives/InlineSubmitField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
@@ -362,17 +364,6 @@ const FORM_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
 };
 
-const INPUT_STYLE: CSSProperties = {
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-4)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  outline: "none",
-};
-
 // Info-style banner used for `recovery-in-progress` mode — distinct
 // from the destructive `<DestructiveBanner>` used for idle-error.
 // The user has not made a mistake; the flow was simply paused.
@@ -405,23 +396,27 @@ const DELETE_VAULT_LINK_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
-// Neutral ghost back link to the vault picker. Placed at the top of the
-// card, left-aligned with a leading chevron — a navigational affordance
-// distinct from the accent recovery link and the danger delete link below
-// the form, so it doesn't compete with the primary Unlock CTA.
+
+/**
+ * The way back to the vault picker — position only. It is a ghost `<Button>`,
+ * so the padding, radius, hover, press and focus ring all come from the shared
+ * primitive; what is left here is where it sits in the column.
+ *
+ * It was a hand-rolled `<button>` for one round and
+ * `scripts/check-primitive-adoption.mjs` caught it, correctly: this is exactly
+ * a ghost button with a leading icon, and re-deriving one is how an app that
+ * is supposed to have one button design ends up with several.
+ *
+ * `←` was a literal arrow character before the screen was deboxed; the icon
+ * comes from `Button`'s own `icon` prop now, which is what
+ * `editor/src/host/lib/icons.ts` asks for by name: a text glyph inherits the
+ * text metrics and sits off the label's baseline at every size.
+ */
 const BACK_LINK_STYLE: CSSProperties = {
-  background: "transparent",
-  border: 0,
-  padding: 0,
   alignSelf: "flex-start",
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--fg-2)",
-  cursor: "pointer",
+  // Pulled left by its own padding so the label's first letter lines up with
+  // the heading beneath it rather than sitting a gutter to its right.
+  marginInlineStart: "calc(var(--control-pad-x) * -1)",
 };
 
 const RECOVER_LINK_STYLE: CSSProperties = {
@@ -741,28 +736,42 @@ export function Unlock({
   }
 
   return (
-    <CenteredCard>
+    <AuthShell
+      testId="unlock.root"
+      // Arriving here is going FORWARD from the picker. The back link below
+      // sends the user the other way, and the picker states its own direction.
+      enter="forward"
+    >
       {/* Back to the vault picker — shown whenever ≥2 vaults exist (App always
           wires `onBack`), so a manual lock / auto-lock can reach the vault
           selector too, not just a picker-reached unlock. Suppressed during
-          `decrypting` so an in-flight unlock isn't abandoned mid-IPC. */}
+          `decrypting` so an in-flight unlock isn't abandoned mid-IPC.
+
+          Above the heading, in the content column, rather than in the shell's
+          top-right with the rest of the chrome. It was tried up there and it is
+          wrong: this is not a global action like "create a vault", it is the
+          way OUT of the specific question the heading asks, so it belongs
+          against that question. Reading order says the same thing — a user
+          arriving at "Unlock your vault" should meet the escape before the
+          demand, not after it in a corner. */}
       {onBack && otherVaultsExist && !decrypting && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          icon="arrow-left"
           onClick={onBack}
           style={BACK_LINK_STYLE}
           data-testid="unlock.back-to-picker"
         >
-          <span aria-hidden="true">←</span>
-          <span>{t("unlock.backToPicker")}</span>
-        </button>
+          {t("unlock.backToPicker")}
+        </Button>
       )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
+      <h1 style={AUTH_TITLE_STYLE}>{t("unlock.title")}</h1>
       {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
           to "enter your password" (MYND — the primary surface is not a password
           when quick-unlock owns the screen). */}
-      <p style={CARD_BODY_STYLE}>
+      <p style={AUTH_BODY_STYLE}>
         {t(
           surface === "quick"
             ? quickMethod === "biometric"
@@ -807,32 +816,29 @@ export function Unlock({
           data-testid="unlock.form"
           data-vault-id={vaultId}
         >
-          <input
-            type="password"
-            placeholder={t("unlock.passwordPlaceholder")}
+          <InlineSubmitField
             value={password}
-            onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
-            disabled={decrypting}
-            autoFocus
-            autoComplete="current-password"
-            style={INPUT_STYLE}
-            aria-label={t("unlock.passwordLabel")}
-            aria-invalid={error != null ? true : undefined}
-            data-testid="unlock.password-input"
+            onChange={(value) => dispatch({ type: "set-password", value })}
+            busy={decrypting}
+            invalid={error != null}
+            ariaLabel={t("unlock.passwordLabel")}
+            placeholder={t("unlock.passwordPlaceholder")}
+            submitLabel={t("unlock.submit")}
+            busyLabel={t("unlock.decrypting")}
+            testId="unlock.password-input"
+            submitTestId="unlock.submit"
+            inputProps={{
+              type: "password",
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus: true,
+              autoComplete: "current-password",
+            }}
+            footer={
+              error != null ? (
+                <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
+              ) : undefined
+            }
           />
-          {error != null && (
-            <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
-          )}
-          <button
-            type="submit"
-            disabled={submitDisabled}
-            style={ctaStyle(submitDisabled)}
-            {...ctaHover(submitDisabled)}
-            data-testid="unlock.submit"
-          >
-            {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-            <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
-          </button>
           {/* Way back to the quick surface the user traded away — rendered only
               when quick-unlock is still redeemable, so an exhausted or
               unconfigured credential is never re-offered. */}
@@ -872,6 +878,6 @@ export function Unlock({
           )}
         </form>
       )}
-    </CenteredCard>
+    </AuthShell>
   );
 }

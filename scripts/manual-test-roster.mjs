@@ -5248,6 +5248,7 @@ export const ROSTER = Object.freeze([
       "src/components/settings/AppearancePanel.tsx",
       "src/components/settings/RibbonCustomizeSettings.tsx",
       "src/components/settings/BarCustomizeSettings.tsx",
+      "src/components/settings/CustomizeList.tsx",
       "src/lib/theme.ts",
       "src/styles/tokens.css",
       "mobile/src/lib/themes.ts",
@@ -6471,6 +6472,7 @@ export const ROSTER = Object.freeze([
     title: "Unlock screen",
     paths: [
       "src/screens/Unlock.tsx",
+      "src/screens/AuthShell.tsx",
       "src/lib/vault-unlock.ts",
       "src/lib/vault-status.ts",
       "src/components/SuspicionBanner.tsx",

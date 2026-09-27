@@ -151,6 +151,10 @@ const V = {
     "ported",
     "Prefs-backed (myne-md/myne#773), the visibility half of the bottom-bar vocabulary. The bar renders from the same shared src/ tree on web and each item carries its own data guard, so hiding one behaves identically here. It is also the reason the bar is allowed to disappear at all: the bar's own right-click menu is the only other place visibility can be changed, so on every client this block is the route back.",
   ],
+  "src/components/settings/CustomizeList.tsx": [
+    "ported",
+    "The row shared by the two customize rosters (myne-md/myne#773) — a grip, an icon, a label and a caller-supplied trailing control, plus the drag and Alt+Arrow bookkeeping. Pure DOM and React state, no host call and no capability of its own, so it carries whatever the two blocks that use it already carry. HTML5 drag-and-drop is the one host-ish thing in it and it is a browser API, which is where the desktop already gets it from.",
+  ],
   "src/components/settings/RibbonCustomizeSettings.tsx": [
     "ported",
     "Prefs-backed (myne-md/myne#699). The rail itself renders from the same shared src/ tree on web, and the commands it pins carry their own per-state guards, so the customization roster behaves identically here.",
