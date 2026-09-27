@@ -150,3 +150,45 @@ export const AUTH_BODY_STYLE: CSSProperties = {
   lineHeight: "var(--leading-normal)",
   color: "var(--fg-2)",
 };
+
+/**
+ * A heading and the line under it, as ONE block.
+ *
+ * They were two siblings of `VIEW_STYLE`, whose `--space-5` is the gap between
+ * the screen's SECTIONS — so the subtitle sat as far from the title it
+ * explains as the whole form sat from both of them. Everything was 24px apart
+ * and nothing on the screen said which pieces belonged together; a title and
+ * its subtitle are one thought, and an even stack asserts they are three.
+ *
+ * The group takes the section gap from outside and spends `--space-1` inside,
+ * which is the whole point: unequal spacing is what grouping IS. Anything
+ * larger and the pair starts reading as two lines again — at `--text-3xl` the
+ * title's own `--leading-snug` already carries most of the separation.
+ */
+const AUTH_HEADING_GROUP_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  // Chrome, like the title and body it holds: the list below is what absorbs
+  // height pressure on a short window.
+  flexShrink: 0,
+};
+
+export function AuthHeading({
+  title,
+  children,
+  testId,
+}: {
+  title: ReactNode;
+  /** The subtitle. Optional — a screen with only a title still groups, so the
+   *  spacing does not change when a subtitle is added or taken away. */
+  children?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div style={AUTH_HEADING_GROUP_STYLE} data-testid={testId}>
+      <h1 style={AUTH_TITLE_STYLE}>{title}</h1>
+      {children === undefined ? null : <p style={AUTH_BODY_STYLE}>{children}</p>}
+    </div>
+  );
+}
