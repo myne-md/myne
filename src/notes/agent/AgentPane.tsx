@@ -1,18 +1,27 @@
 // The agent pane (myne-md/myne#771): the agent tab's body, mounted in the centre
 // pane by `PaneView` the way `GraphPane` and `TasksPane` are.
 //
-// **Two views, one tab kind.** The `agent` tab is a singleton; its `agentView`
-// field says whether it is showing the vault-general Hub (a conversation list)
-// or Focus (one note beside its conversation). A view selector is not a second
-// tab kind: `isSingletonTabKind("agent")` is true, so a second "open the agent"
-// is a reveal of this one, and the view is the thing that tells the user which
-// scope they are in.
+// **One screen, not two views** (`docs/decisions/ai/0623`). The history rail
+// sits beside the open conversation, which is the shape every chat application
+// has, and the reason it is universal is that the two are looked at together:
+// you scan the list for the one you meant while reading the one you have.
 //
-// This file owns the view switch and the chrome common to both views, and it is
-// the ONE place the view is written to the workspace (`setAgentViewState`), so a
-// Hub row opening Focus and a palette verb opening Focus take the same path.
+// It was a Hub (a conversation list) that you navigated OUT of into a Focus
+// view (one conversation), with a back control to return. That made reading
+// your history and continuing it two places and a round trip, and the state it
+// needed — a `view` discriminator — was a mode where the user only ever wanted
+// a selection.
+//
+// The two-view behaviour survives as the NARROW arm and nothing else: below
+// about 560px of pane the two columns cannot both be used, so the rail becomes
+// a view you switch to. That is a responsive fallback, which is what it should
+// always have been.
+//
+// This file owns the selection and is the ONE place it is written to the
+// workspace (`setAgentViewState`), so a rail row, a palette verb and the
+// panel's exit all take the same path.
 
-import { useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PaneId } from "../workspaceState";
@@ -20,7 +29,8 @@ import type { WorkspaceItem } from "../workspaceState";
 import { agentViewOf } from "../workspaceState";
 import { useWorkspace } from "../workspaceContext";
 import { AgentHubList } from "./AgentHubList";
-import { AgentFocusView } from "./AgentFocusView";
+import { AgentConversationView } from "./AgentConversationView";
+import { Button } from "../../components/primitives/Button";
 import { AgentRunOrb } from "./AgentRunOrb";
 import { useAgent } from "./agentStore";
 
@@ -89,6 +99,14 @@ export function AgentPane({
   // correct when mounted anywhere, not only where a caller remembered to pass
   // the fact in.
   const running = useAgent().running;
+  /**
+   * Whether the narrow arm is showing the rail instead of the conversation.
+   *
+   * Local state, not persisted: it is a fallback's transient, and writing it
+   * to the workspace would mean a tab dragged to a wide pane remembering a
+   * choice that no longer has a meaning there.
+   */
+  const [railOpen, setRailOpen] = useState(false);
 
   /**
    * Focus restoration across the hub↔focus change (task 13 of
@@ -109,41 +127,46 @@ export function AgentPane({
    * steal the caret from whatever opened it.
    */
   const rootRef = useRef<HTMLDivElement>(null);
-  const lastView = useRef(view.view);
+  const lastKey = useRef(view.conversationId ?? "");
   useEffect(() => {
-    if (lastView.current === view.view) return;
-    lastView.current = view.view;
+    const key = view.conversationId ?? "";
+    if (lastKey.current === key) return;
+    lastKey.current = key;
     rootRef.current?.focus();
-  }, [view.view]);
+  }, [view.conversationId]);
 
-  // One writer for the view, used by Hub rows and (through the palette verbs)
-  // by anything that reveals the tab on a particular note.
-  const openFocus = useCallback(
+  /**
+   * Open a conversation in the main column, or start a fresh one by passing
+   * neither key.
+   *
+   * There is no early return any more, and its removal is the point. The old
+   * one refused when no note was focused, because the only thing Focus could
+   * be was a note's conversation — so with nothing open there was nowhere to
+   * go. A conversation is its own subject now: a vault-general one is a normal
+   * state, not a degraded one, and what still needs a note is SENDING, which
+   * the composer already refuses on its own (`defaultGrantFor` returns `null`
+   * and Send is disabled). Refusing to open the screen was solving that one
+   * layer too early.
+   */
+  const openConversationInPane = useCallback(
     (next: { noteId?: string | null; conversationId?: string | null }) => {
-      const noteId = next.noteId ?? ws.focusedNoteId ?? null;
-      // A silent return, and it is correct HERE while being the wrong thing to
-      // rely on: a run needs a scope, `defaultGrantFor` resolves that to the
-      // open note or to `null`, and the host refuses a vault-wide grant, so
-      // there is genuinely nothing to open Focus on.
-      //
-      // What it must never be is the only place that knows. The Hub is told the
-      // same fact (`focusedNoteId`) and withholds the control rather than
-      // offering one that lands here and does nothing — a button that silently
-      // fails is worse than an absent one, because the user concludes the
-      // feature is broken rather than that they have a step to do first.
-      if (noteId === null || noteId === "") return;
+      const noteId = next.noteId ?? null;
       ws.setAgentViewState(paneId, {
-        view: "focus",
-        noteId,
-        ...(next.conversationId != null ? { conversationId: next.conversationId } : {}),
+        ...(next.conversationId != null && next.conversationId !== ""
+          ? { conversationId: next.conversationId }
+          : {}),
+        ...(noteId !== null && noteId !== "" ? { noteId } : {}),
       });
     },
     [ws, paneId],
   );
-  const backToHub = useCallback(
-    () => ws.setAgentViewState(paneId, { view: "hub" }),
-    [ws, paneId],
+
+  /** Start a fresh conversation, about the note the user has open if any. */
+  const newConversation = useCallback(
+    () => openConversationInPane({ noteId: ws.focusedNoteId }),
+    [openConversationInPane, ws.focusedNoteId],
   );
+
   // The Hub's anchor chip opens the note in the workspace; the user reads the
   // conversation and the note it changed side by side.
   const openNote = useCallback(
@@ -153,23 +176,42 @@ export function AgentPane({
 
   return (
     <div
+      className="myne-agent"
       data-testid="agent.pane"
-      data-agent-view={view.view}
+      // The rail's narrow-width state. At wide widths the CSS ignores it
+      // entirely — both columns are up — so it is a fallback's state rather
+      // than the layout's, and nothing above the container query reads it.
+      data-rail={railOpen ? "open" : "closed"}
       // Observable to a scenario without reaching into the orb's own internals:
       // the pane knows whether a run is in flight, and that is the fact an E2E
       // wants to wait on.
       data-agent-running={running ? "true" : undefined}
+      // Which conversation is open, for the same reason. Empty for a fresh one.
+      data-agent-conversation={view.conversationId ?? ""}
       // `-1`: reachable programmatically for the restoration above, never a
       // Tab stop of its own. A container in the tab order is a stop that does
       // nothing, on every pass through the pane.
       ref={rootRef}
       tabIndex={-1}
-      aria-label={view.view === "hub" ? t("agent.hub.title") : t("agent.focus.title")}
+      aria-label={t("agent.hub.title")}
       style={ROOT_STYLE}
     >
       <div style={HEADER_STYLE}>
         <div style={HEADING_STYLE}>
-          {view.view === "hub" ? t("agent.hub.title") : t("agent.focus.title")}
+          {/* The rail toggle, visible only in the narrow arm (the CSS decides,
+              not this file). It is rendered unconditionally so the header does
+              not reflow when a pane is dragged across the threshold. */}
+          <Button
+            variant="ghost"
+            icon={railOpen ? "message-square" : "list"}
+            className="myne-agent__rail-toggle"
+            onClick={() => setRailOpen((open) => !open)}
+            aria-expanded={railOpen}
+            data-testid="agent.rail-toggle"
+          >
+            {railOpen ? t("agent.focus.title") : t("agent.hub.historyLabel")}
+          </Button>
+          {t("agent.hub.title")}
         </div>
         {/* The run indicator: present only while a run is active, and it stops
             when the run stops (myne-md/myne#771, the named motion-canon
@@ -186,28 +228,35 @@ export function AgentPane({
         ) : null}
       </div>
 
-      {view.view === "hub" ? (
-        <AgentHubList
-          onOpenFocus={openFocus}
-          onOpenNote={openNote}
-          // What a NEW conversation would be about. The Hub cannot ask the
-          // workspace itself — it is a list, and giving it the controller would
-          // make every future list reach for one.
-          focusedNoteId={ws.focusedNoteId}
-          {...(folders === undefined ? {} : { folders })}
-          {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
-          {...(onRunUndone === undefined ? {} : { onRunUndone })}
-        />
-      ) : (
-        <AgentFocusView
-          noteId={view.noteId ?? null}
-          conversationId={view.conversationId ?? null}
-          onBackToHub={backToHub}
-          {...(folders === undefined ? {} : { folders })}
-          {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
-          {...(onRunUndone === undefined ? {} : { onRunUndone })}
-        />
-      )}
+      <div className="myne-agent__body">
+        <div className="myne-agent__rail" data-testid="agent.rail">
+          <AgentHubList
+            activeConversationId={view.conversationId ?? null}
+            onOpenFocus={(next) => {
+              openConversationInPane(next);
+              // Narrow arm only: opening a conversation from the rail should
+              // show it. At wide widths this changes nothing, because the CSS
+              // never reads the attribute there.
+              setRailOpen(false);
+            }}
+            onNewConversation={() => {
+              newConversation();
+              setRailOpen(false);
+            }}
+            onOpenNote={openNote}
+          />
+        </div>
+
+        <div className="myne-agent__main">
+          <AgentConversationView
+            noteId={view.noteId ?? null}
+            conversationId={view.conversationId ?? null}
+            {...(folders === undefined ? {} : { folders })}
+            {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
+            {...(onRunUndone === undefined ? {} : { onRunUndone })}
+          />
+        </div>
+      </div>
     </div>
   );
 }

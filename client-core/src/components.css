@@ -1458,3 +1458,85 @@
     border-top-color: Highlight;
   }
 }
+
+/* =========================================================================
+   Agent screen — history rail beside the conversation (myne-md/myne#771)
+   ========================================================================= */
+
+/* One screen, not two views. The tab was a conversation LIST you navigated out
+   of into a single conversation, which made reading your history and continuing
+   it two places and a round trip (`docs/decisions/ai/0623`). This is the shape
+   every chat application has, and the reason it is universal is that the list
+   and the conversation are looked at together: you scan for the one you meant
+   while reading the one you have.
+
+   `container-type: inline-size` rather than a viewport media query, and the
+   distinction is load-bearing here: this is a PANE, so it can be half a window
+   on a wide monitor and the window itself is no evidence about its width. The
+   rail's fallback below is keyed on the pane, which is the box the layout
+   actually has to fit in. `src/AGENTS.md` records the same reasoning for the
+   frontmatter block's containment. */
+.myne-agent {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.myne-agent__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+
+.myne-agent__rail {
+  flex: none;
+  width: 248px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* A hairline rather than a fill: the rail and the conversation are one
+     surface with a division in it, not two cards side by side. */
+  border-inline-end: 1px solid var(--line-1);
+  padding-inline-end: var(--space-3);
+}
+
+.myne-agent__main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The rail toggle exists only in the narrow arm, where the two columns cannot
+   both be on screen. Hidden rather than absent at wide widths so the header's
+   layout does not shift when a pane is dragged across the threshold. */
+.myne-agent__rail-toggle { display: none; }
+
+/* ── Narrow: one column at a time ────────────────────────────────────────
+   248px of rail plus a conversation is about 560px of pane. Below that the
+   two columns would each be too narrow to use, so the rail becomes a view you
+   switch TO — the old two-view behaviour, kept as the responsive fallback it
+   should always have been rather than as the primary model.
+
+   Hiding the rail outright was the other option and it is the wrong one: the
+   history would be unreachable at that width, which is worse than a round
+   trip. */
+@container (max-width: 559px) {
+  .myne-agent__rail-toggle { display: inline-flex; }
+
+  .myne-agent__rail {
+    width: auto;
+    flex: 1;
+    border-inline-end: none;
+    padding-inline-end: 0;
+  }
+
+  .myne-agent[data-rail="closed"] .myne-agent__rail { display: none; }
+  .myne-agent[data-rail="open"] .myne-agent__main { display: none; }
+}

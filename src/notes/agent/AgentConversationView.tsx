@@ -1,24 +1,28 @@
-// The agent tab's Focus view (myne-md/myne#771 task 6): one note's conversation,
-// with the note it is about one click away.
+// The agent tab's conversation column (myne-md/myne#771): the open
+// conversation, with the note it is about one click away.
 //
-// ── What "Focus" means here, and why the note is a LINK rather than a pane ───
+// It was `AgentFocusView`, the second of two views you navigated between. There
+// is one screen now — the history rail beside this column
+// (`docs/decisions/ai/0623`) — so this is a COLUMN rather than a view, and the
+// back control that used to head it is gone: there is nothing to go back to
+// when the thing you would go back to is beside you.
+//
+// ── The note is a LINK rather than a pane, and stays one ────────────────────
 // The design session asked for the split Ömer described: the note on one side,
-// its conversation on the other. The literal reading is an automatic pane split,
-// and that was **rejected on the merits**: `openToSide` a note that is not
-// already open moves the focused pane to the new leaf, so mounting Focus would
-// silently steal focus from the tab the user just opened and rearrange a
+// its conversation on the other. The literal reading is an automatic pane
+// split, and that was rejected on the merits: `openToSide` on a note that is
+// not already open moves the focused pane to the new leaf, so mounting this
+// would silently steal focus from the tab the user just opened and rearrange a
 // workspace they did not ask to rearrange. A hidden layout mutation on mount is
 // worse than the thing it buys.
 //
-// So Focus renders the conversation full width and keeps the note one action
-// away: a header link opens (or reveals) the note beside whatever the user
-// already has. A user who wants the split gets it deliberately, in one click,
-// and their layout is theirs. This is the "note side is the real editor"
-// requirement satisfied by the editor itself rather than by a viewer.
+// So the note is one action away: a header link opens (or reveals) it beside
+// whatever the user already has. A user who wants the split gets it
+// deliberately, in one click, and their layout stays theirs.
 //
 // ── The conversation is the shared surface ──────────────────────────────────
-// Same `ConversationSurface` the light panel uses, so a run started in Focus and
-// a run started in the panel are one implementation (story 23).
+// Same `ConversationSurface` the light panel uses, so a run started here and a
+// run started in the panel are one implementation (story 23).
 
 import { useCallback, useEffect, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -43,14 +47,12 @@ const HEADER_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
-export interface AgentFocusViewProps {
-  /** The note whose conversation is open. `null` when the view was opened with
-   *  no note, which the pane refuses before mounting. */
+export interface AgentConversationViewProps {
+  /** The note this conversation is anchored to, or `null` when it is about the
+   *  vault rather than one note — a normal state, not a degraded one. */
   noteId: string | null;
-  /** The conversation being continued, when one is selected. */
+  /** The conversation being continued, or `null` for a fresh one. */
   conversationId: string | null;
-  /** Return to the Hub. */
-  onBackToHub: () => void;
   /** Folders the composer can attach as a run scope. */
   folders?: readonly string[];
   /** Called with the ids of notes an apply wrote. */
@@ -59,14 +61,13 @@ export interface AgentFocusViewProps {
   onRunUndone?: (noteIds: readonly string[]) => void;
 }
 
-export function AgentFocusView({
+export function AgentConversationView({
   noteId,
   conversationId,
-  onBackToHub,
   folders,
   onNotesWritten,
   onRunUndone,
-}: AgentFocusViewProps) {
+}: AgentConversationViewProps) {
   const { t } = useTranslation();
   const ws = useWorkspace();
 
@@ -88,14 +89,6 @@ export function AgentFocusView({
   return (
     <div data-testid="agent.focus" style={WRAP_STYLE}>
       <div style={HEADER_STYLE}>
-        <Button
-          type="button"
-          variant="ghost"
-          data-testid="agent.focus-back"
-          onClick={onBackToHub}
-        >
-          {t("agent.focus.backToHub")}
-        </Button>
         {noteId !== null && noteId !== "" ? (
           <Button
             type="button"

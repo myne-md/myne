@@ -420,13 +420,17 @@ function parseAgentView(o: Record<string, unknown>): { agentView?: PersistedAgen
       ? raw.conversationId
       : undefined;
 
-  if (raw.view === "focus" && noteId !== undefined) {
-    const v: PersistedAgentView = { view: "focus", noteId };
-    if (conversationId !== undefined) v.conversationId = conversationId;
-    return { agentView: v };
-  }
-  // Everything else is the Hub, which is the omit-when-default value.
-  return {};
+  // The two keys are read INDEPENDENTLY, and `raw.view` is deliberately not
+  // consulted: the agent tab was a Hub-or-Focus mode and is one screen now
+  // (`docs/decisions/ai/0623`), so a descriptor written by the two-view build
+  // still resolves — its `noteId` and `conversationId` mean here exactly what
+  // they meant there, and the dropped discriminator is ignored rather than
+  // rejected. A reader that required `view === "focus"` would silently discard
+  // the conversation a user had open across the change.
+  const v: PersistedAgentView = {};
+  if (conversationId !== undefined) v.conversationId = conversationId;
+  if (noteId !== undefined) v.noteId = noteId;
+  return Object.keys(v).length === 0 ? {} : { agentView: v };
 }
 
 function parseItem(t: unknown): ParsedItem {

@@ -146,14 +146,13 @@ export type WorkspaceItem =
       taskView?: PersistedTaskView;
     }
   /**
-   * The agent hub (myne-md/myne#771). A singleton like the graph and the task
-   * list. `agentView` is **per-tab session state** in the same sense
-   * `taskView` is: whether the tab is showing the vault-wide Hub or one note's
-   * Focus is where you are, not a preference. It carries the conversation it is
-   * showing so a Focus tab survives a reload on the same note.
+   * The agent (myne-md/myne#771). A singleton like the graph and the task list.
+   * `agentView` is **per-tab session state** in the same sense `taskView` is:
+   * which conversation the tab is showing is where you are, not a preference.
    *
-   * **Omit-when-default**, so a Hub tab is byte-identical to a descriptor from
-   * before this kind existed. The descriptor is opaque to the storage codec.
+   * **Omit-when-default**, so a tab on a fresh conversation is byte-identical
+   * to a descriptor from before this kind existed. The descriptor is opaque to
+   * the storage codec.
    */
   | {
       kind: "agent";
@@ -163,15 +162,26 @@ export type WorkspaceItem =
       agentView?: PersistedAgentView;
     };
 
-/** The persisted delta of the agent tab's view (myne-md/myne#771). Absent means
- *  the Hub. Omitting a `focus` view with no note is the Hub by construction, so
- *  the object is absent entirely when the tab is on its default. */
+/**
+ * The persisted delta of the agent tab's state (myne-md/myne#771).
+ *
+ * **There is no view discriminator any more.** It carried `"hub" | "focus"`,
+ * because the tab was a conversation LIST you navigated out of into a single
+ * conversation. It is one screen now — the history rail beside the open
+ * conversation, the shape every chat application has — so the only thing worth
+ * persisting is which conversation is open, and the two-view state was a mode
+ * where the user only ever wanted a selection (`docs/decisions/ai/0623`).
+ *
+ * Absent means a fresh conversation with nothing selected, which is the
+ * omit-when-default value. A stored descriptor from the two-view shape still
+ * reads correctly: its `noteId` and `conversationId` mean here what they meant
+ * there, and the dropped `view` key is simply ignored.
+ */
 export type PersistedAgentView = {
-  view: "hub" | "focus";
-  /** The note whose conversation Focus is showing, when `view` is `focus`. */
-  noteId?: string;
-  /** The conversation Focus is showing, when one is selected. */
+  /** The conversation the tab is showing, when one is open. */
   conversationId?: string;
+  /** The note that conversation is anchored to, when it has one. */
+  noteId?: string;
 };
 
 /**
@@ -884,19 +894,19 @@ export function taskViewOf(item: WorkspaceItem): TaskView {
 }
 
 /**
- * The agent tab's view as a live value (myne-md/myne#771). Absent means the
- * Hub, so the fallback is the default rather than an error.
+ * The agent tab's state as a live value (myne-md/myne#771). Absent means a
+ * fresh conversation, so the fallback is the empty object rather than an error.
  */
 export function agentViewOf(item: WorkspaceItem): PersistedAgentView {
-  if (item.kind !== "agent") return { view: "hub" };
-  return item.agentView ?? { view: "hub" };
+  if (item.kind !== "agent") return {};
+  return item.agentView ?? {};
 }
 
 /**
- * Set the agent tab's view, omit-when-default (myne-md/myne#771): a Hub view
- * DROPS the key so an untouched agent tab serializes byte-identical to a
- * descriptor from before the kind existed. `undefined` returned from the
- * to-persisted helper is what triggers the drop.
+ * Set the agent tab's state, omit-when-default (myne-md/myne#771): a tab with
+ * no conversation selected DROPS the key, so an untouched agent tab serializes
+ * byte-identical to a descriptor from before the kind existed. `undefined`
+ * returned from the to-persisted helper is what triggers the drop.
  */
 export function setAgentViewState(
   state: WorkspaceState,
@@ -921,18 +931,26 @@ export function setAgentViewState(
   };
 }
 
-/** The persisted delta of an agent view, or `undefined` when it is the Hub (the
- *  default) or a Focus with no note (incoherent, so also the default). */
+/**
+ * The persisted delta of the agent tab's state, or `undefined` when there is
+ * nothing to persist.
+ *
+ * The two keys are INDEPENDENT, which is the change the one-screen shape makes:
+ * a conversation can be vault-general (an id with no note), and a fresh
+ * conversation can be about the note the user had open (a note with no id yet,
+ * so a reload lands on the same subject rather than on nothing). The old shape
+ * dropped both unless a note was present, because a view called Focus with no
+ * note was incoherent — a sentence about a mode that no longer exists.
+ */
 export function agentViewToPersisted(
   view: PersistedAgentView,
 ): PersistedAgentView | undefined {
-  if (view.view !== "focus") return undefined;
-  if (view.noteId === undefined || view.noteId === "") return undefined;
-  const v: PersistedAgentView = { view: "focus", noteId: view.noteId };
+  const v: PersistedAgentView = {};
   if (view.conversationId !== undefined && view.conversationId !== "") {
     v.conversationId = view.conversationId;
   }
-  return v;
+  if (view.noteId !== undefined && view.noteId !== "") v.noteId = view.noteId;
+  return Object.keys(v).length === 0 ? undefined : v;
 }
 
 /**

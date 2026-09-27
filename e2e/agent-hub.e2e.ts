@@ -1,21 +1,23 @@
 // Agent-hub suite (myne-md/myne#771 task 17). The deep agent surface is a
-// singleton workspace TAB with two views (`decisions/ai/0620`), reached from
-// the palette, from the ribbon and from the light panel's one exit control.
-// This pins that contract through the REAL editor UI:
+// singleton workspace TAB holding ONE screen — the history rail beside the open
+// conversation (`decisions/ai/0620`, amended by `decisions/ai/0623`) — reached
+// from the palette, from the ribbon and from the light panel's one exit
+// control. This pins that contract through the REAL editor UI:
 //
-//   ah1 — "Agent: open on vault" opens the agent as a singleton tab in the HUB
-//         view; re-firing reveals it rather than opening a second one.
-//   ah2 — "Agent: open on note" lands the SAME tab in the FOCUS view on the
-//         open note, and the back control returns it to the hub.
+//   ah1 — "Agent: open on vault" opens the agent as a singleton tab, with the
+//         history rail AND the conversation both on screen; re-firing reveals
+//         it rather than opening a second one.
+//   ah2 — "Agent: open on note" lands the SAME tab on that note's conversation,
+//         with the note one click away.
 //   ah3 — the light panel's focus control reaches the same place, which is the
 //         panel-to-deep-surface exit the depth pair rests on.
-//   ah4 — the ribbon entry reveals the tab in the view it was LAST left on,
+//   ah4 — the tab remembers WHICH CONVERSATION it was left on across a reveal,
 //         which is the whole reason there is no second preference for it.
 //
 // Why the tab contract rather than a run: an agent run needs a provider that
 // answers, and `e2e/ai-chat.e2e.ts` already owns the run path against the fake
 // Ollama. What this file owns is the SURFACE — that the thing exists, is a
-// singleton, and remembers which of its two views you left it on.
+// singleton, shows both columns, and remembers the conversation you left it on.
 //
 // Both gates are opened in every scenario, and in this order: `developer_mode`
 // decides whether the `ai.*` actions are VISIBLE at all, `ai_enabled` decides
@@ -58,15 +60,9 @@ async function readyWithAi(session: Session, password: string): Promise<void> {
   await enableAi(session);
 }
 
-/** Which view the agent pane is currently showing, or null if it is not open. */
-async function agentView(session: Session): Promise<string | null> {
-  const el = (await session.byTestIdAll("agent.pane")).at(0) ?? null;
-  return el === null ? null : await el.attribute("data-agent-view");
-}
-
-describeE2E("ah1 the agent opens as a singleton tab in the hub view", () => {
+describeE2E("ah1 the agent opens as a singleton tab, rail and conversation both", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("the palette's vault verb opens the hub; re-firing reveals, never duplicates", async () => {
+  it("the palette's vault verb opens it; re-firing reveals, never duplicates", async () => {
     let password = "";
     await scenario(
       "ah1-agent-hub",
@@ -83,11 +79,16 @@ describeE2E("ah1 the agent opens as a singleton tab in the hub view", () => {
         );
         expect(await tab.attribute("data-active")).toBe("true");
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
-        expect(await agentView(s)).toBe("hub");
-        // A seeded vault has no conversations, so the hub lands on its
-        // first-run empty state rather than a list. That is the state a new
-        // user meets, which makes it the one worth pinning.
+        // BOTH columns, which is the whole of what changed: the history rail
+        // beside the conversation rather than a list you navigate out of
+        // (`decisions/ai/0623`). A scenario asserting only one of them would
+        // pass against either shape.
+        await s.byTestId("agent.rail", { timeoutMs: 15_000 });
+        await s.byTestId("agent.focus", { timeoutMs: 15_000 });
+        // A seeded vault has no conversations, so the rail lands on its
+        // first-run empty state — which carries the control that starts one.
         await s.byTestId("agent.hub-empty", { timeoutMs: 15_000 });
+        await s.byTestId("agent.hub-new", { timeoutMs: 15_000 });
         expect(await agentTabCount(s)).toBe(1);
 
         // Re-fire: the agent is a workspace-wide singleton, so this reveals the
@@ -102,9 +103,9 @@ describeE2E("ah1 the agent opens as a singleton tab in the hub view", () => {
   });
 });
 
-describeE2E("ah2 the note verb lands the same tab in focus, and back returns", () => {
+describeE2E("ah2 the note verb lands the same tab on that note's conversation", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("open-on-note opens FOCUS on the open note; the back control returns to the hub", async () => {
+  it("open-on-note anchors the conversation, and keeps the rail beside it", async () => {
     let password = "";
     await scenario(
       "ah2-agent-focus",
@@ -117,19 +118,18 @@ describeE2E("ah2 the note verb lands the same tab in focus, and back returns", (
         await runPaletteAction(s, "ai.open-agent-note", "agent");
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
         await s.byTestId("agent.focus", { timeoutMs: 15_000 });
-        expect(await agentView(s)).toBe("focus");
-        // ONE tab, not two: the two verbs are two views of one singleton, which
-        // is the property that makes "open the agent" mean the same thing
+        // The note it is about is one click away, and the rail stays beside it:
+        // there is no view to have switched to.
+        await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
+        await s.byTestId("agent.rail", { timeoutMs: 15_000 });
+        // ONE tab, not two: the two verbs open one singleton on two subjects,
+        // which is the property that makes "open the agent" mean the same thing
         // whichever door was used.
         expect(await agentTabCount(s)).toBe(1);
-
-        const back = await s.byTestId("agent.focus-back", { timeoutMs: 15_000 });
-        await back.click();
-        await s.waitUntil(
-          async () => ((await agentView(s)) === "hub" ? true : null),
-          { label: "the back control returns the tab to the hub", timeoutMs: 15_000 },
-        );
-        expect(await agentTabCount(s)).toBe(1);
+        // And no back control, because the thing it would go back to is on
+        // screen. Asserting its ABSENCE is what keeps the old shape from
+        // returning unnoticed.
+        expect((await s.byTestIdAll("agent.focus-back")).length).toBe(0);
       },
     );
   });
@@ -158,10 +158,8 @@ describeE2E("ah3 the light panel's exit reaches the deep surface", () => {
         await focusAgent.click();
 
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
-        await s.waitUntil(
-          async () => ((await agentView(s)) === "focus" ? true : null),
-          { label: "the panel's exit lands in focus", timeoutMs: 15_000 },
-        );
+        await s.byTestId("agent.focus", { timeoutMs: 15_000 });
+        await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         // The panel is NOT retired by the tab: it keeps its place in the right
         // panel's vocabulary, and the two are a depth pair rather than a
         // migration (`decisions/ai/0620`).
@@ -171,13 +169,13 @@ describeE2E("ah3 the light panel's exit reaches the deep surface", () => {
   });
 });
 
-describeE2E("ah4 the ribbon entry reveals the view the tab was left on", () => {
+describeE2E("ah4 the tab remembers which conversation it was left on", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("a tab left in focus comes back in focus", async () => {
-    // The "last-used view" behaviour, and the reason no preference records it:
+  it("a reveal keeps the anchored conversation, not a default", async () => {
+    // The "last-used" behaviour, and the reason no preference records it:
     // revealing an open tab keeps its `agentView`, so the memory IS the tab.
     // A second record of one fact would be wrong after any path that did not
-    // write it (`decisions/ai/0620`).
+    // write it (`decisions/ai/0620`, `decisions/ai/0623`).
     let password = "";
     await scenario(
       "ah4-agent-last-view",
@@ -187,23 +185,18 @@ describeE2E("ah4 the ribbon entry reveals the view the tab was left on", () => {
         await readyWithAi(s, password);
         await createNote(s, TITLE);
 
-        // Leave the tab in FOCUS, then go elsewhere so the reveal is a real
-        // reveal rather than a no-op on an already-active tab.
+        // Anchor the tab to the note, then go elsewhere so the reveal is a
+        // real reveal rather than a no-op on an already-active tab.
         await runPaletteAction(s, "ai.open-agent-note", "agent");
-        await s.byTestId("agent.focus", { timeoutMs: 15_000 });
+        await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         await runPaletteAction(s, "graph.show", "graph");
         await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
 
         // Come back through the VAULT verb, which is the one the ribbon entry
-        // runs. It reveals, and the reveal keeps the view.
+        // runs. It reveals, and the reveal keeps the subject: the note link is
+        // still there rather than the tab having reset to a fresh chat.
         await runPaletteAction(s, "ai.open-agent-vault", "agent");
-        await s.waitUntil(
-          async () => ((await agentView(s)) === "focus" ? true : null),
-          {
-            label: "the reveal kept the view the tab was left on",
-            timeoutMs: 15_000,
-          },
-        );
+        await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         expect(await agentTabCount(s)).toBe(1);
       },
     );
