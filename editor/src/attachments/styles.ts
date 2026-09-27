@@ -126,26 +126,64 @@ const CSS = `
 }
 
 /* Click-to-preview lightbox (dogfooding fix #3). Centered, size-capped image
-   shown directly on a dimmed backdrop — no white frame/padding/box. Mounts to
+   shown directly on an OPAQUE backdrop — no white frame/padding/box. Mounts to
    document.body so it escapes the CM theme scope. Esc / backdrop-click / the
    top-right × button close it (wired in lightbox.ts). */
 .cm-attach-lightbox-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  /* Fully opaque, not a 72% scrim. A scrim leaves the app legible underneath,
+     so a screenshot — which is most of what gets previewed — was read against
+     a tab strip and a sidebar showing through it, and the eye kept resolving
+     the wrong layer. A preview is a surface you look AT, and the thing behind
+     it is not context, it is noise. */
+  /* A literal, and NOT var(--scrim): that token is the translucent modal
+     scrim by definition, and it is theme-tinted (rgba(11, 11, 9, .4) in the
+     light theme). A picture mat must not tint the picture — a warm-grey wash
+     over a screenshot shifts every colour in it — and it must be the same
+     black in every theme, so this is one of the few values that is correctly
+     not a token. Recorded in scripts/token-adoption.json for that reason. */
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-5, 24px);
   z-index: 1300;
   cursor: zoom-out;
-  /* The image (image mode) is absolutely positioned + transformed; clip it to
-     the viewport so a zoomed image never overflows the page (MYND-594). */
+  overflow: hidden;
+}
+/* The image's frame, and the reason the padding above was never doing anything.
+
+   The image is position: absolute, so its containing block is the backdrop's
+   PADDING box — and mountZoom fits it to stage.clientWidth/clientHeight,
+   which INCLUDES padding. Both measurements therefore ignored the gutter, and
+   a landscape screenshot fitted edge to edge: under the × and Export buttons
+   at the top (top: max(56px, …), 32px tall) and under the zoom bar at the
+   bottom. The chrome sat on the picture instead of around it.
+
+   So the stage is its own element and the gutter is its INSET rather than
+   anyone's padding: clientHeight then measures the box we actually want the
+   image inside, and the fit falls out of it. The top and bottom are unequal on
+   purpose — they clear different chrome. */
+.cm-attach-lightbox-stage {
+  position: absolute;
+  /* Clears the × / Export row (top: 56px + 32px tall) with room to breathe. */
+  top: 96px;
+  /* Clears the zoom bar (bottom: 20px, ~42px tall). */
+  bottom: 72px;
+  left: 0;
+  right: 0;
+  /* The max width. margin-inline: auto centres an absolutely positioned box
+     whose left and right are both 0 and whose width is definite. */
+  width: min(calc(100% - 2 * var(--space-5, 24px)), 1600px);
+  margin-inline: auto;
+  /* The image is transform-driven; clip a zoomed one to the frame rather than
+     to the viewport, so it stays inside the picture area (MYND-594). */
   overflow: hidden;
 }
 .cm-attach-lightbox-img {
-  /* The image sits directly on the dimmed backdrop — no white frame, padding,
-     or background box. Absolutely positioned + transform-driven so it can be
+  /* The image sits directly on the backdrop — no white frame, padding, or
+     background box. Absolutely positioned + transform-driven so it can be
      zoomed/panned (MYND-594); the controller sets translate/scale + cursor. */
   position: absolute;
   top: 0;

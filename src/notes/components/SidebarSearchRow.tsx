@@ -73,7 +73,12 @@ export function SidebarSearchRow() {
   }, [prefs.keymap]);
 
   return (
-    <Tooltip label={t("notes.list.search")} kbd={chord} placement="bottom">
+    // `stretch`, or the row hugs the word "Search". `ROW_STYLE` already says
+    // `flex: 1` and it lands on a child of the tooltip's wrapper, which is the
+    // actual flex item — so the free space in the header row never reached it
+    // and the control sat at about a third of its width, with the three create
+    // buttons floating a long way to its right.
+    <Tooltip label={t("notes.list.search")} kbd={chord} placement="bottom" stretch>
       <button
         type="button"
         data-testid="notes.sidebar-search"
