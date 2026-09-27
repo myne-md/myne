@@ -272,26 +272,24 @@ describe("AgentPane: the pane's top row", () => {
     expect(header.textContent ?? "").not.toContain("agent.hub.title");
   });
 
-  it("is hidden by default and shown while a run is in flight", () => {
+  it("is hidden, and carries no run indicator to un-hide it for", () => {
     // jsdom applies no stylesheet and resolves no container query, so this
-    // reads the rule. What it is pinning is that BOTH halves are there: a
-    // `display: none` with no arm that undoes it hides the live run's
-    // indicator for the entire run, and an arm with no `display: none` in
-    // front of it restores the reserved band.
+    // reads the rule. The row holds only the narrow arm's rail toggle now:
+    // the heading went, and the orb moved to the transcript's own "Working"
+    // line and to the tab. An empty flex item still takes the parent's gap,
+    // so a row with nothing in it must not be a row.
     const text = css();
-    const hide = text.indexOf(".myne-agent__header { display: none; }");
-    expect(hide, "the header has no resting display:none").toBeGreaterThan(-1);
-    const running = text.indexOf(
-      '.myne-agent[data-agent-running="true"] .myne-agent__header {',
+    expect(text, "the header has no resting display:none").toContain(
+      ".myne-agent__header { display: none; }",
     );
-    expect(running, "nothing un-hides the header for a live run").toBeGreaterThan(-1);
-    // Order matters at equal-or-higher specificity: the arm has to come after
-    // the rule it overrides.
-    expect(running).toBeGreaterThan(hide);
-    // And the attribute the arm keys on is one the component actually writes —
-    // both ways, because a selector keyed on a value that is never set hides
-    // the indicator for every run, and nothing else in the tree compares the
-    // stylesheet's string against the component's.
+    // And nothing brings it back for a live run. That arm existed, and it is
+    // what made the whole pane shift down the moment a run started — the
+    // second reason for the row to move under the user, on top of the first.
+    expect(text, "a run still un-hides the header").not.toContain(
+      '.myne-agent[data-agent-running="true"] .myne-agent__header',
+    );
+    // The attribute itself stays: an E2E waits on it, and the orb's own
+    // reason for existing is that a run is a thing worth observing.
     render(<AgentPane paneId="p1" item={{ kind: "agent", id: AGENT_TAB_ID }} />);
     const pane = screen.getByTestId("agent.pane");
     expect(pane.getAttribute("data-agent-running")).toBe(null);
@@ -299,6 +297,10 @@ describe("AgentPane: the pane's top row", () => {
       beginRun();
     });
     expect(pane.getAttribute("data-agent-running")).toBe("true");
+    // The row stays empty of it, or the orb is in three places and the budget
+    // of two silently renders one of them static.
+    expect(screen.queryByTestId("agent.run-orb"), "the orb is back in the header")
+      .toBeNull();
   });
 
   it("re-shows the row in the narrow arm, where the rail toggle is real", () => {
