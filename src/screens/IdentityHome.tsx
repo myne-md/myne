@@ -9,24 +9,177 @@
 // Desktop + mobile only: reached only when `sync_person_status` reports
 // enrolled, which on web is impossible (`sync_person_setup` is Unsupported and
 // the web client never renders `welcome` at zero vaults).
+//
+// Laid out on the shared `CenteredCard` envelope — the same card every other
+// pre-unlock surface uses (`Unlock`, `AccountNumberEntry`, `FailClosedError`) —
+// rather than the bare column it shipped with, so the invite list scrolls
+// inside a bounded card instead of pushing the create-vault and forget actions
+// off the bottom of the window.
 import {
   useEffect,
   useState,
+  type CSSProperties,
   type ChangeEvent,
   type ClipboardEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
+import {
+  CARD_BODY_STYLE,
+  CARD_TITLE_STYLE,
+  CenteredCard,
+} from "../components/primitives/CenteredCard";
+import { DestructiveBanner } from "../components/DestructiveBanner";
 import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { stageRootStyle } from "../components/primitives/stageRoot";
 import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
 import { inspectInviteCode, personLock } from "../lib/invite";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../components/sync/EnrollPhraseCredential";
+
+const BLOCK_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+};
+
+const BRAND_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+};
+
+const WORDMARK_STYLE: CSSProperties = {
+  fontSize: "var(--text-xl)",
+  fontWeight: "var(--weight-semibold)",
+  color: "var(--fg-1)",
+};
+
+// The canon's secondary/eyebrow heading (`VaultPicker`'s group header): small,
+// secondary ink. It must not compete with the `--text-2xl` card title.
+const SECTION_HEADING_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
+  color: "var(--fg-3)",
+};
+
+const HINT_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--fg-3)",
+};
+
+const BODY_SMALL_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--fg-2)",
+};
+
+const PERSON_ID_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  wordBreak: "break-all",
+};
+
+const COPY_ERROR_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-xs)",
+  color: "var(--danger)",
+};
+
+const COPY_SUCCESS_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+};
+
+const INVITES_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+};
+
+const INVITE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-3)",
+};
+
+const INVITE_HASH_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  wordBreak: "break-all",
+  userSelect: "all",
+};
+
+const ACCEPT_FORM_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  paddingTop: "var(--space-2)",
+  borderTop: "1px solid var(--line-1)",
+};
+
+const FINGERPRINT_STYLE: CSSProperties = {
+  display: "block",
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  padding: "var(--space-2) var(--space-3)",
+  wordBreak: "break-all",
+  userSelect: "all",
+};
+
+const CHECKBOX_LABEL_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  cursor: "pointer",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+};
+
+const CHECKBOX_STYLE: CSSProperties = {
+  width: 16,
+  height: 16,
+  accentColor: "var(--accent)",
+  flexShrink: 0,
+};
+
+const FORGET_BOX_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  border: "1px solid var(--danger)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-3)",
+};
+
+const FORGET_ERROR_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  color: "var(--danger)",
+};
+
+const ACTIONS_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  gap: "var(--space-2)",
+};
 
 interface IdentityHomeProps {
   personIdHex: string | null;
@@ -122,43 +275,19 @@ export function IdentityHome({
   const pending = (invites ?? []).filter((i) => !i.claimed);
 
   return (
-    <div
-      data-testid="identity-home.root"
-      style={{
-        ...stageRootStyle,
-        background: "var(--bg-1)",
-        padding: "var(--space-5)",
-      }}
-    >
-      <div style={{ width: 460, display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+    <CenteredCard>
+      <div data-testid="identity-home.root" style={{ display: "contents" }}>
+        <div style={BRAND_ROW_STYLE}>
           <MyneMark size={36} />
-          <div
-            style={{
-              fontSize: "var(--text-xl)",
-              fontWeight: "var(--weight-semibold)",
-              letterSpacing: "-0.02em",
-              color: "var(--fg-display)",
-            }}
-          >
-            {t("identityHome.title")}
-          </div>
+          <span style={WORDMARK_STYLE}>Myne</span>
         </div>
 
-        <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, color: "var(--fg-2)" }}>
-          {t("identityHome.subtitle")}
-        </div>
+        <h1 style={CARD_TITLE_STYLE}>{t("identityHome.title")}</h1>
+
+        <p style={CARD_BODY_STYLE}>{t("identityHome.subtitle")}</p>
 
         {personIdHex ? (
-          <div
-            data-testid="identity-home.person-id"
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-3)",
-              wordBreak: "break-all",
-            }}
-          >
+          <div data-testid="identity-home.person-id" style={PERSON_ID_STYLE}>
             {personIdHex}
           </div>
         ) : null}
@@ -166,16 +295,8 @@ export function IdentityHome({
         {/* The invite code an owner pastes to invite this person. Public
             material only (person id + public halves). */}
         {identityCode ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            <div
-              style={{
-                fontSize: "var(--text-sm)",
-                fontWeight: "var(--weight-semibold)",
-                color: "var(--fg-1)",
-              }}
-            >
-              {t("identityHome.shareCodeHeading")}
-            </div>
+          <div style={BLOCK_STYLE}>
+            <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.shareCodeHeading")}</h2>
             <Input
               data-testid="identity-home.identity-code"
               aria-label={t("identityHome.shareCodeHeading")}
@@ -203,7 +324,7 @@ export function IdentityHome({
                 data-testid="identity-home.copy-feedback"
                 role="status"
                 aria-live="polite"
-                style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}
+                style={COPY_ERROR_STYLE}
               >
                 {t("personIdentityCode.copyFailed")}
               </p>
@@ -212,84 +333,55 @@ export function IdentityHome({
                 data-testid="identity-home.copy-feedback"
                 role="status"
                 aria-live="polite"
-                style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}
+                style={COPY_SUCCESS_STYLE}
               >
                 {t("personIdentityCode.copied")}
               </p>
             ) : null}
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-              {t("identityHome.shareCodeHint")}
-            </div>
+            <p style={HINT_STYLE}>{t("identityHome.shareCodeHint")}</p>
           </div>
         ) : null}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              fontWeight: "var(--weight-semibold)",
-              color: "var(--fg-1)",
-            }}
-          >
-            {t("identityHome.invitesHeading")}
-          </div>
+        <div style={BLOCK_STYLE}>
+          <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.invitesHeading")}</h2>
           {failed ? (
-            <div
-              data-testid="identity-home.error"
-              style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }}
-            >
+            <DestructiveBanner testId="identity-home.error">
               {t("identityHome.invitesError")}
-            </div>
+            </DestructiveBanner>
           ) : invites === null ? (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
-              {t("identityHome.invitesLoading")}
-            </div>
+            <p style={HINT_STYLE}>{t("identityHome.invitesLoading")}</p>
           ) : pending.length === 0 ? (
-            <div
-              data-testid="identity-home.empty-invites"
-              style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}
-            >
+            <p data-testid="identity-home.empty-invites" style={HINT_STYLE}>
               {t("identityHome.noInvites")}
-            </div>
+            </p>
           ) : (
-            <div data-testid="identity-home.invites" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <div data-testid="identity-home.invites" style={INVITES_STYLE}>
               {pending.map((inv) => (
                 <div
                   key={inv.invite_id_hex}
                   data-testid="identity-home.invite-row"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "var(--text-xs)",
-                    color: "var(--fg-2)",
-                    background: "var(--bg-2)",
-                    border: "1px solid var(--line-1)",
-                    borderRadius: "var(--radius-2)",
-                    padding: "var(--space-2)",
-                    wordBreak: "break-all",
-                  }}
+                  style={INVITE_ROW_STYLE}
                 >
-                  <div>{inv.vault_account_hash_hex}</div>
-                  <Button
-                    type="button"
-                    data-testid="identity-home.accept-open"
-                    onClick={() => {
-                      setAccepting(inv.invite_id_hex);
-                      setOwnerCode("");
-                      setOwnerFingerprint(null);
-                       setConfirmed(false);
-                       setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                       setAcceptError(null);
-
-                    }}
-                  >
-                    {t("identityHome.accept")}
-                  </Button>
-                  {accepting === inv.invite_id_hex ? (
-                    <div
-                      data-testid="identity-home.accept-form"
-                      style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-2)" }}
+                  <span style={INVITE_HASH_STYLE}>{inv.vault_account_hash_hex}</span>
+                  <div>
+                    <Button
+                      type="button"
+                      data-testid="identity-home.accept-open"
+                      onClick={() => {
+                        setAccepting(inv.invite_id_hex);
+                        setOwnerCode("");
+                        setOwnerFingerprint(null);
+                        setConfirmed(false);
+                        setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                        setAcceptError(null);
+                      }}
                     >
-                      <p style={{ fontFamily: "var(--font-sans)" }}>{t("identityHome.acceptHint")}</p>
+                      {t("identityHome.accept")}
+                    </Button>
+                  </div>
+                  {accepting === inv.invite_id_hex ? (
+                    <div data-testid="identity-home.accept-form" style={ACCEPT_FORM_STYLE}>
+                      <p style={BODY_SMALL_STYLE}>{t("identityHome.acceptHint")}</p>
                       <textarea
                         data-testid="identity-home.accept-owner-code"
                         aria-label={t("identityHome.acceptOwnerCodeLabel")}
@@ -320,80 +412,78 @@ export function IdentityHome({
                           {t("identityHome.acceptInspect")}
                         </Button>
                       ) : (
-                        <div data-testid="identity-home.accept-sas">
-                          <p style={{ fontFamily: "var(--font-sans)" }}>
-                            {t("identityHome.acceptSasHint")}
-                          </p>
-                          <code data-testid="identity-home.accept-owner-fingerprint">
+                        <div data-testid="identity-home.accept-sas" style={BLOCK_STYLE}>
+                          <p style={BODY_SMALL_STYLE}>{t("identityHome.acceptSasHint")}</p>
+                          <code
+                            data-testid="identity-home.accept-owner-fingerprint"
+                            style={FINGERPRINT_STYLE}
+                          >
                             {ownerFingerprint}
                           </code>
-                          <label style={{ display: "block", fontFamily: "var(--font-sans)" }}>
+                          <label style={CHECKBOX_LABEL_STYLE}>
                             <input
                               type="checkbox"
                               data-testid="identity-home.accept-confirm"
                               checked={confirmed}
                               onChange={(e) => setConfirmed(e.target.checked)}
+                              style={CHECKBOX_STYLE}
                             />
                             {t("identityHome.acceptConfirm")}
                           </label>
-                           <EnrollPhraseCredential
-                             baseId="identity-home-accept"
-                             label={t("identityHome.acceptPhraseLabel")}
-                             cells={acceptPhraseCells}
-                             onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
-                               setAcceptError(null);
-                               setAcceptPhraseCells((cells) =>
-                                 cells.map((cell, cellIndex) =>
-                                   cellIndex === index
-                                     ? event.target.value.replace(/\s+/g, "")
-                                     : cell,
-                                 ),
-                               );
-                             }}
-                             onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-                               const tokens = event.clipboardData
-                                 .getData("text")
-                                 .split(/\s+/)
-                                 .filter((token) => token.length > 0);
-                               if (tokens.length < 2) return;
-                               event.preventDefault();
-                               setAcceptError(null);
-                               setAcceptPhraseCells((cells) => {
-                                 const next = [...cells];
-                                 for (
-                                   let i = 0;
-                                   i < tokens.length && index + i < PHRASE_CELL_COUNT;
-                                   i += 1
-                                 ) {
-                                   next[index + i] = tokens[i];
-                                 }
-                                 return next;
-                               });
-                             }}
-                             gridTestId="identity-home.accept-phrase-grid"
-                             cellTestId={(index) =>
-                               index === 0
-                                 ? "identity-home.accept-phrase"
-                                 : `identity-home.accept-phrase-cell-${index + 1}`
-                             }
-                           />
-
+                          <EnrollPhraseCredential
+                            baseId="identity-home-accept"
+                            label={t("identityHome.acceptPhraseLabel")}
+                            cells={acceptPhraseCells}
+                            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
+                              setAcceptError(null);
+                              setAcceptPhraseCells((cells) =>
+                                cells.map((cell, cellIndex) =>
+                                  cellIndex === index
+                                    ? event.target.value.replace(/\s+/g, "")
+                                    : cell,
+                                ),
+                              );
+                            }}
+                            onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
+                              const tokens = event.clipboardData
+                                .getData("text")
+                                .split(/\s+/)
+                                .filter((token) => token.length > 0);
+                              if (tokens.length < 2) return;
+                              event.preventDefault();
+                              setAcceptError(null);
+                              setAcceptPhraseCells((cells) => {
+                                const next = [...cells];
+                                for (
+                                  let i = 0;
+                                  i < tokens.length && index + i < PHRASE_CELL_COUNT;
+                                  i += 1
+                                ) {
+                                  next[index + i] = tokens[i];
+                                }
+                                return next;
+                              });
+                            }}
+                            gridTestId="identity-home.accept-phrase-grid"
+                            cellTestId={(index) =>
+                              index === 0
+                                ? "identity-home.accept-phrase"
+                                : `identity-home.accept-phrase-cell-${index + 1}`
+                            }
+                          />
                           <Button
                             type="button"
                             variant="primary"
                             data-testid="identity-home.accept-submit"
-                             disabled={!confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)}
-
+                            disabled={!confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)}
                             onClick={async () => {
                               try {
                                 await personAcceptInvite(
                                   inv.invite_id_hex,
                                   ownerCode.trim(),
-                                   acceptPhraseCells.join(" "),
-
+                                  acceptPhraseCells.join(" "),
                                 );
-                                 setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-
+                                setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
                                 onAccepted();
                               } catch {
                                 setAcceptError(t("identityHome.acceptError"));
@@ -405,9 +495,9 @@ export function IdentityHome({
                         </div>
                       )}
                       {acceptError ? (
-                        <p data-testid="identity-home.accept-error" style={{ color: "var(--danger)", fontFamily: "var(--font-sans)" }}>
+                        <DestructiveBanner testId="identity-home.accept-error">
                           {acceptError}
-                        </p>
+                        </DestructiveBanner>
                       ) : null}
                     </div>
                   ) : null}
@@ -417,7 +507,7 @@ export function IdentityHome({
           )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        <div style={BLOCK_STYLE}>
           <Button variant="primary" onClick={onCreateVault} data-testid="identity-home.create-vault-cta">
             {t("identityHome.createVaultCta")}
           </Button>
@@ -427,48 +517,24 @@ export function IdentityHome({
             account and any vault it owns or joined are untouched, and the
             phrase recovers the identity elsewhere. */}
         {forgetOpen ? (
-          <div
-            data-testid="identity-home.forget-confirm"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-2)",
-              border: "1px solid var(--danger)",
-              borderRadius: "var(--radius-2)",
-              padding: "var(--space-3)",
-            }}
-          >
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
-              {t("identityHome.forgetWarning")}
-            </div>
-            <label
-              style={{
-                display: "flex",
-                gap: "var(--space-2)",
-                alignItems: "center",
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-1)",
-              }}
-            >
+          <div data-testid="identity-home.forget-confirm" style={FORGET_BOX_STYLE}>
+            <p style={BODY_SMALL_STYLE}>{t("identityHome.forgetWarning")}</p>
+            <label style={CHECKBOX_LABEL_STYLE}>
               <input
                 type="checkbox"
                 data-testid="identity-home.forget-ack"
                 checked={forgetAck}
                 onChange={(e) => setForgetAck(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+                style={CHECKBOX_STYLE}
               />
               {t("identityHome.forgetCheckbox")}
             </label>
             {forgetError ? (
-              <p
-                data-testid="identity-home.forget-error"
-                role="alert"
-                style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
-              >
+              <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
                 {t("identityHome.forgetError")}
               </p>
             ) : null}
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <div style={ACTIONS_ROW_STYLE}>
               <Button
                 variant="ghost"
                 disabled={forgetBusy}
@@ -492,7 +558,7 @@ export function IdentityHome({
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={BLOCK_STYLE}>
             <Button
               variant="ghost"
               onClick={() => setForgetOpen(true)}
@@ -503,6 +569,6 @@ export function IdentityHome({
           </div>
         )}
       </div>
-    </div>
+    </CenteredCard>
   );
 }
