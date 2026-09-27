@@ -41,6 +41,7 @@ import { clearChat, useChat } from "../ai/chatStore";
 import { agentCancel } from "../../lib/agent-run";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { IconButton } from "../../components/primitives/IconButton";
+import { Tooltip } from "../../components/primitives/Tooltip";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatHistoryModal } from "./ChatHistoryModal";
@@ -124,9 +125,16 @@ export interface AiChatTabProps {
   onNotesWritten?: (noteIds: readonly string[]) => void;
   /** Called after an agent-run undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
-  /** Open Settings (the memory popover's "Manage in Settings" link). Absent
-   *  in isolation (e.g. tests): the link then just closes the popover. */
-  onOpenSettings?: () => void;
+  /**
+   * Open Settings, optionally on a panel and scrolled to a setting.
+   *
+   * Used by the memory popover's "Manage in Settings" link (no arguments: the
+   * default landing is right for it) and by the status chip, which names a
+   * fault and needs to land ON the control that clears it rather than at the
+   * top of a panel. Absent in isolation (e.g. tests): the popover's link then
+   * just closes it, and the chip is not a button at all.
+   */
+  onOpenSettings?: (panel?: string, anchor?: string) => void;
   /** Toast sink for the memory popover's one-shot outcomes (delete saved /
    *  failed). Absent in isolation: the popover still deletes, it just
    *  reports nothing. */
@@ -211,6 +219,29 @@ export function AiChatTab({
    * is never clamped there — which is also why no persisted dismissal exists.
    */
   const honestyClamped = chat.turns.length > 0 && !honestyOpen;
+
+  /**
+   * Whether the chip names something the user can act on, and the sentence
+   * saying how.
+   *
+   * A total switch rather than a lookup, for the reason every helper on this
+   * surface gives: `scripts/check-i18n.mjs` verifies STATIC `t("…")` call
+   * sites, so a key assembled from a variable is a key it cannot see. `off` is
+   * deliberately absent — AI being switched off is a state the user chose, and
+   * a chip offering to undo a deliberate choice is nagging.
+   */
+  const STATUS_HINT = noSearchModel
+    ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
+    : resting === "no-provider"
+      ? t("editor.chrome.rightPanel.aiChat.noModelHint")
+      : resting === "unreachable"
+        ? t("editor.chrome.rightPanel.aiChat.unreachableHint")
+        : "";
+  // `unavailable` is a build without local AI and `off` is the user's own
+  // switch: neither has a setting that would change it, so neither gets a
+  // click target. Offering one would be a control that goes somewhere and
+  // changes nothing.
+  const actionableStatus = STATUS_HINT !== "" && onOpenSettings !== undefined;
   // The surface reports the frame facts the header dresses. Lifted rather than
   // rendered in the surface, because the agent tab does not show either of them.
   const [surfaceStatus, setSurfaceStatus] = useState<ConversationSurfaceStatus>({
@@ -312,34 +343,66 @@ export function AiChatTab({
               {t("editor.chrome.rightPanel.aiChat.persistWarning")}
             </span>
           ) : null}
-          <span
-            data-testid="ai.chrome-status"
-            data-ai-enabled={aiEnabled ? "true" : "false"}
-            data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
-            data-ai-cause={resting}
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: "var(--weight-medium)",
-              color: aiEnabled && !noModel ? "var(--fg-2)" : "var(--fg-3)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-1)",
-              padding: "1px var(--space-1)",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              maxWidth: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {resting !== "ready"
-              ? chipKey(resting, t)
-              : noSearchModel
-                ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
-                : gettingReady
-                  ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                  : (activeProviderName ??
-                    t("editor.chrome.rightPanel.aiChat.statusReady"))}
-          </span>
+          {/* **The chip says what is wrong; this is where it says what to do**
+              (myne-md/myne#771).
+
+              It was a `<span>`: a passive label naming a fault with no route
+              out of it. Worse, the sentence that WAS written to give that
+              route — `noSearchModelHint`, "Asking searches your notes on this
+              device, and that needs a search model here… Choose one in
+              Settings → Developer → AI" — was rendered nowhere at all, in any
+              client. Somebody wrote it, 31 locales translated it, and it has
+              never been on a screen. `check-i18n.mjs` cannot see that: it
+              verifies a USED key exists, not that an existing key is used.
+
+              So the degraded chip is a button carrying that sentence as its
+              tooltip and opening Settings on the models block. The healthy
+              chip stays a `<span>`: naming the provider that is answering is a
+              statement, and a statement with a click target invites a press
+              that would do nothing useful. */}
+          {actionableStatus ? (
+            <Tooltip label={STATUS_HINT}>
+              <button
+                type="button"
+                data-testid="ai.chrome-status"
+                data-ai-enabled={aiEnabled ? "true" : "false"}
+                data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
+                data-ai-cause={resting}
+                data-actionable="true"
+                onClick={() => onOpenSettings?.("ai", "ai.models")}
+                className="myne-pill"
+                data-interactive="true"
+                data-tone={aiEnabled && !noModel ? "ready" : undefined}
+              >
+                {resting !== "ready"
+                  ? chipKey(resting, t)
+                  : noSearchModel
+                    ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
+                    : gettingReady
+                      ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+                      : (activeProviderName ??
+                        t("editor.chrome.rightPanel.aiChat.statusReady"))}
+              </button>
+            </Tooltip>
+          ) : (
+            <span
+              data-testid="ai.chrome-status"
+              data-ai-enabled={aiEnabled ? "true" : "false"}
+              data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
+              data-ai-cause={resting}
+              className="myne-pill"
+              data-tone={aiEnabled && !noModel ? "ready" : undefined}
+            >
+              {resting !== "ready"
+                ? chipKey(resting, t)
+                : noSearchModel
+                  ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
+                  : gettingReady
+                    ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+                    : (activeProviderName ??
+                      t("editor.chrome.rightPanel.aiChat.statusReady"))}
+            </span>
+          )}
         </div>
       </div>
       {/* Honest framing (task 13): rendered VERBATIM (load-bearing copy, never

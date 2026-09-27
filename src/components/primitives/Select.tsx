@@ -30,6 +30,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { placeMenu, type MenuPlacement } from "./menuPlacement";
 import { Icon } from "./Icon";
 
 export interface SelectOption<T extends string> {
@@ -81,11 +82,9 @@ export function Select<T extends string>({
   const [activeIndex, setActiveIndex] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{
-    top: number;
-    left: number;
-    minWidth: number;
-  } | null>(null);
+  const [coords, setCoords] = useState<
+    (MenuPlacement & { left: number; minWidth: number }) | null
+  >(null);
 
   const selectedIndex = options.findIndex((o) => o.value === value);
   const current = selectedIndex >= 0 ? options[selectedIndex] : options[0];
@@ -119,7 +118,12 @@ export function Select<T extends string>({
     [options, onChange],
   );
 
-  // Anchor the menu below the trigger, left-aligned, at least as wide as it.
+  // Anchor the menu to the trigger, left-aligned, at least as wide as it —
+  // and on whichever side there is room for it. `placeMenu` owns the vertical
+  // half: this control sits near the bottom of the window often enough
+  // (the AI composer's two dropdowns are a few pixels above the status bar)
+  // that "always downward" put most of the menu past the fold, with no scroll
+  // to reach it because a fixed portal does not extend the page.
   useLayoutEffect(() => {
     if (!open) return;
     const el = triggerRef.current;
@@ -127,7 +131,14 @@ export function Select<T extends string>({
     const r = el.getBoundingClientRect();
     const minWidth = Math.max(160, r.width);
     const left = Math.min(r.left, window.innerWidth - minWidth - 8);
-    setCoords({ top: r.bottom + 4, left: Math.max(8, left), minWidth });
+    setCoords({
+      // 280 is this variant's `max-height` in `components.css`. Passed rather
+      // than read: an inline `max-height` overrides the sheet, so the number
+      // has to be known here or the menu grows to whatever room exists.
+      ...placeMenu(r, window.innerHeight, { cap: 280 }),
+      left: Math.max(8, left),
+      minWidth,
+    });
   }, [open]);
 
   // Outside-click / Esc handled at the trigger; scroll/resize close the menu
@@ -238,10 +249,19 @@ export function Select<T extends string>({
             role="listbox"
             aria-label={ariaLabel}
             className="myne-select-menu"
-            // The three MEASURED values, and only those: the menu is a fixed
-            // portal anchored to the trigger's rect, which no stylesheet knows.
+            // Which way it opened, for a scenario and for anyone reading the
+            // DOM: the coordinates alone do not say, since `top` and `bottom`
+            // are both plausible numbers.
+            data-side={coords.side}
+            // The measured values, and only those: the menu is a fixed portal
+            // anchored to the trigger's rect, which no stylesheet knows. The
+            // height is measured too — the stylesheet's `max-height` is the
+            // cap, and the room on the chosen side is the value, or flipping
+            // would only move the overflow to the other edge.
             style={{
-              top: coords.top,
+              ...(coords.top === undefined ? {} : { top: coords.top }),
+              ...(coords.bottom === undefined ? {} : { bottom: coords.bottom }),
+              maxHeight: coords.maxHeight,
               left: coords.left,
               minWidth: coords.minWidth,
             }}

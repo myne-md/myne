@@ -55,7 +55,7 @@
       "openNote": "Open note"
     },
     "composer": {
-      "placeholder": "Ask the AI to change these notes",
+      "placeholder": "Ask the AI…",
       "scopeLabel": "Working on",
       "scopeChange": "Change",
       "scopeOpenNote": "This note",

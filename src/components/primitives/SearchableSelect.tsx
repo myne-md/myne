@@ -33,6 +33,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { placeMenu, type MenuPlacement } from "./menuPlacement";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 import type { SelectOption } from "./Select";
@@ -100,11 +101,9 @@ export function SearchableSelect<T extends string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [coords, setCoords] = useState<{
-    top: number;
-    right: number;
-    minWidth: number;
-  } | null>(null);
+  const [coords, setCoords] = useState<
+    (MenuPlacement & { right: number; minWidth: number }) | null
+  >(null);
 
   const selectedSet = useMemo(() => new Set<T>(selected), [selected]);
 
@@ -182,9 +181,12 @@ export function SearchableSelect<T extends string>({
     [multiple, options, selectedSet, onChange, close],
   );
 
-  // Anchor the menu below the trigger, RIGHT-aligned to it (opens leftward) so it
-  // never spills past the right edge — the trigger usually sits on the right of a
-  // settings row / modal, where a left-aligned menu leaked off-screen.
+  // Anchor the menu to the trigger, RIGHT-aligned to it (opens leftward) so it
+  // never spills past the right edge — the trigger usually sits on the right of
+  // a settings row / modal, where a left-aligned menu leaked off-screen. The
+  // vertical half is `placeMenu`'s, shared with `<Select>`: this one is taller
+  // (320px against 280) so it runs out of room below sooner, and the AI
+  // composer's scope picker sits a few pixels above the status bar.
   useLayoutEffect(() => {
     if (!open) return;
     const el = triggerRef.current;
@@ -192,7 +194,13 @@ export function SearchableSelect<T extends string>({
     const r = el.getBoundingClientRect();
     const minWidth = Math.max(220, r.width);
     const right = Math.max(8, window.innerWidth - r.right);
-    setCoords({ top: r.bottom + 4, right, minWidth });
+    // 320 is this variant's `max-height` in `components.css` (taller than the
+    // plain one, because it carries a pinned search row above its list).
+    setCoords({
+      ...placeMenu(r, window.innerHeight, { cap: 320 }),
+      right,
+      minWidth,
+    });
   }, [open]);
 
   // Outside-click closes; scroll/resize close (a fixed menu would drift).
@@ -322,9 +330,15 @@ export function SearchableSelect<T extends string>({
             data-focus-trap-portal=""
             className="myne-select-menu"
             data-searchable="true"
+            data-side={coords.side}
             // The MEASURED anchor only; everything else is in `components.css`.
+            // The height is measured too: the room on the chosen side is the
+            // value and the stylesheet's `max-height` is the cap, or flipping
+            // would move the overflow to the other edge rather than remove it.
             style={{
-              top: coords.top,
+              ...(coords.top === undefined ? {} : { top: coords.top }),
+              ...(coords.bottom === undefined ? {} : { bottom: coords.bottom }),
+              maxHeight: coords.maxHeight,
               right: coords.right,
               minWidth: coords.minWidth,
               maxWidth: "min(360px, calc(100vw - 16px))",

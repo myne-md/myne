@@ -1264,3 +1264,58 @@ describe("AiChatTab: the honesty note costs a line, not a third of the panel", (
     expect(note.textContent).toBe(AI_CHAT_HONESTY_NOTE);
   });
 });
+
+describe("AiChatTab: the status chip leads somewhere", () => {
+  // It was a `<span>` — a passive label naming a fault with no route out of
+  // it. And the sentence written to GIVE that route was rendered nowhere at
+  // all, in any client: `noSearchModelHint` exists in `locales/en` and in 31
+  // translations and had never been on a screen. `check-i18n.mjs` cannot see
+  // that; it verifies a USED key exists, not that an existing key is used.
+
+  it("is a button with the hint, when the fault has a fix", () => {
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    const onOpenSettings = vi.fn();
+    render(<AiChatTab onOpenSettings={onOpenSettings} />);
+    const chip = screen.getByTestId("ai.chrome-status");
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip.getAttribute("data-actionable")).toBe("true");
+  });
+
+  it("lands ON the control that clears it, not at the top of a panel", () => {
+    // The AI panel is a dozen blocks tall. Opening it and leaving the user to
+    // find the models block is the failure a deep link exists to prevent, and
+    // the machinery was already here with one caller.
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    const onOpenSettings = vi.fn();
+    render(<AiChatTab onOpenSettings={onOpenSettings} />);
+    fireEvent.click(screen.getByTestId("ai.chrome-status"));
+    expect(onOpenSettings).toHaveBeenCalledWith("ai", "ai.models");
+  });
+
+  it("stays a plain label when the chip is a statement", () => {
+    // A healthy chip names the provider that is answering. A statement with a
+    // click target invites a press that would do nothing useful.
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    const chip = screen.getByTestId("ai.chrome-status");
+    expect(chip.tagName).toBe("SPAN");
+    expect(chip.getAttribute("data-actionable")).toBeNull();
+  });
+
+  it("stays a plain label when nothing can open Settings", () => {
+    // Rendered in isolation, and in any surface with no settings shell behind
+    // it. A button that goes nowhere is worse than a label.
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    render(<AiChatTab />);
+    expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
+  });
+
+  it("does not offer a fix for a state the user chose", () => {
+    // AI switched off is a deliberate choice, and a chip offering to undo one
+    // is nagging. Same for a build compiled without local AI: no setting
+    // changes it, so a control going somewhere would change nothing.
+    aiEnabled = false;
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
+  });
+});

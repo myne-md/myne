@@ -454,14 +454,17 @@ export function AgentHubList({
                   note" legible in the Hub, distinct from a vault-general
                   conversation. */}
               {row.note_id !== undefined ? (
-                // A chiplet, not a hand-rolled button: the border, radius and
-                // padding it was re-deriving are `.myne-chiplet`'s, and an app
-                // that is supposed to have one chip design had two. The native
-                // `title` it carried repeated its own visible label, which is
-                // the one tooltip that says nothing.
+                // `.myne-pill`, not the hand-rolled border/radius/padding it
+                // was re-deriving — and not `.myne-chiplet`, which it was given
+                // first: that class is a 40x28 THEME SWATCH with hidden
+                // overflow, so a text label in it is a label nobody can read.
+                // Right instinct, wrong class. The native `title` it carried
+                // repeated its own visible label, which is the one tooltip that
+                // says nothing.
                 <button
                   type="button"
-                  className="myne-chiplet"
+                  className="myne-pill"
+                  data-interactive={onOpenNote === undefined ? undefined : "true"}
                   data-testid="agent.hub-anchor"
                   data-note-id={row.note_id}
                   disabled={onOpenNote === undefined}
