@@ -1549,6 +1549,40 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  gap: var(--space-2);
+  /* A UNIFORM inset. It was `--space-4` vertically against `--space-1`
+     horizontally, on the argument that the pane has a tab strip above and a
+     status bar below and is narrow before it is anything else. What that
+     produced is a band of empty pane above the rail four times the gutter
+     beside it, so the content read as pushed down rather than inset — and the
+     band existed to clear a heading that is now gone. Equal on all four sides
+     is the honest version of "just off the edge", and the columns keep the
+     width. */
+  padding: var(--space-1);
+  box-sizing: border-box;
+}
+
+/* The pane's top row: the narrow arm's rail toggle and the live run's
+   indicator, and nothing else since the heading went.
+
+   **Hidden when it holds neither**, which at wide widths with no run in
+   flight is the ordinary case. The alternative is a row that is empty and
+   still a flex item, so it still takes the parent's `gap` — a reserved band
+   of blank pane whose height is explained by nothing on screen. It cannot be
+   decided in the component: whether the toggle counts is a container-width
+   question, and React does not know the container's width. */
+.myne-agent__header { display: none; }
+
+/* Two arms and no `:has()`. A `:has()` arm would have read better — "show the
+   row when it has a visible child" — and an engine that does not support it
+   drops the WHOLE selector list, taking the run indicator's arm with it. */
+.myne-agent[data-agent-running="true"] .myne-agent__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
 }
 
 .myne-agent__body {
@@ -1605,6 +1639,16 @@
    trip. */
 @container (max-width: 559px) {
   .myne-agent__rail-toggle { display: inline-flex; }
+
+  /* The toggle is real at this width, so the row that holds it is too. */
+  .myne-agent__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
 
   .myne-agent__rail {
     width: auto;

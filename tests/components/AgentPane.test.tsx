@@ -8,7 +8,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const { mockSetAgentViewState, mockOpenInFocused, mockChatsList } = vi.hoisted(() => ({
   mockSetAgentViewState: vi.fn(),
@@ -51,7 +51,11 @@ vi.mock("../../src/lib/useDateTimeDisplay", () => ({
   useDateTimeDisplay: () => ({ locale: "en", timeZone: null }),
 }));
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { AgentPane } from "../../src/notes/agent/AgentPane";
+import { beginRun, clearAgent } from "../../src/notes/agent/agentStore";
 import { getChat, sendChatMessage } from "../../src/notes/ai/chatStore";
 import { AGENT_TAB_ID } from "../../src/notes/workspaceState";
 
@@ -60,6 +64,7 @@ beforeEach(() => {
   mockOpenInFocused.mockReset();
   mockChatsList.mockReset();
   mockChatsList.mockResolvedValue([]);
+  clearAgent();
 });
 
 afterEach(() => cleanup());
@@ -241,5 +246,86 @@ describe("AgentPane: New conversation clears the transcript, not just the state"
     );
     fireEvent.click(await screen.findByTestId("agent.hub-new"));
     expect(mockSetAgentViewState).toHaveBeenCalledWith("p1", {});
+  });
+});
+
+describe("AgentPane: the pane's top row", () => {
+  // The heading said "Agent" directly under a TAB that says "Agent", and the
+  // band it sat in stayed there when it went — an empty flex row still takes
+  // the parent's gap, so the rail would have started below a reserved strip of
+  // blank pane that nothing on screen explains.
+
+  function css(): string {
+    return readFileSync(resolve(process.cwd(), "client-core/src/components.css"), "utf8");
+  }
+
+  it("names the region without printing the name", () => {
+    render(<AgentPane paneId="p1" item={{ kind: "agent", id: AGENT_TAB_ID }} />);
+    const pane = screen.getByTestId("agent.pane");
+    // The accessible name is unchanged — it moved nowhere, it was always the
+    // root's `aria-label`; what went is the visible restatement of it.
+    expect(pane.getAttribute("aria-label")).toBe("agent.hub.title");
+    const header = screen.getByTestId("agent.header");
+    // The catalog is stubbed to echo keys, so the heading would be the literal
+    // key here. Asserted on the header rather than the pane, because the key
+    // is legitimately the root's `aria-label`.
+    expect(header.textContent ?? "").not.toContain("agent.hub.title");
+  });
+
+  it("is hidden by default and shown while a run is in flight", () => {
+    // jsdom applies no stylesheet and resolves no container query, so this
+    // reads the rule. What it is pinning is that BOTH halves are there: a
+    // `display: none` with no arm that undoes it hides the live run's
+    // indicator for the entire run, and an arm with no `display: none` in
+    // front of it restores the reserved band.
+    const text = css();
+    const hide = text.indexOf(".myne-agent__header { display: none; }");
+    expect(hide, "the header has no resting display:none").toBeGreaterThan(-1);
+    const running = text.indexOf(
+      '.myne-agent[data-agent-running="true"] .myne-agent__header {',
+    );
+    expect(running, "nothing un-hides the header for a live run").toBeGreaterThan(-1);
+    // Order matters at equal-or-higher specificity: the arm has to come after
+    // the rule it overrides.
+    expect(running).toBeGreaterThan(hide);
+    // And the attribute the arm keys on is one the component actually writes —
+    // both ways, because a selector keyed on a value that is never set hides
+    // the indicator for every run, and nothing else in the tree compares the
+    // stylesheet's string against the component's.
+    render(<AgentPane paneId="p1" item={{ kind: "agent", id: AGENT_TAB_ID }} />);
+    const pane = screen.getByTestId("agent.pane");
+    expect(pane.getAttribute("data-agent-running")).toBe(null);
+    act(() => {
+      beginRun();
+    });
+    expect(pane.getAttribute("data-agent-running")).toBe("true");
+  });
+
+  it("re-shows the row in the narrow arm, where the rail toggle is real", () => {
+    // The toggle is the only way to the history below 560px. A header hidden
+    // there would take the history with it, which is the one thing the narrow
+    // fallback exists to avoid.
+    const text = css();
+    const narrow = text.indexOf("@container (max-width: 559px)");
+    expect(narrow).toBeGreaterThan(-1);
+    const arm = text.indexOf(".myne-agent__header {", narrow);
+    expect(arm, "the narrow arm never un-hides the header").toBeGreaterThan(-1);
+    const end = text.indexOf("\n}", arm);
+    expect(text.slice(arm, end)).toContain("display: flex");
+  });
+
+  it("insets the pane equally on all four sides", () => {
+    // The ask behind it: the content should sit the same distance from every
+    // edge. It was `--space-4` top and bottom against `--space-1` left and
+    // right, which read as pushed down rather than inset.
+    const text = css();
+    const open = text.indexOf(".myne-agent {");
+    const end = text.indexOf("\n}", open);
+    const rule = text.slice(open, end);
+    const padding = /padding:\s*([^;]+);/.exec(rule)?.[1]?.trim();
+    expect(padding, "the pane declares no padding").toBeTruthy();
+    // One value: four different ones written out would satisfy a looser check
+    // while being exactly the asymmetry this replaced.
+    expect(padding!.split(/\s+/), padding).toHaveLength(1);
   });
 });
