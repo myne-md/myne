@@ -22,6 +22,7 @@ import { useWorkspace } from "../workspaceContext";
 import { AgentHubList } from "./AgentHubList";
 import { AgentFocusView } from "./AgentFocusView";
 import { AgentRunOrb } from "./AgentRunOrb";
+import { useAgent } from "./agentStore";
 
 const ROOT_STYLE: CSSProperties = {
   height: "100%",
@@ -43,6 +44,17 @@ const HEADER_STYLE: CSSProperties = {
 const HEADING_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-medium)",
+  color: "var(--fg-2)",
+};
+
+/** The orb plus the word it means. They are one object, so they sit in one
+ *  box: an indicator that can drift away from its own label is an indicator
+ *  that can end up beside somebody else's. */
+const RUN_LABEL_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  fontSize: "var(--text-xs)",
   color: "var(--fg-2)",
 };
 
@@ -71,6 +83,12 @@ export function AgentPane({
   const { t } = useTranslation();
   const ws = useWorkspace();
   const view = agentViewOf(item);
+  // Whether a run is in flight, read here rather than inside the orb so the
+  // pane can also state it in words and expose it to a scenario. The orb reads
+  // the same store for itself, which is deliberate duplication: it must be
+  // correct when mounted anywhere, not only where a caller remembered to pass
+  // the fact in.
+  const running = useAgent().running;
 
   // One writer for the view, used by Hub rows and (through the palette verbs)
   // by anything that reveals the tab on a particular note.
@@ -98,15 +116,32 @@ export function AgentPane({
   );
 
   return (
-    <div data-testid="agent.pane" data-agent-view={view.view} style={ROOT_STYLE}>
+    <div
+      data-testid="agent.pane"
+      data-agent-view={view.view}
+      // Observable to a scenario without reaching into the orb's own internals:
+      // the pane knows whether a run is in flight, and that is the fact an E2E
+      // wants to wait on.
+      data-agent-running={running ? "true" : undefined}
+      style={ROOT_STYLE}
+    >
       <div style={HEADER_STYLE}>
         <div style={HEADING_STYLE}>
           {view.view === "hub" ? t("agent.hub.title") : t("agent.focus.title")}
         </div>
         {/* The run indicator: present only while a run is active, and it stops
             when the run stops (myne-md/myne#771, the named motion-canon
-            exemption). Decorative: the state's meaning is in the surface text. */}
-        <AgentRunOrb />
+            exemption). Decorative and `aria-hidden` — which is only honest
+            while the meaning is stated in WORDS beside it, so the label is part
+            of the exemption rather than a caption on it. Without it the one
+            thing reporting a multi-minute wait would be a 14px shape no screen
+            reader ever reaches. */}
+        {running ? (
+          <span style={RUN_LABEL_STYLE} data-testid="agent.run-label">
+            <AgentRunOrb />
+            {t("agent.progress.working")}
+          </span>
+        ) : null}
       </div>
 
       {view.view === "hub" ? (

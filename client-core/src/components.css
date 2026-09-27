@@ -1342,3 +1342,119 @@
 .myne-auth-view[data-enter="back"] {
   animation: myne-auth-enter-back var(--duration-base) var(--ease-emphasized);
 }
+
+
+/* =========================================================================
+   Agent run orb — the named run indicator (myne-md/myne#771 task 12)
+   ========================================================================= */
+
+/* `PRODUCT.md` principle 4 admits no pulsing state indicator, and
+   `docs/decisions/ui/0618` widened that into a NAMED-exemption mechanism rather
+   than a general permission. This is the second entry of that class, after the
+   `01` field, and `scripts/check-motion-canon.mjs` knows both by name.
+
+   What it indicates is a run in flight: an agent step can take tens of seconds
+   with no output, and the surface would otherwise be indistinguishable from one
+   that had silently stopped. That is the whole justification — it animates
+   while something is happening and not one frame longer, which is the
+   difference between a state indicator and a decoration that never stops.
+
+   It is NOT a second spinner. `<Spinner>` says "waiting for IO" and turns at
+   IO's pace; this breathes, slowly, because what it reports is a model working
+   rather than a request outstanding. Two shapes for two waits.
+
+   Both keyframes animate `transform` and `opacity` only — the canon's list —
+   so neither lays out or paints a new box on any frame. */
+
+@keyframes myne-orb-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(1.5); opacity: 0.12; }
+}
+
+@keyframes myne-orb-turn {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.myne-orb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* The core. Present in every state, including the static one, so a paused or
+   reduced-motion orb is still visibly an indicator rather than a gap. */
+.myne-orb__core {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* The halo, breathing outward. */
+.myne-orb__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.55;
+  transform: scale(1);
+}
+
+/* The ring, turning. Asymmetric on purpose — a uniform ring rotating is
+   invisible, which is the trap a "rotating ring" indicator usually falls into. */
+.myne-orb__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--accent);
+  opacity: 0.8;
+}
+
+/* Animation is OPT-IN through the attribute, so the resting orb is a static
+   frame by construction rather than by a rule that has to remember to switch
+   something off. `paused` is what `document.hidden` and the IntersectionObserver
+   set: a paused CSS animation holds its current frame and consumes no frames,
+   which is the cheapest correct answer available. */
+.myne-orb[data-run="active"] .myne-orb__halo {
+  animation: myne-orb-breathe 2.4s var(--ease-standard) infinite;
+}
+.myne-orb[data-run="active"] .myne-orb__ring {
+  animation: myne-orb-turn 3.6s linear infinite;
+}
+.myne-orb[data-paused="true"] .myne-orb__halo,
+.myne-orb[data-paused="true"] .myne-orb__ring {
+  animation-play-state: paused;
+}
+
+/* Reduced motion: ONE static frame, and the core plus a still ring are that
+   frame. It does NOT take MYND-630's `data-motion="essential"` slow-it-down
+   arm, and the difference from the unlock field's sweep is the point — there,
+   the indicator is the only thing on screen saying work is in flight, so a
+   frozen one reads as a hang. Here the run's status is spelled out in words
+   beside it, so holding still costs the user nothing. */
+@media (prefers-reduced-motion: reduce) {
+  .myne-orb[data-run="active"] .myne-orb__halo,
+  .myne-orb[data-run="active"] .myne-orb__ring {
+    animation: none;
+  }
+}
+
+/* Forced colours strips every background, which would leave the orb as an
+   empty 14px gap next to its label. */
+@media (forced-colors: active) {
+  .myne-orb__core,
+  .myne-orb__halo {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+  .myne-orb__ring {
+    forced-color-adjust: none;
+    border-top-color: Highlight;
+  }
+}

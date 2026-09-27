@@ -39,7 +39,12 @@
 // actually produced was the one surface a new user sees first — an empty
 // sidebar — being the one surface without the brand on it.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { Icon } from "./Icon";
 import { mountBinaryField } from "@myne/client-core/binaryField";
 import type { IconName } from "../../lib/icons";
@@ -82,6 +87,13 @@ interface EmptyStateProps {
    */
   fill?: boolean;
   testId?: string;
+  /**
+   * Passed through to the root. For the `data-*` a caller needs ON the element
+   * its own tests reach for — the AI panel's degraded state carries
+   * `data-ai-cause` beside its testid, and an E2E that reads both from one
+   * element cannot be given two.
+   */
+  rest?: HTMLAttributes<HTMLDivElement>;
 }
 
 export function EmptyState({
@@ -96,6 +108,7 @@ export function EmptyState({
   field = true,
   fill = false,
   testId,
+  rest,
 }: EmptyStateProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -113,6 +126,7 @@ export function EmptyState({
 
   return (
     <div
+      {...rest}
       className="myne-empty"
       data-variant={variant}
       data-size={size}
