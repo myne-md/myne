@@ -33,7 +33,9 @@ const PASSWORD = "correct horse battery staple";
 /** Walk Welcome to briefing to password to the phrase reveal. */
 async function reachPhraseStep(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create a vault" }).click();
+  // First run is identity-first (myne-md/myne#768): the vault path is the
+  // "Create a local vault instead" ghost button, not the old "Create a vault".
+  await page.getByRole("button", { name: "Create a local vault instead" }).click();
 
   // The briefing's three acknowledgements, clicked by TEXT: the rows are labels
   // wrapping a checkbox, and checking the input alone does not enable Continue.

@@ -30,8 +30,10 @@ test.describe("mobile create-vault onboarding", () => {
     await installMockIpc(page, { freshDevice: true });
     await page.goto("/");
 
-    // Welcome (fresh install, no vaults).
-    await page.getByRole("button", { name: "Create a vault" }).click();
+    // Welcome (fresh install, no vaults). First run is identity-first
+    // (myne-md/myne#768), so the vault door is the "Create a local vault
+    // instead" ghost button, beside the "Create an identity" primary.
+    await page.getByRole("button", { name: "Create a local vault instead" }).click();
 
     // Step 1 — safety briefing.
     await ackBriefing(page);

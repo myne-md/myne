@@ -70,6 +70,13 @@ const RENDERS_NOTHING = new Set([
   // The member-vault phrase unlock is substituted out for the same reason as
   // the member roster: a browser must not ship this credential path.
   join("web", "src", "components", "sync", "MemberVaultUnlockCard.tsx"),
+  // The identity setup dialog (myne-md/myne#768). It registers a person account
+  // at a sync server, and `plugin:sync|sync_person_setup` is `Class::Unsupported`
+  // on web, so the served bundle must not carry the real dialog: it renders
+  // `null`. `AccountBootstrap`, not `Welcome`, is the web first-run screen, so
+  // the substitution target is never reached either. See
+  // `web/vite.config.ts` SUBSTITUTED_MODULES.
+  join("web", "src", "components", "IdentitySetupDialog.tsx"),
   // Whole-vault migration is desktop-only, so its phrase credential is absent
   // from the browser bundle rather than merely unreachable.
   join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),
