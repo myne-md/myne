@@ -482,3 +482,59 @@ describe("ChatComposer", () => {
   });
 
 });
+
+describe("ChatComposer: the settings sit under the input", () => {
+  // They were two full-width rows ABOVE it, between the transcript and the
+  // thing the user came to type in — a quarter of a 280px panel spent on two
+  // choices almost nobody changes per message, read past on every visit.
+  //
+  // Nothing else reports the order: both arrangements render, both are
+  // reachable, and every other test in this file finds its control by testid
+  // regardless of where it sits. So the only way this stays fixed is to say so.
+
+  function order(a: string, b: string): boolean {
+    const first = screen.getByTestId(a);
+    const second = screen.getByTestId(b);
+    return (
+      (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    );
+  }
+
+  it("puts the scope and the permission mode after the composer input", () => {
+    mount();
+    expect(order("ai.composer-input", "ai.composer-scope"), "scope is above the input").toBe(
+      true,
+    );
+    expect(
+      order("ai.composer-input", "ai.composer-permission"),
+      "the permission mode is above the input",
+    ).toBe(true);
+  });
+
+  it("keeps the send control with the input, not with the settings", () => {
+    // The input and its Send are one act and stay one row. Only the settings
+    // moved — if Send had gone with them, typing and sending would be split by
+    // two dropdowns.
+    mount();
+    expect(order("ai.composer-input", "ai.composer-send")).toBe(true);
+    expect(order("ai.composer-send", "ai.composer-scope"), "Send fell below the settings").toBe(
+      true,
+    );
+  });
+
+  it("keeps the capability refusal above everything", async () => {
+    // The one thing that must be read BEFORE the next attempt: it is where a
+    // user finds out that agent mode is unavailable on the model they chose,
+    // and a notice below the composer is a notice read after the attempt it
+    // would have saved. It appears only once a probe has come back, so it takes
+    // a send to reach — which is the same path every other refusal case here
+    // uses.
+    agentCapability.mockResolvedValue(FAILING);
+    mount();
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(screen.getByTestId("ai.composer-unsupported")).toBeTruthy());
+    expect(order("ai.composer-unsupported", "ai.composer-input")).toBe(true);
+    expect(order("ai.composer-unsupported", "ai.composer-scope")).toBe(true);
+  });
+});
