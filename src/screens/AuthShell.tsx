@@ -83,12 +83,30 @@ const MAIN_STYLE: CSSProperties = {
   flex: 1,
   minHeight: 0,
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   // Symmetric with the header's inline padding so the centred column lines up
   // with the wordmark's margin at narrow widths.
   padding: "0 var(--space-7) var(--space-7)",
 };
+
+/**
+ * The two spacers that put a short screen in the UPPER THIRD instead of dead
+ * centre, in a `1 : 2` ratio above and below.
+ *
+ * **Spacers rather than a padding or a `vh` offset**, and the reason is what
+ * happens when the screen is NOT short. A `padding-block-end: 33vh` biases the
+ * block by taking that height away from the content box — so on a small window,
+ * or an unlock carrying a suspicion banner and an error, the column has a third
+ * less room to live in and `VIEW_STYLE`'s `max-height: 100%` clips it against a
+ * surface that does not scroll. These carry `flex-basis: 0`, so they take only
+ * free space: when there is none they collapse to nothing and the view has the
+ * whole region, exactly as it does on the centred variant. The bias is a
+ * preference, not a reservation.
+ */
+const SPACER_ABOVE_STYLE: CSSProperties = { flex: 1, minHeight: 0 };
+const SPACER_BELOW_STYLE: CSSProperties = { flex: 2, minHeight: 0 };
 
 const VIEW_STYLE: CSSProperties = {
   width: "100%",
@@ -105,12 +123,23 @@ const VIEW_STYLE: CSSProperties = {
 export function AuthShell({
   actions,
   enter = "forward",
+  align = "center",
   children,
   testId,
 }: {
   /** Top-right controls. Icon buttons — this is chrome, not a form. */
   actions?: ReactNode;
   enter?: AuthEnter;
+  /**
+   * Where the content column sits vertically.
+   *
+   * `center` for a screen whose content can be tall and unbounded — the vault
+   * picker, whose list is the only scrolling region on any of these surfaces.
+   * `upper` for a short, fixed form: dead-centring five short rows leaves a
+   * large empty band above them and reads as a dialog that lost its box, and
+   * the optical centre of a block of text is above the geometric one anyway.
+   */
+  align?: "center" | "upper";
   children: ReactNode;
   testId?: string;
 }) {
@@ -124,12 +153,14 @@ export function AuthShell({
         {actions != null && <div style={ACTIONS_STYLE}>{actions}</div>}
       </header>
       <main style={MAIN_STYLE}>
+        {align === "upper" && <div style={SPACER_ABOVE_STYLE} aria-hidden="true" />}
         {/* The animation is keyed off an attribute rather than a class alone so
             the two directions are one rule pair in `components.css` and the
             reduced-motion arm there covers both without knowing about either. */}
         <div className="myne-auth-view" data-enter={enter} style={VIEW_STYLE}>
           {children}
         </div>
+        {align === "upper" && <div style={SPACER_BELOW_STYLE} aria-hidden="true" />}
       </main>
     </div>
   );

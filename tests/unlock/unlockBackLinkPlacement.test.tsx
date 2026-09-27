@@ -138,4 +138,42 @@ describe("the way back sits with the question it answers", () => {
     );
     expect(group.querySelector("p"), "the subtitle is outside the group").not.toBeNull();
   });
+
+  it("sits in the upper third, and gives that bias up rather than clipping", async () => {
+    // Dead-centring five short rows leaves a large empty band above them.
+    // The bias is two flexible spacers in a 1:2 ratio, NOT a `vh` padding —
+    // which is the part worth pinning, because the two look identical on a
+    // roomy window and differ completely on a cramped one. A padding takes
+    // its height out of the content box, so an unlock carrying a suspicion
+    // banner and an error would have a third less room and clip against
+    // `max-height: 100%` on a surface that does not scroll. A `flex-basis: 0`
+    // spacer takes only FREE space and collapses to nothing when there is
+    // none.
+    const { container } = renderWithTwoVaults();
+    await screen.findByTestId("unlock.back-to-picker");
+    const main = container.querySelector("main") as HTMLElement;
+    const view = main.querySelector(".myne-auth-view") as HTMLElement;
+    expect(view, "no content column").not.toBeNull();
+
+    const kids = Array.from(main.children) as HTMLElement[];
+    expect(kids.length, "the bias is not two spacers around the column").toBe(3);
+    expect(kids[1]).toBe(view);
+    // The ratio, and its direction: more room below than above is what puts
+    // the block high. Equal spacers would just be centring again.
+    const above = Number(kids[0]!.style.flexGrow);
+    const below = Number(kids[2]!.style.flexGrow);
+    expect(above, "the spacer above does not grow").toBeGreaterThan(0);
+    expect(below, `${below} below vs ${above} above`).toBeGreaterThan(above);
+    // Basis zero, which is what makes the bias a preference rather than a
+    // reservation. `flex: 1` shorthand sets `flex-basis: 0%`.
+    expect(kids[0]!.style.flexBasis).toBe("0%");
+    expect(kids[2]!.style.flexBasis).toBe("0%");
+    // And no `vh` reservation crept back in beside them.
+    expect(main.style.paddingBlockEnd ?? "").not.toMatch(/vh/);
+    expect(main.style.padding ?? "").not.toMatch(/vh/);
+    // The spacers are decoration; a screen reader must not meet two blank
+    // groups on either side of the form.
+    expect(kids[0]!.getAttribute("aria-hidden")).toBe("true");
+    expect(kids[2]!.getAttribute("aria-hidden")).toBe("true");
+  });
 });
