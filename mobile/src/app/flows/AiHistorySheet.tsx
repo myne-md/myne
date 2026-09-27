@@ -136,6 +136,27 @@ export function AiHistorySheet({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /**
+   * The hub's filter (myne-md/myne#771 task 14).
+   *
+   * Client-side over the roster already in memory, exactly as the desktop hub
+   * does it: the catalog is small and a server-side search would be a second
+   * answer to a question one answer already covers.
+   */
+  const [query, setQuery] = useState("");
+  /**
+   * Which conversations this sheet is showing: the ones anchored to the open
+   * note, or every conversation in the vault.
+   *
+   * This is the mode control the task asks for, and it is about the ANCHOR
+   * rather than about a run's scope — which is the only reading the host
+   * permits. `defaultGrantFor` records why: a folder grant with an empty path
+   * IS the vault root, `is_root_grant` refuses one before resolving, and a
+   * client that offered "run on the whole vault" would be offering a Send that
+   * cannot work. So "on vault" here means a conversation that is about no
+   * particular note, which is exactly what an absent `note_id` is.
+   */
+  const [mode, setMode] = useState<"note" | "vault">("vault");
 
   async function refresh(): Promise<void> {
     try {
@@ -203,6 +224,17 @@ export function AiHistorySheet({
     }
   }
 
+  // What the list is actually showing: the mode narrows it to conversations
+  // anchored to a note, the query narrows it by title, and the two compose.
+  // Computed here rather than inside the render so the "filtered to nothing"
+  // branch and the list read the same array — two `.filter()` calls would be
+  // two chances for them to disagree about whether there is anything to show.
+  const q = query.trim().toLowerCase();
+  const visible = (rows ?? []).filter((r) => {
+    if (mode === "note" && (r.note_id === undefined || r.note_id === "")) return false;
+    return q === "" || r.title.toLowerCase().includes(q);
+  });
+
   return (
     <div
       role="dialog"
@@ -233,14 +265,64 @@ export function AiHistorySheet({
               {t("editor.chrome.rightPanel.aiChat.historyLoading")}
             </p>
           ) : null}
+          {rows !== null && rows.length > 0 ? (
+            <>
+              {/* The mode control. Two words, not an icon: on a phone this is
+                  the one thing that decides what the list means, and a glyph
+                  for "anchored to this note" is a glyph nobody can read. */}
+              <div
+                role="group"
+                aria-label={t("agent.hub.modeLabel")}
+                data-testid="ai.history-mode"
+                style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-3)" }}
+              >
+                {(["vault", "note"] as const).map((m) => (
+                  <Button
+                    key={m}
+                    variant={mode === m ? "primary" : "secondary"}
+                    full={false}
+                    data-testid={`ai.history-mode-${m}`}
+                    aria-pressed={mode === m}
+                    onClick={() => setMode(m)}
+                  >
+                    {m === "vault" ? t("agent.hub.modeVault") : t("agent.hub.modeNote")}
+                  </Button>
+                ))}
+              </div>
+              {/* A raw `<input>`: this tree has a `Button` primitive and no
+                  input one, so there is nothing to adopt. Recorded in
+                  `scripts/primitive-adoption.json` rather than converted, which
+                  is what that guard asks for when an element genuinely is not a
+                  primitive — the rename field two branches down is the same
+                  case and has been for as long as this sheet has existed. */}
+              <input
+                type="search"
+                data-testid="ai.history-search"
+                aria-label={t("agent.hub.searchLabel")}
+                placeholder={t("agent.hub.searchPlaceholder")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ width: "100%", marginBottom: "var(--space-3)" }}
+              />
+            </>
+          ) : null}
           {rows !== null && rows.length === 0 ? (
             <p data-testid="ai.history-empty" style={META}>
               {t("editor.chrome.rightPanel.aiChat.historyEmpty")}
             </p>
           ) : null}
-          {rows !== null && rows.length > 0 ? (
+          {rows !== null && rows.length > 0 && visible.length === 0 ? (
+            // Filtered to nothing is NOT an empty vault, and the distinction is
+            // the same one the desktop hub draws: this state echoes what was
+            // typed and offers the way back, where the empty one above explains
+            // what would put something here.
+            <p data-testid="ai.history-no-match" style={META}>
+              {t("agent.hub.noMatchTitle")}
+            </p>
+          ) : null}
+          {rows !== null && visible.length > 0 ? (
             <div data-testid="ai.conversation-list">
-              {rows.map((row) => (
+              {visible.map((row) => (
                 <div
                   key={row.id}
                   data-testid="ai.conversation-row"
@@ -311,6 +393,18 @@ export function AiHistorySheet({
                       >
                         {row.title}
                       </button>
+                      {row.note_id !== undefined && row.note_id !== "" ? (
+                        // The anchor, as the shared chiplet the desktop hub
+                        // uses. What makes "about this note" legible in a list
+                        // where every other row is about the vault.
+                        <span
+                          className="myne-chiplet"
+                          data-testid="ai.conversation-anchor"
+                          data-note-id={row.note_id}
+                        >
+                          {t("agent.hub.anchorLabel")}
+                        </span>
+                      ) : null}
                       <span style={ROW_META}>
                         {formatRelativeTime(new Date(row.updated_at))}
                       </span>

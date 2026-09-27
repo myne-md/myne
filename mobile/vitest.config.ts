@@ -91,6 +91,7 @@ export default defineConfig({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      { find: /^@myne\/run-orb$/, replacement: sib("../src/notes/agent/AgentRunOrb.tsx") },
       // The last-run undo's LOGIC, shared rather than retyped. Its own header is
       // the argument: it carries three recorded defect fixes, each invisible
       // until it happens to a user, and it imports neither client's bindings:

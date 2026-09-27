@@ -34,6 +34,7 @@ import { providerLabelOf } from "@myne/copy";
 import { normalizeProviderError, providerErrorKey } from "@myne/engine-error";
 import type { ProviderErrorCause } from "@myne/engine-error";
 import { RunCostLine } from "@myne/run-cost-line";
+import { AgentRunOrb } from "@myne/run-orb";
 import {
   beginRun,
   currentRunEpoch,
@@ -792,7 +793,22 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           )}
 
           {agent.running && (
-            <p data-testid="ai.agent-working" style={MUTED}>
+            // The run indicator, the SAME component the desktop tab carries
+            // (`@myne/run-orb`, myne-md/myne#771 task 14). It is a named
+            // motion-canon exemption and every condition that exemption rests
+            // on is a property of the implementation, so a second copy here
+            // would be a second place for one of them to go missing — on the
+            // client where an unpaused loop costs a battery rather than a fan.
+            //
+            // It sits INSIDE the existing line rather than replacing it: the
+            // orb is `aria-hidden`, so the word is what carries the meaning,
+            // and moving the word out to make room for a mark would be the one
+            // change that breaks the exemption.
+            <p
+              data-testid="ai.agent-working"
+              style={{ ...MUTED, display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+            >
+              <AgentRunOrb />
               {t("agent.progress.working")}
             </p>
           )}
