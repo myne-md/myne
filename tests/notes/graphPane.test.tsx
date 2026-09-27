@@ -321,14 +321,32 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     );
 
     // Apply the tag filter: the tag view is notes-only BY DESIGN, so no hubs.
-    const select = screen.getByTestId("editor.graph-filter");
-    fireEvent.change(select, { target: { value: "tag:work" } });
+    //
+    // Driven as the shared `<Select>` rather than a native one since
+    // myne-md/myne#772: the trigger is a `role="combobox"` button and the
+    // options live in a portal that only exists while it is open. The native
+    // element was also the reason this control ignored the design system's
+    // padding — it could not take it.
+    const openFilter = (): void => {
+      fireEvent.click(screen.getByTestId("editor.graph-filter"));
+    };
+    const pickFilter = (value: string): void => {
+      openFilter();
+      const option = document
+        .querySelectorAll(`[data-testid="editor.graph-filter-option"]`);
+      const match = Array.from(option).find(
+        (el) => el.getAttribute("data-value") === value,
+      );
+      expect(match, `no filter option for ${value}`).toBeTruthy();
+      fireEvent.click(match as Element);
+    };
+    pickFilter("tag:work");
     await waitFor(() =>
       expect(pane.getAttribute("data-tag-node-count")).toBe("0"),
     );
 
     // …and back to All. The hubs have to come back.
-    fireEvent.change(select, { target: { value: "" } });
+    pickFilter("");
     await waitFor(() =>
       expect(pane.getAttribute("data-tag-node-count")).toBe("1"),
     );
@@ -339,13 +357,18 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     // thing; the chip is gone and the dropdown opens on All.
     render(<GraphPane />);
     await settledPane();
-    const select = screen.getByTestId("editor.graph-filter");
-    const options = Array.from(select.querySelectorAll("option")).map((o) =>
-      o.getAttribute("value"),
-    );
-    expect(options[0]).toBe("");
-    // `value` is a DOM property on a select, not an attribute.
-    expect((select as HTMLSelectElement).value).toBe("");
+    const trigger = screen.getByTestId("editor.graph-filter");
+    // The trigger shows the CURRENT option's label, which is how the shared
+    // Select reports its value — there is no `.value` property to read, and
+    // that is the point: a native select silently falls back to its first
+    // option when the value matches none, which is exactly the lie this
+    // control used to be able to tell.
+    expect(trigger.textContent).toContain("All");
+    fireEvent.click(trigger);
+    const values = Array.from(
+      document.querySelectorAll('[data-testid="editor.graph-filter-option"]'),
+    ).map((o) => o.getAttribute("data-value"));
+    expect(values[0]).toBe("");
   });
 
   it("puts the controls on their own line in LIST mode, so nothing overlaps the rows", async () => {
