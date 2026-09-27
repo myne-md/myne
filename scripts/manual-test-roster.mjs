@@ -202,7 +202,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/notes/agent/AgentPane.tsx",
       "src/notes/agent/AgentHubList.tsx",
-      "src/notes/agent/AgentFocusView.tsx",
+      "src/notes/agent/AgentConversationView.tsx",
       "src/notes/agent/AgentRunOrb.tsx",
       "src/notes/ai/ConversationSurface.tsx",
       "src/notes/tabKinds.ts",
@@ -233,6 +233,13 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 10,
         tier: "core",
+      },
+      {
+        see: "Make the agent tab narrow — split the pane until it is under about half the window — and confirm the layout answers. The history rail and the conversation must not both be squeezed into unusable columns: one of them gives way, a control appears to switch between them, and the history is still REACHABLE rather than gone. Widen it again and confirm both come back with no reflow of the header. Do the same by resizing the WINDOW rather than the pane, and confirm the answer is the same — the threshold is the pane's width, not the window's.",
+        whyNotAutomated: "The switch is a CSS container query on the pane, and jsdom implements neither container queries nor layout, so no unit test can reach the narrow arm at all: it can assert the attribute the rule keys off and nothing about what the rule then does. The E2E container runs one fixed window size, and the failure being looked for is a layout that is technically present and practically unusable, which is a judgement about whether two columns can be read rather than whether they exist.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
       },
       {
         see: "Open the agent tab beside a note (split the pane), start a run, and type in the note while the run works. Confirm typing stays responsive and the caret never jumps. Then switch the tab between hub and focus several times while the run is going and confirm the run keeps running rather than restarting, the indicator keeps moving, and the conversation does not lose its scroll position.",

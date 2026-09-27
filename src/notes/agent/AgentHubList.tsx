@@ -102,22 +102,18 @@ const LIST_STYLE: CSSProperties = {
 
 
 export interface AgentHubListProps {
-  /** Open a conversation in the tab's Focus view — an existing one by id, or a
-   *  NEW one by passing neither. The pane owns the workspace write, so the Hub
-   *  does not reach into it. */
+  /** Open an existing conversation in the main column. The pane owns the
+   *  workspace write, so the rail does not reach into it. */
   onOpenFocus: (next: { conversationId?: string }) => void;
-  /**
-   * The note a new conversation would be about, or `null` when none is open.
-   *
-   * The Hub has to know, because starting a conversation is not always
-   * possible: an agent run needs a scope, `defaultGrantFor` resolves that to
-   * the open note or to `null`, and the host REFUSES a vault-wide grant
-   * outright (`is_root_grant`). So with no note open there is nothing a new
-   * conversation could run against, and the honest surface says which of the
-   * two situations the user is in rather than offering a control that silently
-   * does nothing.
-   */
-  focusedNoteId?: string | null;
+  /** Start a fresh conversation. Separate from `onOpenFocus` because they are
+   *  different acts: one selects, the other creates, and collapsing them into
+   *  "open with no id" is how a New-chat button ends up reopening the last one. */
+  onNewConversation?: () => void;
+  /** The conversation currently in the main column, so the rail can mark it.
+   *  Read from the WORKSPACE rather than from the chat store: the store's
+   *  active id is the live transcript, which lags a selection by a round trip
+   *  and would leave the rail highlighting the previous row mid-switch. */
+  activeConversationId?: string | null;
   /** Open the note a conversation is anchored to, in the workspace. */
   onOpenNote?: (noteId: string) => void;
   /** Folders the composer can attach as a run scope (passed through to Focus). */
@@ -130,8 +126,9 @@ export interface AgentHubListProps {
 
 export function AgentHubList({
   onOpenFocus,
+  onNewConversation,
+  activeConversationId = null,
   onOpenNote,
-  focusedNoteId = null,
 }: AgentHubListProps) {
   const { t } = useTranslation();
   const { locale, timeZone } = useDateTimeDisplay();
@@ -154,7 +151,9 @@ export function AgentHubList({
    * erases itself races the reader that is announcing it.
    */
   const [announcement, setAnnouncement] = useState("");
-  const activeId = getActiveConversationId();
+  // The workspace's selection when the pane supplies one, the live transcript
+  // otherwise (the light panel mounts this list with neither).
+  const activeId = activeConversationId ?? getActiveConversationId();
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -265,20 +264,15 @@ export function AgentHubList({
         variant="firstRun"
         icon="message-square"
         size="sm"
-        fill
         title={t("agent.hub.emptyTitle")}
-        body={
-          focusedNoteId === null
-            ? t("agent.hub.emptyNeedsNote")
-            : t("agent.hub.emptyBody")
-        }
+        body={t("agent.hub.emptyBody")}
         testId="agent.hub-empty"
         action={
-          focusedNoteId === null ? undefined : (
+          onNewConversation === undefined ? undefined : (
             <Button
               variant="primary"
               icon="plus"
-              onClick={() => onOpenFocus({})}
+              onClick={onNewConversation}
               data-testid="agent.hub-new"
             >
               {t("agent.hub.newConversation")}
@@ -327,11 +321,16 @@ export function AgentHubList({
           Conditional on a note being open for the same reason the empty
           state's action is: a run needs a scope the host will accept, and with
           no note open there is none. */}
-      {focusedNoteId !== null && (
+      {/* New chat, unconditional. It was gated on a note being open, because
+          starting one meant opening a view that needed a scope; a conversation
+          is its own subject now, and what still needs a note is SENDING, which
+          the composer refuses on its own. Gating the button here refused the
+          screen one layer too early. */}
+      {onNewConversation !== undefined && (
         <Button
           variant="secondary"
           icon="plus"
-          onClick={() => onOpenFocus({})}
+          onClick={onNewConversation}
           data-testid="agent.hub-new"
         >
           {t("agent.hub.newConversation")}

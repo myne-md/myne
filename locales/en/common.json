@@ -46,7 +46,8 @@
       "noMatchBody": "No conversation matches “{{query}}”. Clear the search to see them all.",
       "emptyBody": "Ask the agent to change or create notes. Every conversation you start is listed here, including the ones tied to a single note.",
       "emptyNeedsNote": "A run works on notes you choose, so a conversation starts from one. Open a note, then come back — or use the AI panel beside it.",
-      "newConversation": "New conversation"
+      "newConversation": "New conversation",
+      "historyLabel": "History"
     },
     "focus": {
       "title": "Agent on note",

@@ -48,6 +48,7 @@ import {
   attachmentsItem,
   templatesItem,
   agentItem,
+  agentViewToPersisted,
   AGENT_TAB_ID,
   listSlots,
   noteItem,
@@ -692,9 +693,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const wasPending = pendingRef.current;
       setPending(null);
       setState((s) => {
-        const item: WorkspaceItem = view === null
+        // `agentViewToPersisted` decides whether there is anything to carry, so
+        // the omit-when-default rule lives in ONE place rather than being
+        // re-derived from a discriminator here. It returned `undefined` for
+        // everything but a Focus-with-a-note when the tab had two views; now it
+        // returns `undefined` only for a genuinely empty selection.
+        const persisted = view === null ? undefined : agentViewToPersisted(view);
+        const item: WorkspaceItem = persisted === undefined
           ? agentItem()
-          : { kind: "agent", id: AGENT_TAB_ID, ...(view.view === "focus" ? { agentView: view } : {}) };
+          : { kind: "agent", id: AGENT_TAB_ID, agentView: persisted };
         return wasPending !== null && wasPending === s.focusedPaneId
           ? openInNewTab(s, item)
           : openInFocusedTab(s, item);
@@ -706,13 +713,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const openAgentOnNote = useCallback(
     (noteId?: NoteId) => {
       // The caller (a palette action) passes the open note from its own
-      // `CommandContext`. A call with no note is a call with nothing to focus,
-      // so it lands on the Hub rather than a Focus with no note behind it.
+      // `CommandContext`. A call with no note still opens the tab — a
+      // conversation about the vault rather than one note is a normal state
+      // since the two views became one screen, and refusing here used to send
+      // the user to a list with no way onward.
       if (noteId === undefined || noteId === "") {
         openAgentInternal(null);
         return;
       }
-      openAgentInternal({ view: "focus", noteId });
+      openAgentInternal({ noteId });
     },
     [openAgentInternal],
   );

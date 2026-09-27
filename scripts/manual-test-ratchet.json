@@ -655,7 +655,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11146,
+  "totalMinutesCeiling": 11164,
   "gatedMinutes": 3837,
   "$comment5": [
     "CEILING RAISED 11076 -> 11146 by myne-md/myne#771, in the sanctioned direction.",
@@ -702,5 +702,31 @@
     "memory are all e2e/agent-hub.e2e.ts, and the surface's axe pass is AXS-6 in",
     "e2e/a11y-axe-surfaces.e2e.ts. A machine can honestly judge every one of them,",
     "so none of them is a manual item."
+  ],
+  "$comment6": [
+    "CEILING RAISED 11146 -> 11164 by myne-md/myne#771, in the sanctioned direction.",
+    "Eighteen minutes, one item, on the agent tab becoming ONE screen rather than",
+    "two views (design-notes/ai/0623): the history rail sits beside the open",
+    "conversation, and below roughly half a window of pane the two columns cannot",
+    "both be used, so one gives way.",
+    "",
+    "The item asks a person to narrow the pane and answer whether the layout",
+    "answers: whether the history is still REACHABLE rather than gone, whether the",
+    "header reflows crossing the threshold, and whether the pane's width decides it",
+    "rather than the window's.",
+    "",
+    "It is a manual item because the switch is a CSS CONTAINER QUERY, and nothing",
+    "in this repository can render one. jsdom implements neither container queries",
+    "nor layout, so a unit test can assert the attribute the rule keys off and",
+    "nothing whatever about what the rule then does \u2014 the three tests that exist",
+    "for it say the toggle is mounted, carries `aria-expanded` and flips an",
+    "attribute, all of which would still pass with the stylesheet deleted. The E2E",
+    "container runs at one fixed window size and could not vary the pane anyway.",
+    "",
+    "And the failure being looked for is not a missing element. It is a layout that",
+    "is technically present and practically unusable: two columns each too narrow",
+    "to read, which is a judgement rather than an assertion. The window-versus-pane",
+    "half is the part most likely to be got wrong by a later edit, because a",
+    "viewport media query looks identical until somebody splits the pane."
   ]
 }

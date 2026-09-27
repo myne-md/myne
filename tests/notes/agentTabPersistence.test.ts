@@ -72,51 +72,86 @@ describe("the tab kind itself", () => {
 });
 
 describe("omit-when-default", () => {
+  // The `view` discriminator is gone: the tab was a Hub-or-Focus mode and is
+  // one screen now (`design-notes/ai/0623`), so what is persisted is WHICH
+  // conversation is open rather than which of two views. The two keys are
+  // independent, which the old shape could not express — it dropped both
+  // unless a note was present, because "Focus with no note" was incoherent.
+
   it("a fresh agent tab carries no view key", () => {
     expect(tab(withAgentTab()).agentView).toBeUndefined();
   });
 
-  it("a Hub view drops the key, so the tab stays byte-identical to pre-kind", () => {
-    const s = roundTrip(
-      setAgentViewState(withAgentTab(), "p1", { view: "hub" }),
-    );
+  it("an empty selection drops the key, so the tab stays byte-identical to pre-kind", () => {
+    const s = roundTrip(setAgentViewState(withAgentTab(), "p1", {}));
     expect(tab(s).agentView).toBeUndefined();
   });
 
-  it("a Focus with no note is incoherent, so it drops too", () => {
+  // The three below drive `setAgentViewState` — the WRITER — where the round
+  // trips further down drive the parser. They are different code paths and the
+  // tests had only the second: injecting the old "drop unless a note is
+  // present" rule back into `agentViewToPersisted` passed every test in this
+  // file, because nothing here had ever called it with a conversation and no
+  // note. The writer is the half a user's selection actually goes through.
+
+  it("the WRITER keeps a conversation with no note", () => {
     const s = roundTrip(
-      setAgentViewState(withAgentTab(), "p1", { view: "focus" }),
+      setAgentViewState(withAgentTab(), "p1", { conversationId: "c-7" }),
     );
-    expect(tab(s).agentView).toBeUndefined();
+    expect(tab(s).agentView).toEqual({ conversationId: "c-7" });
   });
 
-  it("a Focus view round-trips its note and conversation", () => {
+  it("the WRITER keeps a note with no conversation", () => {
+    const s = roundTrip(setAgentViewState(withAgentTab(), "p1", { noteId: "n-42" }));
+    expect(tab(s).agentView).toEqual({ noteId: "n-42" });
+  });
+
+  it("the WRITER keeps both", () => {
+    const s = roundTrip(
+      setAgentViewState(withAgentTab(), "p1", { noteId: "n-42", conversationId: "c-7" }),
+    );
+    expect(tab(s).agentView).toEqual({ noteId: "n-42", conversationId: "c-7" });
+  });
+
+  it("round-trips a conversation and its note", () => {
     const item: WorkspaceItem = {
       kind: "agent",
       id: AGENT_TAB_ID,
-      agentView: { view: "focus", noteId: "n-42", conversationId: "c-7" },
+      agentView: { noteId: "n-42", conversationId: "c-7" },
     };
     const s = roundTrip(openInFocusedTab(emptyWorkspace("p1"), item));
-    expect(tab(s).agentView).toEqual({
-      view: "focus",
-      noteId: "n-42",
-      conversationId: "c-7",
-    });
+    expect(tab(s).agentView).toEqual({ noteId: "n-42", conversationId: "c-7" });
   });
 
-  it("a Focus view with no conversation omits the field", () => {
+  it("round-trips a VAULT-GENERAL conversation, which has no note at all", () => {
+    // The state the old shape could not hold: a conversation about the vault
+    // rather than one note. `agentViewToPersisted` dropped it entirely, so
+    // reopening the tab landed on a list instead of the chat you were in.
     const item: WorkspaceItem = {
       kind: "agent",
       id: AGENT_TAB_ID,
-      agentView: { view: "focus", noteId: "n-42" },
+      agentView: { conversationId: "c-7" },
     };
     const s = roundTrip(openInFocusedTab(emptyWorkspace("p1"), item));
-    expect(tab(s).agentView).toEqual({ view: "focus", noteId: "n-42" });
+    expect(tab(s).agentView).toEqual({ conversationId: "c-7" });
+  });
+
+  it("round-trips a fresh conversation that is ABOUT a note", () => {
+    // The other half the old shape could not hold on its own: no conversation
+    // id yet, but a subject. A reload lands on the same subject rather than on
+    // nothing.
+    const item: WorkspaceItem = {
+      kind: "agent",
+      id: AGENT_TAB_ID,
+      agentView: { noteId: "n-42" },
+    };
+    const s = roundTrip(openInFocusedTab(emptyWorkspace("p1"), item));
+    expect(tab(s).agentView).toEqual({ noteId: "n-42" });
   });
 });
 
 describe("degrade-don't-error", () => {
-  it("an unknown view name degrades to the Hub rather than rejecting the blob", () => {
+  it("an unknown view name is ignored rather than rejecting the blob", () => {
     const descriptor = JSON.stringify({
       root: {
         kind: "leaf",
@@ -131,7 +166,8 @@ describe("degrade-don't-error", () => {
     });
     const parsed = deserializeWorkspace(descriptor);
     expect(parsed).not.toBeNull();
-    // The agent tab is still there, on the Hub, and the sibling note survived.
+    // The agent tab is still there, on a fresh conversation, and the sibling
+    // note survived.
     const leaf = parsed!.root as { tabs: WorkspaceItem[] };
     expect(leaf.tabs.find((t) => t.kind === "agent")).toEqual({
       kind: "agent",
@@ -140,7 +176,7 @@ describe("degrade-don't-error", () => {
     expect(leaf.tabs.some((t) => t.kind === "note")).toBe(true);
   });
 
-  it("a Focus with no note id is incoherent and degrades to the Hub", () => {
+  it("an agentView carrying only the retired discriminator drops to nothing", () => {
     const descriptor = JSON.stringify({
       root: {
         kind: "leaf",
@@ -154,6 +190,37 @@ describe("degrade-don't-error", () => {
     expect(parsed).not.toBeNull();
     const leaf = parsed!.root as { tabs: Array<Record<string, unknown>> };
     expect(leaf.tabs[0]).toEqual({ kind: "agent", id: AGENT_TAB_ID });
+  });
+
+  it("a descriptor from the two-view build keeps the conversation it had open", () => {
+    // The migration that matters, and the one a reader can get wrong: the old
+    // reader required `view === "focus"` before it would take the keys, so a
+    // parser that kept that check would SILENTLY discard the conversation a
+    // user had open across the change. The discriminator is ignored; the two
+    // keys beside it mean here exactly what they meant there.
+    const descriptor = JSON.stringify({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [
+          {
+            kind: "agent",
+            id: AGENT_TAB_ID,
+            agentView: { view: "focus", noteId: "n-42", conversationId: "c-7" },
+          },
+        ],
+        activeTab: { kind: "agent", id: AGENT_TAB_ID },
+      },
+      focusedPaneId: "p1",
+    });
+    const parsed = deserializeWorkspace(descriptor);
+    expect(parsed).not.toBeNull();
+    const leaf = parsed!.root as { tabs: Array<Record<string, unknown>> };
+    expect(leaf.tabs[0]).toEqual({
+      kind: "agent",
+      id: AGENT_TAB_ID,
+      agentView: { conversationId: "c-7", noteId: "n-42" },
+    });
   });
 
   it("junk in agentView does not lose the other tabs", () => {
