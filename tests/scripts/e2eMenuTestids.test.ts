@@ -39,13 +39,16 @@ afterEach(() => {
  *  `--scan <dir>` resolves it without weakening anything: the walk is the same
  *  code over the same shape, it just starts in a directory only this test can
  *  see. Same seam as `check-twin-inventory.mjs --roots`. */
-function runWith(body: string): { code: number; out: string } {
+function runWith(
+  body: string,
+  extraArgs: readonly string[] = [],
+): { code: number; out: string } {
   scratch = mkdtempSync(join(tmpdir(), "e2e-menu-testids-"));
   mkdirSync(join(scratch, "e2e"), { recursive: true });
   probe = join(scratch, "e2e", "_guard-probe.e2e.ts");
   writeFileSync(probe, body, "utf8");
   try {
-    const out = execFileSync("node", [GUARD, "--scan", scratch], {
+    const out = execFileSync("node", [GUARD, "--scan", scratch, ...extraArgs], {
       encoding: "utf8",
       cwd: ROOT,
     });
@@ -89,9 +92,20 @@ describe("check-e2e-menu-testids, the submenu rule", () => {
   it("still catches what it caught before, the `+` menu rule", () => {
     // The other direction, which myne-md/myne#411 records as the one nobody
     // thinks to try: closing one blind spot while opening another.
-    const r = runWith('const X = testIdSelector("notes.create");\n');
+    //
+    // Driven through `--menu-only`, because the production roster is EMPTY: the
+    // three create actions are direct icon buttons again, so rule 1 has no
+    // subjects. Asserting against the empty roster would test that nothing
+    // happens and the injection would PASS — the vacuous shape this repo keeps
+    // finding in its own tests. The seam keeps the rule's logic under test for
+    // the whole period it has no subjects, so when the actions go behind a menu
+    // a third time the machinery is known to work rather than hoped to.
+    const r = runWith('const X = testIdSelector("notes.create");\n', [
+      "--menu-only",
+      "notes.create",
+    ]);
     expect(r.code).not.toBe(0);
-    expect(r.out).toContain("clickNewMenuItem");
+    expect(r.out).toContain("clickNewItem");
   });
 
   it("is clean on the tree as it stands", () => {

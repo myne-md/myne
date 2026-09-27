@@ -8,26 +8,29 @@
 // Which is the other half of why it exists. `palette.toggle` lived only in
 // `bindableCatalog.ts` as a keybinding, so a user who did not already know
 // `Mod-K` could not reach the palette at all — and therefore could not reach
-// any palette-only command. #773 registered `palette.open` as a ribbon-eligible
-// action; this is the same command from the surface people actually look at
-// while deciding what to do next.
+// any palette-only command.
 //
-// It runs the command through `ribbonCommands` rather than owning any palette
-// state: the palette lives in a sibling subtree, and the rail solved this
-// already.
+// ── Quiet, not boxed ───────────────────────────────────────────────────────
+// It draws no border and no fill at rest. A bordered field here competed with
+// the vault picker directly above it and with the tree directly below, on the
+// narrowest surface in the app, and the border was doing no work: the row is
+// the full width of its column and the magnifier already says what it is. The
+// hover fill is the affordance.
+//
+// The chord lives in the TOOLTIP rather than as inline keycaps, for the same
+// reason: two keycaps at the end of a 200px row is most of the row's remaining
+// space spent on a hint the user needs once. Hovering still teaches it.
 
 import { useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
-import { Keycaps } from "../../components/primitives/Keycaps";
+import { Tooltip } from "../../components/primitives/Tooltip";
 import { BINDABLE_COMMANDS } from "../../commands/bindableCatalog";
 import { effectiveChords } from "../../commands/keymap";
 import { usePrefs } from "../../hooks/usePrefs";
 import { ribbonCommands } from "../ribbonCommands";
 import { hoverSurface, HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
 
-/** Quiet field-shaped affordance: it reads as a search box, and it is a button,
- *  because pressing it opens the palette rather than focusing an input here. */
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -35,9 +38,9 @@ const ROW_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
   height: 28,
-  padding: "0 var(--space-2)",
+  padding: "0 var(--space-1)",
   background: "transparent",
-  border: "1px solid var(--line-1)",
+  border: 0,
   borderRadius: "var(--radius-2)",
   color: "var(--fg-3)",
   fontFamily: "var(--font-sans)",
@@ -61,9 +64,8 @@ export function SidebarSearchRow() {
 
   // The LIVE chord, not the in-code default. `palette.toggle` is rebindable, so
   // a hint read from `defaultBindings` would keep promising ⌘K to somebody who
-  // had moved it — and a keycap that lies is worse than no keycap, which is why
-  // the hint is omitted entirely rather than guessed when the command is
-  // unbound.
+  // had moved it — and a tooltip that lies is worse than no tooltip, which is
+  // why an unbound command gets none rather than a guess.
   const chord = useMemo(() => {
     const defaults: Record<string, string[]> = {};
     for (const c of BINDABLE_COMMANDS) defaults[c.id] = c.defaultBindings;
@@ -71,16 +73,17 @@ export function SidebarSearchRow() {
   }, [prefs.keymap]);
 
   return (
-    <button
-      type="button"
-      data-testid="notes.sidebar-search"
-      style={ROW_STYLE}
-      {...hoverSurface({ hoverBg: "var(--bg-3)" })}
-      onClick={() => ribbonCommands.run?.("palette.open")}
-    >
-      <Icon name="search" size={14} />
-      <span style={LABEL_STYLE}>{t("notes.list.search")}</span>
-      {chord !== undefined && <Keycaps chord={chord} />}
-    </button>
+    <Tooltip label={t("notes.list.search")} kbd={chord} placement="bottom">
+      <button
+        type="button"
+        data-testid="notes.sidebar-search"
+        style={ROW_STYLE}
+        {...hoverSurface({ hoverBg: "var(--bg-3)" })}
+        onClick={() => ribbonCommands.run?.("palette.open")}
+      >
+        <Icon name="search" size={14} />
+        <span style={LABEL_STYLE}>{t("notes.list.search")}</span>
+      </button>
+    </Tooltip>
   );
 }

@@ -353,7 +353,7 @@
   between), which is a stuck wait, not a loaded host. It was never visible
   because `retry: 2` rescued the second attempt and the suite reported green —
   the failing attempt never reached a report at all. The cause was
-  `flows.ts::clickNewMenuItem` firing the `+` trigger ONCE and then waiting the
+  `flows.ts::clickNewItem` firing the `+` trigger ONCE and then waiting the
   full budget on the dropdown, with nothing to re-click when that click missed;
   it now re-clicks until the menu is actually up. 75 of the 123 spec files reach
   that helper, which is why the victim was a different scenario every run, and
@@ -440,7 +440,7 @@
   because the fresh-vault importer OVERLAY came back and swallowed the click.
 - **A raw `.click()` followed by a wait is the single most common shape behind a
   timeout that reads like a dead surface**, and it kept being written after
-  `clickNewMenuItem` had already been fixed for it. `eo1` and `za1` both clicked
+  `clickNewItem` had already been fixed for it. `eo1` and `za1` both clicked
   a widget control once and then waited 45 s for a surface that a missed click
   can never produce. `clickByTestId` hit-tests and scrolls the control into its
   own container; wrapping it in a re-click loop keyed on the surface appearing is

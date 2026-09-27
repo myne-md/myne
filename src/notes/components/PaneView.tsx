@@ -1596,7 +1596,36 @@ export function PaneView({
     // and the word, and a second copy directly beneath it was the surface
     // announcing itself twice.
     if (isAttachments) {
-      return { fill: true, gutters: false, el: <AttachmentsLibrary /> };
+      return {
+        fill: true,
+        gutters: false,
+        // The flex COLUMN is load-bearing and its absence was a real bug: the
+        // library scrolled nowhere as a tab (reported on the running build).
+        //
+        // A filling body is wrapped in `<div style={{ height: "100%" }}>`, which
+        // is a BLOCK. The library is written as a flex child — its root is
+        // `flex: 1; minHeight: 0` and its scroller is `flex: 1; minHeight: 0;
+        // overflowY: auto` — so with no flex parent neither gets a bounded
+        // height, the root grows to content, and the scroller has nothing to
+        // scroll inside. `GraphPane` never exposed this because a canvas fills
+        // `height: 100%` on its own.
+        //
+        // Fixed here rather than by making the generic wrapper a flex column,
+        // which would change the height regime under the graph and the task
+        // list too — a wider blast radius than the bug warrants.
+        el: (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minHeight: 0,
+            }}
+          >
+            <AttachmentsLibrary />
+          </div>
+        ),
+      };
     }
     // The template library (myne-md/myne#779). Gutters STAY: unlike the graph
     // and the attachment grid, this is a text list, and a text list 8px from

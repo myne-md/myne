@@ -39,7 +39,7 @@ import { join } from "node:path";
 import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
-  clickNewMenuItem,
+  clickNewItem,
   clickRibbonUntilVisible,
   clickUntilVisible,
   closeSettings,
@@ -114,7 +114,7 @@ async function createNote(session: Session, title: string): Promise<void> {
   await sleep(500); // let any prior autosave/remount finish
   let field: Element | null = null;
   for (let attempt = 0; attempt < 3 && !field; attempt++) {
-    await clickNewMenuItem(session, "notes.create");
+    await clickNewItem(session, "notes.create");
     try {
       field = await session.byTestId("editor.frontmatter-title", { timeoutMs: 4000 });
     } catch {
@@ -130,7 +130,7 @@ async function createNote(session: Session, title: string): Promise<void> {
 /** Create a top-level folder named `name`. Enter commits the name input;
  *  then wait for at least one folder row to materialize. */
 async function createFolder(session: Session, name: string): Promise<void> {
-  await clickNewMenuItem(session, "notes.new-folder");
+  await clickNewItem(session, "notes.new-folder");
   await (await session.byTestId("notes.new-folder-input")).sendKeys(name + ENTER);
   await session.byTestId("notes.folder-row", { timeoutMs: 10000 });
 }
