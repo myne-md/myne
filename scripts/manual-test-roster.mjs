@@ -197,6 +197,54 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "ai.agent-hub",
+    title: "Agent hub and focus (the deep agent tab)",
+    paths: [
+      "src/notes/agent/AgentPane.tsx",
+      "src/notes/agent/AgentHubList.tsx",
+      "src/notes/agent/AgentFocusView.tsx",
+      "src/notes/agent/AgentRunOrb.tsx",
+      "src/notes/ai/ConversationSurface.tsx",
+      "src/notes/tabKinds.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: [
+      "e2e/agent-hub.e2e.ts",
+      "e2e/a11y-axe-surfaces.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "Start an agent run with the hub tab open and WATCH the run indicator for a full minute. It must move continuously without drawing the eye away from the text you are reading: if you find yourself looking at it rather than at the conversation, it is too strong. Switch to another application and back, and confirm it is still there and still moving rather than having vanished or restarted. Then turn on the OS reduce-motion setting and confirm it holds still while the word beside it still says the run is working — a stopped mark with no word beside it reads as a crash, which is the failure this item exists to catch.",
+        whyNotAutomated: "Whether a moving mark is calm or distracting is a judgement about a person's attention over a minute of reading, and there is no assertion for it — the unit tests pin that the animation exists, is bounded, pauses and stops, which is the mechanism rather than the effect. The reduce-motion half needs the OS setting, and no lane in this tree renders a page under one: tests/a11y runs in jsdom, which computes no layout and honours no media query, and the E2E container has no accessibility settings to change.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        see: "With Windows high-contrast mode on, open the agent tab and confirm three things are visible: the run indicator (it must be a shape rather than an empty gap), the hub row you are on, and the anchor chip on an anchored conversation. Then tab through the hub with the keyboard only and confirm the focus ring lands somewhere visible on every stop, including the rename and delete controls inside a row.",
+        whyNotAutomated: "forced-colors strips every background and box-shadow, and no gate in this tree has ever rendered a page under it: the axe scenario runs in a Linux container against WebKitGTK, which does not implement the Windows high-contrast mapping at all. The stylesheet carries forced-colors arms and the unit tests assert they are PRESENT, which says nothing about what the platform then paints.",
+        clients: ["desktop-windows"],
+        estimateMin: 8,
+        tier: "core",
+      },
+      {
+        see: "With a screen reader running (VoiceOver on macOS, NVDA on Windows), open the agent hub and rename a conversation, then delete one. Confirm you HEAR what happened both times without moving focus to find out. Open a conversation into focus and confirm the reader announces arriving somewhere new rather than going silent, then use the back control and confirm the same. Finally confirm the run indicator is never announced — it is decoration, and the word beside it is what carries the meaning.",
+        whyNotAutomated: "A live region's whole job is what a screen reader decides to announce, and that is a property of the reader and the platform accessibility API, not of the DOM. jsdom exposes no accessibility tree and axe checks that a region EXISTS and is well-formed; whether VoiceOver actually speaks it — and whether it speaks it twice — is observable only with a reader running on the real platform.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "Open the agent tab beside a note (split the pane), start a run, and type in the note while the run works. Confirm typing stays responsive and the caret never jumps. Then switch the tab between hub and focus several times while the run is going and confirm the run keeps running rather than restarting, the indicator keeps moving, and the conversation does not lose its scroll position.",
+        whyNotAutomated: "Input latency under a working run is a felt property, measured in whether a person notices a hitch between keystroke and glyph. Every E2E scenario drives the agent against StubEngine, which returns a fixed script instantly and so never occupies the thread the way a real run does.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 8,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "ai.chat",
     title: "AI chat panel",
     paths: [
