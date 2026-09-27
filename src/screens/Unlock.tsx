@@ -745,6 +745,10 @@ export function Unlock({
   return (
     <AuthShell
       testId="unlock.root"
+      // A short, fixed form: the upper third rather than dead centre. Unlike
+      // the picker there is no list here, so nothing on this screen can grow
+      // to fill a centred region.
+      align="upper"
       // Arriving here is going FORWARD from the picker. The back link below
       // sends the user the other way, and the picker states its own direction.
       enter="forward"
