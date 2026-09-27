@@ -49,6 +49,7 @@
       "@myne/agent-store": ["../src/notes/agent/agentStore.ts"],
       "@myne/agent-run-core": ["../src/lib/agent-run-core.ts"],
       "@myne/run-cost-line": ["../src/notes/agent/components/RunCostLine.tsx"],
+      "@myne/run-orb": ["../src/notes/agent/AgentRunOrb.tsx"],
       "@myne/undo-last-run": ["../src/notes/agent/useUndoLastRun.ts"],
       "@myne/engine-error": ["../src/lib/engine-error.ts"],
       "@myne/decorations": ["../src/notes/decorations.ts"],

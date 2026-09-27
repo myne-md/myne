@@ -180,6 +180,16 @@ export default defineConfig(async () => ({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The run indicator, shared for the reason the cost line is: it is a
+      // NAMED motion-canon exemption (`design-notes/ai/0621`), and every one
+      // of the conditions that exemption rests on — bounded by the run, paused
+      // when hidden or off-screen, one static frame under reduced motion,
+      // budgeted, `aria-hidden` — is a property of the implementation rather
+      // than of the design. A second copy on the phone would be a second place
+      // for one of those five to go missing, on a surface where nobody would
+      // look. Its imports are React and the shared agent store, both of which
+      // mobile already consumes.
+      { find: /^@myne\/run-orb$/, replacement: sib("../src/notes/agent/AgentRunOrb.tsx") },
       // The last-run undo's LOGIC, shared rather than retyped. Its own header is
       // the argument: it carries three recorded defect fixes, each invisible
       // until it happens to a user, and it imports neither client's bindings:
