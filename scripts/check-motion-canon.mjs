@@ -84,6 +84,16 @@ const INFINITE_ALLOWLIST = new Map([
     "The transcription busy meter. Same class as the two above; it animates " +
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",
   ],
+  [
+    "myne-inline-field-sweep",
+    "The unlock field's in-flight rule (myne-md/myne#773). Argon2id runs for seconds " +
+      "on the pre-unlock screen, and this is the only thing on a deboxed row that can " +
+      "say so now the CTA is an icon rather than a button with a spinner in it. " +
+      "Indeterminate progress: it starts on submit and stops when the attempt " +
+      "resolves, either into the editor or into an error banner. Carries " +
+      "data-motion=\"essential\", because a frozen sweep on a screen the user is " +
+      "waiting on reads as a hang, which is the one reading it must never have.",
+  ],
 ]);
 
 /**
@@ -121,7 +131,7 @@ const DURATION_EXEMPT = new Map([
 const RAF_LOOP_ALLOWLIST = new Map([
   [
     "client-core/src/binaryField.ts",
-    "The brand 01 field behind an empty state (docs/decisions/ui/0616, named exemption). " +
+    "The brand 01 field behind an empty state (docs/decisions/ui/0618, named exemption). " +
       "Pauses on document.hidden and off-screen, paints one static frame under reduced " +
       "motion, and a process-wide budget caps concurrent instances.",
   ],
@@ -479,7 +489,7 @@ for (const root of present) {
           "If it reports work in flight, or stops itself when a bounded computation or a " +
           "gesture ends, add it to RAF_LOOP_ALLOWLIST with the reason — and make sure it " +
           "pauses on document.hidden and off-screen and does not loop under " +
-          "prefers-reduced-motion (docs/decisions/ui/0616).",
+          "prefers-reduced-motion (docs/decisions/ui/0618).",
         line: lineOf(src, m.index),
       });
     }

@@ -19,10 +19,25 @@
 // amounts of room, and three components is three places for the words to drift.
 //
 // ── The `01` field ─────────────────────────────────────────────────────────
-// Optional, off by default, and a continuous animation — which the canon
-// forbids except by name (`docs/decisions/ui/0616`). It is `aria-hidden` and
-// carries no meaning: everything the user needs is in the text above it.
-// `mountBinaryField` owns the pause conditions that make the exemption hold.
+// ON for every variant, and a continuous animation — which the canon forbids
+// except by name (`docs/decisions/ui/0618`). It is `aria-hidden` and carries no
+// meaning: everything the user needs is in the text above it. `mountBinaryField`
+// owns the pause conditions that make the exemption hold.
+//
+// It used to be opt-in, on the argument that only a first-run destination had
+// earned it. That drew the wrong line: a filtered list and a load error are
+// just as much "this surface, with nothing in it", and giving one of the four
+// variants the brand texture made the other three look like a different
+// product. The variants already differ in the two ways that matter — the words
+// and the action — so differing in the backdrop as well was decoration doing a
+// job the copy was already doing.
+//
+// `sm` used to suppress it, on the argument that a 248px sidebar box turns the
+// 15px grid into a texture fighting the copy. It does not: the cell is a fixed
+// size, so a narrower box holds FEWER digits, not denser ones, and the radial
+// scrim behind the words scales with the content column. What the suppression
+// actually produced was the one surface a new user sees first — an empty
+// sidebar — being the one surface without the brand on it.
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "./Icon";
@@ -54,11 +69,18 @@ interface EmptyStateProps {
   secondaryAction?: ReactNode;
   size?: "sm" | "md" | "lg";
   /**
-   * Draw the brand `01` field behind the content. Opt-in, and worth it only
-   * where the state is a destination rather than a transient — a first-run
-   * pane, not a momentarily-filtered sidebar list.
+   * Draw the brand `01` field behind the content. On by default; pass `false`
+   * only where the surface behind the state is already carrying texture of its
+   * own and the two would fight.
    */
   field?: boolean;
+  /**
+   * Become the surface instead of sitting on it — no border, no fill, and grow
+   * to the height the parent offers. For a state that owns the whole of a modal
+   * body or a pane, where a card with empty space under it reads as a layout
+   * bug rather than as a card.
+   */
+  fill?: boolean;
   testId?: string;
 }
 
@@ -71,7 +93,8 @@ export function EmptyState({
   action,
   secondaryAction,
   size = "md",
-  field = false,
+  field = true,
+  fill = false,
   testId,
 }: EmptyStateProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -93,6 +116,7 @@ export function EmptyState({
       className="myne-empty"
       data-variant={variant}
       data-size={size}
+      data-fill={fill ? "true" : undefined}
       data-testid={testId}
     >
       {field && (

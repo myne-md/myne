@@ -838,6 +838,14 @@
   width: 100%;
   height: 100%;
   z-index: 0;
+  /* The field's INK, and the only place it is stated. `binaryField.ts` reads it
+     back with `getComputedStyle().color`, which the engine has already
+     normalized to `rgb()` whatever syntax the token used — so the canvas needs
+     no colour parser and a custom palette's field follows that palette's own
+     ink. Before this the ink was a hardcoded near-white, which is why the light
+     themes drew a field nobody could see: near-white digits on near-white
+     paper. */
+  color: var(--fg-1);
 }
 
 /* The content follows the box by one stagger step, so the card arrives and its
@@ -860,17 +868,26 @@
    gradient that suppresses nothing. */
 .myne-empty:has(.myne-empty__field) .myne-empty__body::before {
   content: "";
+  /* `--paper-2` is the card's own fill, so the scrim reads as the field fading
+     out rather than as a blob. A FILLED state has no fill of its own — it sits
+     directly on whatever surface holds it — so it takes that surface's colour
+     instead, or the scrim would paint a card-coloured cloud on a modal. */
+  --myne-empty-scrim: var(--paper-2);
   position: absolute;
   z-index: -1;
   pointer-events: none;
   inset: -22% -14%;
   background: radial-gradient(
     62% 58% at 50% 50%,
-    var(--paper-2) 0%,
-    var(--paper-2) 34%,
-    color-mix(in srgb, var(--paper-2) 55%, transparent) 58%,
+    var(--myne-empty-scrim) 0%,
+    var(--myne-empty-scrim) 34%,
+    color-mix(in srgb, var(--myne-empty-scrim) 55%, transparent) 58%,
     transparent 78%
   );
+}
+
+.myne-empty[data-fill="true"] .myne-empty__body::before {
+  --myne-empty-scrim: var(--paper);
 }
 
 .myne-empty__body {
@@ -946,13 +963,28 @@
 .myne-empty[data-size="sm"] .myne-empty__glyph { width: 32px; height: 32px; }
 .myne-empty[data-size="sm"] .myne-empty__title { font-size: var(--text-sm); }
 .myne-empty[data-size="sm"] .myne-empty__body-text { font-size: var(--text-xs); }
-/* No field at sidebar width. The grid is a fixed 15px cell, so in a 248px box
-   the digits are a dense texture directly behind the words rather than a
-   backdrop behind a headline — it fights the copy instead of setting it off.
-   The caller may still pass `field`; this is the size deciding it cannot use
-   one, which is the kind of judgement a component should make for its caller
-   rather than push back onto every call site. */
-.myne-empty[data-size="sm"] .myne-empty__field { display: none; }
+
+/* -- Fill ----------------------------------------------------------------
+   A zero state that IS the surface, rather than a card sitting on one.
+
+   The Archive and Trash panels are the case that named it: a 560×78vh modal
+   with a bordered ~200px card pinned to the top of it and empty space below,
+   so the box the user is looking at and the box the state is drawn in are two
+   different rectangles. Filling means the modal body is the state — one
+   border (the modal's own), one background, and the `01` field spanning the
+   whole area instead of a strip.
+
+   It drops the border and the fill rather than keeping them and stretching:
+   a stretched card inside a modal is two nested rounded rectangles with the
+   same corner radius and nothing between them, which reads as a rendering
+   mistake. */
+.myne-empty[data-fill="true"] {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
 
 .myne-empty[data-size="lg"] { padding: var(--space-8) var(--space-5); }
 .myne-empty[data-size="lg"] .myne-empty__glyph { width: 56px; height: 56px; }
@@ -1109,4 +1141,204 @@
     forced-color-adjust: none;
     background: Highlight;
   }
+}
+
+
+/* =========================================================================
+   Inline submit field — the deboxed credential row (myne-md/myne#773)
+   ========================================================================= */
+
+/* A pre-unlock credential is not a form field among several. It is the ONE
+   thing the screen is asking for, and boxing it in a bordered rounded input
+   beside a full-width button made it look like the third row of a settings
+   panel. Deboxed: no fill, no frame, one rule under the text, and the submit
+   collapsed into a round icon button on the rule's right end.
+
+   The rule is TWO elements stacked, not one border, because the focus state
+   has to animate: a border-colour change is instant and reads as a repaint,
+   while a second rule scaling out from the centre reads as the field waking
+   up. The resting rule stays under it the whole time, so nothing shifts. */
+
+.myne-inline-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.myne-inline-field__well {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.myne-inline-field__input {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  padding: var(--space-3) 0;
+}
+
+.myne-inline-field__input::placeholder {
+  color: var(--fg-3);
+}
+
+/* The global `:focus-visible` rule in `tokens.css` paints a `--ring` box-shadow
+   on every input in the app. It is right everywhere else and wrong here: a box
+   around a field that has deliberately been un-boxed puts the frame back the
+   moment the user touches it, which is the one moment they are looking at it.
+   The accent rule below IS this field's focus indicator — 2px, scaled out from
+   the centre, against a resting hairline — so SC 2.4.7 is satisfied by a
+   different shape rather than dropped.
+
+   `!important` because the global rule is equally specific and later in the
+   cascade for any client that loads `tokens.css` after this sheet. The
+   alternative is a load-order dependency between two stylesheets, which is the
+   kind of thing that works until somebody reorders an import. */
+.myne-inline-field__input:focus-visible,
+.myne-inline-field__input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* …except under forced colours, where the rule below is stripped along with
+   every other background and the field would have NO focus indicator at all.
+   There, take the platform's own outline back. */
+@media (forced-colors: active) {
+  .myne-inline-field__input:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+}
+
+/* The resting rule. `--line-2` rather than `--line-1`: with no fill and no
+   frame around it, this single hairline is the only thing saying "type here",
+   so it carries more weight than a divider would. */
+.myne-inline-field__rule {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--line-2);
+  pointer-events: none;
+}
+
+/* The focus rule, scaling out from the centre over the resting one. */
+.myne-inline-field__rule--active {
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform var(--duration-base) var(--ease-emphasized);
+}
+
+.myne-inline-field[data-focused="true"] .myne-inline-field__rule--active {
+  transform: scaleX(1);
+}
+
+/* The in-flight sweep. Unlock runs multi-second Argon2id, and a field that
+   simply goes quiet reads as a hung app — the same reasoning the CTA's spinner
+   was there for, moved onto the rule now that the CTA is an icon.
+
+   `data-motion="essential"` (MYND-630): this carries STATE, so reduced motion
+   slows it rather than freezing it. A frozen progress indicator is a worse
+   answer than a slow one, because a stopped sweep reads as a crash. */
+@keyframes myne-inline-field-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.myne-inline-field[data-busy="true"] .myne-inline-field__rule--active {
+  transform: none;
+  inset-inline: 0;
+  /* A short travelling segment rather than a full-width bar, so the motion is
+     legible as progress rather than as a colour change. */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 35%,
+    var(--accent) 65%,
+    transparent 100%
+  );
+  animation: myne-inline-field-sweep 1.1s var(--ease-standard) infinite;
+}
+
+/* The submit. Round, accent-filled, sized to the rule's height so the row reads
+   as one object rather than a field with a button parked beside it. */
+.myne-inline-field__submit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-on);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-emphasized),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.myne-inline-field__submit:enabled:hover { background: var(--accent-hover); }
+.myne-inline-field__submit:enabled:active { background: var(--accent-press); }
+.myne-inline-field__submit:enabled:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Empty field: present but plainly not ready, rather than absent. A control
+   that appears when you start typing makes the row jump under the caret. */
+.myne-inline-field__submit:disabled {
+  background: var(--bg-3);
+  color: var(--fg-3);
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .myne-inline-field__rule,
+  .myne-inline-field__rule--active {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .myne-inline-field__submit { border: 1px solid ButtonText; }
+}
+
+/* =========================================================================
+   Auth shell — the deboxed pre-unlock page (myne-md/myne#773)
+   ========================================================================= */
+
+/* The picker and the unlock screen were each a bordered card floating in the
+   middle of an empty window, which put a frame around the one thing on screen
+   and left the app's own name inside it. Deboxed: the window IS the surface,
+   the wordmark sits top-left where an app's name sits, the actions sit
+   top-right, and the middle holds only what the user came to do. */
+
+@keyframes myne-auth-enter-forward {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes myne-auth-enter-back {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.myne-auth-view[data-enter="forward"] {
+  animation: myne-auth-enter-forward var(--duration-base) var(--ease-emphasized);
+}
+
+.myne-auth-view[data-enter="back"] {
+  animation: myne-auth-enter-back var(--duration-base) var(--ease-emphasized);
 }
