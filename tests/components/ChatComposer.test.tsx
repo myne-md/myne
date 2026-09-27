@@ -733,7 +733,15 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
     attachProjects();
     act(() => {
       hydrateChatTurns([
-        { id: "t1", kind: "text", role: "user", text: "önceki" },
+        {
+          id: "t1",
+          kind: "text",
+          role: "user",
+          text: "önceki",
+          streaming: false,
+          error: false,
+          insertable: false,
+        },
       ]);
     });
     expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");

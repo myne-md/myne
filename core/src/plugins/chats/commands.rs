@@ -410,16 +410,41 @@ fn title_from_text(text: &str) -> String {
 /// Accepted like the attachment twin, and the milder half of the two crash
 /// orders: a row-first crash would leave a VISIBLE broken row that syncs
 /// cluster-wide, while a file-first crash leaves bytes nothing names.
+/// What a create REQUESTS, separate from the four context handles every
+/// command in this module takes.
+///
+/// A struct because the anchor (`note_id`, myne-md/myne#771) made this the
+/// eighth positional argument and `clippy::too_many_arguments` is right about
+/// what eight of them read like at a call site — three `Option`s and a `u64`
+/// in a row, told apart by position. Grouping the REQUEST rather than the
+/// context is the split that survives: `io`/`vault_dir`/`state`/`hooks` are
+/// the same four on every function here, and burying them in a struct would
+/// make this one read unlike its siblings.
+pub struct ChatsCreateRequest<'a> {
+    /// The first turn's serialized payload.
+    pub first_turn_payload: &'a str,
+    pub now_unix_millis: u64,
+    /// Client-minted id for an idempotent retry: a create whose response was
+    /// lost carries the same id and adopts the existing row.
+    pub requested_id_hex: Option<&'a str>,
+    /// The note this conversation is anchored to, when it is. `None` is a
+    /// vault-general conversation, which is the hub's own case.
+    pub note_id: Option<&'a str>,
+}
+
 pub async fn chats_create_with_dir(
     io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &Hooks,
-    first_turn_payload: &str,
-    now_unix_millis: u64,
-    requested_id_hex: Option<&str>,
-    note_id: Option<&str>,
+    req: ChatsCreateRequest<'_>,
 ) -> Result<String, ChatsMutateError> {
+    let ChatsCreateRequest {
+        first_turn_payload,
+        now_unix_millis,
+        requested_id_hex,
+        note_id,
+    } = req;
     let _guard = lock_write().await;
     validate_turn_payload(first_turn_payload)?;
     let (root_key, seal) = seal_from_slot(io, vault_dir, state).await?;
@@ -924,10 +949,12 @@ pub async fn chats_create_from_host(
             &dir,
             state,
             hooks,
-            first_turn_payload,
-            now,
-            requested_id_hex,
-            note_id,
+            ChatsCreateRequest {
+                first_turn_payload,
+                now_unix_millis: now,
+                requested_id_hex,
+                note_id,
+            },
         )
         .await;
     }
@@ -936,10 +963,12 @@ pub async fn chats_create_from_host(
         &dir,
         state,
         hooks,
-        first_turn_payload,
-        now,
-        requested_id_hex,
-        note_id,
+        ChatsCreateRequest {
+            first_turn_payload,
+            now_unix_millis: now,
+            requested_id_hex,
+            note_id,
+        },
     )
     .await
 }
@@ -1237,10 +1266,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create");
         // 32-char lowercase hex UUIDv7.
@@ -1278,10 +1309,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                Some(wanted),
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: Some(wanted),
+                    note_id: None,
+                },
             ))
             .expect("create");
         assert_eq!(first, wanted);
@@ -1291,10 +1324,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                Some(wanted),
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: Some(wanted),
+                    note_id: None,
+                },
             ))
             .expect("retry adopts");
         assert_eq!(second, wanted);
@@ -1329,10 +1364,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create");
         let second = r#"{"turns":[{"id":"c1-1","kind":"text","role":"user","text":"q"},{"id":"c1-2","kind":"text","role":"assistant","text":"a"}]}"#;
@@ -1367,10 +1404,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create");
         assert!(tmp.path().join("chats").join(&id).exists());
@@ -1427,10 +1466,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create");
         rt().block_on(chats_rename_with_dir(
@@ -1459,10 +1500,12 @@ mod tests {
             tmp.path(),
             &state,
             &hooks,
-            FIRST_TURN,
-            1_000,
-            None,
-            None,
+            ChatsCreateRequest {
+                first_turn_payload: FIRST_TURN,
+                now_unix_millis: 1_000,
+                requested_id_hex: None,
+                note_id: None,
+            },
         ))
         .expect("create");
         // Corrupt the catalog bytes (not the header: a byte in the middle of
@@ -1484,10 +1527,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                2_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 2_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .unwrap_err();
         assert_eq!(err, ChatsMutateError::CatalogUnreadable);
@@ -1505,10 +1550,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                FIRST_TURN,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: FIRST_TURN,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .unwrap_err();
         assert_eq!(err, ChatsMutateError::SlotNotUnlocked);
@@ -1528,10 +1575,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                r#"{"turns":[{"id":"a1","kind":"text","role":"user","text":"first"}]}"#,
-                1_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: r#"{"turns":[{"id":"a1","kind":"text","role":"user","text":"first"}]}"#,
+                    now_unix_millis: 1_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create a");
         let b = rt()
@@ -1540,10 +1589,12 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                r#"{"turns":[{"id":"b1","kind":"text","role":"user","text":"second"}]}"#,
-                2_000,
-                None,
-                None,
+                ChatsCreateRequest {
+                    first_turn_payload: r#"{"turns":[{"id":"b1","kind":"text","role":"user","text":"second"}]}"#,
+                    now_unix_millis: 2_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                },
             ))
             .expect("create b");
         // Touch A so it becomes the most recently updated.
