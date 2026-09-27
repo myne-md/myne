@@ -76,6 +76,7 @@ import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
+import { AgentTabIcon } from "../agent/AgentTabIcon";
 import { useTaskQueryResults } from "../useTaskQueryResults";
 import { useTagSuggestions } from "../useTagSuggestions";
 import { acceptTagIntoView } from "../ai/acceptTagIntoView";
@@ -2008,6 +2009,14 @@ export function PaneView({
           // `item_colors` (MYND-184) is keyed by note UUID; views and graph
           // tabs are not colourable, so they resolve to undefined.
           return it.kind === "note" ? prefs.item_colors[it.id] : undefined;
+        }}
+        iconNodeOf={(key) => {
+          // The agent tab's glyph is live while a run is (myne-md/myne#771):
+          // the orb replaces the speech bubble, so a run started and then
+          // walked away from still says so from whichever tab you moved to.
+          // Only the agent tab has one — every other kind falls through to
+          // `iconOf` below, which is the whole point of returning `undefined`.
+          return parseItemKey(key).kind === "agent" ? <AgentTabIcon /> : undefined;
         }}
         iconOf={(key) => {
           const it = parseItemKey(key);
