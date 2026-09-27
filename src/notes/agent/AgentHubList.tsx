@@ -125,6 +125,19 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  /**
+   * What just happened, announced (task 13 of myne-md/myne#771).
+   *
+   * Rename, delete and a failed reload all change the list WITHOUT moving
+   * focus, so a screen-reader user pressed a button and heard nothing: the row
+   * they were on either changed name underneath them or stopped existing. A
+   * live region is the only channel that reports a change the user did not
+   * navigate to.
+   *
+   * Cleared on the next interaction rather than on a timer: a message that
+   * erases itself races the reader that is announcing it.
+   */
+  const [announcement, setAnnouncement] = useState("");
   const activeId = getActiveConversationId();
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -176,12 +189,13 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
       try {
         await chatsRename(id, title);
         setRenamingId(null);
+        setAnnouncement(t("agent.hub.renamedAnnouncement", { name: draft.trim() }));
         await refresh();
       } catch {
         setError(true);
       }
     },
-    [draft, refresh],
+    [draft, refresh, t],
   );
 
   const commitDelete = useCallback(
@@ -195,12 +209,13 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
           clearChatPersistForLock();
         }
         setDeletingId(null);
+        setAnnouncement(t("agent.hub.deletedAnnouncement"));
         await refresh();
       } catch {
         setError(true);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   if (error) {
@@ -239,6 +254,27 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", flex: 1, minHeight: 0 }}>
+      {/* The announcement channel. `polite` rather than `assertive`: these are
+          confirmations of something the user just did, not interruptions.
+          Always MOUNTED, never conditionally rendered — a live region that
+          appears at the same moment its text does is a region most readers
+          never announce, because they were not watching an element that did
+          not exist. */}
+      <span
+        role="status"
+        aria-live="polite"
+        data-testid="agent.hub-announcer"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          clip: "rect(0 0 0 0)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {announcement}
+      </span>
       <Input
         type="search"
         data-testid="agent.hub-search"
@@ -324,6 +360,11 @@ export function AgentHubList({ onOpenFocus, onOpenNote }: AgentHubListProps) {
             <div
               style={ROW_STYLE}
               data-active={row.id === activeId ? "true" : "false"}
+              // The conversation currently open in the surface. `aria-current`
+              // is what carries that to a reader; `data-active` paints it and
+              // carries nothing. They were one attribute doing one of the two
+              // jobs.
+              aria-current={row.id === activeId ? "true" : undefined}
             >
               {/* The row's own label ellipsizes, so the full title has to be
                   reachable somewhere — through `<Tooltip>` rather than the

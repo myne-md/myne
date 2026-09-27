@@ -32,6 +32,8 @@
     "hub": {
       "title": "Agent",
       "loading": "Loading conversations…",
+      "renamedAnnouncement": "Renamed to {{name}}",
+      "deletedAnnouncement": "Conversation deleted",
       "loadFailed": "Your conversations could not be loaded just now.",
       "emptyTitle": "No conversations yet",
       "anchorLabel": "On a note",
