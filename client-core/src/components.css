@@ -511,6 +511,11 @@
   border-radius: var(--radius-2);
   box-shadow: var(--shadow-2);
   padding: var(--space-1) 0;
+  /* The menu's resting height. The component writes an inline `max-height`
+     from `placeMenu`, which OVERRIDES this rather than deferring to it — so the
+     number is passed to that helper as its `cap` and the smaller of the two
+     wins. Changing it here without changing the argument there makes this
+     declaration dead, which `tests/styles/componentLayer.test.ts` checks. */
   max-height: 280px;
   overflow-y: auto;
 }
@@ -723,6 +728,68 @@
 }
 
 .myne-chiplet__swatch { flex: 1; }
+
+
+/* =========================================================================
+   Pill — the small text chip (myne-md/myne#771)
+   ========================================================================= */
+
+/* A word or two in a bordered capsule: the AI panel's status chip, the agent
+   hub's note anchor. It is NOT `.myne-chiplet` one block up, which is a 40x28
+   THEME SWATCH with `overflow: hidden` — and this class exists because that
+   mistake was made: the anchor chip was given `.myne-chiplet` on the reasoning
+   that an app with one chip design should have one chip class, which was the
+   right instinct pointed at the wrong class. A text label in a fixed 40px box
+   with hidden overflow is a label nobody can read.
+   `tests/styles/componentLayer.test.ts` holds the two apart.
+
+   `[data-interactive]` is the button arm. Most pills are statements and a
+   statement with a hover state invites a press that does nothing; the ones
+   that lead somewhere say so. */
+.myne-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  flex-shrink: 0;
+  /* No vertical padding: the pill's height is its line box, which is what
+     keeps it the same height as the text beside it in a header row. The
+     inline padding is a token; a `1px` block padding would be a literal
+     nothing in the scale corresponds to, and the ratchet is right to refuse
+     one. */
+  padding: 0 var(--space-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-relaxed);
+  /* One line, ellipsized. A pill that wraps is a pill that changes its row's
+     height, and these sit in header rows beside controls that must not move. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.myne-pill[data-tone="ready"] { color: var(--fg-2); }
+
+.myne-pill[data-interactive="true"] {
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.myne-pill[data-interactive="true"]:enabled:hover {
+  background: var(--bg-3);
+  border-color: var(--line-2);
+}
+.myne-pill[data-interactive="true"]:enabled:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.myne-pill[data-interactive="true"]:disabled { cursor: default; }
 
 
 /* =========================================================================

@@ -2371,7 +2371,12 @@ function EditorChrome({
             resizeLabel={t("editor.chrome.resizeBacklinksSidebar")}
           >
             <RightSidebar
-              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSettings={(panel, anchor) =>
+                openSettings(
+                  (panel as PanelId | undefined) ?? null,
+                  anchor ?? null,
+                )
+              }
               onShowToast={(message) => showToastMessage(message)}
             />
           </SidebarPane>
@@ -4494,7 +4499,10 @@ function RightSidebar({
   onOpenSettings,
   onShowToast,
 }: {
-  onOpenSettings?: () => void;
+  // Optionally on a panel and scrolled to a setting: the AI status chip names
+  // a fault and lands ON the control that clears it rather than at the top of
+  // a panel (myne-md/myne#771).
+  onOpenSettings?: (panel?: string, anchor?: string) => void;
   onShowToast?: (message: string) => void;
 }) {
   const { t } = useTranslation();

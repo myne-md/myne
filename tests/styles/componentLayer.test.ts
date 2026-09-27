@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SHEET: string = readFileSync(
@@ -191,5 +192,82 @@ describe("a zero state that owns its surface stops drawing a card on one", () =>
     expect(
       ruleBody(SHEET, '.myne-empty[data-fill="true"] .myne-empty__body::before'),
     ).toContain("--myne-empty-scrim: var(--paper)");
+  });
+});
+
+describe("a dropdown's height is stated in two places, so they must agree", () => {
+  // `placeMenu` writes an INLINE `max-height`, which overrides the stylesheet
+  // rather than deferring to it — so the sheet's number is not a cap unless
+  // the same number is passed to that helper. The first version of this
+  // assumed the sheet would still bind, and a folder list near the bottom of a
+  // tall window grew to fill nearly the whole screen.
+  //
+  // Changing one and not the other makes the CSS declaration dead: it keeps
+  // reading like the answer and stops being it.
+
+  function maxHeightOf(selector: string): number {
+    const body = ruleBody(SHEET, selector);
+    const m = /max-height:\s*(\d+)px/.exec(body);
+    expect(m, `${selector} has no pixel max-height`).not.toBeNull();
+    return Number(m![1]);
+  }
+
+  function capPassedIn(file: string): number {
+    const src: string = readFileSync(resolve(process.cwd(), file), "utf8");
+    const m = /placeMenu\([^)]*\{\s*cap:\s*(\d+)/s.exec(src);
+    expect(m, `${file} does not pass a cap to placeMenu`).not.toBeNull();
+    return Number(m![1]);
+  }
+
+  it("the plain Select agrees with its stylesheet", () => {
+    expect(capPassedIn("src/components/primitives/Select.tsx")).toBe(
+      maxHeightOf(".myne-select-menu {"),
+    );
+  });
+
+  it("the searchable one agrees with its own, which is taller", () => {
+    const searchable = maxHeightOf('.myne-select-menu[data-searchable="true"]');
+    expect(capPassedIn("src/components/primitives/SearchableSelect.tsx")).toBe(searchable);
+    // And the two variants really do differ, or this pair of tests is one test
+    // written twice: the searchable menu carries a pinned search row above its
+    // list, which is what the extra height is for.
+    expect(searchable).toBeGreaterThan(maxHeightOf(".myne-select-menu {"));
+  });
+});
+
+describe("a text chip is not a theme swatch", () => {
+  // `.myne-chiplet` is a 40x28 colour swatch with `overflow: hidden`. The
+  // agent hub's note anchor was given it, on the reasoning that an app with
+  // one chip design should have one chip class — the right instinct pointed at
+  // the wrong class, which put a text label in a fixed 40px box with its
+  // overflow cut off.
+  //
+  // Two classes for two things, and this holds them apart: the failure is
+  // silent, because a label in a swatch still renders, still has its testid,
+  // and is simply unreadable.
+
+  it("the swatch is a fixed box", () => {
+    const body = ruleBody(SHEET, ".myne-chiplet {");
+    expect(body).toContain("width: 40px");
+    expect(body).toContain("overflow: hidden");
+  });
+
+  it("the pill is sized by its text", () => {
+    const body = ruleBody(SHEET, ".myne-pill {");
+    expect(body, "a text chip with a fixed width cannot hold text").not.toMatch(
+      /^\s*width:/m,
+    );
+    expect(body).toContain("text-overflow: ellipsis");
+    expect(body).toContain("white-space: nowrap");
+  });
+
+  it("only an interactive pill answers a pointer", () => {
+    // Most pills are statements, and a statement with a hover state invites a
+    // press that does nothing.
+    expect(SHEET).toContain('.myne-pill[data-interactive="true"]:enabled:hover');
+    expect(
+      /^\.myne-pill:hover/m.test(SHEET),
+      "every pill lights up under the pointer",
+    ).toBe(false);
   });
 });

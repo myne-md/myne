@@ -203,10 +203,19 @@ export function ChatComposer({
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
   // rather than counted from newlines, so a long wrapped line grows too.
+  //
+  // **An EMPTY input is one row, whatever the placeholder does.** `scrollHeight`
+  // measures the rendered text, and a textarea with no value renders its
+  // placeholder — so a placeholder that wraps at panel width reported two lines
+  // and the box opened two rows tall before the user had typed anything. The
+  // height would then be a property of the COPY: translate the placeholder into
+  // a longer language and the empty composer grows, in every locale, with
+  // nothing in the code to point at.
   useEffect(() => {
     const el = inputRef.current;
     if (el === null) return;
     el.style.height = "auto";
+    if (message === "") return;
     if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
   }, [message]);
 

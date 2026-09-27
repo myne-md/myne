@@ -538,3 +538,57 @@ describe("ChatComposer: the settings sit under the input", () => {
     expect(order("ai.composer-unsupported", "ai.composer-scope")).toBe(true);
   });
 });
+
+describe("ChatComposer: the empty input is one row", () => {
+  // `scrollHeight` measures the RENDERED text, and a textarea with no value
+  // renders its placeholder — so a placeholder that wraps at panel width
+  // reported two lines and the box opened two rows tall before the user had
+  // typed anything.
+  //
+  // The reason it is worth a test rather than a shorter string: left as it
+  // was, the empty composer's height is a property of the COPY. Translate the
+  // placeholder into a longer language and it grows again, in that locale
+  // only, with nothing in the code to point at — and `locales/` has 31 of them.
+
+  /**
+   * jsdom reports `scrollHeight: 0` for everything, and the effect skips a
+   * zero measurement — so WITHOUT this stub neither case can reach the state
+   * it is about. The first would pass against an implementation with no guard
+   * at all, which is exactly what happened: removing `if (message === "")`
+   * left it green. The fixture has to be able to hold the defect.
+   */
+  function withMeasuredHeight(px: number, body: () => void): void {
+    Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => px,
+    });
+    try {
+      body();
+    } finally {
+      delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>)
+        .scrollHeight;
+    }
+  }
+
+  const input = () => screen.getByTestId("ai.composer-input") as HTMLTextAreaElement;
+
+  it("does not size itself from the placeholder", () => {
+    withMeasuredHeight(64, () => {
+      mount();
+      // The measurement is available and deliberately not used: an empty value
+      // means there is nothing of the user's to fit, whatever the placeholder
+      // happens to occupy.
+      expect(input().style.height, "an empty input took a measured height").toBe("auto");
+    });
+  });
+
+  it("sizes itself once there is something to size", () => {
+    withMeasuredHeight(64, () => {
+      mount();
+      type("a message long enough to wrap in a side panel, several times over");
+      // The guard is on EMPTINESS, not on the effect: a non-empty value still
+      // goes through the measure-and-write path.
+      expect(input().style.height).toBe("64px");
+    });
+  });
+});
