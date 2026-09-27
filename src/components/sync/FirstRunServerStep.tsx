@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-// The first-run sync-server step (myne-md/myne#768).
+// The first-run sync-server step (myne-md/myne#768, choice added myne-md/myne#780).
 //
 // Identity creation registers a person account at a sync endpoint, so it cannot
 // succeed without one: `plugin:sync|sync_person_setup` returns a typed
@@ -8,20 +8,26 @@
 // generic error telling them to configure a server, with no way to do it from
 // where they were standing (the settings surface is unreachable at zero vaults).
 //
-// The control is the SAME `EndpointConfig` the Settings panel mounts: free-text
-// URL, Connect, TOFU leaf-certificate fingerprint, the same device-local
-// `sync-config.json`. A second endpoint control would be a second contract, and
-// the two would drift in exactly the place a user is least able to recover. What
-// this component adds is the first-run framing and the continue gate, not a new
-// way to configure a server.
+// # The choice
 //
-// Deliberately no hosted preset. `hosted_static_pin()` is `None` until hosted
-// launch, so there is no address to pre-fill, and naming an "official" server in
-// the UI would be a policy statement about which server is trusted
-// (`decisions/sync/0020` puts self-hosted and hosted at the same boundary).
+// The step now opens with two doors, because "which server" has two honest
+// answers: `Myne Sync` (the hosted server, one tap) and `self-hosted` (the
+// operator types their own URL). Both are first-class and neither is presumed:
+// `decisions/sync/0020` puts hosted and self-host at the same trust boundary.
+//
+// The hosted door writes `HOSTED_SYNC_ORIGIN` and lets the first connection
+// TOFU-pin the leaf; it deliberately does NOT claim a pre-vetted build-time pin
+// (that pin, and the SPKI mechanism a renewal-safe one needs, is myne-md/myne#781).
+// The self-hosted door is the SAME `EndpointConfig` the Settings panel mounts:
+// free-text URL, Connect, TOFU leaf-certificate fingerprint, the same
+// device-local `sync-config.json`. A second endpoint control would be a second
+// contract, and the two would drift in exactly the place a user is least able
+// to recover. What this component adds is the first-run framing, the choice and
+// the continue gate, not a new way to configure a server.
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
 import { EndpointConfig } from "./EndpointConfig";
@@ -61,6 +67,11 @@ export function useHasSyncEndpoint(): boolean {
 
 export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepProps) {
   const { t } = useTranslation();
+  // Which door is open. `choose` is the fork itself; `self-hosted` is the URL
+  // form behind the second door.
+  const [mode, setMode] = useState<"choose" | "self-hosted">("choose");
+  const [hostedBusy, setHostedBusy] = useState(false);
+  const [hostedError, setHostedError] = useState(false);
   // Re-read after the user connects, otherwise the Continue button would stay
   // disabled over an endpoint the control just accepted. A local remount key is
   // enough: `EndpointConfig` owns the connect call and its own success state.
@@ -86,6 +97,96 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
     setConfigured(true);
     onConnected();
   };
+
+  // The hosted door: write the Myne server and let the first connection pin its
+  // leaf (TOFU). No fingerprint claim is shown; the pin source the backend
+  // records is `tofu` and the copy stays honest about it.
+  const connectHosted = () => {
+    setHostedBusy(true);
+    setHostedError(false);
+    void invoke("plugin:sync|sync_set_endpoint", {
+      endpointUrl: HOSTED_SYNC_ORIGIN,
+      confirmedFingerprint: null,
+    })
+      .then(() => {
+        setConfigured(true);
+        advance();
+      })
+      .catch(() => setHostedError(true))
+      .finally(() => setHostedBusy(false));
+  };
+
+  if (mode === "choose") {
+    return (
+      <div
+        data-testid="first-run-server.root"
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <div
+            style={{
+              fontSize: "var(--text-xl)",
+              fontWeight: "var(--weight-semibold)",
+              color: "var(--fg-display)",
+            }}
+          >
+            {t("firstRun.server.chooseHeading")}
+          </div>
+          <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-2)" }}>
+            {t("firstRun.server.chooseIntro")}
+          </div>
+        </div>
+
+        <Button
+          variant="primary"
+          disabled={hostedBusy}
+          onClick={connectHosted}
+          data-testid="first-run-server.myne-sync"
+        >
+          {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
+        </Button>
+        <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
+          {t("firstRun.server.myneSyncHint")}
+        </div>
+
+        <Button
+          variant="secondary"
+          disabled={hostedBusy}
+          onClick={() => setMode("self-hosted")}
+          data-testid="first-run-server.self-hosted"
+        >
+          {t("firstRun.server.selfHosted")}
+        </Button>
+
+        {hostedError && (
+          <p
+            data-testid="first-run-server.hosted-error"
+            style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
+          >
+            {t("firstRun.server.hostedError")}
+          </p>
+        )}
+
+        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+          <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">
+            {t("firstRun.server.back")}
+          </Button>
+        </div>
+
+        <BetaTermsConsent
+          open={termsOpen}
+          testId="first-run-server.beta-terms"
+          onAccept={() => {
+            setTermsOpen(false);
+            void betaTerms.accept();
+            setConfigured(true);
+            onConnected();
+          }}
+          onCancel={() => setTermsOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -119,7 +220,12 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
       )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-        <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">
+        <Button
+          variant="ghost"
+          onClick={() => setMode("choose")}
+          icon="arrow-left"
+          data-testid="first-run-server.back"
+        >
           {t("firstRun.server.back")}
         </Button>
         <div style={{ flex: 1 }} />

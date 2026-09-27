@@ -599,9 +599,12 @@ async fn derive_person_profile_key(
 /// **Drop the backend-held person identity** (lock-equivalent). The pair
 /// zeroizes as it drops.
 ///
-/// `forget: true` additionally ERASES the device-local sealed file, which is
-/// person off-boarding from this device rather than a session lock: the next
-/// unlock with the same phrase re-enrols a fresh keypair and a new fingerprint.
+/// `forget: true` additionally ERASES the device-local sealed file **and the
+/// device-scoped person token** (`person-auth.json`), which is person
+/// off-boarding from this device rather than a session lock: the next unlock
+/// with the same phrase re-enrols a fresh keypair and a new fingerprint, and
+/// there is no stale token left claiming an enrollment that no longer exists
+/// (myne-md/myne#780).
 /// The flag exists so the erase path has a production caller instead of being a
 /// dead function, and so a plain lock never destroys an enrollment the user did
 /// not mean to drop.
@@ -614,9 +617,7 @@ pub async fn sync_person_lock<R: Runtime>(
     let _ = state.inner().clear_person_session().await;
     if forget.unwrap_or(false) {
         let host = crate::host::tauri_host::TauriHost::new(app.clone());
-        crate::account::person_identity::delete_sealed_file(&host, &crate::vault_io::StdVaultIo)
-            .await
-            .map_err(|_| SyncDeviceError::BadRequest)?;
+        super::person_account::forget_person_from_host(&host, &crate::vault_io::StdVaultIo).await?;
     }
     Ok(())
 }

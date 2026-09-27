@@ -39,10 +39,24 @@ export interface PersonStatusView {
   identity_unlocked: boolean;
   person_id_hex: string | null;
   identity_code: string | null;
+  /** True when a recoverable sealed keypair exists even with no token
+   *  (myne-md/myne#780). `enrolled` can be false while this is true, and in
+   *  that state Create cannot open the sealed frame it did not write. */
+  sealed_keypair_present: boolean;
 }
 
 export function personStatus(): Promise<PersonStatusView> {
   return invoke<PersonStatusView>("plugin:sync|sync_person_status");
+}
+
+/**
+ * Drop the backend-held person identity. `forget` also erases the device-local
+ * sealed keypair and the device-scoped token (myne-md/myne#780): the first-run
+ * flow uses it to clear an identity this device already holds so a fresh create
+ * can proceed.
+ */
+export function personLock(forget = false): Promise<void> {
+  return invoke<void>("plugin:sync|sync_person_lock", { forget });
 }
 
 /** One invite addressed to this person. The payload is not here; only a claim

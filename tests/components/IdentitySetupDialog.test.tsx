@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personSetup = vi.hoisted(() => vi.fn());
+const personStatus = vi.hoisted(() => vi.fn());
+const personLock = vi.hoisted(() => vi.fn());
 const invoke = vi.hoisted(() => vi.fn());
 
 vi.mock("react-i18next", () => ({
@@ -13,7 +15,10 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../../src/lib/personAccount", () => ({
   personSetup,
+  personStatus,
 }));
+
+vi.mock("../../src/lib/invite", () => ({ personLock }));
 
 vi.mock("../../src/platform/core", () => ({ invoke }));
 
@@ -39,6 +44,14 @@ beforeEach(() => {
     identity_code: "code",
     approved: true,
   });
+  personStatus.mockReset().mockResolvedValue({
+    enrolled: false,
+    identity_unlocked: false,
+    person_id_hex: null,
+    identity_code: null,
+    sealed_keypair_present: false,
+  });
+  personLock.mockReset().mockResolvedValue(undefined);
   // A configured endpoint by default, so the dialog shows its identity form.
   // The server-step case is its own test below.
   invoke.mockReset().mockResolvedValue({ endpoint_url: "https://sync.example" });
@@ -66,14 +79,53 @@ describe("IdentitySetupDialog", () => {
     );
   });
 
-  it("fronts the first-run server step when no endpoint is configured", async () => {
+  it("fronts the first-run server choice when no endpoint is configured", async () => {
     invoke.mockReset().mockResolvedValue({ endpoint_url: null });
     render(<IdentitySetupDialog open onClose={() => {}} />);
 
     const step = await screen.findByTestId("first-run-server.root");
     expect(step).toBeTruthy();
-    // The identity form is not reachable until a server is configured.
+    // Both doors are offered, and the identity form is not reachable until a
+    // server is configured.
+    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
+    expect(screen.getByTestId("first-run-server.self-hosted")).toBeTruthy();
     expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
-    expect(screen.getByTestId("first-run-server.continue").hasAttribute("disabled")).toBe(true);
+  });
+
+  // myne-md/myne#780: a device that already holds a sealed identity is offered
+  // Recover plus an explicit forget, never a Create that cannot open the frame.
+  it("offers recover and an explicit forget when an identity is already held", async () => {
+    personStatus.mockReset().mockResolvedValue({
+      enrolled: false,
+      identity_unlocked: false,
+      person_id_hex: null,
+      identity_code: null,
+      sealed_keypair_present: true,
+    });
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+
+    await screen.findByTestId("identity-setup.held");
+    // No Create affordance for a held identity.
+    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
+    // Recover stays reachable.
+    expect(screen.getByTestId("identity-setup.recover-cta")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("identity-setup.forget-cta"));
+    expect(screen.getByTestId("identity-setup.forget-confirm")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("identity-setup.forget-confirm-cta"));
+    await waitFor(() => expect(personLock).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(personSetup).toHaveBeenCalled());
+  });
+
+  // The stale-probe path: the backend still holds an identity even though the
+  // status read said otherwise, so the typed error must reveal the forget path.
+  it("reveals the forget path when the backend reports a held identity", async () => {
+    personSetup.mockReset().mockRejectedValue({ kind: "AlreadyHeldIdentity" });
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("identity-setup.create-cta"));
+    await screen.findByTestId("identity-setup.error");
+    expect(screen.getByTestId("identity-setup.forget-cta")).toBeTruthy();
   });
 });

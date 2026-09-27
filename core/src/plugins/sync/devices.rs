@@ -533,6 +533,16 @@ pub enum SyncDeviceError {
     /// owner-only affordances from members, so this is the backend contract
     /// for the future member client rather than a button a member sees.
     NotOwner,
+    /// A create was asked for on a device that already holds a sealed person
+    /// identity under a different phrase (myne-md/myne#780).
+    ///
+    /// Its own variant rather than `BadRequest` because the remedy is different
+    /// in kind: `sync_person_setup` generated a fresh phrase that cannot open the
+    /// sealed keypair the device already holds, and nothing the user retypes
+    /// fixes it. The fix is either to recover with the original phrase or to
+    /// explicitly forget the held identity first. On the RECOVER path a
+    /// `CannotDecrypt` stays `BadRequest` — there it means the phrase is wrong.
+    AlreadyHeldIdentity,
     /// Internal (task join, IO).
     Internal,
 }

@@ -124,6 +124,12 @@ pub async fn person_setup_from_host(
                 .map_err(|e| {
                     use crate::account::person_identity::PersonIdentityError as E;
                     match e {
+                        // A CREATE (`generated`) that cannot open the sealed
+                        // frame means this device already holds an identity it
+                        // did not write. On RECOVER the same error is a wrong
+                        // phrase, so it stays the non-distinguishing
+                        // `BadRequest` (myne-md/myne#780).
+                        E::CannotDecrypt if generated => SyncDeviceError::AlreadyHeldIdentity,
                         E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
                         E::Io | E::Csprng => SyncDeviceError::Transport,
                     }
@@ -262,6 +268,14 @@ pub struct PersonStatusView {
     /// the public code from its device-local credential; private operations
     /// require the runtime identity separately.
     pub identity_code: Option<String>,
+    /// Whether this device holds a **recoverable sealed person keypair**, even
+    /// when no token was ever issued (myne-md/myne#780). Distinct from
+    /// `enrolled`, which is only true once a token exists: a device can hold a
+    /// live sealed identity with no token, and in that state "Create an
+    /// identity" cannot open the sealed frame it did not write. The first-run
+    /// UI reads this to steer the user to Recover or an explicit forget rather
+    /// than offering a Create that is guaranteed to fail.
+    pub sealed_keypair_present: bool,
 }
 
 /// Read the device-local person credential and runtime identity readiness.
@@ -303,7 +317,32 @@ pub async fn person_status_from_host(
         identity_unlocked,
         person_id_hex,
         identity_code,
+        sealed_keypair_present: crate::account::person_identity::sealed_keypair_present(host, io)
+            .await,
     })
+}
+
+/// Erase every device-local trace of the person identity: the sealed keypair
+/// and the device-scoped token (`person-auth.json`). The off-boarding path and
+/// the "forget the held identity" recovery in the first-run dialog
+/// (myne-md/myne#780). An absent token is the ordinary case, not a failure: an
+/// identity that never completed enrollment has none.
+///
+/// No server call and no vault access: this forgets the identity ON THIS DEVICE.
+pub async fn forget_person_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+) -> Result<(), SyncDeviceError> {
+    crate::account::person_identity::delete_sealed_file(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    if let Ok(path) = person_auth_path_for_read(host) {
+        match io.remove_file(&path).await {
+            Ok(()) | Err(crate::io_failure_kind::IoFailureKind::NotFound) => {}
+            Err(_) => return Err(SyncDeviceError::BadRequest),
+        }
+    }
+    Ok(())
 }
 
 fn identity_code_from_auth(a: &PersonAuth) -> Option<String> {
@@ -1832,11 +1871,64 @@ mod tests {
             let Err(err) = person_setup_from_host(&host, &io, &state, None).await else {
                 panic!("a second create cannot open the sealed keypair it did not write");
             };
-            assert_eq!(err, SyncDeviceError::BadRequest);
+            assert_eq!(err, SyncDeviceError::AlreadyHeldIdentity);
 
             assert!(
                 crate::account::person_identity::sealed_keypair_present(&host, &io).await,
                 "a create that sealed nothing must not erase the identity already here"
+            );
+        });
+    }
+
+    // myne-md/myne#780: the "forget the held identity" recovery clears BOTH
+    // device-local traces, so `sealed_keypair_present` is false (a create can
+    // now proceed) and a stale token cannot keep `enrolled` true.
+    #[test]
+    fn forgetting_the_held_identity_clears_the_sealed_keypair_and_the_token() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("person-forget").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            let phrase = protocol::generate_recovery_phrase()
+                .expect("csprng")
+                .join_normalized();
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            crate::account::person_identity::unlock_person_identity(&host, &io, &normalized)
+                .await
+                .expect("seed a sealed keypair");
+
+            let auth_path = person_auth_path(&host, &io).await.expect("auth path");
+            write_person_auth(
+                &io,
+                &auth_path,
+                &PersonAuth {
+                    person_id_hex: "11".repeat(16),
+                    device_id_hex: "22".repeat(16),
+                    token_hex: "33".repeat(32),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("write token");
+            assert!(read_person_auth(&io, &auth_path)
+                .await
+                .expect("read")
+                .is_some());
+
+            forget_person_from_host(&host, &io).await.expect("forget");
+
+            assert!(
+                !crate::account::person_identity::sealed_keypair_present(&host, &io).await,
+                "the sealed keypair is gone, so a create can proceed"
+            );
+            assert_eq!(
+                read_person_auth(&io, &auth_path).await.expect("read"),
+                None,
+                "the device-scoped token goes with the identity"
             );
         });
     }

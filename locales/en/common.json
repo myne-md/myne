@@ -4584,6 +4584,13 @@
   "firstRun": {
     "server": {
       "heading": "Choose a sync server",
+      "chooseHeading": "Where should your notes sync?",
+      "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
+      "myneSync": "Use Myne Sync",
+      "myneSyncHint": "The Myne-operated server. This device pins its certificate on first connection.",
+      "selfHosted": "Use my own server",
+      "connecting": "Connecting…",
+      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
@@ -4602,8 +4609,15 @@
       "title": "Choose a sync server",
       "lead": "Your notes stay encrypted on this device before they leave it. The server only stores ciphertext.",
       "urlLabel": "Server address",
+      "useMyneSync": "Use Myne Sync",
+      "selfHostedHint": "Or enter the address of a server you run yourself.",
       "connect": "Connect",
       "connecting": "Connecting…"
+    },
+    "held": {
+      "title": "An identity is already on this device",
+      "lead": "This device already holds an identity. Forgetting it makes this device lose access to any vault it owns or joined until you recover it with its 24-word phrase. If you have not saved that phrase, it cannot be recovered.",
+      "forget": "Forget it and start fresh"
     },
     "create": {
       "title": "Create your identity",
@@ -4630,7 +4644,14 @@
   "identitySetup": {
     "createCta": "Create an identity",
     "doneCta": "Done",
-    "error": "Could not set up the identity. Check that a sync server is configured, then try again.",
+    "error": "Could not set up the identity. Try again.",
+    "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
+    "errorNotConfigured": "Could not set up the identity. Check that a sync server is configured, then try again.",
+    "forgetCancel": "Keep it",
+    "forgetConfirm": "Forget and create new",
+    "forgetCta": "Forget this identity and create a new one",
+    "forgetWarning": "This erases the identity held on this device. If you have not written down its 24-word recovery phrase, it is gone: this device will lose access to any vault it owns or joined until you recover it with that phrase. Continue only if you are sure.",
+    "heldIntro": "This device already holds an identity. Recover it with its 24-word phrase below.",
     "intro": "An identity lets people address an invite to you before you own any vault. It creates no vault and stores no notes.",
     "pending": "This device is waiting for another device on the account to approve it.",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",

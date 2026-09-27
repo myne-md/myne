@@ -205,6 +205,7 @@ function App() {
           identity_unlocked: false,
           person_id_hex: null,
           identity_code: null,
+          sealed_keypair_present: false,
         })),
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
