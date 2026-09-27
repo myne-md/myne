@@ -29,6 +29,8 @@ import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
+import { Icon } from "../../components/primitives/Icon";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { EmptyState } from "../../components/primitives/EmptyState";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ModalShell } from "../../components/primitives/ModalShell";
@@ -61,12 +63,24 @@ const TURN_TEXT_STYLE: CSSProperties = { fontSize: "var(--text-sm)", lineHeight:
  *  composer a fresh array identity on every render. */
 const NO_FOLDERS: readonly string[] = [];
 
-/** The shared bubble every turn sits in. */
+/** The shared bubble every turn sits in.
+ *
+ *  **The user's side wears the accent** (myne-md/myne#771). It was `--bg-2`
+ *  against the assistant's `--paper-2`: two adjacent greys, on a 280px column,
+ *  distinguished further only by an alignment that a long turn wrapping to full
+ *  width erases. So a transcript read quickly was a column of near-identical
+ *  blocks, and the one distinction that matters — what YOU said against what a
+ *  model said about your notes — was the weakest signal on the surface.
+ *
+ *  The accent is the app's one "this is yours" colour, and it goes on the user's
+ *  side rather than the model's deliberately: tinting the model's output would
+ *  lend it the emphasis the accent carries everywhere else, on the one surface
+ *  whose own honesty note says the output may be wrong. */
 const bubbleStyle = (isUser: boolean): CSSProperties => ({
   alignSelf: isUser ? "flex-end" : "flex-start",
   maxWidth: "92%",
-  background: isUser ? "var(--bg-2)" : "var(--paper-2)",
-  border: "1px solid var(--line-1)",
+  background: isUser ? "var(--accent-soft)" : "var(--paper-2)",
+  border: `1px solid ${isUser ? "var(--accent)" : "var(--line-1)"}`,
   borderRadius: "var(--radius-1)",
   padding: "var(--space-1) var(--space-2)",
 });
@@ -126,16 +140,26 @@ function degradedTitleKey(cause: string, t: TFn): string {
   }
 }
 
-/** The speaker caption above a turn's body. */
+/** The speaker caption above a turn's body, with the glyph for who is talking.
+ *
+ *  `aria-hidden` on the icon: the word beside it already names the speaker, and
+ *  a screen reader announcing "image, robot, Assistant" is the same fact twice
+ *  with a guess in the middle. */
 function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
   return (
     <div
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-1)",
         fontSize: "var(--text-xs)",
         fontWeight: "var(--weight-medium)",
-        color: "var(--fg-3)",
+        color: isUser ? "var(--accent)" : "var(--fg-3)",
       }}
     >
+      <span aria-hidden="true" style={{ display: "inline-flex" }}>
+        <Icon name={isUser ? "user" : "bot"} size={12} />
+      </span>
       {isUser
         ? t("editor.chrome.rightPanel.aiChat.you")
         : t("editor.chrome.rightPanel.aiChat.assistant")}
@@ -236,12 +260,11 @@ function AgentTurnView({
         </p>
       ) : null}
       {s !== undefined && s.summary.trim().length > 0 ? (
-        <p
-          data-testid="ai.agent-answer"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", margin: "var(--space-1) 0 0" }}
-        >
-          {s.summary}
-        </p>
+        <ChatMarkdown
+          testId="ai.agent-answer"
+          text={s.summary}
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", marginTop: "var(--space-1)" }}
+        />
       ) : null}
       {s !== undefined ? (
         <div
@@ -328,17 +351,32 @@ const ChatTurnView = memo(function ChatTurnView({
           {t("agent.composer.scopeLabel")}: {turn.scopeLabel}
         </div>
       ) : null}
-      <div
-        data-testid="ai.turn-text"
-        style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}
-      >
-        {turn.text}
-        {turn.streaming && (
-          <span data-testid="ai.turn-streaming" aria-hidden="true">
-            ▍
-          </span>
-        )}
-      </div>
+      {/* **A model's answer is markdown, always** (myne-md/myne#771). It was
+          rendered as `pre-wrap` plain text, so the asterisks, the backticks and
+          the list markers were all on screen as themselves — on the one surface
+          whose own honesty note asks the user to read the answer carefully.
+
+          The USER's side stays plain: what they typed is what they meant, and
+          re-interpreting it would mean a message containing `*` coming back
+          italic. Only the model's output is parsed, because only the model
+          wrote markdown on purpose. */}
+      {isUser ? (
+        <div
+          data-testid="ai.turn-text"
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}
+        >
+          {turn.text}
+        </div>
+      ) : (
+        <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)" }}>
+          <ChatMarkdown text={turn.text} testId="ai.turn-text" />
+          {turn.streaming && (
+            <span data-testid="ai.turn-streaming" aria-hidden="true">
+              ▍
+            </span>
+          )}
+        </div>
+      )}
       {!isUser && !turn.streaming && turn.text.length === 0 && !turn.error && (
         <p
           data-testid="ai.no-answer"

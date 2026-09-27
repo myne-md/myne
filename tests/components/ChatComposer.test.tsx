@@ -97,36 +97,37 @@ afterEach(() => {
 });
 
 describe("ChatComposer", () => {
-  it("offers the scope control, collapsed", () => {
-    // The "only one composer" claim belongs to `AiChatTab` and to e2e `ag6`,
-    // where the second one could actually reappear; from inside this component
-    // counting its own single textarea would only restate the JSX.
+  it("offers the scope control directly, not behind a disclosure", () => {
+    // It used to render a caption plus a Change button, and pressing Change
+    // replaced them with this same control — whose trigger you then pressed to
+    // open the menu. Two clicks and a layout shift to reach a control that
+    // already IS a disclosure (myne-md/myne#771).
+    //
+    // `design-notes/ai/0518` point 1 is what may not break: a
+    // user-originated scope control must be ON the composer, because removing
+    // it routes every folder-scale run through the model-originated expansion,
+    // which is the injection-reachable path. One click instead of two is a
+    // change of cost, not of presence.
     mount();
-    // Collapsed by default (#550): the scope reads as text with a control to
-    // change it, and the dropdown is one step back rather than gone.
-    expect(screen.getByTestId("ai.composer-scope-current")).toBeTruthy();
-    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     expect(screen.getByTestId("ai.composer-scope")).toBeTruthy();
+    expect(screen.queryByTestId("ai.composer-scope-change")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    expect(screen.getAllByTestId("ai.composer-scope-option").length).toBeGreaterThan(0);
   });
 
-  it("collapses the picker once a folder is chosen, and still shows its size", async () => {
+  it("keeps the size beside the picker once a folder is chosen", async () => {
     // The property issue A may not break: the count before sending is part of
-    // the mitigation `design-notes/ai/0515` names, not a nicety, so moving
-    // the picker behind a control must not take the number with it.
+    // the mitigation `design-notes/ai/0515` names, not a nicety, so changing
+    // how the picker is reached must not take the number with it.
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
       .getAllByTestId("ai.composer-scope-option")
       .find((o) => o.getAttribute("data-value") === "Projects");
     fireEvent.click(option!);
 
-    // Back to one line, naming what was chosen.
-    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
-    expect(screen.getByTestId("ai.composer-scope-current").textContent).toContain(
-      "Projects",
-    );
+    // The trigger names what was chosen — no second element to read it from.
+    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
     await waitFor(() =>
       expect(screen.getByTestId("ai.composer-scope-count").textContent).toContain("12"),
     );
@@ -163,12 +164,20 @@ describe("ChatComposer", () => {
     // Before the host has announced anything there is no number to show, and a
     // "0 of 3" would describe nothing.
     await waitFor(() => expect(announce).toBeDefined());
-    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
-      "agent.composer.checking",
-    );
+    expect(screen.queryByTestId("ai.composer-probe-at")).toBeNull();
 
     act(() => announce!({ attempt: 2, of: 3 }));
-    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+    expect(screen.getByTestId("ai.composer-probe-at").textContent).toContain(
+      "agent.composer.checkingAt",
+    );
+
+    // **It is NOT on the button** (myne-md/myne#771). The label grew to
+    // "Checking the model… (2/3)", and in a flex row with a `flex: 1` textarea
+    // that collapsed the input to three characters wide mid-keystroke: the
+    // user's own text squeezed out of the way by a status about the model. The
+    // button keeps one label and gains a spinner; the count lives in a row
+    // that already exists.
+    expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
       "agent.composer.checkingAt",
     );
 
@@ -179,9 +188,7 @@ describe("ChatComposer", () => {
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
-        "agent.composer.checking",
-      ),
+      expect(screen.queryByTestId("ai.composer-probe-at")).toBeNull(),
     );
   });
 
@@ -267,7 +274,6 @@ describe("ChatComposer", () => {
 
   it("sends the run under the attached folder, with the host's count shown first", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
       .getAllByTestId("ai.composer-scope-option")
@@ -309,7 +315,6 @@ describe("ChatComposer", () => {
   it("says the size could not be checked rather than showing nothing", async () => {
     agentPreviewGrant.mockRejectedValue(new Error("no"));
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
       .getAllByTestId("ai.composer-scope-option")
