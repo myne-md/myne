@@ -4357,12 +4357,6 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "copied": "Copied",
-      "copy": "Copy",
-      "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
-      "saveAsFile": "Save as file"
-    },
     "briefing": {
       "back": "Back",
       "continue": "Continue to vault creation",

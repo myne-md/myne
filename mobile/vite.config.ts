@@ -34,6 +34,14 @@ export default defineConfig(async () => ({
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
+      // The shared RECOVERY-KIT FILE FORMAT (myne-md/myne#468). Aliased for
+      // exactly the reason above: the kit is a plain-text document a user saves
+      // on one client and reads back into the recovery flow on ANOTHER, so its
+      // shape has to be one function or the two clients write two different
+      // documents under one name. A hand-copy drifts silently — nothing compares
+      // a phone's kit against a desktop's, and the failure surfaces as "my
+      // recovery file does not work", months later, with the file in hand.
+      { find: "@myne/recovery-kit", replacement: sib("../src/lib/recovery-kit.ts") },
       // The shared English catalog (repo-root `locales/en`) - now consumed only
       // by `src/lib/welcomeNote.ts` for its seed-time welcome-note copy. (The
       // editor host resolved its labels through this too until MYND-485 moved it
