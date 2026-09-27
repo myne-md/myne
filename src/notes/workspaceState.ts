@@ -69,6 +69,13 @@ export const TASKS_TAB_ID = "tasks";
  *  `onClose` instead of closing a tab. */
 export const ATTACHMENTS_TAB_ID = "attachments";
 
+/** The note-template library (myne-md/myne#779). A singleton like the rest: it
+ *  is one library per vault, so opening it twice reveals the first. It was a
+ *  MODAL, which `docs/decisions/ui/0619` classifies as the wrong shape for it —
+ *  you browse a template library, rename in it and delete from it, and none of
+ *  that is a question the app is asking you. */
+export const TEMPLATES_TAB_ID = "templates";
+
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
  * buffer renders. `"live"` is the default WYSIWYG editing surface; `"reading"`
@@ -116,6 +123,13 @@ export type WorkspaceItem =
   | {
       kind: "attachments";
       id: typeof ATTACHMENTS_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+    }
+  /** The note-template library (myne-md/myne#779). */
+  | {
+      kind: "templates";
+      id: typeof TEMPLATES_TAB_ID;
       pinned?: boolean;
       viewMode?: ViewMode;
     }
@@ -187,6 +201,11 @@ export function tasksItem(): WorkspaceItem {
 /** The attachment-library tab item (singleton - see [`ATTACHMENTS_TAB_ID`]). */
 export function attachmentsItem(): WorkspaceItem {
   return { kind: "attachments", id: ATTACHMENTS_TAB_ID };
+}
+
+/** The template-library tab item (singleton - see [`TEMPLATES_TAB_ID`]). */
+export function templatesItem(): WorkspaceItem {
+  return { kind: "templates", id: TEMPLATES_TAB_ID };
 }
 
 /** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`

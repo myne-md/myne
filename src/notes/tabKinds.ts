@@ -35,7 +35,12 @@
 
 import type { IconName } from "../lib/icons";
 import type { WorkspaceItem } from "./workspaceState";
-import { ATTACHMENTS_TAB_ID, GRAPH_TAB_ID, TASKS_TAB_ID } from "./workspaceState";
+import {
+  ATTACHMENTS_TAB_ID,
+  GRAPH_TAB_ID,
+  TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
+} from "./workspaceState";
 
 export type TabKind = WorkspaceItem["kind"];
 
@@ -109,6 +114,14 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     labelKey: "attachments.library.title",
     showsFocusedNote: false,
     openCommandId: "attachments.open",
+  },
+  {
+    kind: "templates",
+    singletonId: TEMPLATES_TAB_ID,
+    icon: "file-text",
+    labelKey: "templates.manager.title",
+    showsFocusedNote: false,
+    openCommandId: "templates.manage",
   },
   {
     kind: "tasks",

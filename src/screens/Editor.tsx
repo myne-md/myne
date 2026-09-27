@@ -104,7 +104,6 @@ import {
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
-import { TemplatesManager } from "../components/TemplatesManager";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
@@ -946,7 +945,6 @@ function EditorChrome({
     [showExportToast, confirmAttachments, confirmPdfExclusions, confirmEgress],
   );
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
-  const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
   // Whole-vault markdown export modal (MYND-211 task 3) - same Editor-local
@@ -2596,15 +2594,6 @@ function EditorChrome({
           and wins. Deferring only delays - the request stays latched and the
           dialog opens as soon as the offer is dismissed. */}
       <ThemeInstallDialog deferred={offerOpen} />
-      <TemplatesManager
-        open={templatesOpen}
-        onClose={() => setTemplatesOpen(false)}
-        onOpenNote={(id) => {
-          void ctx.open(id).catch(() => {
-            /* selection failure surfaces via sidebar UX */
-          });
-        }}
-      />
       <SnapshotsPanel
         open={snapshotsOpen}
         onClose={() => setSnapshotsOpen(false)}
@@ -2623,7 +2612,7 @@ function EditorChrome({
         onClose={() => setNewFromTemplateOpen(false)}
         onManageTemplates={() => {
           setNewFromTemplateOpen(false);
-          setTemplatesOpen(true);
+          ws.openTemplates();
         }}
         onBlankNote={() => {
           // Zero-templates degrade → the existing instant-blank path, unchanged.
@@ -2698,7 +2687,7 @@ function EditorChrome({
         }}
         onManageTemplates={() => {
           setPaletteOpen(false);
-          setTemplatesOpen(true);
+          ws.openTemplates();
         }}
         onNewNoteFromTemplate={() => {
           setPaletteOpen(false);

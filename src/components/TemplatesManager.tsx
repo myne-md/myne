@@ -23,7 +23,6 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
-import { ModalShell } from "./primitives/ModalShell";
 import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import {
   createTemplate,
@@ -36,6 +35,11 @@ import {
 
 interface TemplatesManagerProps {
   open: boolean;
+  /**
+   * Close the surface. As a tab this is "open a note and replace me", which the
+   * `onOpenNote` path already does — so it survives only for the callers that
+   * had one, and a tab body can pass a no-op.
+   */
   onClose: () => void;
   /** Open a template in the normal note editor (selects it + closes the surface). */
   onOpenNote: (id: NoteId) => void;
@@ -203,14 +207,19 @@ export function TemplatesManager({
   }, [onOpenNote, onClose, newTemplateName]);
 
   return (
-    <ModalShell
-      open={open}
-      title={t("templates.manager.title")}
-      onClose={onClose}
-      labelId="templates-modal-title"
-      width={560}
-      height={560}
-      closeLabel={t("templates.manager.closeLabel")}
+    // A TAB body, not a modal (myne-md/myne#779, docs/decisions/ui/0619). A
+    // template library is something you browse, rename in and delete from —
+    // none of which is a question the app is asking, which is the test that
+    // decides the shape. The title and the close affordance come from the tab
+    // strip now, so neither is rendered here.
+    <div
+      data-testid="templates.pane"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
     >
       <div style={TOOLBAR_STYLE}>
         <Button
@@ -286,6 +295,6 @@ export function TemplatesManager({
           })}
         </div>
       )}
-    </ModalShell>
+    </div>
   );
 }

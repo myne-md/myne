@@ -46,6 +46,7 @@ import {
   graphItem,
   tasksItem,
   attachmentsItem,
+  templatesItem,
   listSlots,
   noteItem,
   openInFocusedTab,
@@ -299,6 +300,8 @@ export type WorkspaceApi = {
   openTasks: () => void;
   /** Open (or reveal) the attachment-library tab (myne-md/myne#773). */
   openAttachments: () => void;
+  /** Open (or reveal) the template-library tab (myne-md/myne#779). */
+  openTemplates: () => void;
   /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
   setTaskViewState: (paneId: PaneId, next: TaskView) => void;
@@ -650,6 +653,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     () => openSingleton(attachmentsItem()),
     [openSingleton],
   );
+  const openTemplates = useCallback(
+    () => openSingleton(templatesItem()),
+    [openSingleton],
+  );
   const setTaskViewState = useCallback(
     (paneId: PaneId, next: TaskView) => {
       setState((s) => setTaskViewStateOp(s, paneId, next));
@@ -910,6 +917,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openGraph,
       openTasks,
       openAttachments,
+      openTemplates,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,
@@ -967,6 +975,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openGraph,
       openTasks,
       openAttachments,
+      openTemplates,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,
