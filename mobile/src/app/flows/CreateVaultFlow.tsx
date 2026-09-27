@@ -33,6 +33,12 @@ import {
   type SecretSaveOutcome,
 } from "../../lib/secret-export";
 import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
+import { setVaultLabel } from "../../lib/prefs";
+// The kit's file format, ALIASED to the desktop implementation rather than
+// re-derived here (`mobile/vite.config.ts` carries the reason): a kit saved on a
+// phone is read back by the recovery flow on a computer, so the document has to
+// be one function.
+import { recoveryKitText } from "@myne/recovery-kit";
 import type { CreateVaultFlowProps } from "./types";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow
@@ -49,11 +55,17 @@ const PLACEHOLDER_VAULT_ID = "dev-vault";
 
 type Step =
   | "briefing"
+  /** What to call this vault (myne-md/myne#468 K10). Desktop's twin: `name`. */
+  | "name"
   | "password"
   | "encrypting"
-  | "phrase"
+  /**
+   * The recovery kit: the phrase and the account number on ONE screen, styled as
+   * the file it saves. Replaces the former `phrase` step and the `account` step
+   * that followed the challenge (myne-md/myne#468 K11/K13).
+   */
+  | "kit"
   | "typeback"
-  | "account"
   | "committing"
   | "ready"
   | "unlocking";
@@ -207,6 +219,57 @@ function ConfirmRow({
   );
 }
 
+// ── Vault-name field (myne-md/myne#468) ───────────────────────────────────────
+//
+// Its own row rather than `Field` from `../../components`: this file already owns
+// `FieldShell` and its two siblings (`PasswordRow`, `ConfirmRow`), so a fourth
+// row on the same shell keeps the four fields of this flow identical by
+// construction. Sans rather than mono — a vault name is prose, unlike a password
+// or a BIP-39 word.
+function NameRow({
+  value,
+  onChange,
+  placeholder,
+  onSubmit,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  onSubmit: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <FieldShell focused={focused}>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        autoCorrect="off"
+        spellCheck={false}
+        autoFocus
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        // The software keyboard's Go/Done key advances the step, so naming the
+        // vault does not need the keyboard dismissed first.
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSubmit();
+        }}
+        data-testid="create-vault.name-input"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontSize: "var(--text-md)",
+          color: "var(--fg-1)",
+        }}
+      />
+    </FieldShell>
+  );
+}
+
 // ── Editable type-back word field ─────────────────────────────────────────────
 function WordEntry({
   position,
@@ -228,6 +291,12 @@ function WordEntry({
       </div>
       <FieldShell focused={focused} error={!!error} height={50}>
         <input
+          // Pinned left-to-right for the same reason `RecoveryGrid` is: the words
+          // are frozen English (`protocol.md` §7), and under an RTL locale a
+          // logical-direction field puts the caret and the typed word on the
+          // opposite side from where the grid showed them, on the one screen
+          // whose job is to catch a transcription error.
+          dir="ltr"
           value={value}
           autoCapitalize="none"
           autoCorrect="off"
@@ -406,6 +475,36 @@ function Wordmark({ size = 28 }: { size?: number }) {
  */
 const PHRASE_ACTION_STYLE = { marginTop: 14, height: 40, fontSize: 13 } as const;
 
+/** The recovery kit's sheet (myne-md/myne#468): page-coloured, bordered and
+ *  lifted, so it reads as a document rather than as another recessed card.
+ *  Hoisted out of the render for the same reason `PHRASE_ACTION_STYLE` is — an
+ *  inline object here would add to the hardcoded-value count the token ratchet
+ *  holds, in a file that is already near it. */
+const KIT_SHEET_STYLE = {
+  marginTop: "var(--space-4)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  padding: "var(--space-4)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-3)",
+  boxShadow: "var(--shadow-1)",
+} as const;
+
+/** The sheet's internal hairlines. A `<div>` rather than `<hr>`: `<hr>` carries a
+ *  `separator` role, and three of them inside one document is chrome a screen
+ *  reader reads out rather than structure it uses. */
+const KIT_RULE_STYLE = { height: 1, background: "var(--line-1)" } as const;
+
+/** A kit section's label: what this secret is, and what it is FOR. */
+const KIT_SECTION_LABEL_STYLE = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.45,
+  color: "var(--fg-2)",
+} as const;
+
 export function CreateVaultFlow({
   briefing,
   onCancel,
@@ -413,8 +512,14 @@ export function CreateVaultFlow({
   onAutoUnlockSuccess,
   onAutoUnlockFailed,
 }: CreateVaultFlowProps) {
-  const { t } = useTranslation();
-  const [step, setStep] = useState<Step>(briefing ? "briefing" : "password");
+  const { t, i18n } = useTranslation();
+  const [step, setStep] = useState<Step>(briefing ? "briefing" : "name");
+
+  // The vault's name, from the step before the password (myne-md/myne#468).
+  // NOT secret, so plain state rather than a ref, and it is applied as the
+  // vault's label after the auto-unlock — `prefs|vault_set_label` is
+  // unlock-gated, and during creation there is no unlocked slot to write into.
+  const [vaultName, setVaultName] = useState("");
 
   // Belt and braces on top of `copyMsg` being its own state: clear BOTH messages
   // whenever the step changes, so no confirmation can cross a step boundary and
@@ -454,22 +559,19 @@ export function CreateVaultFlow({
   const [challenge, setChallenge] = useState<number[]>([]);
   const [answers, setAnswers] = useState<string[]>(["", "", "", ""]);
 
-  // OB-05 account
-  const [saved, setSaved] = useState(false);
-  const savedAckLabelId = useId();
-  // Feedback for the "Save to file" (recovery phrase / account number) actions.
+  // Feedback for the kit's "Save to file" action.
   const [fileMsg, setFileMsg] = useState<string | null>(null);
-  // The copy outcome gets its OWN state, not `fileMsg`.
+  // The copy outcome keeps its OWN state, not `fileMsg`, and the reason is worth
+  // keeping now that the two steps have merged into one.
   //
-  // `fileMsg` is never reset and is rendered by TWO steps, the phrase step and
-  // the account step. Writing the phrase-copy confirmation into it left
-  // "Copied. It stays on this device…" on screen permanently, and still showing
-  // two steps later directly under the ACCOUNT NUMBER, where it reads as a
-  // confirmation that the account number was copied and is expiring. That is a
-  // false statement about a bearer token, and it is exactly the stale-confirmation
-  // defect this whole change exists to remove, reintroduced by reusing a field.
+  // `fileMsg` used to be rendered by the phrase step AND the account step and was
+  // never reset, so a phrase-copy confirmation stayed on screen and reappeared
+  // two steps later directly under the ACCOUNT NUMBER, reading as a confirmation
+  // that the account number had been copied and was expiring — a false statement
+  // about a bearer token. The merge removes the two-step distance but not the
+  // argument: Copy and Save are still two affordances with two claims, and one
+  // field for both is how a stale confirmation gets read as a fresh one.
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   // Tier 1's render gate (myne-md/myne#455). Starts `false`, so on the frame
   // before the probe answers the button is ABSENT rather than present, a
   // control that appears and then vanishes on an Android phone would be worse
@@ -526,7 +628,7 @@ export function CreateVaultFlow({
           setAccount(PLACEHOLDER_ACCOUNT);
         }
         if (cancelled) return;
-        setStep("phrase");
+        setStep("kit");
       } catch (e) {
         if (cancelled) return;
         startedRef.current = false; // allow a retry from the password step
@@ -550,13 +652,6 @@ export function CreateVaultFlow({
     },
     [],
   );
-
-  // Copy auto-reset.
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 1600);
-    return () => clearTimeout(t);
-  }, [copied]);
 
   const setPassword = (v: string) => {
     pwdRef.current = v;
@@ -590,8 +685,12 @@ export function CreateVaultFlow({
       committedRef.current = true;
       setStep("ready");
     } catch {
+      // Back to the challenge, which is where the commit was requested from now
+      // that the account number no longer has a step of its own. The typed words
+      // are still in state, so the banner appears above a challenge the user has
+      // already passed and can retry with one tap.
       setCommitError(t("createVault.commitError"));
-      setStep("account");
+      setStep("typeback");
     }
   };
 
@@ -601,6 +700,16 @@ export function CreateVaultFlow({
     try {
       if (HAS_TAURI) await unlockWithPassword(pwdRef.current, id);
       wipeSecrets();
+      // The name from the first step becomes the vault's label, and it has to
+      // happen HERE: `prefs|vault_set_label` writes under the active vault's
+      // `prefs_key`, so it is unlock-gated and the line above is what unlocks.
+      // Best-effort, like `seedWelcomeNote` below and for the same reason — the
+      // vault is open, so a failed rename must not route a successfully unlocked
+      // user to the unlock-failed path. An empty name leaves the picker's neutral
+      // fallback, which is the right answer, so nothing is written for one.
+      if (HAS_TAURI && vaultName.trim().length > 0) {
+        await setVaultLabel(vaultName.trim()).catch(() => {});
+      }
       // MYND-118 mobile mirror — seed the onboarding Welcome note now the
       // new vault is unlocked (note_create requires an unlocked slot).
       // Best-effort: seedWelcomeNote never throws, so a failure here can't
@@ -619,37 +728,38 @@ export function CreateVaultFlow({
     onCommitSuccess(id);
   };
 
-  const copyAccount = () => {
-    // #51: check the write, and use the SECRET copy helper so the auto-clear
-    // happens. This used to fire the raw WebView clipboard write and set
-    // "Copied ✓" unconditionally, so a denied clipboard (the common case on a
-    // browser surface, and possible on iOS) told the user their once-only
-    // account number was safely copied when nothing was. It also bypassed the
-    // auto-clear, leaving a bearer token on the system clipboard indefinitely.
-    // myne-md/myne#455: the write above now reaches a plugin that EXISTS. The
-    // shape below was already right, check the write, report the failure, and
-    // it reported a failure on every tap because the plugin it dispatched to was
-    // never registered. Both outcomes are now stated as a feedback pair instead
-    // of being reconstructed from a `null` check at the call site.
-    void (async () => {
-      const cancel = await copySecretToClipboard(account, {
-        onSuccess: { kind: "inline", run: () => setCopied(true) },
-        onFailure: { kind: "inline", run: () => setFileMsg(t("vaultCreation.account.copyFailed")) },
-      });
-      if (cancel === null) return;
-      clipboardCancelRef.current?.();
-      clipboardCancelRef.current = cancel;
-    })();
-  };
+  // What Save writes and what Copy puts on the clipboard: the same bytes, from
+  // the same shared function the desktop uses, so a kit saved on a phone is the
+  // document the recovery flow on a computer expects (myne-md/myne#468).
+  const kitText = (): string =>
+    recoveryKitText({
+      vaultName,
+      savedOn: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(
+        new Date(),
+      ),
+      phrase: phraseRef.current,
+      accountNumber: account,
+      labels: {
+        title: t("vaultCreation.kit.documentTitle"),
+        phraseHeading: t("vaultCreation.kit.phraseFor"),
+        accountHeading: t("vaultCreation.kit.accountFor"),
+      },
+    });
 
-  // Tier 1: the recovery phrase. Same secret path as the account number, and the
-  // difference is the GATE above, not the write. Both outcomes are reported
-  // inline through `fileMsg`, the line this step already uses for the save
-  // result, a shown-once screen wants a persistent confirmation, not a toast
-  // the user can miss.
-  const copyPhrase = () => {
+
+  // Tier 1: the recovery KIT — both secrets, as one document. Same secret path
+  // the account number used to have of its own, and the difference is the GATE
+  // above, not the write. Both outcomes are reported inline through `copyMsg`,
+  // because a shown-once screen wants a persistent confirmation rather than a
+  // toast the user can miss.
+  //
+  // The two outcome strings keep their `createVault.phrase*` key names. They are
+  // accurate for a kit — what they claim is about the CLIPBOARD, not about which
+  // secret is on it — and renaming them would leave thirty-one catalogs stale for
+  // no gain the reader can see.
+  const copyKit = () => {
     void (async () => {
-      const cancel = await copySecretToClipboard(phraseRef.current.join(" "), {
+      const cancel = await copySecretToClipboard(kitText(), {
         onSuccess: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopied")) },
         onFailure: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopyFailed")) },
       });
@@ -682,22 +792,9 @@ export function CreateVaultFlow({
     }
   };
 
-  const saveAccountFile = () => {
+  const saveKitFile = () => {
     void (async () => {
-      setFileMsg(saveMessage(await saveSecretToDocuments("myne-account-number.txt", account)));
-    })();
-  };
-
-  const savePhraseFile = () => {
-    void (async () => {
-      setFileMsg(
-        saveMessage(
-          await saveSecretToDocuments(
-            "myne-recovery-phrase.txt",
-            phraseRef.current.join(" "),
-          ),
-        ),
-      );
+      setFileMsg(saveMessage(await saveSecretToDocuments("myne-recovery-kit.txt", kitText())));
     })();
   };
 
@@ -705,7 +802,11 @@ export function CreateVaultFlow({
   if (step === "briefing") {
     return (
       <Screen>
-        <FlowHeader label={t("createVault.stepLabel", { current: 1, total: 5 })} />
+        {/* No number. The briefing is first-run only, so counting it promises a
+            length the flow does not have on the picker's "create another" entry
+            (myne-md/myne#468). The four steps the user ALWAYS walks are numbered;
+            this one and the three waits are not. */}
+        <FlowHeader label={t("createVault.briefingTitle")} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("createVault.briefingTitle")}</Title>
           <Lead>
@@ -743,7 +844,62 @@ export function CreateVaultFlow({
           <Button variant="secondary" full={false} onClick={onCancel}>
             {t("common.back")}
           </Button>
-          <Button disabled={!acks.every(Boolean)} onClick={() => setStep("password")}>
+          <Button disabled={!acks.every(Boolean)} onClick={() => setStep("name")}>
+            {t("common.continue")}
+          </Button>
+        </FooterBar>
+      </Screen>
+    );
+  }
+
+  // ── Name the vault (myne-md/myne#468 K10) ───────────────────────────────────
+  //
+  // Blank is a legitimate answer: there is no validation beyond the 4096-byte cap
+  // the backend already enforces, and an empty name leaves the neutral fallback
+  // the picker has always had. So Continue is never disabled — a step the user
+  // may skip must not look like a gate.
+  if (step === "name") {
+    const goOn = () => {
+      setVaultName((v) => v.trim());
+      setStep("password");
+    };
+    return (
+      <Screen>
+        <FlowHeader
+          label={t("createVault.stepLabel", { current: 1, total: 4 })}
+          onBack={briefing ? () => setStep("briefing") : onCancel}
+        />
+        <div style={{ flex: 1, padding: "18px 22px 0" }}>
+          <Title>{t("vaultCreation.name.heading")}</Title>
+          <Lead>{t("vaultCreation.name.intro")}</Lead>
+          <div style={{ marginBlockStart: "var(--space-5)" }}>
+            <NameRow
+              value={vaultName}
+              onChange={setVaultName}
+              placeholder={t("vaultCreation.name.placeholder")}
+              onSubmit={goOn}
+            />
+          </div>
+          <div
+            style={{
+              marginBlockStart: "var(--space-2)",
+              fontSize: "var(--text-sm)",
+              lineHeight: 1.5,
+              color: "var(--fg-3)",
+            }}
+          >
+            {t("vaultCreation.name.helper")}
+          </div>
+        </div>
+        <FooterBar style={{ padding: "14px 20px" }}>
+          <Button
+            variant="secondary"
+            full={false}
+            onClick={briefing ? () => setStep("briefing") : onCancel}
+          >
+            {t("common.back")}
+          </Button>
+          <Button onClick={goOn} data-testid="create-vault.name-continue">
             {t("common.continue")}
           </Button>
         </FooterBar>
@@ -755,7 +911,7 @@ export function CreateVaultFlow({
   if (step === "password") {
     return (
       <Screen>
-        <FlowHeader label={t("createVault.stepLabel", { current: 2, total: 5 })} onBack={briefing ? () => setStep("briefing") : onCancel} />
+        <FlowHeader label={t("createVault.stepLabel", { current: 2, total: 4 })} onBack={() => setStep("name")} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
           <Title>{t("createVault.passwordTitle")}</Title>
           {beginError && (
@@ -781,7 +937,7 @@ export function CreateVaultFlow({
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px" }}>
-          <Button variant="secondary" full={false} onClick={briefing ? () => setStep("briefing") : onCancel}>
+          <Button variant="secondary" full={false} onClick={() => setStep("name")}>
             {t("common.back")}
           </Button>
           <Button disabled={!passwordValid} onClick={() => { setBeginError(null); setStep("encrypting"); }}>
@@ -804,32 +960,98 @@ export function CreateVaultFlow({
     );
   }
 
-  // ── OB · Recovery phrase reveal ─────────────────────────────────────────────
-  if (step === "phrase") {
+  // ── The recovery kit (myne-md/myne#468 K11/K13) ──────────────────────────────
+  //
+  // The phrase and the account number on ONE screen, styled as the document the
+  // Save button writes. This replaces the former phrase step and the account step
+  // that used to follow the challenge: no product in the research survey asks a
+  // user to absorb two consecutive "keep this forever" moments, and the second
+  // one arrived after the challenge had already been passed, so it read as an
+  // epilogue. One sheet, one Save, one acknowledgement.
+  //
+  // No "both secrets are in one file" warning box: the sheet IS that statement,
+  // which is the whole argument for the merge.
+  //
+  // Mobile keeps its own two things. The phrase reveals in halves
+  // (`showSecondHalf`) because 24 mono words do not fit a phone at a readable
+  // size, and the export actions stay gated on the full reveal, as they were.
+  if (step === "kit") {
     const words = showSecondHalf ? phraseRef.current : phraseRef.current.slice(0, 12);
     return (
       <Screen>
-        <ScreenScroll style={{ padding: "64px 24px 8px" }}>
-          <Title>{t("createVault.phraseTitle")}</Title>
+        <FlowHeader label={t("createVault.stepLabel", { current: 3, total: 4 })} />
+        <ScreenScroll style={{ padding: "18px 22px 8px" }}>
+          <Title>{t("vaultCreation.kit.heading")}</Title>
           <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-            {t("createVault.phraseIntro")}
+            {t("vaultCreation.kit.intro")}
           </p>
           <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
             This is the only key to your vault. We can't reset it. Lose these words and the notes are
             gone for good.
           </Banner>
-          <div style={{ marginTop: 20 }}>
+
+          {/* The sheet: page-coloured, bordered and lifted, so it reads as a
+              document on the screen rather than as another recessed card. */}
+          <div style={KIT_SHEET_STYLE} data-testid="create-vault.kit-sheet">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+              <span
+                style={{
+                  fontSize: "var(--text-base)",
+                  fontWeight: "var(--weight-semibold)",
+                  color: "var(--fg-1)",
+                }}
+              >
+                {t("vaultCreation.kit.documentTitle")}
+              </span>
+              <span
+                style={{
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-3)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                data-testid="create-vault.kit-meta"
+              >
+                {vaultName}
+              </span>
+            </div>
+            <div style={KIT_RULE_STYLE} />
+            <p style={KIT_SECTION_LABEL_STYLE}>{t("vaultCreation.kit.phraseFor")}</p>
             <RecoveryGrid words={words} />
+            {!showSecondHalf && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowSecondHalf(true)}
+                style={{ marginTop: 4, height: 40, fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500 }}
+              >
+                {t("createVault.showSecondHalf")}
+              </Button>
+            )}
+            <div style={KIT_RULE_STYLE} />
+            {/* The account number's stated reason is ADDING A DEVICE (K13), not
+                "registering for sync": the second device signs in with the
+                account number and a password, which is what `sync.join.help`
+                says, and it is a reason a first-time user can act on. */}
+            <p style={KIT_SECTION_LABEL_STYLE}>{t("vaultCreation.kit.accountFor")}</p>
+            <AccountNumber value={account} />
           </div>
-          {!showSecondHalf && (
-            <Button
-              variant="secondary"
-              onClick={() => setShowSecondHalf(true)}
-              style={{ marginTop: 14, height: 40, fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500 }}
-            >
-              {t("createVault.showSecondHalf")}
-            </Button>
-          )}
+
+          {/* Why the words are not in the reader's language, said once, where the
+              question occurs. Without it an untranslated grid in a translated UI
+              reads as a missing translation, and a user "helpfully" translating
+              the words back has destroyed their only backup. */}
+          <p
+            style={{
+              marginBlock: "var(--space-3) 0",
+              fontSize: "var(--text-sm)",
+              lineHeight: 1.55,
+              color: "var(--fg-3)",
+            }}
+            data-testid="create-vault.kit-english-note"
+          >
+            {t("vaultCreation.kit.whyEnglish")}
+          </p>
           {showSecondHalf && (
             <>
               {/* Tier 1 (myne-md/myne#455). Rendered only where the OS can hold
@@ -846,12 +1068,22 @@ export function CreateVaultFlow({
                   screenshot the phrase instead, which is what `screen_guard`
                   exists to prevent. */}
               {canCopyPhrase && (
-                <Button variant="secondary" onClick={copyPhrase} style={PHRASE_ACTION_STYLE}>
+                <Button
+                  variant="secondary"
+                  onClick={copyKit}
+                  style={PHRASE_ACTION_STYLE}
+                  data-testid="create-vault.kit-copy"
+                >
                   <Icon name="copy" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-                  {t("createVault.copyPhrase")}
+                  {t("vaultCreation.kit.copy")}
                 </Button>
               )}
-              <Button variant="secondary" onClick={savePhraseFile} style={PHRASE_ACTION_STYLE}>
+              <Button
+                variant="secondary"
+                onClick={saveKitFile}
+                style={PHRASE_ACTION_STYLE}
+                data-testid="create-vault.kit-save"
+              >
                 <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
                 {t("createVault.saveToFile")}
               </Button>
@@ -872,10 +1104,17 @@ export function CreateVaultFlow({
   if (step === "typeback") {
     return (
       <Screen>
-        <FlowHeader label={t("createVault.stepLabel", { current: 3, total: 5 })} onBack={() => setStep("phrase")} />
+        <FlowHeader label={t("createVault.stepLabel", { current: 4, total: 4 })} onBack={() => setStep("kit")} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
           <Title>{t("createVault.typebackTitle")}</Title>
           <Lead>{t("createVault.typebackLead")}</Lead>
+          {/* The commit failure lands here, because this is where the commit is
+              requested from now that the account number has no step of its own. */}
+          {commitError && (
+            <Banner kind="danger" style={{ marginTop: 16 }}>
+              {commitError}
+            </Banner>
+          )}
           <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
             {challenge.map((idx, i) => (
               <WordEntry
@@ -889,73 +1128,18 @@ export function CreateVaultFlow({
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px" }}>
-          <Button variant="secondary" full={false} style={{ fontSize: 14, padding: "0 18px" }} onClick={() => setStep("phrase")}>
+          <Button variant="secondary" full={false} style={{ fontSize: 14, padding: "0 18px" }} onClick={() => setStep("kit")}>
             {t("createVault.backToPhrase")}
           </Button>
-          <Button disabled={!allCorrect} onClick={() => setStep("account")}>
-            {t("common.continue")}
-          </Button>
-        </FooterBar>
-      </Screen>
-    );
-  }
-
-  // ── OB-05 · Account number ──────────────────────────────────────────────────
-  if (step === "account") {
-    return (
-      <Screen>
-        <FlowHeader label={t("createVault.stepLabel", { current: 4, total: 5 })} onBack={startTypeBack} />
-        <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>{t("createVault.accountTitle")}</Title>
-          <Lead>
-            {t("createVault.accountLead")}
-          </Lead>
-          {commitError && (
-            <Banner kind="danger" style={{ marginTop: 16 }}>
-              {commitError}
-            </Banner>
-          )}
-          <div style={{ marginTop: 20 }}>
-            <AccountNumber value={account} />
-          </div>
-          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-            <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={copyAccount}>
-              <Icon name={copied ? "check" : "copy"} size={16} color={copied ? "var(--success)" : "var(--fg-2)"} strokeWidth={1.5} />
-              {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
-            </Button>
-            <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={saveAccountFile}>
-              <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-              {t("vaultCreation.account.saveAsFile")}
-            </Button>
-          </div>
-          {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)" }}>{fileMsg}</p>}
-          <div style={{ marginTop: 22, display: "flex", gap: 12, paddingTop: 16, borderTop: "1px solid var(--line-1)" }}>
-            <button
-              type="button"
-              onClick={() => setSaved((v) => !v)}
-              aria-pressed={saved}
-              // Same unnamed-toggle fix as the shared `Check` row above
-              // (myne#728, task 16): the button holds a glyph, the sentence
-              // beside it is the name.
-              aria-labelledby={savedAckLabelId}
-              style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flex: "none" }}
-            >
-              <Checkbox checked={saved} />
-            </button>
-            <div
-              id={savedAckLabelId}
-              onClick={() => setSaved((v) => !v)}
-              style={{ flex: 1, fontSize: 15, lineHeight: 1.45, color: "var(--fg-1)", cursor: "pointer" }}
-            >
-              {t("createVault.accountSavedAck")}
-            </div>
-          </div>
-        </div>
-        <FooterBar>
-          <Button variant="secondary" full={false} onClick={startTypeBack}>
-            {t("common.back")}
-          </Button>
-          <Button disabled={!saved} onClick={() => void commit()}>
+          {/* This COMMITS. The challenge is the last step, and what gates it is
+              the type-back rather than the checkbox the account step used to
+              carry: `protocol.md` §7.1.3 says a bare checkbox is not evidence, so
+              deleting it made the gate stronger rather than looser. */}
+          <Button
+            disabled={!allCorrect}
+            onClick={() => void commit()}
+            data-testid="create-vault.commit"
+          >
             {t("createVault.commit")}
           </Button>
         </FooterBar>

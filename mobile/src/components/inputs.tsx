@@ -177,7 +177,18 @@ export function RecoveryGrid({
   blurred?: boolean;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}>
+    // `dir="ltr"`, and it is a correctness fix rather than typography
+    // (myne-md/myne#468). The ORDER of the words is part of the secret,
+    // `recovery-flow.md` §2.4 commits to never showing them again, and BIP-39's
+    // checksum does not catch a permutation — so under an RTL locale a grid laid
+    // out in the locale's direction hands the user a transcription whose
+    // wrongness is undiscoverable until the phrase fails to open the vault. The
+    // surrounding page stays in the locale's own direction.
+    <div
+      dir="ltr"
+      data-testid="recovery-grid"
+      style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}
+    >
       {words.map((w, i) => (
         <div
           key={i}

@@ -85,7 +85,7 @@
   "web/src/UnsupportedEnvironment.tsx": 3,
   "web/src/VaultOpenElsewhere.tsx": 1,
   "mobile/src/app/flows/AttachmentsSheet.tsx": 50,
-  "mobile/src/app/flows/CreateVaultFlow.tsx": 66,
+  "mobile/src/app/flows/CreateVaultFlow.tsx": 56,
   "mobile/src/app/flows/EditorFlow.tsx": 89,
   "mobile/src/app/flows/JoinFlow.tsx": 39,
   "mobile/src/app/flows/PickerFlow.tsx": 17,

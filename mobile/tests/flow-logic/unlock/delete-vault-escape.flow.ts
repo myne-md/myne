@@ -16,7 +16,12 @@ test.describe("mobile delete-vault escape", () => {
     await page.getByTestId("unlock-delete-confirm").click();
 
     // Lands back on Welcome (fresh-start), and the real delete IPC ran once.
-    await expect(page.getByRole("button", { name: "Create a vault" })).toBeVisible();
+    // "Create a local vault instead", not "Create a vault": the mobile Welcome
+    // became identity-first in myne-md/myne#768 and that label went with it, so
+    // this lookup had been waiting thirty seconds for a button that no longer
+    // exists. Nothing reported it — a Playwright label is not typechecked, and a
+    // stale one reads as a hung app rather than as a renamed control.
+    await expect(page.getByRole("button", { name: "Create a local vault instead" })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { __vaultDeletes?: number }).__vaultDeletes ?? 0)).toBe(1);
   });
 
@@ -32,6 +37,6 @@ test.describe("mobile delete-vault escape", () => {
 
     await expect(page.getByTestId("unlock-delete-error")).toBeVisible();
     await page.getByTestId("unlock-delete-continue").click();
-    await expect(page.getByRole("button", { name: "Create a vault" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create a local vault instead" })).toBeVisible();
   });
 });

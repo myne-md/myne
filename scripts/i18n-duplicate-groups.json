@@ -361,14 +361,6 @@
     "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
   },
   {
-    "value": "Couldn't copy. Use \"Save as file\" instead.",
-    "keys": [
-      "vaultCreation.account.copyFailed",
-      "vaultCreation.phrase.copyFailed"
-    ],
-    "reason": "Same copy-failed notice on the account-number and phrase steps; one event, one string."
-  },
-  {
     "value": "Before you create your vault",
     "keys": [
       "vaultCreation.briefing.eyebrow",

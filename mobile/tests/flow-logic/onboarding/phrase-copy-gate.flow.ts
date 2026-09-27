@@ -30,10 +30,15 @@ import { installMockIpc } from "../mock-ipc";
 
 const PASSWORD = "correct horse battery staple";
 
-/** Walk Welcome to briefing to password to the phrase reveal. */
-async function reachPhraseStep(page: import("@playwright/test").Page): Promise<void> {
+/** Walk Welcome to briefing to name to password to the recovery kit. */
+async function reachKitStep(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create a vault" }).click();
+  // "Create a local vault instead", not "Create a vault": the mobile Welcome
+  // became identity-first in myne-md/myne#768 and that label went with it, so
+  // this lookup had been waiting thirty seconds for a button that no longer
+  // exists. Nothing reported it — a Playwright label is not typechecked, and a
+  // stale one reads as a hung app rather than as a renamed control.
+  await page.getByRole("button", { name: "Create a local vault instead" }).click();
 
   // The briefing's three acknowledgements, clicked by TEXT: the rows are labels
   // wrapping a checkbox, and checking the input alone does not enable Continue.
@@ -45,6 +50,11 @@ async function reachPhraseStep(page: import("@playwright/test").Page): Promise<v
     await page.getByText(fragment, { exact: false }).first().click();
   }
   await page.getByRole("button", { name: "Continue" }).click();
+
+  // The vault-name step (myne-md/myne#468) sits between the briefing and the
+  // password, and the kit's Copy copies the whole kit, header included.
+  await page.getByTestId("create-vault.name-input").fill("Gate Kasa");
+  await page.getByTestId("create-vault.name-continue").click();
 
   const pwInputs = page.locator('input[type="password"]');
   await expect(pwInputs).toHaveCount(2);
@@ -60,7 +70,7 @@ async function reachPhraseStep(page: import("@playwright/test").Page): Promise<v
 test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
   test("iOS: no Copy while the pasteboard behaviour is unverified", async ({ page }) => {
     await installMockIpc(page, { freshDevice: true, devicePlatform: "ios" });
-    await reachPhraseStep(page);
+    await reachKitStep(page);
 
     // Save to file first, as the control: this assertion is an ABSENCE, and an
     // absence passes trivially if the step never rendered at all.
@@ -70,7 +80,7 @@ test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
 
   test("Android: no Copy, and that one does not change when the gate opens", async ({ page }) => {
     await installMockIpc(page, { freshDevice: true, devicePlatform: "android" });
-    await reachPhraseStep(page);
+    await reachKitStep(page);
 
     await expect(page.getByRole("button", { name: "Save to file" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
