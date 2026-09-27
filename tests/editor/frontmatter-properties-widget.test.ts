@@ -65,26 +65,26 @@ describe("frontmatter widget: presence", () => {
     expect(titleInput(m).value).toBe("Hi");
   });
 
-  it("draws the key/value block as one table, with the note title outside it", () => {
-    // The shape the border is painted on (myne-md/myne#773). Before this the
-    // header, the rows and the add control were three siblings of the note
-    // title with nothing around them, so nothing said where the structure
-    // began or ended — and a border on the container would have boxed the note
-    // title in with its own frontmatter, which it is not part of.
+  it("keeps the note title out of the key/value block", () => {
+    // The frontmatter block was drawn as one bordered table for a round
+    // (myne-md/myne#773) and the border is withdrawn: at the head of every
+    // note with frontmatter it competed with the prose it introduces, which
+    // is the thing a reader is there for.
+    //
+    // What the border was holding together is still true and still worth a
+    // test, which is why this is narrowed rather than deleted: the note title
+    // is the NOTE's, not a row of its frontmatter, so it must not be inside
+    // the properties list however that list is drawn next.
     m = mount("---\ntitle: Hi\nstatus: draft\n---\nbody\n");
-    const table = m.host.querySelector(".cm-fm-properties-table");
-    expect(table, "no table element to paint a border on").not.toBeNull();
-    for (const cls of [
-      ".cm-fm-properties-title",
-      ".cm-fm-properties-list",
-      ".cm-fm-properties-add",
-    ]) {
-      expect(table!.querySelector(cls), `${cls} is outside the table`).not.toBeNull();
-    }
+    const list = m.host.querySelector(".cm-fm-properties-list");
+    expect(list, "no properties list").not.toBeNull();
     expect(
-      table!.querySelector(".cm-fm-properties-name"),
-      "the note title belongs to the note, not to its frontmatter table",
+      list!.querySelector(".cm-fm-properties-name"),
+      "the note title belongs to the note, not to its frontmatter rows",
     ).toBeNull();
+    // And it is on screen — outside the list, not absent, which is the other
+    // way this assertion can be satisfied by a defect.
+    expect(titleInput(m).value).toBe("Hi");
   });
 
   it("a doc with no frontmatter renders no widget", () => {

@@ -203,7 +203,6 @@ export const ROSTER = Object.freeze([
       "src/notes/agent/AgentPane.tsx",
       "src/notes/agent/AgentHubList.tsx",
       "src/notes/agent/AgentConversationView.tsx",
-      "src/notes/agent/AgentRunOrb.tsx",
       "src/notes/ai/ConversationSurface.tsx",
       "src/notes/tabKinds.ts",
     ],

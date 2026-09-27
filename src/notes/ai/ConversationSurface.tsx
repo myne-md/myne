@@ -47,7 +47,6 @@ import {
 } from "./chatPersist";
 import { useAgent } from "../agent/agentStore";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
-import { AgentRunOrb } from "../agent/AgentRunOrb";
 import { RunCostLine } from "../agent/components/RunCostLine";
 import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
@@ -243,32 +242,11 @@ function AgentTurnView({
           </div>
         ) : null}
       </div>
-      {/* **The run indicator's real home** (myne-md/myne#771).
-
-          This line is what an in-flight agent turn shows, and it was the word
-          "Working" in grey and nothing else: the one place the user is
-          certainly looking during a run, and the only place on the surface
-          with no sign of life in it. The orb sat in the pane's top row and in
-          the tab instead — both true, both peripheral — so an indicator built
-          to report a multi-minute wait was, in practice, never seen.
-
-          It also settles the motion exemption's terms better than either of
-          those (`docs/decisions/ai/0621`): the requirement is that the run's
-          status be stated in WORDS beside the shape, and here the words are
-          not merely nearby, they are the same line. */}
       {working && s === undefined && !turn.error ? (
         <p
           data-testid="ai.agent-working"
-          style={{
-            ...TURN_TEXT_STYLE,
-            color: "var(--fg-3)",
-            margin: "var(--space-1) 0 0",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-2)",
-          }}
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "var(--space-1) 0 0" }}
         >
-          <AgentRunOrb />
           {t("agent.progress.working")}
         </p>
       ) : null}

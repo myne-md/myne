@@ -189,7 +189,6 @@ export default defineConfig(async () => ({
       // for one of those five to go missing, on a surface where nobody would
       // look. Its imports are React and the shared agent store, both of which
       // mobile already consumes.
-      { find: /^@myne\/run-orb$/, replacement: sib("../src/notes/agent/AgentRunOrb.tsx") },
       // The last-run undo's LOGIC, shared rather than retyped. Its own header is
       // the argument: it carries three recorded defect fixes, each invisible
       // until it happens to a user, and it imports neither client's bindings:
