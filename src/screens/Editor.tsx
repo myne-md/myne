@@ -2304,7 +2304,6 @@ function EditorChrome({
                 switching={switching}
               />
               <NotesSidebarList
-                onNewFromTemplate={() => setNewFromTemplateOpen(true)}
                 exportHooks={exportHooks}
               />
             </div>

@@ -16,7 +16,7 @@
 // guess.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const prefsMock = vi.hoisted(() => ({ keymap: {} as Record<string, string[]> }));
 vi.mock("../../src/hooks/usePrefs", () => ({
@@ -45,27 +45,40 @@ describe("the sidebar search row", () => {
     expect(ran).toEqual(["palette.open"]);
   });
 
-  it("shows the DEFAULT chord when the user has not rebound the palette", () => {
+  /** Focus the row and return the tooltip bubble's text. */
+  function tooltipText(): string {
+    fireEvent.focus(screen.getByTestId("notes.sidebar-search"), { bubbles: true });
+    const bubble = document.querySelector('[role="tooltip"]');
+    return bubble?.textContent ?? "";
+  }
+
+  it("draws NO inline keycaps — the row stays quiet", () => {
+    // The visual ask: de-boxed, and without the chord taking up the row.
     render(<SidebarSearchRow />);
-    expect(screen.getByTestId("keycaps")).toBeTruthy();
+    expect(screen.queryByTestId("keycaps")).toBeNull();
+  });
+
+  it("teaches the DEFAULT chord in the tooltip", () => {
+    render(<SidebarSearchRow />);
+    expect(tooltipText().toLowerCase()).toContain("k");
   });
 
   it("follows a REBOUND palette chord instead of the in-code default", () => {
     prefsMock.keymap = { "palette.toggle": ["Mod-Shift-p"] };
     render(<SidebarSearchRow />);
-    const caps = screen.getByTestId("keycaps").textContent ?? "";
-    // The override's own key, not `k`. Reading `defaultBindings` here would
-    // keep showing the old chord forever, on the one surface whose job is to
-    // teach the shortcut.
-    expect(caps.toLowerCase()).toContain("p");
-    expect(caps.toLowerCase()).not.toContain("k");
+    const text = tooltipText().toLowerCase();
+    // The override's own key, not `k`. Reading `defaultBindings` here would go
+    // on showing the old chord forever, on the surface whose job is to teach it.
+    expect(text).toContain("p");
+    expect(text).not.toContain("⌘k");
   });
 
-  it("renders NO keycap when the palette has been explicitly unbound", () => {
+  it("shows no chord when the palette has been explicitly unbound", () => {
     // An explicit `[]` is an unbind, honoured verbatim by `effectiveChords`.
-    // A guessed cap here would be a shortcut that does nothing.
+    // A guessed hint here would be a shortcut that does nothing.
     prefsMock.keymap = { "palette.toggle": [] };
     render(<SidebarSearchRow />);
-    expect(screen.queryByTestId("keycaps")).toBeNull();
+    const text = tooltipText();
+    expect(text.trim()).toBe("Search");
   });
 });

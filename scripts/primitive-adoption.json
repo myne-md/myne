@@ -61,7 +61,7 @@
   "src/notes/components/MemoryPopover.tsx": 4,
   "src/notes/components/NewTabChooser.tsx": 4,
   "src/notes/components/NoteActionsMenu.tsx": 3,
-  "src/notes/components/NoteList.tsx": 4,
+  "src/notes/components/NoteList.tsx": 3,
   "src/notes/components/NoteRow.tsx": 2,
   "src/notes/components/OutlineTab.tsx": 2,
   "src/notes/components/SaveStatus.tsx": 1,

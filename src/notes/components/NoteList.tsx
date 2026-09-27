@@ -68,7 +68,6 @@ import { EmptyState as ZeroState } from "../../components/primitives/EmptyState"
 import { tabKindSpec } from "../tabKinds";
 import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
-import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { ViewSettings, type ViewDisplayPatch } from "./ViewSettings";
@@ -97,11 +96,6 @@ import {
   useFolderManagement,
   type FolderManagement,
 } from "./useFolderManagement";
-import { Icon } from "../../components/primitives/Icon";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../../components/primitives/hoverSurface";
 import { regionOf } from "../../lib/regions";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
@@ -545,120 +539,59 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
 
 // The header's single "+" button and its dropdown (New note / New note from
 // template / New folder) — replaces the former three-button cluster.
-const NEW_MENU_STYLE: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 4px)",
-  insetInlineEnd: 0,
-  minWidth: 210,
-  zIndex: 40,
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2)",
-  padding: "var(--space-1)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 1,
-};
-
-const NEW_MENU_ITEM_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  padding: "8px 10px",
-  border: 0,
-  borderRadius: "var(--radius-1)",
-  background: "transparent",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  textAlign: "start",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  transition: HOVER_TRANSITION,
-};
-
-function NotesActionsMenu({
+/**
+ * The sidebar's three create actions, as explicit icon buttons.
+ *
+ * They were folded behind a single `+` dropdown in #230, and #282 then added a
+ * fourth row to it. The dropdown was the wrong trade on this surface: the three
+ * things a person creates in a notes app are a note, a folder and a drawing,
+ * and putting all three one click plus one read behind a `+` taxes the common
+ * case to tidy a row that had room for them.
+ *
+ * "New note from template" does NOT get a button — four icons is a toolbar, and
+ * it is the rarest of the four by a distance. It stays on the command palette
+ * as `templates.new-note`, which is reachable from the search row immediately
+ * to the left of these.
+ *
+ * Order is drawing, folder, note: the most-used sits nearest the tree it acts
+ * on, and the pointer travels least for the thing it does most.
+ */
+function NotesActionsBar({
   onNewFolder,
   onCreate,
-  onNewFromTemplate,
   onNewDrawing,
 }: {
   onNewFolder: () => void;
   onCreate: () => void;
-  onNewFromTemplate?: () => void;
   onNewDrawing: () => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: globalThis.MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const id = window.setTimeout(
-      () => document.addEventListener("mousedown", onDown),
-      0,
-    );
-    document.addEventListener("keydown", onKey);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-  const item = (
-    label: string,
-    testId: string,
-    icon: IconName,
-    onClick: () => void,
-  ) => (
-    <button
-      type="button"
-      role="menuitem"
-      data-testid={testId}
-      {...hoverSurface()}
-      style={NEW_MENU_ITEM_STYLE}
-      onClick={() => {
-        setOpen(false);
-        onClick();
-      }}
-    >
-      <Icon name={icon} size={14} style={{ color: "var(--fg-3)" }} />
-      {label}
-    </button>
-  );
   return (
-    <div ref={ref} style={{ position: "relative", display: "flex" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
       <IconButton
-        icon="plus"
-        label={t("notes.list.newItem")}
-        testId="notes.new-menu"
-        onClick={() => setOpen((v) => !v)}
+        icon="image"
+        iconSize={15}
+        label={t("notes.list.newDrawingMenu")}
+        testId="notes.new-drawing"
+        tooltip
+        onClick={onNewDrawing}
       />
-      {open && (
-        <div role="menu" data-testid="notes.new-menu-dropdown" style={NEW_MENU_STYLE}>
-          {item(t("notes.list.newNote"), "notes.create", "file-plus", onCreate)}
-          {onNewFromTemplate &&
-            item(
-              t("notes.list.newNoteFromTemplate"),
-              "notes.new-from-template",
-              "file-text",
-              onNewFromTemplate,
-            )}
-          {/* myne#282: drawings were creatable from three OTHER menus but not
-              this one — and since #230 moved the create actions behind the `+`,
-              this is the discoverable entry point, so a note kind absent from it
-              is effectively hidden. Sits before New folder because it is a note
-              kind, not a container. */}
-          {item(t("notes.list.newDrawingMenu"), "notes.new-drawing", "image", onNewDrawing)}
-          {item(t("notes.list.newFolder"), "notes.new-folder", "folder-plus", onNewFolder)}
-        </div>
-      )}
+      <IconButton
+        icon="folder-plus"
+        iconSize={15}
+        label={t("notes.list.newFolder")}
+        testId="notes.new-folder"
+        tooltip
+        onClick={onNewFolder}
+      />
+      <IconButton
+        icon="file-plus"
+        iconSize={15}
+        label={t("notes.list.newNote")}
+        testId="notes.create"
+        tooltip
+        onClick={onCreate}
+      />
     </div>
   );
 }
@@ -817,7 +750,7 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
 };
 
-/** Optional props. `onNewFromTemplate` wires the new-note caret that opens
+/** Optional props.
  *  the template flow (MYND-190); omitted → the caret is not rendered.
  *
  *  The sidebar collapse toggle moved to a floated `TitleBarToggle` in the
@@ -825,7 +758,6 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
  *  `SidebarVaultSwitcher` header above this list (MYND-166); neither is
  *  hosted here. */
 interface NoteListProps {
-  onNewFromTemplate?: () => void;
   /** UI hooks for the per-note export flow (MYND-116) — the Editor's
    *  structured toast sink + the pre-flight "Include N attachments"
    *  modal hook. Optional so isolated NoteList renders stay inert. */
@@ -841,7 +773,7 @@ type BuilderState =
 
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
-export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
+export function NoteList({ exportHooks }: NoteListProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // Opening a note used to also have to swap the center view back to the
@@ -1393,7 +1325,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         <EmptyState
           onCreate={handleCreate}
           fm={fm}
-          onNewFromTemplate={onNewFromTemplate}
         />
       ) : (
         <PopulatedList
@@ -1408,7 +1339,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           onRevealFolder={revealFolder}
           onCreate={handleCreate}
           fm={fm}
-          onNewFromTemplate={onNewFromTemplate}
           exportHooks={exportHooks}
           showTimestamps={viewsPrefs.show_note_timestamps}
         />
@@ -1482,11 +1412,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
 function EmptyState({
   onCreate,
   fm,
-  onNewFromTemplate,
 }: {
   onCreate: () => void;
   fm: FolderManagement;
-  onNewFromTemplate?: () => void;
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
@@ -1503,10 +1431,9 @@ function EmptyState({
           <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <NotesActionsMenu
+          <NotesActionsBar
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
-            onNewFromTemplate={onNewFromTemplate}
             onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>
@@ -1643,7 +1570,6 @@ function PopulatedList({
   onRevealFolder,
   onCreate,
   fm,
-  onNewFromTemplate,
   exportHooks,
   showTimestamps,
 }: {
@@ -1673,7 +1599,6 @@ function PopulatedList({
   onRevealFolder: (path: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
-  onNewFromTemplate?: () => void;
   exportHooks?: NoteExportUiHooks;
   /** Sidebar per-note timestamp visibility (sidebar-note-timestamps), read from
    *  `PrefsView.show_note_timestamps` in the parent. Threaded into every
@@ -2902,10 +2827,9 @@ function PopulatedList({
           <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <NotesActionsMenu
+          <NotesActionsBar
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
-            onNewFromTemplate={onNewFromTemplate}
             onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>
