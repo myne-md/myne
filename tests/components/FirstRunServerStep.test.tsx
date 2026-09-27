@@ -59,4 +59,75 @@ describe("FirstRunServerStep", () => {
     fireEvent.click(await screen.findByTestId("first-run-server.self-hosted"));
     expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
   });
+
+  it("requires a fresh connection when repairing a configured endpoint", async () => {
+    invoke.mockResolvedValue({ endpoint_url: "https://sync.example", cert_pin_hex: "old", pin_source: "tofu" });
+    render(<FirstRunServerStep requireConnection onConnected={() => {}} onBack={() => {}} />);
+    fireEvent.click(screen.getByTestId("first-run-server.self-hosted"));
+    expect((await screen.findByTestId("first-run-server.continue") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("opens a fingerprint gate for the hosted server instead of flattening a rotated pin", async () => {
+    const current = "ab".repeat(32);
+    invoke.mockImplementation((command: string, args?: { confirmedFingerprint?: string }) => {
+      if (command === "plugin:sync|sync_set_endpoint") {
+        return args?.confirmedFingerprint === current
+          ? Promise.resolve({ fingerprint: current, pin_source: "tofu" })
+          : Promise.reject({ kind: "CertificateChanged" });
+      }
+      return Promise.resolve({ endpoint_url: "https://sync.myne.md" });
+    });
+    const onConnected = vi.fn();
+    render(<FirstRunServerStep requireConnection onConnected={onConnected} onBack={() => {}} />);
+    fireEvent.click(screen.getByTestId("first-run-server.myne-sync"));
+    expect(await screen.findByTestId("first-run-server.pin-error")).toBeTruthy();
+    expect(onConnected).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("first-run-server.expected-fingerprint-input"), {
+      target: { value: current },
+    });
+    fireEvent.click(screen.getByTestId("first-run-server.fingerprint-confirm"));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
+    expect(invoke).toHaveBeenCalledWith("plugin:sync|sync_set_endpoint", {
+      endpointUrl: HOSTED_SYNC_ORIGIN,
+      confirmedFingerprint: current,
+    });
+  });
+
+  it("does not proceed when the expected hosted fingerprint is rejected", async () => {
+    invoke.mockImplementation((command: string, args?: { confirmedFingerprint?: string }) =>
+      command === "plugin:sync|sync_set_endpoint"
+        ? Promise.reject({ kind: args?.confirmedFingerprint ? "FingerprintMismatch" : "CertificateChanged" })
+        : Promise.resolve({ endpoint_url: HOSTED_SYNC_ORIGIN }),
+    );
+    const onConnected = vi.fn();
+    render(<FirstRunServerStep requireConnection onConnected={onConnected} onBack={() => {}} />);
+    fireEvent.click(screen.getByTestId("first-run-server.myne-sync"));
+    await screen.findByTestId("first-run-server.fingerprint-gate");
+    fireEvent.change(screen.getByTestId("first-run-server.expected-fingerprint-input"), {
+      target: { value: "ab".repeat(32) },
+    });
+    fireEvent.click(screen.getByTestId("first-run-server.fingerprint-confirm"));
+    await waitFor(() => expect(screen.getByTestId("first-run-server.pin-error").textContent).toBe("sync.endpoint.confirmFingerprintMismatch"));
+    expect(onConnected).not.toHaveBeenCalled();
+  });
+
+  it("connects a self-hosted endpoint before returning to identity setup", async () => {
+    invoke.mockImplementation((command: string) =>
+      command === "plugin:sync|sync_set_endpoint"
+        ? Promise.resolve({ fingerprint: null, pin_source: null })
+        : Promise.resolve({ endpoint_url: "http://127.0.0.1:3000" }),
+    );
+    const onConnected = vi.fn();
+    render(<FirstRunServerStep requireConnection onConnected={onConnected} onBack={() => {}} />);
+    fireEvent.click(screen.getByTestId("first-run-server.self-hosted"));
+    await screen.findByTestId("sync.endpoint-config");
+    // The saved endpoint rests as Connected; explicitly re-enter a new address.
+    fireEvent.change(screen.getByTestId("sync.endpoint-input"), {
+      target: { value: "https://self.example" },
+    });
+    fireEvent.click(screen.getByTestId("sync.endpoint-connect"));
+    await waitFor(() => expect((screen.getByTestId("first-run-server.continue") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("first-run-server.continue"));
+    expect(onConnected).toHaveBeenCalledTimes(1);
+  });
 });

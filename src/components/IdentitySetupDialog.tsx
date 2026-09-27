@@ -37,7 +37,7 @@ interface IdentitySetupDialogProps {
 }
 
 /** Which failure the single error slot is showing. */
-type ErrorKind = "generic" | "alreadyHeld" | "notConfigured";
+type ErrorKind = "generic" | "alreadyHeld" | "notConfigured" | "certPinMismatch";
 
 /**
  * Read the serialized `SyncDeviceError::kind` off a rejected invoke. The plugin
@@ -50,6 +50,7 @@ function errorKindOf(error: unknown): ErrorKind {
       : undefined;
   if (kind === "AlreadyHeldIdentity") return "alreadyHeld";
   if (kind === "NotConfigured") return "notConfigured";
+  if (kind === "CertPinMismatch") return "certPinMismatch";
   return "generic";
 }
 
@@ -75,6 +76,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   // generic error naming a fix they cannot perform from here (myne-md/myne#768).
   const hasEndpoint = useHasSyncEndpoint();
   const [serverAcknowledged, setServerAcknowledged] = useState(false);
+  const [serverSelectionOpen, setServerSelectionOpen] = useState(false);
 
   // Read the held-identity state whenever the dialog is opened, so a device
   // that already holds a sealed keypair (from an earlier session or another
@@ -144,11 +146,13 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   }
 
   const errorKey =
-    error === "notConfigured"
-      ? "identitySetup.errorNotConfigured"
-      : error === "alreadyHeld"
-        ? "identitySetup.errorAlreadyHeld"
-        : "identitySetup.error";
+    error === "certPinMismatch"
+      ? "identitySetup.errorCertPinMismatch"
+      : error === "notConfigured"
+        ? "identitySetup.errorNotConfigured"
+        : error === "alreadyHeld"
+          ? "identitySetup.errorAlreadyHeld"
+          : "identitySetup.error";
 
   return (
     <ModalShell
@@ -202,13 +206,26 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             {t("identitySetup.doneCta")}
           </Button>
         </div>
-      ) : !hasEndpoint && !serverAcknowledged ? (
+      ) : (!hasEndpoint && !serverAcknowledged) || serverSelectionOpen ? (
         <FirstRunServerStep
-          onConnected={() => setServerAcknowledged(true)}
-          onBack={close}
+          requireConnection={serverSelectionOpen}
+          onConnected={() => {
+            setServerAcknowledged(true);
+            setServerSelectionOpen(false);
+            setError(null);
+          }}
+          onBack={serverSelectionOpen ? () => setServerSelectionOpen(false) : close}
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => setServerSelectionOpen(true)}
+            data-testid="identity-setup.change-server"
+          >
+            {t("identitySetup.changeServer")}
+          </Button>
           {heldIdentity ? (
             // A held identity cannot be opened by a freshly generated phrase, so
             // Create is replaced by the notice + Recover, with an explicit

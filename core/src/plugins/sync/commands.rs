@@ -178,32 +178,35 @@ pub async fn sync_set_endpoint<R: Runtime>(
                 // whoever answered. The user confirming a fingerprint out of
                 // band is the one path that may replace it, and `capture_pin`
                 // above has already enforced that compare when they did.
-                if confirmed_fingerprint.is_none() {
+                // An empty string is unconfirmed too: `capture_pin` treats it
+                // as absent, so it must not bypass the stored-pin comparison.
+                if confirmed_fingerprint
+                    .as_deref()
+                    .is_none_or(|s| s.trim().is_empty())
+                {
                     let host_ctx = crate::host::tauri_host::TauriHost::new(app.clone());
-                    if let Ok(path) = super::config::config_path_for_read(&host_ctx) {
-                        let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &path)
-                            .await
-                            .unwrap_or_default();
-                        // Compared through `same_endpoint`, not `==`, because
-                        // the string a user types and the server a connection
-                        // reaches are different things. `parse_endpoint` throws
-                        // away everything from the first `/`, so a trailing
-                        // slash made this comparison false against the very
-                        // endpoint it was guarding and the new certificate was
-                        // adopted in silence — which is what the myne#756
-                        // workaround did, every time, while the UI offered no
-                        // other way to recover from a rotated certificate.
-                        let replaces_a_trusted_pin = cfg
-                            .endpoint_url
+                    let path = super::config::config_path_for_read(&host_ctx)?;
+                    let cfg =
+                        super::config::read_config(&crate::vault_io::StdVaultIo, &path).await?;
+                    // Compared through `same_endpoint`, not `==`, because
+                    // the string a user types and the server a connection
+                    // reaches are different things. `parse_endpoint` throws
+                    // away everything from the first `/`, so a trailing
+                    // slash made this comparison false against the very
+                    // endpoint it was guarding and the new certificate was
+                    // adopted in silence — which is what the myne#756
+                    // workaround did, every time, while the UI offered no
+                    // other way to recover from a rotated certificate.
+                    let replaces_a_trusted_pin = cfg
+                        .endpoint_url
+                        .as_deref()
+                        .is_some_and(|prev| super::config::same_endpoint(prev, url))
+                        && cfg
+                            .cert_pin_hex
                             .as_deref()
-                            .is_some_and(|prev| super::config::same_endpoint(prev, url))
-                            && cfg
-                                .cert_pin_hex
-                                .as_deref()
-                                .is_some_and(|prev| prev != captured);
-                        if replaces_a_trusted_pin {
-                            return Err(SyncConfigError::CertificateChanged);
-                        }
+                            .is_some_and(|prev| prev != captured);
+                    if replaces_a_trusted_pin {
+                        return Err(SyncConfigError::CertificateChanged);
                     }
                 }
                 Some(captured)

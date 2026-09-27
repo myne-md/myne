@@ -125,7 +125,7 @@ const FP: CSSProperties = {
   wordBreak: "break-all",
 };
 
-export function EndpointConfig() {
+export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => void; onEdit?: () => void } = {}) {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
   // The endpoint this device is currently connected to (loaded, or set on a
@@ -197,6 +197,7 @@ export function EndpointConfig() {
       .then((r) => {
         setConfirmNeeded(false);
         setConnectedUrl(trimmed);
+        onConnected?.();
         setPinSource(r.pin_source);
         // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
         // loopback endpoint at a remote server — or the reverse — moves
@@ -335,7 +336,10 @@ export function EndpointConfig() {
       <div style={ROW}>
         <input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            onEdit?.();
+          }}
           placeholder={t("sync.endpoint.placeholder")}
           spellCheck={false}
           autoCapitalize="off"
