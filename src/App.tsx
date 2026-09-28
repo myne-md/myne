@@ -891,6 +891,14 @@ function App() {
         <JoinDeviceModal
           onCancel={() => setJoinOpen(false)}
           onJoined={onJoined}
+          // A recovery-phrase join (myne-md/myne#468) leaves the vault
+          // `Recovering`. Reprobing is the whole routing: boot already sends a
+          // Recovering slot to the recovery flow's mandatory password reset, the
+          // door a reload mid-recovery uses, so no new stage action is needed.
+          onRecovering={() => {
+            setJoinOpen(false);
+            void reprobe();
+          }}
         />
       )}
       {/* The browser-extension clip dispatch listener (desktop-ingest, MYND-442,

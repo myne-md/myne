@@ -5862,6 +5862,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/sync-join-recovery.e2e.ts",
       "e2e/device-names.e2e.ts",
       "e2e/sync-replication.e2e.ts",
       "e2e/beta-terms-consent.e2e.ts",

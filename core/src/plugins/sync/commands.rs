@@ -1987,6 +1987,8 @@ pub async fn sync_join_account<R: Runtime>(
     account_number: String,
     password: String,
     confirmed_fingerprint: Option<String>,
+    // Optional so every existing caller keeps meaning "password" (myne-md/myne#468).
+    credential_kind: Option<super::enroll::EnrollCredential>,
 ) -> Result<JoinResult, SyncDeviceError> {
     let base = app
         .path()
@@ -2006,6 +2008,7 @@ pub async fn sync_join_account<R: Runtime>(
             account_number,
             password,
             confirmed_fingerprint,
+            credential_kind: credential_kind.unwrap_or(super::enroll::EnrollCredential::Password),
         },
     )
     .await
