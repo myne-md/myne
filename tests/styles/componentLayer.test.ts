@@ -149,22 +149,28 @@ function walk(dir: string, out: string[]): void {
   }
 }
 
-describe("the zero state carries the brand, in both directions of the ramp", () => {
-  it("states the field's ink ONCE, in CSS, where a theme can reach it", () => {
-    // The canvas reads this back with `getComputedStyle().color`. Deleting it
-    // does not break the read — the canvas simply inherits `--fg-2` from the
-    // card — which is precisely why it needs an assertion: the field would keep
-    // painting, in a colour nobody chose, and only a screenshot would say so.
-    expect(ruleBody(SHEET, ".myne-empty__field {")).toContain("color: var(--fg-1)");
+describe("the zero state's wash (docs/decisions/ui/0630)", () => {
+  it("takes its colour from the accent, so every palette tints it with its own", () => {
+    // A literal here would be the one colour in the zero state no theme reaches.
+    expect(ruleBody(SHEET, ".myne-empty {")).toContain("--myne-empty-wash: var(--accent)");
+    expect(ruleBody(SHEET, ".myne-empty__wash {")).toContain("var(--myne-empty-wash)");
   });
 
-  it("no longer suppresses the field at sidebar size", () => {
-    // `display: none` on the `sm` field made the one surface a new user sees
-    // first — an empty note list — the one surface with no brand on it.
-    expect(
-      SHEET.includes('.myne-empty[data-size="sm"] .myne-empty__field'),
-      "the sm suppression is back",
-    ).toBe(false);
+  it("is static: no animation, so it needs no motion-canon exemption", () => {
+    const wash = ruleBody(SHEET, ".myne-empty__wash {");
+    expect(wash).not.toContain("animation");
+    expect(wash).not.toContain("transition");
+  });
+
+  it("turns to the danger colour on the error variant rather than a second rule set", () => {
+    expect(ruleBody(SHEET, '.myne-empty[data-variant="error"] {')).toContain(
+      "--myne-empty-wash: var(--danger)",
+    );
+  });
+
+  it("the binary field's rules left with it", () => {
+    expect(SHEET.includes(".myne-empty__field"), "the 01 field's rule came back").toBe(false);
+    expect(SHEET.includes("--myne-empty-scrim"), "the field's scrim outlived it").toBe(false);
   });
 });
 
@@ -179,19 +185,6 @@ describe("a zero state that owns its surface stops drawing a card on one", () =>
     expect(body).toContain("flex: 1");
     expect(body).toContain("border: none");
     expect(body).toContain("background: transparent");
-  });
-
-  it("moves the scrim onto the surface the filled state actually sits on", () => {
-    // The scrim's job is to look like the field fading out behind the words. It
-    // does that by being the SURFACE colour, so a filled state keeping the
-    // card's `--paper-2` would paint a card-coloured cloud on a `--paper` modal
-    // — visible as a blob, which is the one thing a scrim must never be.
-    expect(SHEET).toContain(
-      '.myne-empty[data-fill="true"] .myne-empty__body::before',
-    );
-    expect(
-      ruleBody(SHEET, '.myne-empty[data-fill="true"] .myne-empty__body::before'),
-    ).toContain("--myne-empty-scrim: var(--paper)");
   });
 });
 

@@ -349,42 +349,6 @@ export function AgentHubList({
       </p>
     );
   }
-  if (rows.length === 0) {
-    // First-run: explain what the agent is and OFFER THE FIRST ACTION. It did
-    // not, for a round, and that is the exact dead end `<EmptyState>` exists to
-    // prevent — a `firstRun` state whose whole job is to offer the thing that
-    // creates the first thing. `<PanelEmptyState>` cannot carry an action at
-    // all, so using it here meant a screen that explained what conversations
-    // are and gave the user no way to have one.
-    //
-    // The action is conditional because the capability is: a run needs a scope,
-    // and with no note open there is none the host would accept. So the two
-    // situations get two different bodies rather than one button that works
-    // sometimes.
-    return (
-      <EmptyState
-        variant="firstRun"
-        icon="message-square"
-        size="sm"
-        title={t("agent.hub.emptyTitle")}
-        body={t("agent.hub.emptyBody")}
-        testId="agent.hub-empty"
-        action={
-          onNewConversation === undefined ? undefined : (
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={onNewConversation}
-              data-testid="agent.hub-new"
-            >
-              {t("agent.hub.newConversation")}
-            </Button>
-          )
-        }
-      />
-    );
-  }
-
   // Filter by title, case-insensitively. Server-side search is not this slice:
   // the catalog is small and already in memory. Computed AFTER the null and
   // empty returns, so `rows` is narrowed to a real array.
@@ -473,7 +437,28 @@ export function AgentHubList({
         )}
       </div>
 
-      {visible.length === 0 ? (
+      {rows.length === 0 ? (
+        // First run: nothing to list yet. A QUIET line under the header, not a
+        // card with its own button (docs/decisions/ui/0630). The header above
+        // already carries the one action that creates a conversation, and the
+        // conversation beside this rail carries the zero state that explains
+        // what the agent is — a second bordered card with a second "New
+        // conversation" button, side by side with the first, is what made the
+        // empty agent tab look assembled rather than designed.
+        //
+        // No wash: the conversation's zero state carries it, and two washes a
+        // hairline apart compete instead of framing anything.
+        <EmptyState
+          variant="firstRun"
+          icon="message-square"
+          size="sm"
+          fill
+          field={false}
+          title={t("agent.hub.emptyTitle")}
+          body={t("agent.hub.emptyBody")}
+          testId="agent.hub-empty"
+        />
+      ) : visible.length === 0 ? (
         // A filtered-to-nothing list is NOT an empty vault: it echoes the query
         // and offers the way back. `<PanelEmptyState>` cannot say that — it is
         // hardwired to `firstRun`, which is the whole distinction this variant

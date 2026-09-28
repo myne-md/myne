@@ -18,35 +18,22 @@
 // right-rail tab and a full centre pane want the same words with different
 // amounts of room, and three components is three places for the words to drift.
 //
-// ── The `01` field ─────────────────────────────────────────────────────────
-// ON for every variant, and a continuous animation — which the canon forbids
-// except by name (`docs/decisions/ui/0618`). It is `aria-hidden` and carries no
-// meaning: everything the user needs is in the text above it. `mountBinaryField`
-// owns the pause conditions that make the exemption hold.
+// ── The wash ───────────────────────────────────────────────────────────────
+// A soft, blurred accent gradient behind the content, drawn in CSS
+// (`.myne-empty__wash`). Static: no animation, no canvas, no loop, so it needs
+// no motion-canon exemption and costs nothing while it sits on screen.
 //
-// It used to be opt-in, on the argument that only a first-run destination had
-// earned it. That drew the wrong line: a filtered list and a load error are
-// just as much "this surface, with nothing in it", and giving one of the four
-// variants the brand texture made the other three look like a different
-// product. The variants already differ in the two ways that matter — the words
-// and the action — so differing in the backdrop as well was decoration doing a
-// job the copy was already doing.
+// It replaced the `01` binary field (`docs/decisions/ui/0630`). The field read
+// as developer and privacy iconography — "encryption as theme", arriving as
+// texture — on surfaces a general user meets every day, which is exactly the
+// look `PRODUCT.md`'s anti-references refuse. The wash takes its colour from
+// `--accent`, so every palette, custom themes included, gets its own.
 //
-// `sm` used to suppress it, on the argument that a 248px sidebar box turns the
-// 15px grid into a texture fighting the copy. It does not: the cell is a fixed
-// size, so a narrower box holds FEWER digits, not denser ones, and the radial
-// scrim behind the words scales with the content column. What the suppression
-// actually produced was the one surface a new user sees first — an empty
-// sidebar — being the one surface without the brand on it.
+// ON by default for every variant and size; a caller that sits on a surface
+// already carrying colour passes `field={false}`.
 
-import {
-  useEffect,
-  useRef,
-  type HTMLAttributes,
-  type ReactNode,
-} from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { Icon } from "./Icon";
-import { mountBinaryField } from "@myne/client-core/binaryField";
 import type { IconName } from "../../lib/icons";
 
 export type EmptyStateVariant = "firstRun" | "filtered" | "error" | "loading";
@@ -74,9 +61,9 @@ interface EmptyStateProps {
   secondaryAction?: ReactNode;
   size?: "sm" | "md" | "lg";
   /**
-   * Draw the brand `01` field behind the content. On by default; pass `false`
-   * only where the surface behind the state is already carrying texture of its
-   * own and the two would fight.
+   * Draw the accent wash behind the content. On by default; pass `false` where
+   * the surface behind the state already carries colour of its own, or where a
+   * second wash beside another one would compete (the agent tab's rail).
    */
   field?: boolean;
   /**
@@ -110,20 +97,6 @@ export function EmptyState({
   testId,
   rest,
 }: EmptyStateProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    if (!field) return;
-    const el = canvasRef.current;
-    if (el === null) return;
-    const handle = mountBinaryField(el);
-    // The teardown is not optional: the handle owns a rAF loop, an
-    // IntersectionObserver, a visibilitychange listener and two canvas
-    // listeners, plus a slot in the process-wide animation budget. Leaking one
-    // leaks all of them, and the budget would starve every later field.
-    return () => handle.destroy();
-  }, [field]);
-
   return (
     <div
       {...rest}
@@ -134,14 +107,8 @@ export function EmptyState({
       data-testid={testId}
     >
       {field && (
-        <canvas
-          ref={canvasRef}
-          className="myne-empty__field"
-          // Decoration. Every word the user needs is in the body below, which
-          // is also what keeps this readable under `forced-colors`, where a
-          // canvas paints nothing.
-          aria-hidden="true"
-        />
+        // Decoration only: every word the user needs is in the body below.
+        <span className="myne-empty__wash" aria-hidden="true" />
       )}
       <div className="myne-empty__body">
         <span className="myne-empty__glyph" aria-hidden="true">

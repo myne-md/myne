@@ -44,7 +44,7 @@
       "searchPlaceholder": "Search conversations…",
       "noMatchTitle": "No matches",
       "noMatchBody": "No conversation matches “{{query}}”. Clear the search to see them all.",
-      "emptyBody": "Ask the agent to change or create notes. Every conversation you start is listed here, including the ones tied to a single note.",
+      "emptyBody": "Conversations you start appear here.",
       "emptyNeedsNote": "A run works on notes you choose, so a conversation starts from one. Open a note, then come back — or use the AI panel beside it.",
       "newConversation": "New conversation",
       "historyLabel": "History"
@@ -1184,7 +1184,7 @@
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
           "assistant": "Assistant",
-          "emptyTitle": "Nothing here yet",
+          "emptyTitle": "Ask about your notes",
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",

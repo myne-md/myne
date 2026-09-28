@@ -120,12 +120,6 @@ const DURATION_EXEMPT = new Map([
  */
 const RAF_LOOP_ALLOWLIST = new Map([
   [
-    "client-core/src/binaryField.ts",
-    "The brand 01 field behind an empty state (docs/decisions/ui/0618, named exemption). " +
-      "Pauses on document.hidden and off-screen, paints one static frame under reduced " +
-      "motion, and a process-wide budget caps concurrent instances.",
-  ],
-  [
     "src/notes/components/PaneView.tsx",
     "Scroll restoration after a pane swap: it waits for the editor's height to settle " +
       "across two equal frames, then applies and RETURNS. A 90-frame budget bounds the " +

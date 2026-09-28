@@ -614,7 +614,18 @@ export function ConversationSurface({
           const el = e.currentTarget;
           atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          // A flex column only while empty, so the zero state below can FILL the
+          // region and centre in it rather than sitting as a card pinned to the
+          // top with the composer a screen away. A populated transcript keeps
+          // the plain block flow it has always had.
+          ...(chat.turns.length === 0
+            ? { display: "flex", flexDirection: "column" as const }
+            : {}),
+        }}
       >
         {chat.turns.length > 0 ? (
           <div
@@ -663,10 +674,15 @@ export function ConversationSurface({
           //
           // `rest` puts `data-ai-cause` on the same element as the testid: the
           // degradation E2E reads the cause AND the body text off one node.
+          // `fill`: the state IS the empty transcript, centred in the space
+          // above the composer, not a bordered card at the top of it
+          // (docs/decisions/ui/0630). The same component serves the narrow
+          // right panel and the agent tab, and filling is what fits both.
           <EmptyState
             variant={degraded ? "error" : "firstRun"}
             icon={degraded ? "circle-alert" : "message-square"}
             size="sm"
+            fill
             title={
               degraded
                 ? degradedTitleKey(restingCause ?? "no-provider", t)

@@ -877,6 +877,9 @@
 }
 
 .myne-empty {
+  /* The wash's colour — see `.myne-empty__wash`. The accent by default; the
+     error variant overrides it. */
+  --myne-empty-wash: var(--accent);
   animation: myne-empty-in var(--duration-base) var(--ease-emphasized);
   position: relative;
   display: flex;
@@ -890,71 +893,54 @@
   border-radius: var(--radius-3);
   overflow: hidden;
   /* A whisper of surface, so the box reads as a considered area rather than a
-     hole. The binary field sits behind this, inside the same rounded box. */
+     hole. The accent wash sits behind the content, inside the same rounded box. */
   background: var(--paper-2);
   color: var(--fg-2);
   font-family: var(--font-sans);
 }
 
-/* The `01` field, behind the content. `pointer-events: none` everywhere but the
-   canvas itself would kill the cursor glow, so the canvas keeps them and the
-   content sits above. */
-.myne-empty__field {
+/* The wash: a soft, blurred accent gradient behind the content
+   (`docs/decisions/ui/0630`). It replaced the animated `01` binary field, which
+   read as developer / privacy iconography on surfaces a general user meets
+   every day.
+
+   Static on purpose. There is no animation here, so no motion-canon exemption,
+   no rAF loop, no pause logic and nothing to cost battery while it sits on
+   screen. Two off-centre radial glows, blurred and oversized past the box
+   (`inset` below 0) so their edges never show; the card's `overflow: hidden`
+   crops them to its rounded shape.
+
+   The colour is `--myne-empty-wash`, which defaults to `--accent`, so every
+   palette — custom themes included — tints it with its own accent, and the
+   error variant overrides it with `--danger` rather than needing a second
+   rule set. The percentages are low enough that body text over the brightest
+   point keeps its contrast on both ramps: the wash sits UNDER `--paper-2`'s
+   ink, never over it. */
+.myne-empty__wash {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: -30%;
   z-index: 0;
-  /* The field's INK, and the only place it is stated. `binaryField.ts` reads it
-     back with `getComputedStyle().color`, which the engine has already
-     normalized to `rgb()` whatever syntax the token used — so the canvas needs
-     no colour parser and a custom palette's field follows that palette's own
-     ink. Before this the ink was a hardcoded near-white, which is why the light
-     themes drew a field nobody could see: near-white digits on near-white
-     paper. */
-  color: var(--fg-1);
-}
-
-/* The content follows the box by one stagger step, so the card arrives and its
-   contents settle into it rather than the whole thing moving as one slab. ONE
-   step, not a per-child cascade: there are three children, and staggering them
-   individually would take longer than the entrance itself — which is the
-   failure `--stagger-max` exists to bound. */
-/* A scrim that locally suppresses the `01` field behind the words, then
-   dissolves back into it — soft radial falloff, no box edge.
-
-   This was missing from the port and it is not cosmetic: without it the digits
-   run straight through the headline and the body copy, and the text is genuinely
-   hard to read at card size. The website carries the same construct for the
-   same reason (`.hero-copy::before`), and porting the canvas without it was an
-   incomplete port rather than a simplification.
-
-   `--paper-2` is the card's own fill, so the scrim reads as the field fading
-   out behind the text rather than as a visible blob over it. Only drawn when a
-   field is actually present — `:has()` keeps a fieldless card from paying for a
-   gradient that suppresses nothing. */
-.myne-empty:has(.myne-empty__field) .myne-empty__body::before {
-  content: "";
-  /* `--paper-2` is the card's own fill, so the scrim reads as the field fading
-     out rather than as a blob. A FILLED state has no fill of its own — it sits
-     directly on whatever surface holds it — so it takes that surface's colour
-     instead, or the scrim would paint a card-coloured cloud on a modal. */
-  --myne-empty-scrim: var(--paper-2);
-  position: absolute;
-  z-index: -1;
   pointer-events: none;
-  inset: -22% -14%;
-  background: radial-gradient(
-    62% 58% at 50% 50%,
-    var(--myne-empty-scrim) 0%,
-    var(--myne-empty-scrim) 34%,
-    color-mix(in srgb, var(--myne-empty-scrim) 55%, transparent) 58%,
-    transparent 78%
-  );
+  background:
+    radial-gradient(
+      38% 44% at 32% 34%,
+      color-mix(in srgb, var(--myne-empty-wash) 24%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      36% 40% at 70% 64%,
+      color-mix(in srgb, var(--myne-empty-wash) 16%, transparent),
+      transparent 72%
+    );
+  filter: blur(32px);
 }
 
-.myne-empty[data-fill="true"] .myne-empty__body::before {
-  --myne-empty-scrim: var(--paper);
+/* Forced colours strip backgrounds anyway; hiding the element keeps a blurred
+   layer from compositing for nothing. The words carry everything. */
+@media (forced-colors: active) {
+  .myne-empty__wash {
+    display: none;
+  }
 }
 
 .myne-empty__body {
@@ -1064,6 +1050,7 @@
    end. Giving them four fills would have been solving the wrong half. */
 
 .myne-empty[data-variant="error"] {
+  --myne-empty-wash: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
 }
 .myne-empty[data-variant="error"] .myne-empty__glyph {
