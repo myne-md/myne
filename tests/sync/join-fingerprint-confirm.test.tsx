@@ -68,7 +68,7 @@ describe("the join modal's fingerprint gate", () => {
       },
     );
     const onJoined = vi.fn();
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={vi.fn()} />);
     submitForm();
 
     const field = await screen.findByTestId("join.expected-fingerprint-input");
@@ -95,7 +95,7 @@ describe("the join modal's fingerprint gate", () => {
       return "linux";
     });
     const onCancel = vi.fn();
-    render(<JoinDeviceModal onCancel={onCancel} onJoined={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={onCancel} onJoined={vi.fn()} onRecovering={vi.fn()} />);
     submitForm();
 
     await screen.findByTestId("join.fingerprint-gate");

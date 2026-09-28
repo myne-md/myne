@@ -2104,6 +2104,13 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     // leaf certificate. Nothing to confirm, so nothing is asked.
                     // A web user who wants Tor uses Tor Browser (task 12).
                     confirmed_fingerprint: None,
+                    // Always `Password` here, and not as a default someone
+                    // forgot to widen. The phrase as a device-join credential is
+                    // the capability `phraseEnrolment`, which this client lacks
+                    // on purpose (`web/src/platform/capabilities.ts`): a routine
+                    // phrase prompt in a page is the A18 training. The web door
+                    // is `AccountBootstrap`, which never offers it.
+                    credential_kind: myne_core::plugins::sync::enroll::EnrollCredential::Password,
                 },
             )
             .await

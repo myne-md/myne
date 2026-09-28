@@ -1653,8 +1653,21 @@ pub struct JoinRequest {
     pub server_url: String,
     /// The account number, in either display or canonical form.
     pub account_number: String,
-    /// The account password — wrapped in `Zeroizing` on arrival.
+    /// The credential — the account password, or the 24-word recovery phrase
+    /// when `credential_kind` is [`EnrollCredential::Recovery`]. Wrapped in
+    /// `Zeroizing` on arrival either way. The field keeps its historical name
+    /// because both wire callers send it as `password`.
     pub password: String,
+    /// Which credential `password` carries (myne-md/myne#468, task 7).
+    ///
+    /// `Recovery` is the door for a user who has lost every device: nothing is
+    /// left to approve a password join, so it would wait forever. The phrase is
+    /// full account takeover in the server's own assessment
+    /// (`internal/auth/enroll.go` self-approves `PathRecovery`), and that is the
+    /// whole argument for letting it skip the approval gate. The variant, its
+    /// `wire()` mapping and the server side all existed before this field; no
+    /// production call site sent anything but `Password`.
+    pub credential_kind: EnrollCredential,
     /// The server-certificate fingerprint the user obtained **out-of-band**,
     /// or `None`.
     ///
@@ -1681,6 +1694,12 @@ pub struct JoinResult {
     /// pending, so it cannot read the roster to learn which row is itself, and it
     /// needs the id to name itself in its own `vault.prefs`.
     pub device_id_hex: String,
+    /// True when the join used the recovery phrase (myne-md/myne#468). The vault
+    /// is then `Slot::Recovering`, not `Unlocked`, and the caller must route into
+    /// the mandatory chained password reset (`recovery-flow.md` §4.1) — the same
+    /// step a phrase recovery on an existing device ends in, for the same reason:
+    /// a user who needed the phrase may not know the password.
+    pub needs_password_reset: bool,
 }
 
 /// **Add this device to an existing account.** On a fresh device, bootstrap the
@@ -1861,6 +1880,7 @@ pub async fn join_account_from_host(
         account_number,
         password,
         confirmed_fingerprint,
+        credential_kind,
     } = request;
     let password = Zeroizing::new(password);
 
@@ -1989,23 +2009,25 @@ pub async fn join_account_from_host(
     // local copy may legitimately be the newer of the two. The sync meta phase
     // reconciles them; a bootstrap must not adjudicate it by overwriting.
     write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await?;
-    crate::plugins::vault_unlock::commands::unlock_with_path(
+    let opened = open_joined_vault(
+        credential_kind,
         (*password).clone(),
-        Some(vault_id),
+        vault_id,
         &meta_path,
         state,
-        io,
         host,
+        io,
     )
-    .await
-    .map_err(|_| SyncDeviceError::BadRequest)?; // wrong account# / password
+    .await?;
+    let JoinedVault {
+        root_key,
+        path: enroll_path,
+        needs_password_reset,
+    } = opened;
 
-    // 4. Register the verifier + SCRAM enroll (password → pending). The SCRAM
-    //    secret is re-derived from the now-unlocked root_key (no credential reuse).
-    let root_key = state
-        .peek_unlocked_root_key_clone()
-        .await
-        .ok_or(SyncDeviceError::Internal)?;
+    // 4. Register the verifier + SCRAM enroll. The SCRAM secret is re-derived
+    //    from the root_key the credential opened (no credential reuse); only the
+    //    wire PATH differs, and it is what decides approval server-side.
     let approved =
         crate::task::run_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
             let transport = super::http_transport::build_transport(&url, pins)
@@ -2024,7 +2046,7 @@ pub async fn join_account_from_host(
                 transport.as_ref(),
                 &account_hash,
                 secret.as_slice(),
-                EnrollPath::Password,
+                enroll_path,
                 &client_nonce,
                 device_id,
             )
@@ -2096,7 +2118,96 @@ pub async fn join_account_from_host(
         pending: !approved,
         fingerprint,
         device_id_hex,
+        needs_password_reset,
     })
+}
+
+/// What opening the freshly bootstrapped vault produced.
+pub(crate) struct JoinedVault {
+    /// The key the SCRAM secret derives from. The same `root_key` whichever
+    /// credential opened it — `vault.meta` wraps one key twice.
+    pub root_key: Zeroizing<[u8; protocol::AEAD_KEY_LEN]>,
+    /// The wire path the enrolment sends, and the thing the server approves on.
+    pub path: EnrollPath,
+    /// True when the vault is `Slot::Recovering` and the chained password reset
+    /// is owed before it can be used.
+    pub needs_password_reset: bool,
+}
+
+/// Open the bootstrapped vault with the credential the user gave, and pick the
+/// enrolment path that credential earns (myne-md/myne#468, task 7).
+///
+/// Split out of [`join_account_from_host`] so the call-site decision — which
+/// wire path a join sends — is testable without a server. The join itself is a
+/// network fetch; this half is not, and it is the half a regression would hit:
+/// every production caller sent `EnrollPath::Password` until this existed, so a
+/// "recovery" join that quietly fell back to it would sit pending forever on
+/// exactly the device that has nobody to approve it.
+///
+/// - `Password` → the ordinary unlock; `Slot::Unlocked`; path `Password`, which
+///   the server holds pending until an existing device approves.
+/// - `Recovery` → the SAME code the recovery flow runs
+///   (`recover_with_phrase_with_path`), so the phrase is normalised, derived and
+///   checked exactly as it is there; `Slot::Recovering`; path `Recovery`, which
+///   the server self-approves. The password reset that follows is the recovery
+///   flow's own mandatory chained step, reached by the caller's reprobe.
+///
+/// Every credential failure maps to `BadRequest`, the join's single
+/// non-distinguishing refusal: a wrong account number, a wrong password and a
+/// wrong phrase must read the same.
+pub(crate) async fn open_joined_vault(
+    kind: EnrollCredential,
+    credential: String,
+    vault_id: crate::vault_id::VaultId,
+    meta_path: &std::path::Path,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<JoinedVault, SyncDeviceError> {
+    match kind {
+        EnrollCredential::Password => {
+            crate::plugins::vault_unlock::commands::unlock_with_path(
+                credential,
+                Some(vault_id),
+                meta_path,
+                state,
+                io,
+                host,
+            )
+            .await
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+            let root_key = state
+                .peek_unlocked_root_key_clone()
+                .await
+                .ok_or(SyncDeviceError::Internal)?;
+            Ok(JoinedVault {
+                root_key,
+                path: EnrollPath::Password,
+                needs_password_reset: false,
+            })
+        }
+        EnrollCredential::Recovery => {
+            crate::plugins::vault_recover::commands::recover_with_phrase_with_path(
+                credential,
+                Some(vault_id),
+                meta_path,
+                state,
+                host,
+                io,
+            )
+            .await
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+            let root_key = state
+                .peek_recovering_root_key_clone()
+                .await
+                .ok_or(SyncDeviceError::Internal)?;
+            Ok(JoinedVault {
+                root_key,
+                path: EnrollPath::Recovery,
+                needs_password_reset: true,
+            })
+        }
+    }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -2230,5 +2341,116 @@ mod tls_exporter_vectors {
         s.push_str(key);
         s.push('"');
         s
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod join_credential_tests {
+    //! Which enrolment path a JOIN sends (myne-md/myne#468, task 7).
+    //!
+    //! Every production join sent `EnrollPath::Password` until this change, so
+    //! the regression worth fearing is a phrase join that quietly falls back to
+    //! it: that device then sits pending forever, and it is exactly the device
+    //! with nobody left to approve it. The server decides approval on the wire
+    //! path alone, so the wire value is what these assert.
+
+    use super::{open_joined_vault, EnrollCredential, SyncDeviceError};
+    use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
+    use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
+    use crate::test_support::{block_on, ScratchVault, FAST_TEST_KDF};
+
+    const PASSWORD: &str = "join-test-password";
+
+    /// A real `vault.meta` on disk, plus the root key and phrase it wraps.
+    fn seeded() -> (ScratchVault, crate::vault_id::VaultId, [u8; 32], String) {
+        let id = crate::vault_id::VaultId::mint();
+        let session = build_session(id, PASSWORD, FAST_TEST_KDF).expect("build_session");
+        let root: [u8; 32] = *session.root_key;
+        let phrase = (*session.phrase.join_normalized()).to_string();
+        let bytes = build_and_serialize_vault_meta(&session).expect("serialize");
+        let scratch = ScratchVault::new("join_credential");
+        scratch.write_meta(&bytes);
+        (scratch, id, root, phrase)
+    }
+
+    #[test]
+    fn a_password_join_sends_the_password_path_and_unlocks() {
+        let (scratch, id, root, _phrase) = seeded();
+        let state = VaultRuntimeState::default();
+        let out = block_on(open_joined_vault(
+            EnrollCredential::Password,
+            PASSWORD.to_string(),
+            id,
+            scratch.path(),
+            &state,
+            &crate::host::NoopHost,
+            &crate::vault_io::StdVaultIo,
+        ))
+        .unwrap_or_else(|_| panic!("password join failed"));
+        assert_eq!(out.path.wire(), "password");
+        assert!(!out.needs_password_reset);
+        assert_eq!(*out.root_key, root);
+        assert_eq!(block_on(state.slot_kind(id)), SlotKind::Unlocked);
+    }
+
+    #[test]
+    fn a_phrase_join_sends_the_recovery_path_and_owes_a_password_reset() {
+        let (scratch, id, root, phrase) = seeded();
+        let state = VaultRuntimeState::default();
+        let out = block_on(open_joined_vault(
+            EnrollCredential::Recovery,
+            phrase,
+            id,
+            scratch.path(),
+            &state,
+            &crate::host::NoopHost,
+            &crate::vault_io::StdVaultIo,
+        ))
+        .unwrap_or_else(|_| panic!("phrase join failed"));
+        // THE assertion: the server self-approves on this string and nothing
+        // else, so a phrase join sending "password" would wait forever.
+        assert_eq!(
+            out.path.wire(),
+            "recovery",
+            "a phrase join sent the password path"
+        );
+        assert!(
+            out.needs_password_reset,
+            "a phrase join skipped the password reset"
+        );
+        // Same key either way — `vault.meta` wraps one `root_key` twice — so the
+        // SCRAM secret matches the one the account registered.
+        assert_eq!(*out.root_key, root);
+        // Recovering, not Unlocked: the chained reset (`recovery-flow.md` §4.1)
+        // is what the caller routes into next.
+        assert_eq!(block_on(state.slot_kind(id)), SlotKind::Recovering);
+    }
+
+    #[test]
+    fn a_wrong_phrase_is_the_same_refusal_as_a_wrong_password() {
+        let (scratch, id, _root, _phrase) = seeded();
+        let (_other, _oid, _oroot, other_phrase) = seeded();
+        for (kind, credential) in [
+            (EnrollCredential::Recovery, other_phrase),
+            (EnrollCredential::Password, "not-the-password".to_string()),
+        ] {
+            let state = VaultRuntimeState::default();
+            let err = block_on(open_joined_vault(
+                kind,
+                credential,
+                id,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+                &crate::vault_io::StdVaultIo,
+            ))
+            .err()
+            .expect("a wrong credential opened the vault");
+            assert!(
+                matches!(err, SyncDeviceError::BadRequest),
+                "the join's refusal must not distinguish which credential was wrong"
+            );
+            assert_eq!(block_on(state.slot_kind(id)), SlotKind::Empty);
+        }
     }
 }
