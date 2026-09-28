@@ -1,35 +1,26 @@
 // @vitest-environment jsdom
 //
-// `<EmptyState>` — which zero states carry the brand field, and which own their
-// surface (myne-md/myne#776, epic #772).
+// `<EmptyState>` — which zero states carry the accent wash, and which own their
+// surface (myne-md/myne#776, epic #772; the wash replaced the `01` field in
+// design-notes/ui/0630).
 //
 // Both are defaults, and a default is exactly the kind of thing that drifts
 // back without anybody deciding to change it: the field was opt-in for a round
 // and ended up on ONE of four variants, and the panel adapter asked for `sm` on
 // the strength of a comment describing callers it did not have.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { EmptyState } from "../../src/components/primitives/EmptyState";
 import { PanelEmptyState } from "../../src/notes/components/PanelEmptyState";
 
-beforeEach(() => {
-  // jsdom ships no 2D context, and `mountBinaryField` bails to a no-op handle
-  // without one — which would make every assertion below pass for the wrong
-  // reason if it were about the canvas's CONTENT. It is about the element.
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-});
-
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
+afterEach(cleanup);
 
 const VARIANTS = ["firstRun", "filtered", "error", "loading"] as const;
 
-describe("the field is on for every variant", () => {
+describe("the wash is on for every variant", () => {
   it.each(VARIANTS)("%s draws one", (variant) => {
     // Giving the texture to `firstRun` alone made the other three look like a
     // different product. The variants already differ in the two ways that
@@ -37,7 +28,7 @@ describe("the field is on for every variant", () => {
     const { container } = render(
       <EmptyState variant={variant} icon="file-text" title="Nothing here" />,
     );
-    expect(container.querySelector("canvas.myne-empty__field")).not.toBeNull();
+    expect(container.querySelector(".myne-empty__wash")).not.toBeNull();
   });
 
   it.each(["sm", "md", "lg"] as const)("%s draws one too", (size) => {
@@ -46,17 +37,27 @@ describe("the field is on for every variant", () => {
     const { container } = render(
       <EmptyState variant="firstRun" icon="file-text" title="x" size={size} />,
     );
-    expect(container.querySelector("canvas.myne-empty__field")).not.toBeNull();
+    expect(container.querySelector(".myne-empty__wash")).not.toBeNull();
   });
 
-  it("is still refusable, and then mounts nothing at all", () => {
-    // Not merely hidden: a mounted field holds an IntersectionObserver, a
-    // MutationObserver, four listeners and a candidate budget slot, so hiding
-    // one in CSS would cost everything and draw nothing.
+  it("is decoration, hidden from assistive technology", () => {
+    const { container } = render(
+      <EmptyState variant="firstRun" icon="file-text" title="x" />,
+    );
+    expect(container.querySelector(".myne-empty__wash")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    // And it is no longer a canvas: the animated `01` field is gone, not hidden.
+    expect(container.querySelector("canvas")).toBeNull();
+  });
+
+  it("is still refusable, and then renders nothing at all", () => {
+    // The agent tab's rail opts out: its neighbour carries the wash, and two a
+    // hairline apart compete rather than frame anything.
     const { container } = render(
       <EmptyState variant="firstRun" icon="file-text" title="x" field={false} />,
     );
-    expect(container.querySelector("canvas.myne-empty__field")).toBeNull();
+    expect(container.querySelector(".myne-empty__wash")).toBeNull();
   });
 });
 
@@ -98,7 +99,7 @@ describe("a filled state marks itself so the CSS can drop the card", () => {
   });
 });
 
-describe("a settings block's zero state carries the field too", () => {
+describe("a settings block's zero state carries the wash too", () => {
   // It did not, for one round, and the argument was sound at the time: a brand
   // animation inside a column of a dozen settings blocks pulls the eye off the
   // setting above it. What changed is the animation. The glow came off the
@@ -117,7 +118,7 @@ describe("a settings block's zero state carries the field too", () => {
   ] as const;
 
   for (const file of SETTINGS_ZERO_STATES) {
-    it(`${file} keeps the 01 field, at the small size`, () => {
+    it(`${file} keeps the wash, at the small size`, () => {
       // Resolved from the project root rather than from `import.meta.url`:
       // under the jsdom environment the global `URL` is jsdom's, and node's
       // `fileURLToPath` does not agree with it about a relative base.
@@ -125,7 +126,7 @@ describe("a settings block's zero state carries the field too", () => {
       const at = src.indexOf("<EmptyState");
       expect(at, `${file} no longer uses the shared zero state`).toBeGreaterThan(-1);
       const call = src.slice(at, src.indexOf("/>", at));
-      expect(call, `${file} opts out of the field`).not.toContain("field={false}");
+      expect(call, `${file} opts out of the wash`).not.toContain("field={false}");
       expect(call, `${file} should be the small size in a settings block`).toContain(
         'size="sm"',
       );
