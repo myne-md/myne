@@ -27,9 +27,13 @@ At vault creation the client generates a 24-word BIP-39 phrase per `protocol.md`
 
 ### 2.2 Phrase display
 
-The 24 words MUST be presented on a dedicated step within the vault-creation flow, with the following normative properties:
+The 24 words MUST be presented on a dedicated step within the vault-creation flow, with the following normative properties.
 
-- **Layout** — 4-column grid of numbered word cells (4×6 or 6×4 visually equivalent), one BIP-39 word per cell, position indices 1–24 visible to the user.
+**The step is the recovery kit** (`decisions/ui/0629`, myne-md/myne#468). The phrase and the account number are shown together, on ONE step, laid out as a preview of the single file Save writes: a header naming the vault and the date, the phrase section, the account-number section. They were two consecutive steps; the account step arrived after the §2.3 challenge had already been passed and read as an epilogue, and no product surveyed asks a user to absorb two back-to-back "keep this forever" moments. The document layout is itself the statement that both secrets go into one file, so a client MUST NOT add a warning box restating it.
+
+- **Layout** — 4-column grid of numbered word cells (4×6 or 6×4 visually equivalent), one BIP-39 word per cell, position indices 1–24 visible to the user. The grid MUST be laid out left-to-right in every locale, including right-to-left ones, while the page keeps the locale's direction: the ORDER of the words is part of the secret, BIP-39's checksum does not catch a permutation, and §2.4 means a mis-copied order is never discoverable. A mobile client MAY reveal the grid in halves where 24 words do not fit legibly.
+- **Why the words are English** — the step MUST say, once, that the words are the BIP-39 English wordlist on every client and are not translated. Without it an untranslated grid in a translated interface reads as a missing translation, and a user who translates the words back has destroyed their only backup.
+- **Account number** — shown in the same sheet, under a label stating what it is FOR: adding another device (`account-number.md` §7). It carries no acknowledgement control of its own.
 - **Blur-by-default** — the grid is rendered blurred until the user explicitly clicks a "Reveal phrase" affordance. This anchors awareness that the value is sensitive.
 - **Walk-away guard** — when the OS window loses focus (`window.blur` event from Cmd-Tab, app-switch, or screen lock), the grid MUST re-blur immediately. The user must click "Reveal phrase" again to view it. **Web client:** `window.blur` alone under-covers a browser, where the most common walk-away is a tab switch rather than a window switch, so the web client MUST additionally re-blur on `visibilitychange` to a hidden document. Same requirement, two events, because one event does not observe the same user action on both platforms.
 - **Copy**, a "Copy" affordance MUST be offered **where the platform can hold the phrase to the standard below**. Where it cannot, the client MUST NOT present the affordance as though it carried a protection it does not: it either WITHHOLDS the affordance, or OFFERS it and states plainly, beside the control, what is not happening. Which of the two a platform owes is a product decision, argued per platform and written down each time; what is never permitted is leaving the gap implicit. The clipboard contents MUST stop being available after 30 seconds wherever a mechanism below can make that true, and the mechanism is per platform:
@@ -39,13 +43,14 @@ The 24 words MUST be presented on a dedicated step within the vault-creation flo
   - **Web**, the read precondition cannot be satisfied at all: Firefox grants page content no clipboard read, and the other engines gate it behind a permission prompt and document focus, so a web auto-clear would either never fire or would have to wipe blind and destroy contents that are no longer the phrase. The affordance is nevertheless OFFERED, and the client MUST state beside it that the clipboard will not be cleared. Absence is the wrong answer here because it does not remove copying: the words are on screen in a page, manual selection over a numbered grid yields mangled text, and the user is pushed to retype or screenshot, both worse, on the one client that also has no screen-capture protection to fall back on. The promise is what is dropped on web, not the affordance, and saying so is mandatory rather than optional.
 
   Recorded so the history is legible: `decisions.md` 2026-08-04, entry 0427, declined to soften this MUST to a MAY, on the grounds that retiring the affordance would be a product decision across three clients rather than a documentation fix. That deferral is now closed, and closed the way 0427 said it would have to be. What has happened is that the product made the decision, per platform, with the argument written down each time; the spec now describes it. The two outcomes differ because the arguments differ, not because the rule does: Android and web are both platforms that cannot keep the 30-second promise, and each was asked separately what a user does when the button is not there.
-- **Save as file** — a "Save as file" affordance MUST be offered, writing a plain-text file containing only the 24 whitespace-joined words to a user-chosen location. Filename default: `myne-recovery-phrase.txt`. **Web client:** a page has no arbitrary write path, so this is satisfied by a browser download of the same content and the same default filename; the destination is the browser's, not the user's pick. The file's exposure is otherwise identical, and §5 of `threat-model.md` covers both.
+- **Save as file** — a "Save as file" affordance MUST be offered, writing ONE plain-text file holding both secrets to a user-chosen location: a title line, the vault's name and the date, a heading and then the 24 words as a single space-joined line (the shape phrase entry and a password manager both accept), and a heading and then the account number. Labels are localised; the words never are. Both clients MUST produce this text from one shared implementation, so a kit saved on one client is the document the recovery flow on another expects. Filename default: `myne-recovery-kit.txt`. Copy MUST put the same bytes on the clipboard that Save writes. **Web client:** a page has no arbitrary write path, so this is satisfied by a browser download of the same content and the same default filename; the destination is the browser's, not the user's pick. The file's exposure is otherwise identical, and §5 of `threat-model.md` covers both.
 - **Both affordances MUST report their outcome, and MUST NOT report one they cannot observe** (`decisions.md` 2026-08-25, entry 0537, myne-md/myne#522). This step shows the phrase once and never again, so a save or a copy that failed and looked like it worked is not an inconvenience: the user advances believing a file exists, and §2.4's no-re-display commitment makes that permanent. Three rules follow, and the third is the one an implementer gets wrong:
   - A failure MUST be reported, in a form the user cannot miss on a shown-once screen. A console log is not a report.
   - A CANCELLED save dialog MUST report nothing. The user closed it; announcing it is the client narrating the user's own action back at them, and it trains them to ignore the line that matters.
   - A success MUST claim only what the client actually observed. A native save dialog returns after the write, so "saved" is true. A browser download returns when the page hands the bytes to the browser, which chooses the destination and reports neither a block, a cancelled destination prompt, nor a failed write; on that path the client MUST say the download was started rather than that the file was saved. Stating a landing the client never saw is the same defect as saying nothing, wearing a reassuring sentence.
 - **Extension exposure (web client)** — the phrase grid, once revealed, is readable by any browser extension holding host permissions on the origin, which no content-security policy prevents and the page cannot detect (`threat-model.md` A19). The web client MUST say so on this step. Native clients have no equivalent surface and MUST NOT carry the notice, which would be a false symmetry.
-- **Acknowledgement CTA** — the primary action transitions to the confirmation step (§2.3) and is labeled to communicate that the user attests they have saved the phrase. The CTA MUST be visually primary; Copy and Save MUST be visually secondary (ghost-style).
+- **Acknowledgement CTA** — a single action transitions to the confirmation step (§2.3), labeled to communicate that the user attests they have saved the kit. It is the ONLY acknowledgement on the step; there is no checkbox (§2.3 is what gates creation, and `protocol.md` §7.2 says a checkbox is not evidence). Save is the visually primary action on this step, because saving is the step's job; the acknowledgement and Copy are secondary. *(Revised 2026-09-27, `decisions/ui/0629`: this bullet previously made the acknowledgement primary and Save a ghost, when the phrase had a step of its own.)*
+- **Print** is NOT offered. `window.print()` does nothing in some WebViews, so a Print control would silently fail on a shown-once screen; the honest route would stage the phrase into a second rendering surface, which is a threat-model change and is not made here.
 
 ### 2.3 Type-back confirmation challenge
 
@@ -56,13 +61,16 @@ A bare "I have written it down" checkbox is **insufficient** (`protocol.md` §7.
 - **Per-cell typed input** — one input per drawn position, labeled "Word at position N".
 - **Per-cell exact-match validation** — comparison applies §7.4 normalization (NFKD + lowercase + trim) to both the typed value and the target word; an inline per-cell error "Doesn't match word #N" appears when the cell has any input that fails to match. Empty cells stay neutral.
 - **No autocomplete, no typeahead, no spellcheck** — input fields disable browser-level autocomplete and spellcheck.
-- **Submit gating** — the "Continue" affordance is disabled until all four cells match.
+- **Submit gating** — the "Continue" affordance is disabled until all four cells match. This is the LAST step of creation, so that affordance also commits the vault; a commit failure returns here with the typed words intact.
+- **Direction** — the inputs MUST be left-to-right in every locale, for the reason §2.2's grid is.
 
 > Rationale: the create-time challenge has access to the phrase the client just generated, so per-cell validation against a known target is appropriate here. Recovery-time validation (§3) is fundamentally different and follows different rules.
 
 ### 2.4 No re-display commitment
 
 The recovery phrase is shown to the user on §2.2 **exactly once**, and never again by any client surface. After the user advances past the confirmation step, the in-memory phrase string MUST be dropped from the client's state.
+
+Reaffirmed 2026-09-27 (myne-md/myne#468): the read-only verification in §3.6 does not weaken this. It takes the phrase as INPUT and answers yes or no; it never displays one.
 
 This commitment is **narrow**: it covers the *generated* phrase displayed at vault creation. It does not extend to user-typed input during recovery (§3.2), which is governed separately (§3.5). A future client MUST NOT add a "show me my recovery phrase" affordance under any authenticated condition; the architecture additionally enforces this structurally because the phrase plaintext is zeroized at vault creation and only `enc_root_key_recovery` survives on disk.
 
@@ -138,6 +146,26 @@ The 24-word phrase is one of two critical secrets per `threat-model.md` AS11. Th
   These wrappers MUST be dropped — and therefore zeroized — immediately after AEAD-decrypt returns success-or-error. Successful recovery transitions `root_key` into a separate `Zeroizing` container that lives until vault lock or process exit; the phrase-side material does not survive past the decrypt step.
 
 The spec deliberately avoids promising "the phrase is zeroized" without qualification, because that would misrepresent what the V8 runtime can deliver.
+
+### 3.6 Read-only verification (the drill)
+
+A client MUST offer a way to check, on an UNLOCKED vault, whether a phrase the user types opens that vault (`decisions/security/0627`, myne-md/myne#468). §2.4 means a phrase mis-copied at creation is otherwise discovered on the day it is needed, which is the day the password is already gone.
+
+- **Read-only.** The command derives the recovery wrap-key under the vault's recovery salt domain, attempts the AEAD-open of `enc_root_key_recovery`, discards the result, and returns a boolean. It MUST NOT transition any slot (in particular it MUST NOT populate `Recovering`, which would demand a password reset from a user who was only checking) and MUST NOT write.
+- **Unlock-gated.** It MUST refuse when no vault is unlocked. This is what bounds it as an oracle: a caller at a locked app cannot reach it, and a caller at an unlocked app already holds the plaintext.
+- **Shared auth budget.** Attempts ride the same single-permit budget as unlock, recovery and password change, so a check cannot run beside any of them or be used to keep that budget busy.
+- **One failure answer.** A wrong phrase, another vault's phrase and structurally invalid input MUST all produce the same result and the same message. The message MUST NOT name a mismatched position — that would turn one whole-phrase check into twenty-four one-word checks — and SHOULD say why it does not. A `vault.meta` that cannot be read or parsed is an ERROR, not a wrong phrase.
+- **Entry only.** The surface MUST NOT display a phrase. It clears its input after every attempt.
+- **Not surfaced automatically,** with one exception: a single, dismissible line on the backup-success screen, which never returns once dismissed.
+
+### 3.7 Joining a new device with the phrase
+
+A device join MAY use the phrase instead of the password (`decisions/sync/0628`, myne-md/myne#468), for a user who has lost every other device and so has nobody to approve a password join.
+
+- **Path.** The enrolment sends the `recovery` path (`server-protocol.md`), which the server self-approves.
+- **Opening the vault** uses the same pipeline as §3.2–§3.4, so the vault is `Recovering` afterwards and the §4 mandatory password reset follows before it can be used.
+- **From the waiting screen.** A device already joined with the password and waiting for approval MAY re-run its enrolment with the phrase. That vault is already unlocked with the password the user just typed, so no password reset follows.
+- **Web.** Not offered: the phrase as a device credential is the `phraseEnrolment` capability, absent on the web client for the reason `threat-model.md` A18 gives.
 
 ---
 
