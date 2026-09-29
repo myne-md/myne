@@ -4137,10 +4137,17 @@ async fn sync_cycle_attempt(
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| shared_sync_id(shared, SubkeyRole::CatalogSyncId));
     let themes_id = shared_sync_id(shared, SubkeyRole::ThemesSyncId);
-    // The chats catalog is unconditional like themes (a synced singleton that
-    // exists for every holding vault), while the per-conversation files are
-    // scanned below like attachments (an id-named per-file family).
-    let chats_catalog_id = shared_sync_id(shared, SubkeyRole::ChatsCatalogSyncId);
+    // The chats / agent-memory / agent-personality catalogs are ROOT-derived, not
+    // group-derived, and are therefore `None` on a member (which holds no
+    // `root_key`). `design-notes/protocol/0609` states it: those three families
+    // are person-private (the `MYY5` plane, 0608) and "have no group role", which
+    // is why `member_removal::group_rotation_reclaim_sync_ids` lists only the
+    // catalog / prefs / themes ids it rotates. Routing them through
+    // `shared_sync_id` was a defect: on an `NTV6` session `shared` is `Group`, and
+    // `GroupRole` has no chats / memory / personality variant, so the call hit an
+    // `expect` and panicked the whole cycle (myne-md/myne#791). They derive from
+    // the retained owner root, exactly as the v0.1/v0.2 root-tier singletons do.
+    let chats_catalog_id = root_key.map(|rk| sync_id_for(rk, SubkeyRole::ChatsCatalogSyncId));
     // In-memory union of the per-conversation files (conversation id →
     // on-disk nonce), maintained by the pull loop like `att_scan`.
     let mut chats_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4175,10 +4182,14 @@ async fn sync_cycle_attempt(
     // for an opted-out device.
     let memory_on = root_key.is_some()
         && memory_sync_enabled(io, shared, &account_number_hash, vault_root, version).await;
-    let memory_catalog_id =
-        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentMemoryCatalogSyncId));
-    let personality_id =
-        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentPersonalitySyncId));
+    // Root-derived for the same reason the chats catalog is (`0609`): no group
+    // role, so a member (no `root_key`) skips the whole plane.
+    let memory_catalog_id = root_key
+        .map(|rk| sync_id_for(rk, SubkeyRole::AgentMemoryCatalogSyncId))
+        .filter(|_| memory_on);
+    let personality_id = root_key
+        .map(|rk| sync_id_for(rk, SubkeyRole::AgentPersonalitySyncId))
+        .filter(|_| memory_on);
     // In-memory union of the per-entry files (entry id → on-disk nonce),
     // maintained by the pull loop like `chats_scan`.
     let mut memories_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4230,14 +4241,16 @@ async fn sync_cycle_attempt(
     {
         local.insert(themes_id, n);
     }
-    if let Some(n) = io
-        .read(&chats_catalog_file_path(vault_root))
-        .await
-        .ok()
-        .as_deref()
-        .and_then(read_chats_catalog_nonce)
-    {
-        local.insert(chats_catalog_id, n);
+    if let Some(cid) = chats_catalog_id {
+        if let Some(n) = io
+            .read(&chats_catalog_file_path(vault_root))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(read_chats_catalog_nonce)
+        {
+            local.insert(cid, n);
+        }
     }
     if let Some(mid) = memory_catalog_id {
         if let Some(n) = io
@@ -4400,14 +4413,15 @@ async fn sync_cycle_attempt(
     // reconcile that follows it (the shape the sync_chats_phase docblock
     // describes; the phases' own guard is the call site's because a tokio
     // Mutex is not reentrant).
-    let remote_chats_cat_rec = page
-        .all_metas
-        .iter()
-        .find(|m| m.id == chats_catalog_id && m.attachment_id.is_none());
+    let remote_chats_cat_rec = chats_catalog_id.and_then(|cid| {
+        page.all_metas
+            .iter()
+            .find(|m| m.id == cid && m.attachment_id.is_none())
+    });
     let chats_write_mutex = crate::plugins::chats::commands::write_mutex();
     let chats_write_guard = chats_write_mutex.lock().await;
-    let mut chats_phase = match root_key {
-        Some(root_key) => {
+    let mut chats_phase = match (root_key, chats_catalog_id) {
+        (Some(root_key), Some(chats_catalog_id)) => {
             sync_chats_phase(
                 io,
                 transport,
@@ -4422,7 +4436,7 @@ async fn sync_cycle_attempt(
             )
             .await?
         }
-        None => skipped_chats_phase(),
+        _ => skipped_chats_phase(),
     };
 
     // --- conversation pull loop (catalog-guarded) ---
@@ -4901,7 +4915,7 @@ async fn sync_cycle_attempt(
                 && Some(c.id) != cat_id
                 && c.id != prefs_id
                 && c.id != themes_id
-                && c.id != chats_catalog_id
+                && Some(c.id) != chats_catalog_id
                 && !chats_scan.contains_key(&c.id)
         })
         .count() as u32;
@@ -4941,7 +4955,7 @@ async fn sync_cycle_attempt(
                 || Some(c.id) == cat_id
                 || c.id == prefs_id
                 || c.id == themes_id
-                || c.id == chats_catalog_id
+                || Some(c.id) == chats_catalog_id
                 || chats_scan.contains_key(&c.id))
         })
         .filter(|c| {
@@ -5142,7 +5156,7 @@ async fn sync_cycle_attempt(
                     && Some(m.id) != cat_id
                     && m.id != prefs_id
                     && m.id != themes_id
-                    && m.id != chats_catalog_id
+                    && Some(m.id) != chats_catalog_id
                     && !chats_scan.contains_key(&m.id)
             })
             .map(|m| (m.id, m.content_nonce))
@@ -5662,15 +5676,11 @@ async fn sync_cycle_attempt(
         // (myne-md/myne#675). Same single-derivation discipline as themes
         // (myne#436): the bytes come from the phase, never re-derived here.
         if chats_phase.dirty {
-            if let Some(bytes) = chats_phase.push_bytes.take() {
+            if let (Some(bytes), Some(cid)) = (chats_phase.push_bytes.take(), chats_catalog_id) {
                 if let Some(nonce) = read_chats_catalog_nonce(&bytes) {
-                    let base = state
-                        .blobs
-                        .get(&hex(&chats_catalog_id))
-                        .map(|b| b.version)
-                        .unwrap_or(0);
+                    let base = state.blobs.get(&hex(&cid)).map(|b| b.version).unwrap_or(0);
                     to_push.push(PushBlob {
-                        id: chats_catalog_id,
+                        id: cid,
                         base_version: base,
                         content_nonce: nonce,
                         ciphertext: bytes,
@@ -13108,6 +13118,35 @@ mod tests {
                 shared_sync_id(&member, SubkeyRole::PrefsSyncId),
                 shared_sync_id(&member, SubkeyRole::ThemesSyncId)
             );
+        }
+
+        // The chats / agent-memory / agent-personality catalogs are ROOT-derived
+        // even on an `NTV6` session, because they are person-private and have no
+        // `GroupRole` (decisions/protocol/0609, 0608). Routing them through
+        // `shared_sync_id` on a group session hit the `expect` and panicked the
+        // whole cycle (myne-md/myne#791). This pins both halves: their id helper
+        // is the root derivation, and it must not be reachable through the group
+        // tier at all.
+        #[test]
+        fn private_catalogs_stay_root_derived_and_have_no_group_role() {
+            let root = [0x33u8; 32];
+            for (role, id) in [
+                (SubkeyRole::ChatsCatalogSyncId, chats_catalog_sync_id(&root)),
+                (
+                    SubkeyRole::AgentMemoryCatalogSyncId,
+                    agent_memory_catalog_sync_id(&root),
+                ),
+                (
+                    SubkeyRole::AgentPersonalitySyncId,
+                    agent_personality_sync_id(&root),
+                ),
+            ] {
+                assert_eq!(id, sync_id_for(&root, role));
+                assert!(
+                    role.shared_group_role().is_none(),
+                    "{role:?} must have no GroupRole: it is person-private, not shared"
+                );
+            }
         }
 
         // A theme-less vault stays themes-silent: no local blob, no server
