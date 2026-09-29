@@ -2125,6 +2125,12 @@ The zero-vault first-run shape on desktop and mobile in which the person identit
 
 Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
 
+### **identity phrase** &nbsp; 🗝️ *Key/identifier*
+
+The person's 24-word recovery credential. It derives the deterministic person keypair and server-auth secret, and derives the key that seals a member's shared-vault keys on that device. It does not wrap a vault's `root_key`; that is the separate [recovery phrase](#recovery-phrase). The phrase itself stays on the device.
+
+Used in: `design-notes/protocol/0604-deterministic-phrase-derived-person-identity.md`, `design-notes/protocol/0606-member-vault-key-store.md`, `design-notes/ui/0615-first-run-is-identity-first.md`.
+
 ### **person identity code** &nbsp; 🔑 *Identifier*
 
 The out-of-band string a person hands the other party in an invite so it can be

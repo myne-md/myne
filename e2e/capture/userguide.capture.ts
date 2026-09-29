@@ -39,15 +39,25 @@ import { join } from "node:path";
 import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
+  activeNoteId,
   clickNewMenuItem,
   clickRibbonUntilVisible,
   clickUntilVisible,
+  clickNoteRow,
   closeSettings,
+  createNote as createNoteFlow,
   dismissImporterOffer,
   enableDeveloperModeInSettings,
   openExportSubmenuItem,
   pageSeatInvoke,
   pasteIntoEditor,
+  rightClickBySelector,
+  rowMenuPick,
+  nameNewNote,
+  searchAndOpenNote,
+  setFolderNotesEnabled,
+  setViewsEnabled,
+  waitForSaved,
   runPaletteAction,
   unlockToEditor,
 } from "./../support/flows";
@@ -59,7 +69,6 @@ const CM_EDITOR = '[data-testid="editor.content"] .cm-editor';
 const ENTER = String.fromCharCode(0xe007); // W3C key: commit inline rename
 const ESCAPE = String.fromCharCode(0xe00c); // W3C key: dismiss overlays/menus
 const CTRL = String.fromCharCode(0xe009); // W3C modifier (sticky until repeated)
-const ALT = String.fromCharCode(0xe00a); // W3C modifier (open-to-side / split)
 const HOME = String.fromCharCode(0xe011); // W3C Home key
 const END = String.fromCharCode(0xe010); // W3C End key
 const SHIFT = String.fromCharCode(0xe008); // W3C modifier (extend selection)
@@ -74,6 +83,7 @@ interface FrameRecord {
 }
 
 const frames: FrameRecord[] = [];
+const capturedNoteIds = new Map<string, string>();
 
 /** Snap the current viewport to `<OUT_DIR>/<name>.png` and record it. */
 async function capture(session: Session, name: string, slug: string, alt: string): Promise<void> {
@@ -102,29 +112,14 @@ async function frame(
   }
 }
 
-/** Create a note via the sidebar CTA and commit `title` (inline rename).
- *  The CTA can no-op when fired while the previous note is mid-autosave,
- *  so settle first and retry the click until the title field appears.
- *
- *  myne#653 moved naming out of the sidebar: creating a note no longer opens
- *  the inline-rename input, it opens the note with its own `title:` field
- *  focused. The retry loop is unchanged and still earns its place, since the
- *  create click itself is what can miss. */
+/** Use the shared E2E flow for create + title commit. The title field lives in
+ *  a CodeMirror widget and can remount during typing, so the helper re-finds it
+ *  and verifies that the title reached the sidebar before returning. */
 async function createNote(session: Session, title: string): Promise<void> {
-  await sleep(500); // let any prior autosave/remount finish
-  let field: Element | null = null;
-  for (let attempt = 0; attempt < 3 && !field; attempt++) {
-    await clickNewMenuItem(session, "notes.create");
-    try {
-      field = await session.byTestId("editor.frontmatter-title", { timeoutMs: 4000 });
-    } catch {
-      await sleep(600);
-    }
-  }
-  if (!field) {
-    throw new Error("editor.frontmatter-title never appeared after 3 create attempts");
-  }
-  await field.sendKeys(title + ENTER);
+  await createNoteFlow(session, title);
+  const noteId = await activeNoteId(session);
+  if (!noteId) throw new Error(`createNote left no active note tab for "${title}"`);
+  capturedNoteIds.set(title, noteId);
 }
 
 /** Create a top-level folder named `name`. Enter commits the name input;
@@ -245,25 +240,34 @@ async function pressChord(session: Session, mods: string[], key: string): Promis
  *  whose `data-item-id` is `itemId`. The row context-menu idiom recurs across
  *  the new notes-organization frames (favourite / delete / archive / export). */
 async function rowContextAction(session: Session, title: string, itemId: string): Promise<void> {
-  const row = await noteRowByTitle(session, title);
-  await row.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-      { timeoutMs: 6000 },
-    )
-  ).click();
+  const noteId = capturedNoteIds.get(title) ?? (await noteIdByTitle(session, title));
+  try {
+    await rowMenuPick(session, noteId, itemId);
+  } catch (e) {
+    // A failed menu item must not leave a transparent overlay covering every
+    // later best-effort frame in the same capture session.
+    try {
+      await pressKey(session, ESCAPE);
+    } catch (dismissError) {
+      throw new AggregateError([e, dismissError], "row context action and overlay dismissal failed");
+    }
+    throw e;
+  }
 }
 
 /** Open the sidebar note titled `title` by matching the row textContent.
  *  Note rows share `data-testid="notes.row"`; there is no public
  *  title→id map, so scan the rows' text (the byTestIdAll idiom from
- *  saved-views-entry.e2e.ts `openRowMenu`). Returns the row Element. */
-async function openNoteByTitle(session: Session, title: string): Promise<Element> {
-  const row = await session.waitUntil(
+ *  saved-views-entry.e2e.ts `openRowMenu`). Keep the id rather than the row
+ *  element, which can go stale as the list updates after a save. */
+async function noteIdByTitle(session: Session, title: string): Promise<string> {
+  return session.waitUntil(
     async () => {
       for (const r of await session.byTestIdAll("notes.row")) {
-        if ((await r.textContent()).includes(title)) return r;
+        if ((await r.textContent()).includes(title)) {
+          const noteId = await r.attribute("data-note-id");
+          if (noteId) return noteId;
+        }
       }
       return null;
     },
@@ -272,13 +276,20 @@ async function openNoteByTitle(session: Session, title: string): Promise<Element
     // exceeds the old 12s (best-effort frames then flaked "row timed out").
     { label: `notes.row titled "${title}"`, timeoutMs: 20000 },
   );
-  await row.click();
-  await sleep(500); // let the editor swap to the selected note
-  return row;
 }
 
-/** The sidebar row Element titled `title` (no click) — for right-click /
- *  modifier-click flows that target a specific row. */
+/** Open a captured note through palette search and return its id. The sidebar
+ *  virtualizes rows outside its viewport, so scanning `notes.row` cannot find
+ *  every note once the sample vault has grown. */
+async function openNoteByTitle(session: Session, title: string): Promise<string> {
+  const noteId = capturedNoteIds.get(title) ?? (await noteIdByTitle(session, title));
+  await searchAndOpenNote(session, title, noteId);
+  await sleep(500); // let the editor swap to the selected note
+  return noteId;
+}
+
+/** The sidebar row Element titled `title` (no click), for static read-only
+ *  capture state. Use `rowMenuPick` for row actions so it re-finds by id. */
 async function noteRowByTitle(session: Session, title: string): Promise<Element> {
   return session.waitUntil(
     async () => {
@@ -431,8 +442,9 @@ runner(
         createNoteWithBody(
           s,
           "Welcome to Myne",
-          "\nMyne keeps your notes encrypted on your device. This vault is " +
-            "just a folder of encrypted files; nothing leaves your computer.\n\n" +
+          "\nMyne keeps your notes encrypted on this device. Sync is off for " +
+            "this vault; Myne does not send it to a sync server until you turn " +
+            "sync on.\n\n" +
             "Start here:\n\n" +
             "- [[Roadmap]] — what we're shipping next\n" +
             "- [[Reading list]] — articles to get through\n" +
@@ -445,10 +457,13 @@ runner(
       // the folder index (folder-notes.e2e.ts: right-click the folder row →
       // "new-note", then right-click the note → "note.set-index").
       await safe("folder index note", async () => {
+        await setFolderNotesEnabled(s, true);
         const folder = await s.waitForElement(testIdSelector("notes.folder-row"), {
           timeoutMs: 10000,
         });
-        await folder.rightClick();
+        const folderPath = await folder.attribute("data-folder-path");
+        if (!folderPath) throw new Error("folder row has no folder path");
+        await rightClickBySelector(s, testIdSelector("notes.folder-row", { "data-folder-path": folderPath }));
         await (
           await s.waitForElement(
             testIdSelector("notes.context-menu-item", { "data-item-id": "new-note" }),
@@ -457,24 +472,21 @@ runner(
         ).click();
         // myne#653: a folder create names the note in the note, not in the
         // sidebar (the rename input is not opened any more).
-        const titleField = await s.byTestId("editor.frontmatter-title", {
-          timeoutMs: 6000,
-        });
-        await titleField.sendKeys("Projects overview" + ENTER);
-        await sleep(500);
+        await nameNewNote(s, "Projects overview");
+        await waitForSaved(s);
+        const noteId = await activeNoteId(s);
+        if (!noteId) throw new Error("creating the folder note left no active note tab");
+        capturedNoteIds.set("Projects overview", noteId);
         const note = await noteRowByTitle(s, "Projects overview");
-        await note.rightClick();
-        await (
-          await s.waitForElement(
-            testIdSelector("notes.context-menu-item", { "data-item-id": "note.set-index" }),
-            { timeoutMs: 6000 },
-          )
-        ).click();
+        const visibleNoteId = await note.attribute("data-note-id");
+        if (visibleNoteId !== noteId) throw new Error("folder note row is not the created note");
+        await rowMenuPick(s, noteId, "note.set-index");
         // MYND-370: setting a folder note now HIDES the note from the tree and
         // surfaces an "Open folder note" affordance on the folder's own row
         // (the old per-note index badge is gone). Wait for that affordance.
         await s.byTestId("notes.folder-index-affordance", { timeoutMs: 6000 });
       });
+      await safe("dismiss setup menu", () => pressKey(s, ESCAPE));
 
       // =====================================================================
       // CLEAN SINGLE-PANE EDITOR FRAMES (every transient state toggled off
@@ -849,8 +861,10 @@ runner(
         "editor-and-writing/export-notes",
         "The note context menu with the Export as Markdown option, which saves a note as a Markdown file.",
         async () => {
-          const row = await noteRowByTitle(s, "Welcome to Myne");
-          await row.rightClick();
+          await createNote(s, "Export sample");
+          const noteId = capturedNoteIds.get("Export sample");
+          if (!noteId) throw new Error("export sample note id was not recorded");
+          await rightClickBySelector(s, testIdSelector("notes.row", { "data-note-id": noteId }));
           // The formats sit under one `Export…` row since myne-md/myne#611, so
           // the screenshot has to open the submenu to show them at all.
           await openExportSubmenuItem(s, "export-markdown");
@@ -873,8 +887,7 @@ runner(
         "safety-and-recovery/note-snapshots",
         "The note snapshots panel listing earlier saved versions of a note, with a preview of the selected one.",
         async () => {
-          const row = await openNoteByTitle(s, "Roadmap");
-          const noteId = await row.attribute("data-note-id");
+          const noteId = await openNoteByTitle(s, "Roadmap");
           await pageSeatInvoke(s, "plugin:notes|note_snapshot_flush", { noteId }, 15000);
           await runPaletteAction(s, "snapshots.open", "snap");
           await s.byTestId("snapshots.panel", { timeoutMs: 8000 });
@@ -922,7 +935,7 @@ runner(
       await frame(
         s,
         "daily-notes",
-        "notes-and-organization/daily-notes",
+        "notes-and-organization/periodic-notes",
         "Today's dated note, opened from the command palette and filed in the Daily folder.",
         async () => {
           await runPaletteAction(s, "daily.open-today", "today");
@@ -940,12 +953,13 @@ runner(
         "notes-and-organization/favorites",
         "A note starred into the Favorites section pinned at the top of the sidebar.",
         async () => {
-          await rowContextAction(s, "Welcome to Myne", "favorite");
+          await createNote(s, "Favorite sample");
+          await rowContextAction(s, "Favorite sample", "favorite");
           await s.waitUntil(
             async () => {
               let n = 0;
               for (const r of await s.byTestIdAll("notes.row"))
-                if ((await r.textContent()).includes("Welcome to Myne")) n++;
+                if ((await r.textContent()).includes("Favorite sample")) n++;
               return n >= 2 ? true : null;
             },
             { label: "note shown in Favorites + tree", timeoutMs: 8000 },
@@ -954,7 +968,7 @@ runner(
         },
       );
       // Un-favourite so the sidebar returns to its plain shape for later frames.
-      await safe("un-favourite", () => rowContextAction(s, "Welcome to Myne", "favorite"));
+      await safe("un-favourite", () => rowContextAction(s, "Favorite sample", "favorite"));
 
       // ---- Frame: note colours (the colour/icon decoration popover) ----
       // NoteList.tsx menuItems id "color" opens the DecorationPopover
@@ -966,7 +980,8 @@ runner(
         "notes-and-organization/note-colors-and-icons",
         "The colour picker opened from a note's context menu, showing the palette of colour swatches.",
         async () => {
-          await rowContextAction(s, "Welcome to Myne", "color");
+          await createNote(s, "Color sample");
+          await rowContextAction(s, "Color sample", "color");
           await s.byTestId("notes.decoration-popover", { timeoutMs: 6000 });
           await settle(s, 400);
         },
@@ -1014,6 +1029,20 @@ runner(
         await (await s.byTestId("trash.close")).click();
         await s.waitForGone(testIdSelector("trash.panel"));
       });
+      await safe("dismiss trash toast before archive capture", async () => {
+        // The toaster keeps the whole stack in the DOM, with older rows hidden
+        // behind the newest one. Dismiss from the front until the trash toast
+        // and any older fixture toasts have all left the viewport.
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          const dismissButtons = await s.byTestIdAll("editor.toast-dismiss");
+          if (dismissButtons.length === 0) return;
+          await dismissButtons[dismissButtons.length - 1].click();
+          await sleep(220);
+        }
+        if ((await s.byTestIdAll("editor.toast-dismiss")).length > 0) {
+          throw new Error("toast stack did not clear before the archive frame");
+        }
+      });
 
       // ---- Frame: archive (a note kept out of the working set) ----
       // archive.e2e.ts ar1: context archive removes from the tree; the ribbon's
@@ -1056,25 +1085,35 @@ runner(
       );
 
       // ---- Frame: bulk note actions (multi-selected rows + context menu) ----
-      // notes.e2e.ts: click one row, Ctrl-click another (multi-select toggles
-      // since MYND-367), then right-click for the bulk context menu.
+      // Use stable note ids and re-find each row: the sidebar replaces row DOM
+      // nodes as title saves and selection state settle.
       await frame(
         s,
         "bulk-note-actions",
         "notes-and-organization/bulk-note-actions",
         "Several note rows selected together in the sidebar with the bulk-actions context menu open.",
         async () => {
-          const first = await noteRowByTitle(s, "Reading list");
-          await first.click();
-          const second = await noteRowByTitle(s, "Weekly review");
-          await second.modifierClick(CTRL);
+          await createNote(s, "Bulk alpha");
+          const firstId = capturedNoteIds.get("Bulk alpha");
+          await createNote(s, "Bulk beta");
+          const secondId = capturedNoteIds.get("Bulk beta");
+          if (!firstId || !secondId) throw new Error("bulk-action sample note ids were not recorded");
+          await clickNoteRow(s, firstId);
+          const secondRow = await s.waitForElement(
+            testIdSelector("notes.row", { "data-note-id": secondId }),
+          );
+          await secondRow.modifierClick(CTRL);
           await s.waitUntil(
             async () =>
-              (await s.findElements(testIdSelector("notes.row", { "data-multiselected": "true" })))
-                .length >= 2 || null,
+              (await s.findElements(
+                testIdSelector("notes.row", { "data-multiselected": "true" }),
+              )).length >= 2 || null,
             { label: "two rows multi-selected", timeoutMs: 8000 },
           );
-          await second.rightClick();
+          await rightClickBySelector(
+            s,
+            testIdSelector("notes.row", { "data-note-id": secondId }),
+          );
           await s.waitForElement(testIdSelector("notes.context-menu-item"), { timeoutMs: 6000 });
           await settle(s, 400);
         },
@@ -1086,27 +1125,31 @@ runner(
       });
 
       // ---- Frame: pinned and stacked tabs (a pinned tab + multiple tabs) ----
-      // tab-modes.e2e.ts: middle-click rows to open extra tabs, then
-      // right-click a tab → tab.pin.
+      // Use the rows' context-menu Open in new tab action, then the tab's own
+      // context menu to pin it.
       await frame(
         s,
         "pinned-and-stacked-tabs",
         "notes-and-organization/pinned-and-stacked-tabs",
         "The editor tab strip with several note tabs open and one tab pinned.",
         async () => {
-          await openNoteByTitle(s, "Roadmap");
-          await safe("open extra tabs via middle-click", async () => {
-            await (await noteRowByTitle(s, "Reading list")).middleClick();
-            await sleep(400);
-            await (await noteRowByTitle(s, "Weekly review")).middleClick();
-            await sleep(400);
+          const roadmapId = await openNoteByTitle(s, "Roadmap");
+          await safe("open extra tabs from row menus", async () => {
+            await createNote(s, "Tab reading");
+            const readingId = capturedNoteIds.get("Tab reading");
+            await createNote(s, "Tab weekly");
+            const weeklyId = capturedNoteIds.get("Tab weekly");
+            if (!readingId || !weeklyId) throw new Error("tab sample note ids were not recorded");
+            await rowMenuPick(s, readingId, "open-in-new-tab");
+            await rowMenuPick(s, weeklyId, "open-in-new-tab");
           });
           await s.byTestId("editor.tab-strip", { timeoutMs: 8000 });
           // Best-effort: pin the first tab via its context menu.
           await safe("pin a tab", async () => {
-            const tabs = await s.byTestIdAll("editor.tab");
-            if (tabs.length === 0) throw new Error("no tabs to pin");
-            await tabs[0].rightClick();
+            await rightClickBySelector(
+              s,
+              testIdSelector("editor.tab", { "data-tab-id": `note:${roadmapId}` }),
+            );
             await (
               await s.waitForElement(
                 testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
@@ -1138,7 +1181,7 @@ runner(
       });
 
       // ---- Frame: tabs and split view (two panes side by side) ----
-      // workspace-state.e2e.ts: Alt-click a row opens it to the side (split);
+      // Open a freshly-created row to the side through its context menu, then
       // confirm two editor.pane elements. Done AFTER single-pane frames.
       await frame(
         s,
@@ -1146,8 +1189,11 @@ runner(
         "notes-and-organization/tabs-and-split-view",
         "Two notes open side by side in a split editor, each in its own pane.",
         async () => {
+          await createNote(s, "Split target");
+          const splitTargetId = capturedNoteIds.get("Split target");
+          if (!splitTargetId) throw new Error("split target note id was not recorded");
           await openNoteByTitle(s, "Roadmap");
-          await (await noteRowByTitle(s, "Reading list")).modifierClick(ALT);
+          await rowMenuPick(s, splitTargetId, "open-to-side");
           await s.waitUntil(
             async () => ((await s.byTestIdAll("editor.pane")).length >= 2 ? true : null),
             { label: "two editor panes after split", timeoutMs: 10000 },
@@ -1268,6 +1314,7 @@ runner(
         "editor-and-writing/saved-views",
         "The saved-view builder, where conditions filter and group which notes a view shows.",
         async () => {
+          await setViewsEnabled(s, true);
           // The + now lives in the flyout header rather than on a sidebar nav
           // row (myne-md/myne#762), so the flyout has to be open to reach it.
           await clickRibbonUntilVisible(s, "views.show", "views.flyout");
@@ -1760,7 +1807,10 @@ runner(
         JSON.stringify(
           {
             generatedBy: "e2e/capture/userguide.capture.ts",
-            window: "1100x720 (tauri.conf.json), light theme",
+            window:
+              process.env.GDK_SCALE === "2"
+                ? "2200x1440 (@2x), light theme"
+                : "1100x720 (tauri.conf.json), light theme",
             frames,
           },
           null,

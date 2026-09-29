@@ -1262,19 +1262,16 @@ export async function noteRowIds(
   return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
 }
 
-/** The id of the note `createNote` just made: it leaves that note selected, and
- *  the id lives on the ROW rather than anywhere in the editor. Reading it here,
- *  rather than counting rows afterwards, is what keeps a scenario working on a
- *  seeded vault: `seedVault({ exportSuite: true })` brings its own notes, so
- *  "exactly N rows" is a fixture detail rather than something the scenario
- *  controls. Same reading `seedEmbedIntoNote` below uses. */
+/** The id of the active note tab. The sidebar virtualizes its rows, so the
+ *  selected row can be absent from the DOM when it is outside the scroll window.
+ *  The editor tab remains mounted and carries the same note id. */
 export async function selectedNoteId(session: Session): Promise<string> {
-  const row = await session.waitForElement(
-    testIdSelector("notes.row") + '[aria-selected="true"]',
-  );
-  const noteId = (await row.attribute("data-note-id")) ?? "";
-  if (noteId === "") throw new Error("selectedNoteId: the active note row carries no id");
-  return noteId;
+  const tab = await session.waitForElement('[data-testid="editor.tab"][data-active="true"]');
+  const tabId = (await tab.attribute("data-tab-id")) ?? "";
+  if (!tabId.startsWith("note:") || tabId.length === "note:".length) {
+    throw new Error("selectedNoteId: the active editor tab is not a note tab");
+  }
+  return tabId.slice("note:".length);
 }
 
 /** One sidebar row, by note id. */
