@@ -219,8 +219,8 @@ function deviceErrorReason(kind: string): string {
   switch (kind) {
     case "Transport":
       return "sync.devices.reasonUnreachable";
-    case "CertPinMismatch":
-      return "sync.devices.reasonCertChanged";
+    case "TlsFailure":
+      return "sync.devices.reasonTls";
     case "Unauthenticated":
       return "sync.devices.reasonRejected";
     case "AccountFrozen":
@@ -409,8 +409,8 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
         >
           <span>
-            {error === "CertPinMismatch"
-              ? t("sync.devices.certChanged")
+              {error === "TlsFailure"
+                ? t("sync.devices.tlsFailure")
               : t("sync.devices.unreachable", { error: t(deviceErrorReason(error)) })}
           </span>
           {error === "Unauthenticated" ||
@@ -437,23 +437,17 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
               {t("sync.devices.resetSyncOnThisDevice")}
             </button>
           ) : (
-            // A transport failure — NOT a reason to wipe the baseline. The likely cause
-            // (server moved / certificate changed) is fixed by re-pinning the endpoint.
-            //
-            // Two hints, because one of them no longer has to guess: when the
-            // backend says `CertPinMismatch` the cause is KNOWN, and the copy
-            // says so and says what to do. The older hint stays for every other
-            // transport failure, where "the server moved or its certificate
-            // changed" really is a guess.
+            // A TLS failure requires fixing server trust; other transport errors
+            // may clear on their own. Neither warrants erasing the sync baseline.
             <span
               style={{ color: "var(--fg-3)" }}
               data-testid={
-                error === "CertPinMismatch" ? "sync.cert-changed-hint" : "sync.transport-hint"
+                error === "TlsFailure" ? "sync.tls-failure-hint" : "sync.transport-hint"
               }
             >
               {t(
-                error === "CertPinMismatch"
-                  ? "sync.devices.certChangedHint"
+                error === "TlsFailure"
+                  ? "sync.devices.tlsFailureHint"
                   : "sync.devices.transportHint",
               )}
             </span>

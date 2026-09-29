@@ -20,12 +20,13 @@
 //   exactly it, so any other address is CSP-blocked before a request leaves the
 //   page. Offering a field would be a lie of capability whose failure mode is an
 //   unexplained network error.
-// * **The TOFU certificate fingerprint step cannot happen.** A page never sees a
-//   leaf certificate. The desktop flow shows the pinned fingerprint for an
-//   eye-compare; `sync_join_account`'s web arm returns `fingerprint: null` with
-//   `PinSource::PlatformTrustStore` precisely so this screen has a typed answer
-//   to skip on, rather than an empty string that would render as a fingerprint
-//   of nothing.
+// * **The certificate step cannot happen.** A page never sees a leaf
+//   certificate, and pinning is gone from every client anyway
+//   (`decisions/sync/0620`): a browser verifies the chain itself. What is left of
+//   the desktop step is the trust-status line, and `sync_join_account`'s web arm
+//   returns `fingerprint: null` with `PinSource::PlatformTrustStore` precisely
+//   so this screen has a typed answer to render, rather than an empty string
+//   that would read as a certificate nothing could name.
 //
 // What DOES carry over is the pending gate. A browser enrols on the password
 // path, which per `server-protocol.md` §3.1 lands **pending** until an existing

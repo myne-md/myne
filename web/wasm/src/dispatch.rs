@@ -21,14 +21,6 @@ use crate::outcome::Outcome;
 use myne_core::host::HostCtx;
 use myne_core::vault_io::VaultIo;
 
-/// Whether this client can pin a server certificate. It cannot.
-///
-/// A page never sees the leaf certificate — `decisions.md` 2026-07-26 records
-/// that as permanent, and `threat-model.md` qualifies A4 per client. Named here
-/// rather than passed as a bare `false` at each call so the two endpoint arms
-/// cannot drift apart on it, and so the reason is attached to the value.
-const CLIENT_CAN_PIN: bool = false;
-
 // ── the two seam implementations this crate dispatches through ───────────────
 //
 // Selected by target rather than by a `cfg` on each router arm, so the arms stay
@@ -1386,19 +1378,16 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // two whose cores had no target-independent home until this pass moved
         // them out of the host-gated `commands.rs` into `config.rs`.
         //
-        // `CLIENT_CAN_PIN` is `false` here, and that is a decision rather than a
-        // gap: a page never sees a leaf certificate, so it cannot TOFU-pin one.
-        // What it reports instead is `PinSource::PlatformTrustStore` — "verified,
-        // by the browser" — because the alternative answer (`None`, meaning no
-        // pin) renders in the shared UI as "connected to a local server", which
-        // would be a false statement about a real `https://` endpoint.
+        // This build does not verify certificates itself: the browser's `fetch`
+        // does, against the platform trust store, and a page has no rustls arm
+        // to ask (`threat-model.md` qualifies A4 per client for exactly that
+        // reason). So this client reports `PinSource::PlatformTrustStore`:
+        // "verified, by the browser", because the alternative answer (`None`,
+        // meaning no TLS at all) renders in the shared UI as "connected to a
+        // local server", which would be a false statement about a real
+        // `https://` endpoint.
         "plugin:sync|sync_get_endpoint" => {
-            match myne_core::plugins::sync::config::get_endpoint_view(
-                host_ctx(),
-                vault_io(),
-                CLIENT_CAN_PIN,
-            )
-            .await
+            match myne_core::plugins::sync::config::get_endpoint_view(host_ctx(), vault_io()).await
             {
                 Ok(v) => Outcome::ok(&v),
                 Err(e) => Outcome::error(&e),
@@ -1420,16 +1409,14 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     }
                 }
             };
-            // `cert_pin_hex: None` — not a placeholder. The desktop wrapper
-            // passes a pin it fetched over raw TLS; this client has no way to
-            // fetch one and no way to check one, so it passes none and lets the
-            // core report who did the verifying.
+            // `cert_pin_hex: None`, the retired wire field and not a
+            // placeholder: certificate pinning is gone (decisions/sync/0620), so
+            // no client passes a value here and the core reports who verified.
             match myne_core::plugins::sync::config::set_endpoint(
                 host_ctx(),
                 vault_io(),
                 a.endpoint_url,
                 None,
-                CLIENT_CAN_PIN,
             )
             .await
             {
@@ -2022,9 +2009,10 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // per origin, so there is nothing to enumerate, and a constant is what
         // makes re-running this idempotent by construction ("never mints a
         // second container") and the `VaultId` stable across reloads. And
-        // `can_pin: false` — a page cannot see a leaf certificate, so the result
-        // reports `PinSource::PlatformTrustStore` rather than an empty pin that
-        // would read as unverified.
+        // `native_tls: false`: a page has no rustls arm, so the join does not
+        // run the host-side handshake probe. This is not "unverified": `fetch`
+        // verifies against the platform trust store, which is what the result
+        // reports as `PinSource::PlatformTrustStore`.
         "plugin:sync|sync_join_account" => {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
@@ -2048,18 +2036,16 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::state(),
                 myne_core::plugins::sync::enroll::JoinClient {
                     vault_id: myne_core::paths::web_single_vault_id(),
-                    can_pin: false,
+                    native_tls: false,
                 },
                 myne_core::plugins::sync::enroll::JoinRequest {
                     server_url: a.server_url,
                     account_number: a.account_number,
                     password: a.password,
-                    // `confirmed_fingerprint: None` — not a placeholder either.
-                    // The out-of-band compare (MYND-650 task 5) guards a TOFU
-                    // pin captured over Tor, and this client captures no pin at
-                    // all (`can_pin: false`, above) because a page never sees a
-                    // leaf certificate. Nothing to confirm, so nothing is asked.
-                    // A web user who wants Tor uses Tor Browser (task 12).
+                    // `confirmed_fingerprint: None`, the retired wire field.
+                    // Certificate pinning is gone (decisions/sync/0620) and this
+                    // client never produced a value for it; a web user who wants
+                    // Tor uses Tor Browser (task 12).
                     confirmed_fingerprint: None,
                 },
             )

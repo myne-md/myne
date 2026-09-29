@@ -59,8 +59,8 @@ And one that is specific to the browser, and is not a Tor problem:
   browser exposes no certificate-pinning API to page JavaScript, so a web session
   rests on the browser's own trust store and nothing more —
   [permanently](self-host-policy.md#6-certificate-trust), not pending a later
-  release. The desktop's "type in the server's fingerprint before the pin is
-  captured" ceremony has no web analogue and cannot get one. What defends the
+  release. Native clients now use their bundled public CA roots instead of a
+  fingerprint ceremony. What defends the
   connection against a hostile exit node is that the exit would need a
   certificate the browser's CA set accepts — the same defence every HTTPS site
   has, no weaker and no stronger.

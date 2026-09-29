@@ -3,10 +3,12 @@
 //! `sync_device_join_qr` takes the **user-pasted** account number (Option 1,
 //! prompt-to-paste — the account# is an AS9 bearer token Myne never persists at
 //! rest, `account-number.md §8`, so it cannot be read from storage), reads THIS
-//! device's own sync endpoint + cert pin from the endpoint config, builds the
+//! device's own sync endpoint from the endpoint config, builds the
 //! scanner-only join payload (`myne_core::plugins::sync::qr_join`), and renders it
 //! to an SVG QR the WebView displays. The phone scans it to prefill
 //! `{server_url, account#}` — SYNC-47: the password/phrase are NEVER carried.
+//! The legacy cert-pin slot is emitted empty (decisions/sync/0620: native trust
+//! is public CA + hostname), while the codec still decodes a pinned older QR.
 //!
 //! Desktop-only: mobile scans, never generates — so the `qrcode` dependency lives
 //! here rather than in the shared core (kept off the mobile build).
@@ -49,7 +51,7 @@ pub enum DeviceJoinQrError {
 /// Build the SVG QR for adding a device, from the user-pasted `account_number`.
 ///
 /// The account# arrives from the paste (never from storage — it is not persisted);
-/// the endpoint URL + self-host cert pin come from this device's own sync config.
+/// the endpoint URL comes from this device's own sync config.
 #[tauri::command]
 pub async fn sync_device_join_qr<R: Runtime>(
     app: AppHandle<R>,
@@ -67,13 +69,13 @@ pub async fn sync_device_join_qr<R: Runtime>(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let payload = QrJoinPayload::new(
-        endpoint_url,
-        account_number.trim(),
-        endpoint.cert_pin_hex,
-        now_unix,
-    )
-    .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
+    // `None` in the legacy pin slot, always: the phone no longer adopts a pin from
+    // a QR (native trust is CA + hostname, 0620), and `sync_get_endpoint` reports
+    // the retired field as `None` regardless of what a legacy config holds. Emitting
+    // it explicitly keeps a future reader from reading the local `endpoint` binding
+    // as the source of trust material.
+    let payload = QrJoinPayload::new(endpoint_url, account_number.trim(), None, now_unix)
+        .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
 
     let encoded = payload
         .encode()
@@ -200,8 +202,11 @@ mod tests {
         String::from_utf8(generate_account_number().unwrap().canonical.to_vec()).unwrap()
     }
 
-    /// The densest realistic join payload: a long self-host URL plus a full 64-hex
-    /// cert pin. This is the worst case for scan reliability (largest symbol).
+    /// The densest payload the codec can produce: a long self-host URL plus a full
+    /// 64-hex cert pin. No new payload carries a pin (decisions/sync/0620), but a QR
+    /// emitted by an older desktop still has to render and the phone still has to
+    /// decode it, so the symbol-size budget is sized on it. This is the worst case
+    /// for scan reliability (largest symbol).
     fn worst_case_encoded() -> String {
         let acct = fresh_account();
         QrJoinPayload::new(

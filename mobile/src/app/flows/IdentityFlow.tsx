@@ -183,23 +183,26 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     try {
       await syncSetEndpoint(trimmed);
       setStep("create");
-    } catch {
-      setError(t("identityFlow.serverUnreachable"));
+    } catch (e) {
+      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
+        ? "sync.endpoint.tlsFailure"
+        : "identityFlow.serverUnreachable"));
     } finally {
       setBusy(false);
     }
   }, [serverUrl, t]);
 
-  // The hosted door: write the Myne server and let the first connection pin its
-  // leaf (TOFU). No pre-vetted pin is claimed (myne-md/myne#781).
+  // The hosted door uses the same public-CA and hostname verification.
   const connectHosted = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       await syncSetEndpoint(HOSTED_SYNC_ORIGIN);
       setStep("create");
-    } catch {
-      setError(t("identityFlow.serverUnreachable"));
+    } catch (e) {
+      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
+        ? "sync.endpoint.tlsFailure"
+        : "identityFlow.serverUnreachable"));
     } finally {
       setBusy(false);
     }

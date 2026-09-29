@@ -157,12 +157,11 @@ pub async fn person_setup_from_host(
         let cfg = super::config::read_config(io, &cfg_path)
             .await
             .map_err(|_| SyncDeviceError::NotConfigured)?;
-        let pins = super::config::config_pins(&cfg);
         let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
         let outcome: EnrollOutcome =
             crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
-                let transport = super::http_transport::build_transport(&url, pins)
+                let transport = super::http_transport::build_transport(&url)
                     .map_err(|_| SyncDeviceError::Transport)?;
                 register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
                     .map_err(SyncDeviceError::from)
@@ -416,12 +415,11 @@ pub async fn person_list_invites_from_host(
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     crate::task::run_blocking(move || -> Result<Vec<InviteSummary>, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, "/b2b/invites", &[], Some(&auth.token_hex))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -465,20 +463,19 @@ pub async fn sync_person_list_invites<R: tauri::Runtime>(
     .await
 }
 
-/// The endpoint URL + cert pins, the precondition every relay call needs.
+/// The endpoint URL, the precondition every relay call needs.
 async fn endpoint_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
-) -> Result<(String, Vec<[u8; 32]>), SyncDeviceError> {
+) -> Result<String, SyncDeviceError> {
     let cfg_path = super::config::config_path_from_host(host, io)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
-    Ok((url, pins))
+    Ok(url)
 }
 
 /// Decode an even-length hex string. `None` on odd length or a non-hex byte.
@@ -540,13 +537,13 @@ pub async fn ensure_owner_member_token(
     // device's.
     let (device_token, _device_transport) =
         super::devices::authed_transport_from_host(host, io, state).await?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
 
     let account_hash_for_req = account_hash_hex.clone();
     let owner_hex = owner_person_id_hex.to_string();
     let issued = crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         bind_owner_request(
             transport.as_ref(),
             &device_token,
@@ -609,13 +606,13 @@ pub async fn post_sealed_invite(
     recipient_person_id_hex: &str,
     frame: &[u8],
 ) -> Result<(), SyncDeviceError> {
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let token = owner_token_hex.to_string();
     let recipient = recipient_person_id_hex.to_string();
     let frame = frame.to_vec();
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         post_invite_request(transport.as_ref(), &token, &recipient, &frame)
     })
     .await
@@ -732,12 +729,12 @@ pub async fn list_vault_invites_from_host(
         // enrolled: nothing to list, and not a relay failure either.
         return Ok(None);
     };
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let path = format!("/b2b/vaults/{account_hash_hex}/invites");
 
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, &path, &[], Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -885,13 +882,13 @@ pub async fn accept_invite_from_host(
     let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
 
     let invite_id = invite_id_hex.to_string();
     let person_token = auth.token_hex.clone();
     let (claimed, meta_bytes) = crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let claimed = claim_invite_request(transport.as_ref(), &person_token, &invite_id)?;
         let meta = fetch_vault_meta_request(transport.as_ref(), &claimed.vault_account_hash_hex)?;
         Ok::<_, SyncDeviceError>((claimed, meta))
@@ -1259,13 +1256,13 @@ pub async fn push_and_revoke_removed_member_from_host(
         .clone()
         .filter(|s| !s.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let pid = person_id_hex.map(str::to_string);
     let reclaim = reclaim_sync_ids_hex.to_vec();
 
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         // The rotated meta must reach the server before the revoke, so the
         // removed device cannot pull the new epoch even once before its token
         // dies.
@@ -1342,12 +1339,12 @@ pub async fn person_profile_write_from_host(
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let path = profile_path(&account_hash, &profile_id);
     let token = auth.token_hex.clone();
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Put, &path, &blob, Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -1379,12 +1376,12 @@ pub async fn person_profile_read_from_host(
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let path = profile_path(&account_hash, &profile_id);
     let token = auth.token_hex.clone();
     let blob = crate::task::run_blocking(move || -> Result<Option<Vec<u8>>, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, &path, &[], Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;

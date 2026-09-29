@@ -54,7 +54,10 @@ beforeEach(() => {
         // The command that moves `exempt`: a remote server replaces the
         // loopback one, and the backend's posture answer changes with it.
         endpointIsLoopback = false;
-        return { fingerprint: "a".repeat(64), pin_source: "tofu" };
+        // `pin_source` is the only field this screen's behaviour depends on
+        // (loopback exemption, not trust), and the browser-verified answer is
+        // the one a `https` endpoint reports.
+        return { fingerprint: null, pin_source: "platform_trust_store" };
       case "plugin:sync|sync_get_tor_state":
         return {
           enabled: true,
@@ -141,9 +144,8 @@ describe("the Tor posture after an endpoint change", () => {
   it("does not re-read when the endpoint write was refused", async () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "plugin:sync|sync_get_endpoint") throw new Error("unconfigured");
-      // The Tor-mode fingerprint gate: nothing was written, so nothing about
-      // the endpoint moved and there is nothing to re-read.
-      if (cmd === "plugin:sync|sync_set_endpoint") throw { kind: "PinConfirmationRequired" };
+      // A TLS refusal writes no endpoint, so the Tor posture cannot change.
+      if (cmd === "plugin:sync|sync_set_endpoint") throw { kind: "TlsFailure" };
       if (cmd === "plugin:sync|sync_get_tor_state")
         return { enabled: true, state: { kind: "ready" }, exempt: true };
       return undefined;
@@ -166,7 +168,8 @@ describe("the Tor posture after an endpoint change", () => {
       target: { value: "https://sync.example" },
     });
     fireEvent.click(screen.getByTestId("sync.endpoint-connect"));
-    await screen.findByTestId("sync.expected-fingerprint-input");
+    await screen.findByTestId("sync.endpoint-msg");
+    expect(screen.getByTestId("sync.endpoint-msg").textContent).toContain("HTTPS certificate");
 
     expect(
       invokeMock.mock.calls.filter((c) => c[0] === "plugin:sync|sync_get_tor_state").length,

@@ -16,11 +16,12 @@
 // `decisions/sync/0020` puts hosted and self-host at the same trust boundary.
 //
 // The hosted door writes `HOSTED_SYNC_ORIGIN` and lets the first connection
-// TOFU-pin the leaf; it deliberately does NOT claim a pre-vetted build-time pin
-// (that pin, and the SPKI mechanism a renewal-safe one needs, is myne-md/myne#781).
-// The self-hosted door is the SAME `EndpointConfig` the Settings panel mounts:
-// free-text URL, Connect, TOFU leaf-certificate fingerprint, the same
-// device-local `sync-config.json`. A second endpoint control would be a second
+// verify the chain against public CA roots; it deliberately claims no
+// build-time pin (myne-md/myne#781, and `decisions/sync/0620` withdrew pinning
+// outright rather than solving it). The self-hosted door is the SAME
+// `EndpointConfig` the Settings panel mounts: free-text URL, Connect, a CA +
+// hostname handshake before the URL is stored, the same device-local
+// `sync-config.json`. A second endpoint control would be a second
 // contract, and the two would drift in exactly the place a user is least able
 // to recover. What this component adds is the first-run framing, the choice and
 // the continue gate, not a new way to configure a server.
@@ -31,7 +32,6 @@ import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
 import { EndpointConfig } from "./EndpointConfig";
-import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 
@@ -75,9 +75,7 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
   const [mode, setMode] = useState<"choose" | "self-hosted">("choose");
   const [hostedBusy, setHostedBusy] = useState(false);
   const [hostedError, setHostedError] = useState(false);
-  const [hostedPinError, setHostedPinError] = useState<"changed" | "mismatch" | null>(null);
-  const [expectedFingerprint, setExpectedFingerprint] = useState("");
-  const [confirmNeeded, setConfirmNeeded] = useState(false);
+  const [hostedTls, setHostedTls] = useState(false);
   // The endpoint control reports a successful connection before Continue can
   // advance. A saved endpoint alone is insufficient in the repair flow.
   const [configured, setConfigured] = useState(false);
@@ -103,30 +101,26 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
     onConnected();
   };
 
-  // The hosted door: write the Myne server and let the first connection pin its
-  // leaf (TOFU). No fingerprint claim is shown; the pin source the backend
-  // records is `tofu` and the copy stays honest about it.
+  // The hosted door uses the same verified HTTPS transport as self-hosting.
   const connectHosted = () => {
     setHostedBusy(true);
     setHostedError(false);
-    setHostedPinError(null);
+    setHostedTls(false);
     void invoke("plugin:sync|sync_set_endpoint", {
       endpointUrl: HOSTED_SYNC_ORIGIN,
-      confirmedFingerprint: expectedFingerprint.trim() || null,
     })
       .then(() => {
-        setConfirmNeeded(false);
         setConfigured(true);
         advance();
       })
       .catch((e: unknown) => {
-        const refusal = fingerprintGateRefusal(e);
-        if (refusal !== null) {
-          setConfirmNeeded(true);
-          setHostedPinError(refusal === "FingerprintMismatch" ? "mismatch" : "changed");
-        } else {
-          setHostedError(true);
-        }
+        // A refused certificate is not an unreachable server, and the two send a
+        // first-time user opposite ways: the generic copy's own remedy is "use
+        // your own server", which is advice for a server they cannot reach. Four
+        // other surfaces in this change branch on the same `kind`; this door
+        // used to be the one that did not.
+        setHostedTls((e as { kind?: string } | null)?.kind === "TlsFailure");
+        setHostedError(true);
       })
       .finally(() => setHostedBusy(false));
   };
@@ -152,16 +146,14 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
           </div>
         </div>
 
-        {!confirmNeeded && (
-          <Button
-            variant="primary"
-            disabled={hostedBusy}
-            onClick={connectHosted}
-            data-testid="first-run-server.myne-sync"
-          >
-            {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
-          </Button>
-        )}
+        <Button
+          variant="primary"
+          disabled={hostedBusy}
+          onClick={connectHosted}
+          data-testid="first-run-server.myne-sync"
+        >
+          {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
+        </Button>
         <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
           {t("firstRun.server.myneSyncHint")}
         </div>
@@ -178,36 +170,11 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
         {hostedError && (
           <p
             data-testid="first-run-server.hosted-error"
+            data-error-kind={hostedTls ? "tls" : "unreachable"}
             style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
           >
-            {t("firstRun.server.hostedError")}
+            {t(hostedTls ? "sync.endpoint.tlsFailure" : "firstRun.server.hostedError")}
           </p>
-        )}
-
-        {hostedPinError && (
-          <p role="alert" data-testid="first-run-server.pin-error" style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }}>
-            {t(hostedPinError === "mismatch" ? "sync.endpoint.confirmFingerprintMismatch" : "sync.endpoint.certificateChanged")}
-          </p>
-        )}
-        {confirmNeeded && (
-          <>
-            <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-              {t("firstRun.server.hostedFingerprintHelp")}
-            </p>
-            <FingerprintConfirm
-              value={expectedFingerprint}
-              onChange={setExpectedFingerprint}
-              onConfirm={connectHosted}
-              onDecline={() => {
-                setConfirmNeeded(false);
-                setHostedPinError(null);
-                setExpectedFingerprint("");
-              }}
-              confirmLabel={t("firstRun.server.myneSync")}
-              confirmDisabled={hostedBusy}
-              testIdPrefix="first-run-server"
-            />
-          </>
         )}
 
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>

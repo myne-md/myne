@@ -114,21 +114,48 @@ The mechanical commands for the part that works are in the `operations` reproduc
 
 ## 6. Certificate trust
 
-Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) that trust
-is a **certificate pin**, and the pin is the whole of it: the pinned verifier replaces CA-chain validation,
-so a certificate other than the pinned one fails the handshake outright.
+Your client must trust the server's TLS certificate. Native clients (desktop and mobile) verify
+the certificate chain and server hostname against the Mozilla public CA roots bundled with the
+application. The browser client uses the browser's own trust store. None of the clients pins a
+certificate or asks you to transcribe its SHA-256 fingerprint (`decisions/sync/0620`, which
+withdraws the trust-on-first-use and static-pin mechanisms this section previously described). A
+self-signed certificate is not trusted by the native clients merely because the operating system
+trusts it: the roots are compiled into the application, so a private CA installed on your machine,
+on your phone, or pushed to your fleet by device management is **not consulted**.
 
-**The SCRAM channel binding adds nothing to that in any deployment fronted by a terminating proxy**, which
+**The case where this leaves you with no supported answer, stated rather than left implicit.** If
+you serve on a private network, an internal hostname, or a bare IP address, no public CA will issue
+you a certificate, and no public CA bundle contains your root. Native clients will therefore refuse
+the endpoint on the first connection, and there is nothing in Settings that recovers it: the
+client will not accept a private root, and the refusal is not a pin mismatch to be replaced. This
+paragraph is the whole of the operator contract for that case, and it is short because the
+product has no answer to give. What is available, in the order I would reach for:
+
+- **Get a publicly trusted certificate for a name that resolves.** A real domain with a public
+  certificate is the supported path, and it is the only one the client verifies.
+- **Terminate elsewhere and give the clients a public name.** If the sync server is reachable only
+  on a LAN, a reverse proxy or tunnel that presents a publicly trusted certificate to the client
+  is the shape that works; the client never sees the private leg.
+- **Do not sync from a client that must use the private address.** A desktop pointed at a loopback
+  endpoint is the exception the client still permits, and it is a developer case rather than an
+  operator one.
+
+None of these is automatic, and I am not going to describe any of them as though it were. If your
+deployment genuinely cannot satisfy one, the honest statement is that native sync does not work
+against it, and the failure mode you will see is a TLS error on connect with your configured
+endpoint left intact on disk.
+
+**The SCRAM channel binding adds nothing to TLS authentication in any deployment fronted by a terminating proxy**, which
 is every deployment described here, the bundle's own Caddy edge included. The `-PLUS` `tls-exporter`
 binding is wired end to end on both sides, and it engages **only when the server process itself terminates
 TLS 1.3** (`decisions.md` 2026-07-13); behind a proxy that terminates TLS, both ends bind to empty and the
-exchange degrades to plain SCRAM-SHA-256 riding pinned TLS. So the man-in-the-middle resistance in the
-paragraph above is the pin's, and the binding is latent rather than a second lock on the same door. Making
+exchange degrades to plain SCRAM-SHA-256 riding verified TLS. So the man-in-the-middle resistance in the
+paragraph above is the CA-chain and hostname check, and the binding is latent. Making
 it real is a topology change — the server terminates TLS 1.3 and the proxy moves to TCP passthrough — and
 either way it is gated behind the standing R3 primitive-level review, which is also why no surface in the
 client presents certificate trust as *verified* (`threat-model.md` §1 A4).
 
-**Neither the pin nor the binding is available to the web client, and neither ever will be.** A browser
+**The channel binding is unavailable to the web client.** A browser
 exposes neither TLS-exporter keying material nor a certificate-pinning API to page JavaScript, so a
 browser session rests on the browser's own trust store and nothing more — permanently, not pending some
 later release (`decisions.md` 2026-07-26). What is unchanged either way: a man-in-the-middle on the sync
@@ -136,27 +163,17 @@ connection sees only ciphertext. What a web client additionally depends on is th
 the client code, which is a separate boundary with a separate adversary (`threat-model.md` TB11 / A15) —
 and if you self-host the web client too, that origin is yours.
 
-- **Hosted:** a build-time static pin for the hosted endpoint is the **settled design** (`decisions.md`
-  2026-06-20) and is **not shipped**. The hosted certificate and domain do not exist yet, so the client's
-  hosted-pin lookup deliberately answers "no pin", and a hosted endpoint is pinned by TOFU like any other
-  — filling in the constant is the whole remaining change and lands with its own `decisions.md` entry at
-  hosted launch. What already ships is the *distinction*: the client records where a pin came from and
-  surfaces it, so a first-connect TOFU pin is never presented as the pre-vetted hosted one.
-- **Self-host:** **trust-on-first-use (TOFU)**, shipped with the Phase 2 client work (MYND-424). When you
-  point a native client at your endpoint it completes one TLS handshake, records the SHA-256 of the leaf
-  certificate it was served, and verifies every later connection against that pin; you **eye-compare the
-  fingerprint** the client shows you across your devices (the same out-of-band channel the device-approval
-  gate already uses). It is *assumed* trust rather than verified cryptography — the first connection is
-  taken on faith, and the eye-compare is what turns it into something you checked. **When you renew
-  that certificate, connected clients stop syncing until they trust the new one** — the pin is the
-  whole certificate's hash, so any renewal invalidates it, and the client says so specifically rather
-  than reporting a network error. Re-entering the server URL asks you for the new fingerprint (get it
-  with `openssl x509 -noout -fingerprint -sha256 -in <your certificate file>`) and will not adopt a
-  different certificate without it; that refusal is deliberate, because a renewal and an impostor look
-  identical from the client's side. A loopback `http`
-  endpoint has no certificate, so nothing is pinned and the client reports that rather than implying a
-  pin. A **browser cannot pin at all** (above): it reports that the platform's trust store is doing the
-  verifying, which is a third answer rather than a missing one.
+- **Hosted and self-hosted:** a native client checks the same public CA roots and hostname at
+  first connect and on every reconnect, including over Tor. A valid renewed certificate does
+  not interrupt sync. An untrusted, expired or wrong-hostname certificate fails the handshake;
+  neither a stored legacy pin nor a QR payload can override that refusal. Two consequences follow
+  from the bundled-roots model that this section owns: a root a browser has stopped trusting keeps
+  being trusted by a client until Myne ships a release that updates the bundle, and revocation is
+  never checked, so a certificate its issuer has withdrawn stays usable until it expires
+  (`threat-model.md` §1 A4 amendment). A loopback `http` endpoint has no TLS, and any client build
+  will accept one on loopback, which is what makes the local E2E harness and a developer's own
+  machine work; it is a developer case rather than a restricted one, and no shipped setting turns
+  it off.
 
 ## 7. The honest limitation (what TB5 does and doesn't buy you)
 

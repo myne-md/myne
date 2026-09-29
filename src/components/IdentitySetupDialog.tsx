@@ -37,7 +37,7 @@ interface IdentitySetupDialogProps {
 }
 
 /** Which failure the single error slot is showing. */
-type ErrorKind = "generic" | "alreadyHeld" | "notConfigured" | "certPinMismatch";
+type ErrorKind = "generic" | "alreadyHeld" | "notConfigured" | "tlsFailure";
 
 /**
  * Read the serialized `SyncDeviceError::kind` off a rejected invoke. The plugin
@@ -50,7 +50,7 @@ function errorKindOf(error: unknown): ErrorKind {
       : undefined;
   if (kind === "AlreadyHeldIdentity") return "alreadyHeld";
   if (kind === "NotConfigured") return "notConfigured";
-  if (kind === "CertPinMismatch") return "certPinMismatch";
+  if (kind === "TlsFailure") return "tlsFailure";
   return "generic";
 }
 
@@ -146,8 +146,8 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   }
 
   const errorKey =
-    error === "certPinMismatch"
-      ? "identitySetup.errorCertPinMismatch"
+    error === "tlsFailure"
+      ? "identitySetup.errorTlsFailure"
       : error === "notConfigured"
         ? "identitySetup.errorNotConfigured"
         : error === "alreadyHeld"
