@@ -310,7 +310,7 @@ The operator-log-policy limitation (a malicious self-host operator *can still* l
 
 ## 7. Operator console (admin API) + account status (MYND-506)
 
-The server exposes an operator admin API over a **local Unix domain socket** (`MYNE_ADMIN_SOCKET`; no bearer secret — access is filesystem permissions; **disabled by default**). It is never a TCP port or the public edge. A `myne-server admin` CLI is a thin client over it (server-mediated only). The API is a **live projection of already-persisted enforcement state only** (account hash, stored bytes, device count, policy) — never request history, last-seen wall-clocks, or per-account time series (§5 / `threat-model.md` §7 aggregate-only invariant).
+The server exposes an operator admin API over a **local Unix domain socket** (`MYNE_ADMIN_SOCKET`; no bearer secret — access is filesystem permissions; **disabled by default**). The **admin API on that socket** is never a TCP port or the public edge; its read-only browser counterpart is the separate listener of §7.0b, which is also never the public edge. A `myne-server admin` CLI is a thin client over it (server-mediated only). The API is a **live projection of already-persisted enforcement state only** (account hash, stored bytes, device count, policy) — never request history, last-seen wall-clocks, or per-account time series (§5 / `threat-model.md` §7 aggregate-only invariant).
 
 Routes (JSON over the socket):
 
@@ -322,6 +322,100 @@ Routes (JSON over the socket):
 Enforcement policy persists in a **sparse top-level `accounts.json`** (server-side plaintext, `schema_version`; not synced; captured by the built-in backup). A per-account quota override also gates the attachment transport (one AS17 total, no bypass).
 
 `GET /account/status` (on the normal **authed** HTTPS API, *not* the admin socket) returns the authenticated user's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier placed there is ignored, not a selector), so the account number never appears in a request line or log. Enforcement fields carry no cryptographically load-bearing identifier; `accounts.json` is a new server-side plaintext format, forward-incompatible-by-design with a later major version.
+
+### 7.0b The operator panel (normative; myne-md/myne#787)
+
+A browser cannot dial a Unix domain socket, so the operator console's browser surface
+is a **separate TCP listener** gated by `MYNE_ADMIN_PANEL_ADDR` (empty = disabled,
+the default). It renders the same enforcement state §7 describes and **nothing else**.
+
+Four properties are normative here rather than left to the implementation, because each
+one is what lets the threat model's "no boundary expansion" claim survive an access
+criterion that genuinely changed:
+
+1. **It is READ-ONLY, structurally.** The panel's route table registers the read verbs
+   only, so no write route is reachable on its listener under any method. `freeze`,
+   `unfreeze`, quota, device-cap and the irreversible `delete` stay on the Unix socket
+   and the CLI. A read-only surface has **no cross-origin request surface at all**,
+   rather than one to mitigate, which is why the panel needs no token.
+2. **It is NETWORK-BINDABLE and never the public edge.** The bind address is whatever the
+   operator writes and is **not validated**; a non-loopback address produces one startup
+   warning naming the resolved address, and is not refused. Refusing was rejected on a
+   measurement rather than a preference: for the `/metrics` listener a non-loopback bind
+   is frequently the *correct* configuration, since Prometheus scraping from another host
+   is the ordinary deployment. **The consequence an implementation MUST state to the
+   operator: this listener terminates no TLS.** On a non-loopback bind the per-account
+   roster crosses TB4 in cleartext to any passive observer on the path, which is a
+   different exposure from `/metrics` and is why the loopback bind is the documented
+   default rather than a convenience.
+3. **It carries no authentication and NO request log at all**, in either direction: no
+   access-log middleware, and the standard library's connection-level error log is
+   discarded. `self-host-policy.md` §3 prohibits IP logging anywhere in an operator's
+   stack, so a request log here would make a deployment violate its own contract. The
+   panel is therefore the only HTTP surface in this server that records nothing.
+   **Discarding the error log MUST be paired with recovering panics in the handler
+   chain**, per §5.2: a handler panic is logged by the standard library with the peer
+   address, and discarding without recovering trades a privacy leak for silence. The
+   recovery records a bounded, address-free line and answers 500.
+4. **It MUST validate the `Host` header against a known set, and that is the whole
+   authentication story.** A hostile page the operator visits must not be able to read
+   the roster, and neither of the usual answers works here. The same-origin policy does
+   not: a rebound name (`attacker.test` re-resolving to `127.0.0.1`) is **same-origin to
+   the attacker's own page**, so the browser hands it the response. An `Origin` check does
+   not: browsers **omit `Origin` on a GET**, so the header that would catch a rebound
+   fetch is never sent, and `Sec-Fetch-Site` reports `same-origin` for the rebound request,
+   because by then it genuinely is. Validating `Host` is the only check that survives
+   both. The allowed set is loopback names by default; an operator who binds a LAN address
+   MUST name the host they will browse to (`MYNE_ADMIN_PANEL_HOSTS`). Note the scope
+   precisely: read-only removes the **state-changing** cross-origin surface, so there is
+   nothing there to forge, but it does not remove the **read** surface, and the read is
+   what the `Host` check exists for.
+5. **It is an instantaneous projection and renders no time value of any kind.** It reads
+   live on every request and stores nothing
+   between them (no "read at" line), because
+   The reason it cannot render one is **not** that the server holds none: per AS6 the
+   server DOES hold note `created_at` at millisecond resolution, derived from the UUIDv7
+   embedded in the per-vault index, and it holds file and record times besides. The
+   property is a rule about the projection rather than a fact about the store: **a derived
+   time value MUST NOT be added to it** (a file mtime, a UUIDv7 creation time, a
+   device-record age), because that is exactly the per-account time series the
+   aggregate-only invariant forbids.
+6. **It is a per-account read surface, and that is a change of shape, not new history.**
+   The panel renders one row per account, so it is **per-account by construction**: it
+   keeps the "no time series" half of the aggregate-only invariant and does not keep the
+   "no per-account label" half, which the `/metrics` surface does. It stores nothing, so it
+   is not the same as keeping history, but a party that can reach the bind address can poll
+   it and **derive** a per-account series of stored bytes and device count by diffing
+   successive responses, with no server-side state at all. The honest statement is that the
+   panel adds no new **persistence**, not that it adds no observation capability.
+   Relatedly, §3.1's deliberate refusal to distinguish an unknown account from a wrong
+   username on `/auth/scram/init` is an anti-enumeration property the panel does not have:
+   it publishes the complete roster to an unauthenticated reader.
+7. **Its cost MUST be bounded like the rest of the unauthenticated surface.** A page load
+   enumerates the store, so an implementation MUST build the summary from the rows it has
+   already projected rather than projecting twice, MUST answer `Cache-Control: no-store`
+   for the roster page, and SHOULD bound concurrency or response size on this listener.
+
+**What it may render.** The fields the account projection already carries: account hash,
+stored bytes, device count, frozen state, and the quota and device-ceiling overrides,
+plus the deployment totals. It **cannot render an account number, because none exists on
+the server**: the raw number never crosses the wire, the server stores
+`account_number_hash := SHA-256(canonical_form)[:16]` (`account-number.md` §6, §7), and a
+raw-form username is refused `400 bad_request` (§3.1, AS9).
+**That does not make the roster harmless, and the distinction must not be collapsed into
+"readability rather than privacy".** "Non-reversible" is a property of the hash as a string
+and is not the property that decides the exposure. Per §3.1, the pre-auth
+`GET /vault.meta` route is keyed on that same hash, and it returns **the complete offline
+password-cracking target**: the Argon2id salt, the cost parameters, and both wrapped
+`root_key` copies. So the panel's roster is a list of **credentials for that route**, and
+anyone who can reach both the panel and the public sync API can mount an offline cracking
+campaign against every account on the deployment without any further access. On this
+surface the hash is the account number for every purpose the pre-auth route cares about.
+
+**Deferred:** whether anything panel-shaped is reachable from the *hosted* origin is an
+open `operations` decision (public aggregates, or nothing). This spec places the panel off
+the public edge so that decision has something to add to rather than something to
+rewrite.
 
 ### 7.1 `GET /account/status` response (normative; MYND-570)
 

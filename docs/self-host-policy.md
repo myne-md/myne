@@ -53,6 +53,22 @@ they are violations:
   never-pruned backup re-creates the hoarding this rule forbids. The server ships a **built-in feature that
   implements this correctly** (`MYNE_BACKUP_*`, §4) — encrypted, off-box, pruned to a disclosed window — so
   you do not hand-roll it.
+- **Expose the operator panel (`MYNE_ADMIN_PANEL_ADDR`) to a network you do not control.** This is a
+  hazard disclosure, not a configuration ban: §4 below lists the same variable as a knob, and the two
+  describe one act. The panel is **read-only and carries no authentication**: anything that can reach
+  that address reads your account roster and can issue no command. Three facts an operator has to have
+  before binding it anywhere but loopback, none of which the server can enforce:
+  - **The listener serves plain HTTP and terminates no TLS**, so on a non-loopback bind the roster
+    crosses the network in the clear to any passive observer.
+  - **The roster is a list of credentials.** The hash is the selector for the server's pre-auth
+    `GET /vault.meta` route, which returns each account's Argon2id salt, cost parameters and both
+    wrapped key copies, so it is enough to mount an offline password-cracking attempt. "The hash is
+    not reversible" is not the reassurance it sounds like.
+  - **The bind address is not validated and the server does not refuse it.** It prints one startup
+    warning. The server cannot refuse, because the same knob on the metrics listener has legitimate
+    non-loopback uses; the difference is that metrics carries aggregate counters and this carries a
+    per-account roster.
+  Never add a reverse-proxy route for the panel, and never point it at a public origin.
 - **Attempt to weaken the zero-knowledge protocol** in any way — you can't read content regardless, but you
   must not, e.g., add a plaintext side-channel or a metadata-correlation log.
 
@@ -72,6 +88,26 @@ abuse, not confidentiality** — none of them can weaken the zero-knowledge prot
   reclamation. **⚠️ Warning:** turning this on means deleted ciphertext is kept longer than the horizon —
   it **weakens your users' "delete means gone" expectation**. It is a documented, deliberate policy
   deviation, not a default; enable it only if you understand the trade-off and tell your users.
+- **Operator panel** (`MYNE_ADMIN_PANEL_ADDR`). The browser console: read-only, **off by default**,
+  unauthenticated, and the one operator surface that can sit on a network. Set it only if you want the
+  page. The bind address is **not validated** and a non-loopback address is **warned about, not
+  refused** (see §3 for the three things that warning cannot do for you). Enforcement stays in the
+  `myne-server admin` command line, on a local Unix socket reachable by whoever can
+  `docker compose exec`. Never add a reverse-proxy route for the panel.
+- **Operator panel allowed hosts** (`MYNE_ADMIN_PANEL_HOSTS`). Extra `Host` values the panel will
+  answer to; **empty means loopback names only**, which is the safe default. This is the panel's entire
+  defence against DNS rebinding, and it is not optional: a rebound hostname is same-origin to whatever
+  page is attacking you, and browsers send no `Origin` on a GET, so neither the same-origin policy nor
+  an origin check stops a rebound read. If you bind a LAN address and browse to it by name, you must
+  name that host here.
+- **Metrics** (`MYNE_METRICS_ADDR`). The Prometheus endpoint, disabled by default, on its own separate
+  listener. Eight counters, aggregate over every account for the life of the process, with **no
+  per-account label and no time series**; that is not a claim you have to take on trust, it is held by a
+  structural denylist in the server's own metrics test, so a label that would let an observer separate
+  accounts fails the suite. A non-loopback bind is usually correct here, because scraping from another
+  host is the ordinary deployment; the server warns rather than refuses. Bind it to localhost or an
+  internal address if your scraper is not. (Contrast the panel above, which is per-account by
+  construction and therefore keeps only the no-time-series half of that invariant.)
 - **Encrypted off-box backup** (`MYNE_BACKUP_*`). Built-in, server-native backup (`decisions.md`
   2026-07-14): set `MYNE_BACKUP_ENABLED` + a `MYNE_BACKUP_REPOSITORY` + a `MYNE_BACKUP_PASSWORD_FILE` and
   the server drives a bundled restic to snapshot the store to an off-box target on a schedule
