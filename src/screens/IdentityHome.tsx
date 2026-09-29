@@ -10,8 +10,8 @@
 // enrolled, which on web is impossible (`sync_person_setup` is Unsupported and
 // the web client never renders `welcome` at zero vaults).
 //
-// Laid out on the shared `CenteredCard` envelope — the same card every other
-// pre-unlock surface uses (`Unlock`, `AccountNumberEntry`, `FailClosedError`) —
+// Laid out on the shared `CenteredCard` envelope. It uses the same card as the
+// other pre-unlock surfaces (`Unlock`, `AccountNumberEntry`, `FailClosedError`)
 // rather than the bare column it shipped with, so the invite list scrolls
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.

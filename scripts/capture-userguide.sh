@@ -8,6 +8,7 @@
 #
 #   ./scripts/capture-userguide.sh                # build app + capture
 #   ./scripts/capture-userguide.sh --skip-build   # reuse the built binary
+#   ./scripts/capture-userguide.sh --userguide-only # skip unrelated preview capture
 #
 # The xvfb screen is sized 1280x800 so the 1100x720 Tauri window fits
 # with margin (1280x800 is the reference desktop frame — DESIGN.json breakpoints).
@@ -20,9 +21,11 @@ source scripts/lib/e2e-docker.sh
 IMAGE=myne-e2e
 SKIP_BUILD=0
 RETINA=0
+USERGUIDE_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --skip-build) SKIP_BUILD=1 ;;
+    --userguide-only) USERGUIDE_ONLY=1 ;;
     # Retina (@2x) capture: drive WebKitGTK at device-scale-factor 2 so the
     # WebDriver /screenshot returns a 2200x1440 (vs 1100x720) frame — genuine
     # crispness, still fully automated. The xvfb screen must grow to fit the
@@ -72,12 +75,16 @@ BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi
+CAPTURE_TEST_ARGS=""
+if [[ "$USERGUIDE_ONLY" == 1 ]]; then
+  CAPTURE_TEST_ARGS="e2e/capture/userguide.capture.ts"
+fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a -s \"-screen 0 $SCREEN\" pnpm exec vitest run --config vitest.capture.config.ts
+    xvfb-run -a -s \"-screen 0 $SCREEN\" pnpm exec vitest run --config vitest.capture.config.ts $CAPTURE_TEST_ARGS
   '
 "
