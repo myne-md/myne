@@ -523,6 +523,36 @@ pre-commit:
       glob: "*.{rs,json,md}"
       run: node scripts/check-clipper-identifiers.mjs
 
+    server-env-roster:
+      # myne#787: there was no authoritative list of the sync server's environment
+      # variables anywhere except the comments in its own source, so every copy was
+      # hand-maintained and they drifted BOTH ways: the bundle's example file shipped
+      # 8 real knobs (including MYNE_EXTENDED_RETENTION, the one self-host-policy.md
+      # warns hardest about) and 2 entries nothing reads, while the live mechanism
+      # was undocumented. A new knob plus a forgotten example is otherwise a green
+      # tree.
+      #
+      # Both companions are usually ABSENT in a fresh clone, so this prints what it
+      # could not check and its closing line says so rather than claiming a verdict.
+      # `--require-companion` turns that into a failure for a caller that knows the
+      # siblings are there.
+      #
+      # READ THIS BEFORE ASSUMING THE TRIGGER WORKS. The glob names extensions THIS
+      # repository has. It deliberately does NOT name `.go` or `.example`: those files
+      # live in two SEPARATE git repositories whose commits never enter this index, so
+      # lefthook's filter would never match them and naming them would look like coverage
+      # that does not exist. In practice this step fires on an unrelated edit here and
+      # nothing fires when a knob is added in `myne-server` or a marker is dropped in
+      # `myne-ops`. The guard is therefore a LOCAL PERIODIC CHECK, not a gate on the
+      # change that would break it; the real gate on that change has to live in the
+      # companions' own hooks, which this repository does not own.
+      #
+      # It goes GREEN only once the `myne-ops` companion PR that adds the `kind:` markers
+      # and the missing entries has landed. Land that PR FIRST; this one red before it is
+      # the correct behaviour, not a defect.
+      glob: "*.{mjs,json,yml}"
+      run: node scripts/check-server-env-roster.mjs
+
     npm-license-mirror:
       # myne#527: the npm allowlist in check-npm-licenses.mjs claims, in a
       # comment, to mirror deny.toml's [licenses].allow — and it had already
