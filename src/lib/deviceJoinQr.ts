@@ -26,7 +26,7 @@ export type DeviceJoinQrErrorKind =
  * Option 1 (prompt-to-paste): the account number is an AS9 bearer token Myne
  * never persists at rest (`account-number.md §8`), so the caller supplies it from
  * the user's own saved copy — it is never read from storage. The QR carries
- * `{server_url, account#, cert_pin}` and NEVER the password (SYNC-47).
+ * `{server_url, account#}` and NEVER the password (SYNC-47).
  */
 export async function generateDeviceJoinQr(
   accountNumber: string,

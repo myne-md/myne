@@ -44,7 +44,7 @@
 //! server's heartbeat cadence, so a healthy connection never times out.
 //!
 //! So the route the gate answers for this endpoint is part of
-//! [`StreamIdentity`] alongside `(endpoint, pins, token)`, and it is re-read
+//! [`StreamIdentity`] alongside `(endpoint, token)`, and it is re-read
 //! **every** supervisor tick rather than on the 5-tick file-snapshot cadence
 //! (it is an in-memory cell, not a file). A gate that moves — the toggle, a
 //! bootstrap completing, a sidecar dying, the startup restore — is a different
@@ -98,7 +98,6 @@ impl SsePokeSignal {
 #[derive(Clone)]
 struct ConnSnapshot {
     url: String,
-    pins: Vec<[u8; 32]>,
     token_hex: String,
 }
 
@@ -107,15 +106,12 @@ fn fingerprint_of(s: &ConnSnapshot) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     s.url.hash(&mut h);
     s.token_hex.hash(&mut h);
-    for p in &s.pins {
-        p.hash(&mut h);
-    }
     h.finish()
 }
 
-/// Everything a live stream is bound to: the `(endpoint, pins, token)`
-/// fingerprint **and** the route it was opened over. A change in either is a
-/// different stream.
+/// Everything a live stream is bound to: the `(endpoint, token)` fingerprint
+/// **and** the route it was opened over. A change in either is a different
+/// stream.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct StreamIdentity {
     fingerprint: u64,
@@ -169,7 +165,7 @@ fn decide(current: Option<StreamIdentity>, wanted: Option<StreamIdentity>) -> De
     }
 }
 
-/// Gather the live `(endpoint, pins, token)` snapshot, or `None` when any part
+/// Gather the live `(endpoint, token)` snapshot, or `None` when any part
 /// is missing (unconfigured / locked / not enrolled). Reads the same sources as
 /// `run_active_cycle` — but NEVER claims a pending token (that is the cycle's
 /// job; the listener only ever uses an already-stored token).
@@ -179,7 +175,6 @@ async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<ConnSnapshot>
         .await
         .ok()?;
     let url = cfg.endpoint_url.clone()?;
-    let pins = super::commands::config_pins(&cfg);
     let state = app.try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()?;
     let dir = crate::paths::active_vault_root_io(app, state.active_vault_id().await).ok()?;
     let token = super::token_store::default_store()
@@ -191,11 +186,7 @@ async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<ConnSnapshot>
     for b in &token {
         token_hex.push_str(&format!("{b:02x}"));
     }
-    Some(ConnSnapshot {
-        url,
-        pins,
-        token_hex,
-    })
+    Some(ConnSnapshot { url, token_hex })
 }
 
 struct WorkerHandle {
@@ -247,7 +238,7 @@ fn spawn_worker(
 
 /// Spawn the poke supervisor (wired in both hosts' setup, right after
 /// `spawn_sync_loop`). Owns the worker lifecycle; holds no vault secrets — the
-/// snapshot is `(url, pins, token)`, all device-local transport material.
+/// snapshot is `(url, token)`, all device-local transport material.
 pub fn spawn_poke_supervisor<R: Runtime>(app: AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
         let mut worker: Option<WorkerHandle> = None;
@@ -362,9 +353,9 @@ fn connect_and_stream(
     sock_slot: &Mutex<Option<std::net::TcpStream>>,
     signal: &SsePokeSignal,
 ) -> StreamExit {
-    // Fresh transport per connection — byte-identical endpoint/pin semantics to
-    // the sync cycles (`build_transport` is the single factory).
-    let Ok(transport) = super::http_transport::build_transport(&snap.url, snap.pins.clone()) else {
+    // Fresh transport per connection, byte-identical TLS semantics to the sync
+    // cycles (`build_transport` is the single factory).
+    let Ok(transport) = super::http_transport::build_transport(&snap.url) else {
         return StreamExit::Failed;
     };
     let SseStream {
@@ -578,7 +569,6 @@ mod tests {
     fn snap(url: &str) -> ConnSnapshot {
         ConnSnapshot {
             url: url.to_string(),
-            pins: vec![[7u8; 32]],
             token_hex: "deadbeef".into(),
         }
     }

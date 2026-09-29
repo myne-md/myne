@@ -28,7 +28,7 @@ import {
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
-import { pinnedHttpsConfigSeed, syncConfigSeed } from "./support/multi-device";
+import { httpsConfigSeed, syncConfigSeed } from "./support/multi-device";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -122,9 +122,18 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           },
           { label: "identity code copy reports success", timeoutMs: 10_000 },
         );
-        // The invite form now takes the invitee's identity code (person id +
-        // public halves), not three pasted hexes (myne-md/myne#711 task 11).
+        // The invite button is a TWO-STEP door on an unshared vault: the
+        // NTV5 -> NTV6 migration is permanent, so a confirmation precedes the
+        // form (myne-md/myne#783). The migration is a local `vault.meta`
+        // rewrite, so it needs no server. Asserting the form is still closed
+        // between the two steps is the half that keeps the confirmation from
+        // being decorative.
         await (await app.session.byTestId("member-roster.invite-button")).click();
+        await app.session.byTestId("member-roster.share-confirm");
+        expect(await app.session.byTestIdAll("member-roster.invite-modal")).toHaveLength(0);
+        await (await app.session.byTestId("member-roster.share-confirm-cta")).click();
+        // The invite form takes the invitee's identity code (person id +
+        // public halves), not three pasted hexes (myne-md/myne#711 task 11).
         await app.session.byTestId("member-roster.invite-modal");
         const code = [
           "MYNE-PERSON-1",
@@ -173,7 +182,20 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           }
           await (await app.session.byTestId("member-roster.person-unlock-button")).click();
            await app.session.byTestId("member-roster.person-ready");
-           await app.session.byTestId("member-roster.invite-button");
+           // The sent-invitation fetch is gated on a SHARED vault
+           // (myne-md/myne#783): an `NTV5` vault has no roster, so the hook
+           // deliberately never asks and this error line is a surface the code
+           // does not reach. Migrate first, or the scenario asserts something
+           // that cannot happen rather than something that should.
+           await (await app.session.byTestId("member-roster.invite-button")).click();
+           await app.session.byTestId("member-roster.share-confirm");
+           await (await app.session.byTestId("member-roster.share-confirm-cta")).click();
+           // The migration is a local `vault.meta` rewrite, so it lands with the
+           // server still up. Waiting for the form it opens is what makes the
+           // teardown below the FIRST moment the endpoint is unreachable, which
+           // is the whole premise of the scenario.
+           await app.session.byTestId("member-roster.invite-modal");
+           await (await app.session.byTestId("member-roster.invite-cancel")).click();
            await closeSettings(app.session);
            await server.teardown();
            await openSettings(app.session, "sync");
@@ -222,7 +244,7 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     // Vault-count precondition: 0. A saved endpoint is not a vault or an identity.
     await scenario(
       "mr4-first-run-server-recovery",
-      { seedConfig: pinnedHttpsConfigSeed() },
+      { seedConfig: httpsConfigSeed() },
       async (app) => {
         await (await app.session.byTestId("welcome.identity-cta")).click();
         await app.session.byTestId("identity-setup.create-cta");
@@ -230,7 +252,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await app.session.byTestId("first-run-server.myne-sync");
         await (await app.session.byTestId("first-run-server.self-hosted")).click();
         await app.session.byTestId("sync.endpoint-config");
-        await app.session.byTestId("sync.endpoint-reverify");
+        await app.session.byTestId("sync.pin-source");
+        expect(await app.session.byTestIdAll("sync.endpoint-reverify")).toHaveLength(0);
         const continueButton = await app.session.byTestId("first-run-server.continue");
         expect(await continueButton.attribute("disabled")).not.toBeNull();
         await (await app.session.byTestId("first-run-server.back")).click();

@@ -9,18 +9,17 @@
 // has already made — and the failure, when they take it, is a network error
 // with no explanation.
 //
-// **A certificate fingerprint is a lie of security.** The desktop panel shows a
-// SHA-256 leaf-certificate fingerprint with a `static` / `tofu` badge, for the
-// user to eye-compare across devices (`self-host-policy.md` §6). A page cannot
-// see a leaf certificate at all. Whatever appeared there would be a security
-// affordance backed by nothing, which is worse than no affordance: it invites a
-// check the user then believes they have performed.
+// **A certificate fingerprint is a lie of security.** The desktop panel used to
+// show a SHA-256 leaf-certificate fingerprint with a `static` / `tofu` badge, for
+// the user to eye-compare across devices (`self-host-policy.md` §6). That
+// affordance is gone everywhere now (`decisions/sync/0620` removed pinning), and
+// a page could never have backed it: it cannot see a leaf certificate at all.
 //
 // So this shows the configured origin READ-ONLY and says, in the wording the
-// A4-per-client row already uses, that the browser verifies the certificate and
-// this client cannot pin one. Substituting the module (rather than branching
-// inside it) also keeps `sync.endpoint.pinStatic` and `sync.endpoint.pinTofu` —
-// the two claims that are false here — out of the bundle entirely.
+// A4-per-client row already uses, that the browser verifies the certificate
+// against the platform trust store. Substituting the module (rather than
+// branching inside it) also keeps the retired pin copy out of the bundle
+// entirely.
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";

@@ -343,14 +343,6 @@
     "reason": "Same backend-busy error on quick-unlock and vault creation; one error, two call sites."
   },
   {
-    "value": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-    "keys": [
-      "sync.endpoint.confirmFingerprintRequired",
-      "sync.join.confirmFingerprintRequired"
-    ],
-    "reason": "Same SAS-verification warning on the join and settings confirm screens; one product fact, intentionally identical."
-  },
-  {
     "value": "Add this device to an account",
     "keys": [
       "sync.join.title",

@@ -31,12 +31,18 @@
 //! ## R3 transport review-debt (registration ≠ verified crypto)
 //!
 //! Registering this plugin exposes enroll/push/pull over the sync transport,
-//! whose TOFU cert-pinning path (`PinnedVerifier`) and the empty-channel-binding
-//! SCRAM handshake are **not yet primitive-level reviewed** (grill R3, carried in
-//! the epic sync-ledger). Exposing the surface on mobile does NOT discharge that
+//! whose CA-chain + server-name verifier and the empty-channel-binding SCRAM
+//! handshake are **not yet primitive-level reviewed** (grill R3, carried in the
+//! epic sync-ledger). Exposing the surface on mobile does NOT discharge that
 //! debt — no "-PLUS" / "verified cert-trust" claim may be made until R3 lands.
-//! The endpoint UX surfaces TOFU pins honestly as *pinned-on-first-connect,
-//! compare-across-devices*, never as *verified* (SYNC-43).
+//!
+//! What the endpoint UX may and may not say is decided by
+//! `docs/decisions/sync/0620`: the client verifies against bundled Mozilla
+//! public roots, so the honest phrasing is "the certificate chain and server
+//! name were checked" and NOT "verified" (the R3 clause above), and there is no
+//! pin to describe at all. The copy lives in `locales/en/common.json` under
+//! `sync.endpoint.*`; `src/components/sync/EndpointConfig.tsx` is the desktop
+//! twin and both read the same keys.
 //!
 //! See the main repo's `src-tauri/AGENTS.md` "Secret-handling logging discipline"
 //! for the DENY-list this wrapper (and the shared core) follow — no token /

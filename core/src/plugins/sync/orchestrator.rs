@@ -6846,8 +6846,8 @@ mod tests {
         )
         .unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
 
         // Register the SCRAM verifier (idempotent) then enroll both devices.
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
@@ -7042,7 +7042,7 @@ mod tests {
         use base64::Engine as _;
         let decoy_b64 = base64::engine::general_purpose::STANDARD.encode(&decoy);
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
 
         let dev_a = enroll::generate_device_id();
@@ -7058,7 +7058,7 @@ mod tests {
         let tok_a = hex32(&out_a.token);
 
         let tb = NonceCorruptingTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             decoy_b64,
             fired: std::sync::atomic::AtomicUsize::new(0),
         };
@@ -7132,7 +7132,7 @@ mod tests {
         st_b.cursor = 0;
         write_sync_state(&dir_b, &st_b).unwrap();
         let heal = run_cycle_legacy(
-            crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
+            crate::plugins::sync::http_transport::build_transport(&url)
                 .unwrap()
                 .as_ref(),
             &root_key,
@@ -7813,7 +7813,7 @@ mod tests {
         )
         .unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -7826,7 +7826,7 @@ mod tests {
         )
         .unwrap();
         let tok_a = hex32(&out_a.token);
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         let dev_b = enroll::generate_device_id();
         let out_b = enroll::enroll(
             tb.as_ref(),
@@ -7905,8 +7905,7 @@ mod tests {
         let notes_b = dir_b.join("notes");
         std::fs::create_dir_all(&notes_a).unwrap();
         std::fs::create_dir_all(&notes_b).unwrap();
-        let mk =
-            || crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let mk = || crate::plugins::sync::http_transport::build_transport(&url).unwrap();
 
         // Owner A: author a note, register the verifier, enroll (recovery →
         // self-approve), push.
@@ -8086,7 +8085,7 @@ mod tests {
         // B syncs through a transport that FAILS every blob download, so the
         // content-download loop cannot complete.
         let tb_fail = FailBlobTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
         };
         let res = run_cycle_legacy(
             &tb_fail,
@@ -8232,7 +8231,7 @@ mod tests {
 
         // B's next cycle dies in the note-body download loop.
         let tb_fail = FailBlobTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
         };
         let res = run_cycle_legacy(
             &tb_fail,
@@ -8621,7 +8620,7 @@ mod tests {
         // Device A authors a note and pushes it (server stores it at version 1).
         let blob_v1 = encode_new_note(&items_key, &items_key_id, &note_bytes, b"original").unwrap();
         crate::atomic_write::atomic_write(&notes_a.join(&fname), &blob_v1, false).unwrap();
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -8684,7 +8683,7 @@ mod tests {
         );
 
         // Device B pulls the edit fresh → proves the edit actually propagated.
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         let dev_b = enroll::generate_device_id();
         let out_b = enroll::enroll(
             tb.as_ref(),
@@ -8729,7 +8728,7 @@ mod tests {
         nonce: &str,
         register: bool,
     ) -> (Box<dyn SyncTransport>, [u8; 16], String) {
-        let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
+        let t = crate::plugins::sync::http_transport::build_transport(url).unwrap();
         if register {
             enroll::register_verifier(t.as_ref(), account_hash, secret).unwrap();
         }
@@ -10616,8 +10615,8 @@ mod tests {
         std::fs::create_dir_all(dir_a.join("notes")).unwrap();
         std::fs::create_dir_all(dir_b.join("notes")).unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -14273,7 +14272,7 @@ mod tests {
                 false,
             );
             let obs = PullObserver::new(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             );
             let pull = run_cycle_legacy(
                 &obs,
@@ -14322,8 +14321,7 @@ mod tests {
                 false,
             );
             let legacy = PullObserver::new(Box::new(RouteAbsentTransport {
-                inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
-                    .unwrap(),
+                inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                 status: 404,
             }));
             run_cycle_legacy(
@@ -14416,8 +14414,7 @@ mod tests {
                     false,
                 );
                 let obs = PullObserver::new(Box::new(RouteAbsentTransport {
-                    inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
-                        .unwrap(),
+                    inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                     status,
                 }));
                 let pull =
@@ -14492,7 +14489,7 @@ mod tests {
             // First cycle: the batch route drops below HTTP.
             use crate::plugins::sync::transport::{FaultInjectingTransport, FaultMode};
             let dead = FaultInjectingTransport::fail_path(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                 BLOB_BATCH_PATH,
                 99,
                 FaultMode::Network,
@@ -14520,7 +14517,7 @@ mod tests {
 
             // Next cycle, healthy transport: the batch route is tried AGAIN.
             let obs = PullObserver::new(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             );
             let pull = run_cycle_legacy(
                 &obs,
@@ -14982,7 +14979,7 @@ mod tests {
         )
         .unwrap();
 
-        let t = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let t = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(t.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev = enroll::generate_device_id();
         let out = enroll::enroll(

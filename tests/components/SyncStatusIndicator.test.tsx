@@ -196,7 +196,7 @@ describe("refusal classes render distinct copy", () => {
     // from its neighbours in being certain to occur — a certificate expires on
     // a schedule, so a pinned one is replaced on a schedule — and in being the
     // only one that leaves sync entirely dead rather than pull-only.
-    ["cert_pin_mismatch", "Server certificate changed: verify it to reconnect"],
+    ["tls_failure", "Couldn’t verify the sync server’s HTTPS connection"],
   ];
 
   for (const [detail, expected] of cases) {

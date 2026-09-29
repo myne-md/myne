@@ -1,7 +1,7 @@
 //! The raw-rustls sync transport (MYND-424 task 2, SYNC-3).
 //!
 //! One TLS path shared by SCRAM auth (MYND-425) and sync push/pull: a rustls
-//! `ClientConfig` with **certificate pinning** (A4) and access to the
+//! `ClientConfig` with CA-chain and hostname verification (A4) and access to the
 //! **keying-material exporter** (the SCRAM channel binding). It speaks a minimal
 //! keep-alive HTTP/1.1 over the TLS stream (strict `Content-Length`/chunked
 //! framing, one cached session per transport) — deliberately NOT `reqwest` (a
@@ -9,20 +9,18 @@
 //!
 //! ## R3 status (READ THIS)
 //!
-//! The `rustls` dependency is **owner-approved**. The security-critical surface —
-//! the [`PinnedVerifier`] (pin matching replaces CA-chain validation) and the
-//! tls-exporter wiring — is still **R3-pending**: it needs a primitive-level
+//! The `rustls` dependency is **owner-approved**. The TLS trust path and the
+//! tls-exporter wiring remain **R3-pending**: they need a primitive-level
 //! security review AND a live interop test against the Go server before it is
 //! trusted in production. Until then:
-//! - signature verification is **delegated to the `ring` provider** (NOT
-//!   hand-rolled) — only chain validation is pin-substituted, the standard
-//!   reviewable pinning pattern;
-//! - the pure logic (HTTP request build, response parse, pin matching) is
+//! - chain, server name and signature verification use rustls and its `ring`
+//!   provider, never a custom accept-any verifier in the production transport;
+//! - the pure logic (HTTP request build, response parse) is
 //!   unit-tested here; the live TLS handshake is exercised by the MYND-428
 //!   harness, not in this crate;
 //! - [`super::transport::FakeTransport`] stays the default for unit tests.
-//! - Fallback if `-PLUS` channel binding slips: cert-pinning only (the exporter
-//!   call is then simply unused).
+//! - Behind a TLS-terminating proxy, the exporter is inert and verified TLS
+//!   carries the transport authentication instead.
 
 use super::http_transport::SOCKET_TIMEOUT;
 use super::proxy::{self, ProxyGate, Route};
@@ -34,172 +32,38 @@ use super::transport::{
 use crate::http::codec::{
     build_http_request_ext, keepalive_roundtrip, read_http_response, read_response_head,
 };
-use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
-use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
-use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
-use rustls::{
-    CertificateError, ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme,
-    StreamOwned,
-};
-use sha2::{Digest, Sha256};
+#[cfg(test)]
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::ServerName;
+#[cfg(test)]
+use rustls::CertificateError;
+use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
-
-/// A pinned-certificate verifier: the leaf cert's SHA-256 (over its DER) MUST be
-/// in the pin set, replacing CA-chain validation (the pin IS the trust, A4).
-/// Handshake-signature verification is delegated to the crypto provider's
-/// algorithms — this verifier only substitutes the chain-trust decision.
-#[derive(Debug)]
-struct PinnedVerifier {
-    /// SHA-256 hashes of the accepted leaf certificate DER bytes.
-    pins: Vec<[u8; 32]>,
-    /// The provider's supported signature-verification algorithms (ring).
-    algs: WebPkiSupportedAlgorithms,
-}
-
-impl ServerCertVerifier for PinnedVerifier {
-    fn verify_server_cert(
-        &self,
-        end_entity: &CertificateDer<'_>,
-        _intermediates: &[CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: UnixTime,
-    ) -> Result<ServerCertVerified, rustls::Error> {
-        let got = Sha256::digest(end_entity.as_ref());
-        if self.pins.iter().any(|p| p.as_slice() == got.as_slice()) {
-            Ok(ServerCertVerified::assertion())
-        } else {
-            // A MATCHABLE variant, not a prose string. This refusal has to
-            // survive the trip up through `io::Error` so `handshake_error`
-            // below can tell a pin mismatch from every other TLS failure and
-            // the caller can offer the one remedy that fixes it. Matching on
-            // the text of `Error::General` would compile and would then break
-            // silently on a rustls version bump. `ApplicationVerificationFailure`
-            // is unambiguous here: this is the only custom verifier in the
-            // client, and its other two methods delegate signature checking to
-            // the provider, which reports its own distinct variants.
-            Err(rustls::Error::InvalidCertificate(
-                CertificateError::ApplicationVerificationFailure,
-            ))
-        }
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls12_signature(message, cert, dss, &self.algs)
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.algs)
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.algs.supported_schemes()
-    }
-}
-
-/// Compute the pin (SHA-256 of a certificate's DER bytes) for a known cert.
-pub fn cert_pin(cert_der: &[u8]) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&Sha256::digest(cert_der));
-    out
-}
 
 /// Classify a handshake `io::Error` into the transport error it actually is.
 ///
 /// rustls wraps its own error inside the `io::Error` it hands back, so the
 /// distinction is available and was being discarded: `map_err(|_| …)` threw
-/// away a diagnosis the verifier had already made. Three outcomes, and the
-/// split matters because only one of them has a remedy the user can act on:
-///
-/// * the pin refusal from [`PinnedVerifier`] → [`TransportError::CertPinMismatch`],
-///   which does not clear on its own and needs the new certificate confirmed
-///   out of band;
-/// * any other rustls error → [`TransportError::Tls`] (protocol, version,
-///   expiry, a malformed certificate);
-/// * no rustls error inside at all → [`TransportError::Network`], because then
-///   the socket died under the handshake rather than the handshake failing.
+/// away a diagnosis the verifier had already made. A rustls error is a TLS
+/// failure (chain, hostname, expiry, or protocol); an underlying socket error
+/// is a network failure. Neither includes untrusted certificate bytes.
 fn handshake_error(e: std::io::Error) -> TransportError {
     match e
         .get_ref()
         .and_then(|inner| inner.downcast_ref::<rustls::Error>())
     {
-        Some(rustls::Error::InvalidCertificate(
-            CertificateError::ApplicationVerificationFailure,
-        )) => TransportError::CertPinMismatch,
         Some(_) => TransportError::Tls,
         None => TransportError::Network,
-    }
-}
-
-/// A **trust-on-first-use** verifier: it accepts ANY server certificate and
-/// **records** the leaf DER, so a one-shot bootstrap handshake can read back the
-/// cert to pin. Used ONLY by [`tofu_fetch_pin`]; the production transport always
-/// pins (`PinnedVerifier`). The self-host model TOFU-pins the operator's cert +
-/// shows a fingerprint for out-of-band eye-compare (`self-host-policy.md` §6).
-#[derive(Debug)]
-struct TofuVerifier {
-    captured: std::sync::Arc<std::sync::Mutex<Option<Vec<u8>>>>,
-    algs: WebPkiSupportedAlgorithms,
-}
-
-impl ServerCertVerifier for TofuVerifier {
-    fn verify_server_cert(
-        &self,
-        end_entity: &CertificateDer<'_>,
-        _intermediates: &[CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: UnixTime,
-    ) -> Result<ServerCertVerified, rustls::Error> {
-        // TOFU: capture the leaf and accept — the caller pins it, never us.
-        if let Ok(mut slot) = self.captured.lock() {
-            *slot = Some(end_entity.as_ref().to_vec());
-        }
-        Ok(ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls12_signature(message, cert, dss, &self.algs)
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.algs)
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.algs.supported_schemes()
     }
 }
 
 /// **The one place this module opens a socket** — and therefore the one place
 /// the fail-closed invariant has to hold.
 ///
-/// Both socket sites in this file go through here: the transport's
-/// [`RustlsTransport::open_socket`] (which is `request` / `request_ext` /
-/// `request_bound_to_exporter` / `open_sse` and every SSE reconnect) and the
-/// one-shot enrollment handshake in [`tofu_fetch_pin`].
+/// All native sync paths use [`RustlsTransport::open_socket`], including the
+/// first endpoint probe, authenticated requests and SSE reconnects.
 ///
 /// With Tor mode on and the proxy anything other than `Ready`, this returns an
 /// error **without opening a socket**. There is no direct-connect fallback:
@@ -229,76 +93,7 @@ fn open_socket_via(proxy: &ProxyGate, host: &str, port: u16) -> Result<TcpStream
     }
 }
 
-/// TOFU-fetch the server's leaf-cert pin (SHA-256 of its DER): open ONE TLS
-/// handshake to `host:port` accepting any cert, capture the leaf, return its pin.
-/// The caller persists the pin (sync-config) + surfaces the fingerprint for the
-/// user to eye-compare across devices (defeats a per-device MitM). Blocking —
-/// call from `spawn_blocking`.
-///
-/// **Routed through the proxy gate in Tor mode** (MYND-650 task 5), like every
-/// other outbound socket in this file: leaving the enrollment handshake direct
-/// would hand this device's real source IP and the sync hostname to the network
-/// at exactly the moment the user turned Tor on, and would resolve that
-/// hostname on the local resolver besides.
-///
-/// Routing it is not free, and the cost is paid elsewhere: this is the one
-/// handshake that accepts **any** certificate, and a Tor exit node is in the
-/// position to serve one. So it is deliberately NOT public policy — the two
-/// enrollment paths reach it only through [`super::pin_confirm::capture_pin`],
-/// which refuses to accept a pin in Tor mode unless the user supplied the
-/// fingerprint they obtained out-of-band and it matches what was served. Call
-/// this function directly and you get the capture without the compare.
-///
-/// **The gate is a parameter, not a read.** There deliberately is no
-/// `tofu_fetch_pin(host, port)` convenience that resolves it here: the caller
-/// has already asked the same gate whether a confirmation is required, and a
-/// second read is a window in which the answer can change. A user who clicks
-/// Connect with Tor off, hits a stalled handshake and flips Tor on meanwhile
-/// would otherwise get the handshake routed through an exit node with no
-/// fingerprint compare — one gate, snapshotted once by
-/// [`super::pin_confirm::capture_pin`], closes that. It is also what lets a
-/// test drive a gate it owns rather than the process-global `OnceLock` the
-/// whole test binary shares (same split as [`RustlsTransport::with_proxy_gate`]).
-pub fn tofu_fetch_pin_via(
-    proxy: &ProxyGate,
-    host: &str,
-    port: u16,
-) -> Result<[u8; 32], TransportError> {
-    let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let captured = std::sync::Arc::new(std::sync::Mutex::new(None));
-    let verifier = Arc::new(TofuVerifier {
-        captured: captured.clone(),
-        algs: provider.signature_verification_algorithms,
-    });
-    let config = ClientConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()
-        .map_err(|_| TransportError::Tls)?
-        .dangerous()
-        .with_custom_certificate_verifier(verifier)
-        .with_no_client_auth();
-    let server_name =
-        ServerName::try_from(host.to_string()).map_err(|_| TransportError::BadRequest)?;
-    let mut conn =
-        ClientConnection::new(Arc::new(config), server_name).map_err(|_| TransportError::Tls)?;
-    let mut sock = open_socket_via(proxy, host, port)?;
-    // Drive the handshake to completion so `verify_server_cert` fires + captures.
-    while conn.is_handshaking() {
-        let (rd, wr) = conn
-            .complete_io(&mut sock)
-            .map_err(|_| TransportError::Tls)?;
-        if rd == 0 && wr == 0 {
-            break; // no progress (peer closed mid-handshake)
-        }
-    }
-    let der = captured
-        .lock()
-        .ok()
-        .and_then(|mut s| s.take())
-        .ok_or(TransportError::Tls)?;
-    Ok(cert_pin(&der))
-}
-
-/// The raw-rustls transport: a pinned `ClientConfig` + the target host/port.
+/// The raw-rustls transport: a CA-verifying `ClientConfig` + target host/port.
 /// One instance is the single TLS layer auth + sync share (SYNC-3). Holds one
 /// keep-alive TLS session — within a sync cycle every request rides the same
 /// handshake (the codec's framed reader decides reusability per response).
@@ -314,9 +109,10 @@ pub struct RustlsTransport {
 }
 
 impl RustlsTransport {
-    /// Build the transport for `host:port`, trusting only certs whose DER hashes
-    /// to one of `pins`. Installs the `ring` provider explicitly (the crate sets
-    /// no process-default provider).
+    /// Build the transport for `host:port` using public CA roots and hostname
+    /// verification. There is no pin argument: decisions/sync/0620 removed
+    /// certificate pinning, so a caller cannot express one and cannot believe a
+    /// value it passes here is being honoured.
     ///
     /// The routing gate comes from [`proxy::installed_for`] — the host's, unless
     /// `host` is loopback. Every sync connection is built through here (the
@@ -331,31 +127,52 @@ impl RustlsTransport {
     /// is the SSE poke stream, and it is closed by
     /// `poke_listener`'s own gate term rather than by anything here
     /// (`no_bypass::LONG_LIVED_SOCKETS`).
-    pub fn new(host: impl Into<String>, port: u16, pins: Vec<[u8; 32]>) -> Self {
+    pub fn new(host: impl Into<String>, port: u16) -> Self {
         let host = host.into();
         let proxy = proxy::installed_for(&host);
-        Self::with_proxy_gate(host, port, pins, proxy)
+        Self::with_proxy_gate(host, port, proxy)
     }
 
     /// The same transport with an explicit routing gate. Production builds go
     /// through [`Self::new`]; this exists so a test can drive a gate it owns
     /// rather than the process-global one.
-    pub fn with_proxy_gate(
+    pub fn with_proxy_gate(host: impl Into<String>, port: u16, proxy: ProxyGate) -> Self {
+        Self::with_roots(host, port, proxy, Self::bundled_roots())
+    }
+
+    /// **The one place the production trust anchors are named.**
+    ///
+    /// Extracted as a function rather than inlined so the fixture tests can read
+    /// the same value the constructor loads. `rustls::ClientConfig` keeps its
+    /// verifier private, so the store cannot be read back off a built config;
+    /// with the construction inlined there was nothing for a test to assert
+    /// against, and every acceptance test in this module passed with the
+    /// production site replaced by an empty store because each of them injects
+    /// the test CA through `with_roots` instead. One named source is what makes
+    /// "the shipped transport trusts a public CA bundle" a checkable claim
+    /// rather than a line in a constructor.
+    ///
+    /// A bundled `const` rather than the OS trust store, deliberately: a revoked
+    /// CA stays trusted until Myne ships a release, and a private CA installed
+    /// only on the operator's machine is not honoured (self-host-policy §6).
+    /// Both costs are recorded in the threat model's A4 amendment.
+    fn bundled_roots() -> RootCertStore {
+        RootCertStore {
+            roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+        }
+    }
+
+    fn with_roots(
         host: impl Into<String>,
         port: u16,
-        pins: Vec<[u8; 32]>,
         proxy: ProxyGate,
+        roots: RootCertStore,
     ) -> Self {
         let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let verifier = Arc::new(PinnedVerifier {
-            pins,
-            algs: provider.signature_verification_algorithms,
-        });
         let config = ClientConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .expect("ring provider supports the default protocol versions")
-            .dangerous()
-            .with_custom_certificate_verifier(verifier)
+            .with_root_certificates(roots)
             .with_no_client_auth();
         Self {
             host: host.into(),
@@ -373,13 +190,19 @@ impl RustlsTransport {
     /// poke stream and every SSE reconnect at once.
     ///
     /// The routing decision itself is [`open_socket_via`]'s, shared with
-    /// [`tofu_fetch_pin_via`] — this method only supplies the gate it was built
-    /// with. It carries no exemption logic: it obeys whatever gate it holds.
+    /// This method supplies the gate the transport was built with and carries
+    /// no exemption logic of its own.
     fn open_socket(&self) -> Result<TcpStream, TransportError> {
         open_socket_via(&self.proxy, &self.host, self.port)
     }
 
-    /// Open a pinned TLS connection to the configured host. Read/write deadlines
+    /// Check a newly entered endpoint before saving it. This uses exactly the
+    /// verifier and proxy route that subsequent sync requests use, including Tor.
+    pub fn verify_endpoint(&self) -> Result<(), TransportError> {
+        self.connect().map(|_| ())
+    }
+
+    /// Open a verified TLS connection to the configured host. Read/write deadlines
     /// on the socket keep a hung server from wedging a cycle and give keep-alive
     /// reuse a death detector.
     fn connect(&self) -> Result<StreamOwned<ClientConnection, TcpStream>, TransportError> {
@@ -389,7 +212,7 @@ impl RustlsTransport {
             .map_err(|_| TransportError::Tls)?;
         // Whether this is a direct socket or a SOCKS5 tunnel, what rustls gets
         // handed is a `TcpStream` carrying application bytes — which is why the
-        // TLS session, and with it the A4 pin, stays end-to-end to the sync
+        // TLS session, and with it the A4 server-authentication check, stays end-to-end to the sync
         // server rather than terminating at the exit node.
         let sock = self.open_socket()?;
         let _ = sock.set_read_timeout(Some(SOCKET_TIMEOUT));
@@ -416,7 +239,7 @@ impl RustlsTransport {
         Ok(stream)
     }
 
-    /// Export keying material from a fresh pinned connection (the tls-exporter
+    /// Export keying material from a fresh verified connection (the tls-exporter
     /// the SCRAM channel binding consumes). MYND-425 uses this on the SAME
     /// connection it authenticates over; exposed here to prove the layer surfaces
     /// the exporter (acceptance criterion). `out_len` bytes are returned.
@@ -480,10 +303,10 @@ impl SyncTransport for RustlsTransport {
         out_len: usize,
         build_body: &dyn Fn(&[u8]) -> Vec<u8>,
     ) -> Result<TransportResponse, TransportError> {
-        // A dedicated pinned connection (like open_sse), so the tls-exporter is
+        // A dedicated connection (like open_sse), so the tls-exporter is
         // computed over the EXACT connection this request is sent on — independent
-        // of the shared keep-alive slot. Same PinnedVerifier config → identical A4
-        // pin. The exporter secret needs a completed handshake, which `connect`
+        // of the shared keep-alive slot. Same CA verifier config → identical A4
+        // server authentication. The exporter secret needs a completed handshake, which `connect`
         // now guarantees for every caller (it used to be driven here, and only
         // here, which is why the same refusal was named differently on the other
         // two connection paths).
@@ -520,9 +343,10 @@ impl SyncTransport for RustlsTransport {
         token: &str,
         read_timeout: std::time::Duration,
     ) -> Result<SseStream, SseOpenError> {
-        // A dedicated pinned TLS connection (never the keep-alive request slot
-        // — the stream occupies it indefinitely). Same PinnedVerifier config,
-        // so the A4 pin semantics are byte-identical to request cycles.
+        // A dedicated TLS connection (never the keep-alive request slot
+        // (the stream occupies it indefinitely). Same CA verifier config,
+        // so the A4 server-authentication semantics are byte-identical to
+        // request cycles.
         let mut stream = self.connect().map_err(SseOpenError::Transport)?;
         stream
             .sock
@@ -560,80 +384,54 @@ impl SyncTransport for RustlsTransport {
 }
 
 #[cfg(test)]
-// `pub(crate)` so `pin_confirm`'s tests can borrow the TLS server + its
-// certificate rather than standing up a second one: the pin under test IS that
-// certificate's hash, and two hand-written fixtures eventually disagree about
-// which certificate they are both serving.
 pub(crate) mod tests {
     use super::*;
 
+    /// The production trust anchors, read off the same function the
+    /// constructor loads them from.
+    ///
+    /// The lower bound is what makes this non-vacuous: an empty store, a
+    /// one-root store, or a bundle that stopped being a public CA set all fail
+    /// here, and before `bundled_roots` existed every acceptance test in this
+    /// module passed with `RootCertStore::empty()` substituted at the production
+    /// site, because each of them injects the test CA through `with_roots`
+    /// instead. The upper bound is the number `webpki_roots` itself publishes, so
+    /// the two cannot drift apart silently: if a future `webpki-roots` changes
+    /// shape this fails and says so rather than accepting whatever arrived.
     #[test]
-    fn cert_pin_is_sha256_of_der() {
-        let der = b"a fake cert der blob";
-        let pin = cert_pin(der);
-        let mut expect = [0u8; 32];
-        expect.copy_from_slice(&Sha256::digest(der));
-        assert_eq!(pin, expect);
-    }
-
-    #[test]
-    fn config_builds_with_pins() {
-        // Construction must not panic (ring provider + pinned verifier wire up).
-        let t = RustlsTransport::new("sync.myne.md", 443, vec![[0x11u8; 32]]);
+    fn the_production_constructor_trusts_the_bundled_public_roots() {
+        let t = RustlsTransport::new("sync.myne.md", 443);
         assert_eq!(t.host, "sync.myne.md");
         assert_eq!(t.port, 443);
-    }
-
-    #[test]
-    fn verify_server_cert_accepts_pinned_and_rejects_unpinned() {
-        // The A4 trust anchor: the leaf DER's SHA-256 MUST be in the pin set,
-        // which replaces CA-chain validation. `verify_server_cert` hashes the
-        // DER bytes and does not parse X.509 structure, so arbitrary bytes act
-        // as a deterministic "leaf cert" — no real certificate fixture (and no
-        // extra dev-dependency) is needed to pin both decision branches.
-        let der = b"deterministic leaf cert der for the A4 pin test";
-        let end_entity = CertificateDer::from(der.to_vec());
-        let name = ServerName::try_from("sync.myne.md").unwrap();
-        let now = UnixTime::since_unix_epoch(std::time::Duration::from_secs(1_700_000_000));
-
-        // Accept path: the pin set contains this cert's hash.
-        let accepting = PinnedVerifier {
-            pins: vec![cert_pin(der)],
-            algs: rustls::crypto::ring::default_provider().signature_verification_algorithms,
-        };
-        assert!(
-            accepting
-                .verify_server_cert(&end_entity, &[], &name, &[], now)
-                .is_ok(),
-            "a cert whose DER hash is pinned must be accepted"
+        let roots = RustlsTransport::bundled_roots();
+        assert_eq!(
+            roots.roots.len(),
+            webpki_roots::TLS_SERVER_ROOTS.len(),
+            "the production transport must load exactly the bundled Mozilla roots"
         );
-
-        // Reject path: the pin set does NOT contain this cert's hash (the exact
-        // A4 boundary — an attacker-substituted leaf cert).
-        let rejecting = PinnedVerifier {
-            pins: vec![[0u8; 32], cert_pin(b"a different cert")],
-            algs: rustls::crypto::ring::default_provider().signature_verification_algorithms,
-        };
-        // Asserted on the VARIANT, not on the text. It used to read the prose
-        // out of `Error::General`, which is the same fragility the production
-        // side had: `handshake_error` has to recognise this refusal after it
-        // has been wrapped in an `io::Error`, and a message it could only match
-        // by substring would compile, pass, and break on a rustls bump.
         assert!(
-            matches!(
-                rejecting.verify_server_cert(&end_entity, &[], &name, &[], now),
-                Err(rustls::Error::InvalidCertificate(
-                    CertificateError::ApplicationVerificationFailure
-                ))
-            ),
-            "unpinned cert must be rejected (A4) as a matchable variant"
+            roots.roots.len() > 100,
+            "a public CA bundle is over a hundred roots; a small number here means \
+             the store was emptied, replaced or filtered, which would silently \
+             change which servers native sync can reach"
         );
     }
 
-    // --- real TLS round-trip: TOFU-fetch the pin, then prove pinning ----------
+    // Native CA-verified TLS fixture. Its private CA is never in the shipped
+    // Mozilla bundle, only in test transports that explicitly inject it.
 
-    pub(crate) const TEST_CERT_DER: &[u8] = include_bytes!("test_fixtures/localhost.cert.der");
+    const TEST_CERT_DER: &[u8] = include_bytes!("test_fixtures/localhost.cert.der");
     const TEST_KEY_DER: &[u8] = include_bytes!("test_fixtures/localhost.key.der");
+
+    fn trusted_test_server(port: u16, proxy: ProxyGate) -> RustlsTransport {
+        let mut roots = RootCertStore::empty();
+        roots
+            .add(CertificateDer::from(
+                include_bytes!("test_fixtures/test-ca.cert.der").to_vec(),
+            ))
+            .unwrap();
+        RustlsTransport::with_roots("localhost", port, proxy, roots)
+    }
 
     /// Spawn a minimal rustls TLS server (self-signed `localhost` cert) that
     /// accepts + handshakes `n` connections on an ephemeral port. Returns the
@@ -663,7 +461,7 @@ pub(crate) mod tests {
                 };
                 let mut conn = ServerConnection::new(config.clone()).unwrap();
                 // Drive the server side of the handshake; a client that drops
-                // after verifying (the pin-reject case) just closes early.
+                // after verifying (the untrusted-CA case) just closes early.
                 while conn.is_handshaking() {
                     match conn.complete_io(&mut sock) {
                         Ok((0, 0)) => break,
@@ -674,45 +472,6 @@ pub(crate) mod tests {
             }
         });
         port
-    }
-
-    /// Complete ONLY a pinned TLS handshake (no app data) against `host:port`,
-    /// returning `Ok(())` iff the pin verified.
-    fn pinned_handshake(host: &str, port: u16, pin: [u8; 32]) -> Result<(), ()> {
-        let sock = TcpStream::connect((host, port)).map_err(|_| ())?;
-        pinned_handshake_on(sock, host, pin)
-    }
-
-    /// The same pinned handshake, on a socket the caller already opened — a
-    /// direct one above, a SOCKS5 tunnel below. Splitting it here is what lets
-    /// the tunnel test assert "rustls, unchanged" literally: both paths run
-    /// this exact function with this exact `ClientConfig`.
-    fn pinned_handshake_on(mut sock: TcpStream, host: &str, pin: [u8; 32]) -> Result<(), ()> {
-        let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let verifier = Arc::new(PinnedVerifier {
-            pins: vec![pin],
-            algs: provider.signature_verification_algorithms,
-        });
-        let config = ClientConfig::builder_with_provider(provider)
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .dangerous()
-            .with_custom_certificate_verifier(verifier)
-            .with_no_client_auth();
-        let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;
-        let mut conn = ClientConnection::new(Arc::new(config), name).map_err(|_| ())?;
-        while conn.is_handshaking() {
-            match conn.complete_io(&mut sock) {
-                Ok((0, 0)) => break,
-                Ok(_) => {}
-                Err(_) => return Err(()),
-            }
-        }
-        if conn.is_handshaking() {
-            Err(())
-        } else {
-            Ok(())
-        }
     }
 
     /// Accept `n` connections and answer with bytes that are not TLS at all — a
@@ -737,21 +496,18 @@ pub(crate) mod tests {
         port
     }
 
-    /// `handshake_error`'s three arms, driven directly. The live-server test
-    /// below proves the wrapping is real; this proves the reading is right,
-    /// including the arm that must NOT fire — an expired certificate is a TLS
-    /// failure and not a pin mismatch, and sweeping it into the new variant
-    /// would offer the user a remedy that cannot work.
+    /// `handshake_error`'s arms, driven directly. The live-server test below
+    /// proves the wrapping is real; this proves the reading is right, and
+    /// includes the distinction that collapsed every certificate fault into
+    /// one class while pinning existed: an expired certificate and an
+    /// untrusted issuer are both `Tls`, and neither is a network fault.
     #[test]
-    fn handshake_error_names_a_pin_refusal_and_nothing_else() {
-        let pin_refusal = std::io::Error::new(
+    fn handshake_error_names_a_certificate_refusal_and_nothing_else() {
+        let untrusted = std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure),
         );
-        assert_eq!(
-            handshake_error(pin_refusal),
-            TransportError::CertPinMismatch
-        );
+        assert_eq!(handshake_error(untrusted), TransportError::Tls);
 
         let expired = std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -760,7 +516,7 @@ pub(crate) mod tests {
         assert_eq!(
             handshake_error(expired),
             TransportError::Tls,
-            "an expired certificate is not a pin mismatch: re-trusting it fixes nothing"
+            "an expired certificate is a TLS fault, and a distinct one from a network fault"
         );
 
         let protocol =
@@ -779,92 +535,65 @@ pub(crate) mod tests {
     /// rustls really does hand its own error back inside the `io::Error` — the
     /// assumption the classification rests on, and one no type checks.
     ///
-    /// Both directions on purpose. A version that only asserted the mismatch
-    /// arm would pass just as well if the classifier answered `CertPinMismatch`
-    /// to everything, which is the failure this repo has shipped before.
+    /// Both directions on purpose. A version that only asserted the untrusted-CA
+    /// arm would pass just as well if the classifier answered `Tls` to
+    /// everything, which is the failure this repo has shipped before.
     #[test]
-    fn a_live_pin_mismatch_is_named_and_a_live_non_pin_failure_is_not() {
+    fn an_untrusted_certificate_fails_and_non_tls_is_rejected() {
         let tls_port = spawn_tls_server(2);
         let plain_port = spawn_not_tls_server(1);
         std::thread::sleep(std::time::Duration::from_millis(100)); // let them bind
 
-        let wrong_pin = RustlsTransport::new("localhost", tls_port, vec![[0u8; 32]]);
+        // The production constructor: bundled Mozilla roots, no test CA injected.
+        let untrusted = RustlsTransport::new("localhost", tls_port);
         assert_eq!(
-            wrong_pin.connect().err(),
-            Some(TransportError::CertPinMismatch),
-            "the verifier's refusal must survive the trip up through io::Error"
+            untrusted.connect().err(),
+            Some(TransportError::Tls),
+            "a certificate whose issuer is not in the bundled roots must fail"
         );
 
-        let not_tls = RustlsTransport::new("localhost", plain_port, vec![cert_pin(TEST_CERT_DER)]);
+        let not_tls = RustlsTransport::new("localhost", plain_port);
         assert_eq!(
             not_tls.connect().err(),
             Some(TransportError::Tls),
-            "a peer that is not speaking TLS is not a pin problem"
+            "a peer that is not speaking TLS is also a TLS fault"
         );
 
-        let right_pin = RustlsTransport::new("localhost", tls_port, vec![cert_pin(TEST_CERT_DER)]);
+        let trusted = trusted_test_server(tls_port, ProxyGate::new());
         assert!(
-            right_pin.connect().is_ok(),
-            "the pinned handshake still completes, and `connect` now completes it"
+            trusted.connect().is_ok(),
+            "the verified handshake completes after chain and name checks"
         );
     }
 
     #[test]
-    fn tofu_fetch_pins_real_cert_then_pinning_accepts_it_and_rejects_others() {
-        // Three handshakes: the TOFU fetch + the accept-pin proof + the
-        // reject-pin proof.
-        let port = spawn_tls_server(3);
-        std::thread::sleep(std::time::Duration::from_millis(100)); // let it bind
-
-        // 1. TOFU-fetch the server's pin; it must equal the cert's SHA-256.
-        let pin = tofu_fetch_pin_via(&ProxyGate::new(), "localhost", port).expect("TOFU fetch");
-        assert_eq!(
-            pin,
-            cert_pin(TEST_CERT_DER),
-            "TOFU captured the real leaf cert"
-        );
-
-        // 2. A pinned handshake with that exact pin succeeds (A4 accept path).
-        assert!(
-            pinned_handshake("localhost", port, pin).is_ok(),
-            "the correct pin verifies the real cert"
-        );
-
-        // 3. A pinned handshake with a wrong pin fails (A4 reject path).
-        assert!(
-            pinned_handshake("localhost", port, [0u8; 32]).is_err(),
-            "a wrong pin rejects the cert"
-        );
+    fn a_trusted_ca_does_not_override_a_wrong_server_name() {
+        let port = spawn_tls_server(1);
+        let mut roots = RootCertStore::empty();
+        roots
+            .add(CertificateDer::from(
+                include_bytes!("test_fixtures/test-ca.cert.der").to_vec(),
+            ))
+            .unwrap();
+        // The leaf is issued for localhost, not this IP. Both reach the same
+        // socket; the hostname check must still refuse the connection.
+        let transport = RustlsTransport::with_roots("127.0.0.1", port, ProxyGate::new(), roots);
+        assert_eq!(transport.connect().err(), Some(TransportError::Tls));
     }
 
-    /// Tor routing (MYND-650 task 3): pinned TLS runs **unchanged** over a
-    /// SOCKS5 tunnel. The tunnel is a byte pipe, so the TLS session — and with
-    /// it the A4 pin — stays end-to-end between this device and the sync
-    /// server; a Tor exit node sees ciphertext to a hostname and nothing else.
-    ///
-    /// The reject arm is the half that matters: if the tunnel somehow
-    /// terminated TLS (a MitM proxy), the pin would not match and the
-    /// handshake would fail exactly as it does on the direct path.
+    /// TLS verification happens inside the Tor tunnel. A certificate signed by
+    /// the test CA succeeds only when explicitly trusted in this test; the
+    /// production root store refuses it.
     #[test]
-    fn pinned_tls_completes_over_a_socks5_tunnel_and_still_rejects_a_wrong_pin() {
+    fn ca_tls_completes_over_socks5_and_rejects_an_untrusted_certificate() {
         let tls_port = spawn_tls_server(2);
         std::thread::sleep(std::time::Duration::from_millis(100)); // let it bind
         let proxy = FakeSocks5::spawn(2, Behavior::Splice(tls_port));
 
-        // The client asks the proxy for `localhost:443` — a name and the real
-        // service port. Where that lands is the proxy's business, which is the
-        // whole shape of routing through Tor.
-        let tunnel = connect_via_socks5(proxy.port, "localhost", 443).expect("tunnel");
-        assert!(
-            pinned_handshake_on(tunnel, "localhost", cert_pin(TEST_CERT_DER)).is_ok(),
-            "the correct pin verifies the real cert through the tunnel"
-        );
-
-        let tunnel = connect_via_socks5(proxy.port, "localhost", 443).expect("tunnel");
-        assert!(
-            pinned_handshake_on(tunnel, "localhost", [0u8; 32]).is_err(),
-            "a wrong pin must still reject — the tunnel does not weaken A4"
-        );
+        let trusted = trusted_test_server(443, tor_ready(proxy.port));
+        assert!(trusted.verify_endpoint().is_ok());
+        let untrusted = RustlsTransport::with_proxy_gate("localhost", 443, tor_ready(proxy.port));
+        assert_eq!(untrusted.verify_endpoint(), Err(TransportError::Tls));
 
         assert_eq!(
             proxy.seen(),
@@ -876,7 +605,7 @@ pub(crate) mod tests {
                 };
                 2
             ],
-            "both connects travelled as a hostname CONNECT, not a resolved address"
+            "both handshakes used a hostname CONNECT inside Tor"
         );
     }
 
@@ -901,7 +630,7 @@ pub(crate) mod tests {
         gate
     }
 
-    /// A pinned TLS server that also answers HTTP: handshakes `n` connections
+    /// A CA-verified TLS server that also answers HTTP: handshakes `n` connections
     /// and writes `response` (raw HTTP bytes) over the TLS session after
     /// reading the request head. Enough to prove a full request/response — and
     /// an SSE head — traverses the tunnel, which a handshake-only server
@@ -956,7 +685,7 @@ pub(crate) mod tests {
     const SSE_OK: &[u8] =
         b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: keep-alive\r\n\r\ndata:\n\n";
 
-    /// Criterion 1, request/response half: with Tor mode on, a real pinned
+    /// Criterion 1, request/response half: with Tor mode on, a real verified
     /// request rides the SOCKS5 tunnel end to end — and the proxy was handed
     /// the **hostname**, so the name resolved inside the circuit.
     #[test]
@@ -965,12 +694,7 @@ pub(crate) mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100));
         let proxy = FakeSocks5::spawn(1, Behavior::Splice(server));
 
-        let t = RustlsTransport::with_proxy_gate(
-            "localhost",
-            443,
-            vec![cert_pin(TEST_CERT_DER)],
-            tor_ready(proxy.port),
-        );
+        let t = trusted_test_server(443, tor_ready(proxy.port));
         let resp = t
             .request(HttpMethod::Get, "/sync/pull?cursor=0", b"", Some("tok"))
             .expect("request must complete through the tunnel");
@@ -1002,12 +726,7 @@ pub(crate) mod tests {
         for attempt in 0..2 {
             // A fresh transport per connection — the shape the reconnect loop
             // has, so a cached-connection bypass could not hide here.
-            let t = RustlsTransport::with_proxy_gate(
-                "localhost",
-                443,
-                vec![cert_pin(TEST_CERT_DER)],
-                gate.clone(),
-            );
+            let t = trusted_test_server(443, gate.clone());
             t.open_sse("/sync/poke", "tok", std::time::Duration::from_secs(5))
                 .unwrap_or_else(|e| {
                     panic!("attempt {attempt}: SSE must open through the tunnel, got {e:?}")
@@ -1076,12 +795,7 @@ pub(crate) mod tests {
             // `proxy::installed_for`, not in the transport, so a transport
             // handed a Tor-mode gate obeys it whatever its host — which is what
             // lets this test exist at all.
-            let t = RustlsTransport::with_proxy_gate(
-                "localhost",
-                real_port,
-                vec![cert_pin(TEST_CERT_DER)],
-                tor_not_ready(state),
-            );
+            let t = RustlsTransport::with_proxy_gate("localhost", real_port, tor_not_ready(state));
             assert_eq!(
                 t.request(HttpMethod::Get, "/sync/pull", b"", Some("tok")),
                 Err(TransportError::Network),
@@ -1109,12 +823,7 @@ pub(crate) mod tests {
         );
 
         // Control: the probe really does observe a connection when one is made.
-        let direct = RustlsTransport::with_proxy_gate(
-            "localhost",
-            real_port,
-            vec![cert_pin(TEST_CERT_DER)],
-            ProxyGate::new(),
-        );
+        let direct = RustlsTransport::with_proxy_gate("localhost", real_port, ProxyGate::new());
         let _ = direct.request(HttpMethod::Get, "/sync/pull", b"", Some("tok"));
         std::thread::sleep(std::time::Duration::from_millis(150));
         assert_eq!(
@@ -1135,12 +844,7 @@ pub(crate) mod tests {
         let proxy = FakeSocks5::spawn(1, Behavior::Splice(server));
 
         let gate = ProxyGate::new();
-        let t = RustlsTransport::with_proxy_gate(
-            "localhost",
-            443,
-            vec![cert_pin(TEST_CERT_DER)],
-            gate.clone(),
-        );
+        let t = trusted_test_server(443, gate.clone());
         // Tor mode off, sidecar not running: nothing is routed yet.
         assert!(proxy.seen().is_empty());
 
@@ -1161,113 +865,14 @@ pub(crate) mod tests {
     fn the_production_constructor_takes_its_gate_from_the_installed_policy() {
         // Loopback → a direct-only gate, so a local dev server and the E2E
         // harness keep working with Tor mode on.
-        let local = RustlsTransport::new("127.0.0.1", 8443, vec![[0x11; 32]]);
+        let local = RustlsTransport::new("127.0.0.1", 8443);
         assert_eq!(local.proxy.route(), Ok(Route::Direct));
 
         // A remote host → the installed gate. Nothing installs one in this
         // crate's tests, so it reads back the default, which is also direct —
         // the assertion that matters is that it is the *installed* gate, which
         // `proxy::installed_for`'s own tests pin.
-        let remote = RustlsTransport::new("sync.myne.md", 443, vec![[0x11; 32]]);
+        let remote = RustlsTransport::new("sync.myne.md", 443);
         assert!(!remote.proxy.is_enabled());
-    }
-
-    // ── task 5: the enrollment handshake is routed too ───────────────────────
-
-    /// **Criterion 1.** The one-shot pin-capture handshake — the only one in
-    /// the client that accepts any certificate — travels through the proxy in
-    /// Tor mode, as a hostname `CONNECT` so the name is resolved inside the
-    /// circuit. Before task 5 this socket was direct, which meant enabling Tor
-    /// and then pointing the client at a server leaked both the sync hostname
-    /// and this device's source IP at enrollment time.
-    #[test]
-    fn the_pin_capture_handshake_travels_through_the_proxy_in_tor_mode() {
-        let server = spawn_tls_server(1);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let proxy = FakeSocks5::spawn(1, Behavior::Splice(server));
-
-        let pin = tofu_fetch_pin_via(&tor_ready(proxy.port), "localhost", 443)
-            .expect("the TOFU handshake must complete through the tunnel");
-
-        assert_eq!(
-            pin,
-            cert_pin(TEST_CERT_DER),
-            "the pin captured through the tunnel is the server's real leaf cert"
-        );
-        assert_eq!(
-            proxy.seen(),
-            vec![SeenTarget {
-                atyp: 0x03,
-                host: "localhost".to_string(),
-                port: 443,
-            }],
-            "the enrollment handshake must travel as a hostname CONNECT, not a \
-             resolved address and not a direct socket"
-        );
-    }
-
-    /// **Criterion 1, the negative half.** With Tor mode on and the proxy not
-    /// `Ready`, the pin capture fails and the server sees zero connections —
-    /// the same fail-closed rule as the data plane, and for a sharper reason:
-    /// a direct fallback here would leak the source IP *and* pin a certificate
-    /// the user never confirmed.
-    ///
-    /// The control arm at the end is what makes the zero mean something.
-    #[test]
-    fn the_pin_capture_fails_closed_with_no_direct_connection_attempt() {
-        use std::net::TcpListener;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind probe");
-        let real_port = listener.local_addr().expect("addr").port();
-        let accepts = Arc::new(AtomicUsize::new(0));
-        let counter = accepts.clone();
-        std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                if stream.is_err() {
-                    return;
-                }
-                counter.fetch_add(1, Ordering::SeqCst);
-                // Close immediately — a held socket would make the control
-                // arm's handshake block for the full SOCKET_TIMEOUT.
-            }
-        });
-
-        let dead_proxy = TcpListener::bind("127.0.0.1:0")
-            .expect("bind")
-            .local_addr()
-            .expect("addr")
-            .port();
-
-        for state in [
-            TorProxyState::Starting,
-            TorProxyState::Failed,
-            TorProxyState::Stopped,
-            TorProxyState::Ready {
-                socks_port: dead_proxy,
-            },
-        ] {
-            assert!(
-                tofu_fetch_pin_via(&tor_not_ready(state), "localhost", real_port).is_err(),
-                "{state:?}: the pin capture must fail rather than connect directly"
-            );
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(150));
-        assert_eq!(
-            accepts.load(Ordering::SeqCst),
-            0,
-            "fail-closed means ZERO direct connections, enrollment included"
-        );
-
-        // Control: the probe really does observe a connection when one is made.
-        let _ = tofu_fetch_pin_via(&ProxyGate::new(), "localhost", real_port);
-        std::thread::sleep(std::time::Duration::from_millis(150));
-        assert_eq!(
-            accepts.load(Ordering::SeqCst),
-            1,
-            "the probe must be able to see a direct connect, or the zero above \
-             is vacuous"
-        );
     }
 }

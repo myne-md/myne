@@ -84,12 +84,12 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # Phase 2 sync transport (extracted from the desktop crate with the sync engine,
 # decisions.md 2026-07-07). base64 = the SCRAM/enroll wire encoding; the
 # raw-rustls connection layer that SCRAM auth + sync push/pull share — one TLS
-# path with cert-pinning (A4) and keying-material export (tls-exporter, SCRAM
+# path with public CA-chain and hostname verification (A4) and keying-material export (tls-exporter, SCRAM
 # channel binding, SYNC-3). Unconditional (SYNC-33): every core consumer wanting
 # sync wants the transport; desktop + mobile inherit these via the `myne-core`
 # path dep. The `ring` provider is chosen over the default `aws-lc-rs` for a more
 # reproducible build (no C/CMake toolchain → cross-compiles for iOS/Android).
-# NOTE: the cert-pin verifier + tls-exporter wiring is R3-gated — a
+# NOTE: the TLS trust path + tls-exporter wiring are R3-gated, so a
 # primitive-level security review + live interop test are still owed before
 # production trust. Recorded in `docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
 base64 = "0.22"
@@ -164,15 +164,32 @@ rand_core = { version = "0.10.1", default-features = false }
 tauri = { version = "2", features = [], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pki-types = "1"
-# The remote-AI arm's trust anchor (myne-md/myne#456, moved here with the arm
-# itself). A static Mozilla root bundle compiled into the binary, chosen over a
-# platform verifier because the destinations are a compiled-in table of known
-# provider hosts rather than the open web. It is optional and reached only
-# through the `remote-ai` feature, so an isolated `--no-default-features`
-# desktop build links none of it. Target-gated with its neighbours because
-# `rustls` with the `ring` provider has no wasm32 backend and a browser has no
-# raw TCP socket to put TLS on regardless.
-webpki-roots = { version = "1", optional = true }
+# The public CA trust anchors for native sync TLS and the opt-in remote-provider
+# arm. Kept native-only: the browser uses its own trust store through fetch.
+#
+# WHY A COMPILED-IN BUNDLE AND NOT THE PLATFORM VERIFIER. This used to be
+# reachable only through the remote-AI arm, where the destinations were a
+# compiled-in table of known provider hosts and a static set was defensible. It
+# is now also the trust anchor for native SYNC, whose endpoints are arbitrary
+# operator-supplied URLs: the open web. Three properties follow, and all three
+# are costs rather than conveniences:
+#
+#   1. A private or corporate CA installed on the user's machine is NOT
+#      consulted. A self-hoster on a LAN, an internal name or a bare IP has no
+#      path to being trusted, which `self-host-policy.md` section 6 states as an
+#      absence of an answer rather than leaving it implicit.
+#   2. A root a browser has stopped trusting keeps authenticating sync servers
+#      until Myne ships a release that bumps this pin. Updating the bundle is a
+#      RELEASE RESPONSIBILITY in the same sense `threat-model.md` section 7
+#      records for the bundled Tor client, and for the same reason: there is no
+#      updater to deliver the new set.
+#   3. Revocation is not consulted either way; see the A4 amendment.
+#
+# The version is a bare major because the crate publishes no semver-breaking API
+# and the set it carries is a `const` array read at construction
+# (`rustls_transport::bundled_roots`, the single named source the fixture tests
+# assert against). The trade-off is recorded in `decisions/sync/0620`.
+webpki-roots = "1"
 # `rt-multi-thread` is the wall on wasm: tokio emits a `compile_error!` there
 # ("Only features sync,macros,io-util,rt,time are supported"). A browser has one
 # thread per worker and no thread pool to spawn onto, so the wasm arm below
@@ -289,15 +306,11 @@ test-support = []
 # Both client crates turn it on: desktop through its own `local-inference`
 # feature (so the audit build still drops it transitively), mobile directly.
 #
-# `webpki-roots` rides here rather than in the unconditional dependency block
-# because it exists solely for this arm. It is a `const` bundle of certificate
-# DATA, not a networked crate, which is why it is deliberately absent from the
-# egress guard's denylist: it opens nothing and speaks no protocol. `rustls` and
-# `rustls-pki-types` are NOT listed: the sync transport already depends on them
-# unconditionally, and this arm builds its own `ClientConfig` against the static
-# root bundle rather than sharing sync's pinned-certificate verifier. Two
-# verifiers, no shared trust anchor, and this move merges nothing.
-remote-ai = ["dep:webpki-roots"]
+# `webpki-roots` is now unconditional because native sync uses its public CA
+# bundle too. This feature gates the remote-provider MODULE, not the root data;
+# `src-tauri/scripts/ai-no-network-check.sh` checks the feature chain and the
+# module gate rather than treating a shared trust bundle as proof of AI code.
+remote-ai = []
 
 # The E2E build variant, moved here with `inference/engine.rs` (myne-md/myne#456)
 # because that file is where it is read. NEVER the shipped bundle.

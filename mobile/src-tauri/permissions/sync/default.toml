@@ -210,7 +210,7 @@ commands.allow = ["sync_enroll"]
 
 [[permission]]
 identifier = "allow-sync-join-account"
-description = "Allow invoking sync:sync_join_account (add this device to an existing account: TOFU-pin the endpoint, fetch vault.meta pre-auth, bootstrap a NEW local vault from {account#+password}, unlock it, SCRAM-enroll password-path → pending). Materializes a vault dir; gated on the same A4/TB5 transport policy."
+description = "Allow invoking sync:sync_join_account (add this device to an existing account: verify the endpoint certificate, fetch vault.meta pre-auth, bootstrap a NEW local vault from {account#+password}, unlock it, SCRAM-enroll password-path → pending). Materializes a vault dir; gated on the same A4/TB5 transport policy."
 commands.allow = ["sync_join_account"]
 
 [[permission]]
@@ -255,7 +255,7 @@ commands.allow = ["sync_lifecycle_resume"]
 
 [[permission]]
 identifier = "allow-sync-decode-join-qr"
-description = "Allow invoking sync:sync_decode_join_qr (MYND-466 — decode a scanned device-join QR string into {endpoint_url, account#, cert_pin, pin_source, fresh} for the confirm screen). Pure over the scanned string + the clock; no vault access, no IO, no server call, carries no secret."
+description = "Allow invoking sync:sync_decode_join_qr (MYND-466: decode a scanned device-join QR string into {endpoint_url, account#, fresh} for the confirm screen). Pure over the scanned string + the clock; no vault access, no IO, no server call, carries no secret."
 commands.allow = ["sync_decode_join_qr"]
 
 [[permission]]

@@ -15,9 +15,14 @@ import { listen } from "../platform/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
 
-/** Where a cert pin came from (SYNC-43): a pre-vetted hosted static pin vs a
- *  TOFU pin captured at first connect (the one the user eye-compares). */
-export type PinSource = "static" | "tofu";
+/**
+ * How the endpoint's certificate is verified (SYNC-43). The wire name is
+ * historical: it used to distinguish a pre-vetted hosted static pin from a TOFU
+ * pin captured at first connect, and both are gone (decisions/sync/0620). The one
+ * remaining value means "public CA roots plus hostname": the bundled Mozilla
+ * bundle natively, the browser's own trust store on web.
+ */
+export type PinSource = "platform_trust_store";
 
 /** Mirrors the Rust `SyncEndpointView`. */
 export interface SyncEndpointView {
@@ -36,8 +41,7 @@ export function syncGetEndpoint(): Promise<SyncEndpointView> {
   return invoke<SyncEndpointView>("plugin:sync|sync_get_endpoint");
 }
 
-/** Set (or clear, with `null`) the sync endpoint. For an `https` endpoint the
- *  core TOFU-pins the leaf cert and returns its fingerprint for eye-compare. */
+/** Set (or clear) the sync endpoint. Native TLS verifies CA roots and hostname. */
 export function syncSetEndpoint(endpointUrl: string | null): Promise<EndpointPinInfo> {
   return invoke<EndpointPinInfo>("plugin:sync|sync_set_endpoint", { endpointUrl });
 }
@@ -60,7 +64,7 @@ export interface JoinResult {
 }
 
 /** **Add this device to an existing account.** On a fresh device, bootstrap the
- *  whole local vault from the server: set + TOFU-pin the endpoint, fetch the
+ *  whole local vault from the server: verify the endpoint, fetch the
  *  account's `vault.meta` pre-auth, derive `root_key` from `{account# + password}`,
  *  write the meta to a NEW local vault + unlock it, then SCRAM-enroll (password →
  *  pending until an existing device approves). Password-only (no 24-word phrase —
@@ -80,18 +84,12 @@ export function syncJoinAccount(
 
 // ── Device-join via QR (MYND-466) ────────────────────────────────────────────
 
-/** Mirrors Rust `JoinQrPinSource`. */
-export type JoinQrPinSource = "self_host_tofu" | "hosted" | "self_host_no_pin";
-
 /** Mirrors Rust `JoinQrView` — the decoded, validated device-join QR for the
  *  confirm screen. Carries no secret (the account# is an identity; SYNC-47). */
 export interface JoinQrView {
   endpoint_url: string;
   /** Canonical 20-char account number (format for display with `formatAccountNumberInput`). */
   account_number: string;
-  /** The QR's carried leaf-cert pin (hex), or null. */
-  cert_pin_hex: string | null;
-  pin_source: JoinQrPinSource;
   /** False when the QR is past its ephemeral TTL (reject → re-scan). */
   fresh: boolean;
 }

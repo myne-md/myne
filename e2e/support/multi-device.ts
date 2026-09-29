@@ -67,33 +67,10 @@ export function syncConfigSeed(endpointUrl: string): (appConfigDir: string) => v
   };
 }
 
-/**
- * A `seedConfig` callback for a device already connected to a **pinned `https`**
- * endpoint — the posture every self-hoster is in, and the one no other seed here
- * can produce.
- *
- * {@link syncConfigSeed} writes a loopback `http` URL, which is right for every
- * scenario that wants a server to talk to: the harness has no TLS and needs
- * none. The cost is that `pin_source` resolves to `None` on those devices, so
- * the whole certificate surface — the fingerprint callout, the pin-source line,
- * the re-verify door — renders on no device the suite launches, and a
- * regression in it is invisible to all of them. That is how myne#756 shipped.
- *
- * No server is spawned and none is wanted. The pin is read off `sync-config.json`
- * by `sync_get_endpoint` without a handshake, so the screen reaches the connected
- * state against a URL nothing answers. A scenario built on this may assert
- * anything about the endpoint SCREEN and nothing about a connection.
- */
-export function pinnedHttpsConfigSeed(
-  endpointUrl = "https://sync.invalid",
-  certPinHex = "a".repeat(64),
-): (appConfigDir: string) => void {
+/** A saved HTTPS URL for UI-only scenarios. No server is contacted on read. */
+export function httpsConfigSeed(endpointUrl = "https://sync.invalid"): (appConfigDir: string) => void {
   return (appConfigDir: string) => {
-    const body = JSON.stringify(
-      { endpoint_url: endpointUrl, cert_pin_hex: certPinHex },
-      null,
-      2,
-    );
+    const body = JSON.stringify({ endpoint_url: endpointUrl }, null, 2);
     writeFileSync(join(appConfigDir, "sync-config.json"), body);
     legalConsentSeed()(appConfigDir);
   };

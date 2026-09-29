@@ -107,12 +107,12 @@ describe("IdentitySetupDialog", () => {
   });
 
   it("keeps a pin failure distinct and provides recovery from the identity form", async () => {
-    personSetup.mockRejectedValue({ kind: "CertPinMismatch" });
+    personSetup.mockRejectedValue({ kind: "TlsFailure" });
     render(<IdentitySetupDialog open onClose={() => {}} />);
     fireEvent.click(await screen.findByTestId("identity-setup.create-cta"));
 
     expect((await screen.findByTestId("identity-setup.error")).textContent).toBe(
-      "identitySetup.errorCertPinMismatch",
+      "identitySetup.errorTlsFailure",
     );
     fireEvent.click(screen.getByTestId("identity-setup.change-server"));
     expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();

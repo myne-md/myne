@@ -172,7 +172,7 @@ describe("stale-sync warning", () => {
   it("appears once a failure is days old, and can be dismissed", async () => {
     syncStatus = {
       state: "error",
-      detail: "cert_pin_mismatch",
+      detail: "tls_failure",
       last_success_at: Date.now() - 5 * DAY,
     };
     render(<SyncBanners />);

@@ -6,10 +6,10 @@
 // exists here: an origin holds exactly one container under a constant vault id
 // (phase3-web-client task 85), so there is no second vault to bootstrap, and
 // the one join a browser does perform is `AccountBootstrap` — the first-run
-// flow that has no server-URL field and no TOFU fingerprint step, because a
-// page cannot see a leaf certificate.
+// flow that has no server-URL field and no certificate step, because a page
+// cannot see a leaf certificate and the browser verifies on its own.
 //
-// So this renders nothing, and the modal's TOFU pinning vocabulary, its SAS
+// So this renders nothing, and the modal's endpoint-trust vocabulary, its SAS
 // eye-compare copy and its device-naming form never enter the bundle. Before
 // the mount was hoisted out of `Welcome`, that exclusion came for free — the
 // welcome screen is itself substituted, and its stub says so. A globally
