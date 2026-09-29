@@ -647,6 +647,15 @@ pub fn stamp_membership_field(
     account_number_hash: &[u8; 16],
     meta_bytes: &[u8],
 ) -> Vec<u8> {
+    // The membership field lives ONLY in an `NTV5` frame. An `NTV6` vault
+    // carries its membership through the B2B roster instead, and rewriting the
+    // `NTV6` bytes through the `NTV5` serializer would DROP the B2B tail
+    // (group-key wrap, epoch, signed roster), leaving a vault whose `items_key`
+    // is group-sealed but whose meta claims the root tier. `meta_version_of`
+    // reports `NTV6` as `V0_2`, so the magic must be checked directly here.
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return meta_bytes.to_vec();
+    }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
         return meta_bytes.to_vec();
     };
@@ -686,6 +695,20 @@ pub fn stamp_person_binding_field(
     account_number_hash: &[u8; 16],
     meta_bytes: &[u8],
 ) -> Vec<u8> {
+    // The person-binding field lives ONLY in an `NTV5` frame, and this check is
+    // the one that MUST come before the parse: `meta_version_of` reports an
+    // `NTV6` vault as `V0_2` (same generation, different frame), and
+    // `parse_vault_meta_any` reads only the 345-byte base of an `NTV6` blob. So
+    // without this guard, stamping a binding on an `NTV6` vault re-serializes
+    // through `serialize_vault_meta_v0_2` and silently DOWNGRADES it to `NTV5`,
+    // dropping the B2B tail: the group-key wrap that `enc_items_key` needs. The
+    // result is a vault whose `items_key` is group-sealed but whose meta claims
+    // the root tier, so no unlock path can open it (`items_key_unwrap` fails and
+    // it reports "corrupted vault"). An `NTV6` vault already binds its owner
+    // through the signed roster, so stamping is a no-op there by design.
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return meta_bytes.to_vec();
+    }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
         return meta_bytes.to_vec();
     };
@@ -1040,5 +1063,74 @@ mod tests {
             *protocol::unseal_membership(&root, &m, &hash).expect("unseal"),
             account_id
         );
+    }
+
+    /// An `NTV6` frame carries the B2B tail whose group-key wrap `enc_items_key`
+    /// is sealed under. Stamping a membership or person-binding field must NOT
+    /// rewrite it through the `NTV5` serializer, because that drops the tail and
+    /// leaves a vault no unlock path can open (myne-md/myne#786 regression:
+    /// reported as "corrupted vault" on an invite-enabled vault).
+    fn b2b_fixture() -> Vec<u8> {
+        let base = protocol::VaultMeta {
+            account_number_hash: [0x44; 16],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x01; 16],
+            random_salt_recovery: [0x02; 16],
+            nonce_password_wrap: [0x03; 24],
+            enc_root_key_password: [0x04; 64],
+            nonce_recovery_wrap: [0x05; 24],
+            enc_root_key_recovery: [0x06; 64],
+            items_key_id: [0x07; 16],
+            items_key_nonce: [0x08; 24],
+            enc_items_key: [0x09; 64],
+            membership: None,
+            person_binding: None,
+        };
+        protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base,
+            group_key_nonce: [0xAB; 24],
+            enc_group_key: [0xCD; 64],
+            group_key_epoch: 1,
+            signed_roster_envelope: vec![0xEF; 128],
+        })
+        .expect("serialize ntv6")
+    }
+
+    #[test]
+    fn stamp_person_binding_field_must_not_downgrade_an_ntv6_meta() {
+        let bytes = b2b_fixture();
+        assert_eq!(
+            bytes.get(..4),
+            Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+        );
+        let stamped =
+            stamp_person_binding_field(&[0x11; AEAD_KEY_LEN], &[0x51; 16], &[0x44; 16], &bytes);
+        assert_eq!(
+            stamped.get(..4),
+            Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()),
+            "stamping a person binding must not change the vault generation"
+        );
+        assert_eq!(stamped, bytes, "an NTV6 meta must be returned untouched");
+        assert!(
+            protocol::parse_vault_meta_ntv6(&stamped).is_ok(),
+            "the B2B tail must survive the stamp"
+        );
+    }
+
+    #[test]
+    fn stamp_membership_field_must_not_downgrade_an_ntv6_meta() {
+        let bytes = b2b_fixture();
+        let stamped = stamp_membership_field(
+            &[0x11; AEAD_KEY_LEN],
+            &[0xAB; ACCOUNT_ID_LEN],
+            &[0x44; 16],
+            &bytes,
+        );
+        assert_eq!(
+            stamped.get(..4),
+            Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()),
+            "stamping a membership must not change the vault generation"
+        );
+        assert_eq!(stamped, bytes, "an NTV6 meta must be returned untouched");
     }
 }
