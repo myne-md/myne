@@ -4364,8 +4364,8 @@
       "lockedDuringChange": "Password change cancelled: vault was locked.",
       "metaChangedExternally": "Vault was modified in another session. Please unlock again."
     },
-    "title": "Unlock your vault.",
-    "titleNamed": "Unlock {{vault}}.",
+    "title": "Unlock your vault",
+    "titleNamed": "Unlock {{vault}}",
     "vaultUnreadable": "Vault file is unreadable. Restore from a backup.",
     "unlockFailedGeneric": "Couldn't unlock. Please try again.",
     "biometricTooManyAttempts": "Too many {{biometric}} attempts. Use your password.",

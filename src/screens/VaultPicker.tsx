@@ -79,6 +79,7 @@ import { isVaultUnlocked } from "../lib/vault-unlock";
 import { ContextMenu, type ContextMenuItem } from "../notes/components/ContextMenu";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
+import { MyneMark } from "../components/primitives/MyneMark";
 
 interface VaultPickerProps {
   /** Row select → App dispatches `picker.select-vault{vaultId}` → unlock. */
@@ -373,8 +374,16 @@ function PickerCard({
       // has nothing on screen before it to move away from.
       enter="back"
       actions={actions}
+      // The mark sits centred above the question, as on Unlock and Welcome, so
+      // the three screens a returning user meets share one shape.
+      brand={false}
     >
-      <AuthHeading title={t("vaultPicker.heading")}>{subline}</AuthHeading>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <MyneMark size={56} />
+      </div>
+      <AuthHeading centered title={t("vaultPicker.heading")}>
+        {subline}
+      </AuthHeading>
       {children}
     </AuthShell>
   );
