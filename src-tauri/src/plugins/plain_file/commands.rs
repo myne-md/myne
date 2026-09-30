@@ -10,8 +10,25 @@
 //! (`src-tauri/AGENTS.md` plugin pattern).
 
 use super::gate::{self, PlainFileGateError};
+use super::handles::{FileContent, PlainFileError, PlainFileRegistry};
 use crate::io_failure_kind::IoFailureKind;
-use tauri::{AppHandle, Manager, Runtime};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Manager, Runtime, State};
+
+/// The handle registry, shared with the ingress paths that mint handles.
+///
+/// An `Arc` rather than a bare `Mutex` because the file IO moves into
+/// `spawn_blocking`: a read of a large file must not sit on an async worker,
+/// and the closure needs an owned handle to the state to cross the boundary.
+pub type SharedRegistry = Arc<Mutex<PlainFileRegistry>>;
+
+/// A poisoned lock or a panicked blocking task. Both mean the registry is
+/// unusable for this call; neither ever carries file data, a path or a name.
+fn registry_unavailable() -> PlainFileError {
+    PlainFileError::Io {
+        io_error_kind: IoFailureKind::Other,
+    }
+}
 
 fn config_dir<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, PlainFileGateError> {
     app.path()
@@ -39,4 +56,60 @@ pub async fn gate_set<R: Runtime>(
 ) -> Result<(), PlainFileGateError> {
     let path = gate::gate_path_in(&config_dir(&app)?);
     gate::write_gate(&path, enabled)
+}
+
+/// Read the current content behind a handle.
+///
+/// No gate check: the gate guards MINTING a handle (the moment Myne is handed
+/// a file); a handle that exists is a grant the user already made. That split
+/// is what lets the UI flush an open tab after the gate is switched off,
+/// rather than losing the flush to a settings change. See `handles.rs`.
+#[tauri::command]
+pub async fn plain_file_read(
+    handle: u64,
+    registry: State<'_, SharedRegistry>,
+) -> Result<FileContent, PlainFileError> {
+    let registry = registry.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = registry.lock().map_err(|_| registry_unavailable())?;
+        guard.read(handle)
+    })
+    .await
+    .map_err(|_| registry_unavailable())?
+}
+
+/// Write `content` when the on-disk bytes still hash to `expected_base`.
+///
+/// Returns the hash of the bytes written, which the caller carries as the next
+/// expected base.
+#[tauri::command]
+pub async fn plain_file_write(
+    handle: u64,
+    content: String,
+    expected_base: String,
+    registry: State<'_, SharedRegistry>,
+) -> Result<String, PlainFileError> {
+    let registry = registry.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let guard = registry.lock().map_err(|_| registry_unavailable())?;
+        guard.write(handle, &content, &expected_base)
+    })
+    .await
+    .map_err(|_| registry_unavailable())?
+}
+
+/// Drop a handle. Idempotent: closing an unknown handle is a no-op.
+#[tauri::command]
+pub async fn plain_file_close(
+    handle: u64,
+    registry: State<'_, SharedRegistry>,
+) -> Result<(), PlainFileError> {
+    let registry = registry.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = registry.lock().map_err(|_| registry_unavailable())?;
+        guard.close(handle);
+        Ok(())
+    })
+    .await
+    .map_err(|_| registry_unavailable())?
 }

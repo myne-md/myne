@@ -23,18 +23,30 @@
 
 pub mod commands;
 pub mod gate;
+pub mod handles;
 
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::Runtime;
+use tauri::{Manager, Runtime};
 
-/// Construct the `plain_file` plugin. Holds no plugin-private state; the gate
-/// is a device-local file read per call, and the handle registry lands as
-/// managed state in a later task.
+/// Construct the `plain_file` plugin.
+///
+/// Owns the handle registry (`commands::SharedRegistry`): a map from opaque
+/// handle ids to canonical paths, in memory only and never persisted (a
+/// restart restores no plain tab, by decision). The gate itself is a
+/// device-local file read per call, never cached, so a settings change takes
+/// effect on the next open in the same session.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("plain-file")
+        .setup(|app, _api| {
+            app.manage(commands::SharedRegistry::default());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::gate_get,
             commands::gate_set,
+            commands::plain_file_read,
+            commands::plain_file_write,
+            commands::plain_file_close,
         ])
         .build()
 }
