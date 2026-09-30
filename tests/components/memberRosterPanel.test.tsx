@@ -84,9 +84,17 @@ vi.mock("../../src/hooks/useFocusTrap", () => ({
 
 import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
 
+/** The 24-word grid sits behind the card's Unlock button, closed by default so
+ *  the panel does not open on twenty-four empty fields. */
+function openUnlock(): void {
+  const open = screen.queryByTestId("member-roster.person-unlock-open");
+  if (open) fireEvent.click(open);
+}
+
 describe("MemberRosterPanel phrase input", () => {
   it("exposes the recovery-phrase field under a programmatic label", () => {
     render(<MemberRosterPanel />);
+    openUnlock();
      try {
        const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
        expect(input.type).toBe("text");
@@ -108,6 +116,7 @@ describe("MemberRosterPanel phrase input", () => {
   // several ways to produce the duplicate.
   it("states the unlock instruction once, not once per text slot", () => {
     render(<MemberRosterPanel />);
+    openUnlock();
     try {
       const panel = screen.getByTestId("member-roster");
       const statements = Array.from(panel.querySelectorAll("p, span")).filter(
@@ -126,6 +135,7 @@ describe("MemberRosterPanel phrase input", () => {
   // are asserted because either one alone still overflows.
   it("keeps the phrase grid inside its container at any panel width", () => {
     render(<MemberRosterPanel />);
+    openUnlock();
     try {
       const grid = screen.getByTestId("member-roster.phrase-grid") as HTMLElement;
       expect(grid.style.gridTemplateColumns).toBe("repeat(4, minmax(0, 1fr))");
@@ -142,6 +152,7 @@ describe("MemberRosterPanel phrase input", () => {
   it("still accepts typing after the label is added", () => {
 
     render(<MemberRosterPanel />);
+    openUnlock();
     try {
       const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
       fireEvent.change(input, { target: { value: "abandon" } });
@@ -158,6 +169,7 @@ describe("MemberRosterPanel phrase input", () => {
         resolveUnlock = resolve;
       });
     render(<MemberRosterPanel />);
+    openUnlock();
     try {
       for (let index = 0; index < 24; index += 1) {
         const testId = index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;

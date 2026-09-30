@@ -12,6 +12,10 @@ import { refreshTorState } from "../../hooks/useTorState";
 import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { Icon } from "../primitives/Icon";
+import { IconButton } from "../primitives/IconButton";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { toast } from "../toast/toastStore";
 
 /**
  * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
@@ -127,6 +131,18 @@ const FP: CSSProperties = {
 
 export function EndpointConfig() {
   const { t } = useTranslation();
+  const copyFingerprint = (value: string) => {
+    void copyText(clipboardWriteText, value, {
+      onSuccess: {
+        kind: "toast",
+        run: () => toast({ message: t("sync.endpoint.fingerprintCopied"), variant: "info" }),
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => toast({ message: t("sync.endpoint.fingerprintCopyFailed"), variant: "error" }),
+      },
+    });
+  };
   const [url, setUrl] = useState("");
   // The endpoint this device is currently connected to (loaded, or set on a
   // successful connect). When the input still equals it, there is nothing to do
@@ -319,9 +335,20 @@ export function EndpointConfig() {
             {fingerprint && (
               <>
                 <span style={NOTE_LABEL}>{t("sync.endpoint.fingerprintLabel")}</span>
-                <span style={FP} data-testid="sync.cert-fingerprint">
-                  {fingerprint}
-                </span>
+                {/* Copyable, because comparing it across devices is the whole
+                    point of showing it, and 64 hex characters are not something
+                    anyone should retype. */}
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <span style={{ ...FP, userSelect: "all" }} data-testid="sync.cert-fingerprint">
+                    {fingerprint}
+                  </span>
+                  <IconButton
+                    icon="copy"
+                    label={t("sync.endpoint.copyFingerprint")}
+                    onClick={() => copyFingerprint(fingerprint)}
+                    testId="sync.cert-fingerprint-copy"
+                  />
+                </div>
               </>
             )}
             {pinSource && (

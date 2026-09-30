@@ -13,7 +13,7 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { UNKNOWN_CONFLICT_ORIGINAL } from "../sidebarState";
 import { DiffView } from "./DiffView";
 import { Button } from "../../components/primitives/Button";
-import { Icon } from "../../components/primitives/Icon";
+import { EmptyState } from "../../components/primitives/EmptyState";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -60,17 +60,6 @@ const ACTIONS: CSSProperties = {
 // Ghost + danger tone for the one destructive action, so it stays low-emphasis
 // (not a filled red button) but still reads as "this removes something".
 const DISCARD_BTN: CSSProperties = { color: "var(--danger)" };
-
-const EMPTY: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  color: "var(--fg-3)",
-  fontSize: "var(--text-sm)",
-  padding: "var(--space-5)",
-  textAlign: "center",
-};
 
 // --- compare surface ---------------------------------------------------------
 
@@ -344,10 +333,14 @@ export function ConflictsView({
   }
   if (groups.size === 0) {
     return (
-      <div style={EMPTY} data-testid="conflicts.empty">
-        <Icon name="circle-check" size={30} style={{ color: "var(--fg-3)" }} />
-        <span>{t("sync.conflicts.empty")}</span>
-      </div>
+      <EmptyState
+        variant="firstRun"
+        icon="circle-check"
+        size="sm"
+        title={t("sync.conflicts.emptyTitle")}
+        body={t("sync.conflicts.empty")}
+        testId="conflicts.empty"
+      />
     );
   }
   return (

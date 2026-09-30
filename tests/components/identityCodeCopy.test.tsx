@@ -84,7 +84,15 @@ function expectedIdentityPhrase(): string {
   return Array.from({ length: PHRASE_CELL_COUNT }, (_, index) => `word${index + 1}`).join(" ");
 }
 
+/** The 24-word grid sits behind the card's Unlock button, closed by default so
+ *  the panel does not open on twenty-four empty fields. */
+function openUnlock(): void {
+  const open = screen.queryByTestId("member-roster.person-unlock-open");
+  if (open) fireEvent.click(open);
+}
+
 function fillPhrase(): void {
+  openUnlock();
   for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
     fireEvent.change(
       screen.getByTestId(

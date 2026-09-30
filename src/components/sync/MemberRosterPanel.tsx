@@ -32,6 +32,8 @@ function syncErrorKind(e: unknown): string | null {
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
+import { Icon } from "../primitives/Icon";
 import { Input } from "../primitives/Input";
 import { MULTILINE_STYLE } from "../settings/panel-styles";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
@@ -96,6 +98,31 @@ const ROW_ACTION_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+/** The raised surface the identity block sits on, the card every first-run
+ *  and settings form puts its working content on. */
+const CARD_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-4)",
+  padding: "var(--space-4) var(--space-5)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-3)",
+};
+
+/** A card's head: what the block is on the left, its action on the right. */
+const CARD_HEAD_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-4)",
+};
+
+const CARD_TITLE_STYLE: CSSProperties = {
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-medium)",
+  color: "var(--fg-1)",
+};
+
 const ERROR_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--danger)",
@@ -128,6 +155,9 @@ export function MemberRosterPanel({
     lockPerson,
   } = useRoster(personReady);
   const [personError, setPersonError] = useState(false);
+  // Whether the 24-word grid is open. Closed by default: the panel opens on a
+  // one-line statement and an Unlock button, not on twenty-four empty fields.
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [phraseCells, setPhraseCells] = useState<string[]>(() =>
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
@@ -227,53 +257,111 @@ export function MemberRosterPanel({
     </Button>
   );
 
+  // Step 3's control, defined once: an empty roster offers it inside its empty
+  // state (inviting IS the next step there), a populated one under the list.
+  // Owner-only: a member is never shown an admin control they cannot use (the
+  // backend refuses with `NotOwner`).
+  const inviteButton =
+    authority === "owner" ? (
+      <Button
+        type="button"
+        variant="primary"
+        data-testid="member-roster.invite-button"
+        disabled={!personReady || inviting}
+        onClick={() => setInviteOpen(true)}
+      >
+        {t("sync.memberRoster.invite")}
+      </Button>
+    ) : null;
+
   return (
-    <div data-testid="member-roster">
+    <div
+      data-testid="member-roster"
+      style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+    >
       {/* Step 1: the person identity. One unlock per process. */}
       {!personReady ? (
-        <div data-testid="member-roster.person-unlock" style={SECTION_STYLE}>
-          <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
-          {/* No `label` override: this panel's own sentence above is the
-              explanation, and passing the same key here rendered it a SECOND
-              time as the grid's field label (myne-md/myne#764). The primitive's
-              default label ("Recovery phrase") plus its default hint carry the
-              field itself. */}
-          <EnrollPhraseCredential
-            baseId="member-roster"
-            cells={phraseCells}
-            onCellChange={handlePhraseCellChange}
-            onCellPaste={handlePhraseCellPaste}
-            gridTestId="member-roster.phrase-grid"
-            cellTestId={(index) =>
-              index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`
-            }
-          />
-
-          <Button
-            type="button"
-            variant="primary"
-            data-testid="member-roster.person-unlock-button"
-            disabled={!phraseCells.every((cell) => cell.length > 0)}
-            onClick={async () => {
-              const unlockGeneration = getPersonIdentityGeneration();
-              try {
-                const view = await unlockPerson(buildPhraseCredential(phraseCells));
-                if (!setPersonIdentityStateForGeneration(unlockGeneration, {
-                  ready: true,
-                  ownerCode: view.identity_code,
-                })) {
-                  return;
+        <div data-testid="member-roster.person-unlock" style={CARD_STYLE}>
+          <div style={CARD_HEAD_STYLE}>
+            <span style={{ display: "flex", color: "var(--fg-3)" }}>
+              <Icon name="lock" size={16} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={CARD_TITLE_STYLE}>{t("sync.memberRoster.personLockedTitle")}</div>
+              <p style={{ ...STATUS_STYLE, margin: 0, marginTop: "var(--space-1)" }}>
+                {t("sync.memberRoster.personHint")}
+              </p>
+            </div>
+            {!unlockOpen && (
+              <Button
+                type="button"
+                variant="secondary"
+                data-testid="member-roster.person-unlock-open"
+                style={ROW_ACTION_STYLE}
+                onClick={() => setUnlockOpen(true)}
+              >
+                {t("sync.memberRoster.personUnlockOpen")}
+              </Button>
+            )}
+          </div>
+          {unlockOpen && (
+            <>
+              {/* No `label` override: the card's own sentence is the
+                  explanation, and passing the same key here rendered it a
+                  SECOND time as the grid's field label (myne-md/myne#764). */}
+              <EnrollPhraseCredential
+                baseId="member-roster"
+                cells={phraseCells}
+                onCellChange={handlePhraseCellChange}
+                onCellPaste={handlePhraseCellPaste}
+                gridTestId="member-roster.phrase-grid"
+                cellTestId={(index) =>
+                  index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`
                 }
-                setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                setPersonError(false);
-                setCopyFeedback(null);
-              } catch {
-                setPersonError(true);
-              }
-            }}
-          >
-            {t("sync.memberRoster.personUnlock")}
-          </Button>
+              />
+              <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="member-roster.person-unlock-cancel"
+                  onClick={() => {
+                    setUnlockOpen(false);
+                    setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                    setPersonError(false);
+                  }}
+                >
+                  {t("sync.memberRoster.personUnlockCancel")}
+                </Button>
+                <div style={{ flex: 1 }} />
+                <Button
+                  type="button"
+                  variant="primary"
+                  data-testid="member-roster.person-unlock-button"
+                  disabled={!phraseCells.every((cell) => cell.length > 0)}
+        onClick={async () => {
+          const unlockGeneration = getPersonIdentityGeneration();
+          try {
+            const view = await unlockPerson(buildPhraseCredential(phraseCells));
+            if (!setPersonIdentityStateForGeneration(unlockGeneration, {
+              ready: true,
+              ownerCode: view.identity_code,
+            })) {
+              return;
+            }
+            setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                setUnlockOpen(false);
+            setPersonError(false);
+            setCopyFeedback(null);
+          } catch {
+            setPersonError(true);
+          }
+        }}
+                >
+                  {t("sync.memberRoster.personUnlock")}
+                </Button>
+              </div>
+            </>
+          )}
           {personError ? (
             <p data-testid="member-roster.person-error" style={ERROR_STYLE}>
               {t("sync.memberRoster.personError")}
@@ -343,9 +431,15 @@ export function MemberRosterPanel({
           no per-row Remove button renders, and the notice below states the
           disabled state instead of promising a flow that cannot run. */}
       {members.length === 0 ? (
-        <p data-testid="member-roster.empty" style={STATUS_STYLE}>
-          {t("sync.memberRoster.empty")}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="user"
+          size="sm"
+          title={t("sync.memberRoster.emptyTitle")}
+          body={t("sync.memberRoster.empty")}
+          action={inviteButton}
+          testId="member-roster.empty"
+        />
       ) : (
         <>
           {groupKeyEpoch !== null ? (
@@ -447,16 +541,8 @@ export function MemberRosterPanel({
 
       {/* Step 3: invite. Owner-only: a member is never shown an admin
           control they cannot use (the backend refuses with `NotOwner`). */}
-      {authority === "owner" ? (
-        <Button
-          type="button"
-          variant="primary"
-          data-testid="member-roster.invite-button"
-          disabled={!personReady || inviting}
-          onClick={() => setInviteOpen(true)}
-        >
-          {t("sync.memberRoster.invite")}
-        </Button>
+      {members.length > 0 && inviteButton ? (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>{inviteButton}</div>
       ) : null}
 
       {inviteOpen ? (

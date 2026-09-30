@@ -3187,7 +3187,7 @@
     },
     "ribbonCustomize": {
       "add": "Add",
-      "empty": "No commands on the ribbon yet. Use Add to pin one.",
+      "empty": "Use Add to pin a command to the ribbon.",
       "errorSave": "Could not save the ribbon setting.",
       "helper": "The commands on the left ribbon, in order. Drag to reorder, add more from the command list, or remove with the ×. The rail hides commands unavailable in the current state.",
       "label": "Left ribbon",
@@ -3197,7 +3197,8 @@
       "searchPlaceholder": "Search commands…",
       "searchResultsLabel": "Matching commands",
       "showHelper": "Show the left ribbon on this device.",
-      "showLabel": "Show left ribbon"
+      "showLabel": "Show left ribbon",
+      "emptyTitle": "Nothing pinned yet"
     },
     "language": {
       "helper": "Choose the display language for the app.",
@@ -3628,7 +3629,7 @@
     "search": {
       "placeholder": "Search settings…",
       "ariaLabel": "Search settings",
-      "empty": "No settings match “{{query}}”.",
+      "empty": "No settings match “{{query}}”",
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
@@ -3703,7 +3704,8 @@
         "timezone": "timezone time zone tz utc iana region today",
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
         "syncMembers": "members, share, invite, team, collaboration, vault"
-      }
+      },
+      "emptyBody": "Try a shorter word, or the name of a panel."
     },
     "dateTime": {
       "dateLabel": "Date format",
@@ -3784,14 +3786,15 @@
       "compareTheirs": "Conflicting copy",
       "compareTitle": "Comparing “{{title}}”",
       "discard": "Discard",
-      "empty": "No conflicts. Your devices are in sync.",
+      "empty": "Your devices are in sync.",
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",
       "groupTitle_other": "{{count}} conflicting copies of {{original}}",
       "keepAsSeparate": "Keep as separate",
       "tookTheirsToast": "Local version moved to Trash.",
       "tookTheirsUndo": "Undo",
       "untitled": "Untitled ({{hex}})",
-      "useThisVersion": "Use this version"
+      "useThisVersion": "Use this version",
+      "emptyTitle": "No conflicts"
     },
     "deviceJoinQr": {
       "accountLabel": "Account number",
@@ -3809,7 +3812,7 @@
       "awaitingApproval_one": "{{count}} device awaiting approval",
       "awaitingApproval_other": "{{count}} devices awaiting approval",
       "loading": "Loading…",
-      "noDevices": "No devices synced yet.",
+      "noDevices": "No other devices yet",
       "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
       "platform": {
         "android": "Android phone",
@@ -3852,7 +3855,8 @@
       "verifySyncing": "Syncing…",
       "verifyTitle": "Verify the new device",
       "verifyAction": "Compare code",
-      "yourDevices": "Your devices"
+      "yourDevices": "Your devices",
+      "noDevicesBody": "Devices you add to this account appear here, with the date each last synced."
     },
     "members": {
       "title": "Members & Security",
@@ -3880,7 +3884,10 @@
       "fixedOriginNone": "No sync server is configured for this deployment.",
       "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Couldn’t reach that server. Check the URL and that it’s running."
+      "unreachable": "Couldn’t reach that server. Check the URL and that it’s running.",
+      "copyFingerprint": "Copy fingerprint",
+      "fingerprintCopied": "Fingerprint copied.",
+      "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand."
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -3983,7 +3990,7 @@
         "deleteConfirmTitle": "Delete this recovered note?",
         "deleteConfirmWarning": "This permanently deletes the only copy kept on this device. This cannot be undone.",
         "deleteCta": "Delete",
-        "empty": "No recovered notes.",
+        "empty": "No recovered notes",
         "errorGeneric": "Something went wrong. Try again.",
         "helper": "When a note deleted on another device is removed here, its encrypted copy is kept on this device. Restore one as a new note, or delete it permanently.",
         "label": "Recovered notes",
@@ -4073,8 +4080,8 @@
       "transportError": "Couldn't reach the sync server. If the server moved or its certificate changed, re-connect it from the Sync server screen.",
       "retiredSelf": "This device was removed from another device.",
       "resetAndAddAgain": "Reset and add again",
-      "noDevices": "No devices yet.",
-      "syncingHere": "Syncing here"
+      "syncingHere": "Syncing here",
+      "noDevices": "No devices yet."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict needs review",
@@ -4091,7 +4098,7 @@
       "loading": "Loading members…",
       "error": "Could not read the vault roster.",
       "hint": "Members of this vault. Each joins with their own identity and credentials.",
-      "empty": "No members yet. Inviting someone is the next step.",
+      "empty": "Invite someone to share this vault. They join with their own identity.",
       "rotated": "Key rotated",
       "keyChanged": "Key changed. Verify with the owner.",
       "relinkConfirmed": "Relink confirmed by owner",
@@ -4108,7 +4115,7 @@
       "invitationPending": "Not accepted yet",
       "invitationsFailed": "Could not load your invitations.",
       "title": "Vault members",
-      "personHint": "Unlock your member identity with your recovery phrase.",
+      "personHint": "Unlock it with your identity's recovery phrase to invite or manage members.",
       "personUnlock": "Unlock member identity",
       "personReady": "Member identity unlocked.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
@@ -4125,7 +4132,11 @@
       "mldsaLabel": "ML-DSA public key",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
-      "removeFailed": "The member could not be removed."
+      "removeFailed": "The member could not be removed.",
+      "emptyTitle": "No members yet",
+      "personLockedTitle": "Member identity locked",
+      "personUnlockOpen": "Unlock",
+      "personUnlockCancel": "Cancel"
     }
   },
   "tasks": {
