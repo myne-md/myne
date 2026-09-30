@@ -20,6 +20,7 @@ import {
   dragRegionProps,
   TITLE_BAR_CONTROL_HEIGHT,
   TITLE_BAR_CONTROL_TOP,
+  TITLE_BAR_RIGHT_EDGE,
 } from "../../screens/titlebar";
 import {
   useState,
@@ -269,7 +270,12 @@ export function TabStrip({
       style={{
         ...stripStyle,
         paddingInlineStart: STRIP_BASE_PADDING_LEFT + insetLeft,
-        paddingInlineEnd: insetRight,
+        // Never flush against the edge. `insetRight` clears the floated
+        // right-side controls when the right sidebar is collapsed (and already
+        // includes their edge offset); when it is 0 the strip's own caret is the
+        // last control on the row, and it takes the same edge offset the
+        // right-sidebar toggle uses so the two land on one line.
+        paddingInlineEnd: insetRight > 0 ? insetRight : TITLE_BAR_RIGHT_EDGE,
         // The insets clear the floated window controls (traffic lights /
         // sidebar toggles / back-forward nav) when a side has no sidebar, so
         // they flip with the sidebar's collapsed state. Transition them on the
