@@ -4623,7 +4623,10 @@
     "renameCancel": "Cancel",
     "renamePlaceholder": "Account name",
     "renameSave": "Rename",
-    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed.",
+    "createShort": "New vault",
+    "joinShort": "Add device",
+    "restoreShort": "Restore backup"
   },
   "vaultRecover": {
     "decrypting": {
