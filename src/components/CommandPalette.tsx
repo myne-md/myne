@@ -336,6 +336,13 @@ export function CommandPalette({
   // Highlighted autocomplete suggestion (#207/#208). Arrows move it while the
   // suggestion strip is open; Enter/Tab complete it.
   const [suggestIndex, setSuggestIndex] = useState(0);
+  // Which side the arrow keys are on while the strip is open. The strip and the
+  // result list are ONE vertical list to the keyboard: ArrowDown off the last
+  // suggestion lands on the first result, ArrowUp off the first result goes
+  // back to the strip. It used to trap the arrows in the strip, so with a
+  // single suggestion ("section:" for a bare "s") Up and Down cycled one row
+  // and no result was reachable from the keyboard at all.
+  const [inSuggest, setInSuggest] = useState(true);
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
@@ -724,24 +731,38 @@ export function CommandPalette({
       // or a tag/folder value. Enter on a no-op completion (the token already IS
       // the value) falls through to run the search instead.
       if (suggestions.length > 0) {
-        if (e.key === "ArrowDown") {
+        const last = suggestions.length - 1;
+        if (e.key === "ArrowDown" && inSuggest) {
           e.preventDefault();
-          setSuggestIndex((i) => (i + 1) % suggestions.length);
+          if (suggestIndex >= last && rows.length > 0) {
+            setInSuggest(false);
+            setSelectedIndex(0);
+          } else {
+            setSuggestIndex((i) => Math.min(i + 1, last));
+          }
           return;
         }
-        if (e.key === "ArrowUp") {
+        if (e.key === "ArrowUp" && inSuggest) {
           e.preventDefault();
-          setSuggestIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+          setSuggestIndex((i) => Math.max(i - 1, 0));
           return;
         }
-        const active = suggestions[Math.min(suggestIndex, suggestions.length - 1)];
+        if (e.key === "ArrowUp" && !inSuggest && selectedIndex === 0) {
+          e.preventDefault();
+          setInSuggest(true);
+          setSuggestIndex(last);
+          return;
+        }
+        const active = suggestions[Math.min(suggestIndex, last)];
+        // Tab completes from either side: the strip's own hint promises it.
         if (e.key === "Tab") {
           e.preventDefault();
           setQuery(active.next);
           setSuggestIndex(0);
+          setInSuggest(true);
           return;
         }
-        if (e.key === "Enter" && active.next !== query) {
+        if (e.key === "Enter" && inSuggest && active.next !== query) {
           e.preventDefault();
           setQuery(active.next);
           setSuggestIndex(0);
@@ -784,7 +805,7 @@ export function CommandPalette({
         return;
       }
     },
-    [rows, selectedIndex, runRow, close, flushNoteSearch, suggestions, suggestIndex, query, togglePin],
+    [rows, selectedIndex, runRow, close, flushNoteSearch, suggestions, suggestIndex, inSuggest, query, togglePin],
   );
 
   const onBackdropClick = useCallback(
@@ -818,6 +839,7 @@ export function CommandPalette({
             setQuery(e.target.value);
             setSelectedIndex(0);
             setSuggestIndex(0);
+            setInSuggest(true);
           }}
           onKeyDown={onKeyDown}
           placeholder={t("commandPalette.searchPlaceholder")}
@@ -846,7 +868,7 @@ export function CommandPalette({
         {suggestions.length > 0 && (
           <div style={SUGGEST_LIST_STYLE} data-testid="palette.operator-suggestions">
             {suggestions.map((s, i) => {
-              const active = i === Math.min(suggestIndex, suggestions.length - 1);
+              const active = inSuggest && i === Math.min(suggestIndex, suggestions.length - 1);
               return (
                 <button
                   key={s.key}
@@ -857,7 +879,10 @@ export function CommandPalette({
                   }}
                   data-testid="palette.operator-suggestion"
                   data-active={active ? "true" : "false"}
-                  onMouseEnter={() => setSuggestIndex(i)}
+                  onMouseEnter={() => {
+                    setSuggestIndex(i);
+                    setInSuggest(true);
+                  }}
                   // onMouseDown, not onClick: fires before the input blurs, so the
                   // caret + query survive the completion.
                   onMouseDown={(e) => {
@@ -917,7 +942,7 @@ export function CommandPalette({
                   {renderRow(
                     row,
                     i,
-                    i === selectedIndex,
+                    i === selectedIndex && !(suggestions.length > 0 && inSuggest),
                     runRow,
                     t,
                     row.kind === "note" && row.attachmentId === null

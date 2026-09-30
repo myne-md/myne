@@ -296,6 +296,34 @@ describe("CommandPalette UI", () => {
     expect(rows[rows.length - 1]!.getAttribute("aria-selected")).toBe("true");
   });
 
+  // The operator strip and the results are ONE list to the arrow keys. With a
+  // single suggestion ("s" offers only "section:") the arrows used to cycle
+  // that one row forever, and no result was reachable from the keyboard.
+  it("arrows leave a one-row suggestion strip for the results and come back", () => {
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    const input = screen.getByRole("dialog").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "s" } });
+    const strip = screen.getAllByTestId("palette.operator-suggestion");
+    expect(strip.length).toBeGreaterThan(0);
+    const selected = () =>
+      Array.from(screen.getByRole("listbox").querySelectorAll("[role='option']")).findIndex(
+        (r) => r.getAttribute("aria-selected") === "true",
+      );
+    // On open the strip is active and no result claims the highlight.
+    expect(strip[0]!.getAttribute("data-active")).toBe("true");
+    expect(selected()).toBe(-1);
+    for (let i = 0; i < strip.length; i += 1) fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(selected()).toBe(0);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(selected()).toBe(1);
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(selected()).toBe(-1);
+    expect(
+      screen.getAllByTestId("palette.operator-suggestion").some((r) => r.getAttribute("data-active") === "true"),
+    ).toBe(true);
+  });
+
   it("disabled stub action cannot be invoked via Enter", async () => {
     const ctx = buildCtx({
       stageName: "editor",
