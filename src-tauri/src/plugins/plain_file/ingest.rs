@@ -3,19 +3,33 @@
 //! One funnel for every path that arrives from outside the WebView:
 //! Windows/Linux file-association argv (including the second-launch argv the
 //! single-instance plugin forwards), the macOS `RunEvent::Opened` file URLs,
-//! and (a later task) the in-app dialog, the CLI command and the confirmed
-//! deep link. Each funnels into [`ingest_paths`], which is the only place that
-//! calls `PlainFileRegistry::open` on a path this app did not itself produce.
+//! the in-app dialog, the CLI command and the confirmed deep link. Each
+//! funnels into [`ingest_paths`], which is the only place that calls
+//! `PlainFileRegistry::open` on a path this app did not itself produce.
+//!
+//! **The drag ingress is deliberately not wired here.** Tauri's native
+//! `WindowEvent::DragDrop` requires `dragDropEnabled: true`, and enabling it
+//! consumes every OS file drop at the wry layer (`tauri-runtime-wry`'s
+//! handler returns `true` unconditionally): the WebView stops receiving the
+//! HTML5 `DataTransfer` that MYND-629's drag-import and the sidebar's
+//! HTML5 reorder both depend on, and on Windows wry additionally disables
+//! external drops outright (`SetAllowExternalDrop(false)`). The main window
+//! therefore keeps `dragDropEnabled: false` (`design-notes/storage/0151`;
+//! `src/notes/dropImport.ts`), and a drop cannot carry a filesystem path the
+//! WebView could hand back. Wiring drag means re-basing those two flows
+//! first; see the feature's tasks.md task 10.
 //!
 //! **Silent while off or refused.** A gate-off request, an unsupported
 //! extension or an unreadable file produces no event and no dialog: the only
 //! channel to the user here would be a window that may not exist yet, and the
 //! design decision is that the gate-off state is invisible by construction.
-//! The in-app dialog path (a later task) is where a refusal gets a message,
-//! because there the user is looking at the app.
+//! [`ingest_paths_reporting`] exists for the callers where the user IS looking
+//! at the app (the dialog, the CLI, the confirmed deep link), which translate
+//! the typed refusal into their own surface.
 
 use super::commands::SharedRegistry;
 use super::gate::{gate_path_in, read_gate};
+use super::handles::PlainFileError;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, Runtime, Url};
 
@@ -55,25 +69,54 @@ pub fn ingest_urls<R: Runtime>(app: &AppHandle<R>, urls: Vec<Url>) {
 ///
 /// First-match-wins rather than opening several: a file-association launch
 /// with more than one file is a bulk action, and v1's honest answer for it is
-/// one tab, not a silent fan-out of N windows nobody asked for.
+/// one tab, not a silent fan-out of N windows nobody asked for. Fire and
+/// forget: the OS ingresses have no user to answer, so [`ingest_paths`] keeps
+/// this module's silent posture and [`ingest_paths_reporting`] carries the
+/// typed outcome for the callers that do.
 pub fn ingest_paths<R: Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
-    let Ok(config_dir) = app.path().app_config_dir() else {
-        return;
-    };
+    let _ = ingest_paths_reporting(app, paths);
+}
+
+/// [`ingest_paths`] with its outcome returned.
+///
+/// `Ok(())` means a handle was minted and the event emitted. `Err` is the last
+/// refusal seen; it is a [`PlainFileError`], so it carries a closed enum and
+/// never a path or file content (the DENY list in `src-tauri/AGENTS.md`).
+/// An empty list is `Ok(())`: no path was asked about, nothing to refuse.
+pub fn ingest_paths_reporting<R: Runtime>(
+    app: &AppHandle<R>,
+    paths: Vec<PathBuf>,
+) -> Result<(), PlainFileError> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| PlainFileError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
     if !read_gate(&gate_path_in(&config_dir)) {
-        return;
+        return Err(PlainFileError::GateOff);
     }
     let registry = app.state::<SharedRegistry>();
+    let mut last_refusal = PlainFileError::NotAFile;
     let Ok(mut guard) = registry.lock().map_err(|_| ()) else {
-        return;
+        return Err(PlainFileError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        });
     };
     for path in paths {
-        if let Ok(opened) = guard.open(&config_dir, &path) {
-            // Best-effort: the frontend also drains `take_unclaimed` on mount,
-            // so an emit into a WebView that is not listening yet loses
-            // nothing.
-            let _ = app.emit_to(MAIN_WINDOW, OPENED_EVENT, &opened);
-            break;
+        match guard.open(&config_dir, &path) {
+            Ok(opened) => {
+                // Best-effort: the frontend also drains `take_unclaimed` on
+                // mount, so an emit into a WebView that is not listening yet
+                // loses nothing.
+                let _ = app.emit_to(MAIN_WINDOW, OPENED_EVENT, &opened);
+                return Ok(());
+            }
+            Err(refusal) => last_refusal = refusal,
         }
     }
+    Err(last_refusal)
 }

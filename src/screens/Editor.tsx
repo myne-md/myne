@@ -127,6 +127,7 @@ import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import { onExitIntent, setUnsavedGuard } from "../platform/exit-signals";
 import { takeDeepLinkNoteId, useNoteRoute } from "../lib/routing";
+import { takeRequestedNoteOpen } from "../notes/pendingNoteOpen";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   noteList,
@@ -4286,6 +4287,13 @@ function SidebarBootstrap() {
           .catch(() => {});
         const target = takeDeepLinkNoteId();
         if (target !== null && ids.includes(target)) ctx.select(target);
+        // The plain-file Import action (myne-md/myne#788) creates its note
+        // while this screen is unmounted (the plain surface renders INSTEAD of
+        // the stage), so it leaves a one-shot request that lands here. Checked
+        // against the live list for the same reason the deep link is: the note
+        // may have been deleted before the surface closed.
+        const imported = takeRequestedNoteOpen();
+        if (imported !== null && ids.includes(imported)) ctx.select(imported);
       } catch (e) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console

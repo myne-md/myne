@@ -1,10 +1,17 @@
 // The plain-file editor seam: desktop implementation (myne-md/myne#788).
 //
-// The commands take an OPAQUE HANDLE and never a path: a path only enters Rust
-// from an OS ingress or a native dialog, where it is canonicalised and minted.
-// The WebView therefore cannot name a file this surface will touch, which is
-// what makes "sandboxed" structural rather than a promise. See
+// The handle commands take an OPAQUE HANDLE and never a path: a path enters
+// Rust from an OS ingress, where it is canonicalised and minted, and the
+// WebView cannot name a file those commands will touch. See
 // `src-tauri/src/plugins/plain_file/handles.rs`.
+//
+// The two ingress-shaped exceptions are deliberate and narrow. A
+// `myne://open-file` URL is delivered to the WebView by the OS, so the deep
+// link's path necessarily passes through JS: `plainFileResolvePath` returns
+// only the RESOLVED canonical path (for the confirmation layer, so the user
+// sees the real target), and `plainFileOpenConfirmed` re-validates from
+// scratch host-side before anything is read. `plainFileOpenDialog` returns
+// nothing at all: the native dialog runs host-side.
 //
 // The gate (`plainFileGateGet` / `plainFileGateSet`) is a device-local JSON
 // file, its own file rather than a `vault.prefs` field, because the surface it
@@ -96,4 +103,59 @@ export async function plainFileWrite(
 /** Drop a handle. Idempotent. */
 export async function plainFileClose(handle: number): Promise<void> {
   await invoke<void>("plugin:plain-file|plain_file_close", { handle });
+}
+
+/**
+ * Save the buffer to a file the user names (the conflict banner's copy arm).
+ *
+ * The native save dialog runs host-side, so no path crosses IPC in either
+ * direction. Resolves to the written file's NAME, or `null` when the dialog
+ * was cancelled.
+ */
+export async function plainFileSaveCopy(
+  handle: number,
+  content: string,
+): Promise<string | null> {
+  return await invoke<string | null>("plugin:plain-file|plain_file_save_copy", {
+    handle,
+    content,
+  });
+}
+
+/**
+ * The in-app Open: a native Markdown-filtered dialog, then the shared ingest.
+ *
+ * The picked file arrives through the same `plain-file:opened` event every
+ * other ingress uses; no path is returned to the WebView. A cancelled dialog
+ * resolves normally. Rejects with the plugin's typed refusal (gate off,
+ * unsupported type, too large, unreadable).
+ */
+export async function plainFileOpenDialog(): Promise<void> {
+  await invoke<void>("plugin:plain-file|plain_file_open_dialog");
+}
+
+/**
+ * Canonicalise a caller-named path for the deep link's confirmation layer.
+ *
+ * `path` comes from a `myne://open-file` URL, which any website can mint, so
+ * the host gate-checks it and answers with the RESOLVED canonical path: the
+ * confirmation shows what would actually open, not what the link claimed.
+ * Reads no content and mints no handle.
+ */
+export async function plainFileResolvePath(path: string): Promise<string> {
+  return await invoke<string>("plugin:plain-file|plain_file_resolve_path", {
+    path,
+  });
+}
+
+/**
+ * The deep link's confirmed open.
+ *
+ * The host re-checks the gate, the extension and the size cap on the
+ * canonical path and funnels the file through the same ingest every OS
+ * ingress uses. Nothing opens before this call, and the tab arrives through
+ * `plain-file:opened` rather than as a return value.
+ */
+export async function plainFileOpenConfirmed(path: string): Promise<void> {
+  await invoke<void>("plugin:plain-file|plain_file_open_confirmed", { path });
 }

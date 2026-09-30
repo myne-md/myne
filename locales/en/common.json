@@ -2548,11 +2548,28 @@
     "closeTab": "Close {{name}}",
     "conflict": {
       "body": "This file changed on disk while you were editing. Myne has not written anything.",
+      "copy": "Save a copy…",
+      "copyFailed": "The copy could not be saved. The original file is unchanged.",
       "overwrite": "Overwrite with my changes",
       "reload": "Reload from disk"
     },
+    "deeplink": {
+      "body": "It lives outside every vault, so Myne will not encrypt it.",
+      "cancel": "Cancel",
+      "confirm": "Open",
+      "failed": "The file could not be opened. It may have moved or changed.",
+      "title": "Open this local file?"
+    },
     "empty": "No file is open.",
+    "import": "Import to vault",
+    "importFailed": "The file could not be imported. Nothing was changed.",
+    "importLocked": "The vault is locked. Unlock it, then try again.",
+    "importNeedsVault": "There is no vault on this device yet. Create one, then try again.",
     "marker": "Local file. Not encrypted, and not part of any vault.",
+    "open": "Open a local file",
+    "openFailed": "That file could not be opened.",
+    "openRefusedTooLarge": "That file is too large to open here.",
+    "openRefusedType": "Only .md and .markdown files open here.",
     "retry": "Try saving again",
     "saveError": "The file could not be saved. Your edits are still here.",
     "tabs": "Open local files"

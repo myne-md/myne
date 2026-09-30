@@ -163,6 +163,27 @@ impl MyneBackend for IpcBackend {
         }
         Err(map_wire_error(response.error))
     }
+
+    fn open(&self, path: &str) -> Result<(), BackendError> {
+        let response = self.request(&wire::Request::Open {
+            path: path.to_string(),
+        })?;
+        if response.ok {
+            return Ok(());
+        }
+        let error = map_wire_error(response.error);
+        // `not_found` is the shared kind for "the thing you named is not
+        // there", and its human sentence ("No matching note.") is written for
+        // a note id. For `open` the thing named is a file, so the wording is
+        // restated here rather than by changing the shared table every other
+        // command reads. The envelope kind a script sees stays `not_found`
+        // for a missing file and `io` for everything else — the message is
+        // the human half.
+        Err(match error {
+            BackendError::NotFound => BackendError::Io("No file at that path.".to_string()),
+            other => other,
+        })
+    }
 }
 
 /// Map a failure reply's wire `kind` onto the transport-independent
@@ -181,6 +202,7 @@ fn map_wire_error(error: Option<wire::WireError>) -> BackendError {
         Some("not_found") => BackendError::NotFound,
         Some("folder_excluded") => BackendError::FolderExcluded,
         Some("rate_limited") => BackendError::RateLimited,
+        Some("plain_file_off") => BackendError::PlainFileOff,
         _ => BackendError::Io(
             error
                 .map(|e| e.message)
@@ -765,5 +787,93 @@ mod tests {
         assert_eq!(value["cmd"], "period_append");
         assert_eq!(value["period"], "daily");
         assert_eq!(value["line"], "captured thought");
+    }
+
+    #[test]
+    fn open_no_app_data_dir_is_app_not_running() {
+        let backend = IpcBackend { app_data_dir: None };
+        assert_eq!(
+            backend.open("/tmp/note.md"),
+            Err(BackendError::AppNotRunning)
+        );
+    }
+
+    #[test]
+    fn open_marker_disabled_with_no_socket_is_cli_disabled() {
+        let dir = ShortDir::new("open-disabled");
+        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Err(BackendError::CliDisabled));
+    }
+
+    #[test]
+    fn open_marker_locked_with_no_socket_is_vault_locked() {
+        let dir = ShortDir::new("open-locked");
+        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Err(BackendError::VaultLocked));
+    }
+
+    #[test]
+    fn real_socket_open_ok_resolves_unit() {
+        let dir = ShortDir::new("open-ok");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(listener, br#"{"ok":true}"#.to_vec());
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Ok(()));
+    }
+
+    #[test]
+    fn real_socket_open_plain_file_off_maps_through() {
+        let dir = ShortDir::new("open-off");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(
+            listener,
+            br#"{"ok":false,"error":{"kind":"plain_file_off","message":"x"}}"#.to_vec(),
+        );
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(
+            backend.open("/tmp/note.md"),
+            Err(BackendError::PlainFileOff)
+        );
+    }
+
+    #[test]
+    fn real_socket_open_not_found_is_restated_for_a_file() {
+        // The shared `not_found` sentence is written for a note id. An `open`
+        // whose file is missing must not tell the user "No matching note."
+        let dir = ShortDir::new("open-missing");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(
+            listener,
+            br#"{"ok":false,"error":{"kind":"not_found","message":"x"}}"#.to_vec(),
+        );
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        match backend.open("/tmp/gone.md") {
+            Err(BackendError::Io(message)) => {
+                assert!(!message.to_lowercase().contains("note"), "{message:?}");
+            }
+            other => panic!("expected Io, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_request_carries_the_path() {
+        let dir = ShortDir::new("open-path");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let body = framing::read_frame(&mut stream).unwrap();
+                tx.send(body).unwrap();
+                let _ = framing::write_frame(&mut stream, br#"{"ok":true}"#);
+            }
+        });
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        backend.open("/tmp/wanted.md").unwrap();
+        let sent = rx.recv().unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&sent).unwrap();
+        assert_eq!(value["cmd"], "open");
+        assert_eq!(value["path"], "/tmp/wanted.md");
     }
 }

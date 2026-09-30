@@ -36,6 +36,14 @@ use std::path::{Path, PathBuf};
 /// CANONICAL path (what actually gets edited, not the name the user clicked).
 pub const ALLOWED_EXTENSIONS: &[&str] = &["md", "markdown"];
 
+/// Largest file the surface will open.
+///
+/// The editor holds the whole file in the WebView, so the cap bounds what a
+/// mistaken `myne open` or a hand-edited deep link can push through IPC. It
+/// is enforced from the file's metadata BEFORE any read, so an oversized file
+/// costs one `stat`, not a 64 MiB allocation followed by a refusal.
+pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
+
 /// Failure surface. Closed, so the UI switches on it rather than reading prose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, thiserror::Error)]
 #[serde(tag = "kind", content = "detail", rename_all = "snake_case")]
@@ -54,6 +62,9 @@ pub enum PlainFileError {
     /// save.
     #[error("the file is not valid UTF-8")]
     NotUtf8,
+    /// The file exceeds [`MAX_FILE_BYTES`]. Refused before any read.
+    #[error("the file is too large")]
+    TooLarge,
     /// The file on disk no longer matches the hash the caller held: an
     /// external edit, a deletion or a replacement.
     #[error("the file changed on disk")]
@@ -143,6 +154,49 @@ fn extension_allowed(path: &Path) -> bool {
         .is_some_and(|e| ALLOWED_EXTENSIONS.iter().any(|a| e.eq_ignore_ascii_case(a)))
 }
 
+/// The size cap as a pure predicate, so a test pins the boundary without
+/// materialising a 64 MiB fixture.
+fn check_size(len: u64) -> Result<(), PlainFileError> {
+    if len > MAX_FILE_BYTES {
+        Err(PlainFileError::TooLarge)
+    } else {
+        Ok(())
+    }
+}
+
+/// Resolve a path a caller named into the canonical file an ingress opens.
+///
+/// The one validation path every externally-named file walks (registry open,
+/// the deep link's pre-confirmation resolve, the confirmed open). The
+/// extension is checked on the RAW name first, so a `.txt` is refused before
+/// any filesystem work, and again on the CANONICAL path, so a symlink named
+/// `notes.md` pointing at `/etc/passwd` is refused for what it is. The size
+/// cap runs on metadata, before any read.
+pub fn resolve_openable(config_dir: &Path, path: &Path) -> Result<PathBuf, PlainFileError> {
+    if !read_gate(&gate_path_in(config_dir)) {
+        return Err(PlainFileError::GateOff);
+    }
+    if !extension_allowed(path) {
+        return Err(PlainFileError::UnsupportedExtension);
+    }
+    let canonical = path.canonicalize().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            PlainFileError::NotAFile
+        } else {
+            io(e)
+        }
+    })?;
+    if !canonical.is_file() {
+        return Err(PlainFileError::NotAFile);
+    }
+    if !extension_allowed(&canonical) {
+        return Err(PlainFileError::UnsupportedExtension);
+    }
+    let len = std::fs::metadata(&canonical).map_err(io)?.len();
+    check_size(len)?;
+    Ok(canonical)
+}
+
 /// One open handle. No `Debug`: the path is a DENY-listed emission class.
 #[derive(Clone)]
 struct Entry {
@@ -203,28 +257,7 @@ impl PlainFileRegistry {
     /// The gate is read per call and never cached: a settings change takes
     /// effect on the next open in the same session.
     pub fn open(&mut self, config_dir: &Path, path: &Path) -> Result<OpenedFile, PlainFileError> {
-        if !read_gate(&gate_path_in(config_dir)) {
-            return Err(PlainFileError::GateOff);
-        }
-        if !extension_allowed(path) {
-            return Err(PlainFileError::UnsupportedExtension);
-        }
-        let canonical = path.canonicalize().map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                PlainFileError::NotAFile
-            } else {
-                io(e)
-            }
-        })?;
-        if !canonical.is_file() {
-            return Err(PlainFileError::NotAFile);
-        }
-        // The extension check runs again on the RESOLVED path: a symlink named
-        // `notes.md` pointing at `/etc/passwd` must be refused for what it
-        // actually is, not for what it is called.
-        if !extension_allowed(&canonical) {
-            return Err(PlainFileError::UnsupportedExtension);
-        }
+        let canonical = resolve_openable(config_dir, path)?;
 
         let bytes = std::fs::read(&canonical).map_err(io)?;
         let eol = detect_eol(&bytes);
@@ -327,6 +360,52 @@ impl PlainFileRegistry {
         Ok(hash_bytes(&bytes))
     }
 
+    /// The file name to pre-fill the conflict banner's save-copy dialog with.
+    ///
+    /// Name only, never a path: the dialog runs host-side, so this value does
+    /// not cross IPC (the DENY list in `src-tauri/AGENTS.md`).
+    pub fn copy_name(&self, handle: u64) -> Result<String, PlainFileError> {
+        let entry = self
+            .entries
+            .get(&handle)
+            .ok_or(PlainFileError::UnknownHandle)?;
+        entry
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string)
+            .ok_or(PlainFileError::NotAFile)
+    }
+
+    /// Write `content` to `destination` as a copy of the handle's file.
+    ///
+    /// `destination` is the user's own choice from the native save dialog, so
+    /// it is written exactly as named: no extension or location validation,
+    /// and the file is NOT adopted into the registry. The tab keeps the
+    /// original file, which is the point of this arm. Line endings follow the
+    /// SOURCE file's convention (the buffer is `\n`-normalised host-side), so a
+    /// fresh copy matches the file the text came from rather than the editor's
+    /// internal form. Returns the destination's file NAME, never a path.
+    pub fn write_copy(
+        &self,
+        handle: u64,
+        content: &str,
+        destination: &Path,
+    ) -> Result<String, PlainFileError> {
+        let entry = self
+            .entries
+            .get(&handle)
+            .ok_or(PlainFileError::UnknownHandle)?;
+        let name = destination
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string)
+            .ok_or(PlainFileError::NotAFile)?;
+        let bytes = to_disk_bytes(content, entry.eol);
+        write_copy_to(destination, &bytes)?;
+        Ok(name)
+    }
+
     /// Drop a handle. Closing an unknown handle is a no-op: handle ids are
     /// never reused, so a stale close from a torn-down tab is harmless and
     /// must not surface as an error.
@@ -378,6 +457,38 @@ impl PlainFileRegistry {
 /// leave a sibling holding the user's text at umask mode.
 fn write_atomic_preserving(path: &Path, bytes: &[u8]) -> Result<(), PlainFileError> {
     let perms = std::fs::metadata(path).map_err(io)?.permissions();
+    write_atomic_mode(path, bytes, Some(perms))
+}
+
+/// Write the conflict banner's copy to a destination the user just chose.
+///
+/// Same durability contract as [`write_atomic_preserving`] (collision-safe
+/// `create_new` temp, mode applied AT CREATION, `sync_all`, best-effort temp
+/// cleanup on every failure path), with the one difference a brand-new
+/// destination forces: there is no mode to preserve, so a fresh file is
+/// created owner-only (`0600`) on Unix rather than at the process umask. The
+/// bytes are plaintext the user explicitly asked to copy, so the copy starts
+/// as private as the source file was; replacing an existing destination keeps
+/// that destination's mode.
+fn write_copy_to(path: &Path, bytes: &[u8]) -> Result<(), PlainFileError> {
+    let perms = match std::fs::metadata(path) {
+        Ok(meta) => Some(meta.permissions()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(io(e)),
+    };
+    write_atomic_mode(path, bytes, perms)
+}
+
+/// The temp-write + `sync_all` + rename core, shared by both writers above.
+///
+/// `perms` is `None` only for a brand-new destination; Unix then applies
+/// `0600` at creation and Windows leaves the file as the OS created it, since
+/// there is no existing read-only flag or ACL to carry over.
+fn write_atomic_mode(
+    path: &Path,
+    bytes: &[u8],
+    perms: Option<std::fs::Permissions>,
+) -> Result<(), PlainFileError> {
     let parent = path.parent().ok_or(PlainFileError::NotAFile)?;
     let name = path
         .file_name()
@@ -386,7 +497,7 @@ fn write_atomic_preserving(path: &Path, bytes: &[u8]) -> Result<(), PlainFileErr
     #[cfg(unix)]
     let mode = {
         use std::os::unix::fs::PermissionsExt;
-        perms.mode()
+        perms.as_ref().map(|p| p.mode()).unwrap_or(0o600)
     };
     let mut last = PlainFileError::Io {
         io_error_kind: IoFailureKind::Other,
@@ -406,9 +517,11 @@ fn write_atomic_preserving(path: &Path, bytes: &[u8]) -> Result<(), PlainFileErr
             Err(e) => return Err(io(e)),
         };
         #[cfg(not(unix))]
-        if let Err(e) = file.set_permissions(perms.clone()) {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(io(e));
+        if let Some(perms) = perms.as_ref() {
+            if let Err(e) = file.set_permissions(perms.clone()) {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(io(e));
+            }
         }
         let write_result = (|| -> std::io::Result<()> {
             use std::io::Write;
@@ -697,6 +810,37 @@ mod tests {
         assert!(registry.take_unclaimed().is_empty());
     }
 
+    #[test]
+    fn the_size_cap_is_exclusive_at_the_boundary() {
+        // The helper takes the length, so the boundary is pinned without a
+        // 64 MiB fixture: exactly the cap passes, one byte over is refused.
+        assert_eq!(check_size(MAX_FILE_BYTES), Ok(()));
+        assert_eq!(
+            check_size(MAX_FILE_BYTES + 1),
+            Err(PlainFileError::TooLarge)
+        );
+    }
+
+    #[test]
+    fn an_oversized_file_is_refused_by_open() {
+        // A sparse file is 64 MiB + 1 on paper and almost nothing on disk, so
+        // this exercises the real open path (metadata check BEFORE the read)
+        // rather than only the predicate above.
+        let fixture = Fixture::new("too-large", true);
+        let path = fixture.write_file("huge.md", b"");
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .expect("open for set_len");
+        file.set_len(MAX_FILE_BYTES + 1).expect("set_len");
+
+        let mut registry = PlainFileRegistry::default();
+        assert_eq!(
+            registry.open(fixture.config.path(), &path).map(|_| ()),
+            Err(PlainFileError::TooLarge)
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn write_preserves_the_destination_permissions() {
@@ -713,5 +857,95 @@ mod tests {
 
         let mode = std::fs::metadata(&path).expect("meta").permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn a_copy_lands_with_the_source_line_endings_and_leaves_the_source_alone() {
+        let fixture = Fixture::new("copy", true);
+        let path = fixture.write_file("win.md", b"# one\r\n\r\ntwo\r\n");
+        let mut registry = PlainFileRegistry::default();
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+
+        let destination = fixture.files.path().join("copy.md");
+        let name = registry
+            .write_copy(opened.handle, "# one\n\ntwo edited\n", &destination)
+            .expect("copy");
+        assert_eq!(name, "copy.md");
+        // CRLF because the SOURCE is coherently CRLF, even though the editor
+        // buffer is `\n`-normalised.
+        assert_eq!(
+            std::fs::read(&destination).expect("read"),
+            b"# one\r\n\r\ntwo edited\r\n"
+        );
+        assert_eq!(std::fs::read(&path).expect("read"), b"# one\r\n\r\ntwo\r\n");
+    }
+
+    #[test]
+    fn a_copy_replaces_an_existing_destination() {
+        let fixture = Fixture::new("copy-replace", true);
+        let path = fixture.write_file("note.md", b"# source");
+        let mut registry = PlainFileRegistry::default();
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+
+        let destination = fixture.write_file("target.md", b"# old target");
+        registry
+            .write_copy(opened.handle, "# new target", &destination)
+            .expect("copy");
+        assert_eq!(std::fs::read(&destination).expect("read"), b"# new target");
+    }
+
+    #[test]
+    fn an_unknown_handle_copies_nothing() {
+        let fixture = Fixture::new("copy-unknown", true);
+        let destination = fixture.files.path().join("copy.md");
+        let registry = PlainFileRegistry::default();
+        assert_eq!(
+            registry.write_copy(99, "# text", &destination).map(|_| ()),
+            Err(PlainFileError::UnknownHandle)
+        );
+        assert!(!destination.exists());
+    }
+
+    #[test]
+    fn copy_name_is_the_file_name_and_unknown_handles_are_refused() {
+        let fixture = Fixture::new("copy-name", true);
+        let path = fixture.write_file("note.md", b"# one");
+        let mut registry = PlainFileRegistry::default();
+        assert_eq!(registry.copy_name(99), Err(PlainFileError::UnknownHandle));
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+        assert_eq!(registry.copy_name(opened.handle).expect("name"), "note.md");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_fresh_copy_is_owner_only_and_a_replaced_one_keeps_its_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        let fixture = Fixture::new("copy-mode", true);
+        let path = fixture.write_file("note.md", b"# one");
+        let mut registry = PlainFileRegistry::default();
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+
+        // Fresh destination: 0600, not the umask default.
+        let fresh = fixture.files.path().join("fresh.md");
+        registry
+            .write_copy(opened.handle, "# copied", &fresh)
+            .expect("fresh copy");
+        let fresh_mode = std::fs::metadata(&fresh)
+            .expect("meta")
+            .permissions()
+            .mode();
+        assert_eq!(fresh_mode & 0o777, 0o600);
+
+        // Existing destination: its own mode survives the replace.
+        let existing = fixture.write_file("existing.md", b"# old");
+        std::fs::set_permissions(&existing, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+        registry
+            .write_copy(opened.handle, "# replaced", &existing)
+            .expect("replace copy");
+        let existing_mode = std::fs::metadata(&existing)
+            .expect("meta")
+            .permissions()
+            .mode();
+        assert_eq!(existing_mode & 0o777, 0o644);
     }
 }

@@ -78,6 +78,15 @@ enum Request {
         period: String,
         line: String,
     },
+    /// myne-md/myne#788 (plaintext-file-editor task 11). Opens a local
+    /// markdown file in the plain-file surface of the RUNNING app. `path` is
+    /// the one wire field in this module that is filesystem-shaped: the
+    /// desktop re-validates it (gate, extension on the canonical path, size)
+    /// before anything is read, and this process never reads it on its own
+    /// behalf. See [`OpenFileOutcome`].
+    Open {
+        path: String,
+    },
 }
 
 /// One search hit on the wire: an id + its title, nothing else. No score,
@@ -188,6 +197,28 @@ pub enum DailyAppendOutcome {
     Io,
 }
 
+/// Closed outcome of an `open` request (myne-md/myne#788, task 11).
+///
+/// The gate refusal gets its own wire kind because the CLI's exit-code map is
+/// the user-facing contract ("a script can branch without parsing text"), and
+/// "you have not enabled this feature" is a different situation from a disk
+/// failure. The rest collapse into the kinds the CLI already knows.
+pub enum OpenFileOutcome {
+    /// A handle was minted and the frontend told.
+    Ok,
+    /// The device-local plain-file gate is off — nothing was read.
+    PlainFileOff,
+    /// Not a `.md` / `.markdown` file (checked on the canonical path).
+    UnsupportedFile,
+    /// Missing, a directory, or a name the surface cannot present. Maps to
+    /// the CLI's existing `not_found`, which is what a missing argument path
+    /// most often is.
+    NotFound,
+    /// Over the plain-file size cap; refused before any read.
+    TooLarge,
+    Io,
+}
+
 /// The vault-state seam [`serve_connection`] dispatches through. `&dyn`,
 /// not `AppHandle<R>` — so a test can supply a fake with no Tauri runtime
 /// at all (mirrors `clipper::envelope::VaultStatusSource`).
@@ -201,6 +232,11 @@ pub trait NoteLister: Send + Sync {
     /// `"daily"`, so the pre-#177 wire commands keep working unchanged.
     fn period(&self, period: &str) -> DailyOutcome;
     fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome;
+    /// Open a local markdown file in the running app's plain-file surface
+    /// (myne-md/myne#788). The CLI never reads the file; the implementation
+    /// resolves it through the same gate-checked ingest every other ingress
+    /// uses.
+    fn open_plain_file(&self, path: &str) -> OpenFileOutcome;
 }
 
 /// WebView event fired after a CLI write lands (#258).
@@ -256,6 +292,19 @@ fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
         Request::Period { period } => dispatch_period(lister, &period),
         Request::PeriodAppend { period, line } => dispatch_period_append(lister, &period, &line),
         Request::DailyAppend { line } => dispatch_period_append(lister, "daily", &line),
+        Request::Open { path } => match lister.open_plain_file(&path) {
+            OpenFileOutcome::Ok => encode_ok(),
+            OpenFileOutcome::PlainFileOff => encode_err(
+                "plain_file_off",
+                "the local-file editor is off; enable it in the app's Settings",
+            ),
+            OpenFileOutcome::UnsupportedFile => {
+                encode_err("unsupported_file", "only .md and .markdown files open here")
+            }
+            OpenFileOutcome::NotFound => encode_err("not_found", "no such file"),
+            OpenFileOutcome::TooLarge => encode_err("too_large", "that file is too large to open"),
+            OpenFileOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
     }
 }
 
@@ -425,8 +474,8 @@ mod app_seam {
     use tauri::{AppHandle, Manager, Runtime};
 
     use super::{
-        DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, SearchHitWire,
-        SearchOutcome, ShowOutcome,
+        DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, OpenFileOutcome,
+        SearchHitWire, SearchOutcome, ShowOutcome,
     };
 
     /// Production [`NoteLister`] over the running app. Cheap to construct
@@ -671,6 +720,28 @@ mod app_seam {
             }
         }
 
+        /// Open a local file in the plain-file surface (myne-md/myne#788).
+        ///
+        /// The path arrives from the CLI's argv, which is the user's own
+        /// shell, and it is treated as hostile anyway: the ingest gate-checks
+        /// it, canonicalises it and checks the extension and the size cap on
+        /// the canonical path before anything is read. No content, no path
+        /// and no handle crosses back over the socket: the tab appears in the
+        /// app through the same event every other ingress uses.
+        fn open_plain_file(&self, path: &str) -> OpenFileOutcome {
+            use crate::plugins::plain_file::handles::PlainFileError;
+            use crate::plugins::plain_file::ingest::ingest_paths_reporting;
+
+            match ingest_paths_reporting(&self.app, vec![std::path::PathBuf::from(path)]) {
+                Ok(()) => OpenFileOutcome::Ok,
+                Err(PlainFileError::GateOff) => OpenFileOutcome::PlainFileOff,
+                Err(PlainFileError::UnsupportedExtension) => OpenFileOutcome::UnsupportedFile,
+                Err(PlainFileError::NotAFile) => OpenFileOutcome::NotFound,
+                Err(PlainFileError::TooLarge) => OpenFileOutcome::TooLarge,
+                Err(_) => OpenFileOutcome::Io,
+            }
+        }
+
         fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
             use crate::cli_bridge::daily::{period_append, DailyError};
             use myne_core::plugins::notes::daily_match::Period;
@@ -728,6 +799,8 @@ mod tests {
         // every period to daily indistinguishable from a correct one.
         daily: fn(&str) -> DailyOutcome,
         daily_append: fn(&str, &str) -> DailyAppendOutcome,
+        // myne-md/myne#788 (task 11). The path goes in; nothing comes back.
+        open_file: fn(&str) -> OpenFileOutcome,
     }
     impl FixedLister {
         fn list_only(list: fn() -> ListOutcome) -> Self {
@@ -738,6 +811,7 @@ mod tests {
                 new_note: |_, _| NewOutcome::Io,
                 daily: |_| DailyOutcome::Io,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             }
         }
         fn show_only(show: fn(&str) -> ShowOutcome) -> Self {
@@ -748,6 +822,7 @@ mod tests {
                 new_note: |_, _| NewOutcome::Io,
                 daily: |_| DailyOutcome::Io,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             }
         }
         fn search_only(search: fn(&str) -> SearchOutcome) -> Self {
@@ -758,6 +833,7 @@ mod tests {
                 new_note: |_, _| NewOutcome::Io,
                 daily: |_| DailyOutcome::Io,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             }
         }
         fn new_note_only(new_note: fn(&str, Option<&str>) -> NewOutcome) -> Self {
@@ -768,6 +844,7 @@ mod tests {
                 new_note,
                 daily: |_| DailyOutcome::Io,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             }
         }
         fn daily_only(daily: fn(&str) -> DailyOutcome) -> Self {
@@ -778,6 +855,7 @@ mod tests {
                 new_note: |_, _| NewOutcome::Io,
                 daily,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             }
         }
         fn daily_append_only(daily_append: fn(&str, &str) -> DailyAppendOutcome) -> Self {
@@ -788,6 +866,18 @@ mod tests {
                 new_note: |_, _| NewOutcome::Io,
                 daily: |_| DailyOutcome::Io,
                 daily_append,
+                open_file: |_| OpenFileOutcome::Io,
+            }
+        }
+        fn open_only(open_file: fn(&str) -> OpenFileOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show: |_| ShowOutcome::Io,
+                search: |_| SearchOutcome::Io,
+                new_note: |_, _| NewOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file,
             }
         }
     }
@@ -809,6 +899,9 @@ mod tests {
         }
         fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
             (self.daily_append)(period, line)
+        }
+        fn open_plain_file(&self, path: &str) -> OpenFileOutcome {
+            (self.open_file)(path)
         }
     }
 
@@ -933,6 +1026,9 @@ mod tests {
             fn period_append(&self, _period: &str, _line: &str) -> DailyAppendOutcome {
                 panic!("a throttled request must never reach the vault");
             }
+            fn open_plain_file(&self, _path: &str) -> OpenFileOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
         }
         let limiter = SharedRateLimiter::new(0, std::time::Duration::from_secs(60));
         for request in [
@@ -942,6 +1038,7 @@ mod tests {
             br#"{"cmd":"new","body":"x"}"#,
             br#"{"cmd":"daily"}"#,
             br#"{"cmd":"daily_append","line":"x"}"#,
+            br#"{"cmd":"open","path":"/tmp/x.md"}"#,
         ] {
             let reply = roundtrip_limited(request, &NeverCalled, &limiter);
             assert_eq!(reply["error"]["kind"], "rate_limited");
@@ -1463,6 +1560,78 @@ mod tests {
     fn period_append_missing_the_line_field_maps_to_invalid_request() {
         let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Io);
         let reply = roundtrip(br#"{"cmd":"period_append","period":"weekly"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    // ---- myne-md/myne#788 task 11: `myne open` ---------------------------
+
+    #[test]
+    fn open_ok_replies_with_a_bare_ok() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::Ok);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/note.md"}"#, &lister);
+        assert_eq!(reply, serde_json::json!({ "ok": true }));
+    }
+
+    #[test]
+    fn open_hands_the_path_to_the_seam_verbatim() {
+        // The one field this command exists to carry. If it were dropped, a
+        // reply of `ok` would look identical while nothing ever opened.
+        let lister = FixedLister::open_only(|path| {
+            if path == "/tmp/wanted.md" {
+                OpenFileOutcome::Ok
+            } else {
+                OpenFileOutcome::NotFound
+            }
+        });
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/wanted.md"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+    }
+
+    #[test]
+    fn open_gate_off_maps_to_the_plain_file_off_kind() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::PlainFileOff);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/note.md"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "plain_file_off");
+    }
+
+    #[test]
+    fn open_unsupported_extension_maps_to_unsupported_file() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::UnsupportedFile);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/note.txt"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "unsupported_file");
+    }
+
+    #[test]
+    fn open_missing_path_maps_to_not_found() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::NotFound);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/gone.md"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "not_found");
+    }
+
+    #[test]
+    fn open_too_large_maps_to_the_too_large_kind() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::TooLarge);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/huge.md"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "too_large");
+    }
+
+    #[test]
+    fn open_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"open","path":"/tmp/note.md"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn open_missing_the_path_field_maps_to_invalid_request() {
+        let lister = FixedLister::open_only(|_| OpenFileOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"open"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "invalid_request");
     }
