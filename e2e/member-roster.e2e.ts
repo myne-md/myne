@@ -105,6 +105,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await openSettings(app.session, "sync");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         // Unlock the person identity; first enrolment mints the owner.
+        // The 24-word grid opens behind the card's Unlock button.
+        await (await app.session.byTestId("member-roster.person-unlock-open")).click();
         for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
             index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
@@ -166,6 +168,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await dismissImporterOffer(app.session);
            await openSettings(app.session, "sync");
           await app.session.byTestId("member-roster");
+          // The 24-word grid opens behind the card's Unlock button.
+          await (await app.session.byTestId("member-roster.person-unlock-open")).click();
           for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
             const testId =
               index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;

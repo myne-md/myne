@@ -18,6 +18,7 @@ import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { prefsRead, setRibbonItems, setRibbonVisible } from "../../lib/prefs";
 import { resolveRibbonItems, ribbonEligibleIds } from "../../notes/ribbonItems";
 import { CUSTOMIZE_LIST_STYLE, CustomizeRow, useDragReorder } from "./CustomizeList";
+import { EmptyState } from "../primitives/EmptyState";
 
 const SECTION_STYLE: CSSProperties = {
   position: "relative",
@@ -274,7 +275,15 @@ export function RibbonCustomizeSettings() {
         data-testid="settings.ribbon-customize.list"
       >
         {orderLoaded && order.length === 0 && (
-          <p style={EMPTY_STYLE}>{t("settings.ribbonCustomize.empty")}</p>
+          <EmptyState
+            variant="firstRun"
+            icon="pin"
+            size="sm"
+            field={false}
+            title={t("settings.ribbonCustomize.emptyTitle")}
+            body={t("settings.ribbonCustomize.empty")}
+            testId="settings.ribbon-customize.empty"
+          />
         )}
         {order.map((id, index) => {
           const action = byId.get(id);
