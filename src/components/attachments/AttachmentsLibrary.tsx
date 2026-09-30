@@ -889,7 +889,16 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
           writer when it lands. */}
       <AttachmentSyncProgress hideWhenEmpty />
 
-      <div style={SCROLL_STYLE}>
+      <div
+        style={
+          // A flex column only while a zero state is showing, so it can FILL
+          // the tab rather than sit as a card at the top of it with the rest
+          // of the tab empty below.
+          isEmpty || isNoMatch
+            ? { ...SCROLL_STYLE, display: "flex", flexDirection: "column" }
+            : SCROLL_STYLE
+        }
+      >
         {isLoading ? (
           // The library's layout is KNOWN before its contents are — a grid of
           // uniform tiles, or a list of uniform rows — so it draws itself and
@@ -1184,6 +1193,7 @@ function LibraryEmpty(props: LibraryEmptyProps) {
         }
         query={props.query.trim() === "" ? undefined : props.query}
         testId="attachments.empty-no-results"
+        fill
         action={
           <Button
             variant="secondary"
@@ -1206,6 +1216,7 @@ function LibraryEmpty(props: LibraryEmptyProps) {
         title={t("attachments.library.emptyLoadError")}
         body={t("attachments.library.emptyLoadErrorBody")}
         testId="attachments.empty-load-error"
+        fill
         action={
           <Button variant="secondary" icon="refresh-cw" onClick={props.onRetry}>
             {t("attachments.library.emptyRetry")}
@@ -1222,6 +1233,7 @@ function LibraryEmpty(props: LibraryEmptyProps) {
       title={t("attachments.library.emptyNoAttachments")}
       body={t("attachments.library.emptyImportHint")}
       testId="attachments.empty-no-attachments"
+        fill
       action={
         <Button
           variant="primary"

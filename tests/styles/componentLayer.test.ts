@@ -156,6 +156,13 @@ describe("the zero state's wash (docs/decisions/ui/0630)", () => {
     expect(ruleBody(SHEET, ".myne-empty__wash {")).toContain("var(--myne-empty-wash)");
   });
 
+  it("fades to nothing at every edge, so a filled state has no hard line", () => {
+    // A filled zero state has no border to hide where the wash is cut off, so
+    // without a mask the glow met the pane edge as a visible seam.
+    const wash = ruleBody(SHEET, ".myne-empty__wash {");
+    expect(wash).toMatch(/(^|\s)mask-image: radial-gradient\(closest-side,[^;]*transparent 100%\)/);
+  });
+
   it("is static: no animation, so it needs no motion-canon exemption", () => {
     const wash = ruleBody(SHEET, ".myne-empty__wash {");
     expect(wash).not.toContain("animation");
