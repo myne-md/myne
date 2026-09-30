@@ -447,7 +447,7 @@ export function AgentHubList({
 
       {rows.length === 0 ? (
         // First run: nothing to list yet. A QUIET line under the header, not a
-        // card with its own button (docs/decisions/ui/0630). The header above
+        // card with its own button (docs/decisions/ui/0633). The header above
         // already carries the one action that creates a conversation, and the
         // conversation beside this rail carries the zero state that explains
         // what the agent is — a second bordered card with a second "New

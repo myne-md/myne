@@ -16,11 +16,12 @@
 // `decisions/sync/0020` puts hosted and self-host at the same trust boundary.
 //
 // The hosted door writes `HOSTED_SYNC_ORIGIN` and lets the first connection
-// TOFU-pin the leaf; it deliberately does NOT claim a pre-vetted build-time pin
-// (that pin, and the SPKI mechanism a renewal-safe one needs, is myne-md/myne#781).
-// The self-hosted door is the SAME `EndpointConfig` the Settings panel mounts:
-// free-text URL, Connect, TOFU leaf-certificate fingerprint, the same
-// device-local `sync-config.json`. A second endpoint control would be a second
+// verify the chain against public CA roots; it deliberately claims no
+// build-time pin (myne-md/myne#781, and `decisions/sync/0620` withdrew pinning
+// outright rather than solving it). The self-hosted door is the SAME
+// `EndpointConfig` the Settings panel mounts: free-text URL, Connect, a CA +
+// hostname handshake before the URL is stored, the same device-local
+// `sync-config.json`. A second endpoint control would be a second
 // contract, and the two would drift in exactly the place a user is least able
 // to recover. What this component adds is the first-run framing, the choice and
 // the continue gate, not a new way to configure a server.
@@ -41,6 +42,8 @@ interface FirstRunServerStepProps {
   onConnected: () => void;
   /** Abandon the step. The caller decides where Back leads. */
   onBack: () => void;
+  /** An existing endpoint must be reconnected before the user continues. */
+  requireConnection?: boolean;
 }
 
 /**
@@ -66,16 +69,16 @@ export function useHasSyncEndpoint(): boolean {
   return hasEndpoint;
 }
 
-export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepProps) {
+export function FirstRunServerStep({ onConnected, onBack, requireConnection = false }: FirstRunServerStepProps) {
   const { t } = useTranslation();
   // Which door is open. `choose` is the fork itself; `self-hosted` is the URL
   // form behind the second door.
   const [mode, setMode] = useState<"choose" | "self-hosted">("choose");
   const [hostedBusy, setHostedBusy] = useState(false);
   const [hostedError, setHostedError] = useState(false);
-  // Re-read after the user connects, otherwise the Continue button would stay
-  // disabled over an endpoint the control just accepted. A local remount key is
-  // enough: `EndpointConfig` owns the connect call and its own success state.
+  const [hostedTls, setHostedTls] = useState(false);
+  // The endpoint control reports a successful connection before Continue can
+  // advance. A saved endpoint alone is insufficient in the repair flow.
   const [configured, setConfigured] = useState(false);
   const hasEndpoint = useHasSyncEndpoint();
   // The beta-terms gate stands at every door that first enables sync
@@ -85,7 +88,7 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
   const betaTerms = useBetaTermsGate();
   const [termsOpen, setTermsOpen] = useState(false);
 
-  const connected = configured || hasEndpoint;
+  const connected = configured || (!requireConnection && hasEndpoint);
 
   // Gate the CONTINUE on the terms, not the connect: the endpoint control writes
   // the device-local config, which is not itself the consenting act. Identity
@@ -99,21 +102,27 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
     onConnected();
   };
 
-  // The hosted door: write the Myne server and let the first connection pin its
-  // leaf (TOFU). No fingerprint claim is shown; the pin source the backend
-  // records is `tofu` and the copy stays honest about it.
+  // The hosted door uses the same verified HTTPS transport as self-hosting.
   const connectHosted = () => {
     setHostedBusy(true);
     setHostedError(false);
+    setHostedTls(false);
     void invoke("plugin:sync|sync_set_endpoint", {
       endpointUrl: HOSTED_SYNC_ORIGIN,
-      confirmedFingerprint: null,
     })
       .then(() => {
         setConfigured(true);
         advance();
       })
-      .catch(() => setHostedError(true))
+      .catch((e: unknown) => {
+        // A refused certificate is not an unreachable server, and the two send a
+        // first-time user opposite ways: the generic copy's own remedy is "use
+        // your own server", which is advice for a server they cannot reach. Four
+        // other surfaces in this change branch on the same `kind`; this door
+        // used to be the one that did not.
+        setHostedTls((e as { kind?: string } | null)?.kind === "TlsFailure");
+        setHostedError(true);
+      })
       .finally(() => setHostedBusy(false));
   };
 
@@ -178,9 +187,10 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
         {hostedError && (
           <p
             data-testid="first-run-server.hosted-error"
+            data-error-kind={hostedTls ? "tls" : "unreachable"}
             style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
           >
-            {t("firstRun.server.hostedError")}
+            {t(hostedTls ? "sync.endpoint.tlsFailure" : "firstRun.server.hostedError")}
           </p>
         )}
 
@@ -225,7 +235,7 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
         </div>
       </div>
 
-      <EndpointConfig />
+      <EndpointConfig onConnected={() => setConfigured(true)} onEdit={() => setConfigured(false)} />
 
       {!connected && (
         <p

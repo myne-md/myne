@@ -74,8 +74,6 @@ test.describe("sync join flow", () => {
       qrDecode: {
         endpoint_url: "https://sync.example.com",
         account_number: "4K7P9RH2JR3T8XW6VZ0A",
-        cert_pin_hex: null,
-        pin_source: "self_host_no_pin",
         fresh: true,
       },
       joinResult: { vault_id: "flow-vault", pending: true, fingerprint: null },
@@ -107,8 +105,6 @@ test.describe("sync join flow", () => {
       qrDecode: {
         endpoint_url: "https://sync.example.com",
         account_number: "4K7P9RH2JR3T8XW6VZ0A",
-        cert_pin_hex: null,
-        pin_source: "self_host_no_pin",
         fresh: false,
       },
     });

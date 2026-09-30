@@ -900,7 +900,7 @@
 }
 
 /* The wash: a soft, blurred accent gradient behind the content
-   (`docs/decisions/ui/0630`). It replaced the animated `01` binary field, which
+   (`docs/decisions/ui/0633`). It replaced the animated `01` binary field, which
    read as developer / privacy iconography on surfaces a general user meets
    every day.
 

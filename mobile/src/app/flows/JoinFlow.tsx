@@ -42,6 +42,7 @@ function accountStructurallyPlausible(display: string): boolean {
  *  fault gets a distinct (non-leaking) line; every account/password/existence
  *  failure collapses to the single non-distinguishing banner. */
 function joinFailureMessage(kind: string, t: TFunction): string {
+  if (kind === "TlsFailure") return t("sync.endpoint.tlsFailure");
   if (kind === "Transport" || kind === "NotConfigured") {
     return t("join.transportError");
   }
@@ -336,17 +337,6 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     }
   }
 
-  function qrPinLabel(source: JoinQrView["pin_source"]): string {
-    switch (source) {
-      case "self_host_tofu":
-        return t("join.qr.pinSelfHost");
-      case "hosted":
-        return t("join.qr.pinHosted");
-      default:
-        return t("join.qr.pinNone");
-    }
-  }
-
   // Open the camera, decode the QR, and route to the confirm step. The QR fills the
   // server + account number; the user still types only their password (SYNC-47).
   async function onScan() {
@@ -372,7 +362,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   }
 
   // Confirm → prefill the form from the scanned QR; the user then enters only their
-  // password. Endpoint cert trust rests on the endpoint TOFU + the ZK backstop (the
+  // password. Endpoint cert trust rests on public CA roots + the ZK backstop (the
   // pin-source label surfaces which path); strict cert-pin-match at join is a
   // documented follow-up (thread the expected pin through sync_join_account).
   function onConfirmContinue() {
@@ -465,9 +455,6 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
               value={formatAccountNumberInput(scanned.account_number)}
               testId="sync.join.qr-confirm.account"
             />
-            <div style={{ fontSize: 13, color: "var(--fg-3)" }} data-testid="sync.join.qr-confirm.pin-source">
-              {qrPinLabel(scanned.pin_source)}
-            </div>
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>

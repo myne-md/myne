@@ -24,7 +24,7 @@
 // ── One indicator for the wait ─────────────────────────────────────────────
 // Argon2id runs for seconds. The button carries that: a spinner beside a label
 // that says what is happening. There is no second indicator anywhere on the
-// row (`docs/decisions/ui/0626` withdrew the one there used to be), and no
+// row (`docs/decisions/@@ui/0632@@` withdrew the one there used to be), and no
 // motion exemption, because a `<Spinner>` is the app's shared one and already
 // holds its own.
 

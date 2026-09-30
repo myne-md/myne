@@ -26,8 +26,8 @@
 // a second place to look that is EMPTY on desktop, and that is exactly what the
 // seam is for. Desktop's answer is `null` by construction — a desktop install
 // has no deployment operator, its endpoint is typed by the user in settings and
-// TOFU-pinned, and inventing a default here would silently point installs at a
-// server nobody chose.
+// verified against public CA roots, and inventing a default here would silently
+// point installs at a server nobody chose.
 
 /**
  * The sync origin this deployment is configured for, or `null` where the

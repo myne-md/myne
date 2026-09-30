@@ -170,7 +170,7 @@ export type WorkspaceItem =
  * conversation. It is one screen now — the history rail beside the open
  * conversation, the shape every chat application has — so the only thing worth
  * persisting is which conversation is open, and the two-view state was a mode
- * where the user only ever wanted a selection (`docs/decisions/ai/0623`).
+ * where the user only ever wanted a selection (`docs/decisions/ai/0627`).
  *
  * Absent means a fresh conversation with nothing selected, which is the
  * omit-when-default value. A stored descriptor from the two-view shape still

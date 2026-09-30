@@ -180,7 +180,8 @@ pub fn validate(url: &str) -> Result<ResolvedEndpoint, AiEndpointError> {
         reason: EndpointRejection::Malformed,
     })?;
     // The shared validator answers the SYNC policy, where `https` to a remote
-    // host is the normal case (rustls + a TOFU pin). This endpoint has neither:
+    // host is the normal case (rustls against public CA roots). This endpoint
+    // has neither:
     // `engine_ollama` opens a bare `TcpStream`, so an `https://` URL it accepted
     // would carry note plaintext to that host IN THE CLEAR — and `resolve_backends`
     // would class it `LoopbackLocal`, which is the class both the remote-provider

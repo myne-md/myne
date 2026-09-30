@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Button } from "../primitives/Button";
 
 const ROOT_STYLE: CSSProperties = {
   display: "flex",
@@ -89,6 +90,17 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "frozen") {
         return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorFrozen") };
       }
+      // A shared (`NTV6`) vault refuses to sync until the person identity is
+      // unlocked for this session. Separate copy because the
+      // fix is a specific user action, and "Sync error" would send them looking
+      // at the network instead. The unlock control lives in this same Sync panel
+      // (the member roster's identity step).
+      if (status.detail === "identity_locked") {
+        return {
+          dotColor: "var(--warning)",
+          label: i18n.t("sync.status.errorIdentityLocked"),
+        };
+      }
       // Task 94. NOT folded into `auth_failed`: that copy says the sign-in
       // expired and points at re-enrolling, which is the wrong instruction for a
       // device the account owner deliberately removed from another client. The
@@ -105,13 +117,8 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "device_revoked") {
         return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorDeviceRevoked") };
       }
-      // myne#581. The one transport failure with a remedy, and the only failure
-      // class here that is GUARANTEED to occur: a certificate has a lifetime,
-      // so a pinned one is replaced on a schedule. Folded into the generic arm
-      // below it read as "Sync error" for four days while sync was completely
-      // dead and the fix was thirty seconds of work.
-      if (status.detail === "cert_pin_mismatch") {
-        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorCertChanged") };
+      if (status.detail === "tls_failure") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorTls") };
       }
       return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
@@ -122,17 +129,32 @@ function present(status: SyncStatus | null): Presentation {
   }
 }
 
-export function SyncStatusIndicator() {
+export interface SyncStatusIndicatorProps {
+  /**
+   * Offered only while sync is parked on a locked person identity (`NTV6`, the
+   * `identity_locked` detail): opens the identity setup/recover dialog. Optional
+   * so an isolated render (a component test) still shows just the label.
+   */
+  onUnlockIdentity?: () => void;
+}
+
+export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorProps = {}) {
   const { t } = useTranslation();
   const { status, syncNow, busy } = useSyncStatus();
   const { dotColor, label } = present(status);
+  const identityLocked =
+    status?.state === "error" && status.detail === "identity_locked";
   // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this
   // device is not enrolled — a cycle there returns NotReady (→ not_enrolled), not a
   // real sync, so the button would be a false promise (and would flash "Synced").
+  // A locked person identity is the same kind of "not yet": the cycle refuses
+  // before any network call, so "Sync now" cannot help until the identity is
+  // unlocked — the unlock button below is the honest action there instead.
   const hideSyncNow =
     status?.state === "disabled" ||
     status?.state === "not_enrolled" ||
-    status?.state === "pending";
+    status?.state === "pending" ||
+    identityLocked;
 
   return (
     <div style={ROOT_STYLE} data-testid="sync.status-indicator" data-sync-state={status?.state ?? "loading"}>
@@ -140,6 +162,16 @@ export function SyncStatusIndicator() {
       <span style={LABEL_STYLE} data-testid="sync.status-label">
         {label}
       </span>
+      {identityLocked && onUnlockIdentity && (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onUnlockIdentity}
+          data-testid="sync.unlock-identity"
+        >
+          {t("sync.status.unlockIdentityCta")}
+        </Button>
+      )}
       {!hideSyncNow && (
         <button
           type="button"

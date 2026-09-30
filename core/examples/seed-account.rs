@@ -1,18 +1,8 @@
 // Create a real account on a real sync server, from source, without a GUI
 // (phase3-web-client task 105 — the fixture seeder).
 //
-//   cargo run --release --example seed-account -- <server-url> <password> <leaf-cert-sha256-hex>
-//
-//   PIN=$(echo | openssl s_client -connect sync.myne.md:443 2>/dev/null \
-//         | openssl x509 -outform DER | shasum -a 256 | cut -d' ' -f1)
-//   cargo run --release --example seed-account -- https://sync.myne.md 'pw…' "$PIN"
-//
-// The pin is passed in rather than fetched: the native transport verifies ONLY
-// against pins it was given (an empty pin list rejects every certificate), and
-// the desktop app's TOFU acquisition is a private async path inside the sync
-// plugin. Taking it as an argument keeps this tool honest about what it trusts
-// — a seeder that silently accepted any certificate would be a worse example
-// than none.
+//   cargo run --release --example seed-account -- <server-url> <password>
+// This uses the same public CA-chain and hostname verification as native sync.
 //
 // # Why this exists
 //
@@ -55,13 +45,13 @@ fn main() {
         std::process::exit(2);
     });
     let password = args.next().unwrap_or_else(|| {
-        eprintln!("usage: seed-account <server-url> <password> <leaf-cert-sha256-hex>");
+        eprintln!("usage: seed-account <server-url> <password>");
         std::process::exit(2);
     });
-    let pin_hex = args.next().unwrap_or_else(|| {
-        eprintln!("usage: seed-account <server-url> <password> <leaf-cert-sha256-hex>");
+    if args.next().is_some() {
+        eprintln!("usage: seed-account <server-url> <password>");
         std::process::exit(2);
-    });
+    }
 
     // Same KDF parameters the app uses. NOT a weakened test profile: the point
     // of the seeded account is that the web client can unlock it with the real
@@ -78,10 +68,11 @@ fn main() {
     let phrase = session.phrase.words().join(" ");
     let meta = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
 
-    // Endpoint -> host/port, and a TOFU pin fetched the same way the desktop
-    // client fetches one. A browser cannot do this and does not need to (it
-    // verifies through the platform trust store); this tool is a native client
-    // and takes the native path.
+    // Endpoint -> host/port. The certificate is verified the way the shipped
+    // desktop client verifies it: public CA chain plus the requested server
+    // name. A browser cannot do this and does not need to (its fetch verifies
+    // through the platform trust store); this tool is a native client and takes
+    // the native path.
     let url = server.trim_end_matches('/').to_string();
     let (host, port) = {
         let rest = url.strip_prefix("https://").unwrap_or_else(|| {
@@ -93,14 +84,7 @@ fn main() {
             None => (rest.to_string(), 443u16),
         }
     };
-    let pin: [u8; 32] = {
-        let bytes: Vec<u8> = (0..pin_hex.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&pin_hex[i..i + 2], 16).expect("pin must be hex"))
-            .collect();
-        bytes.try_into().expect("pin must be 32 bytes (sha256)")
-    };
-    let transport = RustlsTransport::new(host, port, vec![pin]);
+    let transport = RustlsTransport::new(host, port);
 
     let secret = protocol::derive_subkey(&session.root_key, protocol::SubkeyRole::ServerAuth);
 

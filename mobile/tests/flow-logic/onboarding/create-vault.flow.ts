@@ -36,12 +36,9 @@ test.describe("mobile create-vault onboarding", () => {
     await installMockIpc(page, { freshDevice: true });
     await page.goto("/");
 
-    // Welcome (fresh install, no vaults).
-    // "Create a local vault instead", not "Create a vault": the mobile Welcome
-    // became identity-first in myne-md/myne#768 and that label went with it, so
-    // this lookup had been waiting thirty seconds for a button that no longer
-    // exists. Nothing reported it — a Playwright label is not typechecked, and a
-    // stale one reads as a hung app rather than as a renamed control.
+    // Welcome (fresh install, no vaults). First run is identity-first
+    // (myne-md/myne#768), so the vault door is the "Create a local vault
+    // instead" ghost button, beside the "Create an identity" primary.
     await page.getByRole("button", { name: "Create a local vault instead" }).click();
 
     // The safety briefing (first-run only, and unnumbered for that reason).

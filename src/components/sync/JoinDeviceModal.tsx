@@ -53,7 +53,6 @@ import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
-import { FingerprintConfirm, fingerprintGateRefusal } from "./FingerprintConfirm";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
@@ -241,36 +240,19 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Post-join step machine: "pinned" surfaces the TOFU cert fingerprint (SYNC-43),
-  // "pending" waits for an existing device to approve, "verify" is the mandatory
-  // head-fingerprint SAS eye-compare (SYNC-40) before routing into the editor.
-  // "pending-phrase" is the escape from "pending" (task 8): the same device,
-  // already joined and unlocked with the password, proves the account with the
-  // phrase instead of waiting for an approval nobody is left to give.
-  const [step, setStep] = useState<
-    "form" | "pinned" | "pending" | "pending-phrase" | "verify"
-  >("form");
+  // Post-join step machine: "pending" waits for an existing device to approve,
+  // "verify" is the mandatory head-fingerprint SAS eye-compare (SYNC-40) before
+  // routing into the editor. "pending-phrase" is the escape from "pending"
+  // (task 8): the same device, already joined and unlocked with the password,
+  // proves the account with the phrase instead of waiting for an approval
+  // nobody is left to give. There is no certificate step: the server is
+  // trusted through the platform's CA store (`docs/decisions/sync/0620`).
+  const [step, setStep] = useState<"form" | "pending" | "pending-phrase" | "verify">("form");
   const [joinedVaultId, setJoinedVaultId] = useState<string | null>(null);
-  const [certFingerprint, setCertFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
   // MYND-548: the id this join minted, kept so the pending path can name the
   // device once its first pull lands.
   const [joinedDeviceId, setJoinedDeviceId] = useState<string | null>(null);
-  // MYND-650 task 5: the certificate fingerprint the user obtained OUT-OF-BAND
-  // from their own server, plus whether the backend has asked for it. Required
-  // only in Tor mode, where the enrollment handshake — the one handshake that
-  // accepts any certificate — travels through an exit node that is in a
-  // position to serve its own.
-  //
-  // It is typed in BEFORE the pin is accepted, and the captured value is never
-  // shown alongside the question: "here is what we got, does it match yours?"
-  // anchors the user on whatever the attacker served, and offering the captured
-  // value on the failure path would let them paste it back. The compare below
-  // (`step === "pinned"`) is a different thing — by then the pin is already
-  // verified against this input, and that screen exists for cross-device
-  // comparison.
-  const [expectedFingerprint, setExpectedFingerprint] = useState("");
-  const [confirmNeeded, setConfirmNeeded] = useState(false);
 
   // MYND-548: this device's own name — the same hook the Settings enrollment form
   // uses, so the two doors cannot drift.
@@ -313,11 +295,9 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
       serverUrl: url.trim(),
       accountNumber: account.trim(),
       password: credential,
-      confirmedFingerprint: expectedFingerprint.trim() || null,
       credentialKind: mode,
     })
       .then(async (res) => {
-        setConfirmNeeded(false);
         // The phrase never outlives the call that used it.
         clearCells();
         // A phrase join (task 7) leaves the vault RECOVERING. Nothing here can
@@ -350,35 +330,18 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
           return;
         }
         setJoinedVaultId(res.vault_id);
-        // Show the pinned cert fingerprint first (SYNC-43) when there is one (a
-        // loopback http join has no TLS); either way we then wait for approval +
-        // the head-fingerprint verify.
-        if (res.fingerprint) {
-          setCertFingerprint(res.fingerprint);
-          setStep("pinned");
-        } else {
-          setStep("pending");
-        }
+        setStep("pending");
       })
       .catch((e: unknown) => {
-        // The two Tor-mode refusals aborted the join before anything was
-        // written — no endpoint, no pin, no vault container — so the form stays
-        // put with the fingerprint field revealed. Every other failure keeps the
-        // single non-distinguishing message.
-        const refusal = fingerprintGateRefusal(e);
-        if (refusal !== null) {
-          setConfirmNeeded(true);
-          setError(
-            refusal === "PinConfirmationRequired"
-              ? t("sync.join.confirmFingerprintRequired")
-              : t("sync.join.confirmFingerprintMismatch"),
-          );
+        // A TLS failure names itself (the server's certificate did not chain to
+        // a trusted CA). Every other failure keeps the single non-distinguishing
+        // message, naming the credential the user actually typed: the password
+        // sentence under a phrase attempt sent people to re-check a field they
+        // had not used.
+        if ((e as { kind?: string } | null)?.kind === "TlsFailure") {
+          setError(t("sync.endpoint.tlsFailure"));
           return;
         }
-        // Names the credential the user actually typed. The password sentence
-        // under a phrase attempt sent people to re-check a field they had not
-        // used; the refusal is still non-distinguishing about WHICH input was
-        // wrong, it just lists the right ones.
         setError(mode === "password" ? t("sync.join.error") : t("sync.join.errorPhrase"));
       })
       .finally(() => setBusy(false));
@@ -484,36 +447,6 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
         }}
         onCancel={onCancel}
       />
-    );
-  }
-
-  // Post-join: the fresh device pinned the server's cert (TOFU) — surface the
-  // fingerprint for out-of-band cross-device eye-compare, then wait for approval.
-  if (step === "pinned" && certFingerprint) {
-    return (
-      <JoinScreen rootRef={backdropRef} testId="join.pinned">
-          <h2 style={TITLE}>{t("sync.join.pinnedTitle")}</h2>
-          <p style={HELP}>{t("sync.join.pinnedCompare")}</p>
-          <p style={HELP}>
-            <span
-              style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}
-              data-testid="join.cert-fingerprint"
-            >
-              {certFingerprint}
-            </span>
-          </p>
-          <div style={ROW}>
-            <button
-              type="button"
-              onClick={() => setStep("pending")}
-              style={btn(true, false)}
-              {...btnHover(true, false)}
-              data-testid="join.continue"
-            >
-              {t("sync.join.continue")}
-            </button>
-          </div>
-      </JoinScreen>
     );
   }
 
@@ -786,25 +719,7 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
 
         {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
 
-        {/* Revealed only once the backend refuses for want of it — see the
-            state declaration for why this is typed in rather than confirmed.
-            While it is open it carries the retry AND the abort, so the footer
-            below stands down: two "Add device" buttons on one card would be a
-            choice between identical actions at the exact moment this screen is
-            asking the user to slow down. Declining costs nothing to undo —
-            the refused join wrote no endpoint, no pin and no vault container. */}
-        {confirmNeeded ? (
-          <FingerprintConfirm
-            value={expectedFingerprint}
-            onChange={setExpectedFingerprint}
-            onConfirm={submit}
-            onDecline={onCancel}
-            confirmLabel={busy ? t("sync.join.submitting") : t("sync.join.submit")}
-            confirmDisabled={!canSubmit}
-            testIdPrefix="join"
-          />
-        ) : (
-          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <Button
               variant="ghost"
               icon="arrow-left"
@@ -824,7 +739,6 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
               {busy ? t("sync.join.submitting") : t("sync.join.submit")}
             </Button>
           </div>
-        )}
     </JoinScreen>
   );
 }

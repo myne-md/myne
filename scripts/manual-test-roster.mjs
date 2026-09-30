@@ -2588,8 +2588,8 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that connecting shows the pinned certificate fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm no type-back challenge is asked for the identity phrase.",
-        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the pinned fingerprint needs a real TLS server whose leaf certificate the runner can compare.",
+        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm no type-back challenge is asked for the identity phrase.",
+        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same device walk also observes HTTPS trust on the native WebView and host.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
         tier: "core",
@@ -3679,7 +3679,7 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "Before starting that procedure, satisfy its prerequisites and record that you did: a network that does not block Tor, `ss` or `lsof`, `tcpdump`, a curl with socks5-hostname support, root for the two capture steps, and, critically, a sync endpoint enrolled BEFORE the toggle went on. If you enrol over Tor instead, stop: you would be typing a certificate fingerprint before the pin was captured, which is a different and weaker test than the one the procedure describes.",
+        see: "Before starting that procedure, satisfy its prerequisites and record that you did: a network that does not block Tor, `ss` or `lsof`, `tcpdump`, a curl with socks5-hostname support, root for the two capture steps, and a valid public-CA HTTPS sync endpoint. Test both an already-enrolled endpoint after toggling Tor on and a new connection made while Tor is on: neither may connect directly or ask for a certificate fingerprint.",
         whyNotAutomated: "The prerequisite that matters is an ordering constraint between two manual acts on a real machine against a real endpoint; nothing can assert it after the fact, and getting it wrong silently changes what the whole run proves.",
         clients: ["desktop-linux", "desktop-macos"],
         estimateMin: 15,
@@ -5487,14 +5487,14 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a self-hosted server with a real certificate, connect a desktop and let sync settle, noting the fingerprint the panel shows. Now ROTATE the certificate on the server (renew it, or issue a new leaf) and restart it. Back on the desktop, press Sync and confirm the status reports that the certificate changed rather than reconnecting silently. Then, WITHOUT editing the server URL, press \u201cVerify certificate\u201d, paste the fingerprint read off the server with `openssl x509 -noout -fingerprint -sha256`, and confirm sync reconnects and the panel now shows the new fingerprint. Repeat the paste with one character altered and confirm it is refused with nothing saved and the OLD pin still in force. Finally confirm the refusal message never displays the fingerprint the server actually presented.",
-        whyNotAutomated: "The suite talks to a local Go binary over loopback `http`: there is no TLS terminator, no certificate and no CA anywhere in it, so no lane can rotate a leaf or capture a pin from one. `e2e/sync-cert-reverify.e2e.ts` covers the half that does not need a handshake \u2014 that the re-verify control is reachable while Connect rests disabled, and opens the gate with the URL unedited \u2014 by seeding a pinned config from disk. The half left here is the compare itself against a certificate that really changed, which is the step that decides whether a renewal reconnects and an impostor is refused. myne#756 is why this is written down: the recovery was unreachable from the UI for every self-hoster at every renewal, and no lane here could have said so.",
-        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        see: "On a self-hosted server with a public-CA certificate, connect a desktop and let sync settle. Renew the leaf with another valid certificate for the same hostname and confirm sync reconnects without editing the URL or entering a fingerprint. Then serve an invalid chain, an expired certificate, and a certificate for another hostname in turn: each must fail with a TLS error and leave the configured endpoint intact. Restore the valid certificate and confirm sync resumes. Repeat on a native phone over the same network.",
+        whyNotAutomated: "The Linux suite talks to a local Go binary over loopback `http`; no native iOS or Android device is available to it. Rust TLS tests exercise the certificate-chain and hostname refusal with a real CA-signed fixture, while the device check here observes a live renewal on the actual desktop and mobile TLS stacks. `e2e/sync-cert-reverify.e2e.ts` checks the no-fingerprint UI on a saved HTTPS endpoint, not a real renewal.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
         estimateMin: 15,
         tier: "core",
       },
       {
-        see: "Generate a device-join QR on desktop and scan it with a real iPhone and a real Android phone from Myne's add-device flow. Confirm the camera permission prompt appears the first time with Myne's own wording, the scan fills the server address and account number, the phone then shows the awaiting-approval state, and the phone gains NO vault access until you approve it in the desktop's device list. Let one code sit until it regenerates, then scan the stale one and confirm it is refused. Do the scan on BOTH a light and a dark desktop theme, and with the LARGEST realistic payload (a self-hosted server URL plus a 64-hex cert pin), confirming the code carries the Myne mark centred and still reads first-try at ~30 cm on each phone. The margin proof is the negative case: temporarily oversize the centre knockout in render_qr_svg, confirm the scan then actually fails, and restore it (this is what makes the shipped footprint's margin real rather than assumed).",
+        see: "Generate a device-join QR on desktop and scan it with a real iPhone and a real Android phone from Myne's add-device flow. Confirm the camera permission prompt appears the first time with Myne's own wording, the scan fills the server address and account number, the phone then shows the awaiting-approval state, and the phone gains NO vault access until you approve it in the desktop's device list. Let one code sit until it regenerates, then scan the stale one and confirm it is refused. Do the scan on BOTH a light and a dark desktop theme, and with the LARGEST realistic payload (a long self-hosted HTTPS URL with the empty legacy pin slot), confirming the code carries the Myne mark centred and still reads first-try at ~30 cm on each phone. The margin proof is the negative case: temporarily oversize the centre knockout in render_qr_svg, confirm the scan then actually fails, and restore it (this is what makes the shipped footprint's margin real rather than assumed).",
         whyNotAutomated: "Scanning needs a camera pointed at a screen; there is no camera in any harness here and no lane drives a handset, so the QR has only ever been generated and never read. The branded overlay makes this sharper, not softer: a Rust decode round-trip (rqrr) and the e2e render check prove the SVG is well-formed and decodable by software, but only a phone camera off an emissive screen proves the centre-mark footprint left enough margin to scan.",
         clients: ["ios", "android"],
         estimateMin: 22,
@@ -5834,7 +5834,6 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/sync/JoinDeviceModal.tsx",
       "src/components/sync/DeviceJoinQr.tsx",
-      "src/components/sync/FingerprintConfirm.tsx",
       "src/components/sync/DeviceManagementPanel.tsx",
        "src/components/sync/MemberRosterPanel.tsx",
        "src/components/sync/MemberVaultUnlockCard.tsx",

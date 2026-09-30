@@ -4137,10 +4137,17 @@ async fn sync_cycle_attempt(
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| shared_sync_id(shared, SubkeyRole::CatalogSyncId));
     let themes_id = shared_sync_id(shared, SubkeyRole::ThemesSyncId);
-    // The chats catalog is unconditional like themes (a synced singleton that
-    // exists for every holding vault), while the per-conversation files are
-    // scanned below like attachments (an id-named per-file family).
-    let chats_catalog_id = shared_sync_id(shared, SubkeyRole::ChatsCatalogSyncId);
+    // The chats / agent-memory / agent-personality catalogs are ROOT-derived, not
+    // group-derived, and are therefore `None` on a member (which holds no
+    // `root_key`). `docs/decisions/protocol/0609` states it: those three families
+    // are person-private (the `MYY5` plane, 0608) and "have no group role", which
+    // is why `member_removal::group_rotation_reclaim_sync_ids` lists only the
+    // catalog / prefs / themes ids it rotates. Routing them through
+    // `shared_sync_id` was a defect: on an `NTV6` session `shared` is `Group`, and
+    // `GroupRole` has no chats / memory / personality variant, so the call hit an
+    // `expect` and panicked the whole cycle (myne-md/myne#791). They derive from
+    // the retained owner root, exactly as the v0.1/v0.2 root-tier singletons do.
+    let chats_catalog_id = root_key.map(|rk| sync_id_for(rk, SubkeyRole::ChatsCatalogSyncId));
     // In-memory union of the per-conversation files (conversation id →
     // on-disk nonce), maintained by the pull loop like `att_scan`.
     let mut chats_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4175,10 +4182,14 @@ async fn sync_cycle_attempt(
     // for an opted-out device.
     let memory_on = root_key.is_some()
         && memory_sync_enabled(io, shared, &account_number_hash, vault_root, version).await;
-    let memory_catalog_id =
-        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentMemoryCatalogSyncId));
-    let personality_id =
-        memory_on.then(|| shared_sync_id(shared, SubkeyRole::AgentPersonalitySyncId));
+    // Root-derived for the same reason the chats catalog is (`0609`): no group
+    // role, so a member (no `root_key`) skips the whole plane.
+    let memory_catalog_id = root_key
+        .map(|rk| sync_id_for(rk, SubkeyRole::AgentMemoryCatalogSyncId))
+        .filter(|_| memory_on);
+    let personality_id = root_key
+        .map(|rk| sync_id_for(rk, SubkeyRole::AgentPersonalitySyncId))
+        .filter(|_| memory_on);
     // In-memory union of the per-entry files (entry id → on-disk nonce),
     // maintained by the pull loop like `chats_scan`.
     let mut memories_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
@@ -4230,14 +4241,16 @@ async fn sync_cycle_attempt(
     {
         local.insert(themes_id, n);
     }
-    if let Some(n) = io
-        .read(&chats_catalog_file_path(vault_root))
-        .await
-        .ok()
-        .as_deref()
-        .and_then(read_chats_catalog_nonce)
-    {
-        local.insert(chats_catalog_id, n);
+    if let Some(cid) = chats_catalog_id {
+        if let Some(n) = io
+            .read(&chats_catalog_file_path(vault_root))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(read_chats_catalog_nonce)
+        {
+            local.insert(cid, n);
+        }
     }
     if let Some(mid) = memory_catalog_id {
         if let Some(n) = io
@@ -4400,14 +4413,15 @@ async fn sync_cycle_attempt(
     // reconcile that follows it (the shape the sync_chats_phase docblock
     // describes; the phases' own guard is the call site's because a tokio
     // Mutex is not reentrant).
-    let remote_chats_cat_rec = page
-        .all_metas
-        .iter()
-        .find(|m| m.id == chats_catalog_id && m.attachment_id.is_none());
+    let remote_chats_cat_rec = chats_catalog_id.and_then(|cid| {
+        page.all_metas
+            .iter()
+            .find(|m| m.id == cid && m.attachment_id.is_none())
+    });
     let chats_write_mutex = crate::plugins::chats::commands::write_mutex();
     let chats_write_guard = chats_write_mutex.lock().await;
-    let mut chats_phase = match root_key {
-        Some(root_key) => {
+    let mut chats_phase = match (root_key, chats_catalog_id) {
+        (Some(root_key), Some(chats_catalog_id)) => {
             sync_chats_phase(
                 io,
                 transport,
@@ -4422,7 +4436,7 @@ async fn sync_cycle_attempt(
             )
             .await?
         }
-        None => skipped_chats_phase(),
+        _ => skipped_chats_phase(),
     };
 
     // --- conversation pull loop (catalog-guarded) ---
@@ -4901,7 +4915,7 @@ async fn sync_cycle_attempt(
                 && Some(c.id) != cat_id
                 && c.id != prefs_id
                 && c.id != themes_id
-                && c.id != chats_catalog_id
+                && Some(c.id) != chats_catalog_id
                 && !chats_scan.contains_key(&c.id)
         })
         .count() as u32;
@@ -4941,7 +4955,7 @@ async fn sync_cycle_attempt(
                 || Some(c.id) == cat_id
                 || c.id == prefs_id
                 || c.id == themes_id
-                || c.id == chats_catalog_id
+                || Some(c.id) == chats_catalog_id
                 || chats_scan.contains_key(&c.id))
         })
         .filter(|c| {
@@ -5142,7 +5156,7 @@ async fn sync_cycle_attempt(
                     && Some(m.id) != cat_id
                     && m.id != prefs_id
                     && m.id != themes_id
-                    && m.id != chats_catalog_id
+                    && Some(m.id) != chats_catalog_id
                     && !chats_scan.contains_key(&m.id)
             })
             .map(|m| (m.id, m.content_nonce))
@@ -5662,15 +5676,11 @@ async fn sync_cycle_attempt(
         // (myne-md/myne#675). Same single-derivation discipline as themes
         // (myne#436): the bytes come from the phase, never re-derived here.
         if chats_phase.dirty {
-            if let Some(bytes) = chats_phase.push_bytes.take() {
+            if let (Some(bytes), Some(cid)) = (chats_phase.push_bytes.take(), chats_catalog_id) {
                 if let Some(nonce) = read_chats_catalog_nonce(&bytes) {
-                    let base = state
-                        .blobs
-                        .get(&hex(&chats_catalog_id))
-                        .map(|b| b.version)
-                        .unwrap_or(0);
+                    let base = state.blobs.get(&hex(&cid)).map(|b| b.version).unwrap_or(0);
                     to_push.push(PushBlob {
-                        id: chats_catalog_id,
+                        id: cid,
                         base_version: base,
                         content_nonce: nonce,
                         ciphertext: bytes,
@@ -6846,8 +6856,8 @@ mod tests {
         )
         .unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
 
         // Register the SCRAM verifier (idempotent) then enroll both devices.
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
@@ -7042,7 +7052,7 @@ mod tests {
         use base64::Engine as _;
         let decoy_b64 = base64::engine::general_purpose::STANDARD.encode(&decoy);
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
 
         let dev_a = enroll::generate_device_id();
@@ -7058,7 +7068,7 @@ mod tests {
         let tok_a = hex32(&out_a.token);
 
         let tb = NonceCorruptingTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             decoy_b64,
             fired: std::sync::atomic::AtomicUsize::new(0),
         };
@@ -7132,7 +7142,7 @@ mod tests {
         st_b.cursor = 0;
         write_sync_state(&dir_b, &st_b).unwrap();
         let heal = run_cycle_legacy(
-            crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
+            crate::plugins::sync::http_transport::build_transport(&url)
                 .unwrap()
                 .as_ref(),
             &root_key,
@@ -7813,7 +7823,7 @@ mod tests {
         )
         .unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -7826,7 +7836,7 @@ mod tests {
         )
         .unwrap();
         let tok_a = hex32(&out_a.token);
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         let dev_b = enroll::generate_device_id();
         let out_b = enroll::enroll(
             tb.as_ref(),
@@ -7905,8 +7915,7 @@ mod tests {
         let notes_b = dir_b.join("notes");
         std::fs::create_dir_all(&notes_a).unwrap();
         std::fs::create_dir_all(&notes_b).unwrap();
-        let mk =
-            || crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let mk = || crate::plugins::sync::http_transport::build_transport(&url).unwrap();
 
         // Owner A: author a note, register the verifier, enroll (recovery →
         // self-approve), push.
@@ -8086,7 +8095,7 @@ mod tests {
         // B syncs through a transport that FAILS every blob download, so the
         // content-download loop cannot complete.
         let tb_fail = FailBlobTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
         };
         let res = run_cycle_legacy(
             &tb_fail,
@@ -8232,7 +8241,7 @@ mod tests {
 
         // B's next cycle dies in the note-body download loop.
         let tb_fail = FailBlobTransport {
-            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
         };
         let res = run_cycle_legacy(
             &tb_fail,
@@ -8621,7 +8630,7 @@ mod tests {
         // Device A authors a note and pushes it (server stores it at version 1).
         let blob_v1 = encode_new_note(&items_key, &items_key_id, &note_bytes, b"original").unwrap();
         crate::atomic_write::atomic_write(&notes_a.join(&fname), &blob_v1, false).unwrap();
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -8684,7 +8693,7 @@ mod tests {
         );
 
         // Device B pulls the edit fresh → proves the edit actually propagated.
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         let dev_b = enroll::generate_device_id();
         let out_b = enroll::enroll(
             tb.as_ref(),
@@ -8729,7 +8738,7 @@ mod tests {
         nonce: &str,
         register: bool,
     ) -> (Box<dyn SyncTransport>, [u8; 16], String) {
-        let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
+        let t = crate::plugins::sync::http_transport::build_transport(url).unwrap();
         if register {
             enroll::register_verifier(t.as_ref(), account_hash, secret).unwrap();
         }
@@ -10616,8 +10625,8 @@ mod tests {
         std::fs::create_dir_all(dir_a.join("notes")).unwrap();
         std::fs::create_dir_all(dir_b.join("notes")).unwrap();
 
-        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
@@ -13111,6 +13120,35 @@ mod tests {
             );
         }
 
+        // The chats / agent-memory / agent-personality catalogs are ROOT-derived
+        // even on an `NTV6` session, because they are person-private and have no
+        // `GroupRole` (decisions/protocol/0609, 0608). Routing them through
+        // `shared_sync_id` on a group session hit the `expect` and panicked the
+        // whole cycle (myne-md/myne#791). This pins both halves: their id helper
+        // is the root derivation, and it must not be reachable through the group
+        // tier at all.
+        #[test]
+        fn private_catalogs_stay_root_derived_and_have_no_group_role() {
+            let root = [0x33u8; 32];
+            for (role, id) in [
+                (SubkeyRole::ChatsCatalogSyncId, chats_catalog_sync_id(&root)),
+                (
+                    SubkeyRole::AgentMemoryCatalogSyncId,
+                    agent_memory_catalog_sync_id(&root),
+                ),
+                (
+                    SubkeyRole::AgentPersonalitySyncId,
+                    agent_personality_sync_id(&root),
+                ),
+            ] {
+                assert_eq!(id, sync_id_for(&root, role));
+                assert!(
+                    role.shared_group_role().is_none(),
+                    "{role:?} must have no GroupRole: it is person-private, not shared"
+                );
+            }
+        }
+
         // A theme-less vault stays themes-silent: no local blob, no server
         // record ⇒ nothing to push (no §10.2.1-style initial publish here —
         // vault.themes carries no vault identity a joiner needs).
@@ -14273,7 +14311,7 @@ mod tests {
                 false,
             );
             let obs = PullObserver::new(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             );
             let pull = run_cycle_legacy(
                 &obs,
@@ -14322,8 +14360,7 @@ mod tests {
                 false,
             );
             let legacy = PullObserver::new(Box::new(RouteAbsentTransport {
-                inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
-                    .unwrap(),
+                inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                 status: 404,
             }));
             run_cycle_legacy(
@@ -14416,8 +14453,7 @@ mod tests {
                     false,
                 );
                 let obs = PullObserver::new(Box::new(RouteAbsentTransport {
-                    inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
-                        .unwrap(),
+                    inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                     status,
                 }));
                 let pull =
@@ -14492,7 +14528,7 @@ mod tests {
             // First cycle: the batch route drops below HTTP.
             use crate::plugins::sync::transport::{FaultInjectingTransport, FaultMode};
             let dead = FaultInjectingTransport::fail_path(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
                 BLOB_BATCH_PATH,
                 99,
                 FaultMode::Network,
@@ -14520,7 +14556,7 @@ mod tests {
 
             // Next cycle, healthy transport: the batch route is tried AGAIN.
             let obs = PullObserver::new(
-                crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
             );
             let pull = run_cycle_legacy(
                 &obs,
@@ -14982,7 +15018,7 @@ mod tests {
         )
         .unwrap();
 
-        let t = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let t = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
         enroll::register_verifier(t.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev = enroll::generate_device_id();
         let out = enroll::enroll(

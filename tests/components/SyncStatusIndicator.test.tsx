@@ -196,7 +196,7 @@ describe("refusal classes render distinct copy", () => {
     // from its neighbours in being certain to occur — a certificate expires on
     // a schedule, so a pinned one is replaced on a schedule — and in being the
     // only one that leaves sync entirely dead rather than pull-only.
-    ["cert_pin_mismatch", "Server certificate changed: verify it to reconnect"],
+    ["tls_failure", "Couldn’t verify the sync server’s HTTPS connection"],
   ];
 
   for (const [detail, expected] of cases) {
@@ -211,11 +211,55 @@ describe("refusal classes render distinct copy", () => {
     });
   }
 
+  // A shared (`NTV6`) vault whose person identity is not held
+  // in this session refuses to sync. Deliberately NOT in the table above: those
+  // all still PULL, and this one does nothing at all until the user unlocks the
+  // identity. The claim is the same, though — it must not collapse into "Sync
+  // error", because the fix is a specific action, not the network.
+  it('maps "identity_locked" to its own label', async () => {
+    statusFixture({ state: "error", detail: "identity_locked" } as SyncStatus);
+    render(<SyncStatusIndicator />);
+    await waitFor(() => {
+      expect(screen.getByText("Unlock your identity to sync")).toBeTruthy();
+    });
+    expect(screen.queryByText("Sync error")).toBeNull();
+  });
+
   it("still falls back to the generic label for an unknown detail", async () => {
     statusFixture({ state: "error", detail: "sync_failed" } as SyncStatus);
     render(<SyncStatusIndicator />);
     await waitFor(() => {
       expect(screen.getByText("Sync error")).toBeTruthy();
     });
+  });
+});
+
+// The whole point of the `identity_locked` state is that it is actionable: the
+// fix is to unlock the person identity, so the indicator offers that action and
+// stands "Sync now" down (a cycle refuses before any network call, so it cannot
+// help until the identity is unlocked).
+describe("identity_locked unlock affordance", () => {
+  it("offers the unlock action and calls it, and hides Sync now", async () => {
+    const onUnlockIdentity = vi.fn();
+    statusFixture({ state: "error", detail: "identity_locked" } as SyncStatus);
+    render(<SyncStatusIndicator onUnlockIdentity={onUnlockIdentity} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("sync.unlock-identity")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("sync.sync-now")).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sync.unlock-identity"));
+    });
+    expect(onUnlockIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no unlock action when the host passed no handler", async () => {
+    statusFixture({ state: "error", detail: "identity_locked" } as SyncStatus);
+    render(<SyncStatusIndicator />);
+    await waitFor(() =>
+      expect(screen.getByText("Unlock your identity to sync")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("sync.unlock-identity")).toBeNull();
   });
 });

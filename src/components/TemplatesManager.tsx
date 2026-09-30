@@ -207,7 +207,7 @@ export function TemplatesManager({
   }, [onOpenNote, onClose, newTemplateName]);
 
   return (
-    // A TAB body, not a modal (myne-md/myne#779, docs/decisions/ui/0619). A
+    // A TAB body, not a modal (myne-md/myne#779, docs/decisions/ui/0623). A
     // template library is something you browse, rename in and delete from —
     // none of which is a question the app is asking, which is the test that
     // decides the shape. The title and the close affordance come from the tab

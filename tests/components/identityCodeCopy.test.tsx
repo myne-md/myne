@@ -45,6 +45,9 @@ vi.mock("../../src/hooks/useRoster", () => ({
     invite: vi.fn().mockResolvedValue(null),
     vaultInvites: [],
     vaultInvitesFailed: false,
+    // Shared, so the invite box is reachable without the migration confirmation
+    // (myne-md/myne#783).
+    shared: true,
     removing: false,
     remove: vi.fn().mockResolvedValue(undefined),
   }),
@@ -135,6 +138,7 @@ const surfaces = [
           identityCode={IDENTITY_CODE}
           onCreateVault={() => {}}
           onAccepted={() => {}}
+          onForgotten={() => {}}
         />,
       ),
     prepare: async () => {},
@@ -248,6 +252,7 @@ describe("identity-code textareas are themed", () => {
             identityCode={IDENTITY_CODE}
             onCreateVault={() => {}}
             onAccepted={() => {}}
+            onForgotten={() => {}}
           />,
         );
         await screen.findByTestId("identity-home.invite-row");
@@ -286,6 +291,7 @@ describe("IdentityHome invite phrase", () => {
         identityCode={IDENTITY_CODE}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
+        onForgotten={() => {}}
       />,
     );
 

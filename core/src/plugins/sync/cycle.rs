@@ -27,7 +27,7 @@
 //! revives a deleted note on another device. One serializer, shared by both
 //! clients, is the only way that property holds on either.
 
-use super::config::{config_pins, read_config};
+use super::config::read_config;
 use super::devices::hex16;
 use super::enroll::{self, EnrollPath};
 use super::token_store::TokenStore as _;
@@ -80,12 +80,13 @@ pub(crate) fn classify_cycle_error(
         SyncCycleError::Push(PushError::PayloadTooLarge) => FailureClass::PayloadTooLarge,
         SyncCycleError::Push(PushError::Frozen) => FailureClass::Frozen,
         // Before the catch-all below, because this arm is the reason the payload
-        // is matched at all rather than discarded with `_`. A pin mismatch is a
-        // transport error by mechanism and an auth-shaped park by behaviour, and
-        // it is the only one here the user can fix.
-        SyncCycleError::Pull(PullError::Transport(TransportError::CertPinMismatch))
-        | SyncCycleError::Push(PushError::Transport(TransportError::CertPinMismatch)) => {
-            FailureClass::CertPinMismatch
+        // is matched at all rather than discarded with `_`. A refused
+        // certificate is a transport error by mechanism and an auth-shaped park
+        // by behaviour: repeating the handshake reaches the same certificate and
+        // fails identically, and it is the only failure here a user can act on.
+        SyncCycleError::Pull(PullError::Transport(TransportError::Tls))
+        | SyncCycleError::Push(PushError::Transport(TransportError::Tls)) => {
+            FailureClass::TlsFailure
         }
         SyncCycleError::Pull(PullError::Transport(_))
         | SyncCycleError::Push(PushError::Transport(_)) => FailureClass::Transport,
@@ -104,14 +105,13 @@ pub(crate) fn classify_cycle_error(
 pub(crate) async fn try_claim_token(
     io: &dyn crate::vault_io::VaultIo,
     url: String,
-    pins: Vec<[u8; 32]>,
     dir: std::path::PathBuf,
     root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     account_hash: [u8; 16],
     device_id: [u8; 16],
 ) -> Option<Vec<u8>> {
     let token = crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins).ok()?;
+        let transport = super::http_transport::build_transport(&url).ok()?;
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let mut nonce = [0u8; 16];
         getrandom::getrandom(&mut nonce).ok()?;
@@ -405,7 +405,6 @@ pub async fn run_active_cycle_from_host(
     else {
         return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
     };
-    let pins = config_pins(&cfg);
     let Some(url) = cfg.endpoint_url else {
         return CycleOutcome::Disabled;
     };
@@ -495,7 +494,6 @@ pub async fn run_active_cycle_from_host(
                 match try_claim_token(
                     io,
                     url.clone(),
-                    pins.clone(),
                     dir.clone(),
                     root_key.clone(),
                     account_hash,
@@ -537,19 +535,31 @@ pub async fn run_active_cycle_from_host(
             .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
             .unwrap_or(false);
         if is_ntv6 && signed_ctx.is_none() {
+            // A missing person identity is the one cause of `signed_ctx == None`
+            // the user can fix in place (unlock the identity), so it gets its own
+            // class and the UI its own sentence. Any OTHER
+            // reason the head context could not be built (roster, group key)
+            // stays a generic failure — that fix is not something to ask of them.
+            let has_person = state.clone_person_identity().await.is_some();
+            let class = if has_person {
+                super::loop_control::FailureClass::Other
+            } else {
+                super::loop_control::FailureClass::IdentityLocked
+            };
             tracing::warn!(
                 stage = "sync_cycle",
                 event = "ntv6_head_unsigned",
-                "NTV6 vault without a held person identity; refusing to author a downgraded head"
+                person_identity_held = has_person,
+                "NTV6 vault whose signed head context could not be built; refusing to author a downgraded head"
             );
-            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            return CycleOutcome::Failed(class);
         }
     }
 
     let res = crate::task::run_blocking_future(move || async move {
         // A transport that cannot even be built is a Transport-class failure
         // (same retry posture as an unreachable socket).
-        let transport = super::http_transport::build_transport(&url, pins).map_err(|e| {
+        let transport = super::http_transport::build_transport(&url).map_err(|e| {
             super::orchestrator::SyncCycleError::Pull(super::engine::PullError::Transport(e))
         })?;
         // The full `SyncCycleError` crosses the spawn_blocking boundary intact —
@@ -820,7 +830,6 @@ pub async fn push_vault_meta_now_via_io(
     else {
         return false;
     };
-    let pins = crate::plugins::sync::config::config_pins(&cfg);
     let Some(url) = cfg.endpoint_url else {
         return false; // sync disabled
     };
@@ -854,8 +863,8 @@ pub async fn push_vault_meta_now_via_io(
     // which IS the design there, since the browser transport is synchronous XHR
     // in a dedicated Worker (task 35).
     let res = crate::task::run_blocking(move || {
-        let transport = crate::plugins::sync::http_transport::build_transport(&url_moved, pins)
-            .map_err(|_| ())?;
+        let transport =
+            crate::plugins::sync::http_transport::build_transport(&url_moved).map_err(|_| ())?;
         crate::plugins::sync::enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes)
             .map_err(|_| ())
     })
@@ -901,7 +910,7 @@ mod tests {
     /// must still classify as `Transport`, because they are the ones that do
     /// clear on their own and must keep backing off rather than parking.
     #[test]
-    fn a_pin_mismatch_is_classified_apart_from_every_other_transport_failure() {
+    fn tls_failures_are_classified_apart_from_network_errors() {
         use super::super::engine::{PullError, PushError};
         use super::super::loop_control::FailureClass;
         use super::super::orchestrator::SyncCycleError;
@@ -909,21 +918,20 @@ mod tests {
 
         assert_eq!(
             classify_cycle_error(&SyncCycleError::Pull(PullError::Transport(
-                TransportError::CertPinMismatch
+                TransportError::Tls
             ))),
-            FailureClass::CertPinMismatch
+            FailureClass::TlsFailure
         );
         assert_eq!(
             classify_cycle_error(&SyncCycleError::Push(PushError::Transport(
-                TransportError::CertPinMismatch
+                TransportError::Tls
             ))),
-            FailureClass::CertPinMismatch,
-            "push and pull reach the same server over the same pinned config"
+            FailureClass::TlsFailure,
+            "push and pull use the same certificate validation"
         );
 
         for other in [
             TransportError::Network,
-            TransportError::Tls,
             TransportError::NotConfigured,
             TransportError::BadRequest,
         ] {

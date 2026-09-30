@@ -29,7 +29,6 @@
 //! - `<generated_at>` — unix seconds; drives the ephemeral freshness check
 //!   ([`QrJoinPayload::is_fresh`]).
 
-use super::config::hosted_static_pin;
 use protocol::parse_account_number;
 use serde::Serialize;
 use thiserror::Error;
@@ -69,8 +68,9 @@ pub struct QrJoinPayload {
     pub endpoint_url: String,
     /// The account number in canonical 20-char Crockford form (Damm-32 valid).
     pub account_number: String,
-    /// The trusted device's TOFU/self-host leaf-cert pin (SHA-256, lowercase hex),
-    /// or `None` when the producer carried no pin (hosted / loopback endpoint).
+    /// The retired leaf-cert pin (SHA-256, lowercase hex). New payloads carry
+    /// `None` (native trust is public CA plus hostname, decisions/sync/0620);
+    /// the field survives so a QR an older desktop emitted still decodes.
     pub cert_pin_hex: Option<String>,
     /// Unix seconds when the producing device generated this payload.
     pub generated_at: u64,
@@ -216,65 +216,6 @@ impl QrJoinPayload {
     }
 }
 
-/// The trust decision for a scanned QR payload's cert pin (SYNC-43 + grill Q1/Q2).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QrPinSelection {
-    /// Hosted endpoint: trust the app's baked-in static pin. Any QR-carried pin is
-    /// **ignored** (SYNC-43 — the hosted-TOFU door stays shut). `qr_pin_disagreed`
-    /// is true when the ignored QR pin differed from the static pin (worth a warn).
-    Hosted {
-        static_pin: [u8; 32],
-        qr_pin_disagreed: bool,
-    },
-    /// Self-host endpoint: adopt the QR-carried cert pin as the TOFU pin. The scan
-    /// is the out-of-band channel replacing the SYNC-26 eye-compare (grill Q2).
-    SelfHostAdoptQr { cert_pin_hex: String },
-    /// Self-host endpoint with no QR pin: nothing to establish from the QR (fall
-    /// back to the existing blind-TOFU-at-first-connect path).
-    SelfHostNoPin,
-}
-
-/// Decide which pin to trust, given whether a hosted static pin applies and the
-/// QR-carried pin. Pure and fully branch-testable without the hosted constant
-/// (R2): pass `Some(pin)` to exercise the hosted branch even while
-/// [`hosted_static_pin`] returns `None` in production.
-pub fn decide_pin(
-    hosted_static_pin: Option<[u8; 32]>,
-    qr_cert_pin_hex: Option<&str>,
-) -> QrPinSelection {
-    match hosted_static_pin {
-        Some(static_pin) => {
-            let qr_pin_disagreed = qr_cert_pin_hex
-                .map(|qr| qr != super::to_hex(&static_pin))
-                .unwrap_or(false);
-            QrPinSelection::Hosted {
-                static_pin,
-                qr_pin_disagreed,
-            }
-        }
-        None => match qr_cert_pin_hex {
-            Some(pin) => QrPinSelection::SelfHostAdoptQr {
-                cert_pin_hex: pin.to_string(),
-            },
-            None => QrPinSelection::SelfHostNoPin,
-        },
-    }
-}
-
-/// Resolve the hosted static pin for the payload's endpoint (SYNC-43), then decide.
-///
-/// R2 (pre-existing SYNC-43 gap): [`hosted_static_pin`] returns `None` for every
-/// URL until the hosted service launches, so today this always yields a self-host
-/// decision. That is correct-for-when-the-constant-lands — the hosted branch keys
-/// strictly off a *present* static pin, so hosted-TOFU is never silently
-/// normalized. Do NOT add a URL-string allowlist here as a stand-in for the pin.
-pub fn select_pin_for_qr_join(payload: &QrJoinPayload) -> QrPinSelection {
-    decide_pin(
-        hosted_static_pin(&payload.endpoint_url),
-        payload.cert_pin_hex.as_deref(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,60 +359,12 @@ mod tests {
     }
 
     #[test]
-    fn hosted_static_pin_wins_and_ignores_disagreeing_qr_pin() {
-        let static_pin = [0xABu8; 32];
-        let d = decide_pin(Some(static_pin), Some(&"cd".repeat(32)));
-        assert_eq!(
-            d,
-            QrPinSelection::Hosted {
-                static_pin,
-                qr_pin_disagreed: true
-            }
-        );
-    }
-
-    #[test]
-    fn hosted_with_matching_qr_pin_flags_no_disagreement() {
-        let static_pin = [0xABu8; 32]; // hex "ab" × 32
-        let d = decide_pin(Some(static_pin), Some(&"ab".repeat(32)));
-        assert_eq!(
-            d,
-            QrPinSelection::Hosted {
-                static_pin,
-                qr_pin_disagreed: false
-            }
-        );
-    }
-
-    #[test]
-    fn self_host_adopts_the_qr_pin() {
-        let d = decide_pin(None, Some(&"ef".repeat(32)));
-        assert_eq!(
-            d,
-            QrPinSelection::SelfHostAdoptQr {
-                cert_pin_hex: "ef".repeat(32)
-            }
-        );
-    }
-
-    #[test]
-    fn self_host_without_qr_pin_establishes_nothing() {
-        assert_eq!(decide_pin(None, None), QrPinSelection::SelfHostNoPin);
-    }
-
-    #[test]
-    fn today_every_endpoint_resolves_to_self_host_tofu_r2_gap() {
-        // R2: hosted_static_pin returns None for all URLs today, so even a
-        // hosted-looking URL resolves to self-host TOFU — no silent hosted-TOFU
-        // normalization, and no hosted branch until the static-pin constant lands.
+    fn a_legacy_qr_pin_is_decoded_but_never_adopted() {
+        // An old QR still decodes, but the trust decision does not read its pin.
         let acct = fresh_account();
         let payload = QrJoinPayload::new("https://sync.myne.md", &acct, Some(pin()), 1).unwrap();
-        assert_eq!(
-            select_pin_for_qr_join(&payload),
-            QrPinSelection::SelfHostAdoptQr {
-                cert_pin_hex: pin()
-            }
-        );
+        let decoded = QrJoinPayload::decode(&payload.encode().unwrap()).unwrap();
+        assert_eq!(decoded.cert_pin_hex, Some(pin()));
     }
 
     #[test]

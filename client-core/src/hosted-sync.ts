@@ -6,16 +6,23 @@
 // own. Both clients answer that question identically, and both need the SAME
 // address, so it lives here rather than being typed twice.
 //
-// # Why this is not a certificate pin
+// # What trust this endpoint gets
 //
-// The endpoint is written with NO cert pin: the first connection TOFU-pins the
-// leaf and records the pin source as `Tofu`, never `Static`. The build-time
-// static pin the design calls for (`hosted_static_pin` in
-// `core/src/plugins/sync/config.rs`) is deliberately `None` until hosted launch,
-// because a leaf-DER pin breaks on every certificate renewal and the mechanism
-// that survives renewal (SPKI + stable-key reuse) is its own design change
-// (myne-md/myne#781). Until then the hosted card must not present a
-// first-connect TOFU pin as pre-vetted (`docs/decisions/sync/0379`).
+// The endpoint is written with NO trust material of any kind: no pin, no
+// fingerprint, no static constant. Native clients verify its certificate chain
+// and server name against the public CA roots bundled with the app, on the first
+// connection and every later one, and the browser client verifies through the
+// browser's own trust store (`docs/decisions/sync/0620`).
+//
+// The withdrawn alternative is worth keeping in the record rather than deleting:
+// a build-time static pin (myne-md/myne#781) and trust-on-first-use leaf
+// capture (entry 0379) were both designed and both removed, because a leaf pin
+// breaks on every certificate renewal while the mechanism that survives renewal
+// (SPKI with stable-key reuse) is a separate design change this has not taken.
+// The consequence the hosted card must not paper over is the one entry 0620
+// owns: a compromised or compelled public CA can issue a certificate native
+// clients accept. There is no per-endpoint trust to compare across devices, so
+// there is nothing for the first-run copy to offer the user to verify.
 //
 // # Why a subpath and not the barrel
 //

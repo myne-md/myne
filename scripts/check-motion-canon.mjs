@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Guard: the motion canon, mechanised (epic myne-md/myne#772; the normative
-// statement is `PRODUCT.md` principle 4 + `docs/decisions/ui/0618`).
+// statement is `PRODUCT.md` principle 4 + `docs/decisions/ui/0622`).
 //
 // The failure this prevents: `0615` splits motion into a restrained default and
 // an opt-in expressive tier, and a split held by intention alone regresses to
@@ -473,7 +473,7 @@ for (const root of present) {
           "If it reports work in flight, or stops itself when a bounded computation or a " +
           "gesture ends, add it to RAF_LOOP_ALLOWLIST with the reason — and make sure it " +
           "pauses on document.hidden and off-screen and does not loop under " +
-          "prefers-reduced-motion (docs/decisions/ui/0618).",
+          "prefers-reduced-motion (docs/decisions/ui/0622).",
         line: lineOf(src, m.index),
       });
     }
@@ -574,7 +574,7 @@ if (findings.length > 0) {
     console.error(`      ${f.detail}\n`);
   }
   console.error(
-    "  Normative: PRODUCT.md principle 4 and docs/decisions/ui/0618.\n" +
+    "  Normative: PRODUCT.md principle 4 and docs/decisions/ui/0622.\n" +
       "  These are not style preferences; each one is a defect a user can feel.\n",
   );
   process.exit(1);
