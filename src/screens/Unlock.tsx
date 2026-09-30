@@ -85,6 +85,7 @@ import {
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { AuthHeading, AuthShell } from "./AuthShell";
+import { MyneMark } from "../components/primitives/MyneMark";
 import { Button } from "../components/primitives/Button";
 import { Icon } from "../components/primitives/Icon";
 import { CredentialField } from "../components/primitives/CredentialField";
@@ -361,11 +362,16 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
   }
 }
 
+/** The password field on the raised card every first-run form sits on, so the
+ *  one thing this screen asks for reads as the thing to do. */
 const FORM_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  marginTop: "var(--space-2)",
+  padding: "var(--space-5)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-3)",
 };
 
 // Info-style banner used for `recovery-in-progress` mode — distinct
@@ -394,8 +400,10 @@ const DELETE_VAULT_LINK_STYLE: CSSProperties = {
   border: 0,
   padding: 0,
   fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  // Small and regular-weight: a last resort behind a confirmation, so it is
+  // findable without competing with Unlock. The trash glyph and the colour
+  // carry "destructive" together, never the colour alone.
+  fontSize: "var(--text-xs)",
   color: "var(--danger)",
   cursor: "pointer",
   textAlign: "center",
@@ -477,7 +485,7 @@ const RECOVER_LINK_STYLE: CSSProperties = {
 const DANGER_ZONE_STYLE: CSSProperties = {
   display: "flex",
   justifyContent: "center",
-  marginTop: "var(--space-4)",
+  marginTop: "var(--space-2)",
   paddingTop: "var(--space-4)",
   borderTop: "1px solid var(--line-1)",
 };
@@ -817,6 +825,9 @@ export function Unlock({
       // the picker there is no list here, so nothing on this screen can grow
       // to fill a centred region.
       align="upper"
+      // The mark is centred above the question instead (the Welcome screen's
+      // shape), so the corner copy would draw the brand twice.
+      brand={false}
       // Arriving here is going FORWARD from the picker. The back link below
       // sends the user the other way, and the picker states its own direction.
       enter="forward"
@@ -846,10 +857,14 @@ export function Unlock({
         </Button>
       )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <MyneMark size={56} />
+      </div>
       {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
           to "enter your password" (MYND — the primary surface is not a password
           when quick-unlock owns the screen). */}
       <AuthHeading
+        centered
         title={
           vaultName === null
             ? t("unlock.title")
@@ -923,55 +938,55 @@ export function Unlock({
               ) : undefined
             }
           />
-          {/* The two alternatives to typing this password, on one row. The
-              first is the way back to the quick surface the user traded away,
-              rendered only while quick-unlock is still redeemable so an
-              exhausted or unconfigured credential is never re-offered. */}
-          {!decrypting && (
-            <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
-              {quickMethod != null && (
-                <button
-                  type="button"
-                  onClick={() => setPasswordRevealed(false)}
-                  style={RECOVER_LINK_STYLE}
-                  data-testid="unlock.use-quick-unlock-link"
-                >
-                  {quickMethod === "biometric"
-                    ? t("unlock.useBiometricInstead", {
-                        biometric: t("settings.quickUnlock.methodTouchId"),
-                      })
-                    : t("unlock.unlockWithPinInstead")}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onStartRecovery}
-                style={RECOVER_LINK_STYLE}
-                data-testid="unlock.recovery-link"
-              >
-                {t("unlock.recoveryLink")}
-              </button>
-            </div>
-          )}
-          {/* Below the rule: destroying the vault is not a third way to open
-              it. The `trash-2` glyph is the canon's own requirement rather
-              than decoration — `PRODUCT.md` says colour is never the sole
-              channel, and this was a red word with nothing beside it. */}
-          {!decrypting && (
-            <div style={DANGER_ZONE_STYLE}>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "request-delete-vault" })}
-                style={DELETE_VAULT_LINK_STYLE}
-                data-testid="unlock.delete-link"
-              >
-                <Icon name="trash-2" size={14} />
-                {t("unlock.deleteLink")}
-              </button>
-            </div>
-          )}
         </form>
       )}
+        {/* The two alternatives to typing this password, on one row. The
+            first is the way back to the quick surface the user traded away,
+            rendered only while quick-unlock is still redeemable so an
+            exhausted or unconfigured credential is never re-offered. */}
+        {surface === "password" && !decrypting && (
+          <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
+            {quickMethod != null && (
+              <button
+                type="button"
+                onClick={() => setPasswordRevealed(false)}
+                style={RECOVER_LINK_STYLE}
+                data-testid="unlock.use-quick-unlock-link"
+              >
+                {quickMethod === "biometric"
+                  ? t("unlock.useBiometricInstead", {
+                      biometric: t("settings.quickUnlock.methodTouchId"),
+                    })
+                  : t("unlock.unlockWithPinInstead")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onStartRecovery}
+              style={RECOVER_LINK_STYLE}
+              data-testid="unlock.recovery-link"
+            >
+              {t("unlock.recoveryLink")}
+            </button>
+          </div>
+        )}
+        {/* Below the rule: destroying the vault is not a third way to open
+            it. The `trash-2` glyph is the canon's own requirement rather
+            than decoration — `PRODUCT.md` says colour is never the sole
+            channel, and this was a red word with nothing beside it. */}
+        {surface === "password" && !decrypting && (
+          <div style={DANGER_ZONE_STYLE}>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "request-delete-vault" })}
+              style={DELETE_VAULT_LINK_STYLE}
+              data-testid="unlock.delete-link"
+            >
+              <Icon name="trash-2" size={14} />
+              {t("unlock.deleteLink")}
+            </button>
+          </div>
+        )}
     </AuthShell>
   );
 }

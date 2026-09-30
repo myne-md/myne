@@ -122,6 +122,7 @@ const VIEW_STYLE: CSSProperties = {
 
 export function AuthShell({
   actions,
+  brand = true,
   enter = "forward",
   align = "center",
   children,
@@ -129,6 +130,11 @@ export function AuthShell({
 }: {
   /** Top-right controls. Icon buttons — this is chrome, not a form. */
   actions?: ReactNode;
+  /** The corner mark + wordmark. A screen that centres its own mark above the
+   *  question (Unlock) turns this off so the brand is not drawn twice. The
+   *  header row itself stays: it carries `actions` and the window's drag
+   *  height either way. */
+  brand?: boolean;
   enter?: AuthEnter;
   /**
    * Where the content column sits vertically.
@@ -147,10 +153,14 @@ export function AuthShell({
   return (
     <div style={ROOT_STYLE} data-testid={testId}>
       <header style={HEADER_STYLE}>
-        <div style={BRAND_STYLE}>
-          <MyneMark size={26} />
-          <span style={WORDMARK_STYLE}>Myne</span>
-        </div>
+        {brand ? (
+          <div style={BRAND_STYLE}>
+            <MyneMark size={26} />
+            <span style={WORDMARK_STYLE}>Myne</span>
+          </div>
+        ) : (
+          <div />
+        )}
         {actions != null && <div style={ACTIONS_STYLE}>{actions}</div>}
       </header>
       <main style={MAIN_STYLE}>
@@ -210,16 +220,25 @@ export function AuthHeading({
   title,
   children,
   testId,
+  centered = false,
 }: {
   title: ReactNode;
   /** The subtitle. Optional — a screen with only a title still groups, so the
    *  spacing does not change when a subtitle is added or taken away. */
   children?: ReactNode;
   testId?: string;
+  /** Centre the heading under a centred mark (Unlock), at the step headings'
+   *  size rather than the start-aligned display size. */
+  centered?: boolean;
 }) {
   return (
-    <div style={AUTH_HEADING_GROUP_STYLE} data-testid={testId}>
-      <h1 style={AUTH_TITLE_STYLE}>{title}</h1>
+    <div
+      style={{ ...AUTH_HEADING_GROUP_STYLE, ...(centered ? { textAlign: "center" } : null) }}
+      data-testid={testId}
+    >
+      <h1 style={{ ...AUTH_TITLE_STYLE, ...(centered ? { fontSize: "var(--text-2xl)" } : null) }}>
+        {title}
+      </h1>
       {children === undefined ? null : <p style={AUTH_BODY_STYLE}>{children}</p>}
     </div>
   );
