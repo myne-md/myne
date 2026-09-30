@@ -1018,6 +1018,14 @@ pub async fn create_invite_from_host(
     )
     .await?;
 
+    // Publish the (migrated) `vault.meta` BEFORE the invite can be claimed
+    // (myne-md/myne#795): a member's accept fetches the server copy and requires
+    // `NTV6`, but the NTV5->NTV6 migration does not push one. Best-effort — the
+    // sync loop's meta phase now pushes a one-sided local `NTV6` on its next cycle
+    // — so this only closes the race between the invite being posted and that
+    // cycle, which is the window a member can claim in.
+    let _ = push_vault_meta_now_from_host(host, state).await;
+
     let frame = super::person_account::hex_to_bytes(&view.invite_wire)
         .ok_or(SyncDeviceError::BadRequest)?;
     super::person_account::post_sealed_invite(
