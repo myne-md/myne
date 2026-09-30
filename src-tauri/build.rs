@@ -301,6 +301,9 @@ fn main() {
                 "voice_record_start",
                 "voice_record_stop",
                 "voice_record_cancel",
+                "meeting_session_start",
+                "meeting_session_stop",
+                "meeting_session_cancel",
             ]),
         )
         .plugin(

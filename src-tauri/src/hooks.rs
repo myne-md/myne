@@ -168,6 +168,13 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     }
     fn abort_active_recording(&self) {
         crate::plugins::attachments::abort_active_recording(&self.app);
+        // The meeting session (myne-md/myne#789) rides the same hook rather
+        // than adding a second one: the contract is "no capture outlives the
+        // unlocked session", and both captures are aborted at every slot-drop
+        // site by construction instead of at each call site by discipline.
+        // This is the reason a meeting session cannot leave the microphone or
+        // the system-audio tap running behind a lock.
+        crate::plugins::attachments::abort_active_session(&self.app);
     }
     fn pdf_export_teardown_on_lock(&self) {
         crate::plugins::pdf_export::teardown_on_lock(&self.app);

@@ -427,6 +427,7 @@ const V = {
   "src/lib/vault-status.ts": ["ported", "Boot probe."],
   "src/lib/vault-switch.ts": ["adapted", "Reachable only with ≥2 vaults, which one origin cannot have."],
   "src/lib/vault-unlock.ts": ["ported", "The unlock IPC — the one path web needs most."],
+  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only: the capture path is a Rust CoreAudio tap plus cpal, and the editor host omits the \`meetingSession\` seam, so the /meeting trigger is absent on web rather than throwing."],
   "src/lib/voice-record.ts": ["adapted", "Voice capture is desktop-only; the editor host omits the recorder."],
   "src/lib/workspace-persist.ts": ["ported", "`MYW1` IPC; ported into core and dispatched in task 65."],
   "src/lib/writing-assistant.ts": ["adapted", "Unreachable where `localAi` is absent."],

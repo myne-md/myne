@@ -78,7 +78,7 @@ local-inference-stub = ["local-inference", "myne-core/local-inference-stub"]
 voice-capture-stub = []
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 # `myne://` custom-URL-scheme handling (MYND-567): the OS hands the app a
 # `myne://theme/install?…` link so a website can offer a one-click theme
 # install. The plugin owns only the SCHEME REGISTRATION + URL DELIVERY —

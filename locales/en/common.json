@@ -1006,6 +1006,18 @@
         "confirm": "Save"
       }
     },
+    "meeting": {
+      "barAria": "Meeting session",
+      "cancel": "Cancel",
+      "clipFailed": "A part of the meeting could not be saved. The rest is still in the note.",
+      "machineNotice": "This is a machine transcript of the meeting and may contain errors.",
+      "noteTitle": "Meeting {date}",
+      "saving": "Writing the note…",
+      "stop": "Stop",
+      "systemAudioUnavailable": "This device cannot capture system audio, so the other participants will not be in the note.",
+      "tapSilent": "The other participants' audio is not coming through. Check System Settings, Privacy & Security, Screen & System Audio Recording.",
+      "transcriptHeading": "Transcript"
+    },
     "callout": {
       "label": {
         "attention": "Attention",
@@ -1360,6 +1372,7 @@
       "taskQuery": "Task list",
       "time": "Time",
       "todoList": "To-do list",
+      "meeting": "Meeting session",
       "voiceNote": "Voice note",
       "wikiLink": "Wiki link",
       "remind": "Reminder"

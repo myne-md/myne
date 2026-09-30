@@ -5,11 +5,18 @@
   `tauri dev` on macOS). NSMicrophoneUsageDescription is REQUIRED for the
   voice-notes mic capture (MYND-259): without it, the TCC microphone prompt
   cannot appear and CoreAudio access is denied (often surfacing as silence).
+  NSAudioCaptureUsageDescription is the same requirement for the meeting-notes
+  system-audio tap (myne-md/myne#789): the CoreAudio process tap needs the
+  "System Audio Recording" grant, and Apple's documentation names this key as
+  what the prompt reads. Its absence does not fail a build or a test, which is
+  why it is written down here.
 -->
 <plist version="1.0">
   <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Myne uses the microphone only when you record a voice note. Audio is encrypted on your device and never leaves it.</string>
+    <string>Myne uses the microphone only when you record a voice note. Audio is encrypted on your device before it is stored.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Myne captures your system's audio only while a meeting session is running, so the other participants are part of the meeting note. Audio is encrypted on your device before it is stored.</string>
     <!--
       Opt out of macOS App Nap. The browser-clipper assembles each clip in the
       Myne WebView (the WebView holds note_create / the importer pipeline); a clip

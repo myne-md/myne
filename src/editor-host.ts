@@ -73,6 +73,7 @@ import { startTranscription } from "./lib/transcribe";
 import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
 import { setAttachmentToastSink } from "./editor/attachments/toast";
 import { toast } from "./components/toast/toastStore";
+import { startMeetingSession } from "./notes/meetingSession";
 
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
@@ -174,6 +175,13 @@ const host: EditorHost = {
   // is the interim task 44 fixes; a capability flag would be the wrong tool
   // because the browser CAN capture audio (`getUserMedia`) — the decision owed
   // here is which backend, not whether.
+  // Meeting sessions (myne-md/myne#789). The controller lives desktop-side
+  // (`src/notes/meetingSession.ts`) because it needs the note-creation path,
+  // the transcription binding and the i18n catalog; the shared bar it mounts
+  // comes back from `@myne/editor`.
+  meetingSession: (view: unknown) => {
+    void startMeetingSession(view);
+  },
   voice: {
     start: voiceRecordStart,
     stop: voiceRecordStop,

