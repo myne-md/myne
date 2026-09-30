@@ -2545,6 +2545,12 @@
     }
   },
   "plainFile": {
+    "closePending": {
+      "cancelLabel": "Keep editing",
+      "message": "Some open files still have unsaved changes that could not be written to disk. Closing now discards them.",
+      "okLabel": "Discard and close",
+      "title": "Close Myne?"
+    },
     "closeTab": "Close {{name}}",
     "conflict": {
       "body": "This file changed on disk while you were editing. Myne has not written anything.",
@@ -2572,7 +2578,8 @@
     "openRefusedType": "Only .md and .markdown files open here.",
     "retry": "Try saving again",
     "saveError": "The file could not be saved. Your edits are still here.",
-    "tabs": "Open local files"
+    "tabs": "Open local files",
+    "unsaved": "Unsaved changes"
   },
   "password": {
     "createForm": {
@@ -3175,7 +3182,8 @@
     "plainFile": {
       "errorSaveSetting": "Could not save the plain-file setting.",
       "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. Off by default.",
-      "label": "Plain-file editor"
+      "label": "Plain-file editor",
+      "openFilesRemain": "Files with unsaved changes are still open. Resolve them, then turn this off again."
     },
     "views": {
       "helper": "Show the Views entry in the sidebar for saving filtered note lists. Off by default; on if you already have views.",
@@ -3625,6 +3633,7 @@
         "legal": "legal privacy policy terms impressum gdpr dsgvo law enforcement abuse report data protection",
         "license": "license agpl open source legal",
         "lineNumbers": "line numbers gutter editor display",
+        "plainFile": "plain file editor markdown local disk outside vault plaintext open in place",
         "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",

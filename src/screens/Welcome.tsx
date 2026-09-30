@@ -8,6 +8,7 @@ import { IdentitySetupDialog } from "../components/IdentitySetupDialog";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { has } from "../platform/capabilities";
 import { plainFileGateGet, plainFileGateSet } from "../platform/plainFile";
+import { handleGateDisabled } from "../plain/store";
 
 /**
  * The plain-file gate for a device that has no vault (myne-md/myne#788, task 7).
@@ -42,11 +43,22 @@ function PlainFileGateToggle() {
     setEnabled(next); // optimistic
     try {
       await plainFileGateSet(next);
-      setError(null);
     } catch {
       setEnabled(prev); // rollback
       setError(t("settings.plainFile.errorSaveSetting"));
+      return;
     }
+    if (!next) {
+      // Same contract as the Settings row: a disable flushes and closes the
+      // surface's tabs. A conflicted or errored tab stays (its text exists
+      // only in RAM), and naming it stops the toggle from reading as ignored.
+      const remaining = await handleGateDisabled();
+      if (remaining.length > 0) {
+        setError(t("settings.plainFile.openFilesRemain"));
+        return;
+      }
+    }
+    setError(null);
   }
 
   return (

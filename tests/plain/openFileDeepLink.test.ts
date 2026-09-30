@@ -97,8 +97,24 @@ describe("parseOpenFileUrl", () => {
     }
   });
 
-  it("refuses a path carrying a control character", () => {
+  it("strips control and bidi characters rather than passing them through", () => {
+    // A newline cannot appear in a real path; removing it keeps the parsed
+    // path identical to what the confirmation later shows and the host then
+    // resolves, so there is no string for a display to disagree with.
     expect(parseOpenFileUrl("myne://open-file?path=/tmp/a%0Ab.md")).toEqual({
+      ok: true,
+      path: "/tmp/ab.md",
+    });
+    // U+202E RIGHT-TO-LEFT OVERRIDE is the deception this strip exists for: a
+    // link can end in `.md` (so it passes every check) while rendering with
+    // its tail reversed, so `notesgnp.exe.md` reads as `notesdm.exe.png`.
+    expect(
+      parseOpenFileUrl("myne://open-file?path=/tmp/notes%E2%80%AEgnp.exe.md"),
+    ).toEqual({ ok: true, path: "/tmp/notesgnp.exe.md" });
+  });
+
+  it("refuses a path that is nothing but stripped characters", () => {
+    expect(parseOpenFileUrl("myne://open-file?path=%E2%80%AE")).toEqual({
       ok: false,
       reason: "malformed",
     });

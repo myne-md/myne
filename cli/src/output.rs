@@ -272,7 +272,11 @@ pub fn print_error(err: &BackendError, json: bool) {
     }
 }
 
-fn error_parts(err: &BackendError) -> (&'static str, String) {
+/// `pub(crate)` so the backend tests can assert the envelope KIND a failure
+/// emits (myne-md/myne#788): the `open` remap is only correct if a script sees
+/// `io` for a missing file, and asserting the `BackendError` variant alone
+/// would let the output table drift underneath it.
+pub(crate) fn error_parts(err: &BackendError) -> (&'static str, String) {
     match err {
         BackendError::AppNotRunning => (
             "app_not_running",

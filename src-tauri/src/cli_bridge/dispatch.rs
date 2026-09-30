@@ -206,7 +206,7 @@ pub enum DailyAppendOutcome {
 pub enum OpenFileOutcome {
     /// A handle was minted and the frontend told.
     Ok,
-    /// The device-local plain-file gate is off — nothing was read.
+    /// The device-local plain-file gate is off: nothing was read.
     PlainFileOff,
     /// Not a `.md` / `.markdown` file (checked on the canonical path).
     UnsupportedFile,

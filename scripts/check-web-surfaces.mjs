@@ -160,8 +160,8 @@ const V = {
     "Rendered only where `spellCheck` is present (task 47 decided its absence on web).",
   ],
   "src/components/settings/PlainFileSettings.tsx": [
-    "excluded",
-    "Myne-md/myne#788. The row renders only where the `plainFile` capability is present, and web classifies the whole plugin absent: a browser has no OS file ingress, no native open dialog and no handler registration, and the surface exists to be independent of vault state in a way a sync-required browser session is not. The device-local gate file it writes would also be a desktop path.",
+    "adapted",
+    "Myne-md/myne#788. SHIPS in the bundle: nothing substitutes it out, and this entry said `excluded` with no marker, which the absence half of this guard could not verify. What actually omits the row is the runtime `has(\"plainFile\")` gate in EditorPanel, and `web/wasm/src/capability.rs` classifies the whole `plain-file` plugin `Class::Unsupported`, so even if it were mounted its two bindings would answer the dispatcher's typed refusal. Same correction as `src/lib/import-source-vault.ts`: a module that ships and is unreachable is not an excluded module.",
   ],
   "src/components/settings/StartupOpenSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/StoragePanel.tsx": [

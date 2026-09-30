@@ -17,8 +17,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor";
+import i18n from "../i18n";
 import { Icon } from "../components/primitives/Icon";
+import { StatusMark } from "../components/Spinner";
 import { ImportPlainFileButton } from "../components/plain/ImportPlainFileButton";
+import { confirm as dialogConfirm } from "../platform/dialog";
+import { getCurrentWebviewWindow } from "../platform/webviewWindow";
 import { OpenFileButton } from "./OpenFileButton";
 import { setPlainSurfaceActive } from "./surfaceMode";
 import {
@@ -30,6 +34,7 @@ import {
   resolveOverwrite,
   save,
   setActive,
+  unsettledTabs,
   usePlainFileState,
 } from "./store";
 
@@ -96,12 +101,61 @@ export function PlainFileScreen() {
     };
   }, []);
 
+  // The plain surface's own exit intercept (myne-md/myne#788). `Editor.tsx`
+  // has the desktop's real close-intercept, but it lives on the editor screen
+  // and the editor screen is NOT mounted while this surface is up (`App.tsx`
+  // renders one or the other), so its `onCloseRequested` never sees a close
+  // from here. `beforeunload` is not a substitute: the platform seam records
+  // it as a WARNING with no async guarantee (`src/platform/exit-signals.ts`),
+  // so a flush started there is killed halfway.
+  //
+  // Mirrors `Editor.tsx`'s handler deliberately: preventDefault, flush, then
+  // destroy (`destroy()`, not `close()`: the capability ACL grants
+  // `core:window:allow-destroy` and not `allow-close`). It cannot double-fire
+  // with Editor's, because the two components are never mounted together.
   useEffect(() => {
-    const onBeforeUnload = () => {
-      void flushAll();
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const w = getCurrentWebviewWindow();
+        const fn = await w.onCloseRequested(async (event) => {
+          if (cancelled) return;
+          event.preventDefault();
+          await flushAll();
+          if (unsettledTabs().length > 0) {
+            // A conflicted or errored tab holds the only copy of text that
+            // never landed. `close` refuses to drop it, so destroying the
+            // window here would drop it silently; ask, and keep the window
+            // (and the banner) open on a refusal or a failed prompt.
+            let proceed: boolean;
+            try {
+              proceed = await dialogConfirm(i18n.t("plainFile.closePending.message"), {
+                title: i18n.t("plainFile.closePending.title"),
+                okLabel: i18n.t("plainFile.closePending.okLabel"),
+                cancelLabel: i18n.t("plainFile.closePending.cancelLabel"),
+              });
+            } catch {
+              return;
+            }
+            if (!proceed) return;
+          }
+          await w.destroy();
+        });
+        // `onCloseRequested` registers asynchronously and this surface can
+        // unmount while the await is in flight; without re-checking here the
+        // listener attaches after cleanup and leaks onto later screens.
+        if (cancelled) fn();
+        else unlisten = fn;
+      } catch {
+        // Not running inside Tauri (browser dev) or the seam lacks the
+        // intercept: the unmount flush below is then all there is.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
     };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
   return (
@@ -181,6 +235,9 @@ export function PlainFileScreen() {
                   data-testid="plain-file.tab"
                   onClick={() => setActive(file.handle)}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--space-1)",
                     border: "none",
                     background: "transparent",
                     color: "inherit",
@@ -189,20 +246,33 @@ export function PlainFileScreen() {
                   }}
                 >
                   {file.name}
-                  {dirty ? " •" : ""}
+                  {/* A named icon, not a `•`: `docs/design/README.md` bans a
+                      unicode symbol standing in for an icon. Mark only, no
+                      accessible name, because the tab's text already names the
+                      file and the banner below states what is wrong with it. */}
+                  {dirty && (
+                    <StatusMark
+                      name="circle-dashed"
+                      label={null}
+                      title={t("plainFile.unsaved")}
+                      testId="plain-file.tab-dirty"
+                    />
+                  )}
                 </button>
                 <button
                   aria-label={t("plainFile.closeTab", { name: file.name })}
                   data-testid="plain-file.close"
                   onClick={() => void close(file.handle)}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
                     border: "none",
                     background: "transparent",
                     color: "var(--fg-2)",
                     cursor: "pointer",
                   }}
                 >
-                  ×
+                  <Icon name="x" size={14} />
                 </button>
               </div>
             );
@@ -265,20 +335,26 @@ export function PlainFileScreen() {
           }}
         >
           <span>{t("plainFile.conflict.body")}</span>
-          <button
-            data-testid="plain-file.conflict.reload"
-            onClick={() => resolveReload(active.handle)}
-            style={{
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
-              background: "var(--paper)",
-              color: "var(--fg-1)",
-              padding: "var(--space-1) var(--space-2)",
-              cursor: "pointer",
-            }}
-          >
-            {t("plainFile.conflict.reload")}
-          </button>
+          {/* Reload needs the disk snapshot the banner read. A conflict whose
+              re-read also failed (the file was deleted or moved) has none, so
+              the arm is absent rather than a button that cannot act; the copy
+              and overwrite arms below need no source read and stay. */}
+          {active.diskContent !== undefined && (
+            <button
+              data-testid="plain-file.conflict.reload"
+              onClick={() => resolveReload(active.handle)}
+              style={{
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-2)",
+                background: "var(--paper)",
+                color: "var(--fg-1)",
+                padding: "var(--space-1) var(--space-2)",
+                cursor: "pointer",
+              }}
+            >
+              {t("plainFile.conflict.reload")}
+            </button>
+          )}
           <button
             data-testid="plain-file.conflict.overwrite"
             onClick={() => resolveOverwrite(active.handle)}

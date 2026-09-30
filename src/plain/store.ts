@@ -26,6 +26,16 @@ import {
 /** Autosave idle window. Mirrors the vault editor's shape, not its constant. */
 const AUTOSAVE_IDLE_MS = 900;
 
+/**
+ * Autosave max window (the γ2 safety net): during sustained typing a save
+ * fires at most every `AUTOSAVE_MAX_MS` even without a pause, so a writer who
+ * never stops typing still gets a landing. Mirrors `AUTOSAVE_MAX_MS` in
+ * `src/notes/saveNote.ts` (same 10000), defined locally because the
+ * plain-surface import guard (`scripts/check-plain-surface-imports.mjs`) keeps
+ * this tree off `src/notes/`.
+ */
+const AUTOSAVE_MAX_MS = 10000;
+
 export type PlainFileStatus =
   | "clean"
   | "editing"
@@ -56,7 +66,23 @@ type State = {
 
 let state: State = { files: [], dormant: [], activeHandle: null };
 const listeners = new Set<() => void>();
+/** Idle timers, per handle: one keystroke postpones this one, deliberately. */
 const timers = new Map<number, ReturnType<typeof setTimeout>>();
+/**
+ * Max timers, per handle: armed once per DIRTY RUN and cleared only when a
+ * save of the unchanged buffer lands, so continuous typing cannot postpone the
+ * write past `AUTOSAVE_MAX_MS` the way the idle timer alone allows.
+ */
+const maxTimers = new Map<number, ReturnType<typeof setTimeout>>();
+/**
+ * Handles whose save call arrived while a write was already in flight.
+ *
+ * The in-flight write joins rather than refusing (see `inflight`), so without
+ * this the call would settle with the OLDER body still the newest on disk and
+ * nothing would re-run until the next keystroke. A Set, and cleared before the
+ * follow-up starts, so one write schedules exactly one more.
+ */
+const pendingFollowUp = new Set<number>();
 /**
  * The write already running for a handle, keyed per handle.
  *
@@ -68,6 +94,13 @@ const timers = new Map<number, ReturnType<typeof setTimeout>>();
  * (unreachable today) entry with no promise behind it.
  */
 const inflight = new Map<number, Promise<void>>();
+/**
+ * The buffer each in-flight write is writing, per handle. The join branch
+ * compares against this to decide whether a follow-up is owed: a `save` whose
+ * body is already being written owes nothing, and scheduling one for it would
+ * rewrite identical bytes on every blur and every `flushAll`.
+ */
+const inflightContent = new Map<number, string>();
 
 function emit(): void {
   for (const listener of listeners) listener();
@@ -125,7 +158,10 @@ export function upsertOpened(opened: PlainFileOpened): void {
   });
 }
 
-/** A keystroke: update the buffer and arm the idle autosave. */
+/**
+ * A keystroke: update the buffer, re-arm the idle autosave and start the max
+ * clock if this is the dirty run's first keystroke.
+ */
 export function edit(handle: number, content: string): void {
   patch(handle, (file) => ({ ...file, content, status: "editing" }));
   const existing = timers.get(handle);
@@ -137,6 +173,33 @@ export function edit(handle: number, content: string): void {
       void save(handle);
     }, AUTOSAVE_IDLE_MS),
   );
+  if (!maxTimers.has(handle)) {
+    maxTimers.set(
+      handle,
+      setTimeout(() => {
+        maxTimers.delete(handle);
+        void save(handle);
+      }, AUTOSAVE_MAX_MS),
+    );
+  }
+}
+
+/** Drop a handle's idle timer, if any. The max timer is deliberately kept. */
+function clearIdleTimer(handle: number): void {
+  const timer = timers.get(handle);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(handle);
+  }
+}
+
+/** The dirty run is settled: drop the max clock too. */
+function clearMaxTimer(handle: number): void {
+  const timer = maxTimers.get(handle);
+  if (timer) {
+    clearTimeout(timer);
+    maxTimers.delete(handle);
+  }
 }
 
 /** The Rust enum's internally-tagged variant name (`rename_all` on the enum). */
@@ -158,8 +221,23 @@ export async function save(handle: number): Promise<void> {
   const running = inflight.get(handle);
   if (running) {
     // Join the write already in flight rather than returning into a status
-    // that is about to change; see `inflight` above.
-    return running;
+    // that is about to change; see `inflight` above. A follow-up is owed only
+    // when this call carries a buffer the running write is not writing: the
+    // same body owes nothing, and scheduling one for it would rewrite
+    // identical bytes.
+    if (find(handle)?.content !== inflightContent.get(handle)) {
+      pendingFollowUp.add(handle);
+    }
+    await running;
+    // The settled write schedules at most one follow-up for the newest body
+    // in its `finally`. Join that too, so a caller that awaits `save`
+    // (flushAll, flushForImport) reads a state nothing is about to change.
+    let next = inflight.get(handle);
+    while (next) {
+      await next;
+      next = inflight.get(handle);
+    }
+    return;
   }
   const file = find(handle);
   if (!file || file.status === "saving" || file.status === "conflict") return;
@@ -170,15 +248,19 @@ export async function save(handle: number): Promise<void> {
       const baseHash = await plainFileWrite(handle, attempted, file.baseHash);
       const after = find(handle);
       if (!after) return;
+      const unchanged = after.content === attempted;
       patch(handle, (f) => ({
         ...f,
         baseHash,
         // A keystroke during the save moved the buffer on; the next idle pass
         // owns it, so the status must not read "saved" over newer text.
-        status: after.content === attempted ? "saved" : "editing",
+        status: unchanged ? "saved" : "editing",
         diskContent: undefined,
         diskBaseHash: undefined,
       }));
+      // The dirty run this max clock was armed for is on disk now. A moved-on
+      // buffer stays in its run, and its timer must survive.
+      if (unchanged) clearMaxTimer(handle);
     } catch (error) {
       if (errorKind(error) === "conflict") {
         try {
@@ -190,7 +272,18 @@ export async function save(handle: number): Promise<void> {
             diskBaseHash: disk.baseHash,
           }));
         } catch {
-          patch(handle, (f) => ({ ...f, status: "error" }));
+          // The disk moved (that is why the write refused) AND the re-read
+          // failed: the file was deleted, moved or replaced while the write
+          // ran. Staying "conflict" keeps the banner and its copy arm, which
+          // needs no source read; "error" would offer only a Retry that
+          // cannot succeed. `diskContent` stays undefined, so the banner
+          // hides Reload and shows only the arms that can still act.
+          patch(handle, (f) => ({
+            ...f,
+            status: "conflict",
+            diskContent: undefined,
+            diskBaseHash: undefined,
+          }));
         }
         return;
       }
@@ -198,10 +291,15 @@ export async function save(handle: number): Promise<void> {
     }
   })();
   inflight.set(handle, run);
+  inflightContent.set(handle, attempted);
   try {
     await run;
   } finally {
     inflight.delete(handle);
+    inflightContent.delete(handle);
+    // A save that arrived while this one ran owes exactly one follow-up with
+    // the latest body; `pendingFollowUp` is the latest-wins gate for it.
+    if (pendingFollowUp.delete(handle)) void save(handle);
   }
 }
 
@@ -223,11 +321,8 @@ export async function flushAll(): Promise<void> {
  */
 export async function flushForImport(handle: number): Promise<string | null> {
   if (!find(handle)) return null;
-  const timer = timers.get(handle);
-  if (timer) {
-    clearTimeout(timer);
-    timers.delete(handle);
-  }
+  clearIdleTimer(handle);
+  clearMaxTimer(handle);
   const current = find(handle);
   if (!current) return null;
   if (current.status === "conflict" || current.status === "error") return null;
@@ -301,10 +396,18 @@ export function resolveReload(handle: number): void {
   }));
 }
 
-/** Keep the buffer and write it over the disk version. */
+/**
+ * Keep the buffer and write it over the disk version.
+ *
+ * The disk hash is optional on purpose: a conflict whose re-read failed (the
+ * file was deleted or moved) has no new base to adopt, and refusing here would
+ * make the banner's Overwrite button dead. With the old base the write either
+ * fails the same conflict again (nothing changed, and the banner stays) or
+ * lands when the disk came back to what the tab last saw.
+ */
 export function resolveOverwrite(handle: number): void {
   const file = find(handle);
-  if (!file || file.status !== "conflict" || file.diskBaseHash === undefined) return;
+  if (!file || file.status !== "conflict") return;
   patch(handle, (f) => ({
     ...f,
     baseHash: f.diskBaseHash ?? f.baseHash,
@@ -313,6 +416,17 @@ export function resolveOverwrite(handle: number): void {
     diskBaseHash: undefined,
   }));
   void save(handle);
+}
+
+/**
+ * The tabs whose latest buffer has not landed: `close` refuses to drop these
+ * because neither state has a successful write behind it.
+ *
+ * Exported for the close intercept, which must not destroy the window over
+ * text that exists only in RAM without telling the user.
+ */
+export function unsettledTabs(): PlainFile[] {
+  return state.files.filter((file) => file.status === "conflict" || file.status === "error");
 }
 
 /** What the conflict banner's copy arm decided. */
@@ -361,11 +475,8 @@ export function setActive(handle: number): void {
 export async function close(handle: number): Promise<void> {
   const file = find(handle);
   if (!file) return;
-  const timer = timers.get(handle);
-  if (timer) {
-    clearTimeout(timer);
-    timers.delete(handle);
-  }
+  clearIdleTimer(handle);
+  clearMaxTimer(handle);
   await save(handle).catch(() => undefined);
   const settled = find(handle);
   if (settled && (settled.status === "conflict" || settled.status === "error")) {
@@ -400,6 +511,38 @@ export function restoreDormant(): void {
 }
 
 /**
+ * The device-local gate was just turned off: flush, then close every tab.
+ *
+ * The PRD's disabled-gate contract is "no tabs stay open", and this is the one
+ * place that owes it. `close` refuses to drop a tab whose latest buffer has
+ * not landed (conflict or error), which is correct for the same reason it is
+ * in the tab strip, so the caller gets the remaining handles back and must
+ * surface them: silently leaving them open would read as the toggle not
+ * working. Dormant tabs (parked by a lock earlier in the session) are dropped
+ * the same way; they were flushed when they were parked.
+ *
+ * Returns the handles still open, so an empty array is the whole contract.
+ */
+export async function handleGateDisabled(): Promise<number[]> {
+  await flushAll();
+  for (const file of [...state.files, ...state.dormant]) {
+    if (file.status === "conflict" || file.status === "error") continue;
+    if (find(file.handle)) {
+      await close(file.handle).catch(() => undefined);
+      continue;
+    }
+    await plainFileClose(file.handle).catch(() => undefined);
+    setState({
+      ...state,
+      dormant: state.dormant.filter((f) => f.handle !== file.handle),
+    });
+  }
+  return [...state.files, ...state.dormant]
+    .filter((file) => file.status === "conflict" || file.status === "error")
+    .map((file) => file.handle);
+}
+
+/**
  * Subscribe to OS opens and drain any that arrived before this listener
  * existed (the argv ingest on a cold launch). Returns the unsubscribe.
  */
@@ -430,11 +573,20 @@ export function initializePlainFiles(): Promise<void> {
   return initialized;
 }
 
+/** @internal Test-only read of the module-scope state. */
+export function __getPlainStoreStateForTest(): State {
+  return state;
+}
+
 /** @internal Test-only reset of the module-scope state. */
 export function __resetPlainStoreForTest(): void {
   for (const timer of timers.values()) clearTimeout(timer);
+  for (const timer of maxTimers.values()) clearTimeout(timer);
   timers.clear();
+  maxTimers.clear();
+  pendingFollowUp.clear();
   inflight.clear();
+  inflightContent.clear();
   listeners.clear();
   state = { files: [], dormant: [], activeHandle: null };
 }
