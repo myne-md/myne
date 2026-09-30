@@ -53,6 +53,8 @@ function fillPhrase(): void {
 
 async function unlockPerson(): Promise<void> {
   await screen.findByTestId("member-roster.person-unlock");
+  // The phrase grid is collapsed by default; reveal it, then fill it.
+  fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
   fillPhrase();
   await act(async () => {
     fireEvent.click(screen.getByTestId("member-roster.person-unlock-button"));
