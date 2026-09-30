@@ -14,7 +14,15 @@ pub mod capture;
 pub mod commands;
 pub mod encoder;
 pub mod error;
+pub mod mix;
+pub mod silence;
 pub mod state;
+/// The macOS system-audio capture source. Declared only on macOS because every
+/// symbol in it is a CoreAudio or CoreFoundation one; other platforms answer
+/// "no tap" through `capture.rs::meeting_tap_source` instead of carrying a
+/// module that cannot compile.
+#[cfg(target_os = "macos")]
+pub mod tap;
 
 pub use state::VoiceRecordState;
 

@@ -66,6 +66,8 @@ pub mod read_text;
 pub mod scheme;
 pub mod voice;
 
+pub mod meeting;
+pub use meeting::{abort_active_session, MeetingSessionState};
 pub use voice::{abort_active_recording, VoiceRecordState};
 
 use tauri::plugin::{Builder, TauriPlugin};
@@ -148,6 +150,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             voice::commands::voice_record_start,
             voice::commands::voice_record_stop,
             voice::commands::voice_record_cancel,
+            // Meeting sessions (myne-md/myne#789): the microphone mixed with
+            // the system-audio tap, collected in capture order so the frontend
+            // can write them into a note. Registered HERE, in the desktop shim,
+            // because that is where every plugin's handler list lives; a
+            // command added to a module alone ships dead.
+            meeting::commands::meeting_session_start,
+            meeting::commands::meeting_session_stop,
+            meeting::commands::meeting_session_cancel,
         ])
         .setup(|app, _api| {
             // Load the bundled OCR weights once, at startup, from the Tauri

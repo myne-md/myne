@@ -78,7 +78,10 @@ pub async fn voice_record_start<R: Runtime>(
     // would otherwise be mostly identical floats (a flat/silent meter emits once).
     let emitter = app.clone();
     let last_q = Arc::new(AtomicI16::new(-1));
-    let level_sink: Box<dyn Fn(f32) + Send> = Box::new(move |level| {
+    // The voice-note flow has no system-audio half, so the second argument is
+    // always `None` here. It exists because the meeting session shares this
+    // capture path and watches that value for a denied tap.
+    let level_sink: Box<dyn Fn(f32, Option<f32>) + Send> = Box::new(move |level, _tap| {
         let q = (level.clamp(0.0, 1.0) * 64.0).round() as i16;
         if last_q.swap(q, Ordering::Relaxed) != q {
             let _ = emitter.emit(VOICE_LEVEL_EVENT, level);
@@ -196,7 +199,7 @@ async fn consume_clips<R: Runtime>(app: AppHandle<R>, mut rx: UnboundedReceiver<
 /// attachment under `filename`. The single store path for BOTH the final clip
 /// (`voice_record_stop`) and continuation clips (`consume_clips`) — a future
 /// encoder swap (Opus) or metadata change touches exactly one place.
-async fn encode_and_import_clip<R: Runtime>(
+pub(crate) async fn encode_and_import_clip<R: Runtime>(
     app: &AppHandle<R>,
     samples: Zeroizing<Vec<i16>>,
     sample_rate: u32,
