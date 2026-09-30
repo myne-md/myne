@@ -7372,4 +7372,28 @@ export const ROSTER = Object.freeze([
     manual: [],
     exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues): e2e/support/session.ts already SIGKILLs the whole driver→app process group (killTree) and supports keeping the data dir, so a hard kill followed by a relaunch is a real crash test; and the web lane's profileDir is harness-owned and reusable across sessions, which covers the tab-close and browser-quit pagehide paths.",
   },
+  {
+    id: "plain-file-editor",
+    title: "Plain-file editor: open and edit on-disk markdown without a vault",
+    paths: [
+      "src/plain/PlainFileScreen.tsx",
+      "src/plain/store.ts",
+      "src/plain/surfaceMode.ts",
+      "src/components/settings/PlainFileSettings.tsx",
+      "src/platform/plainFile.ts",
+      "src-tauri/src/plugins/plain_file/",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/plain-file-editor.e2e.ts"],
+    manual: [
+      {
+        see: "With Developer mode and the plain-file editor on (Settings > Editor): on macOS from Finder and on Windows from Explorer, drag a .md onto the Myne window. Confirm the marked surface appears, that the marker reads as local and unencrypted, edit a line and confirm the file's bytes changed on disk with no note appearing and nothing syncing; quit and confirm no recent-files list holds it. Repeat with the vault locked. Before graduation the .md association is deliberately NOT registered, so Finder/Explorer 'Open With' is expected not to list Myne, and that absence is itself the pass condition.",
+        whyNotAutomated: "A native drag session and the Finder/Explorer integration are OS event sources the tauri-driver lane cannot raise: the runner is a Linux container with no file manager and no desktop portal, and the WKWebView and WebView2 renderings of the marker are unexercised there as well. The argv ingress, the device-local gate, autosave and the conflict banner ARE automated in e2e/plain-file-editor.e2e.ts, which is why this item is only the OS-level half.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 12,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
 ]);

@@ -18,6 +18,7 @@ permissions = [
     "allow-plain-file-read",
     "allow-plain-file-write",
     "allow-plain-file-close",
+    "allow-plain-file-take-unclaimed",
 ]
 
 [[permission]]
@@ -50,3 +51,8 @@ commands.allow = ["plain_file_write"]
 identifier = "allow-plain-file-close"
 description = "Allow invoking plain-file:plain_file_close (drops a handle; idempotent)."
 commands.allow = ["plain_file_close"]
+
+[[permission]]
+identifier = "allow-plain-file-take-unclaimed"
+description = "Allow invoking plain-file:plain_file_take_unclaimed (drains the handles an OS ingress minted before the WebView attached its listener; each carries name + content + base hash, never a path)."
+commands.allow = ["plain_file_take_unclaimed"]
