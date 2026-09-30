@@ -98,6 +98,14 @@ const scrollAreaStyle: CSSProperties = {
   minWidth: 0,
   overflowX: "auto",
   overflowY: "hidden",
+  // One pixel of room BELOW the tabs, inside this box's clip. The active tab
+  // hangs 1px past its row to paint over the strip's bottom rule (see the tab
+  // style), and `overflow-x: auto` forces `overflow-y` to clip as well — so
+  // without this the hang was cut off at this element's padding edge and the
+  // rule ran straight under the active tab. Padding extends the clip region;
+  // the equal negative margin keeps the strip's own height unchanged.
+  paddingBottom: 1,
+  marginBottom: -1,
 };
 
 /** Height of the small strip buttons (+ / overflow). Matched to the floated

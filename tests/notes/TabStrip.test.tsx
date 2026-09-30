@@ -126,6 +126,19 @@ describe("the active tab breaks the strip's bottom rule", () => {
     ).toContain("var(--bg-1)");
   });
 
+  it("is not clipped by the scrolling row that holds it", () => {
+    // The overhang above was asserted and the rule still showed on screen. The
+    // row the tabs scroll in is `overflow-x: auto`, which forces `overflow-y`
+    // to clip too, so the hanging pixel was cut at the row's padding edge. The
+    // row therefore carries one pixel of padding below the tabs (inside its
+    // clip) and the equal negative margin, which keeps the strip's height.
+    setup();
+    const row = tabAt(1).parentElement as HTMLElement;
+    expect(row.style.overflowY, "not the row this test is about").toBe("hidden");
+    expect(row.style.paddingBottom, "the overhang is clipped by the row").toBe("1px");
+    expect(row.style.marginBottom, "and the strip grew a pixel").toBe("-1px");
+  });
+
   it("leaves every inactive tab's stretch of the rule intact", () => {
     // An inactive tab is transparent: a filled bottom border there would punch
     // a hole in the rule under a tab that is not open, which is the same defect
