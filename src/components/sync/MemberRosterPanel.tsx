@@ -24,7 +24,8 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
-import { MULTILINE_STYLE } from "../settings/panel-styles";
+import { HELPER_STYLE, MULTILINE_STYLE } from "../settings/panel-styles";
+import { SettingsSection } from "../settings/SettingsSection";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
 import { buildPhraseCredential } from "./phrase-credential";
 import { toast } from "../toast/toastStore";
@@ -58,6 +59,28 @@ const CODE_STYLE: CSSProperties = {
 const STATUS_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
+  // The panel stacks several sentences; without this each `<p>` keeps the
+  // WebView's default paragraph margin and the flex gap doubles on top of it,
+  // which is what opened the dead gaps between the identity-status lines.
+  margin: 0,
+};
+
+/** The panel's outer rhythm: each sub-section is one `SettingsSection`, so the
+ *  gaps match every other settings panel instead of a private `--space-3`. */
+const ROOT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-5)",
+  alignSelf: "stretch",
+  width: "100%",
+};
+
+const LIST_STYLE: CSSProperties = {
+  listStyle: "none",
+  margin: 0,
+  padding: 0,
+  display: "flex",
+  flexDirection: "column",
 };
 
 /** A section's own vertical rhythm. The panel's two identity blocks are plain
@@ -105,7 +128,6 @@ export function MemberRosterPanel({
   const {
     members,
     authority,
-    groupKeyEpoch,
     loading,
     error,
     inviting,
@@ -247,8 +269,14 @@ export function MemberRosterPanel({
   );
 
   return (
-    <div data-testid="member-roster">
-      {/* Step 1: the person identity. One unlock per process. */}
+    <div data-testid="member-roster" style={ROOT_STYLE}>
+      {/* The inviting identity: the person this device invites as. One unlock
+          per process. Grouped under its own heading so it reads apart from the
+          member list and the invitations below. */}
+      <SettingsSection
+        title={t("sync.memberRoster.identityHeading")}
+        testId="member-roster.identity-section"
+      >
       {!personReady ? (
         <div data-testid="member-roster.person-unlock" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
@@ -271,6 +299,7 @@ export function MemberRosterPanel({
           <Button
             type="button"
             variant="primary"
+            style={{ alignSelf: "flex-start" }}
             data-testid="member-roster.person-unlock-button"
             disabled={!phraseCells.every((cell) => cell.length > 0)}
             onClick={async () => {
@@ -428,7 +457,7 @@ export function MemberRosterPanel({
             <Button
               type="button"
               variant="ghost"
-              style={{ ...ROW_ACTION_STYLE, marginTop: "var(--space-2)" }}
+              style={{ ...ROW_ACTION_STYLE, marginTop: "var(--space-2)", alignSelf: "flex-start" }}
               onClick={() => {
                 setForgetOpen(true);
                 setForgetError(false);
@@ -440,27 +469,36 @@ export function MemberRosterPanel({
           )}
         </div>
       )}
+      </SettingsSection>
 
-      {/* Step 2: the roster. Removal is parked until the roster wire ships:
-          no per-row Remove button renders, and the notice below states the
-          disabled state instead of promising a flow that cannot run. */}
+      {/* The members list and the invite action that adds to it. */}
+      <SettingsSection
+        title={t("sync.memberRoster.membersHeading")}
+        testId="member-roster.members-section"
+      >
       {members.length === 0 ? (
-        <p data-testid="member-roster.empty" style={STATUS_STYLE}>
+        <p data-testid="member-roster.empty" style={HELPER_STYLE}>
           {t("sync.memberRoster.empty")}
         </p>
       ) : (
         <>
-          {groupKeyEpoch !== null ? (
-            <p data-testid="member-roster.epoch" style={STATUS_STYLE}>
-              {t("sync.memberRoster.epoch", { epoch: groupKeyEpoch })}
-            </p>
-          ) : null}
-          <ul data-testid="member-roster.list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          <ul data-testid="member-roster.list" style={LIST_STYLE}>
             {members.map((m) => (
               <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex} style={ROW_STYLE}>
-                <span data-testid="member-roster.name" style={NAME_STYLE}>
-                  {m.display_name}
-                </span>
+                {/* The owner row's stored name is the vault label captured at
+                    migration, which is not a person and read as "Untitled
+                    vault" (myne#795 UI pass). Render "You" for the owner and a
+                    name only when one is actually known; the fingerprint beside
+                    it is the identity. */}
+                {m.role === "owner" ? (
+                  <span data-testid="member-roster.name" style={NAME_STYLE}>
+                    {t("sync.memberRoster.youBadge")}
+                  </span>
+                ) : m.display_name ? (
+                  <span data-testid="member-roster.name" style={NAME_STYLE}>
+                    {m.display_name}
+                  </span>
+                ) : null}
                 <span data-testid="member-roster.role" style={CODE_STYLE}>
                   {m.role === "owner"
                     ? t("sync.memberRoster.ownerBadge")
@@ -510,73 +548,100 @@ export function MemberRosterPanel({
         </>
       )}
 
-      {/* Sent invitations, owner-only: claimed versus pending. The roster row
-          exists from invite time, so this list is how the owner tells an
-          accepted invite from one nobody has claimed yet. */}
-      {authority === "owner" && vaultInvites.length > 0 ? (
-        <div data-testid="member-roster.invitations" style={SECTION_STYLE}>
-          <p style={STATUS_STYLE}>{t("sync.memberRoster.invitationsHeading")}</p>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {vaultInvites.map((inv) => (
-              <li
-                key={inv.invite_id_hex}
-                data-testid="member-roster.invitation-row"
-                style={ROW_STYLE}
-              >
-                <span data-testid="member-roster.invitation-recipient" style={CODE_STYLE}>
-                  {inv.recipient_person_id_hex.slice(0, 16)}
-                </span>
-                <span
-                  data-testid="member-roster.invitation-status"
-                  data-claimed={inv.claimed ? "true" : "false"}
-                  style={STATUS_STYLE}
-                >
-                  {inv.claimed
-                    ? t("sync.memberRoster.invitationClaimed")
-                    : t("sync.memberRoster.invitationPending")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {authority === "owner" && personReady && vaultInvitesFailed ? (
-        <p data-testid="member-roster.invitations-error" role="alert" style={ERROR_STYLE}>
-          {t("sync.memberRoster.invitationsFailed")}
-        </p>
-      ) : null}
-
       {/* An unshared vault says so once, plainly, instead of leaving the reader
           to infer it from an error line. `shared` is the roster view's
           `group_key_epoch`, so this is a state and not a guess. */}
       {authority === "owner" && personReady && !shared ? (
-        <p data-testid="member-roster.unshared" style={STATUS_STYLE}>
+        <p data-testid="member-roster.unshared" style={HELPER_STYLE}>
           {t("sync.memberRoster.unsharedNotice")}
         </p>
       ) : null}
 
-      {/* Step 3: invite. Owner-only: a member is never shown an admin
-          control they cannot use (the backend refuses with `NotOwner`). */}
+      {/* Invite: owner-only. A member is never shown an admin control they
+          cannot use (the backend refuses with `NotOwner`). Left-aligned at its
+          natural width rather than stretched across the panel. */}
       {authority === "owner" ? (
-        <Button
-          type="button"
-          variant="primary"
-          data-testid="member-roster.invite-button"
-          disabled={!personReady || inviting}
-          onClick={() => {
-            // An `NTV5` vault gains the group tier on its first invite, which is
-            // PERMANENT. Say so BEFORE the form, rather than letting the user
-            // submit and infer it from a hidden retry (myne-md/myne#783).
-            if (!shared) {
-              setShareConfirmOpen(true);
-              return;
-            }
-            setInviteOpen(true);
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: "var(--space-2)",
           }}
         >
-          {t("sync.memberRoster.invite")}
-        </Button>
+          <Button
+            type="button"
+            variant="primary"
+            data-testid="member-roster.invite-button"
+            disabled={!personReady || inviting}
+            onClick={() => {
+              // An `NTV5` vault gains the group tier on its first invite, which
+              // is PERMANENT. Say so BEFORE the form, rather than letting the
+              // user submit and infer it from a hidden retry (myne-md/myne#783).
+              if (!shared) {
+                setShareConfirmOpen(true);
+                return;
+              }
+              setInviteOpen(true);
+            }}
+          >
+            {t("sync.memberRoster.invite")}
+          </Button>
+          {lastInvite ? (
+            <p data-testid="member-roster.invite-result" style={CODE_STYLE}>
+              {t("sync.memberRoster.inviteReady", {
+                fingerprint: lastInvite.member_fingerprint_hex.slice(0, 16),
+              })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      </SettingsSection>
+
+      {/* Sent invitations, owner-only: its own section so an accepted invite
+          reads apart from the live member list above. The roster row exists
+          from invite time, so this is how the owner tells an accepted invite
+          from one nobody has claimed yet. */}
+      {authority === "owner" ? (
+        <SettingsSection
+          title={t("sync.memberRoster.invitationsHeading")}
+          testId="member-roster.invitations-section"
+        >
+          {vaultInvites.length === 0 ? (
+            <p data-testid="member-roster.invitations-empty" style={HELPER_STYLE}>
+              {t("sync.memberRoster.noInvitations")}
+            </p>
+          ) : (
+            <ul data-testid="member-roster.invitations" style={LIST_STYLE}>
+              {vaultInvites.map((inv) => (
+                <li
+                  key={inv.invite_id_hex}
+                  data-testid="member-roster.invitation-row"
+                  style={ROW_STYLE}
+                >
+                  <span data-testid="member-roster.invitation-recipient" style={CODE_STYLE}>
+                    {inv.recipient_person_id_hex.slice(0, 16)}
+                  </span>
+                  <span
+                    data-testid="member-roster.invitation-status"
+                    data-claimed={inv.claimed ? "true" : "false"}
+                    style={STATUS_STYLE}
+                  >
+                    {inv.claimed
+                      ? t("sync.memberRoster.invitationClaimed")
+                      : t("sync.memberRoster.invitationPending")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {vaultInvitesFailed ? (
+            <p data-testid="member-roster.invitations-error" role="alert" style={ERROR_STYLE}>
+              {t("sync.memberRoster.invitationsFailed")}
+            </p>
+          ) : null}
+        </SettingsSection>
       ) : null}
 
       {shareConfirmOpen ? (
@@ -669,14 +734,6 @@ export function MemberRosterPanel({
             }
           }}
         />
-      ) : null}
-
-      {lastInvite ? (
-        <p data-testid="member-roster.invite-result" style={CODE_STYLE}>
-          {t("sync.memberRoster.inviteReady", {
-            fingerprint: lastInvite.member_fingerprint_hex.slice(0, 16),
-          })}
-        </p>
       ) : null}
 
       {actionError ? (
