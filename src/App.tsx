@@ -23,6 +23,11 @@ import {
   type SuspicionReason,
   type VaultId,
 } from "./lib/stage";
+import {
+  dormancyForLock,
+  restoreDormant,
+  usePlainFileState,
+} from "./plain/store";
 import { PairingDialog } from "./components/PairingDialog";
 import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
@@ -53,6 +58,15 @@ import { detachedNoteId as readDetachedNoteId } from "./lib/detachedWindow";
 // GraphView → GraphCanvas, the app's other lazy boundary).
 const Editor = lazy(() =>
   import("./screens/Editor").then((m) => ({ default: m.Editor })),
+);
+
+/** Lazy for the same reason as `Editor`: the surface mounts `@myne/editor`, and
+ *  a static import would pull the whole engine into the first-load bundle of
+ *  every stage (web bundle budget, `check-web-bundle-budget.mjs`). */
+const PlainFileScreen = lazy(() =>
+  import("./plain/PlainFileScreen").then((m) => ({
+    default: m.PlainFileScreen,
+  })),
 );
 
 /**
@@ -566,6 +580,28 @@ function App() {
     }
   };
 
+  // The plain-file surface (myne-md/myne#788). Rendered OVER the vault stage
+  // whenever files are open, in every vault state: a locked vault and a device
+  // with no vault both still open the user's own files. The vault stays exactly
+  // where it was behind it, and closing the last tab reveals it again.
+  //
+  // Lock/unlock parks the tabs in RAM (`dormancyForLock`, after the flush) and
+  // brings them back on unlock; a restart restores nothing, which is the
+  // zero-trace rule. The Rust-side handles stay alive through dormancy, because
+  // the frontend holds no path with which it could re-open them.
+  const plainState = usePlainFileState();
+  const plainScreen = plainState.files.length > 0;
+  const prevStageRef = useRef(stage.name);
+  useEffect(() => {
+    const previous = prevStageRef.current;
+    prevStageRef.current = stage.name;
+    if (previous === "editor" && stage.name !== "editor") {
+      void dormancyForLock();
+    } else if (previous !== "editor" && stage.name === "editor") {
+      restoreDormant();
+    }
+  }, [stage.name]);
+
   const screen = (() => {
     switch (stage.name) {
       case "account-entry":
@@ -864,7 +900,13 @@ function App() {
           flexDirection: "column",
         }}
       >
-        {screen}
+        {plainScreen ? (
+          <Suspense fallback={null}>
+            <PlainFileScreen />
+          </Suspense>
+        ) : (
+          screen
+        )}
       </div>
       {/* Browser-extension pairing prompt (ext-foundation-handoff task 4,
           TB10). Mounted globally so a connect request from the extension

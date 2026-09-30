@@ -24,6 +24,7 @@ import { asViewMode } from "../../editor/view-mode";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
 import { VimModeSettings } from "./VimModeSettings";
+import { PlainFileSettings } from "./PlainFileSettings";
 import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
 import { DateTimeSettings } from "./DateTimeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
@@ -414,6 +415,11 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
             where the topic lives. Hiding is not disabling - an already-enabled
             keymap keeps running when the mode goes back off. */}
         {prefs.developer_mode && <VimModeSettings />}
+        {/* Plain-file editor (myne-md/myne#788). Behind the same Developer
+            gate as vim mode: it opens files OUTSIDE the vault, in plaintext,
+            so it stays opt-in per device. Not a vault pref — the switch is
+            device-local because the surface works with the vault locked. */}
+        {prefs.developer_mode && <PlainFileSettings />}
         {/* Default view mode (reading-source-modes, MYND-299) - Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />

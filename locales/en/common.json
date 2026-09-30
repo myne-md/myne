@@ -2544,6 +2544,17 @@
       "defaultSlotName": "Default"
     }
   },
+  "plainFile": {
+    "closeTab": "Close {{name}}",
+    "conflict": {
+      "body": "This file changed on disk while you were editing. Myne has not written anything.",
+      "overwrite": "Overwrite with my changes",
+      "reload": "Reload from disk"
+    },
+    "empty": "No file is open.",
+    "marker": "Local file. Not encrypted, and not part of any vault.",
+    "tabs": "Open local files"
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Checking strength…",
@@ -3141,6 +3152,11 @@
       "label": "Line numbers",
       "off": "Off",
       "on": "On"
+    },
+    "plainFile": {
+      "errorSaveSetting": "Could not save the plain-file setting.",
+      "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. Off by default.",
+      "label": "Plain-file editor"
     },
     "views": {
       "helper": "Show the Views entry in the sidebar for saving filtered note lists. Off by default; on if you already have views.",

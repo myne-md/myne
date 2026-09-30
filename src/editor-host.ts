@@ -42,6 +42,7 @@ import { has } from "./platform/capabilities";
 // though this boot-time seam install needs none of it. host.ts is CodeMirror-free
 // at runtime (its only `@codemirror/*` reference is an `import type`).
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
+import { isPlainSurfaceActive } from "./plain/surfaceMode";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
 import {
@@ -74,9 +75,35 @@ import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
 import { setAttachmentToastSink } from "./editor/attachments/toast";
 import { toast } from "./components/toast/toastStore";
 
+/**
+ * The editor preferences the plain surface answers with (myne-md/myne#788).
+ *
+ * Never read from the vault: `vault.prefs` is unreadable with the vault locked
+ * and does not exist before one, which is exactly the states the surface must
+ * work in. `spell_enabled: false` is the second half of the grill's Q18 (no
+ * spellcheck on this surface), enforced here rather than by remembering to
+ * hide the squiggles.
+ */
+const PLAIN_SURFACE_PREFS: EditorPrefs = {
+  editor_content_width: null,
+  editor_font_family: null,
+  editor_line_spacing: null,
+  editor_text_size: null,
+  spell_enabled: false,
+  spell_languages: [],
+};
+
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
-  notes: { tagTree, isMediaTarget },
+  notes: {
+    // The tag tree is vault content, and the tag suggestion band asks for it
+    // the moment a `#` is typed. While the plain surface is active the answer
+    // is the empty tree, so a loose file's tags lead nowhere rather than
+    // reaching into the vault. (`isMediaTarget` is a pure predicate.)
+    tagTree: () =>
+      isPlainSurfaceActive() ? Promise.resolve([]) : tagTree(),
+    isMediaTarget,
+  },
   // Same code for desktop and web, and the substitution is the whole point: the
   // desktop seam re-exports the Tauri clipboard plugin's write, the web seam IS
   // the raw WebView write. `editor/` sees one member either way, which is what
@@ -134,7 +161,13 @@ const host: EditorHost = {
     // warms the ids the OPEN DOCUMENT embeds and has no thumbnails to remount,
     // so it wants the void contract. Keeping `EditorHost.warmRefs` as-is is also
     // what keeps this change out of the mobile client's build.
+    // Vault-coupled: the warm pass asks the attachments plugin for ids. While
+    // the plain surface is active it is skipped entirely, so a loose file that
+    // happens to embed an `attachment://` literal warms nothing. (`resolveRef`
+    // beside it needs no guard: on desktop it is a pure string transform, no
+    // IPC and no IO.)
     warmRefs: async (ids) => {
+      if (isPlainSurfaceActive()) return;
       await warmAttachmentUrls(ids);
     },
     attachmentExport,
@@ -150,7 +183,10 @@ const host: EditorHost = {
     // MYND-268 Tier-2: decrypt + Rust-parse docx/xlsx into a structured model.
     readStructured: attachmentReadStructured,
   },
-  prefsRead: async (): Promise<EditorPrefs> => (await prefsRead()) as EditorPrefs,
+  prefsRead: async (): Promise<EditorPrefs> =>
+    isPlainSurfaceActive()
+      ? PLAIN_SURFACE_PREFS
+      : ((await prefsRead()) as EditorPrefs),
   openExternal: (url) => {
     void openUrl(url).catch((err: unknown) => {
       if (import.meta.env.DEV) console.warn("openExternal: openUrl rejected", err);
@@ -165,7 +201,24 @@ const host: EditorHost = {
   // `spell` is that omission disables the feature, so the editor renders no
   // squiggles and no dictionary affordances rather than ones that reject.
   ...(has("spellCheck")
-    ? { spell: { spellCheck, addToPersonalDictionary, ignoreWordInVault } }
+    ? {
+        spell: {
+          // The personal dictionary is vault content. While the plain surface
+          // is active every member answers emptily, so the pass cannot read
+          // or write `vault.dictionary` even if a future change re-enables
+          // `spell_enabled` for this surface.
+          spellCheck: (words: string[], langs: string[]) =>
+            isPlainSurfaceActive() ? Promise.resolve([]) : spellCheck(words, langs),
+          addToPersonalDictionary: (word: string) =>
+            isPlainSurfaceActive()
+              ? Promise.resolve()
+              : addToPersonalDictionary(word),
+          ignoreWordInVault: (word: string) =>
+            isPlainSurfaceActive()
+              ? Promise.resolve()
+              : ignoreWordInVault(word),
+        },
+      }
     : {}),
   // Native mic capture (MYND-259). Present on both clients as CODE — the calls
   // route through the seam like everything else — but the web `invoke` refuses

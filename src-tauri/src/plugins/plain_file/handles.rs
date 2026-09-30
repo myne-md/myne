@@ -186,6 +186,14 @@ pub struct PlainFileRegistry {
     /// Keyed by handle. Values carry the CANONICAL path, so every later IO
     /// targets the resolved file rather than a symlink the user clicked.
     entries: HashMap<u64, Entry>,
+    /// Handles an ingress minted that the frontend has not claimed yet.
+    ///
+    /// The startup argv path runs before the WebView can have attached its
+    /// event listener, so an emitted event alone would lose the file on every
+    /// cold launch. The frontend drains this list on mount as well as
+    /// subscribing (`plain_file_take_unclaimed`), which makes the two orders
+    /// equivalent.
+    unclaimed: Vec<u64>,
 }
 
 impl PlainFileRegistry {
@@ -236,8 +244,12 @@ impl PlainFileRegistry {
             .find(|(_, entry)| entry.path == canonical)
         {
             entry.eol = eol;
+            let handle = *handle;
+            if !self.unclaimed.contains(&handle) {
+                self.unclaimed.push(handle);
+            }
             return Ok(OpenedFile {
-                handle: *handle,
+                handle,
                 name,
                 content,
                 base_hash: hash_bytes(&bytes),
@@ -253,6 +265,7 @@ impl PlainFileRegistry {
                 eol,
             },
         );
+        self.unclaimed.push(handle);
         Ok(OpenedFile {
             handle,
             name,
@@ -319,6 +332,35 @@ impl PlainFileRegistry {
     /// must not surface as an error.
     pub fn close(&mut self, handle: u64) {
         self.entries.remove(&handle);
+        self.unclaimed.retain(|h| *h != handle);
+    }
+
+    /// Every handle an ingress minted and the frontend has not claimed yet,
+    /// with fresh content, and clears the list.
+    ///
+    /// A handle that can no longer be read (deleted between ingest and claim)
+    /// is dropped silently: the frontend would have nothing to render.
+    pub fn take_unclaimed(&mut self) -> Vec<OpenedFile> {
+        let handles = std::mem::take(&mut self.unclaimed);
+        let mut out = Vec::with_capacity(handles.len());
+        for handle in handles {
+            let Ok(content) = self.read(handle) else {
+                continue;
+            };
+            let Some(entry) = self.entries.get(&handle) else {
+                continue;
+            };
+            let Some(name) = entry.path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            out.push(OpenedFile {
+                handle,
+                name: name.to_string(),
+                content: content.content,
+                base_hash: content.base_hash,
+            });
+        }
+        out
     }
 }
 
@@ -578,6 +620,31 @@ mod tests {
             .write(opened.handle, &opened.content, &opened.base_hash)
             .expect("write");
         assert_eq!(std::fs::read(&path).expect("read"), b"one\ntwo\r\nthree\n");
+    }
+
+    #[test]
+    fn unclaimed_handles_drain_exactly_once() {
+        let fixture = Fixture::new("unclaimed", true);
+        let path = fixture.write_file("note.md", b"# one");
+        let mut registry = PlainFileRegistry::default();
+
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+        let drained = registry.take_unclaimed();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].handle, opened.handle);
+        assert_eq!(drained[0].content, "# one");
+        assert_eq!(drained[0].name, "note.md");
+
+        // A second drain is empty, and reopening the same file re-arms it
+        // (the OS tried to open it again, so the frontend should focus it).
+        assert!(registry.take_unclaimed().is_empty());
+        registry.open(fixture.config.path(), &path).expect("reopen");
+        assert_eq!(registry.take_unclaimed().len(), 1);
+
+        // Closing drops an unclaimed handle too, so the frontend never sees a
+        // handle whose file is gone.
+        registry.close(opened.handle);
+        assert!(registry.take_unclaimed().is_empty());
     }
 
     #[cfg(unix)]

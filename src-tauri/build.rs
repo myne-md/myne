@@ -462,6 +462,7 @@ fn main() {
                 "plain_file_read",
                 "plain_file_write",
                 "plain_file_close",
+                "plain_file_take_unclaimed",
             ]),
         )
         .plugin(

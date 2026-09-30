@@ -24,6 +24,7 @@
 pub mod commands;
 pub mod gate;
 pub mod handles;
+pub mod ingest;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime};
@@ -47,6 +48,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::plain_file_read,
             commands::plain_file_write,
             commands::plain_file_close,
+            commands::plain_file_take_unclaimed,
         ])
         .build()
 }

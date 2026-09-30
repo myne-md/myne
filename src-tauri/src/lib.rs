@@ -267,6 +267,12 @@ pub fn run() {
             use tauri_plugin_deep_link::DeepLinkExt;
             app.deep_link().handle_cli_arguments(args.iter());
         }
+        // myne-md/myne#788: a second launch is also how Windows/Linux delivers
+        // a file association ("Open with Myne" on a `.md`). Ingested after the
+        // deep-link handoff: a `myne://` URL never survives the candidate
+        // filter (it is not a file path), so the order is about the window
+        // being raised, not about shadowing.
+        plugins::plain_file::ingest::ingest_args(app, args.clone());
         // The `show()` inside is load-bearing, not redundant with
         // `unminimize()`: auto-lock on idle calls `window.hide()` (orderOut on
         // macOS), which leaves the window HIDDEN rather than minimized.
@@ -639,6 +645,14 @@ pub fn run() {
             if let Ok(config_dir) = app.path().app_config_dir() {
                 let _ = std::fs::remove_dir_all(config_dir.join("themes"));
             }
+            // myne-md/myne#788: the FIRST-launch argv ingress for the
+            // plain-file editor. The second-launch path is the single-instance
+            // callback below; this covers a cold start from a file association
+            // on Windows/Linux and the E2E's argv launch. Silent while the gate
+            // is off, by design. The file is also held for the frontend to
+            // claim (`plain_file_take_unclaimed`), because this runs before the
+            // WebView could have attached its listener.
+            plugins::plain_file::ingest::ingest_args(app.handle(), std::env::args().collect());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -665,6 +679,16 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 screen_capture::show_protected(app_handle, "macos_reopen");
+            }
+            // myne-md/myne#788: macOS delivers a file open (Finder, `open -a`,
+            // drag onto the Dock icon) as an Apple Event, not as argv. Two
+            // shapes reach here: a cold launch (where the setup-time ingest
+            // above has already run and this URL list is the real delivery) and
+            // a warm app. `ingest_urls` is gate-checked and first-match-wins,
+            // so a duplicate delivery collapses onto the same handle.
+            #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                plugins::plain_file::ingest::ingest_urls(app_handle, urls.clone());
             }
             // MYND-650 task 2: terminate the arti sidecar before the process
             // goes away. A Tor client left holding circuits open after the app

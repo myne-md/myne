@@ -113,3 +113,22 @@ pub async fn plain_file_close(
     .await
     .map_err(|_| registry_unavailable())?
 }
+
+/// Every handle an ingress minted that this frontend has not claimed yet.
+///
+/// The startup argv ingest runs before the WebView can attach its listener, so
+/// the frontend drains this on mount in addition to subscribing to
+/// `plain-file:opened`. Both orders deliver the file exactly once to a store
+/// keyed by handle.
+#[tauri::command]
+pub async fn plain_file_take_unclaimed(
+    registry: State<'_, SharedRegistry>,
+) -> Result<Vec<super::handles::OpenedFile>, PlainFileError> {
+    let registry = registry.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = registry.lock().map_err(|_| registry_unavailable())?;
+        Ok(guard.take_unclaimed())
+    })
+    .await
+    .map_err(|_| registry_unavailable())?
+}
