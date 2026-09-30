@@ -77,3 +77,31 @@ export async function plainFileWrite(
 export async function plainFileClose(handle: number): Promise<void> {
   await invoke<void>("plugin:plain-file|plain_file_close", { handle });
 }
+
+/** Save-copy to a user-named file. Mobile: rejects (the plugin is not registered). */
+export async function plainFileSaveCopy(
+  handle: number,
+  content: string,
+): Promise<string | null> {
+  return await invoke<string | null>("plugin:plain-file|plain_file_save_copy", {
+    handle,
+    content,
+  });
+}
+
+/** The in-app Open. Mobile: rejects (the plugin is not registered here). */
+export async function plainFileOpenDialog(): Promise<void> {
+  await invoke<void>("plugin:plain-file|plain_file_open_dialog");
+}
+
+/** Deep-link resolve. Mobile: rejects (its deep links are `myne://open`/`capture`). */
+export async function plainFileResolvePath(path: string): Promise<string> {
+  return await invoke<string>("plugin:plain-file|plain_file_resolve_path", {
+    path,
+  });
+}
+
+/** Confirmed deep-link open. Mobile: rejects. */
+export async function plainFileOpenConfirmed(path: string): Promise<void> {
+  await invoke<void>("plugin:plain-file|plain_file_open_confirmed", { path });
+}

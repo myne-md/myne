@@ -11,14 +11,18 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the plain-file plugin: the device-local gate plus handle-scoped IO for the sandboxed on-disk markdown editor."
+description = "Default permission set for the plain-file plugin: the device-local gate, handle-scoped IO for the sandboxed on-disk markdown editor, and the in-app/dialog and confirmed-deep-link ingress commands."
 permissions = [
     "allow-gate-get",
     "allow-gate-set",
     "allow-plain-file-read",
     "allow-plain-file-write",
+    "allow-plain-file-save-copy",
     "allow-plain-file-close",
     "allow-plain-file-take-unclaimed",
+    "allow-plain-file-open-dialog",
+    "allow-plain-file-resolve-path",
+    "allow-plain-file-open-confirmed",
 ]
 
 [[permission]]
@@ -31,11 +35,13 @@ identifier = "allow-gate-set"
 description = "Allow invoking plain-file:gate_set (atomic write of the device-local plain-file.json gate)."
 commands.allow = ["gate_set"]
 
-# The three IO commands take an OPAQUE HANDLE, never a path. A handle exists
-# only because a Rust-side ingress opened a user-granted file, so the WebView
-# cannot name a path these commands will touch. The gate is checked when the
-# handle is minted, not here (see `handles.rs` for why the flush must survive a
-# gate toggle). All three are main-window-only.
+# The handle-scoped commands take an OPAQUE HANDLE, never a path (the save-copy
+# command is the one exception and takes the user's buffer, with the
+# destination chosen in a host-side dialog). A handle exists only because a
+# Rust-side ingress opened a user-granted file, so the WebView cannot name a
+# path these commands will touch. The gate is checked when the handle is
+# minted, not here (see `handles.rs` for why the flush must survive a gate
+# toggle). All are main-window-only.
 
 [[permission]]
 identifier = "allow-plain-file-read"
@@ -47,6 +53,14 @@ identifier = "allow-plain-file-write"
 description = "Allow invoking plain-file:plain_file_write (compare-and-swap write of the handle's file: refuses with a conflict when the on-disk hash no longer matches expected_base; atomic and permission-preserving)."
 commands.allow = ["plain_file_write"]
 
+# The conflict banner's copy arm. The destination comes from the native save
+# dialog, which runs host-side, and the answer is the written file's NAME (a
+# cancelled dialog answers null). No path crosses IPC in either direction.
+[[permission]]
+identifier = "allow-plain-file-save-copy"
+description = "Allow invoking plain-file:plain_file_save_copy (writes the caller's buffer to a file the user names in the native save dialog; returns the written file name or null on cancel; never a path)."
+commands.allow = ["plain_file_save_copy"]
+
 [[permission]]
 identifier = "allow-plain-file-close"
 description = "Allow invoking plain-file:plain_file_close (drops a handle; idempotent)."
@@ -56,3 +70,25 @@ commands.allow = ["plain_file_close"]
 identifier = "allow-plain-file-take-unclaimed"
 description = "Allow invoking plain-file:plain_file_take_unclaimed (drains the handles an OS ingress minted before the WebView attached its listener; each carries name + content + base hash, never a path)."
 commands.allow = ["plain_file_take_unclaimed"]
+
+# The ingress commands. Their arguments are path-SHAPED strings, which is the
+# widest surface in this plugin, so each one is narrow on its own: the dialog
+# command takes no argument at all and reaches the OS picker host-side; the
+# resolve command only canonicalises and returns the display path; the
+# confirmed command is the single open path, and it re-runs gate, extension
+# and size validation before anything is read. All three are main-window-only.
+
+[[permission]]
+identifier = "allow-plain-file-open-dialog"
+description = "Allow invoking plain-file:plain_file_open_dialog (opens the native Markdown-filtered file dialog; the picked file is opened host-side and no path is returned to the WebView)."
+commands.allow = ["plain_file_open_dialog"]
+
+[[permission]]
+identifier = "allow-plain-file-resolve-path"
+description = "Allow invoking plain-file:plain_file_resolve_path (gate-checked canonicalisation of a caller-named path, for the deep-link confirmation's display; reads no content and mints no handle)."
+commands.allow = ["plain_file_resolve_path"]
+
+[[permission]]
+identifier = "allow-plain-file-open-confirmed"
+description = "Allow invoking plain-file:plain_file_open_confirmed (the deep link's confirmed open: re-validates gate, extension and size on the canonical path, then funnels into the shared ingest)."
+commands.allow = ["plain_file_open_confirmed"]

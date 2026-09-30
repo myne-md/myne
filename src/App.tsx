@@ -29,6 +29,12 @@ import {
   restoreDormant,
   usePlainFileState,
 } from "./plain/store";
+import { OpenFileConfirm } from "./plain/OpenFileConfirm";
+import {
+  OPEN_FILE_EVENT,
+  consumePendingOpenFile,
+  type OpenFileRequest,
+} from "./plain/openFileDeepLink";
 import { PairingDialog } from "./components/PairingDialog";
 import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
@@ -469,6 +475,20 @@ function App() {
   // stays installed for the process lifetime (the store guards re-entry).
   useEffect(() => {
     void initializePlainFiles();
+  }, []);
+  // The `myne://open-file` confirmation (myne-md/myne#788 task 12). The handler
+  // latches an already-resolved canonical path and fires a bare event; App owns
+  // the one slot because the dialog must be able to appear over ANY vault stage,
+  // including locked. Same drain shape as ThemeInstallDialog, deliberately.
+  const [openFileRequest, setOpenFileRequest] = useState<OpenFileRequest | null>(null);
+  useEffect(() => {
+    const drain = () => {
+      const next = consumePendingOpenFile();
+      if (next) setOpenFileRequest(next);
+    };
+    drain();
+    window.addEventListener(OPEN_FILE_EVENT, drain);
+    return () => window.removeEventListener(OPEN_FILE_EVENT, drain);
   }, []);
   const prevStageRef = useRef(stage?.name ?? null);
   useEffect(() => {
@@ -943,6 +963,15 @@ function App() {
           those surfaces have somewhere to render. */}
       <Toaster />
       <PairingDialog />
+      {/* The `myne://open-file` confirmation. Nothing opens until Confirm, and
+          the path it shows is the host-resolved canonical one; gate-off links
+          never reach the latch, so this renders nothing for them. */}
+      {openFileRequest !== null && (
+        <OpenFileConfirm
+          path={openFileRequest.path}
+          onClose={() => setOpenFileRequest(null)}
+        />
+      )}
       {/* "Add this device to an account" (MYND-424; myne#221 opened it to the
           picker + switcher). Mounted here, over whatever stage is showing,
           because three stages offer the same door and each lands differently —

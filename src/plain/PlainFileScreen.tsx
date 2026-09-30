@@ -14,21 +14,71 @@
 // ratchet stays flat (`scripts/check-token-adoption.mjs`: a new file starts at
 // zero). The custom vault palette never reaches here (MYT1 is vault content).
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor";
 import { Icon } from "../components/primitives/Icon";
+import { ImportPlainFileButton } from "../components/plain/ImportPlainFileButton";
+import { OpenFileButton } from "./OpenFileButton";
 import { setPlainSurfaceActive } from "./surfaceMode";
 import {
   close,
   edit,
   flushAll,
+  resolveCopyWithSave,
   resolveReload,
   resolveOverwrite,
   save,
   setActive,
   usePlainFileState,
 } from "./store";
+
+/** The conflict banner's copy arm: busy + failure state around the store call. */
+function ConflictCopyButton({ handle }: { handle: number }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const copy = async () => {
+    setBusy(true);
+    setFailed(false);
+    const outcome = await resolveCopyWithSave(handle);
+    // "cancelled" is not a failure: the user closed the save dialog, so the
+    // banner stays and says nothing new.
+    if (outcome === "failed") setFailed(true);
+    setBusy(false);
+  };
+
+  return (
+    <>
+      <button
+        data-testid="plain-file.conflict.copy"
+        disabled={busy}
+        onClick={() => void copy()}
+        style={{
+          border: "1px solid var(--line-1)",
+          borderRadius: "var(--radius-2)",
+          background: "var(--paper)",
+          color: "var(--fg-1)",
+          padding: "var(--space-1) var(--space-2)",
+          cursor: "pointer",
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {t("plainFile.conflict.copy")}
+      </button>
+      {failed && (
+        <span
+          role="alert"
+          data-testid="plain-file.conflict.copy-error"
+          style={{ color: "var(--danger)", fontSize: "var(--text-xs)" }}
+        >
+          {t("plainFile.conflict.copyFailed")}
+        </span>
+      )}
+    </>
+  );
+}
 
 export function PlainFileScreen() {
   const { t } = useTranslation();
@@ -88,8 +138,6 @@ export function PlainFileScreen() {
       </div>
 
       <div
-        role="tablist"
-        aria-label={t("plainFile.tabs")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -97,57 +145,75 @@ export function PlainFileScreen() {
           padding: "var(--space-1) var(--space-2)",
           background: "var(--paper-2)",
           borderBottom: "1px solid var(--line-1)",
-          overflowX: "auto",
         }}
       >
-        {files.map((file) => {
-          const isActive = file.handle === activeHandle;
-          const dirty = file.status === "editing" || file.status === "saving";
-          return (
-            <div
-              key={file.handle}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-1)",
-                padding: "var(--space-1) var(--space-2)",
-                borderRadius: "var(--radius-2)",
-                background: isActive ? "var(--paper)" : "transparent",
-                color: isActive ? "var(--fg-1)" : "var(--fg-2)",
-              }}
-            >
-              <button
-                role="tab"
-                aria-selected={isActive}
-                data-testid="plain-file.tab"
-                onClick={() => setActive(file.handle)}
+        <div
+          role="tablist"
+          aria-label={t("plainFile.tabs")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-1)",
+            overflowX: "auto",
+            minWidth: 0,
+          }}
+        >
+          {files.map((file) => {
+            const isActive = file.handle === activeHandle;
+            const dirty = file.status === "editing" || file.status === "saving";
+            return (
+              <div
+                key={file.handle}
                 style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "inherit",
-                  font: "inherit",
-                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-1)",
+                  padding: "var(--space-1) var(--space-2)",
+                  borderRadius: "var(--radius-2)",
+                  background: isActive ? "var(--paper)" : "transparent",
+                  color: isActive ? "var(--fg-1)" : "var(--fg-2)",
+                  flexShrink: 0,
                 }}
               >
-                {file.name}
-                {dirty ? " •" : ""}
-              </button>
-              <button
-                aria-label={t("plainFile.closeTab", { name: file.name })}
-                data-testid="plain-file.close"
-                onClick={() => void close(file.handle)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--fg-2)",
-                  cursor: "pointer",
-                }}
-              >
-                ×
-              </button>
-            </div>
-          );
-        })}
+                <button
+                  role="tab"
+                  aria-selected={isActive}
+                  data-testid="plain-file.tab"
+                  onClick={() => setActive(file.handle)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    font: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {file.name}
+                  {dirty ? " •" : ""}
+                </button>
+                <button
+                  aria-label={t("plainFile.closeTab", { name: file.name })}
+                  data-testid="plain-file.close"
+                  onClick={() => void close(file.handle)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--fg-2)",
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <OpenFileButton />
+        {/* The one-shot vault crossing: acts on the ACTIVE tab, so it renders
+            only while a tab is open. Rendered from `src/components/plain/`
+            because it is the component allowed to reach vault modules (the
+            plain-surface import guard); this surface only places it. */}
+        {active !== null && <ImportPlainFileButton handle={active.handle} />}
       </div>
 
       {active?.status === "error" && (
@@ -227,6 +293,9 @@ export function PlainFileScreen() {
           >
             {t("plainFile.conflict.overwrite")}
           </button>
+          {/* The third arm (task 14): keep the user's text as a copy of their
+              choosing instead of choosing between the two files. */}
+          <ConflictCopyButton handle={active.handle} />
         </div>
       )}
 

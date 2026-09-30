@@ -461,8 +461,15 @@ fn main() {
                 "gate_set",
                 "plain_file_read",
                 "plain_file_write",
+                "plain_file_save_copy",
                 "plain_file_close",
                 "plain_file_take_unclaimed",
+                // The in-app dialog and the two deep-link commands
+                // (`plain_file_resolve_path` for the confirmation's canonical
+                // display, `plain_file_open_confirmed` for the open itself).
+                "plain_file_open_dialog",
+                "plain_file_resolve_path",
+                "plain_file_open_confirmed",
             ]),
         )
         .plugin(

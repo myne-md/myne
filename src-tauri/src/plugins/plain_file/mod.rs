@@ -9,15 +9,39 @@
 //!
 //! - `gate.rs`: the device-local `plain-file.json` gate, the single switch
 //!   every ingress consults before anything opens.
-//! - `commands.rs`: the IPC surface.
-//! - Later tasks add the handle registry, the read/CAS write commands and the
-//!   ingress (argv, OS open event, drag, dialog, CLI, deep link).
+//! - `handles.rs`: the handle registry, the read/CAS write IO and the shared
+//!   path validation (`resolve_openable`).
+//! - `commands.rs`: the IPC surface, including the in-app open dialog, the
+//!   conflict banner's save-copy dialog and the two deep-link commands.
+//! - `ingest.rs`: the funnel every externally-named path walks (argv, macOS
+//!   open event, dialog, CLI, confirmed deep link). The drag ingress is
+//!   deliberately absent; `ingest.rs`'s module docs carry the reason.
 //!
 //! ## Capability ACL
 //!
 //! `plain-file:default` is granted to the main window. There is no second
 //! window: the plain surface renders in the main webview in every vault state,
 //! so the capability set does not multiply.
+//!
+//! ## OS-level traces (task 6's checklist, verified 2026-09-30)
+//!
+//! The surface leaves no OS-level record of which files were opened. Three
+//! candidates were checked:
+//!
+//! - **macOS Recent Documents**: nothing in this repository calls
+//!   `noteNewRecentDocumentURL` / `addRecentDocument`
+//!   (`rg -ni "noteNewRecentDocumentURL|addRecentDocument|NSRecentDocuments"` is
+//   empty over the tree), and the pinned dialog backend contains no
+//!   recent-document API either (`tauri-plugin-dialog 2.7.1`, `rfd 0.16.0`):
+//!   the native panels do not feed `NSRecentDocuments` by themselves.
+//! - **Windows jump list**: nothing writes it
+//!   (`rg -ni "SetJumpList|JumpList|ICustomDestinationList|AddUserTasks"` over
+//!   the tree is empty, and neither `tauri` 2.11.2 nor `muda` 0.19.2 mentions
+//!   it).
+//! - **Window-state restoration**: the app does not use Tauri's window-state
+//!   plugin (`rg -n "window-state"` over `src-tauri/Cargo.toml`,
+//!   `src-tauri/tauri.conf.json` and `Cargo.lock` is empty), so no window
+//!   geometry or open-file state is restored at launch.
 //!
 //! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 
@@ -47,8 +71,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::gate_set,
             commands::plain_file_read,
             commands::plain_file_write,
+            commands::plain_file_save_copy,
             commands::plain_file_close,
             commands::plain_file_take_unclaimed,
+            commands::plain_file_open_dialog,
+            commands::plain_file_resolve_path,
+            commands::plain_file_open_confirmed,
         ])
         .build()
 }

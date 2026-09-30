@@ -17,6 +17,7 @@ import {
   onPlainFileOpened,
   plainFileClose,
   plainFileRead,
+  plainFileSaveCopy,
   plainFileTakeUnclaimed,
   plainFileWrite,
   type PlainFileOpened,
@@ -56,6 +57,17 @@ type State = {
 let state: State = { files: [], dormant: [], activeHandle: null };
 const listeners = new Set<() => void>();
 const timers = new Map<number, ReturnType<typeof setTimeout>>();
+/**
+ * The write already running for a handle, keyed per handle.
+ *
+ * `save` used to return IMMEDIATELY while one was in flight (the `status ===
+ * "saving"` guard), which is fine for the autosave caller and wrong for every
+ * caller that has to READ the settled result: `flushForImport` below must wait
+ * out the running write, or its conflict check reads a status that is about to
+ * change. Joining the promise is the whole fix; the guard stays for the
+ * (unreachable today) entry with no promise behind it.
+ */
+const inflight = new Map<number, Promise<void>>();
 
 function emit(): void {
   for (const listener of listeners) listener();
@@ -143,45 +155,136 @@ function errorKind(error: unknown): string | null {
  * chooses between reloading and overwriting first.
  */
 export async function save(handle: number): Promise<void> {
+  const running = inflight.get(handle);
+  if (running) {
+    // Join the write already in flight rather than returning into a status
+    // that is about to change; see `inflight` above.
+    return running;
+  }
   const file = find(handle);
   if (!file || file.status === "saving" || file.status === "conflict") return;
   const attempted = file.content;
   patch(handle, (f) => ({ ...f, status: "saving" }));
-  try {
-    const baseHash = await plainFileWrite(handle, attempted, file.baseHash);
-    const after = find(handle);
-    if (!after) return;
-    patch(handle, (f) => ({
-      ...f,
-      baseHash,
-      // A keystroke during the save moved the buffer on; the next idle pass
-      // owns it, so the status must not read "saved" over newer text.
-      status: after.content === attempted ? "saved" : "editing",
-      diskContent: undefined,
-      diskBaseHash: undefined,
-    }));
-  } catch (error) {
-    if (errorKind(error) === "conflict") {
-      try {
-        const disk = await plainFileRead(handle);
-        patch(handle, (f) => ({
-          ...f,
-          status: "conflict",
-          diskContent: disk.content,
-          diskBaseHash: disk.baseHash,
-        }));
-      } catch {
-        patch(handle, (f) => ({ ...f, status: "error" }));
+  const run = (async () => {
+    try {
+      const baseHash = await plainFileWrite(handle, attempted, file.baseHash);
+      const after = find(handle);
+      if (!after) return;
+      patch(handle, (f) => ({
+        ...f,
+        baseHash,
+        // A keystroke during the save moved the buffer on; the next idle pass
+        // owns it, so the status must not read "saved" over newer text.
+        status: after.content === attempted ? "saved" : "editing",
+        diskContent: undefined,
+        diskBaseHash: undefined,
+      }));
+    } catch (error) {
+      if (errorKind(error) === "conflict") {
+        try {
+          const disk = await plainFileRead(handle);
+          patch(handle, (f) => ({
+            ...f,
+            status: "conflict",
+            diskContent: disk.content,
+            diskBaseHash: disk.baseHash,
+          }));
+        } catch {
+          patch(handle, (f) => ({ ...f, status: "error" }));
+        }
+        return;
       }
-      return;
+      patch(handle, (f) => ({ ...f, status: "error" }));
     }
-    patch(handle, (f) => ({ ...f, status: "error" }));
+  })();
+  inflight.set(handle, run);
+  try {
+    await run;
+  } finally {
+    inflight.delete(handle);
   }
 }
 
 /** Flush every dirty buffer (blur, unmount, lock). Best effort. */
 export async function flushAll(): Promise<void> {
   await Promise.all(state.files.map((file) => save(file.handle)));
+}
+
+/**
+ * Flush the buffer so the file on disk holds it, and hand back the text to
+ * copy into a note. `null` means the flush did not land.
+ *
+ * A conflict or an I/O failure refuses the import rather than copying text the
+ * file does not hold: the banner owns that resolution, and the user's writing
+ * would otherwise exist only in the new note while the tab still claims a
+ * conflict. The loop covers a keystroke racing a write that was already
+ * landing; the bound exists so a user typing through the click cannot spin the
+ * import forever.
+ */
+export async function flushForImport(handle: number): Promise<string | null> {
+  if (!find(handle)) return null;
+  const timer = timers.get(handle);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(handle);
+  }
+  const current = find(handle);
+  if (!current) return null;
+  if (current.status === "conflict" || current.status === "error") return null;
+  // Already settled: the file holds this exact buffer, so a write here would
+  // only re-encrypt the same bytes.
+  if (current.status === "clean" || current.status === "saved") return current.content;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await save(handle);
+    const settled = find(handle);
+    if (!settled) return null;
+    if (settled.status === "conflict" || settled.status === "error") return null;
+    if (settled.status === "clean" || settled.status === "saved") return settled.content;
+  }
+  const settled = find(handle);
+  if (!settled || settled.status === "conflict" || settled.status === "error") return null;
+  return settled.content;
+}
+
+/**
+ * Import this tab's buffer into a new vault note and close the tab.
+ *
+ * `create` is injected because note creation is vault work and this module may
+ * not reach vault modules (the plain-surface import guard,
+ * `scripts/check-plain-surface-imports.mjs`); the caller owns it. The ordering
+ * is the contract: the flush lands BEFORE `create` sees the text, and the tab
+ * closes only after `create` resolved, so a failed import leaves the tab and
+ * the file exactly as they were.
+ *
+ * Returns the note id `create` produced, or `null` when nothing was imported.
+ * The original file on disk is untouched either way.
+ */
+export async function importToVault(
+  handle: number,
+  create: (file: { name: string; content: string }) => Promise<string>,
+): Promise<string | null> {
+  const content = await flushForImport(handle);
+  if (content === null) return null;
+  const file = find(handle);
+  if (!file) return null;
+  let noteId: string;
+  try {
+    noteId = await create({ name: file.name, content });
+  } catch {
+    return null;
+  }
+  // A keystroke may have landed while the note write ran. Settle it before the
+  // tab can go, for the same reason `close` flushes first: dropping the tab
+  // would drop that text with it (the note already holds the flush-time text).
+  // `flushForImport` refuses on a conflict, which keeps the tab so the banner
+  // owns the resolution; the note id is still returned because it did land.
+  if ((await flushForImport(handle)) === null) return noteId;
+  await plainFileClose(handle).catch(() => undefined);
+  const files = state.files.filter((f) => f.handle !== handle);
+  const nextActive =
+    state.activeHandle === handle ? (files[files.length - 1]?.handle ?? null) : state.activeHandle;
+  setState({ ...state, files, activeHandle: nextActive });
+  return noteId;
 }
 
 /** Adopt the disk content the conflict banner read. */
@@ -210,6 +313,44 @@ export function resolveOverwrite(handle: number): void {
     diskBaseHash: undefined,
   }));
   void save(handle);
+}
+
+/** What the conflict banner's copy arm decided. */
+export type SaveCopyOutcome = "saved" | "cancelled" | "failed";
+
+/**
+ * The conflict banner's third arm: write the buffer to a file the user names,
+ * then re-read the ORIGINAL so the tab shows what is on disk now.
+ *
+ * The user's text lives in the copy from here on; the original file is never
+ * written, and the banner clears only after the copy landed. A cancelled
+ * dialog changes nothing, which is why "cancelled" is distinct from "failed":
+ * only the latter owes the user a message.
+ */
+export async function resolveCopyWithSave(handle: number): Promise<SaveCopyOutcome> {
+  const file = find(handle);
+  if (!file || file.status !== "conflict") return "failed";
+  try {
+    if ((await plainFileSaveCopy(handle, file.content)) === null) return "cancelled";
+  } catch {
+    return "failed";
+  }
+  try {
+    const disk = await plainFileRead(handle);
+    patch(handle, (f) => ({
+      ...f,
+      content: disk.content,
+      baseHash: disk.baseHash,
+      status: "saved",
+      diskContent: undefined,
+      diskBaseHash: undefined,
+    }));
+  } catch {
+    // The original vanished between the copy and the re-read. Fall back to the
+    // snapshot the banner took; the next write surfaces whatever is true then.
+    resolveReload(handle);
+  }
+  return "saved";
 }
 
 export function setActive(handle: number): void {
@@ -287,4 +428,13 @@ export function initializePlainFiles(): Promise<void> {
     })();
   }
   return initialized;
+}
+
+/** @internal Test-only reset of the module-scope state. */
+export function __resetPlainStoreForTest(): void {
+  for (const timer of timers.values()) clearTimeout(timer);
+  timers.clear();
+  inflight.clear();
+  listeners.clear();
+  state = { files: [], dormant: [], activeHandle: null };
 }
