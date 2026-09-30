@@ -211,13 +211,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("121 twin(s) discovered");
+    expect(full.out).toContain("122 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("121 twin(s) discovered");
+    expect(full.out).toContain("122 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -227,7 +227,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("121 twin(s) discovered");
+    expect(full.out).toContain("122 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -260,7 +260,7 @@ describe("check-twin-inventory", () => {
     // (`src/lib/personAccount.ts` against `mobile/src/lib/personAccount.ts`),
     // recorded `decision` at entry time. A same-path pair the sweep DOES find,
     // so it is the roster entry rather than a curated one that classifies it.
-    expect(full.out).toContain("121 twin(s) discovered");
+    expect(full.out).toContain("122 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -434,12 +434,17 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(121);
+    expect(ROSTER.length).toBe(122);
   });
 
   it("keeps `screen` narrow", () => {
     // A count, and it is the weaker half of this pair on purpose: it catches the
     // verdict spreading, which is the failure the definition warns about.
+    //
+    // Raised from 11 to 12 by myne-md/myne#788, the plain-file editor: its
+    // `src/platform/plainFile.ts` is a seam module on the desktop side with a
+    // refusing mobile mirror, which is the same `screen` shape (#492) rather
+    // than a shared decision with a drifted twin.
     //
     // Raised from 6 to 11 when the platform seam entered the set. That is five
     // entries at once, which is exactly the spread this ceiling watches for, so
@@ -448,7 +453,7 @@ describe("check-twin-inventory", () => {
     // independent judgement calls. The enumeration below is what actually holds
     // the line; this number only notices growth nobody argued for.
     const screens = ROSTER.filter((e) => e.verdict === "screen");
-    expect(screens.length).toBeLessThanOrEqual(11);
+    expect(screens.length).toBeLessThanOrEqual(12);
   });
 
   it("holds `screen` to its definition, not to its count", () => {
@@ -474,6 +479,7 @@ describe("check-twin-inventory", () => {
       "src/platform/deepLink.ts", // host: deep-link registration
       "src/platform/event.ts", // host: backend-to-UI push
       "src/platform/path.ts", // host: path arithmetic over the host's filesystem
+      "src/platform/plainFile.ts", // seam (#788): desktop binding, mobile mirror refuses
       "src/platform/window.ts", // host: host-window lifecycle
       "src/vite-env.d.ts", // host: build-time ambient globals
     ]);

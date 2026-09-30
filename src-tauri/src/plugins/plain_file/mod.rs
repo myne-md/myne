@@ -7,9 +7,9 @@
 //!
 //! ## What the plugin owns
 //!
-//! - `gate.rs` — the device-local `plain-file.json` gate, the single switch
+//! - `gate.rs`: the device-local `plain-file.json` gate, the single switch
 //!   every ingress consults before anything opens.
-//! - `commands.rs` — the IPC surface.
+//! - `commands.rs`: the IPC surface.
 //! - Later tasks add the handle registry, the read/CAS write commands and the
 //!   ingress (argv, OS open event, drag, dialog, CLI, deep link).
 //!

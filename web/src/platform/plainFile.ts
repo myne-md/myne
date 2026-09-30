@@ -1,4 +1,4 @@
-// The plain-file editor seam — browser implementation (myne-md/myne#788).
+// The plain-file editor seam: browser implementation (myne-md/myne#788).
 //
 // A deliberate mirror of `src/platform/plainFile.ts`: the browser arm must
 // keep the identical signature, and there is no browser behaviour to give it.
@@ -10,7 +10,7 @@
 // seam contract would then have to special-case.
 //
 // The surface that calls these never renders in a browser, so the commands are
-// reachable only through a stale deep link or a replayed command — exactly the
+// reachable only through a stale deep link or a replayed command: exactly the
 // paths the typed refusal exists for.
 
 import { invoke } from "./core";

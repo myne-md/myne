@@ -37,7 +37,7 @@ import { seedVault } from "./support/fixtures";
 import { typeIntoEditor } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
 
-/** `<app_config_dir>/plain-file.json` — the device-local gate. */
+/** `<app_config_dir>/plain-file.json`: the device-local gate. */
 function gatePath(appConfigDir: string): string {
   return join(appConfigDir, "plain-file.json");
 }
@@ -99,7 +99,7 @@ describeE2E("plain-file editor", () => {
         // assert the surface never appeared. A wait-for-element would pass on
         // the wrong thing here, so the assertion is the absence.
         await app.session.waitForElement(
-          `${testIdSelector("welcome.create-vault")}, ${testIdSelector("welcome.identity-only")}`,
+          `${testIdSelector("welcome.create-cta")}, ${testIdSelector("welcome.identity-cta")}`,
         );
         const markers = await app.session.byTestIdAll("plain-file.marker");
         expect(markers).toHaveLength(0);

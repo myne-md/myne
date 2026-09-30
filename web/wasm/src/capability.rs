@@ -525,7 +525,7 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // myne-md/myne#788: the plain-file editor (device-local gate first; the
     // file IO and ingress land in later tasks). `Unsupported` rather than
     // `Pending`, for the reason `agent` above gives: the feature's own PRD
-    // puts web out of scope, and no port makes it meaningful — a browser has
+    // puts web out of scope, and no port makes it meaningful: a browser has
     // no OS file ingress, no handler registration and no device-local vault
     // state to be independent of. All of its commands share this class.
     ("plain-file", Class::Unsupported),

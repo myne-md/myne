@@ -1,4 +1,4 @@
-// The plain-file editor seam — desktop implementation (myne-md/myne#788).
+// The plain-file editor seam: desktop implementation (myne-md/myne#788).
 //
 // The commands take an OPAQUE HANDLE and never a path: a path only enters Rust
 // from an OS ingress or a native dialog, where it is canonicalised and minted.
@@ -36,7 +36,7 @@ const OPENED_EVENT = "plain-file:opened";
 /**
  * Whether the plain-file editor is enabled on this device.
  *
- * Answers `false` on every failure — an unreadable gate is never read as
+ * Answers `false` on every failure: an unreadable gate is never read as
  * enabled.
  */
 export async function plainFileGateGet(): Promise<boolean> {

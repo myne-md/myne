@@ -322,7 +322,7 @@ export type Capability =
    *
    * Desktop-only by the feature's own verdict: it needs an OS file ingress, a
    * native open dialog and, at graduation, a file-type handler registration,
-   * none of which a browser page has. Absent rather than degraded — the
+   * none of which a browser page has. Absent rather than degraded: the
    * surface is omitted, never rendered against commands that refuse.
    */
   | "plainFile";

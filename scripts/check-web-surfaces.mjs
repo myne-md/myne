@@ -159,6 +159,10 @@ const V = {
     "adapted",
     "Rendered only where `spellCheck` is present (task 47 decided its absence on web).",
   ],
+  "src/components/settings/PlainFileSettings.tsx": [
+    "excluded",
+    "Myne-md/myne#788. The row renders only where the `plainFile` capability is present, and web classifies the whole plugin absent: a browser has no OS file ingress, no native open dialog and no handler registration, and the surface exists to be independent of vault state in a way a sync-required browser session is not. The device-local gate file it writes would also be a desktop path.",
+  ],
   "src/components/settings/StartupOpenSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/StoragePanel.tsx": [
     "excluded",

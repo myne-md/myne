@@ -1,4 +1,4 @@
-// The plain-file editor seam — mobile implementation (myne-md/myne#788).
+// The plain-file editor seam: mobile implementation (myne-md/myne#788).
 //
 // A deliberate mirror of `src/platform/plainFile.ts`. Mobile has no OS file
 // ingress for this feature (its own file flows are the share sheet and the

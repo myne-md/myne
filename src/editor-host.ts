@@ -43,6 +43,7 @@ import { has } from "./platform/capabilities";
 // at runtime (its only `@codemirror/*` reference is an `import type`).
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
 import { isPlainSurfaceActive } from "./plain/surfaceMode";
+import { PlatformUnsupportedError } from "./platform/unsupported";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
 import {
@@ -120,12 +121,20 @@ const host: EditorHost = {
     // and moves the `File` handle to the Worker so the page never allocates the
     // content. The unwrap used to live in `src/lib/picked-file.ts` and THREW for
     // any handle it had not minted — i.e. for every web pick.
-    import: (source) =>
-      source.kind === "picked" ? importPicked(source.file) : attachmentImport(source),
+    import: (source) => {
+      if (isPlainSurfaceActive()) {
+        return Promise.reject(new PlatformUnsupportedError("core.invoke"));
+      }
+      return source.kind === "picked"
+        ? importPicked(source.file)
+        : attachmentImport(source);
+    },
     // The host shapes the rows, so the editor's render path holds no knowledge
     // of the IPC field names.
     catalogList: async () =>
-      (await catalogList()).map((r) => ({
+      isPlainSurfaceActive()
+        ? []
+        : (await catalogList()).map((r) => ({
         id: r.id,
         contentType: r.content_type,
         filename: r.filename,

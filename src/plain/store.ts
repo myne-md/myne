@@ -127,12 +127,11 @@ export function edit(handle: number, content: string): void {
   );
 }
 
-function isConflict(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { kind?: string }).kind === "conflict"
-  );
+/** The Rust enum's internally-tagged variant name (`rename_all` on the enum). */
+function errorKind(error: unknown): string | null {
+  if (typeof error !== "object" || error === null) return null;
+  const kind = (error as { kind?: unknown }).kind;
+  return typeof kind === "string" ? kind : null;
 }
 
 /**
@@ -162,7 +161,7 @@ export async function save(handle: number): Promise<void> {
       diskBaseHash: undefined,
     }));
   } catch (error) {
-    if (isConflict(error)) {
+    if (errorKind(error) === "conflict") {
       try {
         const disk = await plainFileRead(handle);
         patch(handle, (f) => ({
@@ -227,6 +226,13 @@ export async function close(handle: number): Promise<void> {
     timers.delete(handle);
   }
   await save(handle).catch(() => undefined);
+  const settled = find(handle);
+  if (settled && (settled.status === "conflict" || settled.status === "error")) {
+    // Closing here would destroy the only copy of the user's text: neither
+    // state has a successful write behind it. Keep the tab; the banner owns
+    // the resolution.
+    return;
+  }
   await plainFileClose(handle).catch(() => undefined);
   const files = state.files.filter((f) => f.handle !== handle);
   const nextActive =
@@ -256,14 +262,29 @@ export function restoreDormant(): void {
  * Subscribe to OS opens and drain any that arrived before this listener
  * existed (the argv ingest on a cold launch). Returns the unsubscribe.
  */
-export async function initializePlainFiles(): Promise<() => void> {
-  const unlisten = await onPlainFileOpened(upsertOpened);
-  try {
-    const pending = await plainFileTakeUnclaimed();
-    for (const opened of pending) upsertOpened(opened);
-  } catch {
-    // The gate is off, or this is the web client. Either way there is nothing
-    // to drain; silence is the designed answer.
+let initialized: Promise<void> | null = null;
+
+export function initializePlainFiles(): Promise<void> {
+  if (!initialized) {
+    initialized = (async () => {
+      // The listener stays installed for the process lifetime, not for the
+      // surface's lifetime: a lock parks the tabs and unmounts the surface, and
+      // an open arriving while nothing is showing must still land.
+      try {
+        await onPlainFileOpened(upsertOpened);
+      } catch {
+        // No host event channel (a test environment, or a client without one):
+        // opens simply never arrive, which is a valid state. The drain below
+        // still runs, so a host that supports only the pull half works too.
+      }
+      try {
+        const pending = await plainFileTakeUnclaimed();
+        for (const opened of pending) upsertOpened(opened);
+      } catch {
+        // The gate is off, or this is the web client. Either way there is
+        // nothing to drain; silence is the designed answer.
+      }
+    })();
   }
-  return unlisten;
+  return initialized;
 }

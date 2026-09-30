@@ -177,6 +177,10 @@ describe("capability descriptor", () => {
       // there is nothing a later port could deliver. The pop-out affordance is
       // gated on this and omitted where it is absent.
       "detachedWindows",
+      // myne-md/myne#788, the plain-file editor. A page has no OS file ingress
+      // and no handler registration, and the surface exists to be independent
+      // of vault state in a way a sync-required browser session is not.
+      "plainFile",
       // myne-md/myne#698, the B2B member-sharing substrate. The person keypair
       // is held backend-side in a sealed file outside browser storage, and the
       // panel's recovery-phrase prompt is substituted out of the served bundle
