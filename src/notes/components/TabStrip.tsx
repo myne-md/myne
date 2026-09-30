@@ -612,8 +612,19 @@ function Tab({
     // Only the ACTIVE tab does this. An inactive tab is transparent, so a
     // transparent bottom border there would erase nothing and a filled one
     // would punch a hole in the rule under a tab that is not open.
+    //
+    // The overhang is a HEIGHT, not a negative margin. The app sets
+    // `box-sizing: border-box` globally (`src/styles/tokens.css`), so
+    // `height: 100%` already contains the tab's own bottom border, and that
+    // border landed one pixel ABOVE the strip's rule. A negative bottom margin
+    // does not move a flex item with an explicit height, so the earlier
+    // `marginBottom: -1` never reached the rule at all. The tab is one pixel
+    // taller instead, and the scrolling row leaves room for that pixel inside
+    // its clip (`scrollAreaStyle`). Measured, not reasoned: a probe page with
+    // these exact styles under border-box showed the rule through the tab in
+    // WebKit until both halves were in.
     ...(active
-      ? { marginBottom: -1, borderBottom: "1px solid var(--bg-1)" }
+      ? { height: "calc(100% + 1px)", borderBottom: "1px solid var(--bg-1)" }
       : null),
     background: active
       ? "var(--bg-1)"
