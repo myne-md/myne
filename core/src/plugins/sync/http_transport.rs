@@ -6,7 +6,7 @@
 //! transport for exactly those endpoints — same minimal keep-alive HTTP/1.1
 //! codec (`crate::http`), no TLS. It refuses any non-loopback host (a
 //! non-loopback plaintext sync would be an A4 downgrade), so production https
-//! always routes to the pinned rustls layer.
+//! always routes to the CA-verifying rustls layer.
 //!
 //! # What compiles for `wasm32`, and what does not (task 84)
 //!
@@ -57,7 +57,7 @@ use std::time::Duration;
 ///
 /// Deliberately still ONE constant for every request class. Per-class deadlines mean
 /// threading a `Duration` through the transport trait, `keepalive_roundtrip`, the
-/// pinned-TLS layer and the SOCKS5 dialer — a security-load-bearing surface, for a
+/// CA-verifying TLS layer and the SOCKS5 dialer, a security-load-bearing surface, for a
 /// gain the chunk bound already delivers. The cost of the uniform value is that a
 /// genuinely dead server hangs one cycle for 3 min instead of 1; `loop_control`'s
 /// backoff already treats that class as transient.
@@ -220,8 +220,8 @@ pub(crate) fn is_loopback(host: &str) -> bool {
 /// on this device for EVERY scheme, which [`super::config::validate_endpoint_url`]
 /// deliberately does not enforce — that validator serves the SYNC endpoint,
 /// where `https` to a remote host is the normal case and is answered with rustls
-/// plus a TOFU pin. Sharing the validator without sharing this check is what let
-/// `https://anywhere` register as a loopback-class AI backend.
+/// plus the platform trust store. Sharing the validator without sharing this
+/// check is what let `https://anywhere` register as a loopback-class AI backend.
 ///
 /// A wrapper rather than a fourth `matches!`: the doc above already warns that
 /// three copies of a three-name match are three chances for the rules to
@@ -278,28 +278,30 @@ pub fn set_browser_transport(factory: BrowserTransportFactory) {
     let _ = BROWSER_TRANSPORT.set(factory);
 }
 
-/// Build the right transport for an endpoint URL: pinned rustls for `https`,
-/// plain http for a **loopback** `http` endpoint. `pins` are the cert pins for
-/// the rustls path (ignored for loopback http). Errors on a non-loopback http
-/// endpoint (no plaintext sync off loopback — A4) or an unparseable URL.
-pub fn build_transport(
-    endpoint_url: &str,
-    // Consumed only by the rustls arm below, which does not exist on wasm.
-    #[cfg_attr(target_arch = "wasm32", allow(unused_variables))] pins: Vec<[u8; 32]>,
-) -> Result<Box<dyn SyncTransport>, TransportError> {
+/// Build the right transport for an endpoint URL: rustls with public-CA chain +
+/// hostname verification for `https`, plain http for a **loopback** `http`
+/// endpoint. Errors on a non-loopback http endpoint (no plaintext sync off
+/// loopback, A4) or an unparseable URL.
+///
+/// There is no pin parameter, and that is the point rather than an omission:
+/// decisions/sync/0620 removed certificate pinning, so a caller has no way to
+/// express one and a future reader cannot mistake an accepted argument for
+/// working trust material.
+pub fn build_transport(endpoint_url: &str) -> Result<Box<dyn SyncTransport>, TransportError> {
     let (scheme, host, port) = parse_endpoint(endpoint_url).ok_or(TransportError::BadRequest)?;
     match scheme.as_str() {
         // wasm32 has no rustls arm (see `mod.rs`); the browser transport is
         // installed by the Worker host, not built here.
         #[cfg(not(target_arch = "wasm32"))]
         "https" => Ok(Box::new(super::rustls_transport::RustlsTransport::new(
-            host, port, pins,
+            host, port,
         ))),
         // The browser answers for `https` through the factory it installed. TLS,
         // certificate verification and the trust store are the browser's, which
-        // is also why `pins` is unused here: a page cannot pin a certificate,
-        // and `decisions.md` 2026-07-26 records that as permanent rather than
-        // deferred (A4 is ⚠️ Best-effort on web by decision, not by omission).
+        // is also why no pin crosses this boundary: a page cannot pin a
+        // certificate, and `decisions.md` 2026-07-26 records that as permanent
+        // rather than deferred (A4 is ⚠️ Best-effort on web by decision, not by
+        // omission).
         #[cfg(target_arch = "wasm32")]
         "https" => browser_transport(BrowserScheme::Https, &host, port),
         #[cfg(not(target_arch = "wasm32"))]
@@ -361,16 +363,16 @@ mod tests {
     #[test]
     fn factory_rejects_nonloopback_http() {
         assert_eq!(
-            build_transport("http://sync.myne.md:80", vec![]).err(),
+            build_transport("http://sync.myne.md:80").err(),
             Some(TransportError::BadRequest)
         );
     }
 
     #[test]
     fn factory_builds_loopback_http_and_https() {
-        assert!(build_transport("http://127.0.0.1:9000", vec![]).is_ok());
-        assert!(build_transport("https://sync.myne.md", vec![[0x11; 32]]).is_ok());
-        assert!(build_transport("ftp://x", vec![]).is_err());
+        assert!(build_transport("http://127.0.0.1:9000").is_ok());
+        assert!(build_transport("https://sync.myne.md").is_ok());
+        assert!(build_transport("ftp://x").is_err());
     }
 
     #[test]

@@ -64,8 +64,8 @@ export interface MockConfig {
    *  path: the row has to put the stored value back rather than keep the one
    *  that did not land (myne-md/myne#609). */
   timezoneWriteFails?: boolean;
-  endpoint?: { endpoint_url: string | null; cert_pin_hex: string | null; pin_source: "static" | "tofu" | null };
-  setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
+  endpoint?: { endpoint_url: string | null; cert_pin_hex: null; pin_source: "platform_trust_store" | null };
+  setEndpoint?: { fingerprint: null; pin_source: "platform_trust_store" | null };
   devices?: MockDevice[];
   /** `sync_enroll` outcome — `{ approved }` on success, or a `{ kind }` error to reject. */
   enrollResult?: { approved: boolean; device_id_hex?: string };
@@ -100,8 +100,6 @@ export interface MockConfig {
   qrDecode?: {
     endpoint_url: string;
     account_number: string;
-    cert_pin_hex: string | null;
-    pin_source: "self_host_tofu" | "hosted" | "self_host_no_pin";
     fresh: boolean;
   };
   qrDecodeError?: { kind: string };
@@ -1442,8 +1440,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_status": () => config.syncStatus ?? { state: "not_enrolled" },
       "plugin:sync|sync_get_endpoint": () =>
         config.endpoint ?? { endpoint_url: null, cert_pin_hex: null, pin_source: null },
-      "plugin:sync|sync_set_endpoint": () =>
-        config.setEndpoint ?? { fingerprint: null, pin_source: null },
+      "plugin:sync|sync_set_endpoint": (args) =>
+        config.setEndpoint ?? {
+          fingerprint: null,
+          pin_source: String(args.endpointUrl ?? "").startsWith("https://")
+            ? "platform_trust_store" : null,
+        },
       // MYND-548 device naming. The setter mirrors the real one's contract: a
       // blank name is refused (no write), so an empty submit cannot blank a row.
       "plugin:prefs|set_device_name": (args) => {
@@ -1498,8 +1500,6 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           config.qrDecode ?? {
             endpoint_url: "https://sync.example.com",
             account_number: "4K7P9RH2JR3T8XW6VZ0A",
-            cert_pin_hex: null,
-            pin_source: "self_host_no_pin",
             fresh: true,
           }
         );

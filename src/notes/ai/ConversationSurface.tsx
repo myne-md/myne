@@ -676,7 +676,7 @@ export function ConversationSurface({
           // degradation E2E reads the cause AND the body text off one node.
           // `fill`: the state IS the empty transcript, centred in the space
           // above the composer, not a bordered card at the top of it
-          // (design-notes/ui/0630). The same component serves the narrow
+          // (design-notes/ui/0633). The same component serves the narrow
           // right panel and the agent tab, and filling is what fits both.
           <EmptyState
             variant={degraded ? "error" : "firstRun"}

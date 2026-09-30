@@ -249,25 +249,14 @@ pub async fn tick() -> String {
 mod tests {
     use super::*;
 
-    /// Drive a future that cannot pend. Same hand-rolled poll the router's tests
-    /// use, and the same reason: nothing here awaits anything that suspends —
-    /// the locked path returns before it reaches the cycle.
-    fn block_on<F: std::future::Future>(mut fut: F) -> F::Output {
-        use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-        const VTABLE: RawWakerVTable = RawWakerVTable::new(
-            |_| RawWaker::new(std::ptr::null(), &VTABLE),
-            |_| {},
-            |_| {},
-            |_| {},
-        );
-        let waker = unsafe { Waker::from_raw(RawWaker::new(std::ptr::null(), &VTABLE)) };
-        let mut cx = Context::from_waker(&waker);
-        // SAFETY: `fut` is owned by this frame and never moved after pinning.
-        let mut fut = unsafe { std::pin::Pin::new_unchecked(&mut fut) };
-        match fut.as_mut().poll(&mut cx) {
-            Poll::Ready(v) => v,
-            Poll::Pending => panic!("sync_loop future pended; the locked path must not suspend"),
-        }
+    /// Drive a future that must not suspend on the locked path.
+    ///
+    /// Shared with the router's tests, because the reason it re-polls rather
+    /// than panicking on the first `Pending` is one they have in common: `tick`
+    /// reads the process-wide slot map through an async `RwLock` that the
+    /// router's tests take for writing in parallel. See `crate::test_support`.
+    fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+        crate::test_support::block_on(fut, "sync_loop")
     }
 
     /// A LOCKED vault ticks to `Idle`, whatever signals arrived.

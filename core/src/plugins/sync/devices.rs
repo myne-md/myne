@@ -454,13 +454,8 @@ pub enum SyncDeviceError {
     DeviceNotFound,
     /// Transport / server / internal failure.
     Transport,
-    /// The server's certificate is not the pinned one (A4, myne#581). Split out
-    /// of [`SyncDeviceError::Transport`] for the same reason
-    /// [`super::transport::TransportError::CertPinMismatch`] is split out of its
-    /// `Tls`: it is the one failure here with a remedy, and the device panel is
-    /// where a user lands when sync stops, so it is where the remedy has to be
-    /// offered rather than a shrug.
-    CertPinMismatch,
+    /// Certificate trust, hostname or TLS negotiation failed.
+    TlsFailure,
     /// Bad input (e.g. malformed device id).
     BadRequest,
     /// A first-run bootstrap found a vault container already holding a
@@ -474,19 +469,8 @@ pub enum SyncDeviceError {
     /// pinned to one constant id, i.e. the web client — a desktop mints a fresh
     /// id per join and never collides.
     AccountMismatch,
-    /// Tor routing is on and the join carried no expected certificate
-    /// fingerprint (MYND-650 task 5).
-    ///
-    /// Its own variant for the same reason `AccountMismatch` is: the remedy is
-    /// different in kind. Nothing the user retypes about their account fixes
-    /// it — they have to fetch the fingerprint their server publishes and
-    /// supply it. **Nothing was written**: no endpoint, no pin, no vault.
-    PinConfirmationRequired,
-    /// The certificate served does not match the fingerprint the user
-    /// confirmed (MYND-650 task 5) — a typo, or a man in the middle, and from
-    /// here those are indistinguishable. The join aborts with nothing stored,
-    /// and the captured fingerprint is deliberately not reported
-    /// (`super::pin_confirm`'s module doc).
+    /// SCRAM server-signature mismatch. Despite the legacy variant name, this
+    /// is not a TLS certificate fingerprint or a certificate-pinning refusal.
     FingerprintMismatch,
     /// The vault's Argon2id parameters are affordable to the protocol but not
     /// to this host (#349).
@@ -564,35 +548,17 @@ impl From<super::enroll::EnrollError> for SyncDeviceError {
             E::ServerSignatureMismatch => SyncDeviceError::FingerprintMismatch,
             E::Unauthenticated => SyncDeviceError::Unauthenticated,
             // Ahead of the catch-all: this is the arm the payload is matched
-            // for. A revoked pin reaching the panel as a bare "Transport" is
-            // what the panel's own hint was written to guess at.
-            E::Transport(super::transport::TransportError::CertPinMismatch) => {
-                SyncDeviceError::CertPinMismatch
-            }
+            // for. A certificate the client refused reaching the panel as a bare
+            // "Transport" is what the panel's own hint was written to guess at.
+            E::Transport(super::transport::TransportError::Tls) => SyncDeviceError::TlsFailure,
             E::BadResponse | E::Transport(_) => SyncDeviceError::Transport,
         }
     }
 }
 
-/// The fingerprint gate's refusals, projected onto this command's enum
-/// (MYND-650 task 5) — the twin of [`super::config::SyncConfigError`]'s impl.
-/// See it for why this is a `From` rather than a `match` at the call site, and
-/// why both are host-only.
-#[cfg(not(target_arch = "wasm32"))]
-impl From<super::pin_confirm::PinConfirmError> for SyncDeviceError {
-    fn from(e: super::pin_confirm::PinConfirmError) -> Self {
-        use super::pin_confirm::PinConfirmError as P;
-        match e {
-            P::ConfirmationRequired => SyncDeviceError::PinConfirmationRequired,
-            P::FingerprintMismatch => SyncDeviceError::FingerprintMismatch,
-            P::Transport => SyncDeviceError::Transport,
-            // `PinConfirmError` carries no pin-mismatch arm of its own: the
-            // gate runs BEFORE a pin exists to mismatch against. Listed here so
-            // adding one is a compile error rather than a silent fall-through.
-        }
-    }
-}
-
+/// The management-plane refusals, projected onto this command's enum. A `From`
+/// rather than a `match` at each call site because the mapping is one-to-one
+/// and a match would let a new variant skip it silently.
 impl SyncDeviceError {
     pub(crate) fn from_mgmt(e: DeviceMgmtError) -> Self {
         match e {
@@ -640,10 +606,9 @@ pub async fn authed_transport_from_host(
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
-    let transport = super::http_transport::build_transport(&url, pins)
-        .map_err(|_| SyncDeviceError::Transport)?;
+    let transport =
+        super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
     Ok((token_hex, transport))
 }
 

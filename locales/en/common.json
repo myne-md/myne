@@ -3836,16 +3836,13 @@
       "syncedHere": "Synced here",
       "thisDevice": "This device",
       "reasonUnreachable": "the server didn’t answer",
-      "reasonCertChanged": "its certificate is not the one this device trusts",
       "reasonUnexpected": "an unexpected error",
       "reasonRejected": "the server rejected this device’s sign-in",
       "reasonFrozen": "the account is frozen",
       "reasonDeviceLimit": "the account is at its device limit",
       "reasonAwaitingApproval": "this device is still waiting to be approved",
       "reasonNotConfigured": "no sync server is configured",
-      "certChanged": "The sync server answered, but with a different certificate than the one this device pinned.",
-      "certChangedHint": "This is what a renewed certificate looks like, and also what an impostor looks like. Myne cannot tell them apart, so it will not guess. Get the fingerprint from your server, then press “Verify certificate” under “Sync server” above and paste it in.",
-      "transportHint": "If the server moved, enter its new address under “Sync server” above. If its certificate changed, press “Verify certificate” there and paste the fingerprint from your server.",
+      "transportHint": "If the server moved, enter its new address under “Sync server” above. Check that its HTTPS certificate is valid.",
       "unreachable": "Couldn’t reach sync ({{error}}).",
       "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they’re on your account. If it doesn’t, remove the device.",
       "verifyMatch": "They match",
@@ -3856,7 +3853,10 @@
       "verifyTitle": "Verify the new device",
       "verifyAction": "Compare code",
       "yourDevices": "Your devices",
-      "noDevicesBody": "Devices you add to this account appear here, with the date each last synced."
+      "noDevicesBody": "Devices you add to this account appear here, with the date each last synced.",
+      "reasonTls": "the server’s HTTPS certificate could not be verified",
+      "tlsFailure": "The sync server’s HTTPS certificate could not be verified.",
+      "tlsFailureHint": "Check the server address, certificate validity and CA trust. Myne will reconnect when the server presents a valid certificate."
     },
     "members": {
       "title": "Members & Security",
@@ -3868,26 +3868,19 @@
     "endpoint": {
       "connect": "Connect",
       "connected": "Connected",
-      "reverify": "Verify certificate",
       "connectedLocal": "Connected (local, no TLS).",
-      "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
-      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
+      "connectedPlatformTrust": "Connected over TLS. The certificate and server name were verified.",
       "connecting": "Connecting…",
-      "fingerprintLabel": "Server certificate fingerprint:",
-      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted. If it is right, do not connect: something is between this device and your server.",
-      "certificateChanged": "This server presented a different certificate than the one this device trusts. Nothing was changed. If you renewed it, paste the new fingerprint below; if you did not, do not connect.",
-      "confirmFingerprintDeclined": "Nothing was saved: this device is not connected to that server. Come back once you have its certificate fingerprint.",
-      "pinStatic": "Verified against Myne’s built-in certificate.",
-      "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here: the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
-      "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
+      "pinPlatformTrust": "Server certificate verified by this client’s trust store.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server. Check the URL and that it’s running.",
       "copyFingerprint": "Copy fingerprint",
       "fingerprintCopied": "Fingerprint copied.",
-      "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand."
+      "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand.",
+      "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
+      "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity."
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -3916,31 +3909,10 @@
       "submit": "Add this device",
       "wordAria": "Word {{number}}"
     },
-    "fingerprint": {
-      "title": "Check this server’s certificate before trusting it",
-      "why": "Tor routing is on, so this first connection reaches the server through a relay run by a stranger. Until a certificate is pinned, this device would accept whatever certificate it is handed, including one that relay made up. Enter the fingerprint your server publishes and Myne compares it before pinning anything. If it does not match, nothing is saved.",
-      "label": "Expected certificate fingerprint",
-      "placeholder": "SHA-256 fingerprint from your server",
-      "echoLabel": "What you entered",
-      "echoComplete": "64 of 64 characters. Read it against your own copy before continuing.",
-      "echoProgress": "{{count}} of {{total}} characters so far.",
-      "echoProgress_one": "{{count}} of {{total}} characters so far.",
-      "echoProgress_other": "{{count}} of {{total}} characters so far.",
-      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0-9 or a-f. Colons, spaces and a leading “sha256:” are fine. Anything else is not part of it.",
-      "helpToggle": "Where do I find this fingerprint?",
-      "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing: whatever could swap the certificate could swap that page too.",
-      "helpFromServer": "On the machine running your server: openssl x509 -noout -fingerprint -sha256 -in <your certificate file>",
-      "helpFromDevice": "On a device already connected to this account: Settings → Sync shows the same fingerprint.",
-      "helpNoFingerprint": "If you cannot get it any of those ways, this server cannot be added while Tor routing is on. You can turn Tor routing off in Settings → Network and connect directly. That shows your IP address to the server and to whoever can watch your network.",
-      "decline": "I don’t have it, cancel"
-    },
     "join": {
       "accountLabel": "Account number",
       "backToWaiting": "Back to waiting",
       "cancel": "Cancel",
-      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. This device was not added and nothing was saved. Check the fingerprint you pasted. If it is right, do not continue: something is between this device and your server.",
-      "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-      "continue": "Continue",
       "error": "Couldn’t add this device. Check the server URL, account number, and password, and that the server is reachable.",
       "errorPhrase": "Couldn’t add this device. Check the server URL, account number, and recovery phrase, and that the server is reachable.",
       "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
@@ -3951,8 +3923,6 @@
       "phraseEscapeBody": "Your recovery phrase is the full key to this account, so it confirms this device without approval from another device. You keep the password you just used.",
       "phraseTitle": "Confirm with your recovery phrase",
       "phraseWarning": "Your recovery phrase is the full key to this account, so this device is added without approval from another device. Use it only if you have no other device to approve from. You will set a new password next.",
-      "pinnedCompare": "This device pinned your server’s certificate. Check that this fingerprint matches on your other devices.",
-      "pinnedTitle": "Server certificate pinned",
       "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted.",
       "sasMatch": "They match, continue",
       "sasMismatch": "They don’t match, remove this device",
@@ -4004,7 +3974,6 @@
         "cta": "Add an identity"
       },
       "server": {
-        "helper": "Enter the same server URL on every device. For a self-hosted server use its <1>https://</1> address; verify the certificate fingerprint matches across your devices.",
         "label": "Sync server"
       },
       "status": {
@@ -4034,7 +4003,6 @@
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen: uploads paused",
       "errorDeviceRevoked": "This device was removed from your account",
-      "errorCertChanged": "Server certificate changed: verify it to reconnect",
       "errorStorageFull": "Storage full: syncing paused",
       "errorQuota": "Storage full: uploads paused",
       "errorRateLimited": "Sync throttled: retrying",
@@ -4044,7 +4012,10 @@
       "off": "Sync off",
       "synced": "Synced",
       "syncing": "Syncing…",
-      "syncNow": "Sync now"
+      "syncNow": "Sync now",
+      "errorIdentityLocked": "Unlock your identity to sync",
+      "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
+      "unlockIdentityCta": "Unlock identity"
     },
     "usage": {
       "devices": "Devices",
@@ -4062,10 +4033,6 @@
       "connectError": "Couldn't reach that server. Check the address and try again.",
       "serverAddressLabel": "Server address",
       "serverAddressPlaceholder": "https://sync.example.com",
-      "fingerprintLabel": "Certificate fingerprint",
-      "fingerprintCompare": "Compare this against the same screen on a device you already trust. They must match.",
-      "pinStatic": "Verified against this server's known certificate.",
-      "pinTofu": "Pinned on first connect. Compare it across your devices to confirm.",
       "enrollNotConfigured": "Set up a sync server first, then add this device.",
       "enrollTransport": "Couldn't reach the sync server. Check your connection and try again.",
       "accountNumberHint": "Double-check this number. It doesn't look right.",
@@ -4077,7 +4044,7 @@
       "keepDevice": "Keep it",
       "notEnrolledHelp": "This device isn't syncing yet. Add it from the previous screen to see your devices.",
       "unauthenticated": "This device's access was revoked, probably removed from another device.",
-      "transportError": "Couldn't reach the sync server. If the server moved or its certificate changed, re-connect it from the Sync server screen.",
+      "transportError": "Couldn't reach the sync server. Check the server address and its HTTPS certificate.",
       "retiredSelf": "This device was removed from another device.",
       "resetAndAddAgain": "Reset and add again",
       "syncingHere": "Syncing here",
@@ -4136,7 +4103,18 @@
       "emptyTitle": "No members yet",
       "personLockedTitle": "Member identity locked",
       "personUnlockOpen": "Unlock",
-      "personUnlockCancel": "Cancel"
+      "personUnlockCancel": "Cancel",
+      "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
+      "shareConfirmTitle": "Share this vault?",
+      "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
+      "shareConfirmCta": "Share and invite",
+      "shareFailed": "Could not start sharing this vault.",
+      "identityForgetCta": "Forget this identity on this device",
+      "identityForgetCheckbox": "I understand this identity will be removed from this device.",
+      "identityForgetConfirm": "Forget identity",
+      "identityForgetCancel": "Keep it",
+      "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
+      "identityForgetError": "Could not forget the identity. Try again."
     }
   },
   "tasks": {
@@ -4697,7 +4675,7 @@
       "heading": "Choose a sync server",
       "chooseHeading": "Where should your notes sync?",
       "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "myneSyncHint": "The Myne-operated server. This device pins its certificate on first connection.",
+      "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "connecting": "Connecting…",
       "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
@@ -4752,7 +4730,10 @@
       "codeLabel": "Your identity code",
       "invitesHeading": "Invitations",
       "noInvites": "No invitations yet.",
-      "inviteHint": "Open this invite from the vault picker to join with your identity phrase."
+      "inviteHint": "Open this invite from the vault picker to join with your identity phrase.",
+      "forgetHeading": "This device",
+      "forget": "Forget this identity on this device",
+      "forgetCheckbox": "I understand this identity will be removed from this device. The server account survives and the phrase recovers it."
     }
   },
   "identitySetup": {
@@ -4777,7 +4758,9 @@
     "recoverTitle": "I already have one",
     "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
     "recoverAction": "Recover",
-    "back": "Back"
+    "back": "Back",
+    "changeServer": "Change or verify sync server",
+    "errorTlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address and its certificate."
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -4803,7 +4786,13 @@
     "acceptInvalid": "That is not a valid owner identity code.",
     "shareCodeHeading": "Your invite code",
     "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",
-    "title": "Your identity"
+    "title": "Your identity",
+    "forgetCancel": "Keep it",
+    "forgetCheckbox": "I understand this identity will be removed from this device.",
+    "forgetConfirm": "Forget identity",
+    "forgetCta": "Forget this identity on this device",
+    "forgetError": "Could not forget the identity. Try again.",
+    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it."
   },
   "welcome": {
     "startIdentity": "Create an identity",
@@ -4964,9 +4953,6 @@
       "expired": "This QR has expired. Show a fresh one on your other device and scan again.",
       "invalid": "That's not a Myne device QR.",
       "newerVersion": "This QR is from a newer version of Myne. Update the app and try again.",
-      "pinHosted": "Myne-hosted server",
-      "pinNone": "Self-hosted server",
-      "pinSelfHost": "Cert pinned from your trusted device",
       "scan": "Scan QR",
       "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
       "scanUnavailable": "Scanning isn’t available on this device. Enter your details below."

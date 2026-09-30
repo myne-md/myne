@@ -25,11 +25,11 @@ import { join } from "node:path";
 import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
-  clickNewItem,
   closeSettings,
   dismissImporterOffer,
   enableAi,
   enableDeveloperModeInSettings,
+  openPalette,
   openSettings,
   runPaletteAction,
   unlockToEditor,
@@ -153,9 +153,12 @@ runner(
       await dismissImporterOffer(s);
 
       // ── The shell ─────────────────────────────────────────────────────
+      // Through the palette rather than the sidebar's create menu: the same
+      // spec also captures the PR's BEFORE side from the merge base, where
+      // `clickNewItem` does not exist yet, and `note.new` is on both.
       await safe("a note to look at", async () => {
-        await clickNewItem(s, "notes.create");
-        await sleep(600);
+        await runPaletteAction(s, "note.new", "new note");
+        await sleep(800);
       });
 
       await frame(
@@ -200,7 +203,7 @@ runner(
       // Developer mode, from INSIDE the open modal: `enableDeveloperMode`
       // reaches About by the gear, and clicking the gear again on an open
       // modal is a close rather than an open. The agent tab is behind this
-      // switch by decision (`design-notes/ai/0622`).
+      // switch by decision (`design-notes/ai/0626`).
       await safe("developer mode", async () => {
         await enableDeveloperModeInSettings(s);
         await sleep(400);
@@ -262,6 +265,34 @@ runner(
           await runPaletteAction(s, "graph.show", "graph");
           await s.byTestId("editor.graph-pane", { timeoutMs: 20_000 });
           await sleep(1800);
+        },
+      );
+
+      // ── A new tab (#772: the start page) ──────────────────────────────
+      await frame(
+        s,
+        "07-new-tab",
+        "An empty tab: what the '+' on the tab strip opens.",
+        async () => {
+          const [plus] = await s.findElements(
+            '[data-testid="editor.tab-strip-button"][aria-label="New tab"]',
+          );
+          if (plus === undefined) throw new Error("no New tab button on the strip");
+          await plus.click();
+          await sleep(900);
+        },
+      );
+
+      // ── The palette's operator strip (#772: arrows reach the results) ──
+      await frame(
+        s,
+        "08-palette",
+        "The command palette with a bare 's' typed: the operator suggestion " +
+          "strip above the results.",
+        async () => {
+          await openPalette(s);
+          await (await s.byTestId("palette.input")).sendKeys("s");
+          await sleep(700);
         },
       );
 

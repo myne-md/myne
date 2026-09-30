@@ -138,7 +138,7 @@ export function RecordingSheet({
             borderRadius: "50%",
             background: "var(--danger)",
             // A STATIC dot. It pulsed via `myne-rec-pulse` until
-            // `design-notes/ui/0618`, which keeps principle 4's
+            // `design-notes/ui/0622`, which keeps principle 4's
             // no-pulsing-state-indicators clause whole across both motion
             // tiers. The `mmss(elapsedMs)` timer immediately to its right ticks
             // once a second and is the liveness signal — information rather

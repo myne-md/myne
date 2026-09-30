@@ -4,7 +4,7 @@
 //
 // Option 1 (prompt-to-paste): the account# is an AS9 bearer token Myne never
 // persists (account-number.md §8), so the user pastes it here to make the QR.
-// The QR carries {server_url, account#, cert_pin} — NEVER the password (SYNC-47);
+// The QR carries {server_url, account#}, NEVER the password (SYNC-47);
 // the scanning phone still enters its own password. Ephemeral: regenerated before
 // the backend TTL lapses so a photographed code can't be reused later (live
 // co-presence — the basis for the scan replacing the cert eye-compare, SYNC-26).

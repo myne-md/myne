@@ -270,7 +270,7 @@ impl Device {
     /// Enroll a fresh device on `acct`. `register` registers the SCRAM verifier
     /// (the first device on an account does this exactly once).
     fn enroll(label: &'static str, acct: &Account, url: &str, nonce: &str, register: bool) -> Self {
-        let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
+        let t = crate::plugins::sync::http_transport::build_transport(url).unwrap();
         if register {
             enroll::register_verifier(t.as_ref(), &acct.account_hash, &acct.secret()).unwrap();
         }
@@ -2217,7 +2217,7 @@ fn sim_push_fail_then_recover_converges() {
 
     // The edit whose push will hit the outage.
     devices[0].edit_note(&n, b"edited during the outage");
-    let inner = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+    let inner = crate::plugins::sync::http_transport::build_transport(&url).unwrap();
     devices[0].transport = Box::new(FaultInjectingTransport::fail_path(
         inner,
         "/sync/push",

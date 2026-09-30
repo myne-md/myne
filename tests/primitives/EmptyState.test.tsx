@@ -2,7 +2,7 @@
 //
 // `<EmptyState>` — which zero states carry the accent wash, and which own their
 // surface (myne-md/myne#776, epic #772; the wash replaced the `01` field in
-// design-notes/ui/0630).
+// design-notes/ui/0633).
 //
 // Both are defaults, and a default is exactly the kind of thing that drifts
 // back without anybody deciding to change it: the field was opt-in for a round

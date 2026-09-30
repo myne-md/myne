@@ -624,6 +624,7 @@ function App() {
               identityCode={identityCode}
               onCreateVault={() => dispatch({ type: "create-vault.start" })}
               onAccepted={() => void reprobe()}
+              onForgotten={reprobe}
             />
           );
         }

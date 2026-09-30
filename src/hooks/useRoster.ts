@@ -39,9 +39,22 @@ export interface RosterHook {
   invite: typeof personCreateInvite;
   /** The owner's sent invitations with their claim state (empty for a member). */
   vaultInvites: VaultInviteSummary[];
-  /** True when the last sent-invitation fetch failed, so the panel can say
-   *  "could not load" rather than rendering an empty list as "none sent". */
+  /**
+   * True when the last sent-invitation fetch failed, so the panel can say
+   * "could not load" rather than rendering an empty list as "none sent".
+   *
+   * **A vault that is not shared yet is NOT a failure** (myne-md/myne#783):
+   * `listVaultInvites` answers an empty list for an `NTV5` vault, and the panel
+   * reads `shared` to render nothing there instead of an error line. This flag
+   * is reserved for a genuine relay/parse failure.
+   */
   vaultInvitesFailed: boolean;
+  /**
+   * Whether this vault has the B2B group tier (`NTV6`). Derived from the roster
+   * view's `group_key_epoch`, so no extra IPC: `null` means the vault is still
+   * the birth-format `NTV5` and has no roster to share yet (myne-md/myne#783).
+   */
+  shared: boolean;
   removing: boolean;
   remove: typeof removeMember;
 }
@@ -57,6 +70,7 @@ export function useRoster(personReady: boolean): RosterHook {
   const [removing, setRemoving] = useState(false);
   const [vaultInvites, setVaultInvites] = useState<VaultInviteSummary[]>([]);
   const [vaultInvitesFailed, setVaultInvitesFailed] = useState(false);
+  const [shared, setShared] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -68,6 +82,7 @@ export function useRoster(personReady: boolean): RosterHook {
           setMembers(view.members);
           setAuthority(view.authority);
           setGroupKeyEpoch(view.group_key_epoch);
+          setShared(view.group_key_epoch !== null);
           setError(null);
         }
       })
@@ -76,6 +91,7 @@ export function useRoster(personReady: boolean): RosterHook {
           setMembers([]);
           setAuthority("member");
           setGroupKeyEpoch(null);
+          setShared(false);
           setError(String(e));
         }
       })
@@ -88,10 +104,13 @@ export function useRoster(personReady: boolean): RosterHook {
   }, [tick]);
 
   // The owner's sent invitations, for the claimed-versus-pending view. Fetch
-  // only as the owner (the vault-side list is owner-token authorized), and
-  // re-fetch on the same tick that reloads the roster, so an invite shows up.
+  // only as the owner (the vault-side list is owner-token authorized) and only
+  // on a SHARED vault: an `NTV5` vault has no roster and nothing to list, so
+  // asking would manufacture a failure out of a legitimate state
+  // (myne-md/myne#783). Re-fetch on the same tick that reloads the roster, so
+  // an invite shows up.
   useEffect(() => {
-    if (!personReady || authority !== "owner") {
+    if (!personReady || authority !== "owner" || !shared) {
       setVaultInvites([]);
       setVaultInvitesFailed(false);
       return;
@@ -110,7 +129,7 @@ export function useRoster(personReady: boolean): RosterHook {
     return () => {
       cancelled = true;
     };
-  }, [authority, personReady, tick]);
+  }, [authority, personReady, shared, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
@@ -156,6 +175,7 @@ export function useRoster(personReady: boolean): RosterHook {
     invite,
     vaultInvites,
     vaultInvitesFailed,
+    shared,
     removing,
     remove,
   };

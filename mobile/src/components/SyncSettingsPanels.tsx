@@ -24,7 +24,6 @@ import {
   useMembers,
   type EnrollCredentialKind,
   type DeviceEntry,
-  type PinSource,
   type AccountStatusView,
 } from "../lib/sync";
 import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
@@ -190,16 +189,10 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
     case "syncing":
       return { color: "var(--accent)", label: t("sync.status.syncing") };
     case "error":
-      // One arm, deliberately, for every detail the desktop indicator splits
-      // into eight — with ONE exception (myne#581). "Offline" is a tolerable
-      // summary for a failure that clears itself; it is a false one for a
-      // pinned certificate that was replaced, because that never clears and
-      // the phone would say "offline" for as long as the renewal stands while
-      // the network was fine the whole time. Mobile has no fingerprint-confirm
-      // gate of its own yet, so this says what happened and the fix is on the
-      // desktop; the gate is separate follow-up work.
-      return status.detail === "cert_pin_mismatch"
-        ? { color: "var(--danger)", label: t("sync.status.errorCertChanged") }
+      // A TLS failure is not an offline device: certificate and server-name
+      // validation must be fixed before this client can reconnect.
+      return status.detail === "tls_failure"
+        ? { color: "var(--danger)", label: t("sync.status.errorTls") }
         : { color: "var(--warning)", label: t("settings.sync.summary.offline") };
     case "conflicts":
       return {
@@ -374,23 +367,18 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
 
 // ── SY-02 · Endpoint config ──────────────────────────────────────────────────
 
-/** SY-02: set/get the self-host endpoint + the TOFU cert fingerprint for
- *  out-of-band eye-compare. https-only-off-loopback is enforced in shared core. */
+/** SY-02: set/get the endpoint; public-CA HTTPS is required off loopback. */
 export function SyncEndpointPanel() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [pinSource, setPinSource] = useState<PinSource | null>(null);
 
   useEffect(() => {
     if (!HAS_TAURI) return;
     void syncGetEndpoint()
       .then((c) => {
         if (c.endpoint_url) setUrl(c.endpoint_url);
-        if (c.cert_pin_hex) setFingerprint(c.cert_pin_hex);
-        setPinSource(c.pin_source);
       })
       .catch(() => {
         /* unconfigured — leave the field empty */
@@ -402,19 +390,13 @@ export function SyncEndpointPanel() {
     if (trimmed.length === 0) return;
     setBusy(true);
     setMsg(null);
-    setFingerprint(null);
-    setPinSource(null);
     void syncSetEndpoint(trimmed)
       .then((r) => {
-        setPinSource(r.pin_source);
-        if (r.fingerprint) {
-          setFingerprint(r.fingerprint);
-          setMsg(t("sync.settings.connectedTls"));
-        } else {
-          setMsg(t("sync.settings.connectedLocal"));
-        }
+        setMsg(t(r.pin_source === "platform_trust_store" ? "sync.settings.connectedTls" : "sync.settings.connectedLocal"));
       })
-      .catch(() => setMsg(t("sync.settings.connectError")))
+      .catch((e: unknown) => setMsg(t((e as { kind?: string } | null)?.kind === "TlsFailure"
+        ? "sync.endpoint.tlsFailure"
+        : "sync.settings.connectError")))
       .finally(() => setBusy(false));
   };
 
@@ -450,40 +432,6 @@ export function SyncEndpointPanel() {
         </p>
       )}
 
-      {fingerprint && (
-        <div style={{ marginTop: 16 }}>
-          <FieldLabel mt={0}>{t("sync.settings.fingerprintLabel")}</FieldLabel>
-          <p style={{ fontSize: 13, color: "var(--fg-3)", margin: "0 0 8px", lineHeight: 1.5 }}>
-            {t("sync.settings.fingerprintCompare")}
-          </p>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 13,
-              color: "var(--fg-1)",
-              wordBreak: "break-all",
-              padding: "10px 12px",
-              background: "var(--paper-2)",
-              border: "1px solid var(--line-1)",
-              borderRadius: 6,
-            }}
-            data-testid="sync.cert-fingerprint"
-          >
-            {fingerprint}
-          </div>
-          {pinSource && (
-            <p
-              style={{ marginTop: 8, fontSize: 12, color: "var(--fg-3)" }}
-              data-testid="sync.pin-source"
-              data-pin-source={pinSource}
-            >
-              {pinSource === "static"
-                ? t("sync.settings.pinStatic")
-                : t("sync.settings.pinTofu")}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

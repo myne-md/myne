@@ -10,9 +10,10 @@
 //!   real self-host operator setting (TB5), reused by the MYND-428 E2E harness.
 //!   Exposed as `sync_get_endpoint` / `sync_set_endpoint`.
 //! - [`transport`] — the blind-relay [`transport::SyncTransport`] seam (SYNC-3).
-//!   The real rustls + cert-pin + tls-exporter impl is task 2 (R3-gated, blocked
-//!   on the `rustls` dependency decision); the engine builds against the trait,
-//!   and [`transport::FakeTransport`] backs unit tests + the harness until then.
+//!   The real impl is [`rustls_transport`]: rustls verifying the certificate
+//!   chain and server name against bundled public roots, plus the keying-material
+//!   exporter (R3-gated; see `docs/dependency-policy.md`). The engine builds
+//!   against the trait, and [`transport::FakeTransport`] backs unit tests.
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
@@ -90,14 +91,10 @@ pub mod poke_listener;
 // 39). Three atomics rather than an event per note or a host threaded through
 // `run_sync_cycle`: the readout has to be observable DURING the loop, and the
 // loop deliberately has no host.
-// The out-of-band fingerprint compare that has to accompany a TOFU pin captured
-// over Tor (MYND-650 task 5). Host-only for the same reason `rustls_transport`
-// is — it drives that module's handshake — and the single enforcement point
-// both enrollment paths acquire a pin through.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod member_key_store;
-// The person account, membership and invite plane: host-only, like `pin_confirm`
-// and `rustls_transport` it drives. Gated off wasm32 (the web client is
+// The person account, membership and invite plane: host-only, like the
+// `rustls_transport` it drives. Gated off wasm32 (the web client is
 // capability-absent for B2B), so its `TauriHost`/`rustls_transport` references
 // never reach the wasm build.
 #[cfg(not(target_arch = "wasm32"))]
@@ -106,8 +103,6 @@ pub mod person_ai_store;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod person_ai_sync;
 pub mod person_auth;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod pin_confirm;
 pub mod prefs_classification;
 pub mod prefs_merge;
 pub mod progress;

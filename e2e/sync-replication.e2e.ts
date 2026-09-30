@@ -274,8 +274,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await (await b.session.byTestId("join.account-input")).sendKeys(account);
         await (await b.session.byTestId("join.password-input")).sendKeys(password);
         await (await b.session.byTestId("join.submit")).click();
-        // A loopback (http) join has no TLS cert to pin, so B lands straight on the
-        // "waiting for approval" step (no `join.pinned`).
+        // The join goes straight to approval: no certificate-fingerprint step.
         await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
 
         // --- A: approve B while it is pending (its row appears via the roster poll) ---

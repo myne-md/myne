@@ -80,13 +80,10 @@ const DIRECT_CONNECT_SITES: &[(&str, usize, &str)] = &[
         "rustls_transport.rs",
         1,
         "`open_socket_via`'s `Route::Direct` arm — reachable only when the gate \
-         says Tor mode is off, which is the whole fail-closed decision. Both \
-         socket sites in that file (the transport's `open_socket` and the \
-         one-shot enrollment handshake `tofu_fetch_pin_via`) share it, so there is \
-         one arm rather than one per caller. Task 5 routed the enrollment \
-         handshake and paired it with `pin_confirm`'s mandatory out-of-band \
-         fingerprint compare, which is what makes an accept-any-certificate \
-         handshake safe to send through an exit node.",
+         says Tor mode is off, which is the whole fail-closed decision. The \
+         first-endpoint verification probe and every later TLS request share \
+         this transport. The certificate-chain and hostname verifier runs \
+         unchanged inside the tunnel, including on the first connection.",
     ),
     (
         "http_transport.rs",
@@ -454,86 +451,83 @@ fn the_transports_socket_site_consults_the_routing_gate() {
         source.contains("connect_via_socks5"),
         "the socket site must have a tunneled arm, or Tor mode routes nothing"
     );
-    // Task 5: the enrollment handshake is not a second socket site with its own
-    // policy — it goes through the same function, so it cannot drift.
-    assert!(
-        source.contains("open_socket_via(proxy, host, port)"),
-        "`tofu_fetch_pin_via` must open its socket through the shared gated site, \
-         or an accept-any-certificate handshake goes out unrouted in Tor mode"
-    );
-    // The enrollment handshake takes its gate as a PARAMETER. A convenience
-    // wrapper that resolved it here would be a second read of a cell the caller
-    // has already consulted for the confirmation policy — see `pin_confirm`.
+    // Every transport takes its gate from `new`, so one connection resolves the
+    // installed policy exactly once. A second read would let the route be
+    // re-decided after the caller had already acted on the first answer, which is
+    // the TOCTOU this count exists to catch.
     assert_eq!(
         count(&source, "proxy::installed_for"),
         // `RustlsTransport::new` only — one gate resolved per transport built.
         1,
         "the only production read of the installed gate in this file is \
-         `RustlsTransport::new`. A second one means the pin-capture handshake \
-         resolves its own gate again, after `pin_confirm::capture_pin` already \
-         consulted it for the confirmation policy — a TOCTOU between the policy \
-         and the route it governs."
+         `RustlsTransport::new`. A second one means a connection resolves its own \
+         route again after the caller already consulted it, which is a TOCTOU between the \
+         policy and the route it governs."
     );
 }
 
-/// The pin capture's gate is snapshotted once and used for both decisions.
+/// No production sync transport is allowed to install a custom TLS verifier,
+/// in ANY file of this plugin rather than in the one that owns the verifier.
 ///
-/// Two reads of the same cell — one for "is a confirmation required", one
-/// inside the handshake — is a window in which a user flipping the Tor toggle
-/// gets the accept-any-certificate handshake routed through an exit node under
-/// the no-confirmation-needed answer given a moment earlier.
+/// The two spellings checked here are the only ways rustls 0.23 makes an
+/// accept-anything verifier expressible, and they are the whole of the property:
+/// the retired `PinnedVerifier` and `TofuVerifier` both went through
+/// `with_custom_certificate_verifier`, and the Tor first-use certificate
+/// substitution came back through `.dangerous()`.
+///
+/// **The scope is the file SET, and that was a real narrowing once.** The first
+/// version of this change read only `rustls_transport.rs`, which is where the
+/// positive assertions belong and where the negative ones were left by accident:
+/// a new sync module building its own `ClientConfig` through those two APIs
+/// would have passed green, and this test's own comment names that
+/// re-introduction. Verified by injection rather than reasoned: production code
+/// in `enroll.rs` carrying `.dangerous().with_custom_certificate_verifier(..)`
+/// left all nine tests in this module green at the narrowed scope, and the
+/// all-files loop is what turned it red.
 #[test]
-fn the_pin_capture_snapshots_one_gate_for_the_policy_and_the_route() {
+fn production_tls_uses_ca_trust_and_never_the_legacy_verifier() {
     let source = sync_sources()
         .into_iter()
-        .find(|(n, _)| n == "pin_confirm.rs")
+        .find(|(n, _)| n == "rustls_transport.rs")
         .map(|(_, s)| s)
-        .expect("pin_confirm.rs");
-    assert!(
-        source.contains("let gate = proxy::installed_for(&host);")
-            && source.contains("let required = gate.is_enabled();"),
-        "`capture_pin` must read the routing gate ONCE and derive the \
-         confirmation policy from that same value"
-    );
-    assert_eq!(
-        count(&source, "proxy::installed_for"),
-        // `capture_pin`'s snapshot, plus the standalone `confirmation_required`
-        // query (which opens no socket).
-        2,
-        "each extra read of the installed gate is a TOCTOU window between the \
-         policy decision and the handshake it governs"
-    );
+        .expect("rustls_transport.rs");
+    assert!(source.contains(".with_root_certificates(roots)"));
+    assert!(source.contains("self.connect().map(|_| ())"));
+
+    // The negative half, over every file rather than the one above.
+    for (name, source) in sync_sources() {
+        for token in [".dangerous()", "with_custom_certificate_verifier"] {
+            assert!(
+                !source.contains(token),
+                "{name}: `{token}` builds a custom certificate verifier, which is how \
+                 the retired accept-any handshake returned. Chain and server-name \
+                 verification are the only TLS trust this client does."
+            );
+        }
+    }
 }
 
-/// **The pin-capture handshake is reachable only through the compare.**
+/// No production sync code can reach the retired TOFU capture by name.
 ///
-/// `tofu_fetch_pin_via` accepts ANY certificate — it is the one handshake in
-/// the client that does. Over Tor that is the exit node's opportunity, so task
-/// 5 made `pin_confirm::capture_pin` the single enforcement point: it refuses
-/// to return a pin in Tor mode unless the user supplied the fingerprint they
-/// obtained out-of-band and it matches what was served.
+/// Narrower than the test above on purpose, and the reason is recorded rather
+/// than left looking like coverage: `tofu_fetch_pin` is the one token grounded
+/// in a real identifier this tree deleted, so it catches a re-introduction of
+/// that function. It is NOT a general scan, because the neighbouring guesses
+/// (`accept_any`, `AcceptAny`) have no API basis: they miss `skip_verify`,
+/// `insecure` and `no_verify`, and a token list that reads as a net while
+/// covering three of four spellings is worse than the two API tokens above,
+/// which are exhaustive by construction.
 ///
-/// A second caller reaching for it directly would get the capture without the
-/// compare, which compiles, passes every other test, and silently reinstates
-/// the MitM. So the callers are counted, the same way the sockets are.
+/// This file does not strip `#[cfg(test)]`, deliberately: a socket or a verifier
+/// parked in a test-only block that production can still reach would otherwise
+/// be invisible here. `rustls_transport.rs`'s own test module is why that
+/// comment names a file rather than a shape.
 #[test]
-fn the_tofu_capture_is_reached_only_through_the_fingerprint_compare() {
+fn no_production_enrollment_accepts_any_certificate() {
     for (name, source) in sync_sources() {
-        let calls = count(&source, "tofu_fetch_pin");
-        let allowed = match name.as_str() {
-            // Its definition (`pub fn tofu_fetch_pin_via(`).
-            "rustls_transport.rs" => 1,
-            // The enforcement point itself.
-            "pin_confirm.rs" => 1,
-            _ => 0,
-        };
-        assert_eq!(
-            calls, allowed,
-            "{name}: expected {allowed} reference(s) to `tofu_fetch_pin_via`, found {calls}.\n\
-             The accept-any-certificate enrollment handshake must be reached through \
-             `pin_confirm::capture_pin`, which enforces the mandatory out-of-band \
-             fingerprint compare in Tor mode. Calling it directly captures a pin an \
-             exit node may have chosen."
+        assert!(
+            !source.contains("tofu_fetch_pin"),
+            "{name}: the retired TOFU capture is reachable in production"
         );
     }
 }

@@ -9,7 +9,7 @@
 //! at `<app_config_dir>/sync-config.json` and is NOT gated on `Slot::Unlocked`
 //! (an operator configures the server before unlocking/enrolling).
 
-use super::config::{validate_endpoint_url, SyncConfigError};
+use super::config::SyncConfigError;
 use crate::host::HostCtx;
 use crate::vault_io::VaultIo as _;
 use std::path::PathBuf;
@@ -45,22 +45,8 @@ pub async fn sync_get_endpoint<R: Runtime>(
     super::config::get_endpoint_view(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
-        CLIENT_CAN_PIN,
     )
     .await
-}
-
-/// Which trust path a scanned QR's cert pin takes (for the confirm-screen label).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum JoinQrPinSource {
-    /// Self-host: the QR's cert pin is adopted (TOFU-from-scan). The UI verifies
-    /// the connected cert matches this pin before proceeding (grill Q2 transfer).
-    SelfHostTofu,
-    /// Hosted default: the app's baked-in static pin governs; the QR pin is ignored.
-    Hosted,
-    /// Self-host with no pin carried: blind TOFU at first connect.
-    SelfHostNoPin,
 }
 
 /// The decoded, validated view of a scanned device-join QR — everything the mobile
@@ -71,12 +57,6 @@ pub struct JoinQrView {
     pub endpoint_url: String,
     /// Canonical account number the QR carried (the UI formats it for display).
     pub account_number: String,
-    /// The QR's carried leaf-cert pin (lowercase hex), or `None`. The UI matches
-    /// this against the connected cert (`sync_set_endpoint`'s returned fingerprint)
-    /// to verify the Q2 trusted-transfer before joining a self-host endpoint.
-    pub cert_pin_hex: Option<String>,
-    /// Which trust path the pin takes (hosted vs self-host).
-    pub pin_source: JoinQrPinSource,
     /// Whether the QR is still fresh (within the ephemeral TTL). A stale QR is
     /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
     pub fresh: bool,
@@ -87,19 +67,12 @@ fn decode_join_qr_view(
     scanned: &str,
     now_unix: u64,
 ) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
-    use super::qr_join::{select_pin_for_qr_join, QrJoinPayload, QrPinSelection, QR_JOIN_TTL_SECS};
+    use super::qr_join::{QrJoinPayload, QR_JOIN_TTL_SECS};
     let payload = QrJoinPayload::decode(scanned.trim())?;
     let fresh = payload.is_fresh(now_unix, QR_JOIN_TTL_SECS);
-    let pin_source = match select_pin_for_qr_join(&payload) {
-        QrPinSelection::Hosted { .. } => JoinQrPinSource::Hosted,
-        QrPinSelection::SelfHostAdoptQr { .. } => JoinQrPinSource::SelfHostTofu,
-        QrPinSelection::SelfHostNoPin => JoinQrPinSource::SelfHostNoPin,
-    };
     Ok(JoinQrView {
         endpoint_url: payload.endpoint_url,
         account_number: payload.account_number,
-        cert_pin_hex: payload.cert_pin_hex,
-        pin_source,
         fresh,
     })
 }
@@ -117,122 +90,44 @@ pub async fn sync_decode_join_qr(
     decode_join_qr_view(&scanned, now_unix)
 }
 
-/// Re-exported: both moved to `config` with the endpoint cores (task 84), where
-/// the pin policy belongs beside the config it reads.
-pub(crate) use super::config::config_pins;
-
-/// Set (or clear, with `None`) the sync endpoint. Validates against the A4/TB5
-/// policy, then — for an `https` endpoint — **TOFU-pins the server's leaf cert**
-/// and returns its fingerprint (lowercase SHA-256 hex) for the user to
-/// eye-compare across devices (`self-host-policy.md` §6). A loopback `http`
-/// endpoint has no TLS, so it returns `None`. Clearing drops the pin too.
-/// The endpoint-set result: the pinned fingerprint + its source (SYNC-43), so the
-/// UI can render a self-host first-connect TOFU pin ("compare across devices")
-/// distinctly from a pre-vetted hosted static pin — never silently normalizing
-/// TOFU-for-hosted.
-/// Re-exported so the desktop's `generate_handler!` and the TS mirror keep
-/// resolving `commands::EndpointPinInfo`; the type moved to `config` with the
-/// core (task 84).
+/// Re-export the endpoint result so existing IPC registration stays stable.
 pub use super::config::EndpointPinInfo;
 
 /// Set (or clear, with `None`) the sync endpoint.
 ///
-/// This wrapper owns ONE thing the core cannot: acquiring the TOFU pin, which
-/// means completing a TLS handshake and reading the leaf certificate over
-/// `rustls_transport` — host-only, with no browser equivalent (a page never sees
-/// the certificate). Everything after that — URL policy, persistence, derived
-/// pin source — is `config::set_endpoint`, shared with the web dispatch.
+/// Native HTTPS performs a validated handshake using the SAME transport and
+/// Tor route as later sync requests before storing the URL. The retired
+/// `confirmed_fingerprint` IPC argument is ignored for old-client compatibility.
 ///
-/// `confirmed_fingerprint` is the fingerprint the user obtained **out-of-band**
-/// from their server. It is optional on the clearnet (the shipped TOFU bargain
-/// is unchanged) and **mandatory in Tor mode**, where the first handshake goes
-/// through an exit node that is in a position to serve its own certificate —
-/// see `super::pin_confirm`. A mismatch aborts with nothing written: no
-/// endpoint, no pin.
+/// The probe is [`super::enroll::verify_join_tls`], shared with the device-join
+/// flow rather than written out again. The two commands have separate error
+/// enums, so the mapping to `SyncConfigError` stays here; the POLICY, the
+/// transport and the order (verify, then write) do not, and when they were two
+/// copies a server that refused its certificate produced `TlsFailure` on the
+/// join path and `Unreachable` here, so the same fault read as two different
+/// things depending on which door the user came through.
 #[tauri::command]
 pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
-    confirmed_fingerprint: Option<String>,
+    _confirmed_fingerprint: Option<String>,
 ) -> Result<EndpointPinInfo, SyncConfigError> {
-    let cert_pin_hex = match endpoint_url.as_deref() {
-        Some(url) => {
-            // Validate BEFORE reaching out: an invalid URL must fail as an
-            // invalid URL, not as an unreachable server.
-            validate_endpoint_url(url)?;
-            let (scheme, host, port) =
-                super::http_transport::parse_endpoint(url).ok_or(SyncConfigError::InvalidUrl)?;
-            if scheme == "https" {
-                // Reach the server once, accept-and-record its cert, pin it —
-                // subject to the out-of-band compare in Tor mode.
-                let captured =
-                    super::pin_confirm::capture_pin(host, port, confirmed_fingerprint.as_deref())
-                        .await
-                        .map_err(SyncConfigError::from)?;
-                // A re-connect to an endpoint this device ALREADY trusts must
-                // not silently adopt a different certificate (myne#581). This
-                // command used to overwrite the stored pin with whatever the
-                // handshake produced, never reading the old one, so "re-enter
-                // the server URL" — the remedy the device panel recommends for
-                // a transport failure — was also the way to hand a pin to
-                // whoever answered. The user confirming a fingerprint out of
-                // band is the one path that may replace it, and `capture_pin`
-                // above has already enforced that compare when they did.
-                if confirmed_fingerprint.is_none() {
-                    let host_ctx = crate::host::tauri_host::TauriHost::new(app.clone());
-                    if let Ok(path) = super::config::config_path_for_read(&host_ctx) {
-                        let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &path)
-                            .await
-                            .unwrap_or_default();
-                        // Compared through `same_endpoint`, not `==`, because
-                        // the string a user types and the server a connection
-                        // reaches are different things. `parse_endpoint` throws
-                        // away everything from the first `/`, so a trailing
-                        // slash made this comparison false against the very
-                        // endpoint it was guarding and the new certificate was
-                        // adopted in silence — which is what the myne#756
-                        // workaround did, every time, while the UI offered no
-                        // other way to recover from a rotated certificate.
-                        let replaces_a_trusted_pin = cfg
-                            .endpoint_url
-                            .as_deref()
-                            .is_some_and(|prev| super::config::same_endpoint(prev, url))
-                            && cfg
-                                .cert_pin_hex
-                                .as_deref()
-                                .is_some_and(|prev| prev != captured);
-                        if replaces_a_trusted_pin {
-                            return Err(SyncConfigError::CertificateChanged);
-                        }
-                    }
-                }
-                Some(captured)
-            } else {
-                None // loopback http: no TLS, nothing to pin
-            }
-        }
-        None => None,
-    };
+    if let Some(url) = endpoint_url.as_deref() {
+        super::enroll::verify_join_tls(url)
+            .await
+            .map_err(|e| match e {
+                super::transport::TransportError::Tls => SyncConfigError::TlsFailure,
+                _ => SyncConfigError::Unreachable,
+            })?;
+    }
     super::config::set_endpoint(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         endpoint_url,
-        cert_pin_hex,
-        CLIENT_CAN_PIN,
+        None,
     )
     .await
 }
-
-/// Whether this client can pin a server certificate.
-///
-/// A browser cannot: it never sees the leaf cert, and `decisions.md` 2026-07-26
-/// records that as permanent rather than deferred. Named here rather than
-/// spelled `cfg!(…)` at the two call sites so the two readers of the endpoint
-/// config cannot drift apart on it.
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) const CLIENT_CAN_PIN: bool = true;
-#[cfg(target_arch = "wasm32")]
-pub(crate) const CLIENT_CAN_PIN: bool = false;
 
 /// Process-wide live-status cell (app-managed, like `SyncLocalChange`). The loop
 /// and `sync_now` set it; `sync_status` reads it. `None` = no overlay (fall back
@@ -1971,14 +1866,13 @@ pub use super::enroll::JoinResult;
 ///
 /// A thin wrapper: it supplies the two things that differ per client — a
 /// freshly-MINTED vault id (desktop holds many vaults, so collision-freedom
-/// costs a disk scan) and `can_pin: true` (only a host can complete a TLS
-/// handshake and read the leaf certificate).
+/// costs a disk scan) and `native_tls: true` (only a host has a rustls arm to
+/// complete the certificate-verifying handshake with).
 ///
-/// `confirmed_fingerprint` is the out-of-band value the user obtained from
-/// their server — optional on the clearnet, mandatory in Tor mode
-/// (`super::pin_confirm`, MYND-650 task 5). A join that omits it in Tor mode,
-/// or supplies one the server does not match, aborts having written nothing:
-/// no endpoint, no pin, no vault container.
+/// `confirmed_fingerprint` is the retired out-of-band value, still on the wire
+/// and ignored: certificate pinning is gone (decisions/sync/0620), so a join
+/// with a wrong one no longer aborts, and a join without one is no longer
+/// refused in Tor mode.
 #[tauri::command]
 pub async fn sync_join_account<R: Runtime>(
     app: AppHandle<R>,
@@ -2001,7 +1895,7 @@ pub async fn sync_join_account<R: Runtime>(
         state.inner(),
         super::enroll::JoinClient {
             vault_id,
-            can_pin: true,
+            native_tls: true,
         },
         super::enroll::JoinRequest {
             server_url,
@@ -2040,17 +1934,19 @@ mod tests {
     fn decode_join_qr_view_maps_a_fresh_self_host_payload() {
         use super::super::qr_join::QrJoinPayload;
         let acct = qr_account();
+        // A payload that STILL carries a legacy pin, on purpose: the phone must
+        // decode a QR an older desktop produced, and the decoded view must carry
+        // no trust material at all. Asserting the absence is the property; a
+        // payload built with `None` would satisfy any assertion about the
+        // endpoint and say nothing about this.
         let pin = "ab".repeat(32);
-        let encoded =
-            QrJoinPayload::new("https://sync.example.org", &acct, Some(pin.clone()), 1_000)
-                .unwrap()
-                .encode()
-                .unwrap();
+        let encoded = QrJoinPayload::new("https://sync.example.org", &acct, Some(pin), 1_000)
+            .unwrap()
+            .encode()
+            .unwrap();
         let view = decode_join_qr_view(&encoded, 1_050).expect("decode");
         assert_eq!(view.endpoint_url, "https://sync.example.org");
         assert_eq!(view.account_number, acct);
-        assert_eq!(view.cert_pin_hex, Some(pin));
-        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostTofu);
         assert!(view.fresh);
     }
 
@@ -2064,7 +1960,6 @@ mod tests {
             .unwrap();
         let view = decode_join_qr_view(&encoded, 1_000 + QR_JOIN_TTL_SECS + 999).expect("decode");
         assert!(!view.fresh);
-        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostNoPin);
     }
 
     #[test]

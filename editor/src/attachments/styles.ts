@@ -507,7 +507,7 @@ const CSS = `
 /* A STATIC red dot. It used to pulse (cm-voice-rec-pulse, 1.2s ease-in-out
    infinite), which PRODUCT.md principle 4 forbids in both motion tiers and
    which scripts/check-motion-canon.mjs now fails on
-   (design-notes/ui/0618).
+   (design-notes/ui/0622).
 
    Removing it costs nothing, and that is the point: the recording bar already
    carries .cm-voice-rec-time, a monospace elapsed timer ticking once a
@@ -589,7 +589,7 @@ const CSS = `
    in the global sheet (the CM theme's StyleModule doesn't emit @keyframes); the
    bar's static box + colour come from the scoped theme. */
 /* This one STAYS looping, and the distinction from the dot above is the whole
-   of design-notes/ui/0618: a transcription busy meter reports that work is
+   of design-notes/ui/0622: a transcription busy meter reports that work is
    in flight, which is information the user asked for, so it is an indeterminate
    progress indicator rather than decoration.
 

@@ -33,11 +33,8 @@ const PASSWORD = "correct horse battery staple";
 /** Walk Welcome to briefing to name to password to the recovery kit. */
 async function reachKitStep(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
-  // "Create a local vault instead", not "Create a vault": the mobile Welcome
-  // became identity-first in myne-md/myne#768 and that label went with it, so
-  // this lookup had been waiting thirty seconds for a button that no longer
-  // exists. Nothing reported it — a Playwright label is not typechecked, and a
-  // stale one reads as a hung app rather than as a renamed control.
+  // First run is identity-first (myne-md/myne#768): the vault path is the
+  // "Create a local vault instead" ghost button, not the old "Create a vault".
   await page.getByRole("button", { name: "Create a local vault instead" }).click();
 
   // The briefing's three acknowledgements, clicked by TEXT: the rows are labels

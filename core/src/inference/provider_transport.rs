@@ -21,13 +21,11 @@
 //! someone has to remember.
 //!
 //! **3. Verification failure is a refusal with no fallback.** The trust anchor
-//! is the static `webpki-roots` Mozilla bundle. Neither sync verifier fits
-//! here: `PinnedVerifier` replaces CA validation with a leaf pin, which would
-//! make a third party's certificate rotation our outage, and `TofuVerifier` is
-//! safe only because `pin_confirm` pairs it with a mandatory out-of-band
-//! fingerprint compare that does not exist for a host Myne does not operate.
-//! There is no "try again without verification" path here, and adding one would
-//! be the whole of the security of this module.
+//! is the static `webpki-roots` Mozilla bundle, the same one native sync uses
+//! (`decisions/sync/0620`), so a provider and a sync server are both verified by
+//! public CA plus hostname and neither can be pinned around. There is no "try
+//! again without verification" path here, and adding one would be the whole of
+//! the security of this module.
 //!
 //! The costs of the static bundle are real and recorded rather than discovered
 //! later: a revoked CA stays trusted until Myne ships an update, and roots the

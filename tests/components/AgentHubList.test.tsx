@@ -202,7 +202,7 @@ describe("AgentHubList: the rail starts conversations", () => {
   // The control was then gated on a note being open, which was right while
   // opening a conversation meant opening a view that needed a scope. It is not
   // right now: a conversation is its own subject
-  // (`design-notes/ai/0623`), and what still needs a note is SENDING, which
+  // (`design-notes/ai/0627`), and what still needs a note is SENDING, which
   // the composer refuses on its own. Gating the button refused the screen one
   // layer too early.
 

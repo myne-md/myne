@@ -157,15 +157,14 @@ pub async fn person_setup_from_host(
         let cfg = super::config::read_config(io, &cfg_path)
             .await
             .map_err(|_| SyncDeviceError::NotConfigured)?;
-        let pins = super::config::config_pins(&cfg);
         let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
         let outcome: EnrollOutcome =
             crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
-                let transport = super::http_transport::build_transport(&url, pins)
+                let transport = super::http_transport::build_transport(&url)
                     .map_err(|_| SyncDeviceError::Transport)?;
                 register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
-                    .map_err(|_| SyncDeviceError::Transport)
+                    .map_err(SyncDeviceError::from)
             })
             .await
             .map_err(|_| SyncDeviceError::Internal)??;
@@ -416,12 +415,11 @@ pub async fn person_list_invites_from_host(
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     crate::task::run_blocking(move || -> Result<Vec<InviteSummary>, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, "/b2b/invites", &[], Some(&auth.token_hex))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -465,20 +463,19 @@ pub async fn sync_person_list_invites<R: tauri::Runtime>(
     .await
 }
 
-/// The endpoint URL + cert pins, the precondition every relay call needs.
+/// The endpoint URL, the precondition every relay call needs.
 async fn endpoint_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
-) -> Result<(String, Vec<[u8; 32]>), SyncDeviceError> {
+) -> Result<String, SyncDeviceError> {
     let cfg_path = super::config::config_path_from_host(host, io)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
-    Ok((url, pins))
+    Ok(url)
 }
 
 /// Decode an even-length hex string. `None` on odd length or a non-hex byte.
@@ -540,13 +537,13 @@ pub async fn ensure_owner_member_token(
     // device's.
     let (device_token, _device_transport) =
         super::devices::authed_transport_from_host(host, io, state).await?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
 
     let account_hash_for_req = account_hash_hex.clone();
     let owner_hex = owner_person_id_hex.to_string();
     let issued = crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         bind_owner_request(
             transport.as_ref(),
             &device_token,
@@ -609,13 +606,13 @@ pub async fn post_sealed_invite(
     recipient_person_id_hex: &str,
     frame: &[u8],
 ) -> Result<(), SyncDeviceError> {
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let token = owner_token_hex.to_string();
     let recipient = recipient_person_id_hex.to_string();
     let frame = frame.to_vec();
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         post_invite_request(transport.as_ref(), &token, &recipient, &frame)
     })
     .await
@@ -674,15 +671,45 @@ struct VaultInvitesResp {
 /// (`GET /b2b/vaults/{account_hash}/invites`, myne-md/myne#711 task 11). This is
 /// the owner-side claimed-versus-pending view; `person_list_invites_from_host`
 /// is its recipient-scoped twin. Authorized by the owner's per-vault token.
+///
+/// **A vault that is not shared yet is `ShareOpen::Unshared`, not an error**
+/// (myne-md/myne#783). Before this, the whole call collapsed to `NotEnrolled` /
+/// `Unauthenticated` / `Transport` and the roster panel rendered its generic
+/// "Could not load your invitations" line on a freshly created vault where the
+/// user had invited nobody — a legitimate "not shared yet" state reported as a
+/// relay failure. The two are separated here: the preconditions that mean
+/// "this vault has nothing to list" answer `Ok(None)`, and only a genuine
+/// transport/parse failure is an `Err`.
 pub async fn list_vault_invites_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
-) -> Result<Vec<VaultInviteSummary>, SyncDeviceError> {
-    let owner_person_id = state
-        .clone_person_id()
+) -> Result<Option<Vec<VaultInviteSummary>>, SyncDeviceError> {
+    let Some(owner_person_id) = state.clone_person_id().await else {
+        // No person identity held: there is nothing to list and nothing to
+        // report. The panel's own unlock gate already covers this state; it is
+        // not a fetch failure.
+        return Ok(None);
+    };
+    let root = crate::paths::active_vault_root_from_base(
+        &host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?,
+        state.active_vault_id().await,
+    );
+
+    // The `NTV5` gate FIRST, and before any network call: an unshared vault has
+    // no vault-side invite list to fetch, and reaching for one asks the server
+    // a question only a shared vault can answer. `vault.meta` is the authority
+    // on which generation this vault is, exactly as `create_invite_from_host`
+    // reads it.
+    let meta_path = root.join("vault.meta");
+    let meta_bytes = io
+        .read(&meta_path)
         .await
-        .ok_or(SyncDeviceError::NotEnrolled)?;
+        .map_err(|_| SyncDeviceError::Transport)?;
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
+        return Ok(None);
+    }
+
     let token = ensure_owner_member_token(
         host,
         io,
@@ -690,24 +717,24 @@ pub async fn list_vault_invites_from_host(
         &crate::account::person_identity::hex_lower(&owner_person_id),
     )
     .await?;
-    let root = crate::paths::active_vault_root_from_base(
-        &host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?,
-        state.active_vault_id().await,
-    );
     let sync_state = super::state::read_sync_state(io, &root)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    let account_hash_hex = sync_state
+    let Some(account_hash_hex) = sync_state
         .account_hash_hex
         .clone()
         .filter(|s| !s.is_empty())
-        .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    else {
+        // A shared vault with no synced account is a device that has not
+        // enrolled: nothing to list, and not a relay failure either.
+        return Ok(None);
+    };
+    let url = endpoint_from_host(host, io).await?;
     let path = format!("/b2b/vaults/{account_hash_hex}/invites");
 
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, &path, &[], Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -715,9 +742,12 @@ pub async fn list_vault_invites_from_host(
             200 => {
                 let parsed: VaultInvitesResp =
                     serde_json::from_slice(&resp.body).map_err(|_| SyncDeviceError::Transport)?;
-                Ok(parsed.invites)
+                Ok(Some(parsed.invites))
             }
-            401 | 403 => Err(SyncDeviceError::Unauthenticated),
+            // The owner is not bound on this vault (yet). Nothing was sent, so
+            // this is the unshared state rather than a failure.
+            403 => Ok(None),
+            401 => Err(SyncDeviceError::Unauthenticated),
             _ => Err(SyncDeviceError::Transport),
         }
     })
@@ -731,12 +761,15 @@ pub async fn sync_list_vault_invites<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
 ) -> Result<Vec<VaultInviteSummary>, SyncDeviceError> {
-    list_vault_invites_from_host(
+    // `Ok(None)` means "this vault is not shared yet" (myne-md/myne#783); there
+    // is no list to return, and an empty list is the honest answer.
+    Ok(list_vault_invites_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
     )
-    .await
+    .await?
+    .unwrap_or_default())
 }
 
 /// The result of claiming a sealed invite from the relay.
@@ -849,13 +882,13 @@ pub async fn accept_invite_from_host(
     let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
 
     let invite_id = invite_id_hex.to_string();
     let person_token = auth.token_hex.clone();
     let (claimed, meta_bytes) = crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let claimed = claim_invite_request(transport.as_ref(), &person_token, &invite_id)?;
         let meta = fetch_vault_meta_request(transport.as_ref(), &claimed.vault_account_hash_hex)?;
         Ok::<_, SyncDeviceError>((claimed, meta))
@@ -1223,13 +1256,13 @@ pub async fn push_and_revoke_removed_member_from_host(
         .clone()
         .filter(|s| !s.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let pid = person_id_hex.map(str::to_string);
     let reclaim = reclaim_sync_ids_hex.to_vec();
 
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         // The rotated meta must reach the server before the revoke, so the
         // removed device cannot pull the new epoch even once before its token
         // dies.
@@ -1306,12 +1339,12 @@ pub async fn person_profile_write_from_host(
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let path = profile_path(&account_hash, &profile_id);
     let token = auth.token_hex.clone();
     crate::task::run_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Put, &path, &blob, Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -1343,12 +1376,12 @@ pub async fn person_profile_read_from_host(
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    let (url, pins) = endpoint_from_host(host, io).await?;
+    let url = endpoint_from_host(host, io).await?;
     let path = profile_path(&account_hash, &profile_id);
     let token = auth.token_hex.clone();
     let blob = crate::task::run_blocking(move || -> Result<Option<Vec<u8>>, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         let resp = transport
             .request(HttpMethod::Get, &path, &[], Some(&token))
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -1929,6 +1962,75 @@ mod tests {
                 read_person_auth(&io, &auth_path).await.expect("read"),
                 None,
                 "the device-scoped token goes with the identity"
+            );
+        });
+    }
+
+    // myne-md/myne#783: an `NTV5` (unshared) vault answers `Ok(None)` — a state,
+    // not a failure — even with a HOLDING person identity and a configured
+    // endpoint, which is the state the real report was in.
+    //
+    // Both preconditions matter and are why the fixture is shaped this way. A
+    // held identity is what makes the OLD code proceed to `ensure_owner_member_token`
+    // (and fail); without it the first guard returns `Ok(None)` and the test
+    // passes whether or not the NTV5 gate exists — the vacuous-fixture shape.
+    // A real `NTV5` `vault.meta` on disk is what the gate reads; a test that only
+    // set a runtime state would never reach the magic check.
+    #[test]
+    fn an_unshared_vault_lists_no_invites_and_is_not_a_failure() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("person-unshared").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            // A person identity is HELD in the runtime, so the call does not
+            // short-circuit on "no identity": that early guard is what made an
+            // earlier version of this test pass with the NTV5 gate reverted.
+            let phrase = protocol::generate_recovery_phrase()
+                .expect("csprng")
+                .join_normalized();
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            let (pair, _) =
+                crate::account::person_identity::unlock_person_identity(&host, &io, &normalized)
+                    .await
+                    .expect("seed a sealed keypair");
+            let person_id = protocol::person_id_hash(&normalized);
+            state.set_person_identity_and_id(pair, person_id).await;
+
+            // A real v0.2 birth-format vault: `NTV5` magic at offset 0, at the
+            // root `active_vault_root_from_base` resolves. `TestHost::new` puts
+            // `app_data_dir` at `<base>/data`, so the vault lives under
+            // `data/vaults/<id>/`. The directory name must be a parseable
+            // `VaultId`, so it is minted rather than typed.
+            let vault_root = tmp
+                .path()
+                .join("data")
+                .join("vaults")
+                .join(crate::vault_id::VaultId::mint().to_string());
+            std::fs::create_dir_all(&vault_root).expect("vault root");
+            let session = crate::plugins::vault_creation::commands::build_session(
+                crate::vault_id::VaultId::mint(),
+                "CanaryPass-9-animals!",
+                crate::test_support::FAST_TEST_KDF,
+            )
+            .expect("build_session");
+            let meta =
+                crate::plugins::vault_creation::commands::build_and_serialize_vault_meta(&session)
+                    .expect("serialize NTV5 vault.meta");
+            assert_eq!(&meta[..4], b"NTV5", "the fixture must be an NTV5 vault");
+            std::fs::write(vault_root.join("vault.meta"), meta).expect("write meta");
+
+            let out = list_vault_invites_from_host(&host, &io, &state)
+                .await
+                .expect("an unshared vault is not an error");
+            assert!(
+                out.is_none(),
+                "an NTV5 vault has no roster to list: {:?}",
+                out.map(|v| v.len())
             );
         });
     }

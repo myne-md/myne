@@ -53,6 +53,22 @@ they are violations:
   never-pruned backup re-creates the hoarding this rule forbids. The server ships a **built-in feature that
   implements this correctly** (`MYNE_BACKUP_*`, §4) — encrypted, off-box, pruned to a disclosed window — so
   you do not hand-roll it.
+- **Expose the operator panel (`MYNE_ADMIN_PANEL_ADDR`) to a network you do not control.** This is a
+  hazard disclosure, not a configuration ban: §4 below lists the same variable as a knob, and the two
+  describe one act. The panel is **read-only and carries no authentication**: anything that can reach
+  that address reads your account roster and can issue no command. Three facts an operator has to have
+  before binding it anywhere but loopback, none of which the server can enforce:
+  - **The listener serves plain HTTP and terminates no TLS**, so on a non-loopback bind the roster
+    crosses the network in the clear to any passive observer.
+  - **The roster is a list of credentials.** The hash is the selector for the server's pre-auth
+    `GET /vault.meta` route, which returns each account's Argon2id salt, cost parameters and both
+    wrapped key copies, so it is enough to mount an offline password-cracking attempt. "The hash is
+    not reversible" is not the reassurance it sounds like.
+  - **The bind address is not validated and the server does not refuse it.** It prints one startup
+    warning. The server cannot refuse, because the same knob on the metrics listener has legitimate
+    non-loopback uses; the difference is that metrics carries aggregate counters and this carries a
+    per-account roster.
+  Never add a reverse-proxy route for the panel, and never point it at a public origin.
 - **Attempt to weaken the zero-knowledge protocol** in any way — you can't read content regardless, but you
   must not, e.g., add a plaintext side-channel or a metadata-correlation log.
 
@@ -72,6 +88,26 @@ abuse, not confidentiality** — none of them can weaken the zero-knowledge prot
   reclamation. **⚠️ Warning:** turning this on means deleted ciphertext is kept longer than the horizon —
   it **weakens your users' "delete means gone" expectation**. It is a documented, deliberate policy
   deviation, not a default; enable it only if you understand the trade-off and tell your users.
+- **Operator panel** (`MYNE_ADMIN_PANEL_ADDR`). The browser console: read-only, **off by default**,
+  unauthenticated, and the one operator surface that can sit on a network. Set it only if you want the
+  page. The bind address is **not validated** and a non-loopback address is **warned about, not
+  refused** (see §3 for the three things that warning cannot do for you). Enforcement stays in the
+  `myne-server admin` command line, on a local Unix socket reachable by whoever can
+  `docker compose exec`. Never add a reverse-proxy route for the panel.
+- **Operator panel allowed hosts** (`MYNE_ADMIN_PANEL_HOSTS`). Extra `Host` values the panel will
+  answer to; **empty means loopback names only**, which is the safe default. This is the panel's entire
+  defence against DNS rebinding, and it is not optional: a rebound hostname is same-origin to whatever
+  page is attacking you, and browsers send no `Origin` on a GET, so neither the same-origin policy nor
+  an origin check stops a rebound read. If you bind a LAN address and browse to it by name, you must
+  name that host here.
+- **Metrics** (`MYNE_METRICS_ADDR`). The Prometheus endpoint, disabled by default, on its own separate
+  listener. Eight counters, aggregate over every account for the life of the process, with **no
+  per-account label and no time series**; that is not a claim you have to take on trust, it is held by a
+  structural denylist in the server's own metrics test, so a label that would let an observer separate
+  accounts fails the suite. A non-loopback bind is usually correct here, because scraping from another
+  host is the ordinary deployment; the server warns rather than refuses. Bind it to localhost or an
+  internal address if your scraper is not. (Contrast the panel above, which is per-account by
+  construction and therefore keeps only the no-time-series half of that invariant.)
 - **Encrypted off-box backup** (`MYNE_BACKUP_*`). Built-in, server-native backup (`decisions.md`
   2026-07-14): set `MYNE_BACKUP_ENABLED` + a `MYNE_BACKUP_REPOSITORY` + a `MYNE_BACKUP_PASSWORD_FILE` and
   the server drives a bundled restic to snapshot the store to an off-box target on a schedule
@@ -114,21 +150,48 @@ The mechanical commands for the part that works are in the `operations` reproduc
 
 ## 6. Certificate trust
 
-Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) that trust
-is a **certificate pin**, and the pin is the whole of it: the pinned verifier replaces CA-chain validation,
-so a certificate other than the pinned one fails the handshake outright.
+Your client must trust the server's TLS certificate. Native clients (desktop and mobile) verify
+the certificate chain and server hostname against the Mozilla public CA roots bundled with the
+application. The browser client uses the browser's own trust store. None of the clients pins a
+certificate or asks you to transcribe its SHA-256 fingerprint (`decisions/sync/0620`, which
+withdraws the trust-on-first-use and static-pin mechanisms this section previously described). A
+self-signed certificate is not trusted by the native clients merely because the operating system
+trusts it: the roots are compiled into the application, so a private CA installed on your machine,
+on your phone, or pushed to your fleet by device management is **not consulted**.
 
-**The SCRAM channel binding adds nothing to that in any deployment fronted by a terminating proxy**, which
+**The case where this leaves you with no supported answer, stated rather than left implicit.** If
+you serve on a private network, an internal hostname, or a bare IP address, no public CA will issue
+you a certificate, and no public CA bundle contains your root. Native clients will therefore refuse
+the endpoint on the first connection, and there is nothing in Settings that recovers it: the
+client will not accept a private root, and the refusal is not a pin mismatch to be replaced. This
+paragraph is the whole of the operator contract for that case, and it is short because the
+product has no answer to give. What is available, in the order I would reach for:
+
+- **Get a publicly trusted certificate for a name that resolves.** A real domain with a public
+  certificate is the supported path, and it is the only one the client verifies.
+- **Terminate elsewhere and give the clients a public name.** If the sync server is reachable only
+  on a LAN, a reverse proxy or tunnel that presents a publicly trusted certificate to the client
+  is the shape that works; the client never sees the private leg.
+- **Do not sync from a client that must use the private address.** A desktop pointed at a loopback
+  endpoint is the exception the client still permits, and it is a developer case rather than an
+  operator one.
+
+None of these is automatic, and I am not going to describe any of them as though it were. If your
+deployment genuinely cannot satisfy one, the honest statement is that native sync does not work
+against it, and the failure mode you will see is a TLS error on connect with your configured
+endpoint left intact on disk.
+
+**The SCRAM channel binding adds nothing to TLS authentication in any deployment fronted by a terminating proxy**, which
 is every deployment described here, the bundle's own Caddy edge included. The `-PLUS` `tls-exporter`
 binding is wired end to end on both sides, and it engages **only when the server process itself terminates
 TLS 1.3** (`decisions.md` 2026-07-13); behind a proxy that terminates TLS, both ends bind to empty and the
-exchange degrades to plain SCRAM-SHA-256 riding pinned TLS. So the man-in-the-middle resistance in the
-paragraph above is the pin's, and the binding is latent rather than a second lock on the same door. Making
+exchange degrades to plain SCRAM-SHA-256 riding verified TLS. So the man-in-the-middle resistance in the
+paragraph above is the CA-chain and hostname check, and the binding is latent. Making
 it real is a topology change — the server terminates TLS 1.3 and the proxy moves to TCP passthrough — and
 either way it is gated behind the standing R3 primitive-level review, which is also why no surface in the
 client presents certificate trust as *verified* (`threat-model.md` §1 A4).
 
-**Neither the pin nor the binding is available to the web client, and neither ever will be.** A browser
+**The channel binding is unavailable to the web client.** A browser
 exposes neither TLS-exporter keying material nor a certificate-pinning API to page JavaScript, so a
 browser session rests on the browser's own trust store and nothing more — permanently, not pending some
 later release (`decisions.md` 2026-07-26). What is unchanged either way: a man-in-the-middle on the sync
@@ -136,27 +199,17 @@ connection sees only ciphertext. What a web client additionally depends on is th
 the client code, which is a separate boundary with a separate adversary (`threat-model.md` TB11 / A15) —
 and if you self-host the web client too, that origin is yours.
 
-- **Hosted:** a build-time static pin for the hosted endpoint is the **settled design** (`decisions.md`
-  2026-06-20) and is **not shipped**. The hosted certificate and domain do not exist yet, so the client's
-  hosted-pin lookup deliberately answers "no pin", and a hosted endpoint is pinned by TOFU like any other
-  — filling in the constant is the whole remaining change and lands with its own `decisions.md` entry at
-  hosted launch. What already ships is the *distinction*: the client records where a pin came from and
-  surfaces it, so a first-connect TOFU pin is never presented as the pre-vetted hosted one.
-- **Self-host:** **trust-on-first-use (TOFU)**, shipped with the Phase 2 client work (MYND-424). When you
-  point a native client at your endpoint it completes one TLS handshake, records the SHA-256 of the leaf
-  certificate it was served, and verifies every later connection against that pin; you **eye-compare the
-  fingerprint** the client shows you across your devices (the same out-of-band channel the device-approval
-  gate already uses). It is *assumed* trust rather than verified cryptography — the first connection is
-  taken on faith, and the eye-compare is what turns it into something you checked. **When you renew
-  that certificate, connected clients stop syncing until they trust the new one** — the pin is the
-  whole certificate's hash, so any renewal invalidates it, and the client says so specifically rather
-  than reporting a network error. Re-entering the server URL asks you for the new fingerprint (get it
-  with `openssl x509 -noout -fingerprint -sha256 -in <your certificate file>`) and will not adopt a
-  different certificate without it; that refusal is deliberate, because a renewal and an impostor look
-  identical from the client's side. A loopback `http`
-  endpoint has no certificate, so nothing is pinned and the client reports that rather than implying a
-  pin. A **browser cannot pin at all** (above): it reports that the platform's trust store is doing the
-  verifying, which is a third answer rather than a missing one.
+- **Hosted and self-hosted:** a native client checks the same public CA roots and hostname at
+  first connect and on every reconnect, including over Tor. A valid renewed certificate does
+  not interrupt sync. An untrusted, expired or wrong-hostname certificate fails the handshake;
+  neither a stored legacy pin nor a QR payload can override that refusal. Two consequences follow
+  from the bundled-roots model that this section owns: a root a browser has stopped trusting keeps
+  being trusted by a client until Myne ships a release that updates the bundle, and revocation is
+  never checked, so a certificate its issuer has withdrawn stays usable until it expires
+  (`threat-model.md` §1 A4 amendment). A loopback `http` endpoint has no TLS, and any client build
+  will accept one on loopback, which is what makes the local E2E harness and a developer's own
+  machine work; it is a developer case rather than a restricted one, and no shipped setting turns
+  it off.
 
 ## 7. The honest limitation (what TB5 does and doesn't buy you)
 

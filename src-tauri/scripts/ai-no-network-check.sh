@@ -55,8 +55,8 @@
 # proved, and still does not, is that the process has no network path; see
 # check 1.
 #
-# `webpki-roots` (the AI arm's trust anchor, task 4) is deliberately NOT on
-# this list and needs no entry: it is a `const` bundle of certificate DATA. It
+# `webpki-roots` (shared by sync TLS and the AI provider arm) is deliberately
+# NOT on this list and needs no entry: it is a `const` bundle of certificate DATA. It
 # opens nothing, speaks no protocol, and is not denylist-family. Adding it
 # would dilute a list whose value is that every line is a decision.
 #
@@ -259,39 +259,142 @@ done
 #    `--no-default-features` build silently starts carrying provider-transport
 #    code for the first time.
 #
-#    `webpki-roots` is the tell, and it is a tight one rather than a proxy that
-#    could drift: it is optional and reached ONLY through `remote-ai`, and
-#    `provider_transport.rs` names `webpki_roots::TLS_SERVER_ROOTS` directly, so
-#    the crate and the code cannot enter the graph separately. If the arm
-#    compiles, this crate is in the closure; if it does not, it is not.
+#    WHAT IT MEASURES, and what it no longer uses. This check used to read the
+#    dependency closure for `webpki-roots`, which was a tight tell BECAUSE it
+#    was optional and reached only through `remote-ai`. Native sync needs the
+#    same crate with AI off (its bundled Mozilla roots, myne#786), so presence
+#    stopped being evidence and the tell had to go. Dependency presence was
+#    never the property anyway; the property is which FEATURES are on.
 #
-#    Asserted in BOTH directions on purpose. "Absent from the baseline" alone
-#    passes on a tree where the arm has been deleted outright, and "present in
-#    the shipped tree" alone passes on a tree where the gate has been removed.
-#    Neither half is the property; the pair is.
+#    So this now reads the resolved feature graph, in BOTH directions, and both
+#    halves are reported by name because either one alone is satisfied by the
+#    wrong tree:
+#      - `remote-ai` ABSENT from the audit build, and
+#      - `remote-ai` PRESENT in the shipped build (its absence there means the
+#        arm is not being built at all, which this reports as a failure rather
+#        than passing on a tree it could not measure).
+#    Plus the source-level `#[cfg]` on `pub mod inference;`, which no graph can
+#    see: a feature turned on with the module gate dropped compiles the arm in
+#    every configuration, and the graph above would call that correct.
+#
+#    WHAT IT DOES NOT PROVE. `cargo tree` resolves; it does not compile. That
+#    the audit build still COMPILES with these edges is CI's
+#    `cargo clippy -p myne-desktop --all-targets --no-default-features -D warnings`
+#    in the same `ai-no-network` step, and the two together are what back the
+#    claim. Neither alone would: a green resolve with a dropped module gate
+#    compiles provider-transport code into the audit build, and a green compile
+#    says nothing about which features were requested.
 echo "== the remote-AI arm is gated out of the --no-default-features build =="
-REMOTE_ARM_TELL="webpki-roots"
-tell_on=0; tell_off=0
-printf '%s\n' "$on"  | grep -qx "$REMOTE_ARM_TELL" && tell_on=1
-printf '%s\n' "$off" | grep -qx "$REMOTE_ARM_TELL" && tell_off=1
-if [ "$tell_on" -eq 1 ] && [ "$tell_off" -eq 0 ]; then
-  echo "  ✓ $REMOTE_ARM_TELL is in the shipped tree and absent from the audit build"
-elif [ "$tell_off" -eq 1 ]; then
-  echo "  ✗ $REMOTE_ARM_TELL is in the --no-default-features closure:"
-  echo "    the remote-provider arm now compiles into the AI-free auditable"
-  echo "    build, which it never did while it lived in this crate. Check that"
-  echo "    'myne-core/remote-ai' rides on the 'local-inference' feature rather"
-  echo "    than on the myne-core dependency line, and that 'remote-ai' is not"
-  echo "    in myne-core's default feature set."
+
+# The enabled-feature list cargo resolved for `myne-core`, from the DESKTOP
+# package, the audit target, under one feature set. One line per package, so
+# the first `myne-core` line is the whole answer.
+core_features() {
+  cargo tree -p "$PKG" "$@" -e features --prefix none --format '{p} {f}' 2>/dev/null \
+    | grep -E '^myne-core v' \
+    | head -1 \
+    | sed -E 's/^.*\) //'   # drop `myne-core v0.1.0 (/path/to/core) `, keep the feature list
+}
+
+audit_features="$(core_features --no-default-features)"
+shipped_features="$(core_features --no-default-features --features "$FEATURE")"
+
+if [ -z "$audit_features" ]; then
+  echo "  ✗ could not read myne-core's resolved features for the audit build."
+  echo "    A check that skips on a missing input reads as a pass; treat this"
+  echo "    as a failure and re-run with the workspace lockfile present."
   violation=1
 else
-  echo "  ✗ $REMOTE_ARM_TELL is missing from the SHIPPED tree:"
-  echo "    the remote-provider arm is not being built at all. Either the"
-  echo "    'local-inference' feature stopped implying 'myne-core/remote-ai',"
-  echo "    or the arm was removed. This check reports a missing input as a"
-  echo "    failure rather than passing on a tree it could not measure."
+  case ",$audit_features," in
+    *,remote-ai,*)
+      echo "  ✗ 'remote-ai' is ON in the --no-default-features closure:"
+      echo "    myne-core features = $audit_features"
+      echo "    The remote-provider arm now compiles into the AI-free auditable"
+      echo "    build, which it never did while it lived in this crate. Check that"
+      echo "    'myne-core/remote-ai' rides on the 'local-inference' feature rather"
+      echo "    than on the myne-core dependency line, and that 'remote-ai' is not"
+      echo "    in myne-core's default feature set."
+      violation=1
+      ;;
+    *)
+      echo "  ✓ 'remote-ai' is OFF in the --no-default-features closure (features = $audit_features)"
+      ;;
+  esac
+fi
+
+case ",$shipped_features," in
+  *,remote-ai,*)
+    echo "  ✓ 'remote-ai' is ON in the shipped closure (features = $shipped_features)"
+    ;;
+  *)
+    echo "  ✗ 'remote-ai' is OFF in the shipped closure (features = ${shipped_features:-<unreadable>}):"
+    echo "    the remote-provider arm is not being built at all. Either the"
+    echo "    'local-inference' feature stopped implying 'myne-core/remote-ai',"
+    echo "    or the arm was removed."
+    violation=1
+    ;;
+esac
+
+# The module gate the graph cannot see.
+#
+# ADJACENCY, and the reason it is two greps and not one. A feature turned on
+# with the `#[cfg]` dropped compiles the arm in every configuration, and the
+# feature graph above would call that correct, so the source has to be read.
+#
+# A COMMENT-AWARE READER IS A READER WITH A BYPASS, and this one had one. The
+# first version skipped lines matching `^//`, `^/\*` and `^\*` and then required
+# the attribute and the declaration to be adjacent. A column-0 block comment
+# whose interior is not `*`-prefixed leaves its interior visible, so this shape
+#
+#     /* Temporarily ungated for debugging.
+#     #[cfg(feature = "remote-ai")]
+#     pub mod inference;
+#     */
+#     pub mod inference;
+#
+# satisfied the check with the real gate deleted, and the audit build compiled
+# provider-transport code while this printed a green tick. Check 4 below is a
+# plain grep and says in its own header why ("prose must not spell the
+# identifier either, a comment-aware scanner is a scanner with a bypass"); this
+# half now matches that discipline rather than half-contradicting it.
+#
+# So: no comment handling at all, and the property is stated as a UNIVERSAL
+# rather than an existential: EVERY exact `pub mod inference;` line in the file
+# must be immediately preceded by the attribute. A single ungated declaration
+# fails, and that is the shape that matters: one ungated `pub mod inference;` is
+# the whole of provider-transport code in the audit build.
+#
+# An existential ("is there such a pair anywhere") is not enough, and the
+# comment-skipping version was exactly that: `grep -A1` found the attribute
+# inside a block comment and the declaration on the comment's next line, so the
+# pair it proved was the commented-out copy and the live one below was never
+# examined.
+#
+# The cost is stated rather than hidden: a line-initial `//` comment wedged
+# between the attribute and the declaration fails this check, which is a shape a
+# real gate does not have.
+inference_gate() {
+  awk -v attr='#[cfg(feature = "remote-ai")]' '
+    {
+      if ($0 == "pub mod inference;") {
+        found = 1
+        if (prev != attr) { print "ungated"; exit 1 }
+      }
+      prev = $0
+    }
+    END { if (found != 1) exit 1 }
+  ' "$REPO_ROOT/core/src/lib.rs"
+}
+if inference_gate; then
+  echo "  ✓ \`pub mod inference;\` sits behind \`#[cfg(feature = \"remote-ai\")]\`"
+else
+  echo "  ✗ \`pub mod inference;\` in core/src/lib.rs is not behind an"
+  echo "    \`#[cfg(feature = \"remote-ai\")]\` on the line above it. The feature"
+  echo "    graph can look correct while the module compiles unconditionally,"
+  echo "    which puts provider-transport code in the audit build."
   violation=1
 fi
+
 
 # ── Check 4: AI-PATH EGRESS CALL SITES — the ratchet that carries the property
 #    checks 1–2 cannot express (`decisions.md` 2026-08-09). ─────────────────

@@ -1318,7 +1318,6 @@ pub async fn enroll_device_from_host(
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     let account =
@@ -1348,7 +1347,7 @@ pub async fn enroll_device_from_host(
     // the display-form account number never crosses the wire (AS9).
     let outcome =
         crate::task::run_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
-            let transport = super::http_transport::build_transport(&url, pins)
+            let transport = super::http_transport::build_transport(&url)
                 .map_err(|_| SyncDeviceError::Transport)?;
 
             // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
@@ -1581,46 +1580,60 @@ pub async fn enroll_device_from_host(
     })
 }
 
-/// Acquire a TOFU pin for an `https` endpoint by reaching the server once.
+/// The ONE first-connect policy: validate the URL against the A4/TB5 rules,
+/// then complete a CA-verified handshake through the same `RustlsTransport` and
+/// the same Tor route every later request takes. Nothing is written on refusal.
 ///
-/// Host-only by nature: it completes a TLS handshake over the raw-TLS transport
-/// and reads the leaf certificate. A page never sees one, which is why the
-/// browser arm passes `can_pin: false` and gets `None` here without calling it.
+/// It is here rather than inlined at each call site because there are two, and
+/// they used to be two implementations: `sync_set_endpoint` walked the same
+/// three steps in the opposite shape and mapped the identical server fault to
+/// `SyncConfigError::Unreachable` where this one says `TlsFailure`, so a user
+/// setting an endpoint in Settings and a user joining from a QR learned
+/// different things from the same untrusted certificate. The error TYPE stays
+/// each caller's, because the two commands' error enums are separate IPC
+/// contracts; the POLICY and the transport are shared.
 ///
-/// Goes through [`super::pin_confirm::capture_pin`] rather than reaching for
-/// `tofu_fetch_pin` itself (MYND-650 task 5): in Tor mode the handshake travels
-/// through an exit node, and an exit node can serve its own certificate to a
-/// client that has agreed to accept any. `confirmed_fingerprint` is the value
-/// the user obtained out-of-band; it is required there and optional on the
-/// clearnet.
+/// Native only. A browser's `fetch` verifies the chain itself and has no rustls
+/// arm to ask, so the wasm arm refuses rather than pretending to probe, a
+/// browser must not be treated as a client that skips verification.
 #[cfg(not(target_arch = "wasm32"))]
-async fn acquire_tofu_pin(
-    url: &str,
-    confirmed_fingerprint: Option<&str>,
-) -> Result<Option<String>, SyncDeviceError> {
-    super::config::validate_endpoint_url(url).map_err(|_| SyncDeviceError::NotConfigured)?;
+pub async fn verify_join_tls(url: &str) -> Result<(), TransportError> {
+    super::config::validate_endpoint_url(url).map_err(|_| TransportError::BadRequest)?;
     let Some((scheme, host, port)) = super::http_transport::parse_endpoint(url) else {
-        return Err(SyncDeviceError::NotConfigured);
+        return Err(TransportError::BadRequest);
     };
     if scheme != "https" {
-        return Ok(None); // loopback http: no TLS, nothing to pin
+        return Ok(()); // loopback http: no TLS
     }
-    let pin = super::pin_confirm::capture_pin(host, port, confirmed_fingerprint)
+    let probe = super::rustls_transport::RustlsTransport::new(host, port);
+    // A join error is a transport error here, not a SyncDeviceError: the two
+    // commands that probe share this policy and each maps it to its own enum.
+    crate::task::run_blocking(move || probe.verify_endpoint())
         .await
-        .map_err(SyncDeviceError::from)?;
-    Ok(Some(pin))
+        .map_err(|_| TransportError::Network)?
 }
 
-/// The `wasm32` arm exists only so the `can_pin: true` branch has a body to
-/// compile against; it is unreachable, because the browser always passes
-/// `can_pin: false`. It refuses rather than returning `None` so a future caller
-/// that flipped the flag would fail loudly instead of silently unpinned.
+/// A join never reaches its own transport, so the probe is a bare refusal here.
 #[cfg(target_arch = "wasm32")]
-async fn acquire_tofu_pin(
-    _url: &str,
-    _confirmed_fingerprint: Option<&str>,
-) -> Result<Option<String>, SyncDeviceError> {
-    Err(SyncDeviceError::Transport)
+pub async fn verify_join_tls(_url: &str) -> Result<(), TransportError> {
+    Err(TransportError::Network)
+}
+
+/// [`verify_join_tls`]'s outcome projected onto the join command's error enum.
+/// The one place that mapping exists, for the reason the shared policy gives.
+///
+/// Target-INDEPENDENT on purpose, and the reason is the wasm build rather than
+/// taste: [`verify_join_tls`] has an arm for each target but
+/// `join_account_from_host` is not gated, so a `#[cfg]` on this helper alone
+/// compiles for wasm and fails there with `cannot find value` — the exact
+/// shape `core/AGENTS.md` records for a native-only item reaching a shared
+/// caller. The wasm arm of the policy only ever answers `Network`, so the
+/// mapping below simply carries that through.
+fn join_tls_error(e: TransportError) -> SyncDeviceError {
+    match e {
+        TransportError::Tls => SyncDeviceError::TlsFailure,
+        _ => SyncDeviceError::Transport,
+    }
 }
 
 /// The two answers a CLIENT brings to the bootstrap — grouped rather than passed
@@ -1634,10 +1647,16 @@ pub struct JoinClient {
     /// constant `paths::web_single_vault_id()`, which is the registry collapse
     /// made explicit and what makes a re-run idempotent by construction.
     pub vault_id: crate::vault_id::VaultId,
-    /// Whether this client can TOFU-pin the server's certificate. False in a
-    /// browser: a page never sees the leaf cert, so the result reports
-    /// `PinSource::PlatformTrustStore` instead of an empty pin.
-    pub can_pin: bool,
+    /// Whether this client must complete the CA-verified handshake itself
+    /// before the join is allowed to persist the endpoint. True on native, false
+    /// in a browser, where `fetch` performs the same verification and there is
+    /// no rustls arm to ask.
+    ///
+    /// The field was `can_pin`, which asserted the opposite of what the flag
+    /// does: both arms verify a certificate, they verify it with different
+    /// stores. A reader of the old name would conclude the browser verifies
+    /// nothing.
+    pub native_tls: bool,
 }
 
 /// What the USER brings to the bootstrap — the counterpart to [`JoinClient`],
@@ -1668,14 +1687,10 @@ pub struct JoinRequest {
     /// `wire()` mapping and the server side all existed before this field; no
     /// production call site sent anything but `Password`.
     pub credential_kind: EnrollCredential,
-    /// The server-certificate fingerprint the user obtained **out-of-band**,
-    /// or `None`.
-    ///
-    /// Optional on the clearnet (the shipped TOFU bargain: first connect on
-    /// faith, eye-compare after) and **mandatory in Tor mode**, where the
-    /// accept-any-certificate first handshake travels through an exit node
-    /// that can serve its own — see [`super::pin_confirm`]. A value that does
-    /// not match what the server serves aborts the join with nothing written.
+    /// The retired out-of-band fingerprint argument, kept so the three clients'
+    /// command signatures do not have to move. Always ignored: the join no
+    /// longer accepts anything the user could paste here, and a value that used
+    /// to be mandatory in Tor mode is now simply not consulted.
     pub confirmed_fingerprint: Option<String>,
 }
 
@@ -1687,7 +1702,7 @@ pub struct JoinResult {
     /// True when the device is pending approval by an existing device (the
     /// common password-path case); false if it was approved immediately.
     pub pending: bool,
-    /// The server cert fingerprint (https) for eye-compare, or `null` (loopback).
+    /// The retired cert-fingerprint IPC field. Always `None`.
     pub fingerprint: Option<String>,
     /// The freshly generated `device_id` (hex) this join registered (MYND-548) —
     /// same contract as [`EnrollResult::device_id_hex`]: the joining device is
@@ -1703,7 +1718,7 @@ pub struct JoinResult {
 }
 
 /// **Add this device to an existing account.** On a fresh device, bootstrap the
-/// whole local vault from the server: TOFU-pin the endpoint, fetch the account's
+/// whole local vault from the server: verify the endpoint, fetch the account's
 /// `vault.meta` pre-auth, derive `root_key` from `{account# + password}`, write
 /// the meta to a NEW local vault + unlock it, then SCRAM-enroll (password →
 /// **pending** until an existing device approves). No 24-word recovery. After
@@ -1874,33 +1889,36 @@ pub async fn join_account_from_host(
     client: JoinClient,
     request: JoinRequest,
 ) -> Result<JoinResult, SyncDeviceError> {
-    let JoinClient { vault_id, can_pin } = client;
+    let JoinClient {
+        vault_id,
+        native_tls,
+    } = client;
     let JoinRequest {
         server_url,
         account_number,
         password,
-        confirmed_fingerprint,
+        confirmed_fingerprint: _,
         credential_kind,
     } = request;
     let password = Zeroizing::new(password);
 
-    // 1. Set + TOFU-pin the endpoint (https) before any transport use.
+    // 1. Verify the endpoint's certificate before anything persists it.
     //
-    // The pin itself is the caller's to acquire — it needs a TLS handshake and
-    // the leaf certificate, which a browser cannot see. `can_pin` decides what
-    // the RESULT reports, so a browser's `fingerprint` is `None` with
-    // `PinSource::PlatformTrustStore` rather than an empty pin that reads as
-    // unverified. Task 85's criterion asks for exactly that typed answer.
-    let cert_pin_hex = if can_pin {
-        acquire_tofu_pin(&server_url, confirmed_fingerprint.as_deref()).await?
-    } else {
-        None
-    };
-    let fingerprint =
-        super::config::set_endpoint(host, io, Some(server_url), cert_pin_hex, can_pin)
-            .await
-            .map_err(|_| SyncDeviceError::NotConfigured)?
-            .fingerprint;
+    // The probe is the same `RustlsTransport` and the same Tor route every later
+    // sync request takes, so a join cannot succeed against an endpoint this
+    // device would then refuse to talk to. A browser has no rustls arm and its
+    // `fetch` verifies on its own, so it skips the probe rather than being
+    // treated as a client that skips verification.
+    if native_tls {
+        verify_join_tls(&server_url).await.map_err(join_tls_error)?;
+    }
+    // `None`, read from the retired wire field: `set_endpoint` hardcodes it, so
+    // binding the value directly says so rather than chaining a read that can
+    // only produce one thing.
+    let fingerprint: Option<String> = None;
+    super::config::set_endpoint(host, io, Some(server_url), None)
+        .await
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
     let cfg = super::config::read_config(
         io,
         &super::config::config_path_from_host(host, io)
@@ -1909,7 +1927,6 @@ pub async fn join_account_from_host(
     )
     .await
     .map_err(|_| SyncDeviceError::NotConfigured)?;
-    let pins = super::config::config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     let account =
@@ -1926,11 +1943,10 @@ pub async fn join_account_from_host(
     // 2. Fetch the account's vault.meta pre-auth (AEAD-protected — useless
     //    without the credential, the accepted A4-equivalent exposure).
     let url_fetch = url.clone();
-    let pins_fetch = pins.clone();
     let acct_q = acct_hex.clone();
     let meta_bytes: Vec<u8> =
         crate::task::run_blocking(move || -> Result<Vec<u8>, SyncDeviceError> {
-            let transport = super::http_transport::build_transport(&url_fetch, pins_fetch)
+            let transport = super::http_transport::build_transport(&url_fetch)
                 .map_err(|_| SyncDeviceError::Transport)?;
             let resp = transport
                 .request(
@@ -2030,7 +2046,7 @@ pub async fn join_account_from_host(
     //    wire PATH differs, and it is what decides approval server-side.
     let approved =
         crate::task::run_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
-            let transport = super::http_transport::build_transport(&url, pins)
+            let transport = super::http_transport::build_transport(&url)
                 .map_err(|_| SyncDeviceError::Transport)?;
             let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
             register_verifier(transport.as_ref(), &account_hash, secret.as_slice())
@@ -2211,57 +2227,32 @@ pub(crate) async fn open_joined_vault(
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
-mod pin_confirmation_tests {
-    //! The enrollment half of MYND-650 task 5: the join's pin acquisition
-    //! honours the out-of-band compare.
-    //!
-    //! Testing it at [`super::acquire_tofu_pin`] rather than through
-    //! `join_account_from_host` is deliberate and is not a shortcut around the
-    //! criterion. The join is a network fetch, a bootstrap, an unlock and a
-    //! SCRAM handshake, all of which need a live server — but the pin
-    //! acquisition is its **first** step, and it propagates its error with `?`
-    //! before `config::set_endpoint` is reached. So "the fingerprint did not
-    //! match" is, structurally, "nothing was written": no endpoint URL, no
-    //! pin, no vault container. What these tests pin down is the half that
-    //! could actually regress — whether the acquisition compares at all, and
-    //! what it does when the comparison fails.
+mod tls_enrollment_tests {
+    use super::super::rustls_transport::tests::spawn_tls_server;
+    use super::super::transport::TransportError;
+    use super::{join_tls_error, verify_join_tls};
 
-    use super::super::rustls_transport::cert_pin;
-    use super::super::rustls_transport::tests::{spawn_tls_server, TEST_CERT_DER};
-    use super::super::to_hex;
-    use super::{acquire_tofu_pin, SyncDeviceError};
-
-    /// A confirmed fingerprint that is not what the server serves aborts the
-    /// acquisition — and therefore the join — with nothing pinned.
+    /// A private test CA is not a public CA. The join must stop before it writes
+    /// an endpoint, even on the first connection.
     #[test]
-    fn a_mismatched_confirmed_fingerprint_aborts_the_join() {
+    fn first_connection_refuses_an_untrusted_certificate() {
         let port = spawn_tls_server(1);
         let url = format!("https://localhost:{port}");
-
-        let out = crate::test_support::block_on(acquire_tofu_pin(&url, Some(&"0".repeat(64))));
-        assert_eq!(out, Err(SyncDeviceError::FingerprintMismatch));
+        let out = crate::test_support::block_on(verify_join_tls(&url));
+        // Asserted through the projection each caller uses, so the test fails if
+        // the shared policy ever stops distinguishing a certificate refusal from
+        // a network fault, the distinction the whole native join rests on.
+        assert!(matches!(
+            join_tls_error(TransportError::Tls),
+            super::SyncDeviceError::TlsFailure
+        ));
+        assert_eq!(out, Err(TransportError::Tls));
     }
 
-    /// The matching case still returns the pin, in the canonical lowercase-hex
-    /// form the endpoint config stores — i.e. the compare is a gate on the
-    /// existing flow, not a replacement for it.
     #[test]
-    fn a_matching_confirmed_fingerprint_yields_the_pin() {
-        let port = spawn_tls_server(1);
-        let url = format!("https://localhost:{port}");
-        let expected = to_hex(&cert_pin(TEST_CERT_DER));
-
-        let out = crate::test_support::block_on(acquire_tofu_pin(&url, Some(&expected)));
-        assert_eq!(out, Ok(Some(expected)));
-    }
-
-    /// A loopback `http` endpoint has no certificate, so there is nothing to
-    /// confirm and the confirmation policy never fires. The E2E harness and a
-    /// developer's local server keep working unchanged.
-    #[test]
-    fn a_loopback_http_endpoint_needs_no_confirmation() {
-        let out = crate::test_support::block_on(acquire_tofu_pin("http://127.0.0.1:8080", None));
-        assert_eq!(out, Ok(None));
+    fn a_loopback_http_endpoint_needs_no_tls_handshake() {
+        let out = crate::test_support::block_on(verify_join_tls("http://127.0.0.1:8080"));
+        assert_eq!(out, Ok(()));
     }
 }
 

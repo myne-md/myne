@@ -126,10 +126,11 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [personIdHex, setPersonIdHex] = useState<string | null>(null);
   const [identityCode, setIdentityCode] = useState<string | null>(null);
+  // Forget-this-identity acknowledgement (myne-md/myne#782).
+  const [forgetAck, setForgetAck] = useState(false);
 
   // Gate on boot: if an identity already exists, skip straight to the home.
-  useEffect(() => {
-    if (!HAS_TAURI) {
+  useEffect(() => {    if (!HAS_TAURI) {
       setStep("gate");
       return;
     }
@@ -182,23 +183,26 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     try {
       await syncSetEndpoint(trimmed);
       setStep("create");
-    } catch {
-      setError(t("identityFlow.serverUnreachable"));
+    } catch (e) {
+      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
+        ? "sync.endpoint.tlsFailure"
+        : "identityFlow.serverUnreachable"));
     } finally {
       setBusy(false);
     }
   }, [serverUrl, t]);
 
-  // The hosted door: write the Myne server and let the first connection pin its
-  // leaf (TOFU). No pre-vetted pin is claimed (myne-md/myne#781).
+  // The hosted door uses the same public-CA and hostname verification.
   const connectHosted = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       await syncSetEndpoint(HOSTED_SYNC_ORIGIN);
       setStep("create");
-    } catch {
-      setError(t("identityFlow.serverUnreachable"));
+    } catch (e) {
+      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
+        ? "sync.endpoint.tlsFailure"
+        : "identityFlow.serverUnreachable"));
     } finally {
       setBusy(false);
     }
@@ -442,6 +446,43 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
             </div>
           ))
         )}
+        {/* Forget this identity on this device (myne-md/myne#782). Device-local:
+            the server account survives and is recoverable with the phrase. */}
+        <Lead>{t("identityFlow.home.forgetHeading")}</Lead>
+        {error ? <Banner kind="warning">{error}</Banner> : null}
+        <label
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            alignItems: "flex-start",
+            marginTop: "var(--space-2)",
+          }}
+        >
+          <input
+            type="checkbox"
+            data-testid="identity-flow.home-forget-ack"
+            checked={forgetAck}
+            onChange={(e) => setForgetAck(e.target.checked)}
+            style={{ marginTop: "var(--space-1)", width: 20, height: 20, accentColor: "var(--accent)" }}
+          />
+          <span
+            style={{
+              fontSize: "var(--text-sm)",
+              lineHeight: "var(--leading-normal)",
+              color: "var(--fg-1)",
+            }}
+          >
+            {t("identityFlow.home.forgetCheckbox")}
+          </span>
+        </label>
+        <Button
+          variant="ghost"
+          disabled={!forgetAck || busy}
+          onClick={() => void forgetHeld()}
+          data-testid="identity-flow.home-forget"
+        >
+          {t("identityFlow.home.forget")}
+        </Button>
       </ScreenScroll>
     );
   };

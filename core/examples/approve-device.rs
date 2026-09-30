@@ -1,10 +1,8 @@
 // Approve every pending device on an account, from source, without a GUI
 // (phase3-web-client task 105 — the other half of the fixture seeder).
 //
-//   PIN=$(echo | openssl s_client -connect sync.myne.md:443 2>/dev/null \
-//         | openssl x509 -outform DER | shasum -a 256 | cut -d' ' -f1)
 //   cargo run --release --example approve-device -- \
-//     https://sync.myne.md <account-number> <recovery-phrase> "$PIN"
+//     https://sync.myne.md <account-number> <recovery-phrase>
 //
 // # Why this exists
 //
@@ -34,11 +32,13 @@ use myne_core::plugins::sync::rustls_transport::RustlsTransport;
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let usage = "usage: approve-device <server-url> <account-number> <recovery-phrase> <leaf-cert-sha256-hex>";
+    let usage = "usage: approve-device <server-url> <account-number> <recovery-phrase>";
     let server = args.next().unwrap_or_else(|| die(usage));
     let account_input = args.next().unwrap_or_else(|| die(usage));
     let phrase_input = args.next().unwrap_or_else(|| die(usage));
-    let pin_hex = args.next().unwrap_or_else(|| die(usage));
+    if args.next().is_some() {
+        die(usage);
+    }
 
     let account = protocol::parse_account_number(&account_input).expect("valid account number");
 
@@ -50,14 +50,7 @@ fn main() {
         Some((h, p)) => (h.to_string(), p.parse().expect("port")),
         None => (rest.to_string(), 443u16),
     };
-    let pin: [u8; 32] = {
-        let bytes: Vec<u8> = (0..pin_hex.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&pin_hex[i..i + 2], 16).expect("pin must be hex"))
-            .collect();
-        bytes.try_into().expect("pin must be 32 bytes (sha256)")
-    };
-    let transport = RustlsTransport::new(host, port, vec![pin]);
+    let transport = RustlsTransport::new(host, port);
 
     // The recovery phrase re-derives the SAME root_key the account was created
     // with — that is the whole point of the recovery wrap — so the server-auth

@@ -84,20 +84,9 @@ pub enum FailureClass {
     DeviceRevoked,
     /// Socket/TLS-level failure — offline or the server is unreachable.
     Transport,
-    /// The server's certificate is not the pinned one (A4). Split out of
-    /// [`FailureClass::Transport`] on two axes, and it needs both.
-    ///
-    /// **It parks rather than backing off**, because unlike every other
-    /// transport failure it cannot resolve itself: the pinned certificate is
-    /// gone and no amount of retrying brings it back. Only a user action does,
-    /// so it belongs with the 401 family in the ladder even though it is a
-    /// socket-level error.
-    ///
-    /// **And it reaches the UI as itself**, because it is the one transport
-    /// failure with a specific remedy the user can carry out. Folded into
-    /// `Transport` it renders as "Sync error", which is what four days of dead
-    /// sync looked like after a routine certificate renewal.
-    CertPinMismatch,
+    /// A certificate-chain, hostname or TLS-protocol failure needs a server
+    /// configuration change; repeating the same handshake cannot fix it.
+    TlsFailure,
     /// 507 — the account is over its storage ceiling. Retrying cannot help until
     /// the user frees space or the ceiling changes, so it parks like a 401.
     QuotaExceeded,
@@ -115,6 +104,19 @@ pub enum FailureClass {
     /// retrying cannot help until someone frees something — but they are
     /// different sentences to the user, and only one of them is fixable here.
     StorageFull,
+    /// An `NTV6` vault whose head cannot be signed because no person identity is
+    /// held in this session — the third defect in the same NTV6/identity
+    /// intersection as myne-md/myne#790 and #791. The cycle refuses to author a
+    /// downgraded `0x01` head, which the `0x02` server would reject anyway.
+    ///
+    /// **Not parked.** Every parking class above is parked because no user
+    /// action can be awaited by the scheduler; here the user CAN act (unlock the
+    /// identity, `sync_person_unlock`), but that action has no scheduler edge of
+    /// its own — it is not a lock/unlock/focus/resume/poke — so parking for
+    /// [`AUTH_PARK_MS`] would strand the first successful retry up to fifteen
+    /// minutes after the user fixed it. The ordinary ladder keeps the wait
+    /// bounded at [`FAILURE_RETRY_CAP_MS`] instead.
+    IdentityLocked,
     /// Everything else (bad response, CAS races, protocol errors, local IO).
     Other,
 }
@@ -137,10 +139,13 @@ impl FailureClass {
             FailureClass::StorageFull => "storage_full",
             FailureClass::PayloadTooLarge => "payload_too_large",
             FailureClass::Frozen => "frozen",
+            // Its own tag: the fix is a specific user action (unlock the person
+            // identity), which "sync_failed" would never say.
+            FailureClass::IdentityLocked => "identity_locked",
             // Not "sync_failed": this is the one transport failure the user can
-            // act on, and the action is specific (re-trust the server's new
-            // certificate out of band).
-            FailureClass::CertPinMismatch => "cert_pin_mismatch",
+            // act on, and the action is specific (fix the server's certificate, or
+            // point the client at a host a public CA will issue for).
+            FailureClass::TlsFailure => "tls_failure",
             FailureClass::Transport | FailureClass::Other => "sync_failed",
         }
     }
@@ -171,15 +176,14 @@ fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
         | FailureClass::QuotaExceeded
         | FailureClass::StorageFull
         | FailureClass::Frozen
-        // The pinned certificate is gone; retrying reaches the same replacement
-        // certificate and fails identically. Parking here is not a nicety: on
-        // the failure ladder this would otherwise re-probe every few seconds
-        // for as long as the renewal stands, which is days.
-        | FailureClass::CertPinMismatch => return AUTH_PARK_MS,
+        | FailureClass::TlsFailure => return AUTH_PARK_MS,
         FailureClass::RateLimited => (RATE_LIMIT_RETRY_START_MS, RATE_LIMIT_RETRY_CAP_MS),
         FailureClass::Transport | FailureClass::Other | FailureClass::PayloadTooLarge => {
             (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
         }
+        // The person-unlock that clears this has no scheduler edge, so it must
+        // NOT park: the ladder's cap bounds the wait after the user acts.
+        FailureClass::IdentityLocked => (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS),
     };
     // 2^(n-1) with a shift guard; n counts from 1 (first failure).
     let n = consecutive_failures.saturating_sub(1).min(16);
@@ -921,39 +925,28 @@ mod tests {
         assert_eq!(s.tick(30_000), SyncAction::Pull);
     }
 
-    /// A pin mismatch parks and says so, unlike every other transport failure.
-    ///
-    /// Two properties, and the pair is the point. It PARKS, because the pinned
-    /// certificate is gone and the ladder would otherwise re-probe a server
-    /// that will keep answering with the same replacement for as long as the
-    /// renewal stands — days, at a delay that starts at one second. And it
-    /// SAYS which failure it is, because it is the only transport error with a
-    /// remedy the user can carry out; folded into `Transport` it renders as
-    /// "Sync error", which is what a four-day outage after a routine Let's
-    /// Encrypt renewal actually looked like.
+    /// A failed TLS handshake parks rather than reconnect-spinning, and says
+    /// which trust boundary failed rather than claiming the device is offline.
     #[test]
-    fn a_pin_mismatch_parks_and_keeps_its_own_name() {
+    fn a_tls_failure_parks_and_keeps_its_own_name() {
         assert_eq!(
-            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            retry_delay_ms(FailureClass::TlsFailure, 1),
             AUTH_PARK_MS,
-            "a pin mismatch cannot be retried out of — it parks like a 401"
+            "an invalid certificate cannot be retried out of"
         );
         assert_eq!(
-            retry_delay_ms(FailureClass::CertPinMismatch, 9),
-            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            retry_delay_ms(FailureClass::TlsFailure, 9),
+            retry_delay_ms(FailureClass::TlsFailure, 1),
             "parking is flat: there is nothing to back off from"
         );
         assert_ne!(
-            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            retry_delay_ms(FailureClass::TlsFailure, 1),
             retry_delay_ms(FailureClass::Transport, 1),
             "it must NOT share the transport ladder it used to be folded into"
         );
-        assert_eq!(
-            FailureClass::CertPinMismatch.status_detail(),
-            "cert_pin_mismatch"
-        );
+        assert_eq!(FailureClass::TlsFailure.status_detail(), "tls_failure");
         assert_ne!(
-            FailureClass::CertPinMismatch.status_detail(),
+            FailureClass::TlsFailure.status_detail(),
             FailureClass::Transport.status_detail(),
             "the whole defect was these two sharing the string \"sync_failed\""
         );
@@ -985,6 +978,38 @@ mod tests {
             "the two must not collapse into one message"
         );
         assert_eq!(FailureClass::StorageFull.status_detail(), "storage_full");
+    }
+
+    /// An `NTV6` vault whose signed head cannot be built for lack of a held
+    /// person identity is its own class, NOT the generic "sync failed", and it
+    /// retries on the ladder rather than parking: the unlock that clears it has
+    /// no scheduler edge, so a 15-minute park would delay the first successful
+    /// cycle long after the user acted.
+    #[test]
+    fn a_locked_person_identity_is_named_and_retries_on_the_ladder() {
+        assert_eq!(
+            FailureClass::IdentityLocked.status_detail(),
+            "identity_locked"
+        );
+        assert_ne!(
+            FailureClass::IdentityLocked.status_detail(),
+            FailureClass::Other.status_detail(),
+            "the whole defect was this collapsing into the generic \"sync_failed\""
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::IdentityLocked, 1),
+            FAILURE_RETRY_START_MS,
+            "it must retry on the ladder, not park"
+        );
+        assert_ne!(
+            retry_delay_ms(FailureClass::IdentityLocked, 1),
+            AUTH_PARK_MS,
+            "parking would strand the first retry after the user unlocks the identity"
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::IdentityLocked, 8),
+            FAILURE_RETRY_CAP_MS
+        );
     }
 
     #[test]
