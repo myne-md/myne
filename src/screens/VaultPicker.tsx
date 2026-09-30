@@ -388,9 +388,10 @@ function PickerCard({
         <div
           data-testid="picker.actions"
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
+            // Three equal columns spanning the list's own width, so the row
+            // reads as the list's footer rather than as loose links under it.
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: "var(--space-2)",
             flexShrink: 0,
           }}
@@ -409,15 +410,22 @@ function PickerCard({
  *  "Add this device to an account" beside both (myne#221: the join door has to
  *  be offered wherever creation is, or it is reachable on a fresh machine and
  *  nowhere else). */
+/** Each action fills its column, label centred and on one line. */
+const ACTION_STYLE: CSSProperties = {
+  width: "100%",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
+};
+
 /**
- * The three ways to get a vault onto this device, as one row of labelled ghost
- * buttons directly under the vault list.
+ * The three ways to get a vault onto this device, as one row of labelled accent
+ * buttons directly under the vault list, together as wide as a vault row.
  *
  * They were icon-only buttons in the shell's top-right corner for a round,
  * which kept them out of the list's way but made three unlabelled glyphs the
  * only door to creating, joining or restoring, far from the list they add to.
- * Under the list, labelled, and quiet (ghost, not accent), they read as "or add
- * another" without competing with the rows above them.
+ * Under the list, labelled, and spanning its width, they read as the list's
+ * footer: the ways to add to what is above them.
  */
 function CreateAnother({
   onClick,
@@ -432,29 +440,32 @@ function CreateAnother({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="primary"
         icon="plus"
         onClick={onClick}
         title={t("vaultPicker.createAnother")}
         data-testid="picker.create-cta"
+        style={ACTION_STYLE}
       >
         {t("vaultPicker.createShort")}
       </Button>
       <Button
-        variant="ghost"
+        variant="primary"
         icon="link"
         onClick={onJoinDevice}
         title={t("vaultPicker.joinDevice")}
         data-testid="picker.join-cta"
+        style={ACTION_STYLE}
       >
         {t("vaultPicker.joinShort")}
       </Button>
       <Button
-        variant="ghost"
+        variant="primary"
         icon="download"
         onClick={onRestoreBackup}
         title={t("vaultPicker.restoreFromBackup")}
         data-testid="picker.restore-cta"
+        style={ACTION_STYLE}
       >
         {t("vaultPicker.restoreShort")}
       </Button>
