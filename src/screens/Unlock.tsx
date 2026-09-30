@@ -893,14 +893,6 @@ export function Unlock({
             onUnlocked={onUnlocked}
             onUnavailable={() => setQuickMethod(null)}
           />
-          <button
-            type="button"
-            onClick={() => setPasswordRevealed(true)}
-            style={RECOVER_LINK_STYLE}
-            data-testid="unlock.use-password-link"
-          >
-            {t("unlock.usePasswordInstead")}
-          </button>
         </>
       )}
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
@@ -940,13 +932,25 @@ export function Unlock({
           />
         </form>
       )}
-        {/* The two alternatives to typing this password, on one row. The
-            first is the way back to the quick surface the user traded away,
-            rendered only while quick-unlock is still redeemable so an
-            exhausted or unconfigured credential is never re-offered. */}
-        {surface === "password" && !decrypting && (
-          <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
-            {quickMethod != null && (
+      {/* The alternatives to the credential on screen, on one row, under
+          either surface: the PIN / Touch ID screen and the password screen are
+          the same screen with a different field, so they share this row and the
+          delete zone below it. Swapping between them changes only the field.
+          The way back to the quick surface is offered only while quick-unlock is
+          still redeemable, so an exhausted credential is never re-offered. */}
+      {surface !== "pending" && !decrypting && (
+        <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
+          {surface === "quick" ? (
+            <button
+              type="button"
+              onClick={() => setPasswordRevealed(true)}
+              style={RECOVER_LINK_STYLE}
+              data-testid="unlock.use-password-link"
+            >
+              {t("unlock.usePasswordInstead")}
+            </button>
+          ) : (
+            quickMethod != null && (
               <button
                 type="button"
                 onClick={() => setPasswordRevealed(false)}
@@ -959,34 +963,34 @@ export function Unlock({
                     })
                   : t("unlock.unlockWithPinInstead")}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onStartRecovery}
-              style={RECOVER_LINK_STYLE}
-              data-testid="unlock.recovery-link"
-            >
-              {t("unlock.recoveryLink")}
-            </button>
-          </div>
-        )}
-        {/* Below the rule: destroying the vault is not a third way to open
-            it. The `trash-2` glyph is the canon's own requirement rather
-            than decoration — `PRODUCT.md` says colour is never the sole
-            channel, and this was a red word with nothing beside it. */}
-        {surface === "password" && !decrypting && (
-          <div style={DANGER_ZONE_STYLE}>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "request-delete-vault" })}
-              style={DELETE_VAULT_LINK_STYLE}
-              data-testid="unlock.delete-link"
-            >
-              <Icon name="trash-2" size={14} />
-              {t("unlock.deleteLink")}
-            </button>
-          </div>
-        )}
+            )
+          )}
+          <button
+            type="button"
+            onClick={onStartRecovery}
+            style={RECOVER_LINK_STYLE}
+            data-testid="unlock.recovery-link"
+          >
+            {t("unlock.recoveryLink")}
+          </button>
+        </div>
+      )}
+      {/* Below the rule: destroying the vault is not a third way to open it.
+          The `trash-2` glyph is the canon's own requirement rather than
+          decoration — `PRODUCT.md` says colour is never the sole channel. */}
+      {surface !== "pending" && !decrypting && (
+        <div style={DANGER_ZONE_STYLE}>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "request-delete-vault" })}
+            style={DELETE_VAULT_LINK_STYLE}
+            data-testid="unlock.delete-link"
+          >
+            <Icon name="trash-2" size={14} />
+            {t("unlock.deleteLink")}
+          </button>
+        </div>
+      )}
     </AuthShell>
   );
 }
