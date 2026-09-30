@@ -154,7 +154,11 @@ const ERROR_STYLE: CSSProperties = {
 /** The rail's two non-list controls, on one row. */
 const RAIL_HEADER_STYLE: CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  // `stretch`, not `center`: the input and the button compute their heights
+  // from different padding tokens, so centring left them a few pixels apart.
+  // Stretching gives both the row's height; the button keeps its glyph centred
+  // because it is itself an inline-flex with `align-items: center`.
+  alignItems: "stretch",
   gap: "var(--space-1)",
   minWidth: 0,
 };
