@@ -22,6 +22,7 @@ import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "reac
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
+import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "./ChoiceList";
 import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
@@ -56,6 +57,12 @@ function errorKindOf(error: unknown): ErrorKind {
 const emptyRecoveryCells = (): string[] =>
   Array.from({ length: PHRASE_CELL_COUNT }, () => "");
 
+const BODY_STYLE = {
+  padding: "var(--space-5)",
+  overflowY: "auto",
+  minHeight: 0,
+} as const;
+
 export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupDialogProps) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -65,6 +72,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   // True when a sealed identity exists on this device even if it never enrolled.
   const [heldIdentity, setHeldIdentity] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);
+  // Whether the 24-word recovery grid is open. Closed by default so a person
+  // creating their FIRST identity is not met by twenty-four empty fields; a
+  // held identity opens it unconditionally, since Recover is its only door.
+  const [recoverOpen, setRecoverOpen] = useState(false);
   // The identity phrase gets the same display protections the vault phrase gets
   // (myne-md/myne#768): hidden until revealed, re-hidden on a walk-away. Local
   // state rather than a reducer, because this dialog owns no step machine.
@@ -139,6 +150,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setError(null);
     setRecoveryCells(emptyRecoveryCells());
     setConfirmForget(false);
+    setRecoverOpen(false);
     onClose();
     if (created) onCreated?.();
   }
@@ -158,6 +170,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
       labelId="identity-setup-title"
       testId="identity-setup.root"
     >
+      {/* The modal body carries no padding of its own (Settings fills it edge
+          to edge), so a dialog that wants an inset supplies it. This one did
+          not, and its copy ran into the frame. */}
+      <div style={BODY_STYLE}>
       {result ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {result.phrase ? (
@@ -219,27 +235,46 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             >
               {t("identitySetup.heldIntro")}
             </div>
-          ) : (
-            <>
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
-                {t("identitySetup.intro")}
-              </div>
-              <Button
-                variant="primary"
-                disabled={busy}
-                onClick={() => void run()}
-                data-testid="identity-setup.create-cta"
-              >
-                {t("identitySetup.createCta")}
-              </Button>
-            </>
-          )}
+          ) : !recoverOpen ? (
+            // The fork, as two rows that say where each leads. Recovering is
+            // the rarer path, so its twenty-four fields stay behind its button.
+            <ChoiceCard>
+              <ChoiceRow
+                title={t("identitySetup.newTitle")}
+                body={t("identitySetup.intro")}
+                action={
+                  <Button
+                    variant="primary"
+                    disabled={busy}
+                    onClick={() => void run()}
+                    data-testid="identity-setup.create-cta"
+                    style={CHOICE_ACTION_STYLE}
+                  >
+                    {t("identitySetup.createAction")}
+                  </Button>
+                }
+              />
+              <ChoiceRow
+                title={t("identitySetup.recoverTitle")}
+                body={t("identitySetup.recoverHint")}
+                action={
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => setRecoverOpen(true)}
+                    data-testid="identity-setup.recover-open"
+                    style={CHOICE_ACTION_STYLE}
+                  >
+                    {t("identitySetup.recoverAction")}
+                  </Button>
+                }
+                last
+              />
+            </ChoiceCard>
+          ) : null}
 
-          <div style={{ height: 1, background: "var(--line-1)", margin: "var(--space-1) 0" }} />
-
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-            {t("identitySetup.recoverIntro")}
-          </div>
+          {(heldIdentity || recoverOpen) && (
+          <>
           <EnrollPhraseCredential
             baseId="identity-setup"
             label={t("identitySetup.recoverIntro")}
@@ -274,14 +309,34 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
               index === 0 ? "identity-setup.phrase-input" : `identity-setup.phrase-cell-${index + 1}`
             }
           />
-          <Button
-            variant="secondary"
-            disabled={busy || !recoveryCells.every((cell) => cell.length > 0)}
-            onClick={() => void run(recoveryCells.join(" "))}
-            data-testid="identity-setup.recover-cta"
-          >
-            {t("identitySetup.recoverCta")}
-          </Button>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            {!heldIdentity && (
+              <Button
+                variant="ghost"
+                icon="arrow-left"
+                disabled={busy}
+                onClick={() => {
+                  setRecoverOpen(false);
+                  setRecoveryCells(emptyRecoveryCells());
+                  setError(null);
+                }}
+                data-testid="identity-setup.recover-back"
+              >
+                {t("identitySetup.back")}
+              </Button>
+            )}
+            <div style={{ flex: 1 }} />
+            <Button
+              variant="primary"
+              disabled={busy || !recoveryCells.every((cell) => cell.length > 0)}
+              onClick={() => void run(recoveryCells.join(" "))}
+              data-testid="identity-setup.recover-cta"
+            >
+              {t("identitySetup.recoverCta")}
+            </Button>
+          </div>
+          </>
+          )}
 
           {heldIdentity ? (
             confirmForget ? (
@@ -342,6 +397,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           {t(errorKey)}
         </div>
       ) : null}
+      </div>
     </ModalShell>
   );
 }

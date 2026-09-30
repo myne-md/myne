@@ -131,6 +131,18 @@ describe("the active tab breaks the strip's bottom rule", () => {
     ).toContain("var(--bg-1)");
   });
 
+  it("does the same for the pending new-tab chip, which is the selected tab then", () => {
+    // The chip is its own component, so the fix above skipped it and the rule
+    // kept running under "New tab" (myne-md/myne#772).
+    setup({ pendingNewTab: true });
+    const chip = screen
+      .getAllByRole("tab")
+      .find((el) => el.getAttribute("title") === "notes.tabStrip.newTab" || /New tab/.test(el.textContent ?? ""))!;
+    expect(chip.style.height).toBe("calc(100% + 1px)");
+    expect(chip.style.borderBottom).toContain("var(--bg-1)");
+    expect(chip.style.background).toContain("var(--bg-1)");
+  });
+
   it("is not clipped by the scrolling row that holds it", () => {
     // The overhang above was asserted and the rule still showed on screen. The
     // row the tabs scroll in is `overflow-x: auto`, which forces `overflow-y`

@@ -24,6 +24,7 @@
 //   - Mockup (structural reference only, NOT copied):
 //     docs/design/ui_kits/desktop/Editor.jsx
 
+import { recordCommandRun } from "../lib/commandRecency";
 import {
   lazy,
   Suspense,
@@ -3778,6 +3779,7 @@ function CommandPaletteHost({
     ribbonCommands.run = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
       if (action === undefined || action.visibility(commandCtx) !== "show") return;
+      recordCommandRun(id);
       // A rail click that fails must say so: the button already acted pressed.
       // `run` may be sync or async; normalizing lets one catch cover both.
       void Promise.resolve(action.run(commandCtx)).catch(() => {

@@ -12,7 +12,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en", resolvedLanguage: "en" },
+  }),
   Trans: ({ children }: { children?: React.ReactNode }) => children ?? null,
 }));
 
@@ -36,6 +39,9 @@ vi.mock("../../src/lib/personAccount", () => ({
 vi.mock("../../src/platform/core", () => ({
   invoke: vi.fn().mockResolvedValue({ endpoint_url: "https://sync.example" }),
 }));
+
+const setLanguage = vi.fn().mockResolvedValue(true);
+vi.mock("../../src/i18n", () => ({ setLanguage: (c: string) => setLanguage(c) }));
 
 import { Welcome } from "../../src/screens/Welcome";
 
@@ -80,5 +86,14 @@ describe("Welcome first-run fork", () => {
     );
     fireEvent.click(screen.getByTestId("welcome.create-cta"));
     expect(onCreateVault).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a first-run user change the language before any vault exists", () => {
+    // Language is device-local (src/i18n/config.ts), so the first screen is the
+    // one place a person who does not read English can reach it without help.
+    render(
+      <Welcome onCreateVault={() => {}} onRestoreBackup={() => {}} onJoinDevice={() => {}} />,
+    );
+    expect(screen.getByTestId("welcome.language-select")).toBeTruthy();
   });
 });

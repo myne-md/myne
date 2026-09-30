@@ -84,6 +84,42 @@ async function safe(label: string, run: () => Promise<void>): Promise<void> {
 const supported = harnessSupported();
 const runner = supported.ok ? it : it.skip;
 
+// The first run: a launch with NO vault on disk, which is what a new user sees
+// before anything else. Its own launch because the pass below seeds a vault,
+// and a session that has a vault cannot be shown the screen that says it has
+// none.
+runner(
+  "captures the first-run frames",
+  async () => {
+    mkdirSync(OUT_DIR, { recursive: true });
+    const app = await launchApp({});
+    const s = app.session;
+    try {
+      await frame(
+        s,
+        "00a-first-run",
+        "First launch, no vault on disk: the welcome screen and its choices.",
+        async () => {
+          await s.byTestId("welcome.root", { timeoutMs: 45_000 });
+          await sleep(600);
+        },
+      );
+      await frame(
+        s,
+        "00b-first-run-create",
+        "The first step behind 'create a vault'.",
+        async () => {
+          await (await s.byTestId("welcome.create-cta")).click();
+          await sleep(900);
+        },
+      );
+    } finally {
+      await app.teardown();
+    }
+  },
+  300_000,
+);
+
 runner(
   "captures the UI-pass frames",
   async () => {

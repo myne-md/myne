@@ -200,7 +200,6 @@ export function KitStep({
     <StepLayout width={600}>
       <StepCounter
         step="kit"
-        icon="key-round"
         label={t("vaultCreation.kit.eyebrowLabel")}
       />
       <StepHeading>{t("vaultCreation.kit.heading")}</StepHeading>
@@ -271,6 +270,36 @@ export function KitStep({
         </div>
       </div>
 
+      {/* The two ways out for the kit, side by side and directly under the
+          sheet they act on. Save is the one the flow wants; Copy is the
+          fallback for a machine with nowhere good to put a file. */}
+      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <Button
+          variant="primary"
+          icon="download"
+          onClick={() => void handleSave()}
+          data-testid="create.kit-save"
+        >
+          {t("vaultCreation.kit.save")}
+        </Button>
+        <Button
+          variant="secondary"
+          icon="copy"
+          onClick={() => void handleCopy()}
+          data-testid="create.kit-copy"
+        >
+          {t("vaultCreation.kit.copy")}
+        </Button>
+      </div>
+
+      {/* Both outcomes render: neither button's label swaps, so without this line
+          a successful save would be indistinguishable from a click that did
+          nothing. */}
+      <ActionStatus
+        testId="create.kit-action-status"
+        message={outcome === null ? null : message[outcome.action](outcome.ok)}
+      />
+
       {/* Why the words are not in the reader's language, said once, where the
           question occurs (myne-md/myne#468). The wordlist is frozen English by
           `protocol.md` §7 so any client can read a phrase any other client
@@ -289,34 +318,6 @@ export function KitStep({
         {t("vaultCreation.kit.whyEnglish")}
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-        <Button
-          variant="primary"
-          icon="download"
-          onClick={() => void handleSave()}
-          data-testid="create.kit-save"
-        >
-          {t("vaultCreation.kit.save")}
-        </Button>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          <Button
-            variant="ghost"
-            icon="copy"
-            onClick={() => void handleCopy()}
-            data-testid="create.kit-copy"
-          >
-            {t("vaultCreation.kit.copy")}
-          </Button>
-        </div>
-      </div>
-
-      {/* Both outcomes render: neither button's label swaps, so without this line
-          a successful save would be indistinguishable from a click that did
-          nothing. */}
-      <ActionStatus
-        testId="create.kit-action-status"
-        message={outcome === null ? null : message[outcome.action](outcome.ok)}
-      />
 
       <SecretDisplayCaveats testIdPrefix="create.kit" />
 

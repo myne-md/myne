@@ -30,6 +30,7 @@ import { useTranslation } from "react-i18next";
 import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
+import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "../ChoiceList";
 import { EndpointConfig } from "./EndpointConfig";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
@@ -137,26 +138,42 @@ export function FirstRunServerStep({ onConnected, onBack }: FirstRunServerStepPr
           </div>
         </div>
 
-        <Button
-          variant="primary"
-          disabled={hostedBusy}
-          onClick={connectHosted}
-          data-testid="first-run-server.myne-sync"
-        >
-          {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
-        </Button>
-        <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
-          {t("firstRun.server.myneSyncHint")}
-        </div>
-
-        <Button
-          variant="secondary"
-          disabled={hostedBusy}
-          onClick={() => setMode("self-hosted")}
-          data-testid="first-run-server.self-hosted"
-        >
-          {t("firstRun.server.selfHosted")}
-        </Button>
+        {/* Two doors on one card, each saying where it leads: the hint under
+            Myne Sync is the honest pin statement (TOFU), so it has to be read
+            before the button, not after it. */}
+        <ChoiceCard>
+          <ChoiceRow
+            title={t("firstRun.server.myneSyncTitle")}
+            body={t("firstRun.server.myneSyncHint")}
+            action={
+              <Button
+                variant="primary"
+                disabled={hostedBusy}
+                onClick={connectHosted}
+                data-testid="first-run-server.myne-sync"
+                style={CHOICE_ACTION_STYLE}
+              >
+                {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.connectAction")}
+              </Button>
+            }
+          />
+          <ChoiceRow
+            title={t("firstRun.server.selfHostedTitle")}
+            body={t("firstRun.server.selfHostedHint")}
+            action={
+              <Button
+                variant="secondary"
+                disabled={hostedBusy}
+                onClick={() => setMode("self-hosted")}
+                data-testid="first-run-server.self-hosted"
+                style={CHOICE_ACTION_STYLE}
+              >
+                {t("firstRun.server.setUpAction")}
+              </Button>
+            }
+            last
+          />
+        </ChoiceCard>
 
         {hostedError && (
           <p

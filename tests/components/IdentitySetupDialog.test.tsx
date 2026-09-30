@@ -64,6 +64,11 @@ describe("IdentitySetupDialog", () => {
     const onCreated = vi.fn();
     render(<IdentitySetupDialog open onClose={() => {}} onCreated={onCreated} />);
 
+    // The recovery grid sits behind its own door, so a first identity is not
+    // met by twenty-four empty fields.
+    expect(screen.queryByTestId("identity-setup.phrase-grid")).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-setup.recover-open"));
+
     const recoverCta = (await screen.findByTestId(
       "identity-setup.recover-cta",
     )) as HTMLButtonElement;

@@ -2351,13 +2351,25 @@
       "untitledTemplate": "Untitled template"
     },
     "newTab": {
-      "createNote": "Create a new note",
       "createDrawing": "New drawing",
-      "noNotesMatch": "No notes match.",
+      "createFromTemplate": "From template",
+      "createNote": "New note",
+      "kindCommand": "Command",
+      "kindNote": "Note",
+      "noMatch": "Nothing matches.",
       "noNotesYet": "No notes yet.",
-      "recent": "Recent",
-      "searchAriaLabel": "Search notes to open",
-      "searchPlaceholder": "Search notes…",
+      "places": {
+        "agent": "Agent",
+        "attachments": "Attachments",
+        "graph": "Graph",
+        "tasks": "Tasks",
+        "today": "Today"
+      },
+      "placesLabel": "Go to",
+      "recent": "Jump back in",
+      "results": "Results",
+      "searchAriaLabel": "Search notes and commands",
+      "searchPlaceholder": "Search notes and commands…",
       "untitled": "Untitled"
     },
     "pane": {
@@ -2599,7 +2611,7 @@
     "createForm": {
       "checkingStrength": "Checking strength…",
       "confirmLabel": "Confirm master password",
-      "defaultEmptyCaption": "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.",
+      "defaultEmptyCaption": "Choose something you can remember. It cannot be reset.",
       "mismatch": "Passwords do not match.",
       "passwordLabel": "Master password",
       "suggestPassword": "Suggest password",
@@ -2746,7 +2758,7 @@
   },
   "restore": {
     "backLabel": "Back",
-    "cancelLabel": "Cancel",
+    "cancelLabel": "Back",
     "collision": {
       "body": "A vault from this backup already exists on this device. You can keep both: the restored copy appears as a separate vault in your vault list. Or you can restore now and then remove the existing vault from the vault list yourself. Removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens.",
       "keepBoth": "Keep both",
@@ -3947,7 +3959,8 @@
       "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifyTitle": "Verify this device",
       "waitingHint": "Keep this window open. Once approved, a verification code appears here to compare with your other device.",
-      "waitingTitle": "Waiting for approval"
+      "waitingTitle": "Waiting for approval",
+      "back": "Back"
     },
     "panel": {
       "addDevice": {
@@ -4381,7 +4394,7 @@
     "briefing": {
       "back": "Back",
       "continue": "Continue to vault creation",
-      "eyebrow": "Before you create your vault",
+      "eyebrow": "New vault",
       "heading": "Before you create your vault",
       "intro": "Myne encrypts your notes so that only you can open them. Three things follow from that. Read them, then continue.",
       "statements": {
@@ -4407,11 +4420,11 @@
       "back": "Back",
       "commit": "Create vault",
       "committing": "Saving…",
-      "eyebrowLabel": "confirm phrase",
-      "heading": "Type back four words from your phrase.",
-      "intro": "We'll ask for specific positions to verify you saved it.",
-      "mismatch": "Doesn't match word #{{pos}}.",
-      "wordAtPosition": "Word at position {{pos}}"
+      "eyebrowLabel": "Confirm phrase",
+      "heading": "Confirm your recovery phrase",
+      "intro": "Type the words at these four positions, to check you saved them.",
+      "mismatch": "Doesn't match word {{pos}}.",
+      "wordAtPosition": "Word {{pos}}"
     },
     "encrypting": {
       "caption": "This takes a moment.",
@@ -4502,8 +4515,8 @@
       "copyFailed": "Couldn't copy. Use “Save recovery kit” instead.",
       "documentTitle": "Myne recovery kit",
       "downloadStarted": "Sent to your browser's downloads. Check the kit arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-      "eyebrowLabel": "recovery kit",
-      "heading": "Your recovery kit.",
+      "eyebrowLabel": "Recovery kit",
+      "heading": "Save your recovery kit",
       "intro": "The file you are about to save is exactly this. It is shown once.",
       "phraseFor": "Recovery phrase — if you forget your password",
       "save": "Save recovery kit",
@@ -4514,7 +4527,7 @@
     "name": {
       "back": "Back",
       "continue": "Continue",
-      "eyebrowLabel": "name your vault",
+      "eyebrowLabel": "Name your vault",
       "heading": "What should we call this vault?",
       "helper": "The name is stored encrypted with the vault, so only you can read it. You can change it later, or hide vault names entirely, in Settings.",
       "intro": "You will see this name on the lock screen and in your vault list.",
@@ -4538,8 +4551,8 @@
     },
     "password": {
       "back": "Back",
-      "eyebrowLabel": "master password",
-      "heading": "Create vault",
+      "eyebrowLabel": "Master password",
+      "heading": "Choose a master password",
       "helperLead": "Myne does not store your password or recovery phrase.",
       "submit": "Generate recovery phrase"
     },
@@ -4562,22 +4575,22 @@
       "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "ready": {
-      "backedUp": "Backed up ✓",
+      "backedUp": "Backed up",
       "backingUp": "Backing up…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Backup didn't complete. No file was left behind. You can back up any time from Settings → Storage.",
       "backupFilterName": "Myne backup",
-      "backUpNow": "Back up this vault now",
-      "body": "Myne wrote your vault to your application data folder. Your master password and recovery phrase are the only way back in. Make sure both are saved somewhere safe.",
+      "backUpNow": "Back up now",
+      "body": "Your notes are encrypted and stored on this device. Keep your password and recovery kit somewhere safe: they are the only way back in.",
       "decrypting": "Decrypting…",
-      "done": "Done",
-      "heading": "Your vault is ready.",
+      "done": "Open vault",
+      "heading": "Your vault is ready",
       "showFolder": "Show vault folder"
     },
     "sessionLost": {
       "startOver": "Start over"
     },
-    "stepIndicator": "Step {{n}} of {{total}}: {{label}}"
+    "stepIndicator": "Step {{n}} of {{total}} · {{label}}"
   },
   "vaultPicker": {
     "accountFallback": "Account",
@@ -4668,15 +4681,18 @@
       "heading": "Choose a sync server",
       "chooseHeading": "Where should your notes sync?",
       "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "myneSync": "Use Myne Sync",
       "myneSyncHint": "The Myne-operated server. This device pins its certificate on first connection.",
-      "selfHosted": "Use my own server",
       "connecting": "Connecting…",
       "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
-      "continue": "Continue"
+      "continue": "Continue",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "Your own server",
+      "selfHostedHint": "A sync server you run. You enter its address on the next screen.",
+      "connectAction": "Connect",
+      "setUpAction": "Set up"
     }
   },
   "identityFlow": {
@@ -4724,7 +4740,6 @@
     }
   },
   "identitySetup": {
-    "createCta": "Create an identity",
     "doneCta": "Done",
     "error": "Could not set up the identity. Try again.",
     "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
@@ -4738,9 +4753,15 @@
     "pending": "This device is waiting for another device on the account to approve it.",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
     "recoverCta": "Recover an identity",
-    "recoverIntro": "Already have an identity? Enter its 24-word recovery phrase.",
+    "recoverIntro": "Identity recovery phrase",
     "recovered": "Identity recovered.",
-    "title": "Identity only"
+    "title": "Create an identity",
+    "newTitle": "A new identity",
+    "createAction": "Create",
+    "recoverTitle": "I already have one",
+    "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
+    "recoverAction": "Recover",
+    "back": "Back"
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -4772,10 +4793,6 @@
     "startIdentity": "Create an identity",
     "startLocal": "Create a local vault instead",
     "createCta": "Create new vault",
-    "headlineLine1": "Encrypted markdown notes.",
-    "headlineLine2": "No email at signup.",
-    "identityCta": "Create an identity only",
-    "joinCta": "Add this device to an account",
     "repairResidue": {
       "cancel": "Cancel",
       "cleaningUp": "Cleaning up…",
@@ -4795,8 +4812,6 @@
       "partialBody_other": "{{count}} files may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
       "partialTitle": "Some files couldn't be removed"
     },
-    "restoreCta": "Restore from backup",
-    "subtitle": "Your notes are encrypted on this device before they leave it. The server only stores ciphertext.",
     "repairCleanedUp_one": "Cleaned up {{count}} leftover file.",
     "repairCleanedUp_other": "Cleaned up {{count}} leftover files.",
     "repairFailed": "Couldn't finish cleaning up. Please try again.",
@@ -4807,7 +4822,20 @@
     "residueBanner": "Leftover files from an interrupted delete ({{n}}). Clean them up before creating a vault.",
     "cleanUpFiles": "Clean up leftover files",
     "create": "Create a vault",
-    "connect": "Connect to my account"
+    "connect": "Connect to my account",
+    "tagline": "Encrypted markdown notes. No email at signup.",
+    "identityTitle": "Create an identity",
+    "identityBody": "One identity for all your vaults, so people can invite you. Needs a sync server.",
+    "localTitle": "Create a local vault",
+    "localBody": "An encrypted vault on this device. Add sync or an identity later.",
+    "restoreTitle": "Restore from backup",
+    "restoreBody": "Open a .myne-backup file you saved earlier.",
+    "joinTitle": "Add this device to an account",
+    "joinBody": "Use a vault you already have on another device.",
+    "createAction": "Create",
+    "restoreAction": "Restore",
+    "joinAction": "Add device",
+    "version": "Version {{version}} · pre-alpha"
   },
   "wikiGraph": {
     "canvasLabel": "Knowledge graph of {{count}} notes",

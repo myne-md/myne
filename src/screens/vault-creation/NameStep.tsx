@@ -17,7 +17,7 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
-import { StepCounter, StepHeading, StepLayout } from "./step-shell";
+import { StepCard, StepCounter, StepHeading, StepLayout } from "./step-shell";
 
 interface NameStepProps {
   value: string;
@@ -33,7 +33,6 @@ export function NameStep({ value, onChange, onSubmit, onBack }: NameStepProps) {
     <StepLayout>
       <StepCounter
         step="name"
-        icon="pencil"
         label={t("vaultCreation.name.eyebrowLabel")}
       />
       <StepHeading>{t("vaultCreation.name.heading")}</StepHeading>
@@ -50,25 +49,27 @@ export function NameStep({ value, onChange, onSubmit, onBack }: NameStepProps) {
           e.preventDefault();
           onSubmit();
         }}
-        style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}
       >
-        <Input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={t("vaultCreation.name.placeholder")}
-          aria-label={t("vaultCreation.name.heading")}
-          autoComplete="off"
-          spellCheck={false}
-          autoFocus
-          data-testid="create.name-input"
-        />
+        <StepCard>
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={t("vaultCreation.name.placeholder")}
+            aria-label={t("vaultCreation.name.heading")}
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+            data-testid="create.name-input"
+          />
 
-        <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-3)" }}>
-          {t("vaultCreation.name.helper")}
-        </div>
+          <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-3)" }}>
+            {t("vaultCreation.name.helper")}
+          </div>
+        </StepCard>
 
-        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <Button
             type="button"
             variant="ghost"

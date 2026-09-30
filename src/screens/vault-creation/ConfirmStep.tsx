@@ -34,7 +34,7 @@ import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
-import { StepCounter, StepHeading, StepLayout } from "./step-shell";
+import { StepCard, StepCounter, StepHeading, StepLayout } from "./step-shell";
 import { normalizeWord, type Action, type ErrorState } from "./reducer";
 
 interface ConfirmStepProps {
@@ -48,12 +48,10 @@ interface ConfirmStepProps {
   dispatch: Dispatch<Action>;
 }
 
-const labelStyle = {
-  fontSize: 12,
-  color: "var(--fg-3)",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.08em",
-  fontWeight: "var(--weight-semibold)",
+/** Sentence case, like every other field label on the first-run steps. */
+const WORD_LABEL_STYLE = {
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
 };
 
 export function ConfirmStep({
@@ -83,7 +81,6 @@ export function ConfirmStep({
     <StepLayout>
       <StepCounter
         step="confirm"
-        icon="check"
         label={t("vaultCreation.confirm.eyebrowLabel")}
       />
       <StepHeading>{t("vaultCreation.confirm.heading")}</StepHeading>
@@ -94,7 +91,17 @@ export function ConfirmStep({
 
       {error && error.displayMode === "inline" && <ErrorBanner error={error} />}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Two by two on a card: four words is one small task, and a grid of
+          short fields reads as that where a column of four full-width fields
+          read as a form to fill in. */}
+      <StepCard>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: "var(--space-4)",
+          }}
+        >
         {positions.map((pos, idx) => {
           const inputId = `confirm-input-${pos}`;
           const value = inputs[pos] ?? "";
@@ -102,9 +109,9 @@ export function ConfirmStep({
           return (
             <div
               key={pos}
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
             >
-              <label htmlFor={inputId} style={labelStyle}>
+              <label htmlFor={inputId} style={WORD_LABEL_STYLE}>
                 {t("vaultCreation.confirm.wordAtPosition", { pos })}
               </label>
               <Input
@@ -133,7 +140,7 @@ export function ConfirmStep({
               />
               {invalid && (
                 <div
-                  style={{ fontSize: 12, color: "var(--danger)" }}
+                  style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}
                   data-testid="create.confirm-error"
                   data-index={pos}
                 >
@@ -143,9 +150,10 @@ export function ConfirmStep({
             </div>
           );
         })}
-      </div>
+        </div>
+      </StepCard>
 
-      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)" }}>
         <Button
           variant="ghost"
           onClick={() => dispatch({ type: "CONFIRM_BACK" })}

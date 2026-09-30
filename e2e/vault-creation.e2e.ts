@@ -335,7 +335,7 @@ describeE2E("VC-2 confirm gating + VC-3 blur cover (MYND-124 task 2)", () => {
       const cellError = await app.session.waitForElement(
         testIdSelector("create.confirm-error", { "data-index": String(firstPos) }),
       );
-      expect(await cellError.text()).toBe(`Doesn't match word #${firstPos}.`);
+      expect(await cellError.text()).toBe(`Doesn't match word ${firstPos}.`);
       const confirmContinue = await app.session.byTestId("create.confirm-continue");
       expect(await confirmContinue.enabled()).toBe(false);
 

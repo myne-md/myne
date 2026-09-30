@@ -348,7 +348,7 @@
       "sync.join.title",
       "vaultPicker.joinDevice",
       "vaultSwitcher.joinDevice",
-      "welcome.joinCta"
+      "welcome.joinTitle"
     ],
     "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
   },
@@ -359,14 +359,6 @@
       "sync.settings.accountNumberHint"
     ],
     "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
-  },
-  {
-    "value": "Before you create your vault",
-    "keys": [
-      "vaultCreation.briefing.eyebrow",
-      "vaultCreation.briefing.heading"
-    ],
-    "reason": "Briefing eyebrow repeats the briefing heading on one screen; same-screen duplication, accepted as designed."
   },
   {
     "value": "If this takes longer than 30 seconds, close the window and try again.",

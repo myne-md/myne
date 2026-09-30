@@ -49,7 +49,7 @@ function expectScrollable(el: HTMLElement, label: string): void {
 describe("StepLayout, the vault-creation stage envelope", () => {
   it("centres its column inside a bounded root, and lets that column scroll", () => {
     render(
-      <StepLayout>
+      <StepLayout width={512}>
         <p data-testid="probe">content</p>
       </StepLayout>,
     );
@@ -60,7 +60,7 @@ describe("StepLayout, the vault-creation stage envelope", () => {
     expect(root.style.minHeight).toBe("0px");
     expectScrollable(column, "StepLayout column");
     // The width prop is the whole API, and it must survive the scroll region.
-    expect(column.style.width, "StepLayout honours its width prop").toBe("420px");
+    expect(column.style.width, "StepLayout honours its width prop").toBe("512px");
   });
 
   it("honours a caller's width rather than filling the window", () => {
