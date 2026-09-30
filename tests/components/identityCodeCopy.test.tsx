@@ -88,6 +88,9 @@ function expectedIdentityPhrase(): string {
 }
 
 function fillPhrase(): void {
+  // The roster's recovery-phrase grid is collapsed by default (myne#796);
+  // reveal it before typing into it.
+  fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
   for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
     fireEvent.change(
       screen.getByTestId(

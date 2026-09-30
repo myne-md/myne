@@ -146,6 +146,10 @@ export function MemberRosterPanel({
   const [phraseCells, setPhraseCells] = useState<string[]>(() =>
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
+  // The recovery-phrase grid is collapsed until the user chooses to enter it:
+  // the panel must not sit with an always-open phrase field, and the Sync
+  // panel's own Identity block is the other place a phrase is entered.
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
   // vault (myne-md/myne#783). The migration is permanent, so it is an explicit
@@ -261,6 +265,7 @@ export function MemberRosterPanel({
       onClick={async () => {
         await lockPerson();
         setCopyFeedback(null);
+        setUnlockOpen(false);
         setPersonIdentityState({ ready: false, ownerCode: null });
       }}
     >
@@ -280,48 +285,81 @@ export function MemberRosterPanel({
       {!personReady ? (
         <div data-testid="member-roster.person-unlock" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
-          {/* No `label` override: this panel's own sentence above is the
-              explanation, and passing the same key here rendered it a SECOND
-              time as the grid's field label (myne-md/myne#764). The primitive's
-              default label ("Recovery phrase") plus its default hint carry the
-              field itself. */}
-          <EnrollPhraseCredential
-            baseId="member-roster"
-            cells={phraseCells}
-            onCellChange={handlePhraseCellChange}
-            onCellPaste={handlePhraseCellPaste}
-            gridTestId="member-roster.phrase-grid"
-            cellTestId={(index) =>
-              index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`
-            }
-          />
-
-          <Button
-            type="button"
-            variant="primary"
-            style={{ alignSelf: "flex-start" }}
-            data-testid="member-roster.person-unlock-button"
-            disabled={!phraseCells.every((cell) => cell.length > 0)}
-            onClick={async () => {
-              const unlockGeneration = getPersonIdentityGeneration();
-              try {
-                const view = await unlockPerson(buildPhraseCredential(phraseCells));
-                if (!setPersonIdentityStateForGeneration(unlockGeneration, {
-                  ready: true,
-                  ownerCode: view.identity_code,
-                })) {
-                  return;
+          {unlockOpen ? (
+            <>
+              {/* No `label` override: this panel's own sentence above is the
+                  explanation, and passing the same key here rendered it a SECOND
+                  time as the grid's field label (myne-md/myne#764). The
+                  primitive's default label ("Recovery phrase") plus its default
+                  hint carry the field itself. */}
+              <EnrollPhraseCredential
+                baseId="member-roster"
+                cells={phraseCells}
+                onCellChange={handlePhraseCellChange}
+                onCellPaste={handlePhraseCellPaste}
+                gridTestId="member-roster.phrase-grid"
+                cellTestId={(index) =>
+                  index === 0
+                    ? "member-roster.phrase-input"
+                    : `member-roster.phrase-cell-${index + 1}`
                 }
-                setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+              />
+
+              <Button
+                type="button"
+                variant="primary"
+                style={{ alignSelf: "flex-start" }}
+                data-testid="member-roster.person-unlock-button"
+                disabled={!phraseCells.every((cell) => cell.length > 0)}
+                onClick={async () => {
+                  const unlockGeneration = getPersonIdentityGeneration();
+                  try {
+                    const view = await unlockPerson(buildPhraseCredential(phraseCells));
+                    if (!setPersonIdentityStateForGeneration(unlockGeneration, {
+                      ready: true,
+                      ownerCode: view.identity_code,
+                    })) {
+                      return;
+                    }
+                    setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                    setPersonError(false);
+                    setUnlockOpen(false);
+                    setCopyFeedback(null);
+                  } catch {
+                    setPersonError(true);
+                  }
+                }}
+              >
+                {t("sync.memberRoster.personUnlock")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                style={{ alignSelf: "flex-start" }}
+                data-testid="member-roster.person-unlock-cancel"
+                onClick={() => {
+                  setUnlockOpen(false);
+                  setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+                  setPersonError(false);
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              style={{ alignSelf: "flex-start" }}
+              data-testid="member-roster.person-unlock-open"
+              onClick={() => {
+                setUnlockOpen(true);
                 setPersonError(false);
-                setCopyFeedback(null);
-              } catch {
-                setPersonError(true);
-              }
-            }}
-          >
-            {t("sync.memberRoster.personUnlock")}
-          </Button>
+              }}
+            >
+              {t("sync.memberRoster.personUnlockOpen")}
+            </Button>
+          )}
           {personError ? (
             <p data-testid="member-roster.person-error" style={ERROR_STYLE}>
               {t("sync.memberRoster.personError")}

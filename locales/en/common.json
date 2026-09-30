@@ -4002,6 +4002,7 @@
       "membersHeading": "Members",
       "personHint": "Unlock your member identity with your recovery phrase.",
       "personUnlock": "Unlock member identity",
+      "personUnlockOpen": "Enter recovery phrase",
       "personReady": "Member identity unlocked.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
       "personLock": "Lock member identity",

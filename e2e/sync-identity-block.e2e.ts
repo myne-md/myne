@@ -52,9 +52,11 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
         // empty state (before this change the whole block was absent).
         await app.session.byTestId("sync.panel.add-identity", { timeoutMs: 10_000 });
 
-        // Unlock the identity through the member roster below.
-        await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
-        for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
+         // Unlock the identity through the member roster below.
+         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+         // The recovery-phrase grid is collapsed by default (myne#796).
+         await (await app.session.byTestId("member-roster.person-unlock-open")).click();
+         for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
             index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
           await (await app.session.byTestId(testId)).replaceText(word);

@@ -88,6 +88,7 @@ describe("MemberRosterPanel phrase input", () => {
   it("exposes the recovery-phrase field under a programmatic label", () => {
     render(<MemberRosterPanel />);
      try {
+       fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
        const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
        expect(input.type).toBe("text");
        expect(input.style.padding).toBe("var(--space-1) var(--space-2)");
@@ -127,6 +128,7 @@ describe("MemberRosterPanel phrase input", () => {
   it("keeps the phrase grid inside its container at any panel width", () => {
     render(<MemberRosterPanel />);
     try {
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
       const grid = screen.getByTestId("member-roster.phrase-grid") as HTMLElement;
       expect(grid.style.gridTemplateColumns).toBe("repeat(4, minmax(0, 1fr))");
       const wraps = Array.from(grid.children) as HTMLElement[];
@@ -143,9 +145,25 @@ describe("MemberRosterPanel phrase input", () => {
 
     render(<MemberRosterPanel />);
     try {
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
       const input = screen.getByTestId("member-roster.phrase-input") as HTMLInputElement;
       fireEvent.change(input, { target: { value: "abandon" } });
       expect(input.value).toBe("abandon");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("keeps the recovery-phrase grid collapsed until the user asks for it", () => {
+    render(<MemberRosterPanel />);
+    try {
+      // myne#796 follow-up: the panel must not sit with an always-open phrase
+      // field; the grid appears only after the user chooses to enter it.
+      expect(screen.queryByTestId("member-roster.phrase-grid")).toBeNull();
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
+      expect(screen.getByTestId("member-roster.phrase-grid")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-cancel"));
+      expect(screen.queryByTestId("member-roster.phrase-grid")).toBeNull();
     } finally {
       cleanup();
     }
@@ -159,6 +177,7 @@ describe("MemberRosterPanel phrase input", () => {
       });
     render(<MemberRosterPanel />);
     try {
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
       for (let index = 0; index < 24; index += 1) {
         const testId = index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
         fireEvent.change(screen.getByTestId(testId), { target: { value: "abandon" } });

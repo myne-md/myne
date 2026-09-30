@@ -104,6 +104,9 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+        // The recovery-phrase grid is collapsed by default; reveal it before
+        // filling it (myne-md/myne#796 follow-up).
+        await (await app.session.byTestId("member-roster.person-unlock-open")).click();
         // Unlock the person identity; first enrolment mints the owner.
         for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
@@ -175,6 +178,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await dismissImporterOffer(app.session);
            await openSettings(app.session, "sync");
           await app.session.byTestId("member-roster");
+          // The recovery-phrase grid is collapsed by default (myne#796).
+          await (await app.session.byTestId("member-roster.person-unlock-open")).click();
           for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
             const testId =
               index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
