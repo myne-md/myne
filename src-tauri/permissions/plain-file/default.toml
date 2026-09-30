@@ -1,0 +1,25 @@
+# Permissions for the in-app `plain_file` Tauri plugin (myne-md/myne#788).
+# Picked up under the `plain-file:` ACL namespace because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `plain-file:default` (or the per-command identifiers below).
+#
+# The gate commands read and write the DEVICE-LOCAL `plain-file.json` under
+# `<app_config_dir>` — never vault data, in any vault state. Deliberately
+# main-window-only: there is no second window for this feature, so no other
+# capability may ever grant these.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the plain-file plugin — the device-local gate for the sandboxed on-disk markdown editor."
+permissions = ["allow-gate-get", "allow-gate-set"]
+
+[[permission]]
+identifier = "allow-gate-get"
+description = "Allow invoking plain-file:gate_get (reads the device-local plain-file.json; answers false when absent, unreadable or malformed)."
+commands.allow = ["gate_get"]
+
+[[permission]]
+identifier = "allow-gate-set"
+description = "Allow invoking plain-file:gate_set (atomic write of the device-local plain-file.json gate)."
+commands.allow = ["gate_set"]

@@ -315,7 +315,17 @@ export type Capability =
    * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
    * mobile cannot spawn OS windows, so the affordance is absent there.
    */
-  | "detachedWindows";
+  | "detachedWindows"
+  /**
+   * The sandboxed editor for the user's own on-disk markdown files
+   * (myne-md/myne#788).
+   *
+   * Desktop-only by the feature's own verdict: it needs an OS file ingress, a
+   * native open dialog and, at graduation, a file-type handler registration,
+   * none of which a browser page has. Absent rather than degraded — the
+   * surface is omitted, never rendered against commands that refuse.
+   */
+  | "plainFile";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -364,6 +374,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   accountGrouping: true,
   memberSharing: true,
   detachedWindows: true,
+  plainFile: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

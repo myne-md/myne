@@ -522,6 +522,13 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // Both commands are DISPATCHED (task 46); the entry stays so a future
     // graph-layout command lands loudly rather than silently.
     ("graph-layout", Class::Pending), // task 46
+    // myne-md/myne#788: the plain-file editor (device-local gate first; the
+    // file IO and ingress land in later tasks). `Unsupported` rather than
+    // `Pending`, for the reason `agent` above gives: the feature's own PRD
+    // puts web out of scope, and no port makes it meaningful — a browser has
+    // no OS file ingress, no handler registration and no device-local vault
+    // state to be independent of. All of its commands share this class.
+    ("plain-file", Class::Unsupported),
     ("quick-unlock", Class::Pending), // task 40 (the PIN path only; see PER_COMMAND)
     // Dispatched by the arm in `dispatch.rs` (tasks 41 + 88). Listed in
     // DISPATCHED below rather than defaulted here.
