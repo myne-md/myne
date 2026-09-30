@@ -362,16 +362,14 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
   }
 }
 
-/** The password field on the raised card every first-run form sits on, so the
- *  one thing this screen asks for reads as the thing to do. */
+/** The password form: the field and its arrow, then the error under them.
+ *  No surrounding card: the field is the one thing on screen to do, and a box
+ *  around a single row only drew a second outline around the first. */
 const FORM_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  padding: "var(--space-5)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-3)",
+  marginTop: "var(--space-2)",
 };
 
 // Info-style banner used for `recovery-in-progress` mode — distinct
@@ -411,56 +409,23 @@ const DELETE_VAULT_LINK_STYLE: CSSProperties = {
 
 
 /**
- * The way back to the vault picker — position only. It is a ghost `<Button>`,
- * so the padding, radius, hover, press and focus ring all come from the shared
- * primitive; what is left here is where it sits in the column.
+ * The secondary actions under the field, one per line (myne-md/myne#773,
+ * #772).
  *
- * It was a hand-rolled `<button>` for one round and
- * `scripts/check-primitive-adoption.mjs` caught it, correctly: this is exactly
- * a ghost button with a leading icon, and re-deriving one is how an app that
- * is supposed to have one button design ends up with several.
- *
- * `←` was a literal arrow character before the screen was deboxed; the icon
- * comes from `Button`'s own `icon` prop now, which is what
- * `editor/src/host/lib/icons.ts` asks for by name: a text glyph inherits the
- * text metrics and sits off the label's baseline at every size.
- */
-const BACK_LINK_STYLE: CSSProperties = {
-  alignSelf: "flex-start",
-  // Pulled left by its own padding so the label's first letter lines up with
-  // the heading beneath it rather than sitting a gutter to its right.
-  marginInlineStart: "calc(var(--control-pad-x) * -1)",
-  // And pulled UP, against `VIEW_STYLE`'s section gap. This is not a section:
-  // it is the escape from the question the heading asks, so it belongs against
-  // that heading rather than a full 24px above it, floating between the
-  // wordmark and the title with equal claim on both. The button's own vertical
-  // padding covers most of the distance, so what is left after this is about a
-  // line of air — a lead-in rather than a block.
-  marginBlockEnd: "calc(var(--space-4) * -1)",
-};
-
-/**
- * The secondary actions under the field, as ONE row (myne-md/myne#773).
- *
- * They were three centred links stacked down the page — "Use PIN instead",
- * "Forgot your password?", "Delete this vault" — at near-identical weight,
- * one of them destructive and red. Three equal offers under a single question
- * reads as a menu the user has to work through, and it is the reason this
- * screen looked unfinished next to the rest of the app: the field above it is
- * one confident line, and everything below it was a list.
- *
- * A row, because they are ALTERNATIVES to the same act rather than steps.
- * `flex-wrap` because they are translated: German runs long and two of these
- * strings are sentences, so the row folds rather than clipping.
+ * They were three centred links at near-identical weight, then one wrapping
+ * row, where two sentences side by side read as a single run of link text with
+ * no seam between them. One per line keeps them apart; each carries the
+ * `myne-text-link` underline on hover so it reads as a link when the pointer
+ * arrives. Deleting the vault is not among them: it sits below the rule.
  */
 const ALT_ROW_STYLE: CSSProperties = {
   display: "flex",
-  flexWrap: "wrap",
+  flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-1) var(--space-4)",
+  gap: "var(--space-2)",
   marginTop: "var(--space-2)",
 };
+
 
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
@@ -828,34 +793,27 @@ export function Unlock({
       // The mark is centred above the question instead (the Welcome screen's
       // shape), so the corner copy would draw the brand twice.
       brand={false}
+      // The way back to the vault picker, in the top-left corner where a back
+      // control is looked for, now that the corner holds no brand. Shown
+      // whenever ≥2 vaults exist (App always wires `onBack`), and withdrawn
+      // during `decrypting` so an in-flight unlock is never abandoned mid-IPC.
+      leading={
+        onBack && otherVaultsExist && !decrypting ? (
+          <Button
+            type="button"
+            variant="ghost"
+            icon="arrow-left"
+            onClick={onBack}
+            data-testid="unlock.back-to-picker"
+          >
+            {t("unlock.backToPicker")}
+          </Button>
+        ) : undefined
+      }
       // Arriving here is going FORWARD from the picker. The back link below
       // sends the user the other way, and the picker states its own direction.
       enter="forward"
     >
-      {/* Back to the vault picker — shown whenever ≥2 vaults exist (App always
-          wires `onBack`), so a manual lock / auto-lock can reach the vault
-          selector too, not just a picker-reached unlock. Suppressed during
-          `decrypting` so an in-flight unlock isn't abandoned mid-IPC.
-
-          Above the heading, in the content column, rather than in the shell's
-          top-right with the rest of the chrome. It was tried up there and it is
-          wrong: this is not a global action like "create a vault", it is the
-          way OUT of the specific question the heading asks, so it belongs
-          against that question. Reading order says the same thing — a user
-          arriving at "Unlock your vault" should meet the escape before the
-          demand, not after it in a corner. */}
-      {onBack && otherVaultsExist && !decrypting && (
-        <Button
-          type="button"
-          variant="ghost"
-          icon="arrow-left"
-          onClick={onBack}
-          style={BACK_LINK_STYLE}
-          data-testid="unlock.back-to-picker"
-        >
-          {t("unlock.backToPicker")}
-        </Button>
-      )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <div style={{ display: "flex", justifyContent: "center" }}>
         <MyneMark size={56} />
@@ -918,6 +876,7 @@ export function Unlock({
             busyLabel={t("unlock.decrypting")}
             testId="unlock.password-input"
             submitTestId="unlock.submit"
+            reveal={{ show: t("password.input.show"), hide: t("password.input.hide") }}
             inputProps={{
               type: "password",
               // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -945,6 +904,7 @@ export function Unlock({
               type="button"
               onClick={() => setPasswordRevealed(true)}
               style={RECOVER_LINK_STYLE}
+              className="myne-text-link"
               data-testid="unlock.use-password-link"
             >
               {t("unlock.usePasswordInstead")}
@@ -955,6 +915,7 @@ export function Unlock({
                 type="button"
                 onClick={() => setPasswordRevealed(false)}
                 style={RECOVER_LINK_STYLE}
+                className="myne-text-link"
                 data-testid="unlock.use-quick-unlock-link"
               >
                 {quickMethod === "biometric"
@@ -969,6 +930,7 @@ export function Unlock({
             type="button"
             onClick={onStartRecovery}
             style={RECOVER_LINK_STYLE}
+            className="myne-text-link"
             data-testid="unlock.recovery-link"
           >
             {t("unlock.recoveryLink")}
@@ -984,6 +946,7 @@ export function Unlock({
             type="button"
             onClick={() => dispatch({ type: "request-delete-vault" })}
             style={DELETE_VAULT_LINK_STYLE}
+            className="myne-text-link"
             data-testid="unlock.delete-link"
           >
             <Icon name="trash-2" size={14} />

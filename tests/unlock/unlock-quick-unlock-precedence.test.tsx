@@ -212,14 +212,12 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     const submit = screen.getByTestId("unlock.quick-pin-submit");
     fireEvent.click(submit);
 
-    await waitFor(() => expect(submit.textContent).toContain("Decrypting…"));
+    // The wait in words, the same way the password path reports it: a status
+    // line under the field, and the button's name, now that the button is an
+    // arrow with no room for a label.
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Decrypting…"));
+    expect(submit.getAttribute("aria-label")).toBe("Decrypting…");
     expect((submit as HTMLButtonElement).disabled).toBe(true);
-    // Exactly ONE indicator for the wait, and it is in the button. A sweeping
-    // rule under the field used to report it as well (`docs/decisions/ui/0626`
-    // withdrew it): two indicators for one wait, and the one that went read as
-    // a page loading rather than as a key turning.
-    expect(submit.firstElementChild, "the button reports the wait with words alone")
-      .not.toBeNull();
     const row = submit.parentElement as HTMLElement;
     // No motion exemption survives anywhere on the row: nothing here carries
     // state through motion now, so one would be an exemption for nothing.

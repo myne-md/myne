@@ -1360,3 +1360,14 @@
   .myne-agent[data-rail="closed"] .myne-agent__rail { display: none; }
   .myne-agent[data-rail="open"] .myne-agent__main { display: none; }
 }
+
+/* -- Text links -------------------------------------------------------------
+   A button that reads as a link (the unlock screen's "Use password instead",
+   "Forgot your password?", "Delete vault") has no fill to change on hover, so
+   colour alone said nothing when the pointer arrived. The underline is the
+   hover state, and keyboard focus gets the same one. */
+.myne-text-link:hover:not(:disabled),
+.myne-text-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -59,16 +59,13 @@ interface QuickUnlockEntryProps {
   onUnavailable: () => void;
 }
 
-/** The same raised card the password field sits on (Unlock's FORM_STYLE):
- *  swapping PIN for password changes the field, never the screen's shape. */
+/** Laid out exactly as the password form is (Unlock's FORM_STYLE): swapping
+ *  PIN for password changes the field, never the screen's shape. */
 const WRAP_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  padding: "var(--space-5)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-3)",
+  marginTop: "var(--space-2)",
 };
 
 const HINT_STYLE: CSSProperties = {
@@ -211,6 +208,10 @@ export function QuickUnlockEntry({
             busyLabel={t("unlock.decrypting")}
             testId="unlock.quick-pin-input"
             submitTestId="unlock.quick-pin-submit"
+            reveal={{
+              show: t("unlock.quickUnlock.showPin"),
+              hide: t("unlock.quickUnlock.hidePin"),
+            }}
             inputProps={{
               type: "password",
               inputMode: "numeric",

@@ -4350,7 +4350,9 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Unlock with PIN",
       "unlockWithTouchId": "Unlock with Touch ID",
-      "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
+      "wrongCredential": "Incorrect. {{remaining}} attempt(s) left.",
+      "showPin": "Show PIN",
+      "hidePin": "Hide PIN"
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
     "recoveryInterruptedBody": "Set a new password first, then re-seal your vault.",
