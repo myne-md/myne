@@ -174,11 +174,11 @@ impl MyneBackend for IpcBackend {
         let error = map_wire_error(response.error);
         // `not_found` is the shared kind for "the thing you named is not
         // there", and its human sentence ("No matching note.") is written for
-        // a note id. For `open` the thing named is a file, so the wording is
-        // restated here rather than by changing the shared table every other
-        // command reads. The envelope kind a script sees stays `not_found`
-        // for a missing file and `io` for everything else — the message is
-        // the human half.
+        // a note id. For `open` the thing named is a file, so the refusal is
+        // remapped to `Io` with a file-shaped sentence, and `error_parts`
+        // emits the envelope kind `io` for it: a script branching on `kind`
+        // sees `io` for a missing file, never `not_found`. The message is the
+        // human half; the assertion in the test below pins both.
         Err(match error {
             BackendError::NotFound => BackendError::Io("No file at that path.".to_string()),
             other => other,
@@ -839,9 +839,12 @@ mod tests {
     }
 
     #[test]
-    fn real_socket_open_not_found_is_restated_for_a_file() {
+    fn real_socket_open_not_found_maps_to_the_io_envelope_kind() {
         // The shared `not_found` sentence is written for a note id. An `open`
-        // whose file is missing must not tell the user "No matching note."
+        // whose file is missing is remapped to `Io`, so the EMITTED envelope
+        // kind a script branches on is `io`, and the message must not tell the
+        // user "No matching note.". Both halves are asserted against the
+        // output table, not restated here.
         let dir = ShortDir::new("open-missing");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
         serve_once(
@@ -849,12 +852,16 @@ mod tests {
             br#"{"ok":false,"error":{"kind":"not_found","message":"x"}}"#.to_vec(),
         );
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        match backend.open("/tmp/gone.md") {
-            Err(BackendError::Io(message)) => {
-                assert!(!message.to_lowercase().contains("note"), "{message:?}");
-            }
-            other => panic!("expected Io, got {other:?}"),
-        }
+        let error = backend
+            .open("/tmp/gone.md")
+            .expect_err("missing file must refuse");
+        let (kind, message) = crate::output::error_parts(&error);
+        assert_eq!(kind, "io");
+        assert!(
+            matches!(error, BackendError::Io(_)),
+            "expected Io, got {error:?}"
+        );
+        assert!(!message.to_lowercase().contains("note"), "{message:?}");
     }
 
     #[test]

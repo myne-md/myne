@@ -1,4 +1,4 @@
-// `myne://open-file?path=...` deep-link handling (myne-md/myne#788, task 12) —
+// `myne://open-file?path=...` deep-link handling (myne-md/myne#788, task 12):
 // the latch precedent is `src/lib/themeDeepLink.ts`, and the shape here is
 // deliberately the same: a pure parser, a single-slot latch for arrivals
 // before anything can present them, and a bare event that tells the mounted
@@ -10,8 +10,9 @@
 // gates stand between it and an open:
 //
 //   1. This module only accepts the `open-file` action and a non-empty,
-//      control-free, length-capped path parameter. A link whose path fails
-//      any of that is ignored outright.
+//      length-capped path parameter whose control and bidi characters are
+//      stripped before anything else sees it. A link whose path fails any of
+//      that is ignored outright.
 //   2. `plainFileResolvePath` (host-side) checks the device-local gate,
 //      canonicalises the path and validates the extension and size cap on the
 //      CANONICAL file. Only its answer is latched, so the confirmation shows
@@ -90,13 +91,21 @@ export function parseOpenFileUrl(raw: string): OpenFileDeepLinkResult {
   if (path === null || path === "" || path.length > MAX_PATH_CHARS) {
     return { ok: false, reason: "malformed" };
   }
-  // Control characters (including NUL, which some platforms truncate at)
-  // never appear in a path this feature would open; carrying one means the
-  // link is not describing a real file.
-  if (/[\u0000-\u001f\u007f]/.test(path)) {
+  // Strip C0/C1 controls plus the bidi overrides (U+200E/200F, U+202A-202E,
+  // U+2066-2069) with the exact class `src/lib/themeDeepLink.ts` uses for its
+  // display strings. A path carrying a control is not describing a real file,
+  // and a path carrying a bidi override is worse than malformed: rendered in
+  // the confirmation it can read as one target while naming another. Removing
+  // the characters rather than rejecting keeps every position they occupied
+  // out of the string the confirmation shows and the host then resolves.
+  const stripped = path.replace(
+    /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,
+    "",
+  );
+  if (stripped === "" || stripped.length > MAX_PATH_CHARS) {
     return { ok: false, reason: "malformed" };
   }
-  return { ok: true, path };
+  return { ok: true, path: stripped };
 }
 
 /**
@@ -109,7 +118,7 @@ export function parseOpenFileUrl(raw: string): OpenFileDeepLinkResult {
 export const OPEN_FILE_EVENT = "myne://plain-file-open-requested";
 
 /**
- * A resolved request that arrived before anything could present it — a cold
+ * A resolved request that arrived before anything could present it: a cold
  * launch, or a link that landed before `App` mounted.
  *
  * Deliberately a single slot, not a queue: these are user-initiated clicks,

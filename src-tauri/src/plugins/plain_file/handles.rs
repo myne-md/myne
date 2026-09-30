@@ -519,6 +519,9 @@ fn write_atomic_mode(
         #[cfg(not(unix))]
         if let Some(perms) = perms.as_ref() {
             if let Err(e) = file.set_permissions(perms.clone()) {
+                // Windows refuses to rename or delete a path while a handle to
+                // it is open, so the temp handle goes before the cleanup.
+                drop(file);
                 let _ = std::fs::remove_file(&tmp);
                 return Err(io(e));
             }
@@ -529,9 +532,14 @@ fn write_atomic_mode(
             file.sync_all()
         })();
         if let Err(e) = write_result {
+            drop(file);
             let _ = std::fs::remove_file(&tmp);
             return Err(io(e));
         }
+        // Same requirement on the success path: the canonical writer
+        // (`crate::atomic_write`) drops its handle before `finalize_atomic`,
+        // and skipping it here is a hard failure on Windows, not a warning.
+        drop(file);
         match crate::atomic_write::finalize_atomic(&tmp, path, true) {
             Ok(()) => return Ok(()),
             Err(e) => {

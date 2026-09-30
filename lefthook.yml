@@ -63,7 +63,7 @@ pre-commit:
       # Globbed to the tree the rule is about: every import SITE lives under
       # `src/plain/`, so a docs-only, protocol-only or core-only commit cannot
       # change the answer and does not pay the scan. The `run:` takes no
-      # {staged_files} — the glob decides WHETHER it runs, and it sweeps the
+      # {staged_files}: the glob decides WHETHER it runs, and it sweeps the
       # whole tree when it does.
       glob: "{src/plain/**,scripts/check-plain-surface-imports.mjs}"
       run: node scripts/check-plain-surface-imports.mjs

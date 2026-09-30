@@ -315,6 +315,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.vimMode",
   },
   {
+    // The plain-file editor (myne-md/myne#788). Both gates, and they are
+    // independent: `capability` keeps search from navigating to a row the web
+    // bundle does not render (the plugin is absent there), and
+    // `developerGated` keeps it from scrolling to a row EditorPanel hides
+    // while Developer mode is off (the #181 shape the vim entry above carries).
+    id: "editor.plain-file",
+    capability: "plainFile",
+    developerGated: true,
+    panelId: "editor",
+    testid: "settings.plain-file",
+    titleKey: "settings.plainFile.label",
+    descriptionKey: "settings.plainFile.helper",
+    keywordsKey: "settings.search.keywords.plainFile",
+  },
+  {
     id: "editor.toolbar",
     panelId: "editor",
     testid: "settings.toolbar-customize",

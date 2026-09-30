@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import { plainFileGateGet, plainFileGateSet } from "../../platform/plainFile";
+import { handleGateDisabled } from "../../plain/store";
 
 export function PlainFileSettings() {
   const { t } = useTranslation();
@@ -39,11 +40,23 @@ export function PlainFileSettings() {
     setEnabled(next); // optimistic
     try {
       await plainFileGateSet(next);
-      setError(null);
     } catch {
       setEnabled(prev); // rollback
       setError(t("settings.plainFile.errorSaveSetting"));
+      return;
     }
+    if (!next) {
+      // Disabling the gate closes the surface's tabs (the PRD's contract):
+      // flush them, then drop them. A tab whose text never landed stays open
+      // by design, and saying so is the difference between "the switch
+      // worked" and a surface that silently ignores it.
+      const remaining = await handleGateDisabled();
+      if (remaining.length > 0) {
+        setError(t("settings.plainFile.openFilesRemain"));
+        return;
+      }
+    }
+    setError(null);
   }
 
   return (

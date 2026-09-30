@@ -78,7 +78,7 @@ pub trait MyneBackend {
     /// appears in the app. `Ok(())` means a handle was minted there; the
     /// refusal classes this crate can distinguish are [`BackendError::PlainFileOff`]
     /// (the device-local gate is off) and [`BackendError::Io`] (an unsupported
-    /// type, a missing file, an oversized file — each with the desktop's
+    /// type, a missing file, an oversized file: each with the desktop's
     /// bounded sentence).
     fn open(&self, path: &str) -> Result<(), BackendError>;
 }
@@ -124,7 +124,7 @@ pub enum BackendError {
     RateLimited,
     /// The device-local plain-file editor is off, so `open` refused before
     /// anything was read (myne-md/myne#788). Its own code because enabling
-    /// it is a different user action from every other failure here — and
+    /// it is a different user action from every other failure here, and
     /// because the gate lives in Settings, not in the vault, this is NOT
     /// [`BackendError::CliDisabled`]: the CLI door can be open while the
     /// file editor is not.
