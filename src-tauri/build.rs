@@ -456,7 +456,13 @@ fn main() {
             // Each command needs a matching `commands.allow` entry in
             // `permissions/plain-file/default.toml` or the ACL resolver never
             // authorizes the `plugin:plain-file|<cmd>` invoke.
-            tauri_build::InlinedPlugin::new().commands(&["gate_get", "gate_set"]),
+            tauri_build::InlinedPlugin::new().commands(&[
+                "gate_get",
+                "gate_set",
+                "plain_file_read",
+                "plain_file_write",
+                "plain_file_close",
+            ]),
         )
         .plugin(
             "memory",

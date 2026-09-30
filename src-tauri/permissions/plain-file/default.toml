@@ -11,8 +11,14 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the plain-file plugin — the device-local gate for the sandboxed on-disk markdown editor."
-permissions = ["allow-gate-get", "allow-gate-set"]
+description = "Default permission set for the plain-file plugin — the device-local gate plus handle-scoped IO for the sandboxed on-disk markdown editor."
+permissions = [
+    "allow-gate-get",
+    "allow-gate-set",
+    "allow-plain-file-read",
+    "allow-plain-file-write",
+    "allow-plain-file-close",
+]
 
 [[permission]]
 identifier = "allow-gate-get"
@@ -23,3 +29,24 @@ commands.allow = ["gate_get"]
 identifier = "allow-gate-set"
 description = "Allow invoking plain-file:gate_set (atomic write of the device-local plain-file.json gate)."
 commands.allow = ["gate_set"]
+
+# The three IO commands take an OPAQUE HANDLE, never a path. A handle exists
+# only because a Rust-side ingress opened a user-granted file, so the WebView
+# cannot name a path these commands will touch. The gate is checked when the
+# handle is minted, not here (see `handles.rs` for why the flush must survive a
+# gate toggle). All three are main-window-only.
+
+[[permission]]
+identifier = "allow-plain-file-read"
+description = "Allow invoking plain-file:plain_file_read (returns the handle's current content and the on-disk SHA-256 base hash; no path crosses IPC)."
+commands.allow = ["plain_file_read"]
+
+[[permission]]
+identifier = "allow-plain-file-write"
+description = "Allow invoking plain-file:plain_file_write (compare-and-swap write of the handle's file: refuses with a conflict when the on-disk hash no longer matches expected_base; atomic and permission-preserving)."
+commands.allow = ["plain_file_write"]
+
+[[permission]]
+identifier = "allow-plain-file-close"
+description = "Allow invoking plain-file:plain_file_close (drops a handle; idempotent)."
+commands.allow = ["plain_file_close"]
