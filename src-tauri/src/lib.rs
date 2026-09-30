@@ -361,6 +361,10 @@ pub fn run() {
         // reachable pre-unlock, because the pre-unlock set is exactly what a
         // locked-out user cannot see.
         .plugin(plugins::screen_capture::init())
+        // myne-md/myne#788: the device-local gate for the plain-file editor.
+        // Readable in every vault state by construction (its own file, not a
+        // vault.prefs field), which is the whole reason it exists.
+        .plugin(plugins::plain_file::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         .plugin(plugins::detached_window::init())

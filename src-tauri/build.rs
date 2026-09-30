@@ -449,6 +449,16 @@ fn main() {
                 .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
+            "plain-file",
+            // myne-md/myne#788: the sandboxed editor for the user's own
+            // on-disk markdown files. This task ships the device-local gate;
+            // the file IO and ingress commands join this list in later tasks.
+            // Each command needs a matching `commands.allow` entry in
+            // `permissions/plain-file/default.toml` or the ACL resolver never
+            // authorizes the `plugin:plain-file|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&["gate_get", "gate_set"]),
+        )
+        .plugin(
             "memory",
             // myne-md/myne#697: the agent-memory + personality store
             // (vault.agent-memory MYN1 + memories/<id> MYX1 +
