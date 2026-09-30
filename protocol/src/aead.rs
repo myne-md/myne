@@ -1178,6 +1178,25 @@ pub fn aad_person_member_key_store(vault_id: &[u8; 16], account_number_hash: &[u
     aad
 }
 
+/// AAD for the device-local, vault-bound person-identity carrier
+/// (the device-local carrier file `<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`): the person keypair sealed at rest
+/// under the owner `root_key`, so an `NTV6` owner-vault unlock installs the
+/// person session without the recovery phrase. Binds the vault id the reader
+/// expected AND the person id, so a carrier copied to another vault, or one for
+/// a different person, does not open. v0.2 prefix, matching the person plane.
+pub fn aad_person_vault_carrier(vault_id: &[u8; 16], person_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PERSON_VAULT_CARRIER_BLOB: &[u8] = b"person-vault-carrier-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_PERSON_VAULT_CARRIER_BLOB.len() + 32,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_VAULT_CARRIER_BLOB);
+    aad.extend_from_slice(vault_id);
+    aad.extend_from_slice(person_id);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -3589,5 +3608,31 @@ mod tests {
         let current = aad_vault_group_key_wrap_v0_2(&account_a, 7);
         assert_ne!(current, aad_vault_group_key_wrap_v0_2(&account_b, 7));
         assert_ne!(current, aad_vault_group_key_wrap_v0_2(&account_a, 8));
+    }
+
+    /// The device-local vault-bound person-identity carrier AAD
+    /// (myne-md/myne#792) decomposes as prefix · version · len(role) · role ·
+    /// vault_id · person_id, and binds BOTH ids. It is device-local (outside the
+    /// vault-scoped `ctx-aead` / `aad-construction` families, like
+    /// `aad_capture_blob` / `aad_vault_label_blob`), so it is pinned here.
+    #[test]
+    fn aad_person_vault_carrier_binds_vault_and_person() {
+        let vault_id = [0x11u8; 16];
+        let person_id = [0x22u8; 16];
+        let aad = aad_person_vault_carrier(&vault_id, &person_id);
+
+        const ROLE: &[u8] = b"person-vault-carrier-blob";
+        let mut expected = Vec::new();
+        expected.extend_from_slice(AAD_PREFIX_V0_2);
+        expected.push(PROTOCOL_VERSION_V0_2);
+        expected.extend_from_slice(&(ROLE.len() as u16).to_be_bytes());
+        expected.extend_from_slice(ROLE);
+        expected.extend_from_slice(&vault_id);
+        expected.extend_from_slice(&person_id);
+        assert_eq!(aad, expected);
+
+        // Both ids are bound: a change in either changes the AAD.
+        assert_ne!(aad, aad_person_vault_carrier(&[0x99u8; 16], &person_id));
+        assert_ne!(aad, aad_person_vault_carrier(&vault_id, &[0x99u8; 16]));
     }
 }

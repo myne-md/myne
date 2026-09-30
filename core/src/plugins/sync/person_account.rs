@@ -188,6 +188,14 @@ pub async fn person_setup_from_host(
             mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
         };
 
+        // Vault-bound carrier (myne-md/myne#792): seal the keypair under the
+        // active owner vault's root_key so its next unlock installs this session
+        // with no phrase. Best-effort; only fires for an unlocked NTV6 owner
+        // vault.
+        super::person_vault_carrier::refresh_carrier_best_effort(
+            host, io, state, &person_id, &pair,
+        )
+        .await;
         let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
             pair,
             person_id,

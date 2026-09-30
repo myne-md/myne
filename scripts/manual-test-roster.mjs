@@ -5783,6 +5783,7 @@ export const ROSTER = Object.freeze([
       "e2e/multi-device-harness.e2e.ts",
       "e2e/sync-usage.e2e.ts",
       "e2e/member-roster.e2e.ts",
+      "e2e/sync-identity-block.e2e.ts",
     ],
      manual: [
        {

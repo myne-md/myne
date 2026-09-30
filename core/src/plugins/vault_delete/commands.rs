@@ -171,7 +171,10 @@ pub async fn vault_delete_from_host(
     hooks.preempt_inflight_backup(state).await;
 
     let result = vault_delete_with_dir(vault_dir.clone(), vault_id, state).await;
-    run_post_delete_teardown(state, hooks, io, &vault_dir, vault_id, keychain, &result).await;
+    run_post_delete_teardown(
+        host, state, hooks, io, &vault_dir, vault_id, keychain, &result,
+    )
+    .await;
     result
 }
 
@@ -206,7 +209,10 @@ pub async fn vault_delete_via_io_from_host(
     hooks.preempt_inflight_backup(state).await;
 
     let result = vault_delete_via_io(io, vault_dir.clone(), vault_id, state).await;
-    run_post_delete_teardown(state, hooks, io, &vault_dir, vault_id, keychain, &result).await;
+    run_post_delete_teardown(
+        host, state, hooks, io, &vault_dir, vault_id, keychain, &result,
+    )
+    .await;
     result
 }
 
@@ -223,7 +229,10 @@ pub async fn vault_delete_via_io_from_host(
 /// **rejected** delete would leave a surviving vault's picker row falling back
 /// until its next unlock. Everything above the erase is RAM; the erase is the
 /// one durable member, and it goes last for that reason.
+#[allow(clippy::too_many_arguments)]
+#[cfg_attr(target_arch = "wasm32", allow(unused_variables))]
 async fn run_post_delete_teardown(
+    host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     io: &dyn crate::vault_io::VaultIo,
@@ -283,6 +292,17 @@ async fn run_post_delete_teardown(
         // actually recognises: the vault's name. Destroying the key IS the
         // erase.
         crate::vault_label::writeback::forget_label(io, vault_dir, vault_id, keychain).await;
+        // myne-md/myne#792: destroy this vault's device-local person-identity
+        // carrier. Its KEK is this vault's `root_key`, so a deleted vault's
+        // carrier is cryptographically inert, but it is still an at-rest copy of
+        // the person keypair and the vault-delete path must not leave one behind.
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::plugins::sync::person_vault_carrier::delete_person_vault_carrier(
+            host,
+            io,
+            vault_id.as_uuid().as_bytes(),
+        )
+        .await;
     }
 }
 

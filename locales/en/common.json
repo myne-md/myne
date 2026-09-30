@@ -3877,7 +3877,10 @@
       "identity": {
         "label": "Identity",
         "helper": "An identity lets people invite you to a vault, and lets one identity own several vaults.",
-        "cta": "Add an identity"
+        "cta": "Add an identity",
+        "codeLabel": "Your identity code",
+        "lockedHelper": "This device holds an identity. It is locked for this session; unlock it with your recovery phrase to sign sync and invites.",
+        "unlockedHelper": "This device holds an identity, unlocked for this session."
       },
       "server": {
         "label": "Sync server"

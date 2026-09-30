@@ -222,6 +222,13 @@ struct PersonSession {
     profile: Option<PersonProfileSession>,
     pending_transition: Option<Vec<u8>>,
     generation: u64,
+    /// Set by an explicit `sync_person_lock` (not a vault lock or switch). While
+    /// true, the vault-bound carrier must NOT auto-reinstall the identity at a
+    /// later owner-vault unlock: the user asked for it to be locked, and a lock
+    /// that the next unlock silently reverses is not a lock (myne-md/myne#792
+    /// review, threat-model AS21 "until the explicit person lock"). Cleared by
+    /// any real install (a phrase unlock).
+    explicit_lock: bool,
 }
 
 impl PersonSession {
@@ -271,6 +278,7 @@ impl VaultRuntimeState {
             pair,
             person_id: None,
         });
+        session.explicit_lock = false;
     }
 
     pub async fn set_person_identity_and_id(
@@ -283,6 +291,20 @@ impl VaultRuntimeState {
             pair,
             person_id: Some(person_id),
         });
+        session.explicit_lock = false;
+    }
+
+    /// Record an explicit `sync_person_lock`: suppress carrier auto-install until
+    /// the next real install.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn set_person_explicit_lock(&self) {
+        self.person_session.write().await.explicit_lock = true;
+    }
+
+    /// Whether an explicit person lock is in force for this process.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn person_explicit_lock(&self) -> bool {
+        self.person_session.read().await.explicit_lock
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -333,6 +355,7 @@ impl VaultRuntimeState {
                 profile_key,
             });
         session.pending_transition = install.transition;
+        session.explicit_lock = false;
         true
     }
 
@@ -1360,6 +1383,7 @@ impl VaultRuntimeState {
                         profile_key,
                     });
             person.pending_transition = install.transition;
+            person.explicit_lock = false;
         } else {
             person.identity = None;
             person.profile = None;

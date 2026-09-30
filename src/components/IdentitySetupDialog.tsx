@@ -22,6 +22,7 @@ import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "reac
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
+import { Input } from "./primitives/Input";
 import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
@@ -65,6 +66,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   const [result, setResult] = useState<PersonSetupView | null>(null);
   // True when a sealed identity exists on this device even if it never enrolled.
   const [heldIdentity, setHeldIdentity] = useState(false);
+  // The held identity's public code, shown while it is held/locked so the dialog
+  // shows THAT identity rather than only a recover form (myne-md/myne#792
+  // follow-up). Public material; also shown in the member roster when unlocked.
+  const [heldCode, setHeldCode] = useState<string | null>(null);
   const [confirmForget, setConfirmForget] = useState(false);
   // The identity phrase gets the same display protections the vault phrase gets
   // (myne-md/myne#768): hidden until revealed, re-hidden on a walk-away. Local
@@ -86,7 +91,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     let alive = true;
     void personStatus()
       .then((status) => {
-        if (alive) setHeldIdentity(status.sealed_keypair_present);
+        if (alive) {
+          setHeldIdentity(status.sealed_keypair_present);
+          setHeldCode(status.identity_code);
+        }
       })
       .catch(() => {
         /* probe failed: keep the default Create affordance and let the
@@ -140,6 +148,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setResult(null);
     setError(null);
     setRecoveryCells(emptyRecoveryCells());
+    setHeldCode(null);
     setConfirmForget(false);
     onClose();
     if (created) onCreated?.();
@@ -229,13 +238,27 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           {heldIdentity ? (
             // A held identity cannot be opened by a freshly generated phrase, so
             // Create is replaced by the notice + Recover, with an explicit
-            // destructive forget for a user who does not have the phrase.
-            <div
-              data-testid="identity-setup.held"
-              style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}
-            >
-              {t("identitySetup.heldIntro")}
-            </div>
+            // destructive forget for a user who does not have the phrase. The
+            // public code is shown so "an identity is held" names WHICH one.
+            <>
+              <div
+                data-testid="identity-setup.held"
+                style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}
+              >
+                {t("identitySetup.heldIntro")}
+              </div>
+              {heldCode ? (
+                <Input
+                  readOnly
+                  mono
+                  aria-label={t("sync.panel.identity.codeLabel")}
+                  value={heldCode}
+                  data-testid="identity-setup.held-code"
+                  style={{ userSelect: "all" }}
+                  onFocus={(e) => e.target.select()}
+                />
+              ) : null}
+            </>
           ) : (
             <>
               <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>

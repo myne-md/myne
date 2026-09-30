@@ -271,6 +271,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/person-member-key-store/v0.2/cases.json"),
         ),
         (
+            "person-vault-carrier",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-vault-carrier/v0.2/cases.json"),
+        ),
+        (
             "person-profile",
             "v0.2",
             include_str!("../../myne-test-vectors/vectors/person-profile/v0.2/cases.json"),
@@ -1377,18 +1382,19 @@ fn hkdf_sha256_vectors() {
             let role_str = case["input_role"]
                 .as_str()
                 .unwrap_or_else(|| panic!("[{id}] missing input_role"));
-            assert_eq!(
-                role_str, "membership-key",
-                "[{id}] the v0.2 file pins exactly the membership KEK"
-            );
+            let role = match role_str {
+                "membership-key" => SubkeyRole::MembershipKey,
+                "person-vault-carrier" => SubkeyRole::PersonVaultCarrier,
+                other => panic!("[{id}] unexpected v0.2 role {other:?}"),
+            };
             let expected = hex_decode(
                 case["expected_subkey_hex"]
                     .as_str()
                     .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
             );
 
-            if !seen_roles.contains(&SubkeyRole::MembershipKey) {
-                seen_roles.push(SubkeyRole::MembershipKey);
+            if !seen_roles.contains(&role) {
+                seen_roles.push(role);
             }
 
             if let Some(info_hex) = case
@@ -1404,7 +1410,7 @@ fn hkdf_sha256_vectors() {
                 );
             }
 
-            let actual = derive_subkey_v0_2(&root_key, SubkeyRole::MembershipKey);
+            let actual = derive_subkey_v0_2(&root_key, role);
 
             assert_eq!(
                 actual.as_slice(),
@@ -2816,6 +2822,59 @@ fn person_member_key_store_vectors() {
             seen_kinds.contains(required),
             "person-member-key-store must cover the '{required}' case kind"
         );
+    }
+}
+
+/// `person-vault-carrier` v0.2: the device-local vault-bound person-identity
+/// carrier AAD (myne-md/myne#792). The carrier's KEK is pinned by
+/// `hkdf-sha256/v0.2`; this family pins the AAD framing (`aad_person_vault_carrier`).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_vault_carrier_vectors() {
+    use protocol::aad_person_vault_carrier;
+
+    let Some(raw) = cases_json_v0_2("person-vault-carrier") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-vault-carrier/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-vault-carrier");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+
+    for case in cases {
+        let kind = case["case_kind"]
+            .as_str()
+            .expect("case_kind must be a string");
+        match kind {
+            "aad-construction" => {
+                let vault: [u8; 16] = hex_decode_array(
+                    case["input_vault_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_vault_id_hex")),
+                );
+                let person: [u8; 16] = hex_decode_array(
+                    case["input_person_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_person_id_hex")),
+                );
+                let expected: [u8; 70] = hex_decode_array(
+                    case["expected_aad_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_aad_hex")),
+                );
+                let actual = aad_person_vault_carrier(&vault, &person);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[aad-construction] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            other => panic!("[{other}] unknown case_kind for person-vault-carrier"),
+        }
     }
 }
 
