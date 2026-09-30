@@ -2168,6 +2168,24 @@ the invite is sealed. Not an AEAD/magic value and not an AAD role.
 
 Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
+### **person-identity carrier** &nbsp; 🗝️ *Key/identifier*
+
+The device-local, per-vault copy of a person's [person keypair](#person-keypair)
+that lets an `NTV6` owner vault install the person session at unlock without
+re-entering the recovery phrase (`myne-md/myne#792`, `decisions/protocol/0622`,
+amending `decisions/protocol/0612`). One JSON envelope per vault at
+`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`, AEAD-sealed under a
+`root_key` subkey (`SubkeyRole::PersonVaultCarrier`, HKDF context
+`person-vault-carrier`) with the AAD role `person-vault-carrier-blob` binding the
+vault id and the person id. Written when the identity is unlocked while an owner
+vault is open; read by the vault-unlock pipeline; erased by person forget and by
+vault delete. Owner-only (a member holds no `root_key`); never synced. Its
+exposure is the deliberate equivalent of the identity itself: the vault credential
+opens it, which is the trade `decisions/protocol/0622` records and
+`myne-md/myne#793` is to decouple.
+
+Used in: `docs/spec/protocol.md` §3.4 / §5.2; `docs/decisions/protocol/0622-person-identity-carrier-is-vault-bound-device-local.md`; `myne-md/myne#792`.
+
 ### **person keypair** &nbsp; 🗝️ *Key/identifier*
 
 The B2B identity substrate's per-member cryptographic identity

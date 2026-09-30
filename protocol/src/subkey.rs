@@ -272,6 +272,15 @@ const ROLE_STR_GROUP_ROSTER_KEY: &[u8] = b"group-roster-key";
 /// `"membership-blob"`.
 const ROLE_STR_MEMBERSHIP_KEY: &[u8] = b"membership-key";
 
+/// Registered role string for the device-local vault-bound person-identity
+/// carrier (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`; `protocol.md` §3.4). Seals
+/// the person keypair, at rest, under the owner's `root_key`, so an `NTV6`
+/// owner-vault unlock re-installs the person identity without the recovery
+/// phrase. Root-tier and owner-only: a member holds no `root_key`. Load-bearing
+/// (`hkdf-sha256` vector); DISTINCT from the AAD role string
+/// `"person-vault-carrier-blob"`.
+const ROLE_STR_PERSON_VAULT_CARRIER: &[u8] = b"person-vault-carrier";
+
 /// Registered role string for the v0.1 agent-memory catalog KEK (encrypts the
 /// `vault.agent-memory` singleton: `agent_memory_blob.rs`, `MYN1`,
 /// `protocol.md` § 9.25, myne-md/myne#697). Load-bearing: drift silently
@@ -366,10 +375,11 @@ pub enum OwnerRole {
     AgentMemoryKey,
     AgentPersonalityKey,
     AgentPersonalitySyncId,
+    PersonVaultCarrier,
 }
 
 impl OwnerRole {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::GroupKeyWrap,
         Self::ServerAuth,
         Self::MembershipKey,
@@ -383,6 +393,7 @@ impl OwnerRole {
         Self::AgentMemoryKey,
         Self::AgentPersonalityKey,
         Self::AgentPersonalitySyncId,
+        Self::PersonVaultCarrier,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -400,6 +411,7 @@ impl OwnerRole {
             Self::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
             Self::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
             Self::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
+            Self::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
         }
     }
 }
@@ -525,7 +537,8 @@ impl SubkeyRole {
             | Self::AgentMemoryCatalogSyncId
             | Self::AgentMemoryKey
             | Self::AgentPersonalityKey
-            | Self::AgentPersonalitySyncId => None,
+            | Self::AgentPersonalitySyncId
+            | Self::PersonVaultCarrier => None,
         }
     }
 }
@@ -732,6 +745,14 @@ pub enum SubkeyRole {
     /// `ThemesSyncId`); the singleton's KEK stays `AgentPersonalityKey`.
     /// Domain-separated from every other role.
     AgentPersonalitySyncId,
+    /// KEK for the device-local, vault-bound person-identity carrier
+    /// (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`; `protocol.md` §3.4). Seals the
+    /// person keypair, at rest, under the owner's `root_key`, so an `NTV6`
+    /// owner-vault unlock installs the person session without the recovery
+    /// phrase (decisions/protocol/0612 amended). Root-derived and owner-only (a
+    /// member holds no `root_key`); never synced. Distinct
+    /// from the AAD role `"person-vault-carrier-blob"`.
+    PersonVaultCarrier,
 }
 
 impl SubkeyRole {
@@ -747,7 +768,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 26] = [
+    pub const ALL: [SubkeyRole; 27] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -774,6 +795,7 @@ impl SubkeyRole {
         SubkeyRole::AgentMemoryKey,
         SubkeyRole::AgentPersonalityKey,
         SubkeyRole::AgentPersonalitySyncId,
+        SubkeyRole::PersonVaultCarrier,
     ];
 
     /// Registered role string (the part appended after the
@@ -807,6 +829,7 @@ impl SubkeyRole {
             SubkeyRole::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
             SubkeyRole::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
             SubkeyRole::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
+            SubkeyRole::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
         }
     }
 }
@@ -954,6 +977,7 @@ mod tests {
                 SubkeyRole::AgentMemoryKey => 23,
                 SubkeyRole::AgentPersonalityKey => 24,
                 SubkeyRole::AgentPersonalitySyncId => 25,
+                SubkeyRole::PersonVaultCarrier => 26,
             }
         }
 
@@ -1507,6 +1531,7 @@ mod tests {
                 SubkeyRole::AgentMemoryKey => "agent-memory-key",
                 SubkeyRole::AgentPersonalityKey => "agent-personality-key",
                 SubkeyRole::AgentPersonalitySyncId => "agent-personality-sync-id",
+                SubkeyRole::PersonVaultCarrier => "person-vault-carrier",
             }
         }
 
@@ -1879,18 +1904,34 @@ mod tests {
         let zero_root: [u8; 32] = [0u8; 32];
         let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
 
-        let cases: [(&str, &str, &[u8; 32], bool); 2] = [
+        let cases: [(&str, &str, &[u8; 32], bool, SubkeyRole); 4] = [
             (
                 "zero-root-membership-key",
                 "All-zero root_key with the MembershipKey role (§3.4; §9.3.1). KEK for the sealed vault membership field (the account/vault split, decisions.md 2026-09-07); role string 'membership-key' (14 ASCII bytes). Derived under the v0.2 context prefix because the field is NTV5-only: info is 'myne.v0.2 membership-key' (24 bytes). root_key-derived (like prefs/search/workspace), so it is itemsKey-independent. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
                 &zero_root,
                 false,
+                SubkeyRole::MembershipKey,
             ),
             (
                 "prn-alpha-membership-key",
                 "Pseudorandom alpha root with the MembershipKey role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.2 membership-key') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'membership-key' is DISTINCT from the AAD role string 'membership-blob' (aad_membership_blob): two different load-bearing strings in the same feature.",
                 &alpha,
                 true,
+                SubkeyRole::MembershipKey,
+            ),
+            (
+                "zero-root-person-vault-carrier",
+                "All-zero root_key with the PersonVaultCarrier role (§3.4; myne-md/myne#792). KEK for the device-local, vault-bound person-identity carrier (device-local, `<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`), which seals the person keypair under the owner root_key so an NTV6 owner-vault unlock installs the person session without the recovery phrase; role string 'person-vault-carrier' (20 ASCII bytes). info is 'myne.v0.2 person-vault-carrier'. Root-derived and owner-only (a member holds no root_key); never synced. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
+                &zero_root,
+                false,
+                SubkeyRole::PersonVaultCarrier,
+            ),
+            (
+                "prn-alpha-person-vault-carrier",
+                "Pseudorandom alpha root with the PersonVaultCarrier role. The informational_info_utf8_hex field carries the canonical 30-byte HKDF info bytes ('myne.v0.2 person-vault-carrier') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'person-vault-carrier' is DISTINCT from the AAD role string 'person-vault-carrier-blob' (aad_person_vault_carrier): two different load-bearing strings in the same feature.",
+                &alpha,
+                true,
+                SubkeyRole::PersonVaultCarrier,
             ),
         ];
 
@@ -1899,11 +1940,11 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4 + §10.7\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the membership KEK: the one role that derives under the v0.2 context prefix (info='myne.v0.2 '||role) because its field is NTV5-only. Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the v0.2 context prefix (info='myne.v0.2 '||role): the membership KEK (its field is NTV5-only) and the device-local vault-bound PersonVaultCarrier KEK (myne-md/myne#792). Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
-        for (i, (slug, desc, root, include_info)) in cases.iter().enumerate() {
-            let subkey = derive_subkey_v0_2(root, SubkeyRole::MembershipKey);
+        for (i, (slug, desc, root, include_info, role)) in cases.iter().enumerate() {
+            let subkey = derive_subkey_v0_2(root, *role);
 
             dump.push_str("    {\n");
             dump.push_str(&alloc::format!(
@@ -1918,11 +1959,14 @@ mod tests {
                 "      \"input_root_key_hex\": \"{}\",\n",
                 hex_lower(root.as_slice())
             ));
-            dump.push_str("      \"input_role\": \"membership-key\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_role\": \"{}\",\n",
+                core::str::from_utf8(role.role_str()).expect("role str is ASCII")
+            ));
             if *include_info {
                 let mut info = alloc::vec::Vec::new();
                 info.extend_from_slice(HKDF_PREFIX_V0_2);
-                info.extend_from_slice(SubkeyRole::MembershipKey.role_str());
+                info.extend_from_slice(role.role_str());
                 dump.push_str(&alloc::format!(
                     "      \"informational_info_utf8_hex\": \"{}\",\n",
                     hex_lower(&info)
@@ -1974,6 +2018,7 @@ mod tests {
                 OwnerRole::AgentMemoryKey => 10,
                 OwnerRole::AgentPersonalityKey => 11,
                 OwnerRole::AgentPersonalitySyncId => 12,
+                OwnerRole::PersonVaultCarrier => 13,
             }
         }
 

@@ -435,6 +435,17 @@ pub async fn sync_person_unlock<R: Runtime>(
         identity_code: super::invite::encode_person_identity_code(&person_id, &public),
     };
     let profile = derive_person_profile_key(&host, state.inner(), normalized.as_str()).await;
+    // Vault-bound carrier (myne-md/myne#792): seal the keypair under the active
+    // owner vault's root_key so its next unlock installs this session with no
+    // phrase. Best-effort; only fires for an unlocked NTV6 owner vault.
+    super::person_vault_carrier::refresh_carrier_best_effort(
+        &host,
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &person_id,
+        &pair,
+    )
+    .await;
     let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
         pair,
         person_id,
@@ -512,7 +523,21 @@ pub async fn sync_person_lock<R: Runtime>(
     let _ = state.inner().clear_person_session().await;
     if forget.unwrap_or(false) {
         let host = crate::host::tauri_host::TauriHost::new(app.clone());
+        // Erase every vault-bound carrier first: leaving one behind would
+        // silently re-install the identity at the next owner-vault unlock. A
+        // failed erase fails the forget rather than reporting success.
+        super::person_vault_carrier::delete_all_person_vault_carriers(
+            &host,
+            &crate::vault_io::StdVaultIo,
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
         super::person_account::forget_person_from_host(&host, &crate::vault_io::StdVaultIo).await?;
+    } else {
+        // An explicit lock must not be silently reversed by the next owner-vault
+        // unlock (myne-md/myne#792 review): record it so the carrier install
+        // stands down until a real (phrase) unlock.
+        state.inner().set_person_explicit_lock().await;
     }
     Ok(())
 }
@@ -674,6 +699,15 @@ pub async fn start_b2b_migration_from_host(
                     sync_state.rekey_rebase_pending = true;
                     let _ = super::state::write_sync_state(io, &root, &sync_state).await;
                 }
+            }
+            // The vault is `NTV6` now: seal the person-identity carrier under the
+            // held root_key so a later unlock installs the session with no phrase
+            // (myne-md/myne#792). Best-effort.
+            if let Some(person_id) = state.clone_person_id().await {
+                super::person_vault_carrier::refresh_carrier_best_effort(
+                    host, io, state, &person_id, &owner,
+                )
+                .await;
             }
             Ok(B2bMigrationView {
                 group_key_epoch: 1,

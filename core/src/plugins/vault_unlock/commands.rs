@@ -436,6 +436,15 @@ pub(crate) async fn run_post_unlock_pipeline(
         stamp_membership_best_effort(host, state, io, keychain).await;
         stamp_person_binding_best_effort(host, state, io).await;
     }
+    // Install the person session from the vault-bound carrier (myne-md/myne#792),
+    // so an NTV6 owner vault syncs without re-entering the identity phrase. Not
+    // under the stamp permit: it writes a device-local carrier file, not
+    // `vault.meta`, and it only reads the already-held `root_key`. Best-effort.
+    // Native-only: the carrier module holds `PersonSessionInstall`, which is
+    // gated off wasm32, so the call site is gated with it.
+    #[cfg(not(target_arch = "wasm32"))]
+    crate::plugins::sync::person_vault_carrier::install_from_carrier_best_effort(host, io, state)
+        .await;
 }
 
 /// The unlock-time membership stamp, extracted so the permit gate above reads

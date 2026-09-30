@@ -24,6 +24,15 @@ export interface SyncPanelRoute {
   /** What `sync_status` reports. */
   readonly syncState?: string;
   readonly betaTermsAccepted?: boolean;
+  /** What `sync_person_status` reports (the Identity block's device-local read).
+   *  Defaults to "no identity on this device". */
+  readonly person?: {
+    readonly enrolled?: boolean;
+    readonly identity_unlocked?: boolean;
+    readonly person_id_hex?: string | null;
+    readonly identity_code?: string | null;
+    readonly sealed_keypair_present?: boolean;
+  };
   /** What `vault_migrate_settle_status` reports. `can_abort` defaults to false. */
   readonly migration?: {
     readonly offerable: boolean;
@@ -44,11 +53,25 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
   const {
     syncState = "not_enrolled",
     betaTermsAccepted = true,
+    person,
     migration = { offerable: false, pending: false },
   } = route;
   return async (cmd: string): Promise<unknown> => {
     if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
       return { can_abort: false, ...migration };
+    }
+    // The Identity block's device-local read. Defaults to "no identity here", so
+    // the block offers the Add CTA; a case that wants the identity surface sets
+    // it.
+    if (cmd === "plugin:sync|sync_person_status") {
+      return {
+        enrolled: false,
+        identity_unlocked: false,
+        person_id_hex: null,
+        identity_code: null,
+        sealed_keypair_present: false,
+        ...person,
+      };
     }
     if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
     // The B2B member roster (myne-md/myne#698). The panel renders whenever the
