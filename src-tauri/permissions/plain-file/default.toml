@@ -4,14 +4,14 @@
 # `plain-file:default` (or the per-command identifiers below).
 #
 # The gate commands read and write the DEVICE-LOCAL `plain-file.json` under
-# `<app_config_dir>` — never vault data, in any vault state. Deliberately
+# `<app_config_dir>`: never vault data, in any vault state. Deliberately
 # main-window-only: there is no second window for this feature, so no other
 # capability may ever grant these.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the plain-file plugin — the device-local gate plus handle-scoped IO for the sandboxed on-disk markdown editor."
+description = "Default permission set for the plain-file plugin: the device-local gate plus handle-scoped IO for the sandboxed on-disk markdown editor."
 permissions = [
     "allow-gate-get",
     "allow-gate-set",

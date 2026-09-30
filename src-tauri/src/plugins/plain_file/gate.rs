@@ -7,7 +7,7 @@
 //! **Its own file, not a `vault.prefs` field, and that is load-bearing rather
 //! than stylistic.** The surface this gate guards must work with the vault
 //! locked and on a device that has no vault at all, and `vault.prefs` is
-//! unreadable in both states — it lives inside the encrypted prefs blob. The
+//! unreadable in both states: it lives inside the encrypted prefs blob. The
 //! grill session had assumed the existing `developer_mode` preference would do
 //! this job; exploration found it is per-vault, so the gate is its own
 //! device-local file, the same class as `tor-routing.json` and
@@ -17,7 +17,7 @@
 //! to disabled.** Failing open would open plaintext on a device whose config
 //! failed to parse, which is the direction this file must never take.
 //!
-//! Errors are closed, `Serialize`, and carry no `String` and no path — a path
+//! Errors are closed, `Serialize`, and carry no `String` and no path: a path
 //! in an error message is a disclosure (`src-tauri/AGENTS.md` DENY list).
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
@@ -87,10 +87,11 @@ pub fn write_gate(path: &Path, enabled: bool) -> Result<(), PlainFileGateError> 
         serde_json::to_vec(&PlainFileGate { enabled }).map_err(|_| PlainFileGateError::Io {
             io_error_kind: IoFailureKind::Other,
         })?;
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, body).map_err(io)?;
-    std::fs::rename(&tmp, path).map_err(io)?;
-    Ok(())
+    // The canonical durable-write helper: temp, fsync, rename, and cleanup on
+    // the failure path. This file is OURS (the app config dir), so the fixed
+    // temp name is safe here; the user-owned destination case is the note path
+    // in `handles.rs`.
+    crate::atomic_write::atomic_write(path, &body, true).map_err(io)
 }
 
 #[cfg(test)]

@@ -25,13 +25,6 @@
 //! count, path and content never appear in an error (a path in an error is a
 //! disclosure, `src-tauri/AGENTS.md` DENY list).
 
-// No production consumer of `open` until the ingress task mints the first
-// handle (the read/write/close commands are wired but nothing can produce a
-// handle yet). Annotated at module level with the consuming task named, rather
-// than left to a blanket allow somewhere up the tree, the `endpoint_config`
-// precedent: an unexplained `allow(dead_code)` is how inert wiring hides.
-#![cfg_attr(not(test), allow(dead_code))]
-
 use super::gate::{gate_path_in, read_gate};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use serde::Serialize;
@@ -45,7 +38,7 @@ pub const ALLOWED_EXTENSIONS: &[&str] = &["md", "markdown"];
 
 /// Failure surface. Closed, so the UI switches on it rather than reading prose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, thiserror::Error)]
-#[serde(tag = "kind")]
+#[serde(tag = "kind", content = "detail", rename_all = "snake_case")]
 pub enum PlainFileError {
     /// The device-local gate is off: no handle is minted.
     #[error("the plain-file editor is off")]
@@ -150,15 +143,20 @@ fn extension_allowed(path: &Path) -> bool {
         .is_some_and(|e| ALLOWED_EXTENSIONS.iter().any(|a| e.eq_ignore_ascii_case(a)))
 }
 
-/// One open handle.
-#[derive(Debug, Clone)]
+/// One open handle. No `Debug`: the path is a DENY-listed emission class.
+#[derive(Clone)]
 struct Entry {
     path: PathBuf,
     eol: Eol,
 }
 
 /// What an open returns.
-#[derive(Debug, Clone, Serialize)]
+///
+/// `rename_all = "camelCase"`: Tauri camel-cases command ARGUMENTS, not
+/// returned structs. Every TS mirror reads `baseHash`, so without this the
+/// compare-and-swap base arrives `undefined` and every autosave rejects.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenedFile {
     /// The opaque handle the frontend passes back to read/write/close.
     pub handle: u64,
@@ -170,8 +168,9 @@ pub struct OpenedFile {
     pub base_hash: String,
 }
 
-/// What a read returns.
-#[derive(Debug, Clone, Serialize)]
+/// What a read returns. `camelCase` for the same reason as [`OpenedFile`].
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileContent {
     /// The file's text, `\n`-normalised.
     pub content: String,
@@ -180,7 +179,8 @@ pub struct FileContent {
 }
 
 /// The handle registry. Held in this plugin's managed state; one per app.
-#[derive(Debug, Default)]
+/// No `Debug`: the entries carry filesystem paths.
+#[derive(Default)]
 pub struct PlainFileRegistry {
     next_id: u64,
     /// Keyed by handle. Values carry the CANONICAL path, so every later IO
@@ -364,20 +364,70 @@ impl PlainFileRegistry {
     }
 }
 
-/// Atomic replace that keeps the destination's permissions.
+/// Atomic replace that keeps the destination's permissions, with an
+/// UNCLOBBERED temp name.
 ///
-/// `atomic_write` alone would commit the temp file's mode, which on a `0600`
-/// note is a silent widening to the umask default. The mode is copied onto
-/// the temp BEFORE the rename, so the destination is never briefly readable.
+/// The fixed `<path>.tmp` name is wrong at a destination the user owns: a real
+/// file they happen to have named that way would be truncated and renamed away,
+/// and a symlink placed there redirects the write. `format/src/atomic_write.rs`
+/// documents exactly this and routes user-owned destinations to
+/// `atomic_write_unclobbered`, so the naming contract is reproduced here
+/// (randomized, `create_new`, bounded retry) with the one addition this caller
+/// needs: the destination's mode is applied to the temp AT CREATION, before any
+/// content exists, so a `0600` note is never briefly wider and a crash cannot
+/// leave a sibling holding the user's text at umask mode.
 fn write_atomic_preserving(path: &Path, bytes: &[u8]) -> Result<(), PlainFileError> {
     let perms = std::fs::metadata(path).map_err(io)?.permissions();
-    let tmp = crate::atomic_write::tmp_path(path);
-    std::fs::write(&tmp, bytes).map_err(io)?;
-    // Best effort: a filesystem that refuses a chmod would otherwise fail the
-    // whole write, and failing here would lose the user's edit to protect a
-    // permission bit. The rename below is the write that matters.
-    let _ = std::fs::set_permissions(&tmp, perms);
-    crate::atomic_write::finalize_atomic(&tmp, path, true).map_err(io)
+    let parent = path.parent().ok_or(PlainFileError::NotAFile)?;
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or(PlainFileError::NotAFile)?;
+    #[cfg(unix)]
+    let mode = {
+        use std::os::unix::fs::PermissionsExt;
+        perms.mode()
+    };
+    let mut last = PlainFileError::Io {
+        io_error_kind: IoFailureKind::Other,
+    };
+    for attempt in 0..16u32 {
+        let tmp = parent.join(format!(".{name}.{}-{attempt}.myne-tmp", std::process::id()));
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        let mut file = match options.open(&tmp) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(io(e)),
+        };
+        #[cfg(not(unix))]
+        if let Err(e) = file.set_permissions(perms.clone()) {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(io(e));
+        }
+        let write_result = (|| -> std::io::Result<()> {
+            use std::io::Write;
+            file.write_all(bytes)?;
+            file.sync_all()
+        })();
+        if let Err(e) = write_result {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(io(e));
+        }
+        match crate::atomic_write::finalize_atomic(&tmp, path, true) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp);
+                last = io(e);
+            }
+        }
+    }
+    Err(last)
 }
 
 #[cfg(test)]

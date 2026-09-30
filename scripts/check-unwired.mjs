@@ -93,7 +93,7 @@ const EXEMPT = new Map([
   ["web/src/platform/window.ts", "platform-seam twin"],
   ["web/src/platform/webviewWindow.ts", "platform-seam twin"],
   ["web/src/platform/deepLink.ts", "platform-seam twin"],
-  ["web/src/platform/plainFile.ts", "platform-seam twin (myne-md/myne#788) — substituted for src/platform/plainFile.ts at web build time"],
+  ["web/src/platform/plainFile.ts", "platform-seam twin (myne-md/myne#788): substituted for src/platform/plainFile.ts at web build time"],
   ["mobile/src/lib/graph-layout.worker.ts", "worker entry — `WikiGraph.tsx` loads it with `new Worker(new URL(…, import.meta.url))`, a real edge that a static import scan cannot see"],
   // Same shape as the mobile twin above, measured the first time `src/notes`
   // joined WATCHED (myne#587): `GraphCanvas.tsx` loads the worker through

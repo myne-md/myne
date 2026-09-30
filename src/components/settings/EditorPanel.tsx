@@ -23,6 +23,7 @@ import {
 import { asViewMode } from "../../editor/view-mode";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
+import { has } from "../../platform/capabilities";
 import { VimModeSettings } from "./VimModeSettings";
 import { PlainFileSettings } from "./PlainFileSettings";
 import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
@@ -419,7 +420,7 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
             gate as vim mode: it opens files OUTSIDE the vault, in plaintext,
             so it stays opt-in per device. Not a vault pref — the switch is
             device-local because the surface works with the vault locked. */}
-        {prefs.developer_mode && <PlainFileSettings />}
+        {prefs.developer_mode && has("plainFile") && <PlainFileSettings />}
         {/* Default view mode (reading-source-modes, MYND-299) - Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />

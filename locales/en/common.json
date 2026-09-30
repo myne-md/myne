@@ -2553,6 +2553,8 @@
     },
     "empty": "No file is open.",
     "marker": "Local file. Not encrypted, and not part of any vault.",
+    "retry": "Try saving again",
+    "saveError": "The file could not be saved. Your edits are still here.",
     "tabs": "Open local files"
   },
   "password": {

@@ -23,7 +23,6 @@ import {
   close,
   edit,
   flushAll,
-  initializePlainFiles,
   resolveReload,
   resolveOverwrite,
   save,
@@ -37,17 +36,10 @@ export function PlainFileScreen() {
   const active = files.find((file) => file.handle === activeHandle) ?? null;
 
   useEffect(() => {
+    // The open subscription + drain live at App level (they must exist before
+    // the first file); this effect only marks which surface owns the host.
     setPlainSurfaceActive(true);
-    let unlisten: (() => void) | null = null;
-    let cancelled = false;
-    void (async () => {
-      const off = await initializePlainFiles();
-      if (cancelled) off();
-      else unlisten = off;
-    })();
     return () => {
-      cancelled = true;
-      unlisten?.();
       setPlainSurfaceActive(false);
       // Best-effort flush on unmount: the autosave idle pass may not have run.
       void flushAll();
@@ -157,6 +149,39 @@ export function PlainFileScreen() {
           );
         })}
       </div>
+
+      {active?.status === "error" && (
+        <div
+          role="alert"
+          data-testid="plain-file.save-error"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-3)",
+            background: "var(--paper-2)",
+            borderBottom: "1px solid var(--line-1)",
+            color: "var(--fg-1)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>{t("plainFile.saveError")}</span>
+          <button
+            data-testid="plain-file.save-error.retry"
+            onClick={() => void save(active.handle)}
+            style={{
+              border: "1px solid var(--line-1)",
+              borderRadius: "var(--radius-2)",
+              background: "var(--paper)",
+              color: "var(--fg-1)",
+              padding: "var(--space-1) var(--space-2)",
+              cursor: "pointer",
+            }}
+          >
+            {t("plainFile.retry")}
+          </button>
+        </div>
+      )}
 
       {active?.status === "conflict" && (
         <div
