@@ -115,7 +115,12 @@ describe("the active tab breaks the strip's bottom rule", () => {
   it("hangs the active tab over the rule and repaints it in the tab's fill", () => {
     setup(); // active is "B", index 1
     const active = tabAt(1);
-    expect(active.style.marginBottom, "the tab must overhang the rule").toBe("-1px");
+    // A HEIGHT, not a negative margin: under the app's global border-box, a
+    // -1px margin on a flex item with an explicit height moves nothing, and
+    // the tab's own bottom border sat one pixel above the rule.
+    expect(active.style.height, "the tab must reach down over the rule").toBe(
+      "calc(100% + 1px)",
+    );
     expect(
       active.style.borderBottom,
       "and repaint that pixel in its own fill, or the rule shows through",
@@ -145,7 +150,7 @@ describe("the active tab breaks the strip's bottom rule", () => {
     // pointing the other way.
     setup();
     for (const i of [0, 2]) {
-      expect(tabAt(i).style.marginBottom, `tab ${i} overhangs the rule`).toBe("");
+      expect(tabAt(i).style.height, `tab ${i} overhangs the rule`).toBe("100%");
       expect(tabAt(i).style.borderBottom, `tab ${i} paints over the rule`).toBe("");
     }
   });
