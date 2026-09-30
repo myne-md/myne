@@ -250,6 +250,7 @@ import {
   HAS_OVERLAY_WINDOW_CONTROLS,
   TITLE_BAR_CONTROL_HEIGHT,
   TITLE_BAR_CONTROL_TOP,
+  TITLE_BAR_RIGHT_EDGE,
   TRAFFIC_LIGHT_GAP,
   dragRegionProps,
 } from "./titlebar";
@@ -2971,8 +2972,9 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 // The left toggle x-offset + left clearance are computed PER-RENDER inside
 // EditorChrome (`leftToggleX` / `leftClearance`) because they depend on the live
 // fullscreen state (the traffic-light gap collapses in fullscreen).
-/** Right toggle's x offset from the right edge. */
-const RIGHT_TOGGLE_X = 8;
+/** Right toggle's x offset from the right edge — shared with the tab strip's
+ *  trailing inset, so the two end the row on one line. */
+const RIGHT_TOGGLE_X = TITLE_BAR_RIGHT_EDGE;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =

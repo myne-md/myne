@@ -158,3 +158,23 @@ describe("the active tab breaks the strip's bottom rule", () => {
     ).toContain("var(--line-1)");
   });
 });
+
+describe("the strip never ends flush against the window edge", () => {
+  // With the right sidebar open nothing floats over the strip's right end, so
+  // `insetRight` is 0 and the tab-list caret was the last control on the row —
+  // pressed against the edge while the right-sidebar toggle, in the other
+  // layout, sits TITLE_BAR_RIGHT_EDGE in. The two now end the row on one line.
+  it("takes the title bar's edge offset when nothing floats beside it", async () => {
+    const { TITLE_BAR_RIGHT_EDGE } = await import("../../src/screens/titlebar");
+    setup({ insetRight: 0 });
+    const strip = screen.getByTestId("editor.tab-strip");
+    expect(strip.style.paddingInlineEnd).toBe(`${TITLE_BAR_RIGHT_EDGE}px`);
+  });
+
+  it("keeps the larger clearance when the floated controls need it", () => {
+    // That clearance already contains the edge offset; adding it again would
+    // leave a gap between the caret and the floated `…`.
+    setup({ insetRight: 76 });
+    expect(screen.getByTestId("editor.tab-strip").style.paddingInlineEnd).toBe("76px");
+  });
+});
