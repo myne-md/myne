@@ -104,6 +104,19 @@ pub enum FailureClass {
     /// retrying cannot help until someone frees something — but they are
     /// different sentences to the user, and only one of them is fixable here.
     StorageFull,
+    /// An `NTV6` vault whose head cannot be signed because no person identity is
+    /// held in this session — the third defect in the same NTV6/identity
+    /// intersection as myne-md/myne#790 and #791. The cycle refuses to author a
+    /// downgraded `0x01` head, which the `0x02` server would reject anyway.
+    ///
+    /// **Not parked.** Every parking class above is parked because no user
+    /// action can be awaited by the scheduler; here the user CAN act (unlock the
+    /// identity, `sync_person_unlock`), but that action has no scheduler edge of
+    /// its own — it is not a lock/unlock/focus/resume/poke — so parking for
+    /// [`AUTH_PARK_MS`] would strand the first successful retry up to fifteen
+    /// minutes after the user fixed it. The ordinary ladder keeps the wait
+    /// bounded at [`FAILURE_RETRY_CAP_MS`] instead.
+    IdentityLocked,
     /// Everything else (bad response, CAS races, protocol errors, local IO).
     Other,
 }
@@ -126,6 +139,9 @@ impl FailureClass {
             FailureClass::StorageFull => "storage_full",
             FailureClass::PayloadTooLarge => "payload_too_large",
             FailureClass::Frozen => "frozen",
+            // Its own tag: the fix is a specific user action (unlock the person
+            // identity), which "sync_failed" would never say.
+            FailureClass::IdentityLocked => "identity_locked",
             // Not "sync_failed": this is the one transport failure the user can
             // act on, and the action is specific (fix the server's certificate, or
             // point the client at a host a public CA will issue for).
@@ -165,6 +181,9 @@ fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
         FailureClass::Transport | FailureClass::Other | FailureClass::PayloadTooLarge => {
             (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
         }
+        // The person-unlock that clears this has no scheduler edge, so it must
+        // NOT park: the ladder's cap bounds the wait after the user acts.
+        FailureClass::IdentityLocked => (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS),
     };
     // 2^(n-1) with a shift guard; n counts from 1 (first failure).
     let n = consecutive_failures.saturating_sub(1).min(16);
@@ -959,6 +978,38 @@ mod tests {
             "the two must not collapse into one message"
         );
         assert_eq!(FailureClass::StorageFull.status_detail(), "storage_full");
+    }
+
+    /// An `NTV6` vault whose signed head cannot be built for lack of a held
+    /// person identity is its own class, NOT the generic "sync failed", and it
+    /// retries on the ladder rather than parking: the unlock that clears it has
+    /// no scheduler edge, so a 15-minute park would delay the first successful
+    /// cycle long after the user acted.
+    #[test]
+    fn a_locked_person_identity_is_named_and_retries_on_the_ladder() {
+        assert_eq!(
+            FailureClass::IdentityLocked.status_detail(),
+            "identity_locked"
+        );
+        assert_ne!(
+            FailureClass::IdentityLocked.status_detail(),
+            FailureClass::Other.status_detail(),
+            "the whole defect was this collapsing into the generic \"sync_failed\""
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::IdentityLocked, 1),
+            FAILURE_RETRY_START_MS,
+            "it must retry on the ladder, not park"
+        );
+        assert_ne!(
+            retry_delay_ms(FailureClass::IdentityLocked, 1),
+            AUTH_PARK_MS,
+            "parking would strand the first retry after the user unlocks the identity"
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::IdentityLocked, 8),
+            FAILURE_RETRY_CAP_MS
+        );
     }
 
     #[test]

@@ -16,6 +16,7 @@ import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
 import { personStatus } from "../../lib/personAccount";
+import { setPersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
@@ -114,7 +115,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // pending?" is asking the one source guaranteed to be silent. Status derives
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
-  const { status: syncStatus } = useSyncStatus();
+  const { status: syncStatus, syncNow } = useSyncStatus();
   useEffect(() => {
     let alive = true;
     void personStatus()
@@ -126,6 +127,23 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       alive = false;
     };
   }, []);
+  // After the identity dialog recovers or creates an identity, the session now
+  // holds it. Reflect that in the shared identity store (the roster's unlock gate
+  // reads it, and without this it stayed on the phrase grid) and kick one cycle
+  // so the status dot clears now rather than at the top of the retry ladder.
+  const handleIdentityCreated = useCallback(() => {
+    setPersonEnrolled(true);
+    void personStatus()
+      .then((s) => {
+        setPersonEnrolled(s.enrolled);
+        setPersonIdentityState({
+          ready: s.identity_unlocked,
+          ownerCode: s.identity_code,
+        });
+      })
+      .catch(() => {});
+    void syncNow();
+  }, [syncNow]);
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
   const betaTerms = useBetaTermsGate();
@@ -369,7 +387,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
-        <SyncStatusIndicator />
+        <SyncStatusIndicator onUnlockIdentity={() => setIdentityOpen(true)} />
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
@@ -431,7 +449,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       <IdentitySetupDialog
         open={identityOpen}
         onClose={() => setIdentityOpen(false)}
-        onCreated={() => setPersonEnrolled(true)}
+        onCreated={handleIdentityCreated}
       />
 
       {/* What that form is replaced BY for a device that is already waiting
