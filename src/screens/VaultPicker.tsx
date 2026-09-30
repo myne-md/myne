@@ -180,11 +180,26 @@ const SUBLINE_STYLE: CSSProperties = {
 // `minHeight: 0` is load-bearing: a flex item's default `min-height: auto`
 // refuses to shrink below its content, which would leave `overflowY` with nothing
 // to do and push the overflow back out to the card.
+/** One vault row's fixed height, shared by the row and the list's cap. */
+const ROW_HEIGHT = 60;
+
+/** Rows shown before the list scrolls. Past four the screen stops being a
+ *  short choice and the actions row drifts toward the fold, so the list caps
+ *  there and scrolls; a short window still shrinks it below the cap. */
+export const VISIBLE_VAULT_ROWS = 4;
+
 const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
   ...fillingScrollRegionStyle,
+  // `flex: 1 1 auto` from the filling style lets it grow to the content; the
+  // cap is what stops a fifth row showing. Account group headers are not in
+  // the arithmetic, so a grouped list shows slightly fewer than four rows,
+  // which errs on the side of scrolling.
+  maxHeight: `calc(${VISIBLE_VAULT_ROWS} * ${ROW_HEIGHT}px + ${VISIBLE_VAULT_ROWS - 1} * var(--space-2))`,
+  flexShrink: 1,
+  flexGrow: 0,
 };
 
 /**
@@ -209,7 +224,7 @@ function rowStyle(hovered: boolean): CSSProperties {
     alignItems: "center",
     justifyContent: "space-between",
     width: "100%",
-    height: 60,
+    height: ROW_HEIGHT,
     boxSizing: "border-box",
     padding: "var(--space-3) var(--space-4)",
     borderRadius: "var(--radius-2)",

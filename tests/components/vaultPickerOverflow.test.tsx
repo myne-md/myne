@@ -30,7 +30,7 @@ vi.mock("../../src/lib/vault-list", async () => {
   return { ...actual, listVaults: (...a: unknown[]) => listVaults(...a) };
 });
 
-import { VaultPicker } from "../../src/screens/VaultPicker";
+import { VaultPicker, VISIBLE_VAULT_ROWS } from "../../src/screens/VaultPicker";
 import type { VaultSummary } from "../../src/types/vault-summary";
 
 afterEach(() => {
@@ -90,6 +90,12 @@ describe("VaultPicker at a vault count that overflows the window", () => {
     const list = screen.getAllByTestId("picker.vault-row")[0]!.parentElement!;
     expect(list.style.overflowY).toBe("auto");
     expect(list.style.minHeight).toBe("0px");
+    // And it scrolls past four rows even in a tall window, rather than only
+    // once the window runs out: the cap is four rows and three gaps.
+    expect(list.style.maxHeight).toBe(
+      `calc(${VISIBLE_VAULT_ROWS} * 60px + ${VISIBLE_VAULT_ROWS - 1} * var(--space-2))`,
+    );
+    expect(VISIBLE_VAULT_ROWS).toBe(4);
   });
 
   it("keeps the heading and the three actions out of the shrink", async () => {
