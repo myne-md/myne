@@ -101,6 +101,19 @@ export function PlainFileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    // `pagehide` is the last event WebKit reliably fires on an app quit
+    // (Cmd+Q does not route through `onCloseRequested` above). It cannot
+    // await, so the write races process teardown and may lose; the intercept
+    // is the real flush point. This is the same best-effort arm the vault
+    // editor has, not a second guarantee.
+    const onPageHide = () => {
+      void flushAll();
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, []);
+
   // The plain surface's own exit intercept (myne-md/myne#788). `Editor.tsx`
   // has the desktop's real close-intercept, but it lives on the editor screen
   // and the editor screen is NOT mounted while this surface is up (`App.tsx`
