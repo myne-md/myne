@@ -3908,6 +3908,7 @@
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen: uploads paused",
+      "errorIdentityLocked": "Unlock your identity to sync",
       "errorDeviceRevoked": "This device was removed from your account",
       "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "errorStorageFull": "Storage full: syncing paused",
@@ -3919,7 +3920,8 @@
       "off": "Sync off",
       "synced": "Synced",
       "syncing": "Syncing…",
-      "syncNow": "Sync now"
+      "syncNow": "Sync now",
+      "unlockIdentityCta": "Unlock identity"
     },
     "usage": {
       "devices": "Devices",

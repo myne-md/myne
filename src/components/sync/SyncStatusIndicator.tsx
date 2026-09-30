@@ -89,6 +89,17 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "frozen") {
         return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorFrozen") };
       }
+      // A shared (`NTV6`) vault refuses to sync until the person identity is
+      // unlocked for this session. Separate copy because the
+      // fix is a specific user action, and "Sync error" would send them looking
+      // at the network instead. The unlock control lives in this same Sync panel
+      // (the member roster's identity step).
+      if (status.detail === "identity_locked") {
+        return {
+          dotColor: "var(--warning)",
+          label: i18n.t("sync.status.errorIdentityLocked"),
+        };
+      }
       // Task 94. NOT folded into `auth_failed`: that copy says the sign-in
       // expired and points at re-enrolling, which is the wrong instruction for a
       // device the account owner deliberately removed from another client. The
@@ -117,17 +128,32 @@ function present(status: SyncStatus | null): Presentation {
   }
 }
 
-export function SyncStatusIndicator() {
+export interface SyncStatusIndicatorProps {
+  /**
+   * Offered only while sync is parked on a locked person identity (`NTV6`, the
+   * `identity_locked` detail): opens the identity setup/recover dialog. Optional
+   * so an isolated render (a component test) still shows just the label.
+   */
+  onUnlockIdentity?: () => void;
+}
+
+export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorProps = {}) {
   const { t } = useTranslation();
   const { status, syncNow, busy } = useSyncStatus();
   const { dotColor, label } = present(status);
+  const identityLocked =
+    status?.state === "error" && status.detail === "identity_locked";
   // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this
   // device is not enrolled — a cycle there returns NotReady (→ not_enrolled), not a
   // real sync, so the button would be a false promise (and would flash "Synced").
+  // A locked person identity is the same kind of "not yet": the cycle refuses
+  // before any network call, so "Sync now" cannot help until the identity is
+  // unlocked — the unlock button below is the honest action there instead.
   const hideSyncNow =
     status?.state === "disabled" ||
     status?.state === "not_enrolled" ||
-    status?.state === "pending";
+    status?.state === "pending" ||
+    identityLocked;
 
   return (
     <div style={ROOT_STYLE} data-testid="sync.status-indicator" data-sync-state={status?.state ?? "loading"}>
@@ -135,6 +161,20 @@ export function SyncStatusIndicator() {
       <span style={LABEL_STYLE} data-testid="sync.status-label">
         {label}
       </span>
+      {identityLocked && onUnlockIdentity && (
+        <button
+          type="button"
+          style={BUTTON_STYLE}
+          {...hoverSurface({
+            restBg: "var(--bg-2)",
+            hoverBg: "var(--paper-3)",
+          })}
+          onClick={onUnlockIdentity}
+          data-testid="sync.unlock-identity"
+        >
+          {t("sync.status.unlockIdentityCta")}
+        </button>
+      )}
       {!hideSyncNow && (
         <button
           type="button"

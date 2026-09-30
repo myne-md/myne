@@ -535,12 +535,24 @@ pub async fn run_active_cycle_from_host(
             .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
             .unwrap_or(false);
         if is_ntv6 && signed_ctx.is_none() {
+            // A missing person identity is the one cause of `signed_ctx == None`
+            // the user can fix in place (unlock the identity), so it gets its own
+            // class and the UI its own sentence. Any OTHER
+            // reason the head context could not be built (roster, group key)
+            // stays a generic failure — that fix is not something to ask of them.
+            let has_person = state.clone_person_identity().await.is_some();
+            let class = if has_person {
+                super::loop_control::FailureClass::Other
+            } else {
+                super::loop_control::FailureClass::IdentityLocked
+            };
             tracing::warn!(
                 stage = "sync_cycle",
                 event = "ntv6_head_unsigned",
-                "NTV6 vault without a held person identity; refusing to author a downgraded head"
+                person_identity_held = has_person,
+                "NTV6 vault whose signed head context could not be built; refusing to author a downgraded head"
             );
-            return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            return CycleOutcome::Failed(class);
         }
     }
 
