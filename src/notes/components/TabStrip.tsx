@@ -848,7 +848,11 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
         display: "flex",
         alignItems: "center",
         gap: 6,
-        height: "100%",
+        // The active tab's covering pixel (see the tab style above): the chip
+        // IS the selected tab while a new tab is pending, so it owes the same
+        // one-pixel overhang or the strip's rule shows through it.
+        height: "calc(100% + 1px)",
+        borderBottom: "1px solid var(--bg-1)",
         padding: "0 6px 0 10px",
         borderTopLeftRadius: 8,
         borderTopRightRadius: 8,

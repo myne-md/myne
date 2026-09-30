@@ -113,12 +113,12 @@ export interface PasswordInputProps {
   testId?: string;
 }
 
+// Sentence case, the label every first-run form uses (Welcome through the
+// join screen). The uppercase tracked label this replaced was the one caps
+// line left on those screens once the rest had moved.
 const labelStyle: CSSProperties = {
-  fontSize: 12,
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  fontWeight: "var(--weight-semibold)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
 };
 
 /**

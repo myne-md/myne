@@ -15,6 +15,7 @@
 // the query is never a mystery. Per-keystroke note search is debounced +
 // generation-guarded (a stale response never overwrites a fresher one).
 
+import { recordCommandRun } from "../lib/commandRecency";
 import {
   Fragment,
   useCallback,
@@ -688,6 +689,7 @@ export function CommandPalette({
       if (row.kind === "action") {
         if (row.visibility === "disabled") return;
         close();
+        recordCommandRun(row.action.id);
         try {
           await row.action.run({ ...ctx, activatedByKey: viaKey });
         } catch {

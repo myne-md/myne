@@ -144,12 +144,22 @@ const HELP: CSSProperties = {
 };
 
 const FIELD: CSSProperties = { display: "flex", flexDirection: "column", gap: 6 };
+/** Sentence case, like every other first-run field label. */
 const LABEL: CSSProperties = {
-  fontSize: 12,
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  fontWeight: "var(--weight-semibold)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+};
+
+/** The raised surface the form's fields sit on, the one every first-run step
+ *  puts its working content on. */
+const FIELDS_CARD: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-4)",
+  padding: "var(--space-5)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-3)",
 };
 
 /** The waiting screen's second door, set apart by a rule so it reads as an
@@ -671,6 +681,7 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
         </h2>
         <p style={HELP}>{t("sync.join.help")}</p>
 
+        <div style={FIELDS_CARD}>
         <div style={FIELD}>
           <label style={LABEL} htmlFor={`${baseId}-url`}>
             {t("sync.join.serverLabel")}
@@ -771,6 +782,7 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
             />
           </>
         )}
+        </div>
 
         {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
 
@@ -792,27 +804,25 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
             testIdPrefix="join"
           />
         ) : (
-          <div style={ROW}>
-            <button
-              type="button"
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button
+              variant="ghost"
+              icon="arrow-left"
               onClick={onCancel}
               disabled={busy}
-              style={btn(false, busy)}
-              {...btnHover(false, busy)}
               data-testid="join.cancel"
             >
-              {t("sync.join.cancel")}
-            </button>
-            <button
-              type="button"
+              {t("sync.join.back")}
+            </Button>
+            <div style={{ flex: 1 }} />
+            <Button
+              variant="primary"
               onClick={submit}
               disabled={!canSubmit}
-              style={btn(true, !canSubmit)}
-              {...btnHover(true, !canSubmit)}
               data-testid="join.submit"
             >
               {busy ? t("sync.join.submitting") : t("sync.join.submit")}
-            </button>
+            </Button>
           </div>
         )}
     </JoinScreen>

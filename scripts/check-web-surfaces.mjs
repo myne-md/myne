@@ -202,6 +202,7 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
     "The pop-out spawn binding (myne#173). The `detached-window` plugin is `Class::Unsupported` in web/wasm/src/capability.rs (a browser page cannot open an OS window), so its one command answers the typed unsupported refusal; the affordance is also gated off, since `detachedWindows` is absent on web.",

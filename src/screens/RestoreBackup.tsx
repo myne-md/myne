@@ -172,16 +172,24 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 </>
               )}
             </div>
+            {/* Back on the left, the step's action on the right: the footer
+                every first-run step uses. */}
             <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Button
+                variant="ghost"
+                icon="arrow-left"
+                onClick={onExit}
+                data-testid="restore.back"
+              >
+                {backLabel}
+              </Button>
+              <div style={{ flex: 1 }} />
               <Button
                 variant="primary"
                 onClick={() => void pickFile()}
                 data-testid="restore.pick-file"
               >
                 {t("restore.pick.chooseFile")}
-              </Button>
-              <Button variant="secondary" onClick={onExit} data-testid="restore.back">
-                {backLabel}
               </Button>
             </div>
           </>

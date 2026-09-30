@@ -47,7 +47,6 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
     <StepLayout>
       <StepCounter
         step="password"
-        icon="lock"
         label={t("vaultCreation.password.eyebrowLabel")}
       />
       <StepHeading>{t("vaultCreation.password.heading")}</StepHeading>
@@ -66,20 +65,20 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
             <ErrorBanner error={error} />
           ) : undefined
         }
+        fieldsCard
         helperCopy={
+          // Quiet text rather than a boxed alert: the briefing already asked the
+          // user to acknowledge this, so here it is a reminder, not a warning.
+          // The sentence itself is load-bearing and stays verbatim.
           <div
             style={{
-              padding: "var(--space-3)",
-              background: "var(--paper-2)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
               fontSize: "var(--text-sm)",
               lineHeight: 1.6,
               color: "var(--fg-2)",
             }}
           >
             {t("vaultCreation.password.helperLead")}{" "}
-            <strong style={{ color: "var(--fg-1)" }}>
+            <strong style={{ color: "var(--fg-1)", fontWeight: "var(--weight-medium)" }}>
               {LOST_BOTH_SECRETS_SENTENCE}
             </strong>
           </div>
