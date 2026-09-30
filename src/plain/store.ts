@@ -426,7 +426,16 @@ export function resolveOverwrite(handle: number): void {
  * text that exists only in RAM without telling the user.
  */
 export function unsettledTabs(): PlainFile[] {
-  return state.files.filter((file) => file.status === "conflict" || file.status === "error");
+  return state.files.filter(
+    (file) =>
+      file.status === "conflict" ||
+      file.status === "error" ||
+      // A buffer that moved on while a save was in flight, or one still in
+      // flight, has not landed either: destroying the window over it drops
+      // text the user typed. The intercept asks rather than assumes.
+      file.status === "editing" ||
+      file.status === "saving",
+  );
 }
 
 /** What the conflict banner's copy arm decided. */
@@ -479,7 +488,13 @@ export async function close(handle: number): Promise<void> {
   clearMaxTimer(handle);
   await save(handle).catch(() => undefined);
   const settled = find(handle);
-  if (settled && (settled.status === "conflict" || settled.status === "error")) {
+  if (
+    settled &&
+    (settled.status === "conflict" ||
+      settled.status === "error" ||
+      settled.status === "editing" ||
+      settled.status === "saving")
+  ) {
     // Closing here would destroy the only copy of the user's text: neither
     // state has a successful write behind it. Keep the tab; the banner owns
     // the resolution.

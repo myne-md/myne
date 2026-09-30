@@ -410,17 +410,27 @@ describe("the + menu stays open behind the field editor (myne-md/myne#656)", () 
   });
 
   it("a commit keeps the menu open for a second field", () => {
-    openMenu("- [ ] pay the rent\n");
-    menuRow("due").click();
-    // The due control is the Myne calendar (myne#614): pick a day button.
-    const day = document.querySelector<HTMLButtonElement>(
-      'button.cm-date-day[data-date="2026-09-09"]',
-    );
-    expect(day).not.toBeNull();
-    day!.click();
-    commit();
-    expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
-    expect(menu()).not.toBeNull();
+    // The due control is the Myne calendar (myne#614), and it opens on the
+    // CURRENT month, so the pinned day below only exists in the DOM while the
+    // clock is inside that month. Found on 2026-10-01: the test passed
+    // through September and fails from October on. Pinning the clock is what
+    // the skip-row suite above already does for the same reason.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 9, 12, 0, 0)); // 2026-09-09, local
+    try {
+      openMenu("- [ ] pay the rent\n");
+      menuRow("due").click();
+      const day = document.querySelector<HTMLButtonElement>(
+        'button.cm-date-day[data-date="2026-09-09"]',
+      );
+      expect(day).not.toBeNull();
+      day!.click();
+      commit();
+      expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
+      expect(menu()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("writes the REAL kind, not the menu handle's placeholder `repeat`", () => {
