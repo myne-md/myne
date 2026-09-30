@@ -95,22 +95,26 @@ describe("VaultPicker at a vault count that overflows the window", () => {
   it("keeps the heading and the three actions out of the shrink", async () => {
     // If the chrome shrank too, a tall list would compress the heading and the
     // actions instead of scrolling, so the same rows are lost in a different
-    // way. The three actions moved into the shell's top bar, which is where
-    // they are now held out of the shrink — as a row, rather than one button at
-    // a time. They must still be REACHABLE at any vault count, which is most of
-    // what moving them out of the list's column bought.
-    const root = await renderPicker();
+    // way. The three actions sit as one labelled row directly UNDER the list
+    // (they were icon-only in the shell's top bar for a round); the row is held
+    // out of the shrink, so at any vault count the list scrolls and the row
+    // stays on screen beneath it.
+    await renderPicker();
     for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
       expect(screen.getByTestId(testId), `${testId} is gone`).toBeTruthy();
     }
-    const header = root.querySelector("header") as HTMLElement;
-    expect(header.style.flexShrink, "the top bar must not compress").toBe("0");
-    // The actions row, not the button: an icon button that carries a tooltip is
-    // wrapped by the tooltip's own span, so the button's parent is that wrapper
-    // rather than the row. Reaching for the row by position says what is meant.
-    const actions = header.lastElementChild as HTMLElement;
-    expect(actions.contains(screen.getByTestId("picker.create-cta"))).toBe(true);
-    expect(actions.style.flexShrink).toBe("0");
+    const actions = screen.getByTestId("picker.actions");
+    for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
+      expect(actions.contains(screen.getByTestId(testId)), `${testId} left the row`).toBe(true);
+    }
+    expect(actions.style.flexShrink, "the actions row must not compress").toBe("0");
+    // Under the list, not above it: the row follows the scrolling list in
+    // document order, so it reads as "or add another".
+    const firstRow = screen.getAllByTestId("picker.vault-row")[0]!;
+    expect(
+      firstRow.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the actions row must come after the vault list",
+    ).toBeTruthy();
     // The heading's GROUP, not the `<h1>`. The title and its subtitle are one
     // block now (they were two siblings a section-gap apart), so the group is
     // the flex item the column sizes — `flex-shrink` on a child of it means

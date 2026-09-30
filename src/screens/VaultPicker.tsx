@@ -56,7 +56,7 @@ import { Icon } from "../components/primitives/Icon";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
 import { AuthHeading, AuthShell } from "./AuthShell";
 import { HOVER_TRANSITION } from "../components/primitives/hoverSurface";
-import { IconButton } from "../components/primitives/IconButton";
+import { Button } from "../components/primitives/Button";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import {
@@ -373,7 +373,6 @@ function PickerCard({
       // arrive. The one route in that is not a step backwards — cold boot —
       // has nothing on screen before it to move away from.
       enter="back"
-      actions={actions}
       // The mark sits centred above the question, as on Unlock and Welcome, so
       // the three screens a returning user meets share one shape.
       brand={false}
@@ -385,6 +384,20 @@ function PickerCard({
         {subline}
       </AuthHeading>
       {children}
+      {actions != null && (
+        <div
+          data-testid="picker.actions"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "var(--space-2)",
+            flexShrink: 0,
+          }}
+        >
+          {actions}
+        </div>
+      )}
     </AuthShell>
   );
 }
@@ -397,18 +410,14 @@ function PickerCard({
  *  be offered wherever creation is, or it is reachable on a fresh machine and
  *  nowhere else). */
 /**
- * The three ways to get a vault onto this device, as top-right page chrome.
+ * The three ways to get a vault onto this device, as one row of labelled ghost
+ * buttons directly under the vault list.
  *
- * They were a divider and three full-width accent links under the vault list,
- * which put three calls to action below the one list the screen exists to
- * present — and on a device with enough vaults to scroll, they sat below the
- * fold of the thing they were competing with. As icon buttons in the top bar
- * they are available without arguing with the list, which is the trade a
- * secondary action should make.
- *
- * Icon-only, so each carries its label as a tooltip AND as its accessible
- * name: `tooltip` on `<IconButton>` is the convention that keeps those two the
- * same string rather than two strings that drift.
+ * They were icon-only buttons in the shell's top-right corner for a round,
+ * which kept them out of the list's way but made three unlabelled glyphs the
+ * only door to creating, joining or restoring, far from the list they add to.
+ * Under the list, labelled, and quiet (ghost, not accent), they read as "or add
+ * another" without competing with the rows above them.
  */
 function CreateAnother({
   onClick,
@@ -422,27 +431,33 @@ function CreateAnother({
   const { t } = useTranslation();
   return (
     <>
-      <IconButton
+      <Button
+        variant="ghost"
         icon="plus"
-        label={t("vaultPicker.createAnother")}
-        tooltip
         onClick={onClick}
-        testId="picker.create-cta"
-      />
-      <IconButton
+        title={t("vaultPicker.createAnother")}
+        data-testid="picker.create-cta"
+      >
+        {t("vaultPicker.createShort")}
+      </Button>
+      <Button
+        variant="ghost"
         icon="link"
-        label={t("vaultPicker.joinDevice")}
-        tooltip
         onClick={onJoinDevice}
-        testId="picker.join-cta"
-      />
-      <IconButton
+        title={t("vaultPicker.joinDevice")}
+        data-testid="picker.join-cta"
+      >
+        {t("vaultPicker.joinShort")}
+      </Button>
+      <Button
+        variant="ghost"
         icon="download"
-        label={t("vaultPicker.restoreFromBackup")}
-        tooltip
         onClick={onRestoreBackup}
-        testId="picker.restore-cta"
-      />
+        title={t("vaultPicker.restoreFromBackup")}
+        data-testid="picker.restore-cta"
+      >
+        {t("vaultPicker.restoreShort")}
+      </Button>
     </>
   );
 }
