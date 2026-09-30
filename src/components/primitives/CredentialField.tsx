@@ -28,8 +28,10 @@
 // motion exemption, because a `<Spinner>` is the app's shared one and already
 // holds its own.
 
-import { useId, type InputHTMLAttributes, type ReactNode } from "react";
+import { useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
+import { IconButton } from "./IconButton";
 import { Input } from "./Input";
 import { Spinner } from "../Spinner";
 
@@ -57,7 +59,37 @@ interface CredentialFieldProps {
   >;
   testId?: string;
   submitTestId?: string;
+  /**
+   * Offer an eye toggle inside the field that shows the typed value in the
+   * clear and hides it again. The two strings are the toggle's accessible name
+   * in each state ("Show password" / "Hide password"). Absent means no toggle.
+   */
+  reveal?: { show: string; hide: string };
 }
+
+const STATUS_STYLE = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-3)",
+  textAlign: "center",
+} as const;
+
+/** The eye, pinned inside the field's end edge and centred on its height. */
+const REVEAL_SLOT_STYLE = {
+  position: "absolute",
+  insetInlineEnd: 4,
+  top: "50%",
+  transform: "translateY(-50%)",
+  display: "flex",
+} as const;
+
+/** A square icon button, as tall as the field beside it. */
+const SUBMIT_STYLE = {
+  flexShrink: 0,
+  width: 40,
+  padding: 0,
+  justifyContent: "center",
+} as const;
 
 export function CredentialField({
   value,
@@ -72,37 +104,80 @@ export function CredentialField({
   inputProps,
   testId,
   submitTestId,
+  reveal,
 }: CredentialFieldProps) {
   const describedBy = useId();
+  const [revealed, setRevealed] = useState(false);
+  // Revealing swaps the field's type; hiding restores whatever the caller
+  // asked for (always `password` today).
+  const type = reveal && revealed ? "text" : inputProps?.type;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      <Input
-        {...inputProps}
-        value={value}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        disabled={busy}
-        aria-label={ariaLabel}
-        invalid={invalid}
-        aria-describedby={footer != null ? describedBy : undefined}
-        placeholder={placeholder}
-        data-testid={testId}
-      />
+      {/* The field and its submit on one line: an arrow beside the input is the
+          whole instruction, where a full-width labelled button under it said
+          the same thing a second time. The button's accessible name is still
+          the label ("Unlock", "Unlock with PIN") and becomes the busy label
+          while the KDF runs, so a screen reader hears what the spinner shows. */}
+      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
+        <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex" }}>
+          <Input
+            {...inputProps}
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.currentTarget.value)}
+            disabled={busy}
+            aria-label={ariaLabel}
+            invalid={invalid}
+            aria-describedby={footer != null ? describedBy : undefined}
+            placeholder={placeholder}
+            data-testid={testId}
+            // Room on the right for the eye, so a long value never runs under it.
+            style={{ flex: 1, minWidth: 0, ...(reveal ? { paddingInlineEnd: 36 } : null) }}
+          />
+          {reveal && (
+            <span style={REVEAL_SLOT_STYLE}>
+              <IconButton
+                icon={revealed ? "eye-off" : "eye"}
+                label={revealed ? reveal.hide : reveal.show}
+                onClick={() => setRevealed((r) => !r)}
+                disabled={busy}
+                active={revealed}
+                testId={testId ? `${testId}-reveal` : undefined}
+              />
+            </span>
+          )}
+        </div>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={busy || value.length === 0}
+          aria-label={busy ? busyLabel : submitLabel}
+          title={submitLabel}
+          style={SUBMIT_STYLE}
+          data-testid={submitTestId}
+        >
+          {busy ? (
+            // Decorative here: the status line below is the announcement, and a
+            // second `role="status"` would make a screen reader say it twice.
+            <span aria-hidden="true" style={{ display: "flex" }}>
+              <Spinner size={14} style={{ borderWidth: 2 }} />
+            </span>
+          ) : (
+            <Icon name="arrow-right" size={16} />
+          )}
+        </Button>
+      </div>
+      {/* The wait in words. The button shrank to an arrow, so the label that
+          used to say "Decrypting…" inside it now says it under the field: the
+          KDF runs for seconds, and a spinner alone gives a sighted user no word
+          and a screen-reader user nothing at all. `role="status"` announces it. */}
+      {busy && (
+        <p role="status" data-testid={testId ? `${testId}-status` : undefined} style={STATUS_STYLE}>
+          {busyLabel}
+        </p>
+      )}
       {footer != null && <div id={describedBy}>{footer}</div>}
-      <Button
-        type="submit"
-        variant="primary"
-        disabled={busy || value.length === 0}
-        // Full width, which `.myne-btn` is not by default — it is an
-        // inline-flex control sized to its label, correct in a toolbar and
-        // wrong as the one action on a screen. Centred with it, or the label
-        // sits left in a button the width of the field.
-        style={{ width: "100%", justifyContent: "center" }}
-        data-testid={submitTestId}
-      >
-        {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
-        {busy ? busyLabel : submitLabel}
-      </Button>
     </div>
   );
 }

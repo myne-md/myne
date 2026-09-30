@@ -67,27 +67,17 @@ afterEach(() => {
 });
 
 describe("the way back sits with the question it answers", () => {
-  it("is in the content column, not in the page's top bar", async () => {
+  it("sits in the top-left corner of the screen (#772)", async () => {
+    // Moved on request: with the centred mark above the question, the corner
+    // is empty, and the top-left is where a back control is looked for. It is
+    // the header's start slot, never the end one beside global actions.
     const { container } = renderWithTwoVaults();
     const back = await screen.findByTestId("unlock.back-to-picker");
     const header = container.querySelector("header") as HTMLElement;
-    const main = container.querySelector("main") as HTMLElement;
-    expect(header, "the shell has no header").not.toBeNull();
-    expect(header.contains(back), "the back control is up in the chrome").toBe(false);
-    expect(main.contains(back), "the back control is not in the task column").toBe(true);
-  });
-
-  it("comes before the heading in reading order", async () => {
-    renderWithTwoVaults();
-    // `compareDocumentPosition` rather than an index: the suspicion banner
-    // renders between the two whenever it fires, so a positional assertion
-    // would be about a layout that only sometimes exists.
-    const back = await screen.findByTestId("unlock.back-to-picker");
-    const heading = screen.getByRole("heading", { level: 1 });
-    expect(
-      back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
-      "the escape must be met before the demand",
-    ).toBeTruthy();
+    expect(header.contains(back), "the back control is not in the top bar").toBe(true);
+    expect(header.firstElementChild?.contains(back), "the back control is not at the start").toBe(
+      true,
+    );
   });
 
   it("is a labelled control, not a bare glyph", async () => {
@@ -117,22 +107,10 @@ describe("the way back sits with the question it answers", () => {
     void container;
   });
 
-  it("sits against the heading rather than a full section above it", async () => {
-    // The content column's `gap` is the distance between SECTIONS, and the
-    // back control is not one: it is the escape from the question the heading
-    // asks. At the full gap it floated midway between the wordmark and the
-    // title with equal claim on both, and the screen read as three evenly
-    // spaced strangers.
+  it("keeps the title and its subtitle as one tight pair", async () => {
     renderWithTwoVaults();
-    const back = await screen.findByTestId("unlock.back-to-picker");
-    const pull = back.style.marginBlockEnd;
-    expect(pull, "the back control takes the whole section gap").toBeTruthy();
-    // Negative, i.e. it pulls UP against that gap. A positive margin here adds
-    // to the distance, which is the defect wearing the fix's clothes.
-    expect(pull.includes("-1") || pull.trimStart().startsWith("-"), pull).toBe(true);
-
-    // And the heading's own pair is tighter still, so the three distances on
-    // this screen are unequal by construction: lead-in, title+subtitle, form.
+    await screen.findByTestId("unlock.back-to-picker");
+    // The heading's own pair is tighter than the section gap around it.
     const heading = screen.getByRole("heading", { level: 1 });
     const group = heading.parentElement as HTMLElement;
     expect(group.style.gap, "the title and its subtitle are a section apart").toBe(
@@ -210,19 +188,18 @@ describe("the way back sits with the question it answers", () => {
     expect(css, "the scrim outlived the field").not.toContain(".myne-auth-view::before");
   });
 
-  it("offers the alternatives as one row, with destruction below a rule", async () => {
-    // Three centred links at near-identical weight, one of them destructive
-    // and red, is what made this screen read as a menu to work through. They
-    // are alternatives to the same act, so they are a row; deleting the vault
-    // is not a third way to open it, so it is not in that row.
+  it("offers the alternatives one per line, with destruction below a rule", async () => {
+    // Two sentences side by side read as one run of link text with no seam, so
+    // each alternative takes its own line. Deleting the vault is not a way to
+    // open it, so it is not among them.
     renderWithTwoVaults();
     const recovery = await screen.findByTestId("unlock.recovery-link");
     const row = screen.getByTestId("unlock.alt-row");
-    expect(row.contains(recovery), "the alternatives are not on the row").toBe(true);
+    expect(row.contains(recovery), "the alternatives are not grouped").toBe(true);
     expect(row.style.display).toBe("flex");
-    // It wraps, or a long translation clips: two of these strings are
-    // sentences and German runs long.
-    expect(row.style.flexWrap).toBe("wrap");
+    expect(row.style.flexDirection).toBe("column");
+    // And each reads as a link on hover: the class carries the underline.
+    expect(recovery.className).toContain("myne-text-link");
 
     const del = screen.getByTestId("unlock.delete-link");
     expect(row.contains(del), "destruction is offered as an alternative").toBe(false);

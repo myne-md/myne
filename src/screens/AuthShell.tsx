@@ -122,6 +122,7 @@ const VIEW_STYLE: CSSProperties = {
 
 export function AuthShell({
   actions,
+  leading,
   brand = true,
   enter = "forward",
   align = "center",
@@ -135,6 +136,9 @@ export function AuthShell({
    *  header row itself stays: it carries `actions` and the window's drag
    *  height either way. */
   brand?: boolean;
+  /** The header's start-edge slot, shown in place of the brand when `brand`
+   *  is off: Unlock puts its way back to the vault picker here. */
+  leading?: ReactNode;
   enter?: AuthEnter;
   /**
    * Where the content column sits vertically.
@@ -159,7 +163,7 @@ export function AuthShell({
             <span style={WORDMARK_STYLE}>Myne</span>
           </div>
         ) : (
-          <div />
+          <div style={BRAND_STYLE}>{leading}</div>
         )}
         {actions != null && <div style={ACTIONS_STYLE}>{actions}</div>}
       </header>

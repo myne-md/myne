@@ -85,7 +85,7 @@
   "src/screens/DeviceRevoked.tsx": 1,
   "src/screens/Editor.tsx": 13,
   "src/screens/StorageLost.tsx": 2,
-  "src/screens/Unlock.tsx": 5,
+  "src/screens/Unlock.tsx": 1,
   "src/screens/VaultPicker.tsx": 4,
   "src/screens/WebNoAccount.tsx": 1,
   "src/screens/vault-creation/BriefingStep.tsx": 1,

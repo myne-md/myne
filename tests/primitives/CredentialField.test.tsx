@@ -43,15 +43,45 @@ describe("it is the app's primitives, not a second design", () => {
     expect(submit.getAttribute("data-variant")).toBe("primary");
   });
 
-  it("gives the button the width of the field", () => {
-    // `.myne-btn` is inline-flex and sized to its label — correct in a toolbar,
-    // wrong as the one action on a screen, where it would sit as a small chip
-    // under a full-width input.
+  it("sits beside the field as an arrow, named by its label", () => {
+    // One line: the field and an arrow to submit it. The arrow is the whole
+    // visible instruction, so the label moves to the accessible name rather
+    // than disappearing.
     render(<Field value="hunter2" />);
     const submit = screen.getByTestId("cred.submit");
-    expect(submit.style.width).toBe("100%");
-    // And centred with it, or the label sits left in a full-width button.
-    expect(submit.style.justifyContent).toBe("center");
+    const input = screen.getByTestId("cred.input");
+    // The input sits in its own wrapper (the slot the eye toggle hangs in),
+    // and that wrapper shares the row with the submit.
+    expect(submit.parentElement, "the submit left the field's row").toBe(
+      input.parentElement?.parentElement,
+    );
+    expect(submit.getAttribute("aria-label")).toBe("Unlock");
+    expect(submit.querySelector("svg"), "the arrow is missing").not.toBeNull();
+    expect(input.style.flex).toContain("1");
+  });
+
+  it("offers an eye that shows and hides the value when asked to", () => {
+    render(
+      <Field
+        value="hunter2"
+        inputProps={{ type: "password" }}
+        reveal={{ show: "Show password", hide: "Hide password" }}
+      />,
+    );
+    const input = screen.getByTestId("cred.input") as HTMLInputElement;
+    const eye = screen.getByTestId("cred.input-reveal");
+    expect(input.type).toBe("password");
+    expect(eye.getAttribute("aria-label")).toBe("Show password");
+    fireEvent.click(eye);
+    expect(input.type).toBe("text");
+    expect(screen.getByTestId("cred.input-reveal").getAttribute("aria-label")).toBe("Hide password");
+    fireEvent.click(screen.getByTestId("cred.input-reveal"));
+    expect(input.type).toBe("password");
+  });
+
+  it("offers no eye unless asked", () => {
+    render(<Field value="hunter2" />);
+    expect(screen.queryByTestId("cred.input-reveal")).toBeNull();
   });
 });
 
@@ -80,7 +110,9 @@ describe("one indicator for the wait", () => {
     // whose normal case is several seconds of nothing happening.
     render(<Field value="hunter2" busy />);
     const submit = screen.getByTestId("cred.submit") as HTMLButtonElement;
-    expect(submit.textContent).toContain("Decrypting…");
+    // In words on screen, announced, and on the button's name.
+    expect(screen.getByRole("status").textContent).toBe("Decrypting…");
+    expect(submit.getAttribute("aria-label")).toBe("Decrypting…");
     expect(submit.disabled).toBe(true);
     // The field locks too, so a second attempt cannot race the in-flight one.
     expect((screen.getByTestId("cred.input") as HTMLInputElement).disabled).toBe(true);
@@ -97,19 +129,16 @@ describe("one indicator for the wait", () => {
 });
 
 describe("the error belongs to the field, not to the retry", () => {
-  it("renders the footer between the input and the button, and describes the input with it", () => {
+  it("renders the footer under the field's row, and describes the input with it", () => {
     render(<Field value="hunter2" invalid footer={<p>Wrong password</p>} />);
     const input = screen.getByTestId("cred.input");
-    const submit = screen.getByTestId("cred.submit");
     const footer = screen.getByText("Wrong password").parentElement as HTMLElement;
-    // Order: an error under the control that will retry it reads as being
-    // about the retry.
+    // The field and its arrow are one row now, so the error sits under that
+    // row: against the field that produced it, not inside the control row.
     expect(
       input.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(
-      footer.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect((input.parentElement as HTMLElement).contains(footer)).toBe(false);
     // And a screen reader reaches it from the field itself.
     expect(input.getAttribute("aria-describedby")).toBe(footer.id);
     expect(input.getAttribute("data-invalid")).toBe("true");
