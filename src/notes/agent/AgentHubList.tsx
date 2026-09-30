@@ -421,7 +421,11 @@ export function AgentHubList({
           placeholder={t("agent.hub.searchPlaceholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{ flex: 1, minWidth: 0 }}
+          // `--radius-2`, the button's, rather than the input default
+          // `--radius-1`: in this row the two controls sit flush beside each
+          // other at the same height, and two corner radii a few pixels apart
+          // read as a mismatch rather than as two kinds of control.
+          style={{ flex: 1, minWidth: 0, borderRadius: "var(--radius-2)" }}
         />
         {onNewConversation !== undefined && (
           <Tooltip label={t("agent.hub.newConversation")}>
