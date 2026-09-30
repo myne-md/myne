@@ -198,6 +198,12 @@ const LIST_STYLE: CSSProperties = {
   // the arithmetic, so a grouped list shows slightly fewer than four rows,
   // which errs on the side of scrolling.
   maxHeight: `calc(${VISIBLE_VAULT_ROWS} * ${ROW_HEIGHT}px + ${VISIBLE_VAULT_ROWS - 1} * var(--space-2))`,
+  // The scrollbar's own gutter, outside the rows. Padding on the scroll side
+  // gives the bar a lane of its own, and the equal negative margin hands that
+  // lane back to the page, so the rows keep the column's width (and line up
+  // with the actions below) while the bar sits beside them, not over them.
+  paddingInlineEnd: "var(--space-3)",
+  marginInlineEnd: "calc(var(--space-3) * -1)",
   flexShrink: 1,
   flexGrow: 0,
 };
@@ -275,16 +281,6 @@ const ROW_META_STYLE: CSSProperties = {
 // The account group header: a small, secondary-ink label above a group of
 // vault rows. Standalone vaults (no account) render no header, so the header
 // only ever names a real grouping.
-const GROUP_HEADER_STYLE: CSSProperties = {
-  flexShrink: 0,
-  margin: 0,
-  fontSize: "var(--text-sm)",
-  lineHeight: "var(--leading-normal)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--ink-3)",
-  padding: "var(--space-2) var(--space-1) 0",
-};
-
 // Account-grouping failure banner: danger ink on the danger wash, so a
 // grouping failure reads as an error and never as a second subline.
 const ACCOUNTS_ERROR_STYLE: CSSProperties = {
@@ -808,11 +804,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
       <div ref={listRef} style={LIST_STYLE} {...listFade}>
         {groups.map((group) => (
           <Fragment key={group.account?.id ?? "__standalone__"}>
-            {group.account !== null && (
-              <p style={GROUP_HEADER_STYLE} data-testid="picker.account-header">
-                {accountLabel(group.account, t)}
-              </p>
-            )}
             {group.vaults.map((vault) => (
               <VaultRow
                 key={vault.id}
