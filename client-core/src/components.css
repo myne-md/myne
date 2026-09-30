@@ -906,9 +906,8 @@
 
    Static on purpose. There is no animation here, so no motion-canon exemption,
    no rAF loop, no pause logic and nothing to cost battery while it sits on
-   screen. Two off-centre radial glows, blurred and oversized past the box
-   (`inset` below 0) so their edges never show; the card's `overflow: hidden`
-   crops them to its rounded shape.
+   screen. Two off-centre radial glows, blurred, then masked so they fade to
+   nothing before reaching any edge of the box.
 
    The colour is `--myne-empty-wash`, which defaults to `--accent`, so every
    palette — custom themes included — tints it with its own accent, and the
@@ -918,21 +917,28 @@
    ink, never over it. */
 .myne-empty__wash {
   position: absolute;
-  inset: -30%;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
     radial-gradient(
-      38% 44% at 32% 34%,
+      38% 44% at 34% 36%,
       color-mix(in srgb, var(--myne-empty-wash) 24%, transparent),
       transparent 72%
     ),
     radial-gradient(
-      36% 40% at 70% 64%,
+      36% 40% at 68% 62%,
       color-mix(in srgb, var(--myne-empty-wash) 16%, transparent),
       transparent 72%
     );
   filter: blur(32px);
+  /* The fade to the edges. A radial mask sized to the box (`closest-side`)
+     takes the wash to fully transparent AT every edge, so a filled state — which
+     has no border to hide a cut — dissolves into the surrounding surface
+     instead of meeting the pane edge as a hard line. Masking happens after the
+     blur in the rendering order, so the blur cannot bleed it back out. */
+  -webkit-mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
+  mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
 }
 
 /* Forced colours strip backgrounds anyway; hiding the element keeps a blurred
