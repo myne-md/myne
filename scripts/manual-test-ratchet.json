@@ -636,8 +636,22 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11096,
+  "totalMinutesCeiling": 11120,
   "gatedMinutes": 3837,
+  "$comment6": [
+    "CEILING RAISED 11096 -> 11120 by myne-md/myne#788, in the sanctioned",
+    "direction: a new surface whose OS-level half genuinely needs a human. What",
+    "added the minutes: the plain-file editor's drag-and-drop and file-manager",
+    "integration, 12 minutes on desktop-macos and desktop-windows (+24, the",
+    "whole of 11096 -> 11120). The argv ingress, the device-local gate,",
+    "autosave and the conflict banner are automated in",
+    "e2e/plain-file-editor.e2e.ts; what no lane can raise is a native drag",
+    "session and the Finder/Explorer integration, and the harness is Linux with",
+    "WebKitGTK, so the WKWebView and WebView2 renderings of the marker are",
+    "unexercised as well. The item is standard, so gatedMinutes is unchanged:",
+    "the rule is that gating may not fall by more than total does, and both",
+    "rose."
+  ],
   "$comment5": [
     "CEILING RAISED 11066 -> 11096 by myne-md/myne#786, in the sanctioned",
     "direction: an EXISTING gated item genuinely grew rather than a new surface",

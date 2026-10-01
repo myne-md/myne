@@ -52,6 +52,22 @@ pre-commit:
       glob: "*.{ts,tsx,js,jsx,mts,cts}"
       run: node scripts/check-platform-seam.mjs {staged_files}
 
+    plain-surface-imports:
+      # myne-md/myne#788: the plain-file surface renders the user's own file with
+      # the vault locked or absent, and several vault-coupled modules call
+      # `invoke` at module scope, so a single direct import in `src/plain/` turns
+      # "works with no vault" into a runtime failure that no compiler reports.
+      # The host refusal covers only what the editor calls THROUGH the host; a
+      # direct import never passes through it.
+      #
+      # Globbed to the tree the rule is about: every import SITE lives under
+      # `src/plain/`, so a docs-only, protocol-only or core-only commit cannot
+      # change the answer and does not pay the scan. The `run:` takes no
+      # {staged_files}: the glob decides WHETHER it runs, and it sweeps the
+      # whole tree when it does.
+      glob: "{src/plain/**,scripts/check-plain-surface-imports.mjs}"
+      run: node scripts/check-plain-surface-imports.mjs
+
     core-task-seam:
       # phase3-web-client task 80: `crate::task` is the only place in `core/`
       # allowed to reach tokio's execution surface. The reason this is a hook

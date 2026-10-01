@@ -30,8 +30,8 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 use super::dispatch::{
-    self, DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, SearchHitWire,
-    SearchOutcome, ShowOutcome,
+    self, DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, OpenFileOutcome,
+    SearchHitWire, SearchOutcome, ShowOutcome,
 };
 use super::rate_limit::SharedRateLimiter;
 
@@ -132,6 +132,7 @@ struct ScriptedLister {
     new_note: fn(&str, Option<&str>) -> NewOutcome,
     daily: fn(&str) -> DailyOutcome,
     daily_append: fn(&str, &str) -> DailyAppendOutcome,
+    open_file: fn(&str) -> OpenFileOutcome,
 }
 
 impl NoteLister for ScriptedLister {
@@ -152,6 +153,9 @@ impl NoteLister for ScriptedLister {
     }
     fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
         (self.daily_append)(period, line)
+    }
+    fn open_plain_file(&self, path: &str) -> OpenFileOutcome {
+        (self.open_file)(path)
     }
 }
 
@@ -174,6 +178,11 @@ fn every_request() -> Vec<Vec<u8>> {
         br#"{"cmd":"daily"}"#.to_vec(),
         serde_json::to_vec(&serde_json::json!({ "cmd": "daily_append", "line": SENTINEL_LINE }))
             .expect("request encodes"),
+        serde_json::to_vec(&serde_json::json!({
+            "cmd": "open",
+            "path": format!("{SENTINEL_PATH}/sentinel-file-task13.md"),
+        }))
+        .expect("request encodes"),
     ]
 }
 
@@ -214,6 +223,7 @@ fn success_paths_carry_their_payload_on_the_wire_and_nothing_into_the_logs() {
         new_note: |_, _| NewOutcome::Ok(SENTINEL_NOTE_ID.to_string()),
         daily: |_| DailyOutcome::Ok(SENTINEL_BODY.to_string(), false),
         daily_append: |_, _| DailyAppendOutcome::Ok(false),
+        open_file: |_| OpenFileOutcome::Ok,
     };
     let limiter = open_limiter();
     let (replies, captured) = capture(|| {
@@ -252,6 +262,7 @@ fn every_failure_class_logs_no_denied_value() {
                 new_note: |_, _| NewOutcome::VaultLocked,
                 daily: |_| DailyOutcome::VaultLocked,
                 daily_append: |_, _| DailyAppendOutcome::VaultLocked,
+                open_file: |_| OpenFileOutcome::PlainFileOff,
             },
         ),
         (
@@ -263,6 +274,7 @@ fn every_failure_class_logs_no_denied_value() {
                 new_note: |_, _| NewOutcome::Io,
                 daily: |_| DailyOutcome::Io,
                 daily_append: |_, _| DailyAppendOutcome::Io,
+                open_file: |_| OpenFileOutcome::Io,
             },
         ),
         (
@@ -274,6 +286,7 @@ fn every_failure_class_logs_no_denied_value() {
                 new_note: |_, _| NewOutcome::FolderExcluded,
                 daily: |_| DailyOutcome::FolderExcluded,
                 daily_append: |_, _| DailyAppendOutcome::FolderExcluded,
+                open_file: |_| OpenFileOutcome::NotFound,
             },
         ),
     ];
@@ -298,6 +311,7 @@ fn a_rate_limited_request_logs_a_bounded_event_and_never_the_request() {
         new_note: |_, _| NewOutcome::Io,
         daily: |_| DailyOutcome::Io,
         daily_append: |_, _| DailyAppendOutcome::Io,
+        open_file: |_| OpenFileOutcome::Io,
     };
     // A budget of zero throttles the very first request, so the sentinel-
     // bearing frame is refused before it is even parsed.
@@ -323,6 +337,7 @@ fn malformed_truncated_and_oversized_frames_log_only_the_bounded_frame_label() {
         new_note: |_, _| NewOutcome::Io,
         daily: |_| DailyOutcome::Io,
         daily_append: |_, _| DailyAppendOutcome::Io,
+        open_file: |_| OpenFileOutcome::Io,
     };
     let limiter = open_limiter();
 

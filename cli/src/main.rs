@@ -36,10 +36,15 @@ COMMANDS:
     weekly:append <text>     Append a line to this week's note
     monthly                  Print this month's note, creating it if needed
     monthly:append <text>    Append a line to this month's note
+    open <path>              Open a local .md file in the Myne window
 
 Trashed notes and templates are not notes you are working with, so they
 are absent from list, search and show: the same notes the app itself
 leaves out of its own lists.
+
+`open` edits a file that lives on disk, outside every vault: the app's
+local-file editor must be enabled in Settings, and only .md and .markdown
+files open there. This command never reads the file itself.
 
 Some folders may be excluded from these results (see Settings). An
 excluded note's id looks identical to an unknown one everywhere above, and
@@ -66,6 +71,8 @@ enum CommandOutput {
     /// one-day mismatch bites hardest says nothing.
     Period(String, bool),
     PeriodAppend(bool),
+    /// `open` has no payload: the tab appearing in the app is the result.
+    Open,
 }
 
 /// Parsed argv, split into the two flags this crate supports and the
@@ -237,6 +244,32 @@ fn main() {
                 .period_append(period, line)
                 .map(CommandOutput::PeriodAppend)
         }
+        // myne-md/myne#788 (plaintext-file-editor task 11). The file is
+        // opened by the RUNNING app; this binary only names the path. It is
+        // made absolute against THIS shell's working directory first, because
+        // the desktop's cwd is wherever the app was launched from and a
+        // relative path would silently name a different file there. Nothing
+        // is read: `absolute` joins and normalises, it does not touch the
+        // filesystem.
+        "open" => {
+            if positional.len() > 2 {
+                eprintln!("myne: 'open' takes exactly one path");
+                std::process::exit(exit::USAGE);
+            }
+            let Some(&raw) = positional.get(1) else {
+                eprintln!("myne: 'open' requires a path\n");
+                eprintln!("{HELP}");
+                std::process::exit(exit::USAGE);
+            };
+            let absolute = std::path::absolute(raw)
+                .ok()
+                .and_then(|path| path.to_str().map(str::to_string));
+            let Some(path) = absolute else {
+                eprintln!("myne: 'open' needs a usable filesystem path");
+                std::process::exit(exit::USAGE);
+            };
+            IpcBackend::new().open(&path).map(|()| CommandOutput::Open)
+        }
         // The unrecognized word is deliberately NOT echoed back. `git`-style
         // "unknown command 'foo'" reads friendlier, but the word here is
         // uncontrolled input, and the commonest way to land in this arm is a
@@ -281,6 +314,10 @@ fn main() {
         Ok(CommandOutput::PeriodAppend(used_device_clock)) => {
             output::print_device_clock_note(used_device_clock);
             output::print_daily_append(json);
+            std::process::exit(exit::OK);
+        }
+        Ok(CommandOutput::Open) => {
+            output::print_open(json);
             std::process::exit(exit::OK);
         }
         Err(err) => {

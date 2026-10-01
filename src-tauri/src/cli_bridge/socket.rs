@@ -753,6 +753,9 @@ mod tests {
         ) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
             crate::cli_bridge::dispatch::DailyAppendOutcome::Io
         }
+        fn open_plain_file(&self, _path: &str) -> crate::cli_bridge::dispatch::OpenFileOutcome {
+            crate::cli_bridge::dispatch::OpenFileOutcome::Io
+        }
     }
     fn test_lister() -> Arc<dyn NoteLister> {
         Arc::new(FixedLister)
@@ -1035,6 +1038,9 @@ mod tests {
                 _line: &str,
             ) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
                 crate::cli_bridge::dispatch::DailyAppendOutcome::Io
+            }
+            fn open_plain_file(&self, _path: &str) -> crate::cli_bridge::dispatch::OpenFileOutcome {
+                crate::cli_bridge::dispatch::OpenFileOutcome::Io
             }
         }
 

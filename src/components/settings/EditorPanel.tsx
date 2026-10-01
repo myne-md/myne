@@ -23,7 +23,9 @@ import {
 import { asViewMode } from "../../editor/view-mode";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
+import { has } from "../../platform/capabilities";
 import { VimModeSettings } from "./VimModeSettings";
+import { PlainFileSettings } from "./PlainFileSettings";
 import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
 import { DateTimeSettings } from "./DateTimeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
@@ -414,6 +416,13 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
             where the topic lives. Hiding is not disabling - an already-enabled
             keymap keeps running when the mode goes back off. */}
         {prefs.developer_mode && <VimModeSettings />}
+        {/* Plain-file editor (myne-md/myne#788). On by default now, so the
+            switch lives in the normal Editor settings rather than behind
+            Developer mode (amended 2026-10-01): the control that turns the
+            surface OFF has to be findable. Not a vault pref: the switch is
+            device-local because the surface works with the vault locked and
+            with no vault at all. */}
+        {has("plainFile") && <PlainFileSettings />}
         {/* Default view mode (reading-source-modes, MYND-299) - Live/Reading/
             Source a note opens in; per-tab override via ⇧⌘E. */}
         <DefaultViewModeSettings />

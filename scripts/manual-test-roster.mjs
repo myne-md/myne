@@ -7371,4 +7371,28 @@ export const ROSTER = Object.freeze([
     manual: [],
     exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues): e2e/support/session.ts already SIGKILLs the whole driver→app process group (killTree) and supports keeping the data dir, so a hard kill followed by a relaunch is a real crash test; and the web lane's profileDir is harness-owned and reusable across sessions, which covers the tab-close and browser-quit pagehide paths.",
   },
+  {
+    id: "plain-file-editor",
+    title: "Plain-file editor: open and edit on-disk markdown without a vault",
+    paths: [
+      "src/plain/PlainFileScreen.tsx",
+      "src/plain/store.ts",
+      "src/plain/surfaceMode.ts",
+      "src/components/settings/PlainFileSettings.tsx",
+      "src/platform/plainFile.ts",
+      "src-tauri/src/plugins/plain_file/",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/plain-file-editor.e2e.ts"],
+    manual: [
+      {
+        see: "With the plain-file editor on (the Settings > Editor switch when a vault exists; a vault-less device needs no switch, since the feature is on by default and the Welcome footer toggle was removed): exercise the OS-level open paths that ship. Launch the built app with a .md path in argv on each desktop OS (the Windows/Linux file-association route). On macOS confirm Finder's 'Open With' now LISTS Myne and that Open With / double-click / `open -a Myne <file>` delivers the file through the macOS open event (the bundle declares md/markdown document types). Use the app menu's File > Open File... (Cmd+O) to open the FIRST file, since the in-surface Open button appears only once a tab is open; and confirm the 'Plain file editor' switch is reachable in Settings > Editor WITHOUT Developer mode, since it is on by default and the control to turn it off must be findable. Open a file with the vault locked and on a device with no vault. Each time: confirm the marked surface appears with its marker, edit a line, confirm the file's bytes changed on disk, and confirm no note appeared and nothing synced. Repeat on macOS (WKWebView) and Windows (WebView2) and judge the marker, tab strip and conflict banner renderings there, since the automated lane sees only WebKitGTK. Confirm no recent-files list holds the file (macOS Recent Items, Windows jump list). Drag onto the window is expected to do NOTHING: dragDropEnabled is false (docs/decisions/storage/0151) so the OS drop never reaches the WebView, which is blocked rather than failed; the two flows that block it are MYND-629's in-process drop-import (src/notes/dropImport.ts) and the sidebar's HTML5 reorder. Then the two flows just added: quit with Cmd+Q (and once from the app menu) while a line typed inside the autosave window is unsaved, confirming the text lands or the app said it would not; and disable the editor from Settings while a tab is open, confirming it closes after its flush, then repeat with a conflicted tab open and confirm the tab is KEPT and the refusal is reported rather than dropped. Then Import to vault: with an unlocked vault and a file open, press the Import control and confirm a new note is created and selected in the editor, the plain tab closes, and the original file on disk is unchanged.",
+        whyNotAutomated: "The OS event sources and the second WebView engine cannot be raised in the tauri-driver lane: the runner is a Linux container against WebKitGTK, with no Finder or Explorer, no file-association launch and no WKWebView or WebView2 rendering. Drag is blocked by product decision rather than by the harness: dragDropEnabled is false so an OS drop cannot reach the WebView while src/notes/dropImport.ts (MYND-629) and the sidebar HTML5 reorder depend on the HTML5 DataTransfer path (docs/decisions/storage/0151). The argv ingress, the device-local gate, autosave and the conflict banner ARE automated in e2e/plain-file-editor.e2e.ts, which is why this item is only the OS-level and second-engine half.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 12,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
 ]);

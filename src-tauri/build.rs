@@ -449,6 +449,30 @@ fn main() {
                 .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
+            "plain-file",
+            // myne-md/myne#788: the sandboxed editor for the user's own
+            // on-disk markdown files. The commands are declared here so each
+            // gets an auto-generated `allow-`/`deny-` pair; each also needs a
+            // matching `commands.allow` entry in
+            // `permissions/plain-file/default.toml` or the ACL resolver never
+            // authorizes the `plugin:plain-file|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "gate_get",
+                "gate_set",
+                "plain_file_read",
+                "plain_file_write",
+                "plain_file_save_copy",
+                "plain_file_close",
+                "plain_file_take_unclaimed",
+                // The in-app dialog and the two deep-link commands
+                // (`plain_file_resolve_path` for the confirmation's canonical
+                // display, `plain_file_open_confirmed` for the open itself).
+                "plain_file_open_dialog",
+                "plain_file_resolve_path",
+                "plain_file_open_confirmed",
+            ]),
+        )
+        .plugin(
             "memory",
             // myne-md/myne#697: the agent-memory + personality store
             // (vault.agent-memory MYN1 + memories/<id> MYX1 +

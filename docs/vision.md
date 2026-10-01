@@ -13,7 +13,7 @@ Privacy-aware users who want Obsidian-like flexibility face an impossible choice
 
 **Primary** — the technical Obsidian power user who currently routes around Obsidian's lack of native E2EE. They run Obsidian + Cryptomator + Syncthing, pay for Obsidian Sync uneasily, or self-censor inside the app entirely. They read r/PrivacyGuides, have self-hosted at least one service, can manage a master password and a 24-word recovery phrase. They want Obsidian-grade flexibility without the privacy compromise — and they will read the protocol spec before they install.
 
-**Secondary** — everyone else, including users who don't actively think about privacy. Myne has no plaintext mode and no opt-in encryption toggle. Built-in privacy is the default for every user, not a feature surfaced to a niche. A casual user who picks Myne because it looks like a clean, fast markdown notes app gets the same zero-knowledge guarantees as the threat-model expert without ever opening the settings. Privacy is not what the app sells; privacy is what the app *is*.
+**Secondary**: everyone else, including users who don't actively think about privacy. Myne has no plaintext mode for your vault and no opt-in encryption toggle. Built-in privacy is the default for every user, not a feature surfaced to a niche. (The plain-file editor opens a user's own separate on-disk `.md` files outside the vault; it never turns a vault note into plaintext. See `decisions/clients/0625`, `threat-model.md` §7.) A casual user who picks Myne because it looks like a clean, fast markdown notes app gets the same zero-knowledge guarantees as the threat-model expert without ever opening the settings. Privacy is not what the app sells; privacy is what the app *is*.
 
 ## The Wedge
 
@@ -88,7 +88,7 @@ A record of the choices made while drafting this document, captured for the next
 - **Project name kept as Myne** for now (placeholder, not branding-final).
 - **Tagline retained from the project-advisor evaluation** with the explicit "Mullvad-style" reference removed; the no-email property is preserved in plain language.
 - **Problem framing combines self-censorship + workaround stack + critique of existing E2EE apps.** All three are load-bearing; dropping any one weakens the case.
-- **Two personas, with privacy as default for both.** Primary is the technical Obsidian power user; secondary is everyone else, who gets E2EE without opting in. There is no plaintext mode.
+- **Two personas, with privacy as default for both.** Primary is the technical Obsidian power user; secondary is everyone else, who gets E2EE without opting in. There is no plaintext mode for the vault. (The plain-file editor opens a user's own separate on-disk files outside the vault; `decisions/clients/0625`, `threat-model.md` §7.)
 - **Wedge is portability + open source full stack** (alternatives `b` + `c`) rather than competitor takedown or trust-only framing.
 - **Success criteria tiered (Minimum / Modest / Stretch)** with both numerical and qualitative outcomes. Numbers anchored on the audience-sizing analysis (5k–30k global power users) and the Notesnook benchmark (~14k stars in ~2 years OSS).
 - **Anti-features include nine commitments**, deliberately longer than typical because the team treats scope creep as the primary failure mode for privacy products.
