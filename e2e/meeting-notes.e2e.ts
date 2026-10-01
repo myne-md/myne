@@ -25,9 +25,9 @@
 //
 // SYNC-13: no credential appears in any assert.
 //
-// ⚠️ NEW SCENARIO: authored but NOT yet validated in the container. Per
-// `e2e/AGENTS.md` definition of done it must go green 3× consecutive via
-// `./scripts/e2e-local.sh` before merge.
+// Validated in the container: green 3x consecutive via
+// `MYNE_E2E_ONLY=e2e/meeting-notes.e2e.ts ./scripts/e2e-local.sh` on
+// 2026-09-30, which is `e2e/AGENTS.md`'s definition of done for a new scenario.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
