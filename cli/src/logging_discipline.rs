@@ -283,6 +283,7 @@ fn every_error_message_this_crate_originates_is_bounded() {
         BackendError::NotFound,
         BackendError::FolderExcluded,
         BackendError::RateLimited,
+        BackendError::PlainFileOff,
     ] {
         let message = crate::output::message_for(&err);
         assert!(
