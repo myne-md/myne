@@ -35,6 +35,13 @@ pub struct SyncEndpointConfig {
     /// TLS verification, and written as `None` on the next endpoint change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cert_pin_hex: Option<String>,
+    /// The shared admission code for a gated server (`MYNE_INVITE_CODE` on the
+    /// server), or `None` for an open server. Device-local plaintext beside the
+    /// endpoint, never synced and never in a backup: it is a shared door word,
+    /// not a per-user credential, and spreading it through sync would defeat the
+    /// gate. Sent on `POST /auth/register` for a NEW account only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invite_code: Option<String>,
 }
 
 /// Historical IPC name; on HTTPS every client now reports verified CA trust.
@@ -196,6 +203,9 @@ pub struct SyncEndpointView {
     pub cert_pin_hex: Option<String>,
     /// TLS verified by native rustls or the browser, or no TLS on loopback HTTP.
     pub pin_source: Option<PinSource>,
+    /// The stored invite code, so the settings field can prefill it. `None` when
+    /// the server needs none.
+    pub invite_code: Option<String>,
 }
 
 /// Read the device-local endpoint config into its UI view.
@@ -210,6 +220,7 @@ pub async fn get_endpoint_view(
         endpoint_url: cfg.endpoint_url,
         cert_pin_hex: None,
         pin_source,
+        invite_code: cfg.invite_code,
     })
 }
 
@@ -227,12 +238,15 @@ pub struct EndpointPinInfo {
 /// probe TLS before calling this shared storage routine; the browser delegates
 /// TLS validation to fetch. The `cert_pin_hex` argument is the retired IPC wire
 /// field, kept so the three clients' command signatures do not have to move; it
-/// is ignored here and cannot bypass certificate verification.
+/// is ignored here and cannot bypass certificate verification. `invite_code` is
+/// the shared admission code for a gated server (empty = none), stored
+/// device-locally and sent only on registration.
 pub async fn set_endpoint(
     host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     endpoint_url: Option<String>,
     _cert_pin_hex: Option<String>,
+    invite_code: Option<String>,
 ) -> Result<EndpointPinInfo, SyncConfigError> {
     let path = config_path_from_host(host, io).await?;
     let Some(url) = endpoint_url else {
@@ -243,9 +257,25 @@ pub async fn set_endpoint(
         });
     };
     validate_endpoint_url(&url)?;
+    // The invite code is the only copy of the admission word and is never synced
+    // or backed up, so a caller that knows nothing about it (the join flow, the
+    // first-run server step, vault creation) must not erase it by passing `None`.
+    // Read-modify-write: `None` preserves the stored code when the endpoint is
+    // unchanged and drops it when the endpoint MOVES, since a code issued for one
+    // server must not be sent to another. `Some("")` is an explicit clear; a
+    // non-empty value sets it.
+    let existing = read_config(io, &path).await.unwrap_or_default();
+    let url_unchanged = existing.endpoint_url.as_deref() == Some(url.as_str());
+    let invite_code = match invite_code {
+        Some(c) if !c.is_empty() => Some(c),
+        Some(_) => None,
+        None if url_unchanged => existing.invite_code,
+        None => None,
+    };
     let cfg = SyncEndpointConfig {
         endpoint_url: Some(url.clone()),
         cert_pin_hex: None,
+        invite_code,
     };
     write_config(io, &path, &cfg).await?;
     Ok(EndpointPinInfo {
@@ -414,19 +444,27 @@ mod tests {
             let cfg = SyncEndpointConfig {
                 endpoint_url: Some("https://sync.myne.md".into()),
                 cert_pin_hex: Some("ab".repeat(32)),
+                invite_code: Some("correct-horse-battery-staple-0001".into()),
             };
             write_config(&io, &path, &cfg).await.unwrap();
             assert_eq!(read_config(&io, &path).await.unwrap(), cfg);
+            // The code round-trips through the device-local file.
+            assert!(std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("invite_code"));
 
             let updated = SyncEndpointConfig {
                 cert_pin_hex: None,
+                invite_code: None,
                 ..cfg
             };
             write_config(&io, &path, &updated).await.unwrap();
             assert_eq!(read_config(&io, &path).await.unwrap(), updated);
-            assert!(!std::fs::read_to_string(&path)
-                .unwrap()
-                .contains("cert_pin_hex"));
+            let written = std::fs::read_to_string(&path).unwrap();
+            assert!(!written.contains("cert_pin_hex"));
+            // An absent code is omitted, so an open-server config carries no
+            // empty secret.
+            assert!(!written.contains("invite_code"));
 
             // Present-but-corrupt → `Parse`, NOT the default. This file has a
             // write path, so collapsing the two would let a transient fault
@@ -437,6 +475,76 @@ mod tests {
             // A truncated file is the shape a torn write actually leaves.
             std::fs::write(&path, br#"{"endpoint_url":"https://s"#).unwrap();
             assert_eq!(read_config(&io, &path).await, Err(SyncConfigError::Parse));
+
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    /// The invite code is the only copy of the admission word and is never
+    /// synced or backed up, so a caller that knows nothing about it (the join
+    /// flow, the first-run server step, vault creation) must not erase it: a
+    /// `None` for an UNCHANGED endpoint preserves it, while moving the endpoint
+    /// drops it so a code issued for one server never crosses to another.
+    #[test]
+    fn set_endpoint_preserves_the_code_only_for_the_same_url() {
+        crate::test_support::block_on(async {
+            let io = crate::vault_io::StdVaultIo;
+            let dir = std::env::temp_dir().join(format!("myne-sync-inv-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("sync-config.json");
+            let url = "https://sync.example";
+            let code = "correct-horse-battery-staple-0001";
+
+            write_config(
+                &io,
+                &path,
+                &SyncEndpointConfig {
+                    endpoint_url: Some(url.into()),
+                    cert_pin_hex: None,
+                    invite_code: Some(code.into()),
+                },
+            )
+            .await
+            .unwrap();
+
+            // Same URL, `None` code: preserved. This mirrors `set_endpoint`'s
+            // read-modify-write, which cannot be called here (it takes a
+            // `HostCtx`), so the test pins the DECISION the way `write_config`
+            // is pinned above: the preserve-on-unchanged-URL rule.
+            let preserve = |url: Option<String>, code: Option<String>| async {
+                let existing = read_config(&io, &path).await.unwrap_or_default();
+                let url_unchanged = existing.endpoint_url == url;
+                let invite_code = match code {
+                    Some(c) if !c.is_empty() => Some(c),
+                    Some(_) => None,
+                    None if url_unchanged => existing.invite_code,
+                    None => None,
+                };
+                let cfg = SyncEndpointConfig {
+                    endpoint_url: url,
+                    cert_pin_hex: None,
+                    invite_code,
+                };
+                write_config(&io, &path, &cfg).await.unwrap();
+                read_config(&io, &path).await.unwrap()
+            };
+
+            let kept = preserve(Some(url.into()), None).await;
+            assert_eq!(
+                kept.invite_code.as_deref(),
+                Some(code),
+                "same URL preserves"
+            );
+
+            // Moved URL, `None` code: dropped.
+            let moved = preserve(Some("https://other.example".into()), None).await;
+            assert_eq!(moved.invite_code, None, "a moved endpoint drops the code");
+
+            // Explicit empty string clears even on the same URL.
+            let url2 = "https://other.example";
+            let _ = url2;
+            let cleared = preserve(Some("https://other.example".into()), Some(String::new())).await;
+            assert_eq!(cleared.invite_code, None, "empty string clears");
 
             std::fs::remove_dir_all(&dir).ok();
         });

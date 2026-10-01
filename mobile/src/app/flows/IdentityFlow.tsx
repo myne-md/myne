@@ -208,6 +208,10 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
 
   // Server step
   const [serverUrl, setServerUrl] = useState("");
+  // The shared invite code for a gated server (myne-md/myne#800); empty for an
+  // open one. Identity creation registers a new account, so a gated server
+  // refuses it without the code.
+  const [inviteCode, setInviteCode] = useState("");
 
   // Identity
   const [result, setResult] = useState<PersonSetupView | null>(null);
@@ -272,7 +276,7 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     setBusy(true);
     setError(null);
     try {
-      await syncSetEndpoint(trimmed);
+      await syncSetEndpoint(trimmed, inviteCode.trim());
       setStep("create");
     } catch (e) {
       setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
@@ -281,14 +285,14 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     } finally {
       setBusy(false);
     }
-  }, [serverUrl, t]);
+  }, [serverUrl, inviteCode, t]);
 
   // The hosted door uses the same public-CA and hostname verification.
   const connectHosted = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      await syncSetEndpoint(HOSTED_SYNC_ORIGIN);
+      await syncSetEndpoint(HOSTED_SYNC_ORIGIN, inviteCode.trim());
       setStep("create");
     } catch (e) {
       setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
@@ -297,7 +301,7 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
     } finally {
       setBusy(false);
     }
-  }, [t]);
+  }, [inviteCode, t]);
 
   // Forget a held identity this device cannot open with a fresh phrase, so a
   // create can proceed (myne-md/myne#780).
@@ -364,6 +368,15 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
             placeholder="https://sync.example"
             inputMode="url"
             testId="identity-flow.server-input"
+          />
+        </div>
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <FieldLabel>{t("sync.endpoint.inviteLabel")}</FieldLabel>
+          <MonoField
+            value={inviteCode}
+            onChange={setInviteCode}
+            placeholder={t("sync.endpoint.invitePlaceholder")}
+            testId="identity-flow.server-invite"
           />
         </div>
         {error ? (

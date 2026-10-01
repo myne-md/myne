@@ -45,6 +45,16 @@ interface AccountStepProps {
   acknowledged: boolean;
   committing: boolean;
   error: ErrorState | null;
+  /**
+   * The shared invite code for a gated sync server (myne-md/myne#800). Empty for
+   * an open server. The web client creates accounts, so a gated hosted server
+   * refuses registration without it.
+   */
+  inviteCode: string;
+  onInviteCodeChange: (value: string) => void;
+  /** Render the invite-code field. True only where creation registers with a
+   *  server (`REQUIRES_PROVISIONING`); a local-only vault has no gate to pass. */
+  showInviteCode: boolean;
   dispatch: Dispatch<Action>;
 }
 
@@ -53,6 +63,9 @@ export function AccountStep({
   acknowledged,
   committing,
   error,
+  inviteCode,
+  onInviteCodeChange,
+  showInviteCode,
   dispatch,
 }: AccountStepProps) {
   const { t } = useTranslation();
@@ -155,6 +168,41 @@ export function AccountStep({
         </strong>{" "}
         {t("vaultCreation.account.shownOnceBody")}
       </div>
+
+      {/* The invite code for a gated sync server. Optional: an open server
+          (self-host) needs none, and this client persists it device-locally,
+          never syncing it. Rendered only where creation registers with a server,
+          because the WEB client creates accounts and has no sync-settings panel
+          before the vault exists. */}
+      {showInviteCode && (
+        <>
+          <label
+            htmlFor="create-invite-code"
+            style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+          >
+            {t("sync.endpoint.inviteLabel")}
+          </label>
+          <input
+            id="create-invite-code"
+            value={inviteCode}
+            onChange={(e) => onInviteCodeChange(e.target.value)}
+            placeholder={t("sync.endpoint.invitePlaceholder")}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+            style={{
+              padding: "var(--space-2) var(--space-3)",
+              fontSize: "var(--text-sm)",
+              background: "var(--paper)",
+              border: "1px solid var(--line-1)",
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-1)",
+              fontFamily: "var(--font-mono)",
+            }}
+            data-testid="create.invite-code"
+          />
+        </>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <Button variant="ghost" icon="copy" onClick={handleCopy}>

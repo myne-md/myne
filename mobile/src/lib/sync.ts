@@ -29,6 +29,8 @@ export interface SyncEndpointView {
   endpoint_url: string | null;
   cert_pin_hex: string | null;
   pin_source: PinSource | null;
+  /** The stored invite code for a gated server, or null when none is needed. */
+  invite_code: string | null;
 }
 
 /** Mirrors the Rust `EndpointPinInfo` returned by `sync_set_endpoint`. */
@@ -41,9 +43,17 @@ export function syncGetEndpoint(): Promise<SyncEndpointView> {
   return invoke<SyncEndpointView>("plugin:sync|sync_get_endpoint");
 }
 
-/** Set (or clear) the sync endpoint. Native TLS verifies CA roots and hostname. */
-export function syncSetEndpoint(endpointUrl: string | null): Promise<EndpointPinInfo> {
-  return invoke<EndpointPinInfo>("plugin:sync|sync_set_endpoint", { endpointUrl });
+/** Set (or clear) the sync endpoint. Native TLS verifies CA roots and hostname.
+ *  `inviteCode` is the shared admission code for a gated server; omit it for an
+ *  open one. Device-local, sent only on registration. */
+export function syncSetEndpoint(
+  endpointUrl: string | null,
+  inviteCode?: string,
+): Promise<EndpointPinInfo> {
+  return invoke<EndpointPinInfo>("plugin:sync|sync_set_endpoint", {
+    endpointUrl,
+    inviteCode: inviteCode ?? null,
+  });
 }
 
 // ── Join an existing account on a fresh device (Welcome → JoinFlow) ───────────

@@ -97,6 +97,10 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
   const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // The shared admission code for a gated server (`MYNE_INVITE_CODE` on the
+  // server). Optional: an open server (self-host, fresh clone) needs none.
+  // Device-local, never synced and never backed up.
+  const [inviteCode, setInviteCode] = useState("");
   // `null` means loopback HTTP, never an unverified remote TLS session.
   const [pinSource, setPinSource] = useState<PinSource>(null);
 
@@ -107,12 +111,14 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
     void invoke<{
       endpoint_url: string | null;
       pin_source: PinSource;
+      invite_code: string | null;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
         if (c.endpoint_url) {
           setUrl(c.endpoint_url);
           setConnectedUrl(c.endpoint_url);
         }
+        setInviteCode(c.invite_code ?? "");
         setPinSource(c.pin_source);
       })
       .catch(() => {
@@ -130,6 +136,7 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
       pin_source: PinSource;
     }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
+      inviteCode: inviteCode.trim(),
     })
       .then((r) => {
         setConnectedUrl(trimmed);
@@ -200,6 +207,9 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
           value={url}
           onChange={(e) => {
             setUrl(e.target.value);
+            // Changing the address invalidates a code issued for the old server;
+            // clearing it here keeps it from being sent to the new one.
+            setInviteCode("");
             onEdit?.();
           }}
           placeholder={t("sync.endpoint.placeholder")}
@@ -234,6 +244,32 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
               {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
             </button>
           )}
+      </div>
+      {/* The invite code for a gated server (myne-md/myne#800). Optional: an
+          open server ignores it, and a self-host operator never sets one. It
+          sits under the address because it is part of "which server, and what
+          does it ask for", not a separate setting. */}
+      <label
+        style={{ ...HELP, marginTop: "var(--space-1)" }}
+        htmlFor="sync-endpoint-invite"
+      >
+        {t("sync.endpoint.inviteLabel")}
+      </label>
+      <div style={ROW}>
+        <input
+          id="sync-endpoint-invite"
+          value={inviteCode}
+          onChange={(e) => {
+            setInviteCode(e.target.value);
+            onEdit?.();
+          }}
+          placeholder={t("sync.endpoint.invitePlaceholder")}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          style={INPUT}
+          data-testid="sync.endpoint-invite-input"
+        />
       </div>
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">
