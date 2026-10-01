@@ -140,7 +140,11 @@ function find(handle: number): PlainFile | undefined {
 
 /** Add or focus an open delivered by Rust. Idempotent per handle. */
 export function upsertOpened(opened: PlainFileOpened): void {
-  if (find(opened.handle)) {
+  // Check BOTH lists: a file parked by a vault lock is not in `files`, and
+  // without this an OS re-open while locked (Finder double-click, second-launch
+  // argv) would add a second entry for the same handle and `restoreDormant`
+  // would then show two tabs sharing one Rust registry entry.
+  if (find(opened.handle) ?? state.dormant.find((f) => f.handle === opened.handle)) {
     setState({ ...state, activeHandle: opened.handle });
     return;
   }
@@ -240,7 +244,20 @@ export async function save(handle: number): Promise<void> {
     return;
   }
   const file = find(handle);
-  if (!file || file.status === "saving" || file.status === "conflict") return;
+  // A buffer already on disk must not be re-written: `save` is called from
+  // blur, tab-close, `flushAll` (unmount, lock, `pagehide`) and gate-off, and
+  // writing a `clean`/`saved` handle anyway churns the file's inode and mtime
+  // for every external watcher (Syncthing, git) with byte-identical content,
+  // and on a mixed-ending file it would rewrite the whole file to LF. The
+  // `flushForImport` shape.
+  if (
+    !file ||
+    file.status === "clean" ||
+    file.status === "saved" ||
+    file.status === "saving" ||
+    file.status === "conflict"
+  )
+    return;
   const attempted = file.content;
   patch(handle, (f) => ({ ...f, status: "saving" }));
   const run = (async () => {
@@ -425,17 +442,20 @@ export function resolveOverwrite(handle: number): void {
  * Exported for the close intercept, which must not destroy the window over
  * text that exists only in RAM without telling the user.
  */
-export function unsettledTabs(): PlainFile[] {
-  return state.files.filter(
-    (file) =>
-      file.status === "conflict" ||
-      file.status === "error" ||
-      // A buffer that moved on while a save was in flight, or one still in
-      // flight, has not landed either: destroying the window over it drops
-      // text the user typed. The intercept asks rather than assumes.
-      file.status === "editing" ||
-      file.status === "saving",
+function isUnsettled(file: PlainFile): boolean {
+  // A buffer that moved on while a save was in flight, or one still in flight,
+  // has not landed either: destroying the window over it drops text the user
+  // typed. The intercept asks rather than assumes.
+  return (
+    file.status === "conflict" ||
+    file.status === "error" ||
+    file.status === "editing" ||
+    file.status === "saving"
   );
+}
+
+export function unsettledTabs(): PlainFile[] {
+  return state.files.filter(isUnsettled);
 }
 
 /** What the conflict banner's copy arm decided. */
@@ -511,7 +531,19 @@ export async function close(handle: number): Promise<void> {
 export async function dormancyForLock(): Promise<void> {
   await flushAll();
   if (state.files.length === 0) return;
-  setState({ files: [], dormant: [...state.dormant, ...state.files], activeHandle: null });
+  // Park ONLY the tabs whose buffer landed. A tab that did NOT land (conflict,
+  // error, or a save still in flight) stays in `files`: parking it removes it
+  // from `files`, `App.tsx` then unmounts this surface, and the close intercept
+  // and `pagehide` flush unmount with it, so a quit while the vault is locked
+  // would drop text that exists only in RAM with no prompt. Keeping it mounted
+  // is what the close intercept already does for the same reason.
+  const staying = state.files.filter(isUnsettled);
+  const sleeping = state.files.filter((file) => !isUnsettled(file));
+  setState({
+    files: staying,
+    dormant: [...state.dormant, ...sleeping],
+    activeHandle: staying[staying.length - 1]?.handle ?? null,
+  });
 }
 
 /** Vault unlock in the same session: bring the tabs back. */
@@ -534,7 +566,8 @@ export function restoreDormant(): void {
  * in the tab strip, so the caller gets the remaining handles back and must
  * surface them: silently leaving them open would read as the toggle not
  * working. Dormant tabs (parked by a lock earlier in the session) are dropped
- * the same way; they were flushed when they were parked.
+ * the same way: only a tab whose buffer had already landed is ever parked (see
+ * `dormancyForLock`), so a dormant tab is safe to drop without a re-flush.
  *
  * Returns the handles still open, so an empty array is the whole contract.
  */

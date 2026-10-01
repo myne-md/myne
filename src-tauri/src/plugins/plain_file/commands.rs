@@ -1,13 +1,10 @@
-//! IPC surface of the `plain_file` plugin: the device-local gate only
-//! (myne-md/myne#788).
+//! IPC surface of the `plain_file` plugin (myne-md/myne#788).
 //!
-//! The file IO commands land in a later task; this module starts with the two
-//! the Settings and Welcome toggles need, and the commands the file IO adds
-//! live beside them so the permission set stays one file.
-//!
-//! Every command resolves `app_config_dir` and delegates to a pure `*_in`
-//! helper that takes its path directly, so the tests need no Tauri runtime
-//! (`src-tauri/AGENTS.md` plugin pattern).
+//! The device-local gate, the handle IO, the in-app open/save dialogs and the
+//! two deep-link commands, all in one file so the permission set stays one
+//! file. Every command resolves `app_config_dir` and delegates to a pure
+//! `*_in` helper that takes its path directly, so the tests need no Tauri
+//! runtime (`src-tauri/AGENTS.md` plugin pattern).
 
 use super::gate::{self, PlainFileGateError};
 use super::handles::{resolve_openable, FileContent, PlainFileError, PlainFileRegistry};
@@ -71,8 +68,10 @@ fn path_from_input(raw: &str) -> PathBuf {
 
 /// Whether the plain-file editor is enabled on this device.
 ///
-/// Answers `false` on every failure (see `gate::read_gate`), so a caller never
-/// has to distinguish "off" from "unreadable": both mean the ingress refuses.
+/// Answers `true` when the gate file is absent (the feature is on by default)
+/// and `false` when it is present-but-untrusted; see `gate::read_gate`. A
+/// caller never has to distinguish "off" from "unreadable": both mean the
+/// ingress refuses.
 #[tauri::command]
 pub async fn gate_get<R: Runtime>(app: AppHandle<R>) -> Result<bool, PlainFileGateError> {
     let path = gate::gate_path_in(&config_dir(&app)?);
@@ -225,8 +224,21 @@ pub async fn plain_file_take_unclaimed(
 /// The gate is checked BEFORE the dialog opens. A gate that went off in this
 /// session must refuse visibly here rather than showing a picker whose
 /// selection would then be silently dropped.
+///
+/// Shared with the app menu's File → Open File… item, which calls
+/// [`open_dialog`] directly rather than round-tripping through IPC.
 #[tauri::command]
 pub async fn plain_file_open_dialog<R: Runtime>(app: AppHandle<R>) -> Result<(), PlainFileError> {
+    open_dialog(app).await
+}
+
+/// Open the native Markdown picker and funnel the choice into the ingest.
+///
+/// The one implementation behind both the `plain_file_open_dialog` command
+/// (the in-surface Open button) and the app menu's File → Open File… item. The
+/// gate is checked before the picker opens, so a device with the gate off gets
+/// no dialog whose selection would then be dropped; cancelling is `Ok(())`.
+pub async fn open_dialog<R: Runtime>(app: AppHandle<R>) -> Result<(), PlainFileError> {
     tauri::async_runtime::spawn_blocking(move || {
         let config_dir = config_dir(&app).map_err(gate_to_plain)?;
         if !gate::read_gate(&gate::gate_path_in(&config_dir)) {

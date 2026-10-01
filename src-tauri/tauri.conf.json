@@ -41,6 +41,17 @@
     "publisher": "Myne",
     "homepage": "https://myne.md",
     "category": "Productivity",
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "rank": "Alternate",
+        "contentTypes": ["net.daringfireball.markdown"]
+      }
+    ],
     "shortDescription": "A calm place for your notes.",
     "longDescription": "Myne is a clean, fast markdown notes app. Capture, link, and find your notes across devices — calmly, without lock-in. A markdown editor with [[wikilinks]], backlinks, a graph view, and full-text search; no email to sign up; your notes stay plaintext-readable markdown after decryption.",
     "macOS": {

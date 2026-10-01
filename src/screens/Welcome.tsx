@@ -1,91 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { Switch } from "../components/primitives/Switch";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
 import { IdentitySetupDialog } from "../components/IdentitySetupDialog";
 import { stageRootStyle } from "../components/primitives/stageRoot";
-import { has } from "../platform/capabilities";
-import { plainFileGateGet, plainFileGateSet } from "../platform/plainFile";
-import { handleGateDisabled } from "../plain/store";
 
-/**
- * The plain-file gate for a device that has no vault (myne-md/myne#788, task 7).
- *
- * Settings is unreachable without a vault, so without this control a fresh
- * device could never enable the feature. Same optimistic-toggle-with-rollback
- * shape as `src/components/settings/PlainFileSettings.tsx`, and it deliberately
- * shows no developer-mode gate: `developer_mode` is a vault pref, which is
- * exactly the state this device does not have.
- */
-function PlainFileGateToggle() {
-  const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void plainFileGateGet()
-      .then((value) => {
-        if (!cancelled) setEnabled(value);
-      })
-      .catch(() => {
-        /* unreadable gate reads as off (Rust fails closed) */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await plainFileGateSet(next);
-    } catch {
-      setEnabled(prev); // rollback
-      setError(t("settings.plainFile.errorSaveSetting"));
-      return;
-    }
-    if (!next) {
-      // Same contract as the Settings row: a disable flushes and closes the
-      // surface's tabs. A conflicted or errored tab stays (its text exists
-      // only in RAM), and naming it stops the toggle from reading as ignored.
-      const remaining = await handleGateDisabled();
-      if (remaining.length > 0) {
-        setError(t("settings.plainFile.openFilesRemain"));
-        return;
-      }
-    }
-    setError(null);
-  }
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-2)",
-        fontSize: "var(--text-xs)",
-        color: "var(--fg-3)",
-      }}
-    >
-      <span>{t("settings.plainFile.label")}</span>
-      <Switch
-        checked={enabled}
-        onChange={() => void toggle(!enabled)}
-        ariaLabel={t("settings.plainFile.label")}
-        testId="welcome.plain-file"
-      />
-      {error !== null && (
-        <span role="alert" data-testid="welcome.plain-file-error" style={{ color: "var(--danger)" }}>
-          {error}
-        </span>
-      )}
-    </div>
-  );
-}
+// There is deliberately NO plain-file gate toggle on this screen
+// (myne-md/myne#788, amended 2026-10-01). The gate is ON by default and the
+// surface is reachable from the app menu's File → Open File…, so a vault-less
+// device needs no control here to use it. The only switch now lives in
+// Settings → Editor, where a user with a vault can turn the surface back off;
+// a device with no vault has no Settings to host it.
 
 interface WelcomeProps {
   onCreateVault: () => void;
@@ -221,17 +147,12 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdenti
 
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "var(--space-2)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-3)",
             marginTop: "var(--space-2)",
           }}
         >
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>v0.1 pre-alpha</div>
-          {/* Desktop-only: web has no OS file ingress, so the capability is
-              absent there and the row is omitted rather than shown broken. */}
-          {has("plainFile") && <PlainFileGateToggle />}
+          v0.1 pre-alpha
         </div>
       </div>
 

@@ -27,7 +27,7 @@ permissions = [
 
 [[permission]]
 identifier = "allow-gate-get"
-description = "Allow invoking plain-file:gate_get (reads the device-local plain-file.json; answers false when absent, unreadable or malformed)."
+description = "Allow invoking plain-file:gate_get (reads the device-local plain-file.json; ON by default, so an ABSENT file answers true, while an unreadable or malformed one answers false)."
 commands.allow = ["gate_get"]
 
 [[permission]]
@@ -35,13 +35,17 @@ identifier = "allow-gate-set"
 description = "Allow invoking plain-file:gate_set (atomic write of the device-local plain-file.json gate)."
 commands.allow = ["gate_set"]
 
-# The handle-scoped commands take an OPAQUE HANDLE, never a path (the save-copy
-# command is the one exception and takes the user's buffer, with the
-# destination chosen in a host-side dialog). A handle exists only because a
-# Rust-side ingress opened a user-granted file, so the WebView cannot name a
-# path these commands will touch. The gate is checked when the handle is
-# minted, not here (see `handles.rs` for why the flush must survive a gate
-# toggle). All are main-window-only.
+# The read/write/close commands take an OPAQUE HANDLE, never a path. Three
+# commands take a caller-named string instead and are the deliberate
+# exceptions: `plain_file_save_copy` (the conflict banner's copy, destination
+# chosen in a host-side dialog), `plain_file_resolve_path` and
+# `plain_file_open_confirmed` (the `myne://open-file?path=…` deep link parsed
+# in JS). For those two, the guarantee is not provenance but host-side
+# re-validation: no path becomes a handle without the gate, canonicalisation,
+# the `.md`/`.markdown` check and the size cap re-running (see `handles.rs`).
+# The gate is checked when a handle is minted, not on the handle commands (see
+# `handles.rs` for why the flush must survive a gate toggle). All are
+# main-window-only.
 
 [[permission]]
 identifier = "allow-plain-file-read"

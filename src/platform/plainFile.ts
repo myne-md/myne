@@ -43,8 +43,9 @@ const OPENED_EVENT = "plain-file:opened";
 /**
  * Whether the plain-file editor is enabled on this device.
  *
- * Answers `false` on every failure: an unreadable gate is never read as
- * enabled.
+ * On by default: an absent gate file reads as enabled. A present-but-corrupt
+ * one reads as disabled (see the Rust `gate` module), so a caller still never
+ * has to distinguish "off" from "unreadable".
  */
 export async function plainFileGateGet(): Promise<boolean> {
   return await invoke<boolean>("plugin:plain-file|gate_get");

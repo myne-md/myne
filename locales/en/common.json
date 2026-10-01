@@ -3181,7 +3181,7 @@
     },
     "plainFile": {
       "errorSaveSetting": "Could not save the plain-file setting.",
-      "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. Off by default.",
+      "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. On by default; turn it off here.",
       "label": "Plain-file editor",
       "openFilesRemain": "Files with unsaved changes are still open. Resolve them, then turn this off again."
     },

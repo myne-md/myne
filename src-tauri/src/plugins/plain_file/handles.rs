@@ -1,14 +1,22 @@
 //! The handle registry and the file IO for the plain-file editor
 //! (myne-md/myne#788).
 //!
-//! **Paths never come from the WebView.** A path arrives at this module from
-//! an OS ingress (argv, macOS open event, drag, native dialog, CLI command or
-//! a confirmed deep link), where it is canonicalised, checked against the
-//! extension allowlist and minted into an opaque handle. The frontend sees the
-//! handle, the file name and the content, and can do nothing else with it. The
-//! three commands in `commands.rs` take a handle and never a path, which is
-//! what makes "no JavaScript-named path exists" structural rather than a
-//! promise.
+//! **No path becomes a handle without host-side validation.** A path arrives
+//! at this module from an OS ingress (argv, macOS open event, native dialog,
+//! CLI command or a confirmed deep link), where it is canonicalised, checked
+//! against the extension allowlist and minted into an opaque handle. The
+//! frontend sees the handle, the file name and the content, and can do nothing
+//! else with it.
+//!
+//! Two commands DO take a caller-named path straight from the WebView:
+//! `commands::plain_file_resolve_path` and `commands::plain_file_open_confirmed`,
+//! the `myne://open-file?path=…` route parsed in JavaScript (see
+//! `openFileDeepLink.ts`). The guarantee is therefore NOT "no JavaScript-named
+//! path exists"; it is that no such path becomes a handle without the host
+//! re-running the gate, the canonicalisation, the `.md`/`.markdown` check and
+//! the size cap (which `resolve_openable` below does). Every other command
+//! takes a handle and never a path. `docs/threat-model.md` §7 states the same
+//! invariant.
 //!
 //! **The base hash is the conflict guard.** A read returns the SHA-256 of the
 //! bytes on disk; a write takes that hash back and refuses when the file no
@@ -88,11 +96,14 @@ fn io(e: std::io::Error) -> PlainFileError {
 
 /// The line ending the file uses on disk.
 ///
-/// The editor works in `\n`; a COHERENTLY CRLF file is converted on the way in
-/// and converted back on the way out, so a save never rewrites a Windows
-/// checkout's line endings into a whole-file diff. A file with MIXED endings
-/// is treated as LF and left byte-for-byte as it was (the conversion is
-/// skipped, so the stray `\r`s ride along untouched).
+/// The editor works in `\n`. A file is normalised to `\n` on the way in, and a
+/// COHERENTLY CRLF file is converted back on the way out, so opening (or
+/// editing) a Windows checkout never rewrites it into a whole-file LF diff.
+/// A file with MIXED endings, or lone `\r` (old Mac), is presented as `\n` too
+/// and is saved as `\n` if it is edited; it is NOT left byte-for-byte, because
+/// the editor cannot hold a bare `\r` (CodeMirror splits on `/\r\n?|\n/`), so
+/// a value that kept one would disagree with the live document and trigger a
+/// spurious autosave on open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Eol {
     Lf,
@@ -119,11 +130,15 @@ fn detect_eol(bytes: &[u8]) -> Eol {
 }
 
 /// Normalise a VALIDATED UTF-8 file's text to the editor's `\n` convention.
-fn to_editor_text(text: String, eol: Eol) -> String {
-    match eol {
-        Eol::Lf => text,
-        Eol::Crlf => text.replace("\r\n", "\n"),
-    }
+///
+/// EVERY `\r` is normalised, coherent or not, so the value handed to the
+/// frontend matches what CodeMirror will hold (it splits on `/\r\n?|\n/` and
+/// drops a bare `\r`). `eol` no longer changes the input; it is kept in the
+/// signature because the SAME detection decides whether `to_disk_bytes`
+/// re-applies CRLF on the way out, which is what keeps a coherently CRLF file
+/// round-tripping.
+fn to_editor_text(text: String, _eol: Eol) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn to_disk_bytes(content: &str, eol: Eol) -> Vec<u8> {
@@ -135,9 +150,13 @@ fn to_disk_bytes(content: &str, eol: Eol) -> Vec<u8> {
 
 /// Lowercase hex, written locally rather than pulling `hex` in for six lines.
 fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        out.push_str(&format!("{b:02x}"));
+        // `write!` into the pre-sized buffer. `format!` here would allocate a
+        // throwaway String per byte, which at the 64 MiB cap is ~134M transient
+        // allocations on every read and write of the hot path.
+        let _ = write!(out, "{b:02x}");
     }
     out
 }
@@ -516,11 +535,16 @@ fn write_atomic_mode(
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(io(e)),
         };
-        #[cfg(not(unix))]
         if let Some(perms) = perms.as_ref() {
+            // Applied on EVERY platform, not just Windows: on Unix the
+            // creation-time `mode` is masked by the process umask, so a `0666`
+            // destination under a `0022` umask would otherwise land `0644` and
+            // the "permissions preserved" claim would be false for exactly the
+            // modes a umask narrows. On Windows this is the only place the
+            // existing read-only flag is carried over, and the handle must go
+            // before the cleanup because Windows refuses to delete an open
+            // path.
             if let Err(e) = file.set_permissions(perms.clone()) {
-                // Windows refuses to rename or delete a path while a handle to
-                // it is open, so the temp handle goes before the cleanup.
                 drop(file);
                 let _ = std::fs::remove_file(&tmp);
                 return Err(io(e));
@@ -779,18 +803,30 @@ mod tests {
     }
 
     #[test]
-    fn a_mixed_ending_file_is_left_as_lf_and_keeps_its_carriage_returns() {
+    fn a_mixed_ending_file_is_normalised_to_lf_for_the_editor() {
         let fixture = Fixture::new("mixed", true);
         let path = fixture.write_file("mixed.md", b"one\ntwo\r\nthree\n");
         let mut registry = PlainFileRegistry::default();
         let opened = registry.open(fixture.config.path(), &path).expect("open");
-        // No normalisation: the file is not COHERENTLY CRLF, so the text keeps
-        // its stray returns and a save writes those bytes back.
-        assert_eq!(opened.content, "one\ntwo\r\nthree\n");
+        // The editor cannot hold a bare `\r` (CodeMirror splits on
+        // `/\r\n?|\n/`), so the value handed to the frontend matches what it
+        // will render and a save writes LF. Keeping the `\r\n` here is what
+        // used to make the controlled-mirror effect mark an opened-but-untouched
+        // file dirty and rewrite it on the first autosave.
+        assert_eq!(opened.content, "one\ntwo\nthree\n");
         registry
             .write(opened.handle, &opened.content, &opened.base_hash)
             .expect("write");
-        assert_eq!(std::fs::read(&path).expect("read"), b"one\ntwo\r\nthree\n");
+        assert_eq!(std::fs::read(&path).expect("read"), b"one\ntwo\nthree\n");
+    }
+
+    #[test]
+    fn a_lone_cr_file_is_normalised_to_lf_for_the_editor() {
+        let fixture = Fixture::new("lone-cr", true);
+        let path = fixture.write_file("old-mac.md", b"one\rtwo\r");
+        let mut registry = PlainFileRegistry::default();
+        let opened = registry.open(fixture.config.path(), &path).expect("open");
+        assert_eq!(opened.content, "one\ntwo\n");
     }
 
     #[test]
@@ -854,8 +890,13 @@ mod tests {
     fn write_preserves_the_destination_permissions() {
         use std::os::unix::fs::PermissionsExt;
         let fixture = Fixture::new("perms", true);
+        // `0666` on purpose: a `0600` destination cannot hold the defect, since
+        // no umask narrows it and the old creation-time `mode` alone would pass
+        // this test. `0666` under a typical `0022` umask lands `0644` if the
+        // mode is only set at creation, so this pins that the destination's
+        // mode is re-applied after the temp is opened.
         let path = fixture.write_file("private.md", b"# secret");
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666)).expect("chmod");
 
         let mut registry = PlainFileRegistry::default();
         let opened = registry.open(fixture.config.path(), &path).expect("open");
@@ -864,7 +905,7 @@ mod tests {
             .expect("write");
 
         let mode = std::fs::metadata(&path).expect("meta").permissions().mode();
-        assert_eq!(mode & 0o777, 0o600);
+        assert_eq!(mode & 0o777, 0o666);
     }
 
     #[test]

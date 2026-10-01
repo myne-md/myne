@@ -270,4 +270,50 @@ describe("closure and dormancy", () => {
     expect(file(1).status).toBe("saved");
     expect(file(2).status).toBe("saved");
   });
+
+  it("save is a no-op for a tab already on disk", async () => {
+    openOne();
+    // `clean`: nothing to write, so blur/flush must not churn the file.
+    await save(1);
+    expect(writeMock).not.toHaveBeenCalled();
+
+    edit(1, "# typed");
+    await save(1);
+    expect(writeMock).toHaveBeenCalledTimes(1);
+
+    // Now `saved`; a second save (blur, flushAll, lock, pagehide) must not
+    // rewrite byte-identical content.
+    await save(1);
+    expect(writeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a lock parks settled tabs but keeps an unresolved one mounted", async () => {
+    openTwo();
+    await conflicted(); // handle 1 -> conflict; handle 2 stays settled
+    await dormancyForLock();
+
+    const state = __getPlainStoreStateForTest();
+    // The unresolved tab is NOT parked: parking removes it from `files`, the
+    // surface then unmounts, and the close intercept that guards a quit-while-
+    // locked goes with it, so its RAM-only text would be dropped silently.
+    expect(state.files.map((f) => f.handle)).toEqual([1]);
+    expect(state.dormant.map((f) => f.handle)).toEqual([2]);
+    expect(state.activeHandle).toBe(1);
+  });
+
+  it("an OS re-open while a tab is parked does not create a second tab", async () => {
+    openOne();
+    await dormancyForLock();
+    expect(__getPlainStoreStateForTest().files).toEqual([]);
+
+    // The OS re-opens the SAME file while the vault is locked (Finder
+    // double-click / a second-launch argv).
+    upsertOpened({ handle: 1, name: "note.md", content: "# disk", baseHash: "hash-1" });
+    expect(__getPlainStoreStateForTest().files).toEqual([]);
+
+    restoreDormant();
+    const state = __getPlainStoreStateForTest();
+    expect(state.files.map((f) => f.handle)).toEqual([1]);
+    expect(state.dormant).toEqual([]);
+  });
 });

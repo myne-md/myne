@@ -451,9 +451,9 @@ fn main() {
         .plugin(
             "plain-file",
             // myne-md/myne#788: the sandboxed editor for the user's own
-            // on-disk markdown files. This task ships the device-local gate;
-            // the file IO and ingress commands join this list in later tasks.
-            // Each command needs a matching `commands.allow` entry in
+            // on-disk markdown files. The commands are declared here so each
+            // gets an auto-generated `allow-`/`deny-` pair; each also needs a
+            // matching `commands.allow` entry in
             // `permissions/plain-file/default.toml` or the ACL resolver never
             // authorizes the `plugin:plain-file|<cmd>` invoke.
             tauri_build::InlinedPlugin::new().commands(&[
