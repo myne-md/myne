@@ -22,9 +22,24 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => {}) }));
 
 afterEach(cleanup);
 
-/** The segment for `days`, by the testid contract `${testId}-${value}`. */
-const segment = (days: number): HTMLElement =>
-  screen.getByTestId(`settings.reminders-horizon-picker-${days}`);
+/** The picker's trigger. The row is a `Select` since myne-md/myne#769; its
+ *  selected value rides on the trigger's `data-value` and its options exist
+ *  only while the menu is open. */
+const trigger = (): HTMLElement => screen.getByTestId("settings.reminders-horizon-picker");
+
+/** Open the menu and return its options, in order. */
+const openOptions = (): HTMLElement[] => {
+  fireEvent.click(trigger());
+  return screen.getAllByRole("option");
+};
+
+/** The open menu's option for `days`. Options share one testid (they are a
+ *  portal'd list), so they are addressed by the `data-value` each carries. */
+const option = (days: number): HTMLElement => {
+  const found = openOptions().find((el) => el.dataset.value === String(days));
+  if (found === undefined) throw new Error(`no horizon option for ${days}`);
+  return found;
+};
 
 describe("the horizon row", () => {
   it("hands the chosen horizon to the caller's setter", () => {
@@ -40,7 +55,7 @@ describe("the horizon row", () => {
         today="2026-07-28"
       />,
     );
-    fireEvent.click(segment(1));
+    fireEvent.click(option(1));
     expect(onChange).toHaveBeenCalledWith(1);
   });
 
@@ -95,11 +110,11 @@ describe("the horizon row", () => {
         today="2026-07-28"
       />,
     );
-    const offered = screen.getAllByRole("radio").map((el) => Number(el.dataset.value));
+    const offered = openOptions().map((el) => Number(el.dataset.value));
     expect(offered).toEqual([...REMINDER_HORIZON_CHOICES]);
   });
 
-  it("selects the default's segment for a vault that never set one", () => {
+  it("shows the default for a vault that never set one", () => {
     // `null` is a legitimate persisted state meaning "the default", not an
     // error. A picker showing the shortest option instead would misreport the
     // window actually in force.
@@ -111,7 +126,7 @@ describe("the horizon row", () => {
         today="2026-07-28"
       />,
     );
-    expect(segment(REMINDER_HORIZON_DAYS).dataset.active).toBe("true");
+    expect(trigger().dataset.value).toBe(String(REMINDER_HORIZON_DAYS));
   });
 
   it("labels each option in the active locale, with no catalog key per option", () => {
@@ -127,8 +142,10 @@ describe("the horizon row", () => {
         today="2026-07-28"
       />,
     );
-    expect(segment(7).textContent).toBe("7 days");
-    expect(segment(1).textContent).toBe("1 day");
+    // The trigger carries the CURRENT choice's label; the rest live in the
+    // menu, so both halves are read where they actually render.
+    expect(trigger().textContent).toBe("7 days");
+    expect(option(1).textContent).toBe("1 day");
   });
 
   it("renders nothing at all while reminders are off", () => {

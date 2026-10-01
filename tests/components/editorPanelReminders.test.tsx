@@ -86,10 +86,17 @@ afterEach(() => {
 });
 
 describe("the Editor panel's horizon row", () => {
-  it("reaches the setter when a segment is chosen", () => {
+  it("reaches the setter when a horizon is chosen", () => {
     render(<EditorPanel />);
     const shortest = REMINDER_HORIZON_CHOICES[0];
-    fireEvent.click(screen.getByTestId(`settings.reminders-horizon-picker-${shortest}`));
+    // The row is a `Select` (myne-md/myne#769): open its menu, then pick the
+    // option carrying the wire value (the portal'd options share one testid).
+    fireEvent.click(screen.getByTestId("settings.reminders-horizon-picker"));
+    const chosen = screen
+      .getAllByRole("option")
+      .find((el) => el.dataset.value === String(shortest));
+    expect(chosen).toBeTruthy();
+    fireEvent.click(chosen as HTMLElement);
     expect(setReminderHorizon).toHaveBeenCalledWith(shortest);
   });
 

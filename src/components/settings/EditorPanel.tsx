@@ -38,7 +38,7 @@ import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
 import { SettingRow } from "./SettingRow";
-import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -323,14 +323,14 @@ function TaskChipInkSetting(): ReactNode {
           >
             {t("settings.editor.taskChipColor.sample")}
           </span>
-          <Segmented
+          <Select
             options={TASK_CHIP_COLORS.map((c) => ({
               value: c,
               label: t(`settings.editor.taskChipColor.${c}`),
             }))}
             value={value}
             onChange={(v) => ws.setTaskDisplay({ ...ws.taskDisplay, chipColor: v as TaskChipColor })}
-            ariaLabel={t("settings.editor.taskChipColor.label")}
+            aria-label={t("settings.editor.taskChipColor.label")}
             ariaDescribedBy={helperId}
             testId="settings.editor.taskChipColor.control"
           />
