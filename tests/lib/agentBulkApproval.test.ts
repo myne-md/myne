@@ -198,33 +198,6 @@ describe("netDeletion", () => {
   });
 });
 
-describe("the approve-all gate counts both verbs", () => {
-  // The button asked `kept.length === 0`, which counts EDITS only, so a run
-  // that proposed only new notes (or one whose edits were all rejected) left it
-  // dead and its notes uncreatable: `approveAll` is the only path that sends
-  // `approvedNewNoteIndices`, and the per-edit route always sends an empty
-  // list. `apply()` already handled the case and its own comment records that
-  // an edit-count-only early return had caused exactly this once, in core.
-  //
-  // Asserted on the derivation rather than on the rendered button, because the
-  // derivation is what both the gate and the send path read.
-  function hasApprovedWork(edits: number, newNotes: number): boolean {
-    return edits > 0 || newNotes > 0;
-  }
-
-  it("is open for a proposal of only new notes", () => {
-    expect(hasApprovedWork(0, 2)).toBe(true);
-  });
-
-  it("is open for a proposal of only edits", () => {
-    expect(hasApprovedWork(3, 0)).toBe(true);
-  });
-
-  it("is closed only when neither verb has anything approved", () => {
-    expect(hasApprovedWork(0, 0)).toBe(false);
-  });
-});
-
 // **An append is not a removal, and flagging one would be a false statement to
 // the user at the moment they are deciding** (myne-md/myne#616).
 //

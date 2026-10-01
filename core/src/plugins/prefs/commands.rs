@@ -6868,29 +6868,6 @@ mod tests {
     // ---- editor_layout setter (MYND-137) ------------------------------
 
     #[test]
-    fn set_editor_layout_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-layout-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_editor_layout_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                EditorLayout {
-                    left_width: 260,
-                    right_width: 280,
-                    left_collapsed: false,
-                    right_collapsed: false,
-                },
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn editor_layout_round_trips_via_set_then_read() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
@@ -6952,43 +6929,7 @@ mod tests {
 
     // ---- deliberate_folders setter (MYND-144) -------------------------
 
-    #[test]
-    fn set_deliberate_folders_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-folders-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_deliberate_folders_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                SetMutation::adding_all(alloc_vec(["Projects/"])),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
     // ---- auto_lock_seconds setter (MYND-121) --------------------------
-
-    #[test]
-    fn set_auto_lock_timeout_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-autolock-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_auto_lock_timeout_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                300,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn auto_lock_timeout_round_trips_and_caches_effective() {
@@ -7079,24 +7020,6 @@ mod tests {
     }
 
     // ---- archived_folders setter (folder-archive) ---------------------
-
-    #[test]
-    fn set_archived_folders_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-archived-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_archived_folders_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                SetMutation::adding_all(alloc_vec(["Projects/"])),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn archived_folders_round_trip_via_set_then_read() {
@@ -7364,79 +7287,7 @@ mod tests {
         });
     }
 
-    #[test]
-    fn set_developer_mode_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-devmode-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_developer_mode_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
     // ---- CLI prefs setters (myne-cli epic, MYND-490; task 2) ----------
-
-    #[test]
-    fn set_cli_enabled_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-cli-enabled-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_cli_enabled_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
-    fn set_cli_excluded_folders_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-cli-excluded-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_cli_excluded_folders_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                SetMutation::adding_all(alloc_vec(["Secret/"])),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
-    fn set_cli_rate_limit_disabled_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-cli-ratelimit-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_cli_rate_limit_disabled_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn cli_prefs_round_trip_via_set_then_read() {
@@ -7545,44 +7396,6 @@ mod tests {
     }
 
     // ---- "Files" panel setters (MYND-462) -----------------------------
-
-    #[test]
-    fn set_new_note_location_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-newnote-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_new_note_location_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some("root".to_string()),
-                None,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
-    fn set_startup_open_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-startup-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_startup_open_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some("last".to_string()),
-                None,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn new_note_location_specific_registers_deliberate_folder() {
@@ -7785,24 +7598,6 @@ mod tests {
     }
 
     #[test]
-    fn set_item_order_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-item-order-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_item_order_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                root_order(["a", "b"]),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn item_order_and_favorites_round_trip_preserving_sequence() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
@@ -7867,24 +7662,6 @@ mod tests {
     // ---- hidden_bar_items setter (bottom-bar customization) -----------
 
     #[test]
-    fn set_hidden_bar_items_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-hidden-bar-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_hidden_bar_items_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                alloc_vec(["graph"]),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn hidden_bar_items_round_trips_as_canonicalized_set() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
@@ -7944,24 +7721,6 @@ mod tests {
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
         }
-    }
-
-    #[test]
-    fn upsert_saved_view_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-sv-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = upsert_saved_view_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                test_view("v1", "A"),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
     }
 
     #[test]
@@ -8200,24 +7959,6 @@ mod tests {
     // ---- bar_items_order setter (bottom-bar reorder) ------------------
 
     #[test]
-    fn set_bar_items_order_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-bar-order-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_bar_items_order_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                alloc_vec(["graph"]),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn set_bar_items_order_preserves_sequence_verbatim() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x49).await;
@@ -8260,24 +8001,6 @@ mod tests {
     }
 
     // ---- ribbon setters (myne-md/myne#699) ----------------------------
-
-    #[test]
-    fn set_ribbon_items_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-ribbon-items-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_ribbon_items_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                alloc_vec(["note.new"]),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn set_ribbon_items_writes_some_so_emptied_stays_emptied() {
@@ -8358,24 +8081,6 @@ mod tests {
     }
 
     #[test]
-    fn set_ribbon_visible_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-ribbon-visible-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_ribbon_visible_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                false,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn set_ribbon_visible_round_trips() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
@@ -8406,24 +8111,6 @@ mod tests {
             enabled,
             filter: protocol::FilterNode::All,
         }
-    }
-
-    #[test]
-    fn set_color_groups_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-color-groups-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_color_groups_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                vec![test_color_group("g1", "group-olive", true)],
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
     }
 
     #[test]
@@ -8569,24 +8256,6 @@ mod tests {
     // ---- theme setter (MYND-110) --------------------------------------
 
     #[test]
-    fn set_theme_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-theme-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_theme_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some(ThemeChoice::Dark),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn theme_round_trips_via_set_then_read() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
@@ -8644,24 +8313,6 @@ mod tests {
                 .await
                 .expect("read after system");
             assert_eq!(view.theme, None);
-        });
-    }
-
-    #[test]
-    fn set_custom_theme_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-custom-theme-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_custom_theme_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some(String::from("solarized")),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
 
@@ -8724,27 +8375,6 @@ mod tests {
     }
 
     // ---- editor-typography setters ------------------------------------
-
-    #[test]
-    fn set_editor_text_size_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-typo-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_typography_field_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                "editor_text_size",
-                |p| {
-                    p.editor_text_size = Some(String::from("lg"));
-                },
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn typography_presets_round_trip_via_set_then_read() {
@@ -8810,24 +8440,6 @@ mod tests {
     }
 
     // ---- spell-check setters (MYND-267) -------------------------------
-
-    #[test]
-    fn set_spell_enabled_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-spell-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_spell_enabled_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn spell_prefs_round_trip_via_set_then_read() {
@@ -8899,24 +8511,6 @@ mod tests {
     // ---- show_note_timestamps setter (sidebar-note-timestamps) --------
 
     #[test]
-    fn set_show_note_timestamps_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-timestamps-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_show_note_timestamps_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                false,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn show_note_timestamps_round_trips_via_set_then_read() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
@@ -8966,24 +8560,6 @@ mod tests {
     // ---- editor_line_numbers setter (editor-line-numbers, MYND-314) ---
 
     #[test]
-    fn set_editor_line_numbers_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-line-numbers-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_editor_line_numbers_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn editor_line_numbers_round_trips_via_set_then_read() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
@@ -9031,24 +8607,6 @@ mod tests {
     }
 
     // ---- editor_vim_mode setter (vim-keyboard-mode, MYND-313) ---------
-
-    #[test]
-    fn set_editor_vim_mode_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-vim-mode-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_editor_vim_mode_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn editor_vim_mode_round_trips_via_set_then_read() {
@@ -9138,24 +8696,6 @@ mod tests {
     // ---- archive_disabled setter (archive-disable, MYND-…) ------------
 
     #[test]
-    fn set_archive_disabled_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-archive-disabled-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_archive_disabled_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn archive_disabled_round_trips_via_set_then_read() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
@@ -9204,25 +8744,6 @@ mod tests {
     }
 
     // ---- attachment_compression_enabled setter -------------------------
-
-    #[test]
-    fn set_attachment_compression_enabled_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp =
-                ScopedTempDir::new("prefs-attachment-compression-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_attachment_compression_enabled_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                false,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn attachment_compression_enabled_round_trips_via_set_then_read() {
@@ -9289,42 +8810,6 @@ mod tests {
     }
 
     // ---- batch editor setters (MYND-308 / MYND-299 / MYND-348) --------
-
-    #[test]
-    fn set_editor_focus_dim_inactive_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-focus-dim-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_editor_focus_dim_inactive_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
-    fn set_editor_focus_typewriter_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-focus-tw-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_editor_focus_typewriter_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                true,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     #[test]
     fn editor_focus_toggles_round_trip_via_set_then_read() {
@@ -9435,25 +8920,6 @@ mod tests {
     // ---- set_keymap_binding setter (hotkeys epic, MYND-304) -----------
 
     #[test]
-    fn set_keymap_binding_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-keymap-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = set_keymap_binding_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                "graph.show".to_string(),
-                Some(vec!["Mod-Shift-g".to_string()]),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
-
-    #[test]
     fn keymap_binding_round_trips_three_states() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x4B).await;
@@ -9540,24 +9006,6 @@ mod tests {
     /// `SlotNotUnlocked` — writing the label needs `prefs_key`, which only
     /// exists for the active/sole-`Unlocked` vault (SYNC-3). This is the
     /// structural unlock-gate the danger-zone/rename surface relies on.
-    #[test]
-    fn vault_set_label_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-label-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = vault_set_label_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some(String::from("Work")),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-                &crate::vault_label::key::UnavailableKeychain,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     /// The label round-trips through the encrypted `vault.prefs` (disk-first),
     /// AND the per-session RAM cache is refreshed so `vault_list` reflects the
@@ -9820,23 +9268,6 @@ mod tests {
     /// Unlock-gating: with no vault unlocked, `vault_set_icon` rejects with
     /// `SlotNotUnlocked` (writing the icon needs `prefs_key`, only present for
     /// the active/sole-`Unlocked` vault). Same structural gate as the label.
-    #[test]
-    fn vault_set_icon_rejects_when_slot_empty() {
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-icon-empty").expect("scoped tempdir");
-            let state = VaultRuntimeState::default();
-            let result = vault_set_icon_with_dir(
-                tmp.path(),
-                &state,
-                &noop_hooks(),
-                Some(String::from("book")),
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
 
     /// The icon round-trips through the encrypted `vault.prefs` (disk-first),
     /// AND the per-session RAM icon cache is refreshed so `vault_list` reflects

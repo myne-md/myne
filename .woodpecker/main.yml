@@ -544,9 +544,10 @@ steps:
       - node scripts/check-mobile-plugin-acl.mjs
       # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
       # narrow Rust mirror in the export rewrite share one numeric bound. Both
-      # sides claimed the published embed-layout vectors held them together, and
-      # that vector step is commented out below pending a vectors_token secret,
-      # so the stated lock ran nowhere. This one runs.
+      # sides claimed the published embed-layout vectors held them together, but
+      # the vector step below needs a VECTORS_TOKEN it only resolves on
+      # push/manual, so on pull_request the stated lock ran green and empty.
+      # This one runs on every PR.
       - node scripts/check-embed-layout-drift.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain

@@ -106,11 +106,14 @@ mod tests {
 
     #[test]
     fn decode_rejects_garbage() {
-        // postcard is a binary format; arbitrary bytes usually fail to decode
-        // into the two-Vec<String> shape. A defensive None keeps the caller on
-        // the fall-back-to-empty path.
+        // postcard is a binary format; an unterminated varint length cannot
+        // decode into the two-Vec<String> shape. A defensive None keeps the
+        // caller on the fall-back-to-empty path.
         let garbage = [0xFFu8; 4];
-        let _ = PersonalDictionaryData::decode(&garbage); // must not panic
+        assert!(
+            PersonalDictionaryData::decode(&garbage).is_none(),
+            "a malformed payload must decode to None, not a partial dictionary"
+        );
     }
 
     #[test]
