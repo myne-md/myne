@@ -214,6 +214,23 @@ pre-commit:
       glob: "{mobile/**,scripts/check-mobile-plugin-acl.mjs}"
       run: node scripts/check-mobile-plugin-acl.mjs
 
+    ios-extensions:
+      # myne#803: the iOS widget + Apple Watch targets live only in the
+      # committed `mobile/src-tauri/ios/project.yml`, re-applied by
+      # `mobile/scripts/ios-postinit.sh` (the `tauri ios init` tree is
+      # regenerated and git-ignored). A reset silently drops every native
+      # extension: Myne.app ships with no PlugIns/ and no Watch/, no compiler or
+      # test reports anything, and it is only visible on a device — which is how
+      # the v0.8.2 TestFlight build went out phone-only. On a machine with the
+      # generated project this also fails while it is unsynced, the exact
+      # "ran init and forgot" state.
+      #
+      # Globbed like its mobile neighbours above: every side of the property is
+      # under mobile/ (plus this guard), so a docs- or protocol-only commit has
+      # nothing here to break.
+      glob: "{mobile/**,scripts/check-ios-extensions.mjs}"
+      run: node scripts/check-ios-extensions.mjs
+
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
       # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a

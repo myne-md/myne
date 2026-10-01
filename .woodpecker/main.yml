@@ -542,6 +542,14 @@ steps:
       # command in that plugin at runtime, silently. All 27 directories, both
       # directions.
       - node scripts/check-mobile-plugin-acl.mjs
+      # myne#803: the iOS widget + Apple Watch targets are wired only through a
+      # committed source of truth re-applied by `mobile/scripts/ios-postinit.sh`
+      # (the `tauri ios init` tree is regenerated and git-ignored). A reset drops
+      # every native extension and the app ships phone-only with nothing failing,
+      # which is exactly what happened to the v0.8.2 TestFlight build. This checks
+      # the wired spec, the version-by-build-setting rule and the mechanism, and
+      # — on a machine that has the generated project — that it was synced.
+      - node scripts/check-ios-extensions.mjs
       # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
       # narrow Rust mirror in the export rewrite share one numeric bound. Both
       # sides claimed the published embed-layout vectors held them together, and
