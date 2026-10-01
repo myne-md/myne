@@ -9002,11 +9002,6 @@ mod tests {
 
     // ---- vault_set_label setter (MYND-205) ----------------------------
 
-    /// Unlock-gating: with no vault unlocked, `vault_set_label` rejects with
-    /// `SlotNotUnlocked` — writing the label needs `prefs_key`, which only
-    /// exists for the active/sole-`Unlocked` vault (SYNC-3). This is the
-    /// structural unlock-gate the danger-zone/rename surface relies on.
-
     /// The label round-trips through the encrypted `vault.prefs` (disk-first),
     /// AND the per-session RAM cache is refreshed so `vault_list` reflects the
     /// rename immediately. Clearing (`None`) round-trips back to no-label and
@@ -9264,10 +9259,6 @@ mod tests {
     }
 
     // ---- vault_set_icon setter (vault-icons) ---------------------------
-
-    /// Unlock-gating: with no vault unlocked, `vault_set_icon` rejects with
-    /// `SlotNotUnlocked` (writing the icon needs `prefs_key`, only present for
-    /// the active/sole-`Unlocked` vault). Same structural gate as the label.
 
     /// The icon round-trips through the encrypted `vault.prefs` (disk-first),
     /// AND the per-session RAM icon cache is refreshed so `vault_list` reflects
