@@ -317,12 +317,12 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     // The plain-file editor (myne-md/myne#788). Both gates, and they are
     // independent: `capability` keeps search from navigating to a row the web
-    // bundle does not render (the plugin is absent there), and
-    // `developerGated` keeps it from scrolling to a row EditorPanel hides
-    // while Developer mode is off (the #181 shape the vim entry above carries).
+    // bundle does not render (the plugin is absent there). NOT
+    // `developerGated`: the row is on by default and not behind Developer mode
+    // (amended 2026-10-01), so search must find the off-switch for every user
+    // rather than hiding it until Developer mode is on.
     id: "editor.plain-file",
     capability: "plainFile",
-    developerGated: true,
     panelId: "editor",
     testid: "settings.plain-file",
     titleKey: "settings.plainFile.label",

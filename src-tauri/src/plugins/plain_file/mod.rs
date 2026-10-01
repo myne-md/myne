@@ -23,10 +23,13 @@
 //! window: the plain surface renders in the main webview in every vault state,
 //! so the capability set does not multiply.
 //!
-//! ## OS-level traces (task 6's checklist, verified 2026-09-30)
+//! ## OS-level traces (task 6's checklist; re-checked 2026-10-01)
 //!
-//! The surface leaves no OS-level record of which files were opened. Three
-//! candidates were checked:
+//! The surface leaves no OS-level record of which files were opened. Registering
+//! the app as a macOS/Windows handler for `md`/`markdown`
+//! (`bundle.fileAssociations`, added 2026-10-01) makes the app an editor OF the
+//! type; it does not itself feed a per-file list, and the three candidates
+//! below were re-checked with the registration in place:
 //!
 //! - **macOS Recent Documents**: nothing in this repository calls
 //!   `noteNewRecentDocumentURL` / `addRecentDocument`
@@ -52,6 +55,14 @@ pub mod ingest;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime};
+
+/// Menu id of the app menu's File → Open File… item (`lib.rs`).
+///
+/// The item is the discoverable entry point for the surface: the in-surface
+/// Open button renders only once a file is already open, so without a menu (or
+/// an OS ingress) there is no way to open the FIRST file. The menu is built
+/// host-side in `lib.rs`, so no `core:menu` capability is involved.
+pub const OPEN_FILE_MENU_ID: &str = "plain-file-open";
 
 /// Construct the `plain_file` plugin.
 ///

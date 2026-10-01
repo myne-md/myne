@@ -1,5 +1,6 @@
-// Settings → Developer: enable the plain-file editor on this device
-// (myne-md/myne#788).
+// Settings → Editor: enable the plain-file editor on this device
+// (myne-md/myne#788). On by default and NOT behind Developer mode (amended
+// 2026-10-01), so the off-switch is findable by every user.
 //
 // A DEVICE-LOCAL switch, not a vault preference, and that is the point: the
 // surface it gates must work with the vault locked and on a device that has no

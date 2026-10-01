@@ -13,9 +13,14 @@
 //! device-local file, the same class as `tor-routing.json` and
 //! `screen-capture.json`. See the feature's decisions entry.
 //!
-//! **Which way each failure falls: absent, unreadable or malformed all resolve
-//! to disabled.** Failing open would open plaintext on a device whose config
-//! failed to parse, which is the direction this file must never take.
+//! **Which way each failure falls: absent resolves to ENABLED, while
+//! unreadable or malformed resolves to disabled.** The feature is ON by default
+//! (amended 2026-10-01): a device that has never written this file has made no
+//! choice, and the plain-file editor is a normal feature rather than a
+//! Developer-options opt-in. A file that EXISTS but cannot be trusted is a
+//! different state, though, and is read as off: opening plaintext on the
+//! strength of bytes nobody can parse is the direction this file must never
+//! take, so absence and corruption answer differently on purpose.
 //!
 //! Errors are closed, `Serialize`, and carry no `String` and no path: a path
 //! in an error message is a disclosure (`src-tauri/AGENTS.md` DENY list).
@@ -62,15 +67,17 @@ pub fn gate_path_in(config_dir: &Path) -> PathBuf {
 
 /// Whether the plain-file editor is enabled on this device.
 ///
-/// Never errors: absent, unreadable and malformed all answer `false`, which is
-/// the fail-closed direction the module doc states.
+/// Never errors. An ABSENT file answers `true` (the feature is on by default);
+/// an unreadable or malformed one answers `false`. The two are deliberately
+/// different states: see the module doc.
 pub fn read_gate(path: &Path) -> bool {
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return false;
-    };
-    serde_json::from_str::<PlainFileGate>(&raw)
-        .map(|gate| gate.enabled)
-        .unwrap_or(false)
+    match std::fs::read_to_string(path) {
+        Ok(raw) => serde_json::from_str::<PlainFileGate>(&raw)
+            .map(|gate| gate.enabled)
+            .unwrap_or(false),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+        Err(_) => false,
+    }
 }
 
 /// Persist the gate.
@@ -100,9 +107,21 @@ mod tests {
     use myne_core::test_support::ScopedTempDir;
 
     #[test]
-    fn absent_file_is_disabled() {
+    fn absent_file_is_enabled() {
+        // The feature is on by default: a device that never wrote this file has
+        // made no choice, so absence answers enabled.
         let dir = ScopedTempDir::new("plain-file-gate-absent").expect("tempdir");
-        assert!(!read_gate(&gate_path_in(dir.path())));
+        assert!(read_gate(&gate_path_in(dir.path())));
+    }
+
+    #[test]
+    fn unreadable_path_fails_closed() {
+        // A path that EXISTS but cannot be read as a file (here: a directory)
+        // is corruption-class, not absence-class, and answers disabled.
+        let dir = ScopedTempDir::new("plain-file-gate-unreadable").expect("tempdir");
+        let path = gate_path_in(dir.path());
+        std::fs::create_dir(&path).expect("seed directory where the file belongs");
+        assert!(!read_gate(&path));
     }
 
     #[test]

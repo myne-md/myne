@@ -8,6 +8,9 @@
 //   pf3  a seeded (locked) vault: the surface still opens over the Unlock
 //        screen; an external write raises the conflict banner; Myne writes
 //        NOTHING until the user chooses, and Reload adopts the disk text.
+//   pf4  a vault-less device with NO gate file: the surface STILL opens,
+//        because the gate is on by default (amended 2026-10-01). Absent and
+//        false are different states now; pf2 covers the false one.
 //
 // ## Why argv is the ingress here
 //
@@ -21,9 +24,10 @@
 //
 // `plain-file.json` lives under `app_config_dir`, not in a vault, which is
 // what lets pf1 open a file on a device that has never had a vault and pf3
-// open one with the vault LOCKED. Writing it from `seedConfig` also pins the
-// fail-closed read in the other direction (pf2: absent or false means the
-// same launch opens nothing).
+// open one with the vault LOCKED. `seedConfig` writes it both ways (pf2 false,
+// pf3 true); pf4 leaves it ABSENT to pin the default-on read. The three are
+// genuinely different inputs: absent resolves to enabled, while a malformed or
+// unreadable file resolves to disabled (myne-md/myne#788, amended 2026-10-01).
 //
 // The file the app edits is a real file in the container's `/tmp`, written and
 // read by the test process, so "what landed on disk" is asserted against the
@@ -152,6 +156,27 @@ describeE2E("plain-file editor", () => {
             : true;
         });
         expect(readFileSync(file, "utf8")).toBe(theirs);
+      },
+    );
+  });
+
+  it("pf4: with NO gate file the surface opens (the feature is on by default)", async () => {
+    const file = scratchFile(`myne-plain-pf4-${process.pid}.md`);
+    writeFileSync(file, "# Default on\n");
+
+    await scenario(
+      "pf4-default-on",
+      {
+        args: [file],
+        // No `seedConfig`: the device has never written `plain-file.json`, and
+        // an absent gate resolves to ENABLED. This is the half pf2 does not
+        // cover, because absent and false are different states (amended
+        // 2026-10-01).
+      },
+      async (app) => {
+        await app.session.waitForElement(testIdSelector("plain-file.marker"));
+        const tab = await app.session.byTestId("plain-file.tab");
+        expect(await tab.text()).toContain("pf4");
       },
     );
   });

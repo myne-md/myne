@@ -14,12 +14,13 @@
 // ratchet stays flat (`scripts/check-token-adoption.mjs`: a new file starts at
 // zero). The custom vault palette never reaches here (MYT1 is vault content).
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor";
 import i18n from "../i18n";
 import { Icon } from "../components/primitives/Icon";
 import { StatusMark } from "../components/Spinner";
+import { MIN_TARGET } from "../components/primitives/targetSize";
 import { ImportPlainFileButton } from "../components/plain/ImportPlainFileButton";
 import { confirm as dialogConfirm } from "../platform/dialog";
 import { getCurrentWebviewWindow } from "../platform/webviewWindow";
@@ -90,9 +91,15 @@ export function PlainFileScreen() {
   const { files, activeHandle } = usePlainFileState();
   const active = files.find((file) => file.handle === activeHandle) ?? null;
 
-  useEffect(() => {
-    // The open subscription + drain live at App level (they must exist before
-    // the first file); this effect only marks which surface owns the host.
+  // Mark the host owned in a LAYOUT effect, which React flushes during commit,
+  // before any child's PASSIVE effect runs. `CMEditor` creates its
+  // `EditorView` (building the attachment-catalog and spell ViewPlugins) in a
+  // passive `useEffect`, so a passive effect here would run AFTER it and leave
+  // the first render's ambient reads (`catalogList` / `prefsRead` through the
+  // editor host) unguarded, reaching the vault. A layout effect here runs
+  // before that, and unlike a bare render-body write it stays render-pure and
+  // is cleaned up on the abandoned/strict-mode path.
+  useLayoutEffect(() => {
     setPlainSurfaceActive(true);
     return () => {
       setPlainSurfaceActive(false);
@@ -227,7 +234,18 @@ export function PlainFileScreen() {
         >
           {files.map((file) => {
             const isActive = file.handle === activeHandle;
-            const dirty = file.status === "editing" || file.status === "saving";
+            // One shape per FACT (`docs/design/README.md`): text merely waiting
+            // for the autosave is `circle-dashed`, a write actually in flight
+            // is `loader-circle` and spinning. Collapsing them would tell the
+            // user a save is happening when it is only scheduled.
+            const editing = file.status === "editing";
+            const saving = file.status === "saving";
+            // A buffer that did NOT land (I/O error, or an external change) is
+            // not "dirty" in the same sense, but it must not render like a
+            // clean tab either: the banner that explains it renders only for
+            // the ACTIVE tab, so a backgrounded failed tab would otherwise be
+            // indistinguishable from a saved one.
+            const failed = file.status === "error" || file.status === "conflict";
             return (
               <div
                 key={file.handle}
@@ -248,6 +266,7 @@ export function PlainFileScreen() {
                   data-testid="plain-file.tab"
                   onClick={() => setActive(file.handle)}
                   style={{
+                    ...MIN_TARGET,
                     display: "flex",
                     alignItems: "center",
                     gap: "var(--space-1)",
@@ -263,22 +282,52 @@ export function PlainFileScreen() {
                       unicode symbol standing in for an icon. Mark only, no
                       accessible name, because the tab's text already names the
                       file and the banner below states what is wrong with it. */}
-                  {dirty && (
+                  {editing && (
                     <StatusMark
                       name="circle-dashed"
-                      label={null}
+                      label={t("plainFile.unsaved")}
                       title={t("plainFile.unsaved")}
                       testId="plain-file.tab-dirty"
+                    />
+                  )}
+                  {saving && (
+                    <StatusMark
+                      name="loader-circle"
+                      label={t("plainFile.unsaved")}
+                      title={t("plainFile.unsaved")}
+                      tone="accent"
+                      spinning
+                      testId="plain-file.tab-saving"
+                    />
+                  )}
+                  {failed && (
+                    <StatusMark
+                      name="circle-x"
+                      label={t("plainFile.saveError")}
+                      title={t("plainFile.saveError")}
+                      testId="plain-file.tab-failed"
                     />
                   )}
                 </button>
                 <button
                   aria-label={t("plainFile.closeTab", { name: file.name })}
                   data-testid="plain-file.close"
-                  onClick={() => void close(file.handle)}
+                  onClick={() => {
+                    // A failed tab refuses to close (`store.ts::close` keeps it
+                    // because its text exists only in RAM). Selecting it makes
+                    // the banner that owns the resolution visible instead of
+                    // the click doing nothing.
+                    if (failed) {
+                      setActive(file.handle);
+                      return;
+                    }
+                    void close(file.handle);
+                  }}
                   style={{
+                    ...MIN_TARGET,
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     border: "none",
                     background: "transparent",
                     color: "var(--fg-2)",

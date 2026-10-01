@@ -490,6 +490,59 @@ pub fn run() {
             // 19041+. The main window is declared `"visible": false` in
             // `tauri.conf.json` so this is the only `show()` call.
             screen_capture::init(app)?;
+            // myne-md/myne#788: File → Open File… (⌘O), the discoverable entry
+            // point for the plain-file editor. The in-surface Open button
+            // renders only once a file is ALREADY open (`PlainFileScreen`
+            // mounts on `files.length > 0`), so without this menu item a
+            // running app has no way to open the first file. Built by
+            // extending Tauri's platform default menu (the app/Edit/View/
+            // Window/Help submenus stay), host-side in Rust, so the capability
+            // set gains no `core:menu` grant. The handler is silent on a
+            // gate-off device and on a cancelled picker, matching the OS
+            // ingresses; the dialog command carries the typed refusal for the
+            // in-app caller.
+            {
+                use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
+                let menu = Menu::default(app.handle())?;
+                let open_item = MenuItem::with_id(
+                    app.handle(),
+                    plugins::plain_file::OPEN_FILE_MENU_ID,
+                    "Open File…",
+                    true,
+                    Some("CmdOrCtrl+O"),
+                )?;
+                // The platform default carries a File submenu on macOS and
+                // Windows but not on Linux/BSD, so create one when it is
+                // absent rather than dropping the item.
+                let mut file_submenu = None;
+                for item in menu.items()? {
+                    if let MenuItemKind::Submenu(sub) = item {
+                        if sub.text().map(|t| t == "File").unwrap_or(false) {
+                            file_submenu = Some(sub);
+                            break;
+                        }
+                    }
+                }
+                let file = match file_submenu {
+                    Some(sub) => sub,
+                    None => {
+                        let sub = Submenu::with_id(app.handle(), "file-menu", "File", true)?;
+                        menu.prepend(&sub)?;
+                        sub
+                    }
+                };
+                file.prepend(&PredefinedMenuItem::separator(app.handle())?)?;
+                file.prepend(&open_item)?;
+                app.set_menu(menu)?;
+                app.on_menu_event(|handle, event| {
+                    if event.id() == plugins::plain_file::OPEN_FILE_MENU_ID {
+                        let handle = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = plugins::plain_file::commands::open_dialog(handle).await;
+                        });
+                    }
+                });
+            }
             // MYND-121: start the authoritative, fail-closed idle-lock timer.
             // Runs for the process lifetime; no-op until a vault is Unlocked.
             auto_lock::spawn_idle_lock_timer(app.handle().clone());
