@@ -592,28 +592,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn mint_unique_retries_when_first_minted_dir_exists() {
-        // Deterministic collision exercise: pre-create a directory for a
-        // KNOWN minted id, then confirm `vaults/<that id>/` is recognized as
-        // occupied (the predicate the retry loop branches on). This pins the
-        // mint-and-retry decision without RNG injection.
-        let tmp = ScopedTempDir::new("mint-retry").unwrap();
-        let first = VaultId::mint();
-        let first_dir = tmp.path().join(VAULTS_DIR_NAME).join(first.to_string());
-        std::fs::create_dir_all(&first_dir).unwrap();
-        assert!(first_dir.exists(), "pre-seeded the first id's directory");
-
-        // A second, independently-minted id is necessarily distinct and its
-        // dir does not exist → it is what the loop would settle on.
-        let second = mint_unique_vault_id(tmp.path());
-        assert_ne!(second, first);
-        assert!(!tmp
-            .path()
-            .join(VAULTS_DIR_NAME)
-            .join(second.to_string())
-            .exists());
-    }
+    // `mint_unique_retries_when_first_minted_dir_exists` was removed
+    // (myne-md/myne#802): `mint_unique_vault_id` mints its own id and exposes no
+    // RNG seam, so the collision predicate cannot be exercised deterministically.
+    // The test minted an independent id, and `assert_ne!` on two UUIDv7 draws is
+    // randomness rather than the retry. `mint_unique_skips_a_pre_seeded_colliding_id`
+    // above already pins the observable contract.
 
     // ---- registry: rebuild path ----------------------------------------
 

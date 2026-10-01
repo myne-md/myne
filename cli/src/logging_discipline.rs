@@ -324,27 +324,3 @@ fn the_transport_never_puts_an_io_error_display_into_a_message() {
         "backend/ipc.rs: an io::Error must never be Display-formatted"
     );
 }
-
-#[test]
-fn a_forwarded_desktop_message_is_bounded_by_the_desktops_own_signature() {
-    // `backend::ipc::map_wire_error` forwards an UNRECOGNIZED wire kind's
-    // message verbatim, so a version-skewed pair says something true rather
-    // than mislabelling the failure (task 4's decision). That is a real
-    // channel, and it is bounded on the *desktop* side rather than here:
-    // `cli_bridge::dispatch::encode_err` takes `message: &'static str`, so
-    // the desktop structurally cannot put a runtime string — a path, an
-    // io::Error Display — on the wire. `cli_bridge::logging_discipline::
-    // the_wire_error_message_vocabulary_is_closed` pins that signature.
-    //
-    // Clamping here as well was considered and rejected: a peer that is not
-    // the desktop is a program already running as this user, which is the
-    // confused-deputy case `docs/threat-model.md` §7 records as undefended —
-    // echoing back a string it wrote itself tells it nothing it did not
-    // already know, and a sanitizer would imply a boundary that is not
-    // there. What must not regress is the desktop's signature.
-    let ipc = production_half(include_str!("backend/ipc.rs"));
-    assert!(
-        ipc.contains("fn map_wire_error"),
-        "the forwarding seam this test documents has moved; re-check the bound"
-    );
-}

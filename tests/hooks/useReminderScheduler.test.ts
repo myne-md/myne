@@ -207,16 +207,22 @@ describe("the catch-up pass", () => {
   });
 
   it("does nothing without a notifier — an unsupported platform is not an error", async () => {
+    const onPass = vi.fn();
     const unmount = mount({
       enabled: true,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: null,
       horizonDays: null,
       clock: () => NOW,
+      onPass,
     });
     await act(async () => {
       await Promise.resolve();
     });
+    // The `notifier === null` guard (useReminderScheduler.ts:148) returns before
+    // a pass is ever built, so nothing is reported. Removing that guard would
+    // run the pass (against a null notifier) and report it here.
+    expect(onPass).not.toHaveBeenCalled();
     unmount();
   });
 
