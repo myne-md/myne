@@ -72,17 +72,26 @@ The committed spec declares:
 2. **`MyneWatchComplications` target** — watchOS `app-extension`,
    `com.apple.widgetkit-extension`, embedded into `MyneWatch` via a
    `- target: MyneWatchComplications` dependency, bundle id
-   `md.myne.mobile.watchkitapp.complication`. It also compiles
-   `../../../ios-watch/Shared` — `MyneMark()` is used by the complication view, so
-   that file is a source of BOTH watch targets (omitting it fails the compile).
-3. **On the iOS app target (`myne-mobile_iOS`):** `- target: MyneWatch` (embeds the
-   watch app into `Watch/`), `- sdk: WatchConnectivity.framework`, the
-   `- path: ../../../ios-watch/Receiver` source, `SWIFT_VERSION: "5.0"` in
-   `settings.base` (the app compiles Swift only because of the receiver), and
-   `OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]` —
-   force-retains the receiver class, which is reached only via `NSClassFromString`
-   from the `+load` bootstrap and would otherwise be at risk of a silent dead-code
-   strip (apple/swift SR-3333).
+   `md.myne.mobile.watchkitapp.ext`. (`.ext`, not `.complication`: Apple bundle IDs
+   are globally unique and `…watchkitapp.complication` was already taken, so it
+   could not be registered. The extension only has to be a dot-child of the watch
+   app's id.) It also compiles `../../../ios-watch/Shared` — `MyneMark()` is used
+   by the complication view, so that file is a source of BOTH watch targets
+   (omitting it fails the compile).
+3. **On the iOS app target (`myne-mobile_iOS`):** the watch is NOT a target
+   dependency. `tauri ios build` archives the scheme under `-sdk iphoneos`, and
+   that flag overrides a target's `SDKROOT`, so a linked watch target is compiled
+   against the iOS SDK and every watchOS WidgetKit API in the complication fails
+   as "only available in iOS 16+", killing the archive. Instead two script phases
+   do the work: `mobile/scripts/ios-watch-build.sh` builds `MyneWatch` with an
+   explicit `-sdk watchos` and stages it at `gen/apple/watch-build/`, and
+   `mobile/scripts/ios-watch-embed.sh` copies it to `Myne.app/Watch/` (Apple
+   requires exactly that path). The app still carries `- sdk:
+   WatchConnectivity.framework`, the `- path: ../../../ios-watch/Receiver` source,
+   `SWIFT_VERSION: "5.0"`, and `OTHER_LDFLAGS: ["$(inherited)",
+   "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]` — which force-retains the receiver
+   class, reached only via `NSClassFromString` from the `+load` bootstrap and
+   otherwise at risk of a silent dead-code strip (apple/swift SR-3333).
 
 ## Build / CI reality
 

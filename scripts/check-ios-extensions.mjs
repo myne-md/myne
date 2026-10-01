@@ -43,7 +43,10 @@ const PLISTS = [
   "mobile/ios-watch/MyneWatchComplications/Info.plist",
 ];
 const TARGETS = ["MyneWidgets", "MyneWatch", "MyneWatchComplications"];
-const EMBEDS = ["MyneWidgets", "MyneWatch"];
+// Only the widget is embedded via a target dependency. MyneWatch is built and
+// copied by script phases instead (see below); embedding it as a dependency is
+// the break this guard exists to prevent.
+const EMBEDS = ["MyneWidgets"];
 const SOURCE_DIRS = [
   ["mobile/ios-widgets/MyneWidgets", "../../../ios-widgets/MyneWidgets"],
   ["mobile/ios-watch/MyneWatch", "../../../ios-watch/MyneWatch"],
@@ -133,8 +136,37 @@ for (const rel of PLISTS) {
 
 // The re-apply mechanism itself, so removing it fails here rather than at the
 // next dropped release.
-for (const rel of ["mobile/scripts/ios-postinit.sh", "mobile/scripts/tauri.sh"]) {
-  if (!existsSync(join(repoRoot, rel))) failures.push(`${rel}: missing — the iOS re-apply mechanism is gone.`);
+for (const rel of [
+  "mobile/scripts/ios-postinit.sh",
+  "mobile/scripts/tauri.sh",
+  "mobile/scripts/ios-watch-build.sh",
+  "mobile/scripts/ios-watch-embed.sh",
+]) {
+  if (!existsSync(join(repoRoot, rel))) failures.push(`${rel}: missing — the iOS re-apply/build mechanism is gone.`);
+}
+if (spec !== null) {
+  // The watch is built by a script phase, NOT a target dependency: a dependency
+  // would be compiled by `tauri ios build`'s `-sdk iphoneos` and die on every
+  // watchOS WidgetKit API. Both halves of that mechanism have to stay wired.
+  //
+  // Scoped to the app target's body, because `- target: MyneWatch` legitimately
+  // appears inside the MyneWatch target itself (its complication dependency).
+  const clean = stripComments(spec);
+  const appBody = clean.slice(clean.indexOf("myne-mobile_iOS:"));
+  const appTarget = appBody.slice(0, appBody.indexOf("\n  MyneWidgets:"));
+  if (/\n\s+- target: MyneWatch\b/.test(appTarget)) {
+    failures.push(
+      `${SPEC}: MyneWatch is a target dependency of the app again. Tauri's ` +
+        `\`xcodebuild archive -sdk iphoneos\` will compile it against the iOS SDK ` +
+        `and the complication fails ("only available in iOS 16+"). Build it via ` +
+        `ios-watch-build.sh and embed via ios-watch-embed.sh instead.`,
+    );
+  }
+  for (const marker of ["ios-watch-build.sh", "ios-watch-embed.sh"]) {
+    if (!clean.includes(marker)) {
+      failures.push(`${SPEC}: the watch build/embed wiring (\`${marker}\`) is gone.`);
+    }
+  }
 }
 const pkgText = read("mobile/package.json");
 if (pkgText !== null) {
