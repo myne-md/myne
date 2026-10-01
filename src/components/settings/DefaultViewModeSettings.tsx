@@ -1,8 +1,10 @@
 // Settings → Editor: default view mode (reading-source-modes, MYND-299).
-// A three-way segmented control (Live preview / Reading / Source) persisting the
-// `editor_default_view_mode` pref. Uses the shared `Segmented` primitive (like the
-// sibling TypographySettings rows) for a consistent look + E2E hooks. Self-
-// contained: local state loaded on mount, disk-first persist, no in-flight gating.
+// A three-way picker (Live preview / Reading / Source) persisting the
+// `editor_default_view_mode` pref. Uses the shared `Select` primitive (like
+// every other row-level picker in Settings, whatever its option count —
+// docs/design/README.md "Which picker", myne-md/myne#769) for a consistent look
+// + E2E hooks. Self-contained: local state loaded on mount, disk-first persist,
+// no in-flight gating.
 //
 // Default "live" (prose-first live-preview). `null` ≡ unset → host default-live;
 // only an explicit choice is persisted (live persists as null for byte-stable
@@ -12,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
-import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { prefsRead, setEditorDefaultViewMode } from "../../lib/prefs";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
 
@@ -70,15 +72,16 @@ export function DefaultViewModeSettings() {
       label={t("settings.viewMode.label")}
       helper={t("settings.viewMode.helper")}
       error={error}
-      control={
-        <Segmented
+      control={(helperId) => (
+        <Select
           options={options}
           value={mode}
           onChange={(v) => void choose(v as ViewMode)}
-          ariaLabel={t("settings.viewMode.label")}
+          aria-label={t("settings.viewMode.label")}
+          ariaDescribedBy={helperId}
           testId="settings.default-view-mode"
         />
-      }
+      )}
     />
   );
 }

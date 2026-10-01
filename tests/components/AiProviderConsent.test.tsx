@@ -123,10 +123,34 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
+/** Drive the provider picker. myne-md/myne#769 moved this row off `Segmented`
+ *  onto `Select`, so a choice is open-then-click rather than one click, and the
+ *  options render into a body PORTAL where they all share a single testid —
+ *  they are addressed by the `data-value` carrying the wire name. */
+async function chooseProvider(wire: string): Promise<void> {
+  fireEvent.click(screen.getByTestId("ai.provider-choice"));
+  const option = await waitFor(() => {
+    const el = document.querySelector<HTMLElement>(
+      `[data-testid="ai.provider-choice-option"][data-value="${wire}"]`,
+    );
+    if (el === null) throw new Error(`no provider option for ${wire}`);
+    return el;
+  });
+  fireEvent.click(option);
+}
+
+/** The picker's current selection, read off the trigger — the `data-value`
+ *  `Select` publishes there replaces the `data-active` the active segment
+ *  used to carry. One read covers what took two: a `Select` cannot hold two
+ *  selections, so "openrouter is pending" is also "none is not". */
+function selectedProvider(): string | null {
+  return screen.getByTestId("ai.provider-choice").getAttribute("data-value");
+}
+
 describe("the per-provider consent screen", () => {
   it("stores NOTHING until the screen is accepted", async () => {
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     await screen.findByTestId("ai-consent.screen");
     // The whole point of routing through a screen: selecting is not agreeing.
     expect(setAiProvider).not.toHaveBeenCalled();
@@ -135,7 +159,7 @@ describe("the per-provider consent screen", () => {
 
   it("answers all four questions explicitly, including the one usually omitted", async () => {
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     await screen.findByTestId("ai-consent.screen");
 
     expect(screen.getByTestId("ai-consent.what").textContent).toBe(CONSENT_WHAT_LEAVES);
@@ -180,7 +204,7 @@ describe("the per-provider consent screen", () => {
     // same one the CLI honors, empty excludes nothing, and saved conversation
     // text keeps seeding. Identity, like every other clause on this screen.
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     await screen.findByTestId("ai-consent.screen");
     expect(screen.getByTestId("ai-consent.excluded").textContent).toBe(
       CONSENT_EXCLUDED_FOLDERS,
@@ -197,7 +221,7 @@ describe("the per-provider consent screen", () => {
 
   it("writes the provider and the consent, in that order, on accept", async () => {
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     fireEvent.click(await screen.findByTestId("ai-consent.accept"));
     await waitFor(() => expect(setAiProviderConsent).toHaveBeenCalledWith("openrouter"));
     expect(setAiProvider).toHaveBeenCalledWith("openrouter");
@@ -209,33 +233,24 @@ describe("the per-provider consent screen", () => {
   });
 
   it("shows the pending choice on the control behind the dialog, and reverts it on cancel", async () => {
-    // The dialog leaves the panel standing, so the segmented control is now
-    // visible while the question is being asked. It highlights the provider
+    // The dialog leaves the panel standing, so the picker is still visible
+    // while the question is being asked. Its trigger shows the provider
     // being asked ABOUT — a control that does not move when clicked reads as
     // broken — and that highlight is the whole of what happened: nothing is
     // written until accept, and cancelling puts it back.
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     await screen.findByTestId("ai-consent.screen");
-    expect(
-      screen.getByTestId("ai.provider-choice-openrouter").getAttribute("data-active"),
-    ).toBe("true");
+    expect(selectedProvider()).toBe("openrouter");
     expect(setAiProvider).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId("ai-consent.cancel"));
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("ai.provider-choice-openrouter").getAttribute("data-active"),
-      ).toBe("false"),
-    );
-    expect(screen.getByTestId("ai.provider-choice-none").getAttribute("data-active")).toBe(
-      "true",
-    );
+    await waitFor(() => expect(selectedProvider()).toBe("none"));
   });
 
   it("cancelling stores nothing and returns to the controls", async () => {
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     fireEvent.click(await screen.findByTestId("ai-consent.cancel"));
     await waitFor(() => expect(screen.queryByTestId("ai-consent.screen")).toBeNull());
     expect(setAiProvider).not.toHaveBeenCalled();
@@ -245,7 +260,7 @@ describe("the per-provider consent screen", () => {
   it("does not re-ask for a provider already consented to ON THIS DEVICE", async () => {
     consentFor = "openrouter@device";
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     await waitFor(() => expect(setAiProvider).toHaveBeenCalledWith("openrouter"));
     // No screen: the recipient is one they have already agreed to, here.
     expect(screen.queryByTestId("ai-consent.screen")).toBeNull();
@@ -268,7 +283,7 @@ describe("the per-provider consent screen", () => {
     // name makes this fail.
     consentFor = "openrouter";
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await chooseProvider("openrouter");
     const screenEl = await screen.findByTestId("ai-consent.screen");
     expect(screenEl.textContent).toContain("OpenRouter");
     expect(setAiProvider).not.toHaveBeenCalled();
@@ -279,7 +294,7 @@ describe("the per-provider consent screen", () => {
     consentFor = "openrouter";
     aiProvider = "openrouter";
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.provider-choice-ollama-cloud"));
+    await chooseProvider("ollama-cloud");
     const screenEl = await screen.findByTestId("ai-consent.screen");
     expect(screenEl.textContent).toContain("Ollama Cloud");
     expect(setAiProvider).not.toHaveBeenCalled();
@@ -340,7 +355,7 @@ describe("the provider key controls", () => {
     aiProviderHasKey.mockResolvedValue(true);
     render(<AiPanel />);
     await screen.findByTestId("ai.provider-key-input");
-    fireEvent.click(screen.getByTestId("ai.provider-choice-none"));
+    await chooseProvider("none");
     // ONE action. The host drops the key and the consent with it, so the user
     // does not have to remember three separate steps to turn this off — and
     // the panel does not have to issue three writes that could half-apply.
