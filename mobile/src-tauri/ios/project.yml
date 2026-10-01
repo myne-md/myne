@@ -109,12 +109,18 @@ targets:
       - sdk: Security.framework
       - sdk: UIKit.framework
       - sdk: WebKit.framework
-      # Embedded native extensions. `MyneWatch` carries the watch app +
-      # complication into Watch/, `MyneWidgets` the widget extension into
-      # PlugIns/ — xcodegen emits the Embed-Watch-Content / Embed-App-Extensions
-      # phases from these dependencies.
+      # `MyneWidgets` is a normal target dependency: it is iOS, so Tauri's
+      # `xcodebuild archive -sdk iphoneos` compiles it correctly and xcodegen
+      # emits the Embed-Foundation-Extensions phase into PlugIns/.
       - target: MyneWidgets
-      - target: MyneWatch
+      # `MyneWatch` is deliberately NOT a target dependency. `tauri ios build`
+      # archives the scheme under `-sdk iphoneos`, and THAT flag wins over a
+      # target's `SDKROOT`, so a watch target linked this way is compiled against
+      # the iOS SDK: every watchOS WidgetKit API in the complication then fails as
+      # "'AccessoryWidgetBackground' is only available in iOS 16.0 or newer" and
+      # the whole archive dies — the exact break this spec's SDKROOT lines cannot
+      # fix. Instead `mobile/scripts/ios-watch-build.sh` builds MyneWatch under the
+      # real watchOS SDK and copies the result into `Myne.app/Watch/` here.
       - sdk: WatchConnectivity.framework
     preBuildScripts:
       - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
@@ -123,6 +129,28 @@ targets:
         outputFiles:
           - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a
           - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a
+      # Build the Apple Watch app + complication under the REAL watchOS SDK and
+      # stage them for embedding. This has to be a script rather than a target
+      # dependency: `tauri ios build` archives under `-sdk iphoneos`, and that flag
+      # overrides a target's own SDKROOT, so a linked watch target compiles
+      # against the iOS SDK and dies on every watchOS WidgetKit API. The script
+      # uses `xcodebuild -sdk watchos` explicitly.
+      - script: |
+          set -euo pipefail
+          "${SRCROOT}/../../../scripts/ios-watch-build.sh"
+        name: Build & Stage Apple Watch
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(SRCROOT)/watch-build/MyneWatch.app
+    # The staged watch app is copied into Myne.app/Watch/ by this phase. xcodegen
+    # has no `files:` for a directory that does not exist at generate time, so the
+    # copy is a script phase too (Apple requires the watch app at Watch/ exactly).
+    postCompileScripts:
+      - script: |
+          set -euo pipefail
+          "${SRCROOT}/../../../scripts/ios-watch-embed.sh"
+        name: Embed Apple Watch Content
+        basedOnDependencyAnalysis: false
   MyneWidgets:
     type: app-extension
     platform: iOS
@@ -134,7 +162,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.widgets
-        INFOPLIST_FILE: ../../../ios-widgets/MyneWidgets/Info.plist
+        # Points at a COPY under gen/ (made by ios-postinit.sh), never the
+        # committed source: Xcode's ProcessInfoPlistFile rewrites the
+        # INFOPLIST_FILE in place, so pointing it at ios-widgets/ left the repo
+        # dirty after every build with the version expanded to a literal.
+        INFOPLIST_FILE: ext-plists/MyneWidgets-Info.plist
         MARKETING_VERSION: __MYNE_MARKETING_VERSION__
         CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
         CODE_SIGN_STYLE: Automatic
@@ -158,8 +190,15 @@ targets:
       - path: ../../../ios-watch/Shared
     settings:
       base:
+        # SDKROOT=watchos is LOAD-BEARING: without it xcodebuild compiles the
+        # watch targets against the iphoneos SDK, and every watchOS WidgetKit API
+        # fails as "only available in iOS 16+" (watchOS 9 == iOS 16 in the
+        # availability mapping). The build then dies on the complication, not the
+        # watch app, which is what makes the cause hard to read.
+        SDKROOT: watchos
         PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.watchkitapp
-        INFOPLIST_FILE: ../../../ios-watch/MyneWatch/Info.plist
+        # A copy under gen/, not the committed source — see MyneWidgets above.
+        INFOPLIST_FILE: ext-plists/MyneWatch-Info.plist
         MARKETING_VERSION: __MYNE_MARKETING_VERSION__
         CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
         CODE_SIGN_STYLE: Automatic
@@ -191,8 +230,16 @@ targets:
       - path: ../../../ios-watch/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.watchkitapp.complication
-        INFOPLIST_FILE: ../../../ios-watch/MyneWatchComplications/Info.plist
+        # See the MyneWatch target: the watch targets need SDKROOT=watchos or the
+        # complication's WidgetKit APIs fail as "only available in iOS 16+".
+        SDKROOT: watchos
+        # `.ext`, NOT `.complication`: Apple bundle IDs are globally unique and an
+        # `md.myne.mobile.watchkitapp.complication` identifier was already taken
+        # elsewhere in this team's account, so it could not be registered. The
+        # extension must still be a dot-child of the watch app's id.
+        PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.watchkitapp.ext
+        # A copy under gen/, not the committed source — see MyneWidgets above.
+        INFOPLIST_FILE: ext-plists/MyneWatchComplications-Info.plist
         MARKETING_VERSION: __MYNE_MARKETING_VERSION__
         CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
         CODE_SIGN_STYLE: Automatic
