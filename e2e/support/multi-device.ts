@@ -55,9 +55,16 @@ export async function launchDevice(index: number, opts: LaunchOptions = {}): Pro
  * `sync_set_endpoint` command persists. Loopback `http` is policy-valid
  * (`validate_endpoint_url`), so the ephemeral server's URL is accepted as-is.
  */
-export function syncConfigSeed(endpointUrl: string): (appConfigDir: string) => void {
+export function syncConfigSeed(
+  endpointUrl: string,
+  inviteCode?: string,
+): (appConfigDir: string) => void {
   return (appConfigDir: string) => {
-    const body = JSON.stringify({ endpoint_url: endpointUrl }, null, 2);
+    const body = JSON.stringify(
+      inviteCode ? { endpoint_url: endpointUrl, invite_code: inviteCode } : { endpoint_url: endpointUrl },
+      null,
+      2,
+    );
     writeFileSync(join(appConfigDir, "sync-config.json"), body);
     // Every scenario that seeds an endpoint is a scenario about sync, not about
     // the terms — so they arrive already accepted (myne-ops#15). Without this

@@ -1280,6 +1280,12 @@ The vault-scoped pseudonymous identifier a signed [vault head](#vault-head) carr
 
 Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/sync-protocol.md` §3
 
+### **invite code** &nbsp; 📦 *Product*
+
+A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0625`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
+
+Used in: `docs/decisions/sync/0625-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
+
 ### **invite relay** &nbsp; 📦 *Product*
 
 The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, plus the owner-side claimed-versus-pending list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
