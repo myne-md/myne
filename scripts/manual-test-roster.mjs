@@ -3173,7 +3173,6 @@ export const ROSTER = Object.freeze([
     id: "install.store-distribution-and-update",
     title: "App Store / Play install, icon and upgrade",
     paths: [
-      "mobile/store",
       "mobile/scripts/sync-icons.sh",
       "mobile/scripts/android-postinit.sh",
       "mobile/src-tauri/icons",
