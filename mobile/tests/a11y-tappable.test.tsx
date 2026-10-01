@@ -99,6 +99,8 @@ const NOT_CONTROLS: Record<string, string> = {
     "The row div keeps a plain onClick as a touch convenience; the CONTROL is its text block, because the row also contains an Edit button and a control inside a control is nested-interactive. Same split as the note row.",
   "mobile/src/app/flows/CreateVaultFlow.tsx":
     "Two acknowledgement sentences beside a real `aria-pressed` button holding the checkbox glyph. The sentence is the button's accessible name (aria-labelledby) and stays clickable as a touch convenience; making it a SECOND control would announce the same toggle twice.",
+  "mobile/src/app/flows/IdentityFlow.tsx":
+    "Same shape as CreateVaultFlow's AckRow: the phrase and forget acknowledgements are sentences beside a real `aria-pressed` button holding the checkbox glyph (its `AckRow`). The sentence is the button's accessible name (aria-labelledby) and stays clickable as a touch convenience; a second control would announce the same toggle twice.",
 };
 
 /**
