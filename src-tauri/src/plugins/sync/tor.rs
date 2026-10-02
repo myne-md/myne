@@ -803,6 +803,7 @@ mod tests {
         let configured = |url: &str| SyncEndpointConfig {
             endpoint_url: Some(url.to_string()),
             cert_pin_hex: None,
+            invite_code: None,
         };
 
         assert!(

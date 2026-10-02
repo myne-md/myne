@@ -122,6 +122,10 @@ export function CreateVault({
     makeInitialState,
   );
   const [autoUnlocking, setAutoUnlocking] = useState(false);
+  // The shared invite code for a gated sync server (myne-md/myne#800). Empty for
+  // an open server. Kept out of the reducer's secret material: it is an
+  // operator-supplied door word, not a vault secret.
+  const [inviteCode, setInviteCode] = useState("");
 
   const sessionTokenRef = useRef<string | null>(null);
   // The id of the vault `commit` just wrote to (`vaults/<id>/`), captured from
@@ -432,9 +436,10 @@ export function CreateVault({
         );
         const serverUrl = cfg?.endpoint_url ?? (await deploymentSyncOrigin());
         if (serverUrl === null) throw new Error("no sync endpoint configured");
-        if (cfg?.endpoint_url == null) {
+        if (cfg?.endpoint_url == null || inviteCode.trim().length > 0) {
           await invoke("plugin:sync|sync_set_endpoint", {
             endpointUrl: serverUrl,
+            inviteCode: inviteCode.trim(),
           });
         }
 
@@ -602,6 +607,9 @@ export function CreateVault({
           acknowledged={state.accountAcknowledged}
           committing={state.step === "committing"}
           error={state.error}
+          inviteCode={inviteCode}
+          onInviteCodeChange={setInviteCode}
+          showInviteCode={REQUIRES_PROVISIONING}
           dispatch={dispatch}
         />
       );

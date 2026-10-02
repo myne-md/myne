@@ -527,6 +527,15 @@ pub enum SyncDeviceError {
     /// explicitly forget the held identity first. On the RECOVER path a
     /// `CannotDecrypt` stays `BadRequest` — there it means the phrase is wrong.
     AlreadyHeldIdentity,
+    /// The server gates new accounts behind an invite code and none was sent
+    /// (server 403 `invite_code_required`). Same reasoning as `AccountFrozen`:
+    /// the credentials are right, and the remedy is to type the code the
+    /// operator gave the user.
+    InviteCodeRequired,
+    /// The invite code sent did not match the server's (server 403
+    /// `invite_code_invalid`). Distinct from `InviteCodeRequired` so the field
+    /// can say "that code is wrong" rather than "a code is needed".
+    InviteCodeInvalid,
     /// Internal (task join, IO).
     Internal,
 }
@@ -545,6 +554,8 @@ impl From<super::enroll::EnrollError> for SyncDeviceError {
             E::Frozen => SyncDeviceError::AccountFrozen,
             E::DeviceLimit => SyncDeviceError::DeviceLimitReached,
             E::PendingApproval => SyncDeviceError::AwaitingApproval,
+            E::InviteCodeRequired => SyncDeviceError::InviteCodeRequired,
+            E::InviteCodeInvalid => SyncDeviceError::InviteCodeInvalid,
             E::ServerSignatureMismatch => SyncDeviceError::FingerprintMismatch,
             E::Unauthenticated => SyncDeviceError::Unauthenticated,
             // Ahead of the catch-all: this is the arm the payload is matched

@@ -118,6 +118,10 @@ function failureMessage(kind: string): string {
       return i18n.t("sync.enroll.error.deviceLimit");
     case "AwaitingApproval":
       return i18n.t("sync.enroll.error.awaitingApproval");
+    case "InviteCodeRequired":
+      return i18n.t("sync.enroll.error.inviteCodeRequired");
+    case "InviteCodeInvalid":
+      return i18n.t("sync.enroll.error.inviteCodeInvalid");
     case "FingerprintMismatch":
       // Its own message rather than the credential banner: a mismatch here is
       // a typo or a man in the middle, and "check your password" is the one

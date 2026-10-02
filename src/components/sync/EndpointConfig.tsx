@@ -88,15 +88,41 @@ const BTN_CONNECTED: CSSProperties = {
   cursor: "default",
 };
 
-export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => void; onEdit?: () => void } = {}) {
+export function EndpointConfig({
+  onConnected,
+  onEdit,
+  initialUrl,
+  lockedUrl = false,
+}: {
+  onConnected?: () => void;
+  onEdit?: () => void;
+  /**
+   * Seed the address on mount, for the first-run HOSTED door (myne-md/myne#800):
+   * the hosted server is the gated one, so its one-tap connection needs the
+   * invite-code field the self-hosted form already has. Seeding the SAME control
+   * rather than adding a second one is the file's own rule — "a second endpoint
+   * control would be a second contract".
+   */
+  initialUrl?: string;
+  /**
+   * Render the address read-only. The hosted door fixes the origin (`the browser
+   * fixes the origin`, and the desktop hosted door writes `HOSTED_SYNC_ORIGIN`
+   * for the same reason), so the user may enter only the invite code.
+   */
+  lockedUrl?: boolean;
+} = {}) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   // The endpoint this device is currently connected to (loaded, or set on a
   // successful connect). When the input still equals it, there is nothing to do
   // and the button rests as a disabled "Connected" (E4c).
   const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // The shared admission code for a gated server (`MYNE_INVITE_CODE` on the
+  // server). Optional: an open server (self-host, fresh clone) needs none.
+  // Device-local, never synced and never backed up.
+  const [inviteCode, setInviteCode] = useState("");
   // `null` means loopback HTTP, never an unverified remote TLS session.
   const [pinSource, setPinSource] = useState<PinSource>(null);
 
@@ -107,12 +133,25 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
     void invoke<{
       endpoint_url: string | null;
       pin_source: PinSource;
+      invite_code: string | null;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
+        // A seeded hosted door keeps its fixed origin; only the invite code is
+        // hydrated (and only if the stored code belongs to that same origin,
+        // which `set_endpoint`'s read-modify-write already enforces).
+        if (lockedUrl) {
+          if (initialUrl && c.endpoint_url === initialUrl) {
+            setConnectedUrl(initialUrl);
+          }
+          setInviteCode(c.invite_code ?? "");
+          setPinSource(c.pin_source);
+          return;
+        }
         if (c.endpoint_url) {
           setUrl(c.endpoint_url);
           setConnectedUrl(c.endpoint_url);
         }
+        setInviteCode(c.invite_code ?? "");
         setPinSource(c.pin_source);
       })
       .catch(() => {
@@ -130,6 +169,7 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
       pin_source: PinSource;
     }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
+      inviteCode: inviteCode.trim(),
     })
       .then((r) => {
         setConnectedUrl(trimmed);
@@ -198,15 +238,19 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
       <div style={ROW}>
         <input
           value={url}
+          readOnly={lockedUrl}
           onChange={(e) => {
             setUrl(e.target.value);
+            // Changing the address invalidates a code issued for the old server;
+            // clearing it here keeps it from being sent to the new one.
+            setInviteCode("");
             onEdit?.();
           }}
           placeholder={t("sync.endpoint.placeholder")}
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          style={INPUT}
+          style={lockedUrl ? { ...INPUT, color: "var(--fg-3)" } : INPUT}
           data-testid="sync.endpoint-input"
         />
         {isConnectedUnedited ? (
@@ -234,6 +278,32 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
               {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
             </button>
           )}
+      </div>
+      {/* The invite code for a gated server (myne-md/myne#800). Optional: an
+          open server ignores it, and a self-host operator never sets one. It
+          sits under the address because it is part of "which server, and what
+          does it ask for", not a separate setting. */}
+      <label
+        style={{ ...HELP, marginTop: "var(--space-1)" }}
+        htmlFor="sync-endpoint-invite"
+      >
+        {t("sync.endpoint.inviteLabel")}
+      </label>
+      <div style={ROW}>
+        <input
+          id="sync-endpoint-invite"
+          value={inviteCode}
+          onChange={(e) => {
+            setInviteCode(e.target.value);
+            onEdit?.();
+          }}
+          placeholder={t("sync.endpoint.invitePlaceholder")}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          style={INPUT}
+          data-testid="sync.endpoint-invite-input"
+        />
       </div>
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">
