@@ -7248,7 +7248,7 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "With the vault unlocked and notes open, go to the home screen and look at every Myne widget in every size, the iOS lock-screen widget, the StandBy view, the Control Centre control, the Android Quick Settings tile and the long-press shortcut menu. Confirm none of them shows a note title, note body, tag, count or any other vault content, and that only Myne's own static labels appear. Then lock the phone and look at the lock-screen widgets again.",
+        see: "With the vault unlocked and notes open, go to the home screen and look at every Myne widget in every size, the iOS lock-screen widget, the StandBy view, the Control Centre control, the Android Quick Settings tile and the long-press shortcut menu. Confirm none of them shows a note title, note body, tag, count or any other vault content, and that only Myne's own static labels appear. Then lock the phone and look at the lock-screen widgets again. On iOS 18, also set the Home Screen widget appearance to Tinted and then Clear and confirm every Myne Home widget (all three, both sizes) stays visible and legible rather than collapsing into a blank tile, on a light and a dark wallpaper; the StandBy glance must stay legible too.",
         whyNotAutomated: "On Android there is no separate widget process, so \"no vault content in a widget\" is a policy the code keeps rather than a sandbox guarantee; checking a policy that no boundary enforces means looking at every widget surface on a real device.",
         clients: ["ios", "android"],
         estimateMin: 12,
