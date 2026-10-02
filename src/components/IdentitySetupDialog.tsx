@@ -38,7 +38,13 @@ interface IdentitySetupDialogProps {
 }
 
 /** Which failure the single error slot is showing. */
-type ErrorKind = "generic" | "alreadyHeld" | "notConfigured" | "tlsFailure";
+type ErrorKind =
+  | "generic"
+  | "alreadyHeld"
+  | "notConfigured"
+  | "tlsFailure"
+  | "inviteCodeRequired"
+  | "inviteCodeInvalid";
 
 /**
  * Read the serialized `SyncDeviceError::kind` off a rejected invoke. The plugin
@@ -52,6 +58,12 @@ function errorKindOf(error: unknown): ErrorKind {
   if (kind === "AlreadyHeldIdentity") return "alreadyHeld";
   if (kind === "NotConfigured") return "notConfigured";
   if (kind === "TlsFailure") return "tlsFailure";
+  // A gated server refuses identity creation without (or with a wrong) invite
+  // code. Named distinctly so the user learns the remedy is the operator's
+  // code, which a generic "try again" would loop them away from
+  // (myne-md/myne#800).
+  if (kind === "InviteCodeRequired") return "inviteCodeRequired";
+  if (kind === "InviteCodeInvalid") return "inviteCodeInvalid";
   return "generic";
 }
 
@@ -161,7 +173,11 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
         ? "identitySetup.errorNotConfigured"
         : error === "alreadyHeld"
           ? "identitySetup.errorAlreadyHeld"
-          : "identitySetup.error";
+          : error === "inviteCodeRequired"
+            ? "sync.enroll.error.inviteCodeRequired"
+            : error === "inviteCodeInvalid"
+              ? "sync.enroll.error.inviteCodeInvalid"
+              : "identitySetup.error";
 
   return (
     <ModalShell

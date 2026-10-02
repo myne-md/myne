@@ -64,6 +64,9 @@ const SCREENS = [
           acknowledged={false}
           committing={false}
           error={null}
+          inviteCode=""
+          onInviteCodeChange={() => {}}
+          showInviteCode={false}
           dispatch={() => {}}
         />,
       ),
