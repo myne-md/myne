@@ -42,14 +42,18 @@ those files are read only through a skill's standing-obligations block: a sessio
 skill reads none of them, which is exactly the session that then skips them. This file is loaded for
 every session in this tree, so the lane is stated here and the mechanics stay there.
 
-1. **No issue, no work.** Work that changes a repository binds to a tracked issue
-   (`issue: myne-md/<repo>#<n>`), and when none exists the first action is to file one through the
-   `issue-pm` subagent. The only exception is the user saying "no issue for this" in so many words:
-   silence is not it, and neither is "this is tiny". Reading, explaining, reviewing, researching and
-   answering a question are outside the gate, since none of them change anything. Move the issue to
-   `status: in progress` through `issue-pm` when you start: on this lane nothing else will, because
-   that transition belongs to `/do-work` and this lane skips it, so the issue would jump from
-   `triage` straight to `ready to test` and no second session would ever see it as taken.
+1. **No issue, no work, and the setup is asked for.** Work that changes a repository binds to a
+   tracked issue (`issue: myne-md/<repo>#<n>`), and when none exists the issue is filed through the
+   `issue-pm` subagent. But before either the issue or the worktree is created, the skill asks a
+   single yes/no question and takes no action until it has the answer: `"No tracker issue exists for
+   this and I would work in a fresh worktree. File an issue and create the worktree? (y/n)"`. When
+   the issue already exists it asks only about the worktree. The only exception to the gate is the
+   user answering `n` to that question: silence is not it, "this is tiny" is not it, and neither is
+   "we are in a hurry". Reading, explaining, reviewing, researching and answering a question are
+   outside the gate, since none of them change anything. Move the issue to `status: in progress`
+   through `issue-pm` when you start: on this lane nothing else will, because that transition
+   belongs to `/do-work` and this lane skips it, so the issue would jump from `triage` straight to
+   `ready to merge` and no second session would ever see it as taken.
    `agent-tooling/reference/github-issues.md`.
 2. **A session that changes a repository works in a worktree of it, never in the shared checkout.**
    The section below is that rule in full, including where a worktree lives and what it branches from.
@@ -83,6 +87,12 @@ otherwise.** Not the shared checkout, not "just this one file". That checkout's 
 every session sitting in the directory, so switching it puts their next commit on your branch, and
 committing from it lands your work on whatever branch the last session left it on. The shared
 checkout stays on the default branch and is for reading.
+
+**And creating one is asked for, not assumed.** It is one half of the single yes/no question in lane
+item 1 above: the skill asks `"No tracker issue exists for this and I would work in a fresh
+worktree. File an issue and create the worktree? (y/n)"` before it creates either, and does nothing
+until it has the answer. On `n` the work proceeds in the current checkout, and the session says once
+that it is untracked and not isolated.
 
 A worktree for this repo is created only with `git worktree add`, into
 `.opencode/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**:
