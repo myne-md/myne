@@ -35,6 +35,7 @@ use myne_core::plugins::notes::commands::note_read_with_dir;
 
 use super::cancel::{guarded_on_token, CancelReach, CancelRegistry, CancelToken, RequestCancel};
 use super::compute_priority::ComputePriority;
+use super::download::{self, DownloadCancels, ModelDownloadCommandError};
 use super::endpoint_config;
 use super::engine::Engine;
 use super::error::EngineError;
@@ -786,7 +787,7 @@ pub async fn semantic_search(
     // split off (#415 task 18 split the two handles where there was one).
     let engine = engine_state.embedding_engine()?;
     // Embed off the async thread (CPU-bound); the wrapper zeroizes on drop.
-    let query_vec = tokio::task::spawn_blocking(move || engine.embed(&query))
+    let query_vec = tokio::task::spawn_blocking(move || engine.embed_query(&query))
         .await
         .map_err(|_| EngineError::EmbeddingFailed)??;
     // Scan the resident store synchronously — no await, no model call, so the
@@ -997,12 +998,12 @@ pub(crate) async fn suggest_tags_with_engine(
 /// vault — no prefs read, no note decrypt, nothing an unlocked slot is needed
 /// for. A locked or absent vault answers the same as an unlocked one.
 ///
-/// The settings surface calls it so the auto-tag switch can say "this build has
-/// no tag model" instead of persisting `true` against a host that will answer
-/// [`EngineError::NotReady`] forever. The tag role is bundled-only by design
-/// (`threat-model.md` §7: no override picker), so a `false` here is not
-/// something the user can fix by side-loading — which is exactly why the UI has
-/// to say it rather than leave the user guessing.
+/// The settings surface calls it so the auto-tag switch can say "no tag model
+/// installed yet" instead of persisting `true` against a host that will answer
+/// [`EngineError::NotReady`] forever. Since myne-md/myne#805 the tag role is
+/// selectable: the user can download it or side-load it, and this probe
+/// re-resolves the stored override at call time, so a `false` here is something
+/// the UI tells the user how to fix rather than a permanent state.
 ///
 /// This is NOT the enforcement point for anything: [`suggest_tags`] re-reads
 /// both prefs switches and the folder gate host-side regardless of what any
@@ -1074,6 +1075,92 @@ pub async fn get_model_path<R: Runtime>(
         _ => model_store::selected_model(&base, role)?,
     };
     Ok(resolved.map(|p| p.to_string_lossy().into_owned()))
+}
+
+/// Remove a model for `role` (myne-md/myne#805). A downloaded bundle under the
+/// app's `models/` directory is deleted; a side-loaded file elsewhere on disk is
+/// only unregistered, never deleted. The engine's caches are invalidated so the
+/// next call sees the absence rather than serving the removed weights.
+#[tauri::command]
+pub async fn remove_model<R: Runtime>(
+    role: String,
+    app: AppHandle<R>,
+    engine_state: State<'_, LocalInferenceState>,
+) -> Result<(), ModelStoreError> {
+    let role = ModelRole::parse(&role).ok_or(ModelStoreError::InvalidRole)?;
+    let base = crate::paths::app_data_dir(&app).map_err(|_| ModelStoreError::Io {
+        kind: crate::io_failure_kind::IoFailureKind::Other,
+    })?;
+    // Invalidate BEFORE deleting: the embedding model is memory-mapped
+    // (`VarBuilder::from_mmaped_safetensors`), so on a platform that refuses to
+    // delete a file that is still mapped the delete would fail and leave the
+    // engine cached on the stale weights. Dropping the cache first releases the
+    // mapping.
+    engine_state.invalidate_all_models();
+    // Deletion touches the filesystem; keep it off the async executor.
+    tokio::task::spawn_blocking(move || model_store::remove_selected_model(&base, role))
+        .await
+        .map_err(|_| ModelStoreError::Io {
+            kind: crate::io_failure_kind::IoFailureKind::Other,
+        })??;
+    Ok(())
+}
+
+/// Download a model artefact on explicit user action, verifying every file
+/// against the digest compiled into this binary before registering it
+/// (myne-md/myne#805, `decisions/ai/0627`).
+///
+/// `artifact` is an id from the compiled-in table; `download_id` is minted by
+/// the calling surface so [`cancel_model_download`] can target exactly this
+/// fetch. The socket, TLS and Tor routing live in
+/// `myne_core::inference::model_download`; this command owns the table lookup,
+/// the staging directory and the register step. Blocking (network + hashing +
+/// atomic rename), so it runs off the async runtime.
+#[tauri::command]
+pub async fn download_model<R: Runtime>(
+    artifact: String,
+    download_id: String,
+    app: AppHandle<R>,
+    cancels: State<'_, DownloadCancels>,
+    engine_state: State<'_, LocalInferenceState>,
+) -> Result<String, ModelDownloadCommandError> {
+    let artifact =
+        download::artifact_by_id(&artifact).ok_or(ModelDownloadCommandError::UnknownArtifact)?;
+    let base = crate::paths::app_data_dir(&app).map_err(|_| {
+        ModelDownloadCommandError::Store(ModelStoreError::Io {
+            kind: crate::io_failure_kind::IoFailureKind::Other,
+        })
+    })?;
+    let (token, guard) = cancels.begin(&download_id);
+    let cancelled = download::cancelled_fn(&token);
+    // A clone for the blocking task: the original stays borrowed by the guard.
+    let staging_id = download_id.clone();
+    // Drop the cached engine models BEFORE the install renames the previous
+    // bundle aside: a memory-mapped embedding model can make the OS refuse the
+    // rename on some platforms, so release the mapping first, exactly as
+    // `remove_model` does.
+    engine_state.invalidate_all_models();
+    let joined = tokio::task::spawn_blocking(move || {
+        download::download_and_install(&base, artifact, &staging_id, &cancelled)
+    })
+    .await;
+    drop(guard);
+    let installed = joined.map_err(|_| {
+        ModelDownloadCommandError::Store(ModelStoreError::Io {
+            kind: crate::io_failure_kind::IoFailureKind::Other,
+        })
+    })??;
+    // Invalidate again so a model that loaded between the pre-invalidate and the
+    // rename is dropped too.
+    engine_state.invalidate_all_models();
+    Ok(installed.to_string_lossy().into_owned())
+}
+
+/// Cancel an in-flight [`download_model`] by the id its surface minted. Returns
+/// `false` when no such download is in flight.
+#[tauri::command]
+pub fn cancel_model_download(download_id: String, cancels: State<'_, DownloadCancels>) -> bool {
+    cancels.cancel(&download_id)
 }
 
 /// Testable core of [`infer`]: `Zeroizing`-wrap → `spawn_blocking` → trait.

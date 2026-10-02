@@ -15,6 +15,10 @@ pnpm-debug.log*
 
 # Node / Vite build output
 node_modules/
+# The trailing slash does not match a SYMLINK named `node_modules`, which is what
+# a worktree sees when it links the shared checkout's install. Git then reports it
+# untracked and `git add -A` commits the link.
+node_modules
 dist/
 dist-ssr/
 *.local
@@ -85,6 +89,11 @@ e2e-web/artifacts/
 # Same reasoning as `web/wasm/pkg/` below: a multi-MB binary in every diff, and a
 # bundle whose contents depend on whoever last ran the script.
 src-tauri/binaries/
+# The trailing slash above does not match a SYMLINK named `binaries`, which is
+# what a worktree sees when it links the shared checkout's staged sidecars. Git
+# then reports it untracked and a `git add -A` commits the link. The bare
+# pattern matches both the real directory and the symlink.
+src-tauri/binaries
 
 # phase3-web-client task 11: the wasm-bindgen output for `web/wasm`. Pure build
 # artefact — derived from `web/wasm/src/` plus the pinned toolchain by

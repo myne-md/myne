@@ -86,6 +86,8 @@ Marketing copy and code may not exceed the guarantees in the threat model. If yo
 
 The order matters. Don't ship the marketing copy and "fix the threat model later".
 
+**Every trust-boundary row (`TB*`) and adversary row (`A*`) the threat model declares owes a verdict in `myne`'s `scripts/check-adversary-coverage.mjs` in the same change** (the `internal-service` scenario that exercises it, or a written out-of-scope reason), and the projection `docs/dev/adversary-coverage.md` must be regenerated (`--emit`). The guard compares both ways: a new row with no verdict fails naming the row, and a verdict whose row is gone fails as stale. A threat-model row is normative, so its coverage binding is not optional bookkeeping.
+
 ### `protocol.md` versioning
 
 v0.1 and a later major version are **forward-incompatible by design**. No extension points, no algorithm-agility headers, no negotiation. Cross-major reads happen only via explicit user-initiated migration. If you find yourself wanting to add a feature flag or version negotiation: stop, you're walking back the major-version commitment. Add a new major-version spec instead.
