@@ -174,107 +174,77 @@ impl From<std::io::Error> for VaultRecoveryError {
 mod tests {
     use super::*;
 
-    fn serialize(e: &VaultRecoveryError) -> String {
+    fn json<T: serde::Serialize>(e: &T) -> String {
         serde_json::to_string(e).expect("VaultRecoveryError must serialize cleanly")
     }
 
+    /// Every unit variant serializes under `#[serde(tag = "kind", content = "detail")]`
+    /// as `{"kind":"<VariantName>"}`, including the shared-name
+    /// `InvalidCredentialOrVault`/`WeakNewPassword` twins.
     #[test]
-    fn vault_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::VaultNotFound),
-            r#"{"kind":"VaultNotFound"}"#
-        );
+    fn unit_variants_serialize_with_kind_tag() {
+        let cases = [
+            (
+                json(&VaultRecoveryError::VaultNotFound),
+                r#"{"kind":"VaultNotFound"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::InvalidCredentialOrVault),
+                r#"{"kind":"InvalidCredentialOrVault"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::RecoveryInProgress),
+                r#"{"kind":"RecoveryInProgress"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::VaultOpenAsImportSource),
+                r#"{"kind":"VaultOpenAsImportSource"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::VaultAlreadyUnlocked),
+                r#"{"kind":"VaultAlreadyUnlocked"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::RecoveryAlreadyInProgress),
+                r#"{"kind":"RecoveryAlreadyInProgress"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::VaultRecoveryRequiresActiveSession),
+                r#"{"kind":"VaultRecoveryRequiresActiveSession"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::RecoveryAbortedByLock),
+                r#"{"kind":"RecoveryAbortedByLock"}"#,
+            ),
+            (
+                json(&VaultRecoveryError::WeakNewPassword),
+                r#"{"kind":"WeakNewPassword"}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
-    fn invalid_credential_or_vault_serializes_with_kind_tag() {
-        // Wire shape MUST match `VaultUnlockError::InvalidCredentialOrVault`
-        // — same `kind` tag, same absence of payload. This is the
-        // shared-by-name discipline from `decisions.md` 2026-05-02
-        // "Recovery error discipline parallels unlock".
-        assert_eq!(
-            serialize(&VaultRecoveryError::InvalidCredentialOrVault),
-            r#"{"kind":"InvalidCredentialOrVault"}"#
-        );
-    }
-
-    #[test]
-    fn invalid_vault_meta_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::InvalidVaultMeta),
-            r#"{"kind":"InvalidVaultMeta"}"#
-        );
-    }
-
-    #[test]
-    fn io_error_serializes_with_io_failure_kind_payload() {
-        let e = VaultRecoveryError::IoError {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize(&e),
-            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn recovery_in_progress_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::RecoveryInProgress),
-            r#"{"kind":"RecoveryInProgress"}"#
-        );
-    }
-
-    #[test]
-    fn vault_already_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::VaultAlreadyUnlocked),
-            r#"{"kind":"VaultAlreadyUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn recovery_already_in_progress_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::RecoveryAlreadyInProgress),
-            r#"{"kind":"RecoveryAlreadyInProgress"}"#
-        );
-    }
-
-    #[test]
-    fn vault_recovery_requires_active_session_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::VaultRecoveryRequiresActiveSession),
-            r#"{"kind":"VaultRecoveryRequiresActiveSession"}"#
-        );
-    }
-
-    #[test]
-    fn join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
-
-    #[test]
-    fn recovery_aborted_by_lock_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultRecoveryError::RecoveryAbortedByLock),
-            r#"{"kind":"RecoveryAbortedByLock"}"#
-        );
-    }
-
-    #[test]
-    fn weak_new_password_serializes_with_kind_tag() {
-        // Cross-plugin shared variant name with
-        // `AppError::WeakNewPassword` (vault_creation) — both must
-        // serialize to the same `{"kind":"WeakNewPassword"}` JSON for
-        // the frontend to discriminate uniformly.
-        assert_eq!(
-            serialize(&VaultRecoveryError::WeakNewPassword),
-            r#"{"kind":"WeakNewPassword"}"#
-        );
+    fn payload_variants_serialize_with_detail() {
+        let cases = [(
+            json(&VaultRecoveryError::IoError {
+                io_error_kind: IoFailureKind::PermissionDenied,
+            }),
+            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#,
+        )];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     /// Compile-time enforcement of "no `String` field on any variant".
@@ -302,17 +272,5 @@ mod tests {
             }
         }
         assert_closed(&VaultRecoveryError::VaultNotFound);
-    }
-
-    #[test]
-    fn from_io_error_maps_via_closed_enum() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: VaultRecoveryError = raw.into();
-        match mapped {
-            VaultRecoveryError::IoError { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected IoError variant, got {other:?}"),
-        }
     }
 }

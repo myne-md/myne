@@ -35,10 +35,10 @@
 // split / move round-trips, hide-vault-names suppression and mutation refusal,
 // overlong-label rejection, read-only list (no write-back, undecryptable bytes
 // preserved), and eager seal at creation. The grouping helper both pickers
-// share is pinned by unit tests on both twins
-// (`tests/lib/accountGrouping.test.ts`,
-// `mobile/tests/accountGrouping.test.ts`), which fail if the helper ever
-// answers `null` unconditionally. What no automated lane drives is the grouped
+// share is pinned by `tests/lib/accountGrouping.test.ts`, which fails if the
+// helper ever answers `null` unconditionally. (myne-md/myne#802 removed the
+// mobile twin's copy of that test: `mobile/src/lib/account.ts` is byte-
+// identical to `src/lib/account.ts`, so the desktop spec covers both.) What no automated lane drives is the grouped
 // RENDERING itself (headers, menus, the sibling notice on a keychain-holding
 // device): that half stays a manual roster item until a runner with a keychain
 // backend exists.
