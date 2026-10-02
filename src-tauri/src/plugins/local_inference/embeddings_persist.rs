@@ -355,6 +355,24 @@ mod tests {
         assert!(decode_snapshot(&KEY, &ACCOUNT_HASH, &blob, &bumped).is_none());
     }
 
+    /// The E5-prefix change (myne-md/myne#805 task 4) rides the `chunker_version`
+    /// bump, and this is the proof the lever actually discards an index built by
+    /// the PREVIOUS generation. Tied to the constant rather than a literal, so it
+    /// keeps meaning what it says if the generation moves again.
+    #[test]
+    fn an_index_from_the_previous_chunker_generation_is_discarded() {
+        use crate::plugins::local_inference::chunker::CHUNKER_VERSION;
+        let store = sample_store();
+        let built = identity(0xAA, 384, CHUNKER_VERSION - 1);
+        let blob = encode_snapshot(&KEY, &ACCOUNT_HASH, &store, &built).expect("encode");
+        let current = identity(0xAA, 384, CHUNKER_VERSION);
+        assert!(
+            decode_snapshot(&KEY, &ACCOUNT_HASH, &blob, &current).is_none(),
+            "an index persisted before the generation bump must not decode \
+             under the current generation"
+        );
+    }
+
     #[test]
     fn matching_identity_decodes_ok() {
         let store = sample_store();

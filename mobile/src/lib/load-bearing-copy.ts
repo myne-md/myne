@@ -237,3 +237,11 @@ export const CONNECTED_EXTENSIONS_REPAIR_HINT =
 /** Shown when the precise-alarm permission is not held — the default state. */
 export const REMINDER_APPROXIMATE_DELIVERY_SENTENCE =
   "Android batches wake-ups to save battery, so reminders arrive around the time you set rather than exactly on it. Allowing exact timing removes the delay.";
+
+// The pinned AI trust invariant (myne-md/myne#805). Byte-identical to the
+// desktop constant by construction: desktop's `src/lib/load-bearing-copy.ts`
+// re-exports this same literal, so the sentence cannot drift between clients.
+// It is a privacy property (an E2E-pinned claim about what leaves the device),
+// so it is rendered verbatim and never translated.
+export const AI_TRUST_INVARIANT =
+  "Myne never sends your notes anywhere you have not named. A model downloads only when you ask, from Myne's own origin, which keeps no IP logs and no analytics.";

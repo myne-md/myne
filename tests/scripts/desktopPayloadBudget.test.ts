@@ -47,19 +47,18 @@ describe("declaredPaths / modelMappings", () => {
         "resources/dictionaries/en-US": "dictionaries/en-US",
         "resources/models/whisper": "models/whisper",
         "resources/models/ocr": "models/ocr",
-        "resources/models/tag": "models/tag",
       },
     },
   };
 
   it("reads the map form and the array form alike", () => {
-    expect(declaredPaths(conf)).toHaveLength(4);
+    expect(declaredPaths(conf)).toHaveLength(3);
     expect(declaredPaths({ bundle: { resources: ["a", "b"] } })).toEqual(["a", "b"]);
     expect(declaredPaths({})).toEqual([]);
   });
 
   it("extracts the bundled-model names, sorted and deduped", () => {
-    expect(modelMappings(conf)).toEqual(["ocr", "tag", "whisper"]);
+    expect(modelMappings(conf)).toEqual(["ocr", "whisper"]);
     // A dictionary path is not a model, and a nested file under a model dir is
     // not a second model.
     expect(modelMappings({ bundle: { resources: ["resources/dictionaries/de"] } })).toEqual([]);
@@ -68,7 +67,7 @@ describe("declaredPaths / modelMappings", () => {
 
 describe("compareModelSets — both directions", () => {
   it("names an addition", () => {
-    expect(compareModelSets(["ocr", "tag", "whisper", "embed"], EXPECTED_MODELS)).toEqual({
+    expect(compareModelSets(["ocr", "whisper", "embed"], EXPECTED_MODELS)).toEqual({
       added: ["embed"],
       removed: [],
     });
@@ -78,7 +77,7 @@ describe("compareModelSets — both directions", () => {
     // A silently dropped `models/ocr` breaks OCR-backed search. `ai-no-network-
     // check.sh` check 3 guards that on the CODE side; nothing guarded it on the
     // packaging side before this.
-    expect(compareModelSets(["tag", "whisper"], EXPECTED_MODELS)).toEqual({
+    expect(compareModelSets(["whisper"], EXPECTED_MODELS)).toEqual({
       added: [],
       removed: ["ocr"],
     });

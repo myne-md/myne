@@ -167,6 +167,31 @@
       "remote": "Answered by {{provider}}. Your notes were sent there."
     }
   },
+  "aiOnboarding": {
+    "title": "Set up AI",
+    "intro": "Myne can search your notes by meaning, suggest tags, and chat about them. None of it is required, and you can turn it on later from Settings.",
+    "enableLabel": "Turn on AI features",
+    "semantic": {
+      "title": "Semantic search",
+      "body": "Download a multilingual embedding model (about 449 MB) so you can search by meaning, not just by words."
+    },
+    "tag": {
+      "title": "Auto-tagging",
+      "body": "Download the tag model (about 337 MB) so Myne can suggest tags as you write."
+    },
+    "chat": {
+      "title": "Chat",
+      "body": "No download. Chat runs against a model you already run yourself or a provider you name, with a consent step.",
+      "setup": "Set up a provider"
+    },
+    "download": "Download",
+    "downloading": "Downloading…",
+    "cancel": "Cancel",
+    "complete": "Ready",
+    "retry": "Retry",
+    "skip": "Skip",
+    "done": "Done"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Cancel",
@@ -3210,7 +3235,7 @@
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
+      "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
@@ -3269,7 +3294,20 @@
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models. That would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Download a model here, or open a link to get one in your browser and pick the downloaded files. A model runs on your device; if you have named a provider instead, that provider answers.",
+      "downloadsLabel": "Download models",
+      "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
+      "downloadEmbeddingSize": "Multilingual model, about 449 MB.",
+      "downloadTagLabel": "Tag model: automatic tag suggestions",
+      "downloadTagSize": "Small local model, about 337 MB.",
+      "downloadInstalled": "Installed",
+      "downloadNotInstalled": "Not installed",
+      "downloadReinstall": "Download",
+      "modelRemove": "Remove",
+      "downloading": "Downloading…",
+      "downloadFailed": "The download did not finish.",
+      "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
+      "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeyLabel": "API key",
