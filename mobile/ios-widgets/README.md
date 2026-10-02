@@ -18,6 +18,29 @@ So: **no note titles, previews, counts, streaks, or timestamps** anywhere. The
 "deliberately excluded" panel of the design board (recent notes, counts, search,
 "vault unlocked" status, Live Activity) is excluded here too — on purpose.
 
+## Rendering modes (iOS 18 Tinted and Clear)
+
+Home Screen widgets do **not** always render in the brand colors. When the person
+picks the **Tinted** or **Clear** appearance, iOS 18 switches WidgetKit to its
+`accented` rendering mode: the system ignores view colors, removes the
+`containerBackground`, templates the hierarchy by its **alpha channel**, and
+paints the accent and primary groups in system tints. The Lock Screen uses the
+related `vibrant` mode. Light and Dark stay `fullColor`.
+
+This is why every Home widget view reads `\.widgetRenderingMode` through
+`MyneTokens` (`MyneColor.swift`) rather than using the raw `MyneColor` tokens:
+
+- a filled shape gains a `stroke` twin (`accent` plus `accentStroke`, `paper2`
+  plus `line`) so it survives losing its fill;
+- foregrounds fall back to `.primary`/`.secondary` off the `fullColor` path;
+- `MyneBrandMark` (`MyneMark.swift`) draws the bare stroked `MyneGlyph` instead
+  of the opaque `MyneLogo` tile, because two fully opaque shapes collapse into
+  one blank block once the system templates them. This collapsed tile was the
+  reported "the widget disappears in Tinted/Clear" bug (myne-md/myne#807).
+
+When adding a widget view, use `MyneTokens`, group meaningful content with
+`.widgetAccentable()`, and never assume a `MyneColor` fill will be painted.
+
 ## What's here
 
 ```
@@ -29,7 +52,8 @@ ios-widgets/
 │   ├── MyneControl.swift        ← WG-02 Control Center control "New note" (iOS 18+)
 │   ├── CaptureIntent.swift      ← NewNoteIntent (Action Button + control), opens the app
 │   ├── MyneColor.swift          ← design tokens (mirror of src/styles/tokens.css)  [SHARED]
-│   └── MyneMark.swift           ← the Myne "M" mark Shape + logo tile              [SHARED]
+│   ├── MyneMark.swift           ← the Myne "M" mark Shape + logo tile              [SHARED]
+│   └── MyneWidgetRendering.swift ← rendering-mode tokens + adaptive brand mark
 └── MyneApp/
     └── CaptureSheet.swift       ← WG-04 quick-capture surface (typing/voice/saving)
                                     — belongs to the APP target (holds plaintext)
@@ -37,7 +61,10 @@ ios-widgets/
 
 `MyneColor.swift` and `MyneMark.swift` are used by both the extension and the
 app-side `CaptureSheet`; add them to **both** targets' membership (or factor them
-into a shared Swift package).
+into a shared Swift package). They must stay compilable at the app target's
+`deploymentTarget` (iOS 15), so they carry no `WidgetRenderingMode` or other
+iOS 16+ WidgetKit API. `MyneWidgetRendering.swift` owns those, and is
+**widget-target-only** for that reason.
 
 ## Wiring into the Tauri iOS project — committed spec + ios-postinit.sh
 
@@ -118,6 +145,23 @@ The Control Center control + `NewNoteIntent` (which opens `myne://capture` via
   copy-commands for the same `Myne.app/libapp.a` → *"Multiple commands produce"*.
   Before a release build after a dev run: `rm -rf src-tauri/gen/apple/Externals/*/debug`
   and re-run `xcodegen generate`.
+
+## Verification checklist (physical device)
+
+Like the Android mirror (`android-widgets/README.md`) and the biometric
+quick-unlock checklist, the widget surfaces depend on OS rendering that no
+automated lane reaches; run this after any change to this module:
+
+1. Add every Home widget (Open Myne, Quick capture small and medium, Encrypted).
+   On the Home Screen customization, check the **Light** and **Dark**
+   appearances, then switch to **Tinted** and then **Clear**, on a light and a
+   dark wallpaper. Confirm the brand mark, the `+`/mic glyphs and every label
+   stay visible and legible in all four, and that nothing renders as a blank
+   tile. This is the regression myne-md/myne#807 fixed.
+2. Confirm the lock-screen accessories (inline, circular, rectangular) and the
+   StandBy glance still render legibly after the change.
+3. Resize Quick capture between small and medium and confirm the medium layout's
+   two buttons both remain visible in the Tinted and Clear appearances.
 
 ## Preview
 
