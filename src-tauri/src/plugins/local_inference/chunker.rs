@@ -520,12 +520,17 @@ mod tests {
     }
 
     #[test]
-    fn no_model_or_ipc_dependency_is_pure() {
-        // Compile-time guard by construction: this module imports only
-        // core::ops::Range + NoteId. The test documents the invariant (task-1
-        // acceptance 4) — a future `use` of an engine/http/tauri command here
-        // would be caught in review against this note.
-        let md = "sanity";
-        let _ = chunk_note(nid(), md, ChunkParams::default());
+    fn pure_over_inputs_yields_deterministic_well_formed_chunks() {
+        // `chunk_note` is pure over `(NoteId, &str)`: it imports no engine,
+        // IPC or I/O, so the same input must yield byte-identical,
+        // well-formed chunks on every call. A `use` of a model/http/tauri
+        // command here would let the result depend on something outside the
+        // arguments and fail the equality half.
+        let md = "sanity prose for the default budget\n\n# Heading\n\nbody text under it";
+        let first = chunk_note(nid(), md, ChunkParams::default());
+        let second = chunk_note(nid(), md, ChunkParams::default());
+        assert_eq!(first, second, "same input must yield the same chunks");
+        assert!(!first.is_empty(), "non-empty prose must yield chunks");
+        assert_well_formed(md, &first);
     }
 }

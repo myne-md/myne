@@ -79,6 +79,15 @@ node -e '
   fs.writeFileSync(dest, s);
 ' "$SPEC" "$DEST" "$TEAM" "$MARKETING" "$CURRENT"
 
+# Copy the committed extension Info.plists into gen/ and point INFOPLIST_FILE at
+# the copies. Xcode's ProcessInfoPlistFile REWRITES its INFOPLIST_FILE in place
+# (expanding $(CURRENT_PROJECT_VERSION) to a literal), so pointing at the
+# committed files left the repo dirty with a hardcoded version after every build.
+mkdir -p "$GEN_DIR/ext-plists"
+cp ios-widgets/MyneWidgets/Info.plist "$GEN_DIR/ext-plists/MyneWidgets-Info.plist"
+cp ios-watch/MyneWatch/Info.plist "$GEN_DIR/ext-plists/MyneWatch-Info.plist"
+cp ios-watch/MyneWatchComplications/Info.plist "$GEN_DIR/ext-plists/MyneWatchComplications-Info.plist"
+
 ( cd "$GEN_DIR" && xcodegen generate )
 
 echo "ios-postinit: project.yml wired (widgets + watch), version $MARKETING / $CURRENT, team ${TEAM:-<unset>}"

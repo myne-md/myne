@@ -143,6 +143,7 @@ fn main() {
         let cfg = myne_core::plugins::sync::config::SyncEndpointConfig {
             endpoint_url: Some(String::from("https://sync.example.test")),
             cert_pin_hex: None,
+            invite_code: None,
         };
         myne_core::plugins::sync::config::write_config(
             &io,

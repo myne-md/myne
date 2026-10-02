@@ -3878,6 +3878,8 @@
       "fixedOriginNone": "No sync server is configured for this deployment.",
       "pinPlatformTrust": "Server certificate verified by this client’s trust store.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "inviteLabel": "Invite code (only if this server asks for one)",
+      "invitePlaceholder": "The code the server’s operator gave you",
       "unreachable": "Couldn’t reach that server. Check the URL and that it’s running."
     },
     "enroll": {
@@ -3891,6 +3893,8 @@
         "awaitingApproval": "This device is already waiting for approval. Approve it from a device that is already signed in.",
         "deviceLimit": "This account has reached its device limit. Remove a device you no longer use, then try again.",
         "frozen": "This account is frozen, so no new device can be added right now. Your notes on this device are unaffected.",
+        "inviteCodeInvalid": "That invite code was not accepted. Check it and try again.",
+        "inviteCodeRequired": "This server only accepts new accounts with an invite code. Enter the code its operator gave you.",
         "notConfigured": "Set a sync server in settings before adding this device.",
         "serverMismatch": "The sync server’s identity didn’t match what this device expected. Don’t enter your credentials again until you know why.",
         "kdfTooLarge": "This device does not have enough memory to open that vault. Its encryption settings need more memory than this app can use here. Open it on a desktop computer instead.",
@@ -4657,8 +4661,6 @@
       "myneSync": "Use Myne Sync",
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "selfHosted": "Use my own server",
-      "connecting": "Connecting…",
-      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",

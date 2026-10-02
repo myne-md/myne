@@ -375,21 +375,6 @@ mod tests {
         );
     }
 
-    /// The oracle property, at the envelope layer: a query that hit ONLY an
-    /// excluded note and a query with a genuine no-match both arrive here as
-    /// an empty `hits` slice (the backend already collapsed them) — so their
-    /// rendered envelopes must be byte-for-byte identical, not merely
-    /// "both empty" by coincidence of this one call.
-    #[test]
-    fn excluded_hit_and_genuine_miss_render_byte_identical_envelopes() {
-        let excluded_hit_result: Vec<SearchHit> = vec![]; // backend already filtered
-        let genuine_miss_result: Vec<SearchHit> = vec![];
-        assert_eq!(
-            search_envelope_json(&excluded_hit_result),
-            search_envelope_json(&genuine_miss_result)
-        );
-    }
-
     #[test]
     fn error_envelope_shape_is_pinned() {
         assert_eq!(

@@ -70,12 +70,10 @@ export function useHasSyncEndpoint(): boolean {
 
 export function FirstRunServerStep({ onConnected, onBack, requireConnection = false }: FirstRunServerStepProps) {
   const { t } = useTranslation();
-  // Which door is open. `choose` is the fork itself; `self-hosted` is the URL
-  // form behind the second door.
-  const [mode, setMode] = useState<"choose" | "self-hosted">("choose");
-  const [hostedBusy, setHostedBusy] = useState(false);
-  const [hostedError, setHostedError] = useState(false);
-  const [hostedTls, setHostedTls] = useState(false);
+  // Which door is open. `choose` is the fork itself; `hosted` is the fixed
+  // `sync.myne.md` form (address locked, invite code enterable); `self-hosted`
+  // is the URL form behind the second door.
+  const [mode, setMode] = useState<"choose" | "hosted" | "self-hosted">("choose");
   // The endpoint control reports a successful connection before Continue can
   // advance. A saved endpoint alone is insufficient in the repair flow.
   const [configured, setConfigured] = useState(false);
@@ -102,27 +100,14 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
   };
 
   // The hosted door uses the same verified HTTPS transport as self-hosting.
-  const connectHosted = () => {
-    setHostedBusy(true);
-    setHostedError(false);
-    setHostedTls(false);
-    void invoke("plugin:sync|sync_set_endpoint", {
-      endpointUrl: HOSTED_SYNC_ORIGIN,
-    })
-      .then(() => {
-        setConfigured(true);
-        advance();
-      })
-      .catch((e: unknown) => {
-        // A refused certificate is not an unreachable server, and the two send a
-        // first-time user opposite ways: the generic copy's own remedy is "use
-        // your own server", which is advice for a server they cannot reach. Four
-        // other surfaces in this change branch on the same `kind`; this door
-        // used to be the one that did not.
-        setHostedTls((e as { kind?: string } | null)?.kind === "TlsFailure");
-        setHostedError(true);
-      })
-      .finally(() => setHostedBusy(false));
+  // It routes through the SAME `EndpointConfig` the self-hosted door mounts,
+  // seeded with `HOSTED_SYNC_ORIGIN` and with the address locked: the hosted
+  // server is a gated server (`MYNE_INVITE_CODE`, myne-md/myne#800), so its
+  // one-tap connection needs the invite-code field the self-hosted form already
+  // has. A bare `sync_set_endpoint` here would have been a second endpoint
+  // contract missing exactly the field a gated server needs.
+  const openHosted = () => {
+    setMode("hosted");
   };
 
   if (mode === "choose") {
@@ -148,11 +133,10 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
 
         <Button
           variant="primary"
-          disabled={hostedBusy}
-          onClick={connectHosted}
+          onClick={openHosted}
           data-testid="first-run-server.myne-sync"
         >
-          {hostedBusy ? t("firstRun.server.connecting") : t("firstRun.server.myneSync")}
+          {t("firstRun.server.myneSync")}
         </Button>
         <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
           {t("firstRun.server.myneSyncHint")}
@@ -160,22 +144,11 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
 
         <Button
           variant="secondary"
-          disabled={hostedBusy}
           onClick={() => setMode("self-hosted")}
           data-testid="first-run-server.self-hosted"
         >
           {t("firstRun.server.selfHosted")}
         </Button>
-
-        {hostedError && (
-          <p
-            data-testid="first-run-server.hosted-error"
-            data-error-kind={hostedTls ? "tls" : "unreachable"}
-            style={{ fontSize: "var(--text-sm)", color: "var(--danger)", margin: 0 }}
-          >
-            {t(hostedTls ? "sync.endpoint.tlsFailure" : "firstRun.server.hostedError")}
-          </p>
-        )}
 
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
           <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">
@@ -218,7 +191,15 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
         </div>
       </div>
 
-      <EndpointConfig onConnected={() => setConfigured(true)} onEdit={() => setConfigured(false)} />
+      <EndpointConfig
+        // The hosted door fixes the origin and lets only the invite code be
+        // entered; the self-hosted door is the free-text form. Same component,
+        // same contract (myne-md/myne#800).
+        initialUrl={mode === "hosted" ? HOSTED_SYNC_ORIGIN : undefined}
+        lockedUrl={mode === "hosted"}
+        onConnected={() => setConfigured(true)}
+        onEdit={() => setConfigured(false)}
+      />
 
       {!connected && (
         <p

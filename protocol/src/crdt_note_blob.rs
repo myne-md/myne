@@ -355,11 +355,23 @@ mod tests {
     }
 
     #[test]
-    fn oversized_ciphertext_len_field_is_capped_before_alloc() {
+    fn oversized_ciphertext_len_field_is_rejected_before_alloc() {
+        // A declared `ciphertext_len` one byte past the §9.2 cap must be
+        // refused by the cap check (line 213), and this fixture makes that the
+        // ONLY check that can return `Parse`: the blob is padded so the
+        // strict-trailing check passes (`blob.len() == declared layout`), and
+        // the items_key_id is zeroed so that WITHOUT the cap the very next
+        // check would return the distinct `ItemsKeyIdMismatch`. So the
+        // assertion is falsifiable in a way the previous form was not, where
+        // the trailing check masked the cap with the same `Parse`. Restored
+        // after the myne-md/myne#802 audit flagged the cap as the one
+        // collapsing-cause family (audit Part 1 #25).
         let mut blob = encode(b"payload");
-        // Overwrite ciphertext_len with 0xFFFFFFFF (>> cap) — the cap check
-        // fires (Parse) before the strict-trailing check and before any alloc.
-        blob[OFFSET_CIPHERTEXT_LEN..OFFSET_CIPHERTEXT].copy_from_slice(&u32::MAX.to_be_bytes());
+        let declared = NC05_MAX_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN + 1;
+        blob[OFFSET_CIPHERTEXT_LEN..OFFSET_CIPHERTEXT]
+            .copy_from_slice(&(declared as u32).to_be_bytes());
+        blob.resize(OFFSET_CIPHERTEXT + declared, 0);
+        blob[OFFSET_ITEMS_KEY_ID..OFFSET_ITEM_KEY_NONCE].fill(0);
         assert_eq!(
             decode_crdt_note_blob_with_cause(&blob, &NOTE_UUID, &ITEMS_KEY, &ITEMS_KEY_ID),
             Err(CrdtNoteBlobCause::Parse)

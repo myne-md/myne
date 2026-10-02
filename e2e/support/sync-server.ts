@@ -121,6 +121,12 @@ export interface SyncServerOptions {
   quotaCeilingBytes?: number;
   /** Device cap (`MYNE_MAX_DEVICES_PER_ACCOUNT`); omit/`0` = unlimited. */
   maxDevicesPerAccount?: number;
+  /**
+   * Shared invite code (`MYNE_INVITE_CODE`); omit for open registration. When
+   * set, the server refuses a NEW account that does not carry the matching code
+   * (`decisions/sync/0625`). Minimum 32 characters, enforced at server startup.
+   */
+  inviteCode?: string;
 }
 
 export async function startSyncServer(
@@ -138,6 +144,9 @@ export async function startSyncServer(
   }
   if (opts.maxDevicesPerAccount !== undefined) {
     policyEnv.MYNE_MAX_DEVICES_PER_ACCOUNT = String(opts.maxDevicesPerAccount);
+  }
+  if (opts.inviteCode !== undefined) {
+    policyEnv.MYNE_INVITE_CODE = opts.inviteCode;
   }
 
   const proc: ChildProcess = spawn(syncServerBinary(), [], {

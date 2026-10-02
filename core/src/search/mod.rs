@@ -1022,12 +1022,15 @@ mod tests {
 
     #[test]
     fn raw_form_still_matches_after_stemming_plumbing() {
-        // The raw form is always in the expansion → exact raw matching is
-        // unaffected by the multi-stem machinery.
+        // The raw form is always in the expansion → a NON-last (exact) term
+        // still matches by its raw form through the multi-stem machinery, and
+        // the AND across terms still holds. Multi-term on purpose: a single-term
+        // query makes the term the last (prefix) one and never enters the
+        // `exact_terms` branch this pins.
         let mut idx = InvertedIndex::default();
         idx.add(doc("a", "rust guide", "async tokio"));
-        assert_eq!(ids(&idx.query("rust")), vec!["a"]);
-        assert_eq!(ids(&idx.query("tokio")), vec!["a"]);
+        idx.add(doc("last_only", "t", "tokio runtime"));
+        assert_eq!(ids(&idx.query("rust async tokio")), vec!["a"]);
     }
 
     // ---- Task 3: per-note language detection + index-side stemming -----

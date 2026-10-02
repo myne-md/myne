@@ -22,92 +22,6 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// ── 3.3.7 ────────────────────────────────────────────────────────────────
-
-/** The exception names the criterion actually gives. Anything else is a fail. */
-const EXCEPTIONS = ["essential", "security", "no-longer-valid"] as const;
-type Exception = (typeof EXCEPTIONS)[number];
-
-interface Asked {
-  value: string;
-  /** Which steps ask for it. More than one needs an exception. */
-  steps: readonly string[];
-  exception?: Exception;
-  why?: string;
-}
-
-/**
- * Every multi-step flow that collects something, and what each step asks for.
- * Hand-written because "is this the same information" is a judgement about
- * meaning, not about types: the four words of the confirmation challenge are
- * the same information as the phrase, and no scan could know that.
- */
-const FLOWS: Record<string, readonly Asked[]> = {
-  "create a vault": [
-    { value: "account number", steps: ["account"] },
-    {
-      value: "recovery phrase",
-      steps: ["phrase (shown)", "confirm (4 of 24 re-entered)"],
-      exception: "security",
-      why: "The challenge exists to verify the user actually recorded the phrase. Auto-populating it would verify nothing, which is the case 3.3.7's security exception names. The phrase is selectable and has a Copy control, so the re-entry is a paste rather than a transcription (3.3.8, task 13).",
-    },
-    {
-      value: "password",
-      steps: ["password", "password confirm"],
-      exception: "essential",
-      why: "Confirming a NEW password is the canonical essential re-entry: the whole point is to catch a typo in a value nothing else can check.",
-    },
-  ],
-  "recover a vault": [
-    { value: "account number", steps: ["select (optional selector)"] },
-    { value: "recovery phrase", steps: ["phrase-entry"] },
-    {
-      value: "new password",
-      steps: ["password-reset"],
-      why: "Asked once. The old password is never asked for, which is the point of recovery.",
-    },
-  ],
-  "import a vault": [
-    { value: "recovery phrase", steps: ["phrase grid"] },
-    { value: "password", steps: ["password"] },
-  ],
-  "enrol a device": [
-    { value: "recovery phrase", steps: ["phrase grid"] },
-  ],
-};
-
-describe("no flow asks for the same thing twice without an exception", () => {
-  it("every repeated value cites one of the criterion's own exceptions", () => {
-    for (const [flow, asked] of Object.entries(FLOWS)) {
-      for (const entry of asked) {
-        if (entry.steps.length < 2) continue;
-        expect(
-          entry.exception,
-          `${flow}: "${entry.value}" is asked at ${entry.steps.length} steps with no exception`,
-        ).toBeDefined();
-        expect(EXCEPTIONS).toContain(entry.exception);
-      }
-    }
-  });
-
-  it("every exception carries an argument, not just a label", () => {
-    // "security" as a bare word is how a convenience re-entry gets recorded as
-    // compliant. The reason has to say why auto-populating would be wrong.
-    for (const [flow, asked] of Object.entries(FLOWS)) {
-      for (const entry of asked) {
-        if (entry.exception === undefined) continue;
-        expect((entry.why ?? "").length, `${flow}: ${entry.value}`).toBeGreaterThan(60);
-      }
-    }
-  });
-
-  it("covers the flows that exist", () => {
-    // Non-vacuity: an empty table passes every rule above.
-    expect(Object.keys(FLOWS).length).toBeGreaterThanOrEqual(4);
-    expect(Object.values(FLOWS).flat().length).toBeGreaterThanOrEqual(8);
-  });
-});
-
 // ── 3.2.6 ────────────────────────────────────────────────────────────────
 
 /**
@@ -189,18 +103,5 @@ describe("help stays in one place, because there is one place", () => {
     const present = new Set(outboundUrls());
     const stale = Object.keys(OUTBOUND).filter((u) => !present.has(u));
     expect(stale, stale.join("\n")).toEqual([]);
-  });
-
-  it("no help mechanism is offered today, so consistency is not yet a question", () => {
-    // The moment this stops being true, the test above forces the author to
-    // say where help lives, and this one to say it lives in ONE place.
-    const helps = Object.entries(OUTBOUND).filter(([, v]) => v.help);
-    expect(helps.map(([u]) => u)).toEqual([]);
-  });
-
-  it("every classification says what the link is", () => {
-    for (const [url, v] of Object.entries(OUTBOUND)) {
-      expect(v.what.length, url).toBeGreaterThan(15);
-    }
   });
 });

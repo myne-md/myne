@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 //
-// The first-run sync-server choice (myne-md/myne#780): a hosted door and a
-// self-hosted door. The hosted door must write the shared `HOSTED_SYNC_ORIGIN`
-// and no fingerprint argument at all (the retired `confirmedFingerprint` is
-// gone from this call, and the endpoint's own CA verification is the backend's
-// job); the self-hosted door must reveal the same `EndpointConfig` the Settings
-// panel mounts.
+// The first-run sync-server choice (myne-md/myne#780, invite code myne-md/myne#800):
+// a hosted door and a self-hosted door.
 //
-// The certificate gate this file used to test, a "the pin changed" form the
-// user answered by pasting the old fingerprint, was removed with pinning
-// (`decisions/sync/0620`). Its replacement surface is the refusal below: an
-// endpoint whose certificate the client will not accept reports an error and
-// does not advance.
+// The hosted door seeds the SAME `EndpointConfig` the Settings panel mounts, with
+// the origin locked and the address read-only, so its one-tap connection carries
+// the invite-code field a gated server needs. A bare `sync_set_endpoint` on the
+// hosted button (the pre-fix shape) sent no code and had nowhere to enter one, so
+// the hosted server — which IS the gated one — could not be reached at all. The
+// self-hosted door reveals the same control unlocked.
+//
+// The certificate gate this file used to test, a "the pin changed" form the user
+// answered by pasting the old fingerprint, was removed with pinning
+// (`decisions/sync/0620`); the refusal now surfaces through `EndpointConfig`'s own
+// message line, tested in `EndpointConfig`'s spec.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,27 +49,52 @@ describe("FirstRunServerStep", () => {
     expect(screen.getByTestId("first-run-server.self-hosted")).toBeTruthy();
   });
 
-  it("writes the hosted origin with no fingerprint argument when Myne Sync is chosen", async () => {
+  it("opens the hosted door with the origin locked and the invite field available", async () => {
+    render(<FirstRunServerStep onConnected={() => {}} onBack={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("first-run-server.myne-sync"));
+
+    // The same EndpointConfig the Settings panel mounts, seeded with the hosted
+    // origin and locked, so the user may enter only the invite code.
+    const config = await screen.findByTestId("sync.endpoint-config");
+    expect(config).toBeTruthy();
+    const url = screen.getByTestId("sync.endpoint-input") as HTMLInputElement;
+    expect(url.value).toBe(HOSTED_SYNC_ORIGIN);
+    expect(url.readOnly).toBe(true);
+    expect(screen.getByTestId("sync.endpoint-invite-input")).toBeTruthy();
+  });
+
+  it("connects the hosted origin and carries the typed invite code", async () => {
+    invoke.mockImplementation((command: string) =>
+      command === "plugin:sync|sync_set_endpoint"
+        ? Promise.resolve({ fingerprint: null, pin_source: "platform_trust_store" })
+        : Promise.resolve({ endpoint_url: null }),
+    );
     const onConnected = vi.fn();
     render(<FirstRunServerStep onConnected={onConnected} onBack={() => {}} />);
 
     fireEvent.click(await screen.findByTestId("first-run-server.myne-sync"));
+    fireEvent.change(await screen.findByTestId("sync.endpoint-invite-input"), {
+      target: { value: "beta-code-0000000000000000000000000001" },
+    });
+    fireEvent.click(screen.getByTestId("sync.endpoint-connect"));
 
-    // Exactly `{ endpointUrl }`. The retired `confirmedFingerprint` is not sent
-    // as `null` either: the backend ignores it, and sending it keeps a removed
-    // affordance looking like a live one to anything reading the IPC log.
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("plugin:sync|sync_set_endpoint", {
         endpointUrl: HOSTED_SYNC_ORIGIN,
+        inviteCode: "beta-code-0000000000000000000000000001",
       }),
     );
-    await waitFor(() => expect(onConnected).toHaveBeenCalled());
+    await waitFor(() =>
+      expect((screen.getByTestId("first-run-server.continue") as HTMLButtonElement).disabled).toBe(false),
+    );
   });
 
-  it("reveals the self-hosted URL field behind the second door", async () => {
+  it("reveals the self-hosted URL field behind the second door, unlocked", async () => {
     render(<FirstRunServerStep onConnected={() => {}} onBack={() => {}} />);
     fireEvent.click(await screen.findByTestId("first-run-server.self-hosted"));
     expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
+    expect((screen.getByTestId("sync.endpoint-input") as HTMLInputElement).readOnly).toBe(false);
   });
 
   it("requires a fresh connection when repairing a configured endpoint", async () => {
@@ -94,26 +121,9 @@ describe("FirstRunServerStep", () => {
     const onConnected = vi.fn();
     render(<FirstRunServerStep onConnected={onConnected} onBack={() => {}} />);
     fireEvent.click(await screen.findByTestId("first-run-server.myne-sync"));
-    expect(await screen.findByTestId("first-run-server.hosted-error")).toBeTruthy();
-    expect(onConnected).not.toHaveBeenCalled();
-  });
-
-  it("tells a refused certificate apart from an unreachable server", async () => {
-    // The first-run door is where a self-hoster meets the hosted path, and the
-    // generic copy's own remedy is "or use your own server", advice for a
-    // server they cannot reach. Four other surfaces branch on the same `kind`;
-    // this asserts the fifth does too, and that the two errors stay distinct.
-    invoke.mockImplementation((command: string) =>
-      command === "plugin:sync|sync_set_endpoint"
-        ? Promise.reject({ kind: "TlsFailure" })
-        : Promise.resolve({ endpoint_url: null }),
-    );
-    const onConnected = vi.fn();
-    render(<FirstRunServerStep onConnected={onConnected} onBack={() => {}} />);
-    fireEvent.click(await screen.findByTestId("first-run-server.myne-sync"));
-    const err = await screen.findByTestId("first-run-server.hosted-error");
-    expect(err.getAttribute("data-error-kind")).toBe("tls");
-    expect(err.textContent).toBe("sync.endpoint.tlsFailure");
+    fireEvent.click(await screen.findByTestId("sync.endpoint-connect"));
+    const msg = await screen.findByTestId("sync.endpoint-msg");
+    expect(msg.textContent).toBe("sync.endpoint.tlsFailure");
     expect(onConnected).not.toHaveBeenCalled();
   });
 
@@ -128,32 +138,9 @@ describe("FirstRunServerStep", () => {
     const onConnected = vi.fn();
     render(<FirstRunServerStep onConnected={onConnected} onBack={() => {}} />);
     fireEvent.click(await screen.findByTestId("first-run-server.myne-sync"));
-    const err = await screen.findByTestId("first-run-server.hosted-error");
-    expect(err.getAttribute("data-error-kind")).toBe("unreachable");
-    expect(err.textContent).toBe("firstRun.server.hostedError");
-  });
-
-  it("lets the user retry the hosted door after a refusal", async () => {
-    let attempt = 0;
-    invoke.mockImplementation((command: string) => {
-      if (command === "plugin:sync|sync_set_endpoint") {
-        attempt += 1;
-        return attempt === 1
-          ? Promise.reject({ kind: "TlsFailure" })
-          : Promise.resolve({ fingerprint: null, pin_source: "platform_trust_store" });
-      }
-      return Promise.resolve({ endpoint_url: null });
-    });
-    const onConnected = vi.fn();
-    render(<FirstRunServerStep onConnected={onConnected} onBack={() => {}} />);
-    const door = await screen.findByTestId("first-run-server.myne-sync");
-    fireEvent.click(door);
-    await screen.findByTestId("first-run-server.hosted-error");
-    // The button must come back enabled, or the refusal is a dead end rather
-    // than an error the user can act on (a transient DNS failure, say).
-    await waitFor(() => expect((door as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(door);
-    await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByTestId("sync.endpoint-connect"));
+    const msg = await screen.findByTestId("sync.endpoint-msg");
+    expect(msg.textContent).toBe("sync.endpoint.unreachable");
   });
 
   it("connects a self-hosted endpoint before returning to identity setup", async () => {

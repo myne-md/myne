@@ -12,14 +12,12 @@ import {
   resolveFormatBarOrder,
   visibleFormatBarIds,
 } from "../src/lib/formatBarItems";
+// Desktop's frozen vocabulary, IMPORTED rather than copied: this is a
+// CROSS-CLIENT contract check, so editing desktop's list without a look at mobile
+// has to turn it red. A hand-copied literal only ever contained itself.
+import { EDITOR_TOOLBAR_ITEMS } from "../../src/notes/toolbarItems";
 
-/** Desktop's frozen vocabulary (`src/notes/toolbarItems.ts`) as of MYND-336 —
- *  hard-coded here on purpose: this is a CROSS-CLIENT contract check, so it must
- *  fail if desktop's list is edited without a look at mobile. */
-const DESKTOP_IDS = [
-  "bold", "italic", "strike", "code", "highlight", "link",
-  "heading", "bulletList", "numberedList", "checklist", "quote", "wikilink",
-];
+const DESKTOP_IDS: readonly string[] = EDITOR_TOOLBAR_ITEMS.map((i) => i.id);
 
 describe("vocabulary", () => {
   it("default order lists every item exactly once", () => {
