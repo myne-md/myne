@@ -268,27 +268,14 @@ mod tests {
         assert!(json["request_id"].is_null());
     }
 
-    #[test]
-    fn accept_with_no_session_maps_to_no_pending_pairing_error() {
-        let st = PairingState::default();
-        // Mirror the command's mapping of `None` → NoPendingPairing.
-        let mapped = match st.accept_pending().unwrap() {
-            Some(_) => None,
-            None => Some(PairingError::NoPendingPairing),
-        };
-        assert_eq!(mapped, Some(PairingError::NoPendingPairing));
-    }
-
-    #[test]
-    fn reject_with_no_session_maps_to_no_pending_pairing_error() {
-        let st = PairingState::default();
-        let mapped = if st.reject_pending() {
-            None
-        } else {
-            Some(PairingError::NoPendingPairing)
-        };
-        assert_eq!(mapped, Some(PairingError::NoPendingPairing));
-    }
+    // The commands' `None`/`false` → `PairingError::NoPendingPairing` mapping
+    // is their own `match`/`if` body, and driving the `#[tauri::command]`
+    // entry points needs an `AppHandle` + `State<'_, _>` harness this crate's
+    // tests do not build. The underlying `accept_pending`/`reject_pending`
+    // behaviour is asserted directly in `state.rs`
+    // (`accept_with_no_pending_session_is_none`,
+    // `reject_with_no_pending_session_is_false`); the commands add nothing
+    // beyond restating that mapping, so there is no independent oracle here.
 
     #[test]
     fn error_serializes_with_a_closed_kind_tag() {

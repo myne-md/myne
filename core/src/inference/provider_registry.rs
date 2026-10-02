@@ -1033,11 +1033,18 @@ mod tests {
     /// different request from the one the decision entry argues for.
     #[test]
     fn no_user_or_assistant_turn_carries_a_cache_marker() {
+        // `cache_system = true` so the fixture CAN carry a marker: with it
+        // false the body holds no `cache_control` at all and the assertion
+        // below could never be consulted.
         let v: serde_json::Value = serde_json::from_slice(
-            &RemoteProvider::OpenRouter.build_chat_body("m", "sys", &turns(), None, false),
+            &RemoteProvider::OpenRouter.build_chat_body("m", "sys", &turns(), None, true),
         )
         .unwrap();
         let msgs = v["messages"].as_array().unwrap();
+        assert_eq!(
+            msgs[0]["content"][0]["cache_control"]["type"], "ephemeral",
+            "the fixture must actually carry a marker on the system turn"
+        );
         assert!(msgs.len() > 1, "the fixture must carry non-system turns");
         for m in &msgs[1..] {
             assert!(
