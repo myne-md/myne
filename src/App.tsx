@@ -23,6 +23,18 @@ import {
   type SuspicionReason,
   type VaultId,
 } from "./lib/stage";
+import {
+  dormancyForLock,
+  initializePlainFiles,
+  restoreDormant,
+  usePlainFileState,
+} from "./plain/store";
+import { OpenFileConfirm } from "./plain/OpenFileConfirm";
+import {
+  OPEN_FILE_EVENT,
+  consumePendingOpenFile,
+  type OpenFileRequest,
+} from "./plain/openFileDeepLink";
 import { PairingDialog } from "./components/PairingDialog";
 import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
@@ -53,6 +65,15 @@ import { detachedNoteId as readDetachedNoteId } from "./lib/detachedWindow";
 // GraphView → GraphCanvas, the app's other lazy boundary).
 const Editor = lazy(() =>
   import("./screens/Editor").then((m) => ({ default: m.Editor })),
+);
+
+/** Lazy for the same reason as `Editor`: the surface mounts `@myne/editor`, and
+ *  a static import would pull the whole engine into the first-load bundle of
+ *  every stage (web bundle budget, `check-web-bundle-budget.mjs`). */
+const PlainFileScreen = lazy(() =>
+  import("./plain/PlainFileScreen").then((m) => ({
+    default: m.PlainFileScreen,
+  })),
 );
 
 /**
@@ -432,6 +453,55 @@ function App() {
     },
   });
 
+  // The plain-file surface (myne-md/myne#788). Rendered OVER the vault stage
+  // whenever files are open, in every vault state: a locked vault and a device
+  // with no vault both still open the user's own files. The vault stays exactly
+  // where it was behind it, and closing the last tab reveals it again.
+  //
+  // These hooks sit ABOVE the `stage === null` early return below, and that is
+  // load-bearing: a hook declared after a conditional return renders more hooks
+  // on the second pass than on the first, which React rejects. The boot probe
+  // makes that first pass the common one.
+  //
+  // Lock/unlock parks the tabs in RAM (`dormancyForLock`, after the flush) and
+  // brings them back on unlock; a restart restores nothing, which is the
+  // zero-trace rule. The Rust-side handles stay alive through dormancy, because
+  // the frontend holds no path with which it could re-open them.
+  const plainState = usePlainFileState();
+  const plainScreen = plainState.files.length > 0;
+  // Subscribe and drain ONCE per process, at App level rather than inside the
+  // surface: the surface renders only when a file is already open, so an
+  // initialization living there could never deliver the first one. The listener
+  // stays installed for the process lifetime (the store guards re-entry).
+  useEffect(() => {
+    void initializePlainFiles();
+  }, []);
+  // The `myne://open-file` confirmation (myne-md/myne#788 task 12). The handler
+  // latches an already-resolved canonical path and fires a bare event; App owns
+  // the one slot because the dialog must be able to appear over ANY vault stage,
+  // including locked. Same drain shape as ThemeInstallDialog, deliberately.
+  const [openFileRequest, setOpenFileRequest] = useState<OpenFileRequest | null>(null);
+  useEffect(() => {
+    const drain = () => {
+      const next = consumePendingOpenFile();
+      if (next) setOpenFileRequest(next);
+    };
+    drain();
+    window.addEventListener(OPEN_FILE_EVENT, drain);
+    return () => window.removeEventListener(OPEN_FILE_EVENT, drain);
+  }, []);
+  const prevStageRef = useRef(stage?.name ?? null);
+  useEffect(() => {
+    const current = stage?.name ?? null;
+    const previous = prevStageRef.current;
+    prevStageRef.current = current;
+    if (previous === "editor" && current !== "editor") {
+      void dormancyForLock();
+    } else if (previous !== "editor" && current === "editor") {
+      restoreDormant();
+    }
+  }, [stage?.name]);
+
   useEffect(() => {
     if (stageName !== "editor") {
       applyTheme(null);
@@ -453,7 +523,10 @@ function App() {
         // Light/Dark/System choice (MYND-297). Read + apply its palette via the
         // CSSOM; on any failure (missing / renamed / invalid file) fall back to
         // the built-in theme rather than leaving the UI un-themed.
-        if (prefs.custom_theme) {
+        // The custom palette is vault content (`MYT1`). The plain surface
+        // renders built-in palettes only, so while it owns the window the
+        // custom theme is skipped and the built-in choice is painted instead.
+        if (prefs.custom_theme && !plainScreen) {
           try {
             const palette = await readCustomTheme(prefs.custom_theme);
             if (!cancelled) applyCustomTheme(palette);
@@ -472,7 +545,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stageName]);
+  }, [stageName, plainScreen]);
 
   // Stage ↔ address bar (MYND-574 task 64). On desktop every call inside is a
   // seam no-op — a window has no back button and opens where the boot probe
@@ -864,7 +937,13 @@ function App() {
           flexDirection: "column",
         }}
       >
-        {screen}
+        {plainScreen ? (
+          <Suspense fallback={null}>
+            <PlainFileScreen />
+          </Suspense>
+        ) : (
+          screen
+        )}
       </div>
       {/* Browser-extension pairing prompt (ext-foundation-handoff task 4,
           TB10). Mounted globally so a connect request from the extension
@@ -884,6 +963,15 @@ function App() {
           those surfaces have somewhere to render. */}
       <Toaster />
       <PairingDialog />
+      {/* The `myne://open-file` confirmation. Nothing opens until Confirm, and
+          the path it shows is the host-resolved canonical one; gate-off links
+          never reach the latch, so this renders nothing for them. */}
+      {openFileRequest !== null && (
+        <OpenFileConfirm
+          path={openFileRequest.path}
+          onClose={() => setOpenFileRequest(null)}
+        />
+      )}
       {/* "Add this device to an account" (MYND-424; myne#221 opened it to the
           picker + switcher). Mounted here, over whatever stage is showing,
           because three stages offer the same door and each lands differently —

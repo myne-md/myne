@@ -338,9 +338,14 @@ describe("FolderRow — visual extras", () => {
 
   it("renders an insertion line element when reorderPlace is set", () => {
     const { container } = renderRow({ reorderPlace: "above" });
-    // The insertion line is an aria-hidden absolutely-positioned bar.
-    const line = container.querySelector('[aria-hidden="true"]');
+    // The insertion line is the only aria-hidden DIV: the default folder icon's
+    // aria-hidden node is a SPAN (FolderRow.tsx:219) and the glyphs are SVGs.
+    // Selecting on `[aria-hidden="true"]` alone matched the icon on every row,
+    // so deleting the line left this green.
+    const line = container.querySelector('div[aria-hidden="true"]') as HTMLElement | null;
     expect(line).toBeTruthy();
+    expect(line?.style.background).toContain("var(--accent)");
+    expect(line?.style.height).toBe("2px");
   });
 
   it("renders a custom folder glyph when iconName resolves", () => {

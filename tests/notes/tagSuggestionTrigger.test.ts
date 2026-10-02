@@ -272,7 +272,21 @@ describe("createTagSuggestionTrigger", () => {
     expect(h.results.map((r) => r.noteId)).toEqual(["n2"]);
   });
 
-  it("defaults to the shared debounce constant when none is given", () => {
-    expect(TAG_SUGGESTION_DEBOUNCE_MS).toBeGreaterThan(0);
+  it("defaults to the shared debounce constant when none is given", async () => {
+    // Construct the trigger through the DEFAULT path (no `debounceMs`), which
+    // `harness` never does, and observe the interval by its effect: nothing
+    // before the shared constant, one pass at it.
+    const suggest = vi.fn().mockResolvedValue("rust");
+    const trigger = createTagSuggestionTrigger({
+      suggest: (args) => suggest(args) as Promise<string>,
+      existingTags: () => Promise.resolve([]),
+      excludedFolders: () => [],
+      onResult: () => {},
+    });
+    trigger.schedule({ noteId: "n1", noteBody: "body", noteFolder: "" });
+    await vi.advanceTimersByTimeAsync(TAG_SUGGESTION_DEBOUNCE_MS - 1);
+    expect(suggest).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(suggest).toHaveBeenCalledTimes(1);
   });
 });

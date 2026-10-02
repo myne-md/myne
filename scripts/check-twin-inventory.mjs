@@ -1121,6 +1121,15 @@ const ROSTER = [
       "Path arithmetic on one side, an export chokepoint on the other, and the two stopped having the same SHAPE in myne-md/myne#517. Desktop re-exports `appDataDir` and `join` from Tauri and composes a destination in TypeScript, which is right there because the user picks it through the OS save dialog. Mobile has no dialog to pick with (myne-md/myne#491), so the app picks for the user, and since #517 it picks in Rust: the whole module is one `exportPath(filename)` over `plugin:export-dir|export_path`, which resolves the directory, creates it, applies the platform backup exclusion and sanitizes the filename in one call. Mobile grants no `core:path` capability at all as a result. Making the member lists match would be wrong on both sides, and matching them now would mean putting the backup exclusion behind a client that has no platform backup.",
   },
 
+  {
+    a: "src/platform/plainFile.ts",
+    b: "mobile/src/platform/plainFile.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "The plain-file editor's gate commands (myne-md/myne#788). The feature is desktop-only by its PRD's own verdict: it needs an OS file ingress a phone has no equivalent of, and mobile's own file flows are the share sheet and the importer. Desktop's arm is the real host binding; mobile's exists so a future shared caller cannot accidentally wire itself to the desktop implementation, and it rejects at the host because the plugin is not registered there. Nothing to share: the gate is a device-local file only the desktop reads.",
+  },
+
   // ── The two Rust/TS pairs the merge brought in
   {
     a: "src/notes/setNoteCover.ts",

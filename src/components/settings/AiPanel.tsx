@@ -74,7 +74,7 @@ import {
   type AiTrustState,
 } from "../../lib/load-bearing-copy";
 import { Input } from "../primitives/Input";
-import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
@@ -1175,7 +1175,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <label style={LABEL_STYLE}>{t("settings.ai.providerLabel")}</label>
         <p style={HELPER_STYLE}>{t("settings.ai.providerHelper")}</p>
         <div style={{ marginTop: "var(--space-1)" }}>
-          <Segmented
+          <Select
             options={[
               { value: "none", label: t("settings.ai.providerNone") },
               ...REMOTE_PROVIDERS.map((p) => ({
@@ -1185,7 +1185,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             ]}
             value={pendingProvider ?? prefs.ai_provider ?? "none"}
             onChange={(v) => chooseProvider(v === "none" ? null : v)}
-            ariaLabel={t("settings.ai.providerLabel")}
+            aria-label={t("settings.ai.providerLabel")}
             testId="ai.provider-choice"
           />
         </div>

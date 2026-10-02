@@ -1003,6 +1003,31 @@ mod tests {
     }
 
     #[test]
+    fn every_registered_role_derives_a_distinct_subkey() {
+        // Domain separation (spec § 3.2.2): every registered role's `info`
+        // string is distinct (`all_covers_every_registered_role`), and
+        // `derive_subkey` is exactly HKDF(`prefix || role_str`)
+        // (`derive_subkey_concatenates_prefix_and_role_string`), so distinct
+        // roles MUST derive distinct subkeys. This states that once over the
+        // WHOLE registry, which the per-role pairwise copies it replaces each
+        // restated for a hand-picked subset. The load-bearing case is the
+        // id-vs-KEK families (`catalog-sync-id` / `prefs-sync-id` /
+        // `themes-sync-id` against their `*-key` KEKs, §9.10.1): a collision
+        // there would let one store's id be another store's key.
+        let root = [0u8; 32];
+        for (i, a) in SubkeyRole::ALL.iter().enumerate() {
+            let derived_a = derive_subkey(&root, *a);
+            for b in SubkeyRole::ALL.iter().skip(i + 1) {
+                assert_ne!(
+                    *derived_a,
+                    *derive_subkey(&root, *b),
+                    "{a:?} and {b:?} derive the SAME subkey: domain separation lost"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn hkdf_prefix_is_exactly_myne_v0_1_with_trailing_space() {
         // Spec § 1.2 + § 3.2.2 lock this verbatim. The trailing space is
         // load-bearing — it is part of the bytes hashed into every
@@ -1067,17 +1092,6 @@ mod tests {
     }
 
     #[test]
-    fn personal_dict_key_is_distinct_from_other_root_key_blobs() {
-        // The dictionary KEK must differ from prefs/search/workspace KEKs so
-        // the blob families are domain-separated (HKDF info-string property).
-        let root = [0u8; 32];
-        let dict = derive_subkey(&root, SubkeyRole::PersonalDictKey);
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-    }
-
-    #[test]
     fn server_auth_role_string_matches_spec_registry() {
         // MYND-420 registry entry "myne.v0.1 server-auth" (§3.4 + §11.1). The
         // SCRAM-SHA-256-PLUS credential secret is HKDF(root_key, "server-auth");
@@ -1086,43 +1100,11 @@ mod tests {
     }
 
     #[test]
-    fn server_auth_is_distinct_from_other_roles() {
-        // The server-auth secret must be domain-separated from every blob KEK and
-        // from the vault-head MAC key (a server-auth leak must not imply any other).
-        let root = [0u8; 32];
-        let sa = derive_subkey(&root, SubkeyRole::ServerAuth);
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-    }
-
-    #[test]
     fn vault_indices_key_role_string_matches_spec_registry() {
         // MYND-271 registry entry "myne.v0.1 vault-indices-key" (§ 9.8; design
         // MYND-31). Frozen + load-bearing: drift silently changes the
         // vault.indices KEK.
         assert_eq!(SubkeyRole::VaultIndicesKey.role_str(), b"vault-indices-key");
-    }
-
-    #[test]
-    fn vault_indices_key_is_distinct_from_other_root_key_blobs() {
-        // The vault-indices KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families are domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from search-index-key —
-        // vault.indices (structured metadata) and vault.search (BM25) are
-        // separate families, one KEK each.
-        let root = [0u8; 32];
-        let vi = derive_subkey(&root, SubkeyRole::VaultIndicesKey);
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(
-            *vi,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
     }
 
     #[test]
@@ -1152,49 +1134,12 @@ mod tests {
     }
 
     #[test]
-    fn attachment_text_key_is_distinct_from_other_root_key_blobs() {
-        // The attachment-text KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families stay domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from search-index-key,
-        // since extracted text feeds the search index but the cache is its own
-        // blob family.
-        let root = [0u8; 32];
-        let at = derive_subkey(&root, SubkeyRole::AttachmentTextKey);
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(
-            *at,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-    }
-
-    #[test]
     fn catalog_sync_id_role_string_matches_spec_registry() {
         // MYND-468 registry entry "myne.v0.1 catalog-sync-id" (§3.4;
         // sync-protocol.md §8.1). Derives the catalog's reserved 16-byte
         // sync blob-id; drift silently splits the catalog into a second
         // sync record on every existing account.
         assert_eq!(SubkeyRole::CatalogSyncId.role_str(), b"catalog-sync-id");
-    }
-
-    #[test]
-    fn catalog_sync_id_is_distinct_from_other_roles() {
-        // The sync blob-id derivation must be domain-separated from the
-        // catalog KEK (an id is public-ish sync metadata; the KEK is key
-        // material) and from the other identifier derivation
-        // (attachments-id-hmac) and the head MAC key.
-        let root = [0u8; 32];
-        let cs = derive_subkey(&root, SubkeyRole::CatalogSyncId);
-        assert_ne!(
-            *cs,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
     }
 
     #[test]
@@ -1207,21 +1152,6 @@ mod tests {
     }
 
     #[test]
-    fn prefs_sync_id_is_distinct_from_other_roles() {
-        // The prefs sync blob-id derivation must be domain-separated from
-        // the prefs KEK (the id is public-ish sync metadata; the KEK is key
-        // material — the §9.10.1-class id/KEK pair), from the sibling
-        // identifier derivation (catalog-sync-id), and from the other
-        // non-KEK roles.
-        let root = [0u8; 32];
-        let ps = derive_subkey(&root, SubkeyRole::PrefsSyncId);
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
     fn themes_sync_id_role_string_matches_spec_registry() {
         // MYND-486 registry entry "myne.v0.1 themes-sync-id" (§3.4;
         // sync-protocol.md §10.x). Derives vault.themes' reserved 16-byte
@@ -1231,44 +1161,10 @@ mod tests {
     }
 
     #[test]
-    fn themes_sync_id_is_distinct_from_other_roles() {
-        // The themes sync blob-id derivation must be domain-separated from
-        // the themes KEK (the id is public-ish sync metadata; the KEK is key
-        // material — the §9.10.1-class id/KEK pair), from the sibling
-        // identifier derivations (catalog-sync-id / prefs-sync-id), and from
-        // the other non-KEK roles.
-        let root = [0u8; 32];
-        let ts = derive_subkey(&root, SubkeyRole::ThemesSyncId);
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::PrefsSyncId));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
     fn custom_themes_key_role_string_matches_spec_registry() {
         // MYND-486 registry entry "myne.v0.1 custom-themes-key" (§ 9.21).
         // Frozen + load-bearing: drift silently changes the vault.themes KEK.
         assert_eq!(SubkeyRole::CustomThemesKey.role_str(), b"custom-themes-key");
-    }
-
-    #[test]
-    fn custom_themes_key_is_distinct_from_other_root_key_blobs() {
-        // The custom-themes KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families are domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from personal-dictionary-key
-        // — vault.themes (MYT1) is the structural twin of vault.dictionary (MYD1),
-        // one KEK each.
-        let root = [0u8; 32];
-        let ct = derive_subkey(&root, SubkeyRole::CustomThemesKey);
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
     }
 
     #[test]
@@ -1283,36 +1179,6 @@ mod tests {
         // Registry entry "myne.v0.2 membership-key" (§3.4; §9.3.1). KEK for the
         // sealed vault membership field; drift silently changes the KEK.
         assert_eq!(SubkeyRole::MembershipKey.role_str(), b"membership-key");
-    }
-
-    #[test]
-    fn membership_key_is_distinct_from_other_root_key_blobs() {
-        // The membership KEK must differ from every other root_key-derived blob
-        // KEK so the families stay domain-separated (HKDF info-string property).
-        let root = [0u8; 32];
-        let mk = derive_subkey(&root, SubkeyRole::MembershipKey);
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
-    fn graph_layout_key_is_distinct_from_other_root_key_blobs() {
-        // vault.graph (layout cache) is its own blob family — its KEK must be
-        // domain-separated from its structural siblings, most importantly the
-        // other rebuildable caches (search / indices / embeddings) whose blobs
-        // sit next to it, so a blob of one kind can never AEAD-verify as another.
-        let root = [0u8; 32];
-        let gl = derive_subkey(&root, SubkeyRole::GraphLayoutKey);
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::AiEmbeddingsKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
     }
 
     #[test]

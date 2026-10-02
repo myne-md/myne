@@ -1182,42 +1182,14 @@ mod tests {
 
     // ── the host arm computes the same paths as the Tauri arm ────────────────
     //
-    // "Pure move, zero behaviour change" is the whole claim of task 79, and
-    // these are what make it checkable rather than asserted. Each pins that a
-    // `*_from_host` resolver equals the pure `*_from_base` helper the Tauri
-    // resolver is a one-line wrapper over — so the two arms cannot drift
-    // without a test going red.
+    // The `*_from_host` resolvers are one-line delegations over the pure
+    // `*_from_base` helpers, so asserting the two agree would be a tautology
+    // (removed, myne-md/myne#802). What is checked below is the host-only
+    // behaviour a delegation cannot express: the sole-vault fallback, its
+    // override by an active id, directory creation, and the error shape.
 
     use crate::host::test_host::TestHost;
     use crate::host::{HostCtx, NoopHost};
-
-    #[test]
-    fn host_and_base_arms_agree_on_the_current_vault_root() {
-        let tmp = ScopedTempDir::new("host-current-root").unwrap();
-        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
-        let base = host.app_data_dir().unwrap();
-        assert_eq!(
-            current_vault_root_from_host(&host).unwrap(),
-            current_vault_root_from_base(&base)
-        );
-    }
-
-    #[test]
-    fn host_and_base_arms_agree_on_the_active_vault_root_with_and_without_an_id() {
-        let tmp = ScopedTempDir::new("host-active-root").unwrap();
-        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
-        let base = host.app_data_dir().unwrap();
-        let id = VaultId::mint();
-
-        assert_eq!(
-            active_vault_root_from_host(&host, Some(id)).unwrap(),
-            active_vault_root_from_base(&base, Some(id))
-        );
-        assert_eq!(
-            active_vault_root_from_host(&host, None).unwrap(),
-            active_vault_root_from_base(&base, None)
-        );
-    }
 
     /// A host that names a sole vault, the way the browser's `WebHost` does.
     struct SoleVaultHost {
@@ -1294,37 +1266,6 @@ mod tests {
         assert_eq!(
             active_vault_root_from_host(&host, Some(active)).unwrap(),
             vault_root_for_id_from_base(&base, active)
-        );
-    }
-
-    /// The default is silence: desktop and mobile are untouched by the seam
-    /// method existing at all.
-    #[test]
-    fn a_host_that_names_no_sole_vault_still_falls_to_the_disk_scan() {
-        let tmp = ScopedTempDir::new("no-sole-vault").unwrap();
-        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
-        let base = host.app_data_dir().unwrap();
-        assert_eq!(host.sole_vault_id(), None);
-        assert_eq!(
-            active_vault_root_from_host(&host, None).unwrap(),
-            current_vault_root_from_base(&base)
-        );
-    }
-
-    #[test]
-    fn host_and_base_arms_agree_on_vault_root_for_id_and_current_vault_id() {
-        let tmp = ScopedTempDir::new("host-id-resolvers").unwrap();
-        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
-        let base = host.app_data_dir().unwrap();
-        let id = VaultId::mint();
-
-        assert_eq!(
-            vault_root_for_id_from_host(&host, id).unwrap(),
-            vault_root_for_id_from_base(&base, id)
-        );
-        assert_eq!(
-            current_vault_id_from_host(&host).unwrap(),
-            current_vault_id_from_base(&base)
         );
     }
 
