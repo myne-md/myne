@@ -50,6 +50,9 @@ const TABLE = "web/wasm/src/capability.rs";
 const CAPABILITY_BACKING = {
   clipper: ["clipper-pairing"],
   localAi: ["local-inference", "agent", "memory"],
+  // myne-md/myne#788. The whole plugin, absent on web by the feature's own
+  // verdict (no OS file ingress in a browser).
+  plainFile: ["plain-file"],
   // No ported command surface: the watch queue is drained by native code, and
   // `captures` is gated out of the wasm build at the module level.
   watchCapture: [],

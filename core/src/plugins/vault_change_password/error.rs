@@ -199,99 +199,73 @@ impl From<std::io::Error> for VaultChangePasswordError {
 mod tests {
     use super::*;
 
-    fn serialize(e: &VaultChangePasswordError) -> String {
+    fn json<T: serde::Serialize>(e: &T) -> String {
         serde_json::to_string(e).expect("VaultChangePasswordError must serialize cleanly")
     }
 
+    /// Every unit variant serializes under `#[serde(tag = "kind", content = "detail")]`
+    /// as `{"kind":"<VariantName>"}`. The shared name/wire discipline is documented on
+    /// the enum (`InvalidCredentialOrVault` matches its unlock/recover twins).
     #[test]
-    fn invalid_credential_or_vault_serializes_with_kind_tag() {
-        // Wire shape MUST match `VaultUnlockError::InvalidCredentialOrVault`
-        // and `VaultRecoveryError::InvalidCredentialOrVault` — same
-        // `kind` tag, same absence of payload. This is the
-        // shared-by-name discipline from `decisions.md` 2026-05-02
-        // "Recovery error discipline parallels unlock", extended to
-        // `vault_change_password` per MYND-22 grilling Q6.
-        assert_eq!(
-            serialize(&VaultChangePasswordError::InvalidCredentialOrVault),
-            r#"{"kind":"InvalidCredentialOrVault"}"#
-        );
+    fn unit_variants_serialize_with_kind_tag() {
+        let cases = [
+            (
+                json(&VaultChangePasswordError::InvalidCredentialOrVault),
+                r#"{"kind":"InvalidCredentialOrVault"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::ServerAckPending),
+                r#"{"kind":"ServerAckPending"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::VaultMetaChangedExternally),
+                r#"{"kind":"VaultMetaChangedExternally"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::VaultLockedDuringChange),
+                r#"{"kind":"VaultLockedDuringChange"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::ChangePasswordInProgress),
+                r#"{"kind":"ChangePasswordInProgress"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::SamePasswordRejected),
+                r#"{"kind":"SamePasswordRejected"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::WeakNewPassword),
+                r#"{"kind":"WeakNewPassword"}"#,
+            ),
+            (
+                json(&VaultChangePasswordError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
-    fn invalid_vault_meta_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::InvalidVaultMeta),
-            r#"{"kind":"InvalidVaultMeta"}"#
-        );
-    }
-
-    #[test]
-    fn vault_meta_changed_externally_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::VaultMetaChangedExternally),
-            r#"{"kind":"VaultMetaChangedExternally"}"#
-        );
-    }
-
-    #[test]
-    fn vault_locked_during_change_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::VaultLockedDuringChange),
-            r#"{"kind":"VaultLockedDuringChange"}"#
-        );
-    }
-
-    #[test]
-    fn change_password_in_progress_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::ChangePasswordInProgress),
-            r#"{"kind":"ChangePasswordInProgress"}"#
-        );
-    }
-
-    #[test]
-    fn vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn same_password_rejected_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::SamePasswordRejected),
-            r#"{"kind":"SamePasswordRejected"}"#
-        );
-    }
-
-    #[test]
-    fn weak_new_password_serializes_with_kind_tag() {
-        // Cross-plugin shared variant name with `AppError::WeakNewPassword`
-        // and `VaultRecoveryError::WeakNewPassword`.
-        assert_eq!(
-            serialize(&VaultChangePasswordError::WeakNewPassword),
-            r#"{"kind":"WeakNewPassword"}"#
-        );
-    }
-
-    #[test]
-    fn io_error_serializes_with_io_failure_kind_payload() {
-        let e = VaultChangePasswordError::IoError {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize(&e),
-            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultChangePasswordError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
+    fn payload_variants_serialize_with_detail() {
+        let cases = [(
+            json(&VaultChangePasswordError::IoError {
+                io_error_kind: IoFailureKind::PermissionDenied,
+            }),
+            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#,
+        )];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     /// Compile-time enforcement of "no `String` field on any variant".

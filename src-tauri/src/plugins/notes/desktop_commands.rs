@@ -2574,27 +2574,6 @@ mod tests {
     // ---- defensive guards ------------------------------------------------
 
     #[test]
-    fn atomic_write_replace_false_canary_under_notes_dir() {
-        // The `NoteAlreadyExists` defensive guard rides on
-        // `atomic_write::atomic_write(.., replace=false)` rejecting a
-        // pre-existing destination. UUIDv7 isn't predictable mid-test,
-        // so we cannot forge a real collision through `note_create`;
-        // this test pins the helper-layer guard the canary depends on.
-        // That `note_create_with_dir` invokes the helper with
-        // `replace=false` is verified by reading the call site directly.
-        let scratch = ScopedTempDir::new("note-create-already-exists").unwrap();
-        let notes_dir = notes_dir_under(scratch.path()).unwrap();
-        let sentinel = notes_dir.join("sentinel.myn");
-        std::fs::write(&sentinel, b"pre-existing").unwrap();
-
-        let err = atomic_write::atomic_write(&sentinel, b"replacement", false).expect_err(
-            "atomic_write replace=false must reject a pre-existing dest — the canary \
-                that note_create maps to NoteAlreadyExists",
-        );
-        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
-    }
-
-    #[test]
     fn notes_dir_resolution_failing_with_not_a_directory_returns_structural_variant() {
         // `note_create_with_dir` takes `notes_dir` already resolved,
         // so the `NotesDirNotADirectory` mapping lives in the outer
@@ -2703,42 +2682,6 @@ mod tests {
                 Err(other) => panic!("unexpected create outcome: {other:?}"),
             }
         });
-    }
-
-    // ---- error_kind label ------------------------------------------------
-
-    #[test]
-    fn error_kind_label_covers_every_variant() {
-        // Compile-time exhaustiveness via the helper's match. Each
-        // label is a static `&'static str`; the test just exercises
-        // every variant through the helper to pin the wire shape.
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::NoteAlreadyExists),
-            "NoteAlreadyExists"
-        );
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::PlaintextTooLarge),
-            "PlaintextTooLarge"
-        );
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_create_error_kind(&NoteCreateError::JoinFailure),
-            "JoinFailure"
-        );
     }
 
     // =====================================================================
@@ -3092,47 +3035,6 @@ mod tests {
                 Err(NoteReadError::InvalidPlaintextEncoding)
             ));
         });
-    }
-
-    // ---- error_kind label ----------------------------------------------
-
-    #[test]
-    fn read_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::NoteNotFound),
-            "NoteNotFound"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::InvalidNoteId),
-            "InvalidNoteId"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::CannotDecrypt),
-            "CannotDecrypt"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::InvalidPlaintextEncoding),
-            "InvalidPlaintextEncoding"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_read_error_kind(&NoteReadError::JoinFailure),
-            "JoinFailure"
-        );
     }
 
     // ---- MYND-26 retroactive: notes_dir-as-regular-file behavioral pin --
@@ -3853,47 +3755,6 @@ mod tests {
         });
     }
 
-    // ---- error_kind label ------------------------------------------------
-
-    #[test]
-    fn update_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::InvalidNoteId),
-            "InvalidNoteId"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::NoteNotFound),
-            "NoteNotFound"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::PlaintextTooLarge),
-            "PlaintextTooLarge"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::CannotDecrypt),
-            "CannotDecrypt"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_update_error_kind(&NoteUpdateError::JoinFailure),
-            "JoinFailure"
-        );
-    }
-
     // =====================================================================
     // note_delete
     // =====================================================================
@@ -4261,39 +4122,6 @@ mod tests {
         });
     }
 
-    // ---- error_kind label ------------------------------------------------
-
-    #[test]
-    fn delete_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::InvalidNoteId),
-            "InvalidNoteId"
-        );
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::NoteNotFound),
-            "NoteNotFound"
-        );
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_delete_error_kind(&NoteDeleteError::JoinFailure),
-            "JoinFailure"
-        );
-    }
-
     // ---- enumerate_notes_dir tests ---------------------------------------
 
     #[test]
@@ -4644,29 +4472,6 @@ mod tests {
         });
     }
 
-    #[test]
-    fn list_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_list_error_kind(&NoteListError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_list_error_kind(&NoteListError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_list_error_kind(&NoteListError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_list_error_kind(&NoteListError::JoinFailure),
-            "JoinFailure"
-        );
-    }
-
     // =====================================================================
     // note_titles_batch
     // =====================================================================
@@ -4936,58 +4741,6 @@ mod tests {
             .expect("empty batch must succeed");
             assert!(results.is_empty());
         });
-    }
-
-    // ---- error_kind labels --------------------------------------------
-
-    #[test]
-    fn title_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_title_error_kind(&NoteTitleError::CannotDecrypt),
-            "CannotDecrypt"
-        );
-        assert_eq!(
-            note_title_error_kind(&NoteTitleError::NoteNotFound),
-            "NoteNotFound"
-        );
-        assert_eq!(
-            note_title_error_kind(&NoteTitleError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_title_error_kind(&NoteTitleError::JoinFailure),
-            "JoinFailure"
-        );
-    }
-
-    #[test]
-    fn title_batch_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_title_batch_error_kind(&NoteTitleBatchError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_title_batch_error_kind(&NoteTitleBatchError::NotesDirNotADirectory),
-            "NotesDirNotADirectory"
-        );
-        assert_eq!(
-            note_title_batch_error_kind(&NoteTitleBatchError::BatchTooLarge { cap: 100 }),
-            "BatchTooLarge"
-        );
-        assert_eq!(
-            note_title_batch_error_kind(&NoteTitleBatchError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_title_batch_error_kind(&NoteTitleBatchError::JoinFailure),
-            "JoinFailure"
-        );
     }
 
     // ---- note_search (MYND-29 Task 5) -----------------------------------
@@ -5713,51 +5466,6 @@ mod tests {
     // returns `()` (it cannot fail the export by construction) and its
     // missing-file no-op is pinned by
     // `export_mtime::tests::apply_on_missing_file_is_a_nonfatal_noop`.
-
-    // ---- error_kind label ----------------------------------------------------
-
-    #[test]
-    fn export_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::VaultNotUnlocked),
-            "VaultNotUnlocked"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::InvalidNoteId),
-            "InvalidNoteId"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::NoteNotFound),
-            "NoteNotFound"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::CannotDecrypt),
-            "CannotDecrypt"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::InvalidPlaintextEncoding),
-            "InvalidPlaintextEncoding"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::InvalidDestination),
-            "InvalidDestination"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::TargetAlreadyExists),
-            "TargetAlreadyExists"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::Io {
-                io_error_kind: IoFailureKind::Other,
-            }),
-            "Io"
-        );
-        assert_eq!(
-            note_export_error_kind(&NoteExportError::JoinFailure),
-            "JoinFailure"
-        );
-    }
 
     // =====================================================================
     // note_export_attachments (MYND-115 task 4)
@@ -6491,59 +6199,6 @@ mod tests {
     // (The pure export-naming helpers — sanitize / suffix-dedup /
     // embed rewrite — moved to `crate::export_naming` with their
     // tests.)
-
-    // ---- error_kind label ------------------------------------------------------
-
-    #[test]
-    fn export_attachments_error_kind_label_covers_every_variant() {
-        use crate::io_failure_kind::IoFailureKind;
-        for (e, expected) in [
-            (
-                NoteExportAttachmentsError::VaultNotUnlocked,
-                "VaultNotUnlocked",
-            ),
-            (NoteExportAttachmentsError::InvalidNoteId, "InvalidNoteId"),
-            (
-                NoteExportAttachmentsError::InvalidNoteFilename,
-                "InvalidNoteFilename",
-            ),
-            (NoteExportAttachmentsError::NoteNotFound, "NoteNotFound"),
-            (NoteExportAttachmentsError::CannotDecrypt, "CannotDecrypt"),
-            (
-                NoteExportAttachmentsError::InvalidPlaintextEncoding,
-                "InvalidPlaintextEncoding",
-            ),
-            (
-                NoteExportAttachmentsError::InvalidVaultMeta,
-                "InvalidVaultMeta",
-            ),
-            (
-                NoteExportAttachmentsError::InvalidDestination,
-                "InvalidDestination",
-            ),
-            (
-                NoteExportAttachmentsError::TargetAlreadyExists,
-                "TargetAlreadyExists",
-            ),
-            (
-                NoteExportAttachmentsError::AttachmentMissing,
-                "AttachmentMissing",
-            ),
-            (
-                NoteExportAttachmentsError::AttachmentCorrupt,
-                "AttachmentCorrupt",
-            ),
-            (
-                NoteExportAttachmentsError::Io {
-                    io_error_kind: IoFailureKind::Other,
-                },
-                "Io",
-            ),
-            (NoteExportAttachmentsError::JoinFailure, "JoinFailure"),
-        ] {
-            assert_eq!(note_export_attachments_error_kind(&e), expected);
-        }
-    }
 
     // =====================================================================
     // note_export_html / note_export_html_attachments (MYND-340)

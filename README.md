@@ -10,7 +10,7 @@ The companion repos (server, mobile, website, ops, agents, clipper extension, th
 
 ## What Myne commits to
 
-- **End-to-end encrypted, no opt-out.** Note content, titles, folder structure, timestamps, and attachments stay encrypted at rest and in transit. There is no plaintext mode.
+- **End-to-end encrypted, no opt-out.** Note content, titles, folder structure, timestamps, and attachments stay encrypted at rest and in transit. There is no plaintext mode for your vault. (The plain-file editor opens a user's own separate on-disk `.md` files outside the vault; `design-notes/clients/0625`.)
 - **Plain markdown after decryption.** No proprietary block format. If Myne disappears, your files are already in the format every editor understands.
 - **No email at signup, no email recovery.** A 20-character Crockford-base32 account number with a Damm-32 check character identifies you ([`docs/spec/account-number.md`](docs/spec/account-number.md)). Recovery is a BIP-39 24-word phrase. Lose both password and phrase and the data is unrecoverable, by design.
 - **Argon2id (`m=256 MiB, t=3, p=2`)** for password stretching, with parameters bound into the AEAD AAD to defeat downgrade attacks.

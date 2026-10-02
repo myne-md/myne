@@ -150,9 +150,10 @@
     "value": "The vault is locked. Unlock it, then try again.",
     "keys": [
       "export.note.errors.vaultLocked",
-      "export.vault.errors.vaultLocked"
+      "export.vault.errors.vaultLocked",
+      "plainFile.importLocked"
     ],
-    "reason": "Same locked-vault error on note export and vault export; one error, two call sites."
+    "reason": "Same locked-vault error on note export, vault export and the plain-file editor's Import to vault (myne-md/myne#788): the app has one sentence for that state, and the import deliberately reuses it rather than growing a second copy."
   },
   {
     "value": "Cannot read the vault file.",

@@ -11,8 +11,8 @@
 //   - a live preview (the typography specimen)
 //   - a control with its own prose body
 //
-// Anything that fits beside its label — a `Switch`, a dropdown trigger, a
-// short `Segmented`, a button or two — belongs in a `SettingRow`.
+// Anything that fits beside its label — a `Switch`, a `Select` trigger, a
+// button or two — belongs in a `SettingRow`.
 
 import type { ReactNode } from "react";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";

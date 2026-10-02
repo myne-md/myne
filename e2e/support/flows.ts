@@ -521,6 +521,38 @@ export async function pickSelect(
   });
 }
 
+/** The values a `Select`'s menu offers, in order, leaving the menu closed.
+ *
+ *  A `Segmented` published every choice in the row's own markup, so a scenario
+ *  asserting "all four horizons are offered" could just find four testids.
+ *  `Select` renders its options into a body PORTAL that exists only while the
+ *  menu is open, so the same assertion needs the menu opened, read and shut
+ *  again — and a scenario hand-rolling that is a scenario that will leave the
+ *  menu open and fail the NEXT interaction instead of this one (#769). */
+export async function selectOptionValues(
+  session: Session,
+  selectTestId: string,
+): Promise<string[]> {
+  await (await session.byTestId(selectTestId)).click();
+  await session.waitForElement(testIdSelector(`${selectTestId}-option`));
+  const options = await session.byTestIdAll(`${selectTestId}-option`);
+  const values: string[] = [];
+  for (const option of options) {
+    values.push((await option.attribute("data-value")) ?? "");
+  }
+  // Re-click the trigger to close: clicking an OPTION would choose it, and
+  // reading a roster must not change the setting it read.
+  await (await session.byTestId(selectTestId)).click();
+  await session.waitUntil(
+    async () => {
+      const open = await session.findElements(testIdSelector(`${selectTestId}-option`));
+      return open.length === 0 ? true : null;
+    },
+    { label: `${selectTestId} menu to close after reading its roster` },
+  );
+  return values;
+}
+
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
  *  modal. Idempotent by construction: it clicks only when `aria-checked` is not
  *  already what the caller asked for, so a caller can assert a DEFAULT without a

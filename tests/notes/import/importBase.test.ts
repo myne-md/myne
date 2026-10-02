@@ -59,30 +59,24 @@ describe("runBaseImport / importBaseSource", () => {
   });
 
   it("wraps a persist failure (MYP1 cap) in BaseImportPersistError, no swallow", async () => {
-    let calls = 0;
-    const persistView = async () => {
-      calls++;
-      if (calls === 2) throw new Error("prefs blob exceeds 64 KiB cap");
-    };
-    await expect(
-      importBaseSource(SOURCE, { persistView, makeId }),
-    ).rejects.toBeInstanceOf(BaseImportPersistError);
+    const persistView = (() => {
+      let c = 0;
+      return async () => {
+        c++;
+        if (c === 2) throw new Error("prefs blob exceeds 64 KiB cap");
+      };
+    })();
+    // `.then(ok, err)` rather than a `catch` inside the test body: a
+    // non-throwing implementation would resolve, `err` would not be an
+    // instance, and this fails. The old second half read `persistedCount` only
+    // inside a catch block, so a resolving implementation never consulted it.
+    const err = await importBaseSource(SOURCE, { persistView, makeId }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BaseImportPersistError);
     // The first view persisted before the cap hit (partial-import model).
-    try {
-      await importBaseSource(SOURCE, {
-        persistView: (() => {
-          let c = 0;
-          return async () => {
-            c++;
-            if (c === 2) throw new Error("cap");
-          };
-        })(),
-        makeId,
-      });
-    } catch (e) {
-      expect(e).toBeInstanceOf(BaseImportPersistError);
-      expect((e as BaseImportPersistError).persistedCount).toBe(1);
-    }
+    expect((err as BaseImportPersistError).persistedCount).toBe(1);
   });
 
   it("runBaseImport over a parsed-empty .base persists nothing, zero tally", async () => {

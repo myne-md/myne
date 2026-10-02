@@ -25,7 +25,7 @@
 
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE } from "./panel-styles";
@@ -191,14 +191,14 @@ export function ReminderHorizonSettings({
       helper={inAppOnly ? t("settings.reminders.horizonLabelHelper") : undefined}
       helperTestId="settings.reminders-horizon-helper"
       control={(helperId) => (
-        <Segmented
+        <Select
           value={String(resolveHorizonDays(horizonDays))}
           options={REMINDER_HORIZON_CHOICES.map((d) => ({
             value: String(d),
             label: days.format(d),
           }))}
           onChange={(v) => onChange(Number(v))}
-          ariaLabel={t("settings.reminders.horizonLabel")}
+          aria-label={t("settings.reminders.horizonLabel")}
           ariaDescribedBy={inAppOnly ? helperId : undefined}
           testId="settings.reminders-horizon-picker"
         />

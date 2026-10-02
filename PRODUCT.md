@@ -24,7 +24,7 @@ The strategy in this document covers all three layers. `docs/design/` covers tac
 
 **Primary.** The technical Obsidian power user who currently routes around Obsidian's lack of native end-to-end encryption. They run Obsidian plus Cryptomator plus Syncthing today, or pay uneasily for Obsidian Sync, or self-censor inside the app entirely. They read r/PrivacyGuides, have self-hosted at least one service, can manage a master password and a 24-word recovery phrase, and will read the protocol spec before they install. Their context is a desktop session of sustained reading and writing, often hours long, frequently with a sidebar of cryptographic identifiers visible.
 
-**Secondary.** Everyone else, including users who don't actively think about privacy. Myne has no plaintext mode, no encryption opt-in toggle, no settings to flip. A casual user who picks Myne because it looks like a clean, fast markdown notes app gets the same zero-knowledge guarantees as the threat-model expert without ever seeing the word "encryption" in a heading. The job-to-be-done is the same for both personas: capture, link, and find markdown notes across devices, calmly, without lock-in.
+**Secondary.** Everyone else, including users who don't actively think about privacy. Myne has no plaintext mode for your vault, no encryption opt-in toggle, no settings to flip. A casual user who picks Myne because it looks like a clean, fast markdown notes app gets the same zero-knowledge guarantees as the threat-model expert without ever seeing the word "encryption" in a heading. The job-to-be-done is the same for both personas: capture, link, and find markdown notes across devices, calmly, without lock-in.
 
 ## Product Purpose
 
@@ -58,7 +58,7 @@ Both at the strategic and visual levels. The list is long because privacy produc
 - **Notion.** Feature creep into databases, kanban, calendar, whiteboards. Myne is markdown notes, files on disk, bidirectional links, and graph. That is the entire product surface forever.
 - **Standard Notes.** Paywalls markdown rendering. Myne paywalls only the hosted-sync convenience. Everything that runs locally (editor, links, graph, search, encrypted storage) is free.
 - **Notesnook.** Rich-text-first, stores notes in its own format. Myne is plain markdown after decryption with no custom block model.
-- **Joplin.** End-to-end encryption is off by default, leaks timestamps, plugin ecosystem doesn't work on mobile. Myne has no plaintext mode and no opt-in encryption.
+- **Joplin.** End-to-end encryption is off by default, leaks timestamps, plugin ecosystem doesn't work on mobile. Myne has no plaintext mode for the vault and no opt-in encryption.
 - **Logseq.** Deprecated on-disk encryption entirely. Myne treats encryption as the foundation, not a feature to retire.
 
 **Visual and copy anti-patterns** (the surfaces Myne refuses to render):

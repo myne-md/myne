@@ -17,6 +17,7 @@
     "mobile:test": "pnpm --filter myne-mobile test",
     "mobile:test:flow": "pnpm --filter myne-mobile test:flow",
     "mobile:ios": "pnpm --filter myne-mobile tauri ios dev",
+    "mobile:ios:build": "pnpm --filter myne-mobile tauri ios build",
     "mobile:android": "pnpm --filter myne-mobile tauri android dev",
     "tauri": "tauri",
     "sidecar": "node scripts/build-cli-sidecar.mjs --profile debug && node scripts/build-tor-sidecar.mjs --profile debug",

@@ -779,57 +779,249 @@ impl From<crate::plugins::attachments::ref_scan::ReferencedScanError>
 mod tests {
     use super::*;
 
-    #[test]
-    fn locked_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentImportError::Locked).unwrap(),
-            r#"{"kind":"Locked"}"#
-        );
+    fn json<T: serde::Serialize>(e: &T) -> String {
+        serde_json::to_string(e).expect("attachment error enum must serialize cleanly")
     }
 
+    /// Every unit variant across this file's enums serializes under
+    /// `#[serde(tag = "kind", content = "detail")]` as `{"kind":"<VariantName>"}`.
     #[test]
-    fn oversize_serializes_with_cap() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentImportError::Oversize {
-                cap_bytes: 67108864
-            })
-            .unwrap(),
-            r#"{"kind":"Oversize","detail":{"cap_bytes":67108864}}"#
-        );
+    fn unit_variants_serialize_with_kind_tag() {
+        let cases = [
+            (json(&AttachmentImportError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&AttachmentImportError::NotOwner),
+                r#"{"kind":"NotOwner"}"#,
+            ),
+            (
+                json(&AttachmentImportError::UnsupportedType),
+                r#"{"kind":"UnsupportedType"}"#,
+            ),
+            (
+                json(&AttachmentImportError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentImportError::EncodeFailed),
+                r#"{"kind":"EncodeFailed"}"#,
+            ),
+            (
+                json(&AttachmentImportError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&AttachmentImportError::CatalogUndecodable),
+                r#"{"kind":"CatalogUndecodable"}"#,
+            ),
+            (json(&AttachmentExportError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&AttachmentExportError::InvalidId),
+                r#"{"kind":"InvalidId"}"#,
+            ),
+            (
+                json(&AttachmentExportError::NotFound),
+                r#"{"kind":"NotFound"}"#,
+            ),
+            (
+                json(&AttachmentExportError::Corrupt),
+                r#"{"kind":"Corrupt"}"#,
+            ),
+            (
+                json(&AttachmentExportError::TargetAlreadyExists),
+                r#"{"kind":"TargetAlreadyExists"}"#,
+            ),
+            (
+                json(&AttachmentExportError::InvalidDestination),
+                r#"{"kind":"InvalidDestination"}"#,
+            ),
+            (
+                json(&AttachmentExportError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentExportError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (json(&CatalogListError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&CatalogListError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (json(&AttachmentServeError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&AttachmentServeError::NotFound),
+                r#"{"kind":"NotFound"}"#,
+            ),
+            (json(&AttachmentServeError::Denied), r#"{"kind":"Denied"}"#),
+            (
+                json(&AttachmentServeError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (json(&AttachmentDeleteError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&AttachmentDeleteError::InvalidId),
+                r#"{"kind":"InvalidId"}"#,
+            ),
+            (
+                json(&AttachmentDeleteError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentDeleteError::EncodeFailed),
+                r#"{"kind":"EncodeFailed"}"#,
+            ),
+            (
+                json(&AttachmentDeleteError::CatalogUndecodable),
+                r#"{"kind":"CatalogUndecodable"}"#,
+            ),
+            (json(&AttachmentRenameError::Locked), r#"{"kind":"Locked"}"#),
+            (
+                json(&AttachmentRenameError::InvalidId),
+                r#"{"kind":"InvalidId"}"#,
+            ),
+            (
+                json(&AttachmentRenameError::EmptyFilename),
+                r#"{"kind":"EmptyFilename"}"#,
+            ),
+            (
+                json(&AttachmentRenameError::AttachmentNotFound),
+                r#"{"kind":"AttachmentNotFound"}"#,
+            ),
+            (
+                json(&AttachmentRenameError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentRenameError::EncodeFailed),
+                r#"{"kind":"EncodeFailed"}"#,
+            ),
+            (
+                json(&AttachmentRenameError::CatalogUndecodable),
+                r#"{"kind":"CatalogUndecodable"}"#,
+            ),
+            (
+                json(&AttachmentRefsError::SlotNotUnlocked),
+                r#"{"kind":"SlotNotUnlocked"}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::Locked),
+                r#"{"kind":"Locked"}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::NoteScanFailed),
+                r#"{"kind":"NoteScanFailed"}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::CorpusIncomplete),
+                r#"{"kind":"CorpusIncomplete"}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::Locked),
+                r#"{"kind":"Locked"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::InvalidId),
+                r#"{"kind":"InvalidId"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::NoteScanFailed),
+                r#"{"kind":"NoteScanFailed"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::CorpusIncomplete),
+                r#"{"kind":"CorpusIncomplete"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::EncodeFailed),
+                r#"{"kind":"EncodeFailed"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::CatalogUndecodable),
+                r#"{"kind":"CatalogUndecodable"}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
+    /// Every payload variant serializes as `{"kind":"<Name>","detail":{…}}`.
     #[test]
-    fn unsupported_type_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentImportError::UnsupportedType).unwrap(),
-            r#"{"kind":"UnsupportedType"}"#
-        );
-    }
-
-    #[test]
-    fn import_io_serializes_with_io_error_kind() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentImportError::Io {
-                io_error_kind: IoFailureKind::PermissionDenied
-            })
-            .unwrap(),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn delete_invalid_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentDeleteError::InvalidId).unwrap(),
-            r#"{"kind":"InvalidId"}"#
-        );
-    }
-
-    #[test]
-    fn unused_list_note_scan_failed_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&AttachmentUnusedListError::NoteScanFailed).unwrap(),
-            r#"{"kind":"NoteScanFailed"}"#
-        );
+    fn payload_variants_serialize_with_detail() {
+        let cases = [
+            (
+                json(&AttachmentImportError::Oversize {
+                    cap_bytes: 67108864,
+                }),
+                r#"{"kind":"Oversize","detail":{"cap_bytes":67108864}}"#,
+            ),
+            (
+                json(&AttachmentImportError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentExportError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&CatalogListError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentServeError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentDeleteError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentRenameError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentUnusedListError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&AttachmentCleanUnusedError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 }

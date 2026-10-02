@@ -46,6 +46,7 @@
     "vault-label:default",
     "account:default",
     "screen-capture:default",
+    "plain-file:default",
     "spell:default",
     "clipper-pairing:default",
     "cli-bridge:default",
