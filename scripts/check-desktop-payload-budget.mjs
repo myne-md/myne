@@ -86,7 +86,7 @@ export const BASELINED = ["resources"];
 
 /** The bundled-model set this build is allowed to declare. Both directions are
  *  compared against it: an addition and a removal are equally loud. */
-export const EXPECTED_MODELS = ["ocr", "tag", "whisper"];
+export const EXPECTED_MODELS = ["ocr", "whisper"];
 
 /** Git LFS pointer files begin with this exact line. */
 const LFS_HEADER = "version https://git-lfs.github.com/spec/v1";

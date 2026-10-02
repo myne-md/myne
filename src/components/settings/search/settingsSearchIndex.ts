@@ -785,6 +785,27 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.aiModels",
   },
   {
+    // On-demand downloads (myne-md/myne#805). Both gates apply as everywhere in
+    // this panel; the block itself is desktop-only because the download command
+    // is, but a `localAi` host always has it, so `capability` is the right
+    // predicate here rather than a new one.
+    id: "ai.downloads",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.downloadsLabel",
+    descriptionKey: "settings.ai.downloadsHelper",
+    keywordsKey: "settings.search.keywords.aiModels",
+  },
+  {
+    id: "ai.sideload",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.sideloadDisclosure",
+    keywordsKey: "settings.search.keywords.aiModels",
+  },
+  {
     id: "ai.excluded-folders",
     capability: "localAi",
     developerGated: true,
