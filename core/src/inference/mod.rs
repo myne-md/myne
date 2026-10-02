@@ -49,6 +49,10 @@ pub mod cancellable_io;
 pub mod chatml;
 pub mod engine;
 pub mod error;
+/// The on-demand model-download transport (myne-md/myne#805): a streaming
+/// HTTPS GET with the same public-CA verification and Tor routing native sync
+/// uses. The desktop command orchestrates it through the model store.
+pub mod model_download;
 /// The Tauri-host adapters both clients share: note reads, the restore point,
 /// and the approved batch write. `ScopeSearcher` is deliberately NOT here; see
 /// the module doc.

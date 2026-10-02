@@ -28,6 +28,7 @@
 
 import { consentIsDeviceScoped } from "@myne/copy";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -74,6 +75,7 @@ import {
   type AiTrustState,
 } from "../../lib/load-bearing-copy";
 import { Input } from "../primitives/Input";
+import { Button } from "../primitives/Button";
 import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
@@ -83,6 +85,13 @@ import {
   HOVER_TRANSITION,
 } from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
+import {
+  isChecksumMismatch,
+  downloadModel,
+  newDownloadId,
+  removeModel,
+  type DownloadArtifactId,
+} from "../../lib/ai-model-download";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
@@ -151,6 +160,10 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
     name: "whisper-base (multilingual)",
     url: "https://huggingface.co/openai/whisper-base",
   },
+  tag: {
+    name: "Qwen2.5-0.5B-Instruct (GGUF)",
+    url: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+  },
 };
 
 /**
@@ -208,6 +221,12 @@ const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }>
     // The Whisper engine loads via `WhisperVarBuilder::from_gguf`
     // (`engine_candle.rs::load_transcription`), so the override picker must
     // offer `.gguf` — a `.safetensors` pick fails `from_gguf` at load time.
+    nameKey: "settings.ai.modelFilter.gguf",
+    extensions: ["gguf"],
+  },
+  tag: {
+    // The tag role is a Qwen2 GGUF (`load_tag` via `from_gguf`), so the same
+    // `.gguf` filter applies.
     nameKey: "settings.ai.modelFilter.gguf",
     extensions: ["gguf"],
   },
@@ -325,6 +344,106 @@ function ModelRoleBlock(props: {
   );
 }
 
+/** One downloadable model the desktop can fetch on demand (myne-md/myne#805).
+ *  `artifact` is a compiled-in id; the UI never constructs a URL or a digest.
+ *  Shown only when the host resolves a stored path for the role (downloaded or
+ *  side-loaded), so the same row answers "is it installed" and "fetch it again". */
+function DownloadedModelRow(props: {
+  artifact: DownloadArtifactId;
+  /** The model-store role this artefact registers (for remove). */
+  role: string;
+  label: string;
+  sizeText: string;
+  path: string | null;
+  aiEnabled: boolean;
+  onChanged: () => void;
+  onShowToast?: (message: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    const id = newDownloadId();
+    try {
+      await downloadModel(props.artifact, id);
+      props.onChanged();
+    } catch (err) {
+      // One cause, one message: the checksum branch is named in the inline
+      // error, so the toast carries the same copy rather than the generic one.
+      const message = isChecksumMismatch(err)
+        ? t("settings.ai.downloadFailedChecksum")
+        : t("settings.ai.downloadFailed");
+      setError(message);
+      props.onShowToast?.(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await removeModel(props.role);
+      props.onChanged();
+    } catch {
+      setError(t("settings.ai.downloadFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingRow
+      anchorId={`ai.download.${props.artifact}`}
+      label={props.label}
+      helper={props.sizeText}
+      testId={`ai.download-row-${props.artifact}`}
+      error={error}
+      control={(helperId) => (
+        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <span
+            data-testid={`ai.download-state-${props.artifact}`}
+            style={{
+              fontSize: "var(--text-sm)",
+              color: props.path ? "var(--accent)" : "var(--fg-3)",
+              fontFamily: "var(--font-mono)",
+            }}
+            aria-describedby={helperId}
+          >
+            {props.path
+              ? t("settings.ai.downloadInstalled")
+              : t("settings.ai.downloadNotInstalled")}
+          </span>
+          <Button
+            variant="secondary"
+            disabled={!props.aiEnabled || busy}
+            onClick={() => void run()}
+            data-testid={`ai.download-button-${props.artifact}`}
+          >
+            {busy
+              ? t("settings.ai.downloading")
+              : t("settings.ai.downloadReinstall")}
+          </Button>
+          {props.path && (
+            <Button
+              variant="ghost"
+              disabled={!props.aiEnabled || busy}
+              onClick={() => void remove()}
+              data-testid={`ai.remove-button-${props.artifact}`}
+            >
+              {t("settings.ai.modelRemove")}
+            </Button>
+          )}
+        </div>
+      )}
+    />
+  );
+}
+
 export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
   const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled, setChatHistoryBudget } =
@@ -335,6 +454,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     generation: null,
     embedding: null,
     transcription: null,
+    tag: null,
   });
   /** The host's own view of which backend is active (myne-md/myne#466). `null`
    *  until the first report lands, which renders as "nothing is answering" —
@@ -509,12 +629,25 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       : { kind: "in-process" };
   const autoTag = prefs.auto_tag_enabled;
 
-  // Load the persisted device-local model paths on open (both roles). A missing
+  // Read every role's persisted path from the host. Shared by the mount effect
+  // and the download rows' `onChanged`, so a completed download updates the
+  // installed state without remounting the panel (myne-md/myne#805).
+  const reloadModelPaths = useCallback(() => {
+    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
+      loadModelPath(role)
+        .then((p) => setModelPaths((prev) => ({ ...prev, [role]: p })))
+        .catch(() => {
+          /* feature off / not set: keep local state */
+        });
+    });
+  }, []);
+
+  // Load the persisted device-local model paths on open (all roles). A missing
   // command (the `local-inference` feature is off) degrades silently to no
   // persisted path — the panel stays usable.
   useEffect(() => {
     let alive = true;
-    (["generation", "embedding", "transcription"] as const).forEach((role) => {
+    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => {
           if (alive) setModelPaths((prev) => ({ ...prev, [role]: p }));
@@ -1017,6 +1150,54 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           testIdSelect="ai.model-select-transcription"
           testIdChoose="ai.model-choose-transcription"
         />
+      </div>
+
+      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0627`).
+          The AI-shaped weights are no longer bundled: a user who skipped
+          onboarding enables AI and fetches them here, and the same rows answer
+          "is it installed" from the device-local model store. No file name and
+          no quantisation label is shown, only the feature and its size. */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.downloads"
+        data-setting-row="true"
+        data-testid="ai.downloads-section"
+      >
+        <label style={LABEL_STYLE}>{t("settings.ai.downloadsLabel")}</label>
+        <p style={HELPER_STYLE}>{t("settings.ai.downloadsHelper")}</p>
+        <DownloadedModelRow
+          artifact="embedding-e5-small"
+          role="embedding"
+          label={t("settings.ai.modelEmbeddingLabel")}
+          sizeText={t("settings.ai.downloadEmbeddingSize")}
+          path={modelPaths.embedding}
+          aiEnabled={aiEnabled}
+          onChanged={reloadModelPaths}
+          onShowToast={onShowToast}
+        />
+        <DownloadedModelRow
+          artifact="tag"
+          role="tag"
+          label={t("settings.ai.downloadTagLabel")}
+          sizeText={t("settings.ai.downloadTagSize")}
+          path={modelPaths.tag}
+          aiEnabled={aiEnabled}
+          onChanged={reloadModelPaths}
+          onShowToast={onShowToast}
+        />
+      </div>
+
+      {/* Side-load disclosure (myne-md/myne#805). Developer mode lets a user
+          point Myne at a model they sourced themselves; the disclosure states
+          that plainly, because a side-loaded model is the untrusted-input case
+          `threat-model.md` §7 now carries. */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.sideload"
+        data-setting-row="true"
+        data-testid="ai.sideload-disclosure"
+      >
+        <p style={HELPER_STYLE}>{t("settings.ai.sideloadDisclosure")}</p>
       </div>
 
       {/* Local model runtime (ai-ollama-local task 8, SYNC-17/SYNC-18).

@@ -37,6 +37,7 @@ const OUTBOUND: Record<string, { help: boolean; what: string }> = {
   "https://myne.md/themes/": { help: false, what: "the theme gallery, a content source" },
   "https://myne.md/threat-model": { help: false, what: "the published threat model, reference material" },
   "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF": { help: false, what: "a model card, shown beside the AI model picker" },
+  "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF": { help: false, what: "a model card for the on-demand tag model, shown beside the AI model picker" },
   "https://huggingface.co/openai/whisper-base": { help: false, what: "a model card, shown beside the transcription model" },
   "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2": { help: false, what: "a model card, shown beside the search-embedding model" },
   "https://ollama.com": { help: false, what: "a third-party runtime's home page" },

@@ -759,6 +759,9 @@ fn main() {
                 "get_ai_endpoint",
                 "set_ai_endpoint",
                 "list_provider_models",
+                "download_model",
+                "cancel_model_download",
+                "remove_model",
             ]),
         );
     }

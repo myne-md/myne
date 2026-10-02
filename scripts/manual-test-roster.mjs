@@ -416,6 +416,36 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "ai.model-download-onboarding",
+    title: "AI model download onboarding",
+    paths: [
+      "src/components/settings/AiOnboardingSurface.tsx",
+      "src/lib/aiOnboardingSeen.ts",
+      "src/lib/ai-model-download.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: [
+      "e2e/ai-model-download.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "On a fresh device, unlock a new vault and confirm the AI screen appears once, that each of the three cards is independent, and that after Skip the app is fully usable and nothing was downloaded. Lock and unlock again, then create, restore and recover a vault on the same device: the screen must not appear a second time.",
+        whyNotAutomated: "The one-time-per-device gate is a localStorage flag and the E2E harness starts from a clean profile each run, so no lane re-launches the app against a populated profile to observe that the screen stays gone. The judgement is temporal across app restarts, which the driver does not model.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+      {
+        see: "Download the embedding model on a real connection and watch it through to Ready, then cancel a second download mid-transfer and confirm no partial model is registered and Retry works. On a slow or flaky connection, confirm a failed transfer is named as a failure and offers Retry rather than a silent no-op. Then open Settings, Developer, AI and confirm the same model shows as Installed, that Remove returns it to Not installed and reclaims the disk space, and that a model you side-loaded yourself is only forgotten (your own file stays on disk).",
+        whyNotAutomated: "The E2E lane drives a local fixture origin that answers instantly, so the progress, cancel and flaky-connection states are exercised only against a fixture with no latency. A real transfer over a real network, and a real cancel at an arbitrary byte, are the conditions a human has to create. It also drives the download command and the first-run surface rather than the Settings management rows, and has no side-loaded file to prove the remove path only deletes the app's own copy.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 8,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "app.cold-start",
     title: "Cold launch on a real machine",
     paths: [

@@ -23,6 +23,8 @@ import {
   SnapshotFailedBanner,
   SyncBanners,
   ConflictsSheet,
+  AiOnboardingSheet,
+  readAiOnboardingSeen,
 } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import {
@@ -125,7 +127,7 @@ import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import type { VaultId } from "../../lib/stage";
-import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
+import { SettingsSheet, applyStoredTheme, type Panel } from "./SettingsSheet";
 import { useSizeClass } from "../../formfactor/SizeClassContext";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
@@ -712,6 +714,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [copied, setCopied] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // First-run AI onboarding (myne-md/myne#805): offered once per device after
+  // the first unlock. The localStorage flag is written when the sheet closes.
+  const [aiOnboardingOpen, setAiOnboardingOpen] = useState<boolean>(
+    () => !readAiOnboardingSeen(),
+  );
+  // Panel the next SettingsSheet opens on; the onboarding's provider button
+  // routes straight to `ai`, the bar entry leaves it `root`.
+  const [settingsPanel, setSettingsPanel] = useState<Panel | undefined>(undefined);
   // SY-08 sync status detail sheet (MYND-461 T6), opened from the header glyph.
   // Conflicts sheet (MYND-461 T8), opened from the conflicts count banner.
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -3457,9 +3467,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {settingsOpen && (
           <SettingsSheet
             vaultId={vaultId}
-            onClose={() => setSettingsOpen(false)}
+            initialPanel={settingsPanel}
+            onClose={() => {
+              setSettingsOpen(false);
+              setSettingsPanel(undefined);
+            }}
             onLock={onLock}
             onDeleteVaultSuccess={onDeleteVaultSuccess}
+          />
+        )}
+
+        {aiOnboardingOpen && (
+          <AiOnboardingSheet
+            onClose={() => setAiOnboardingOpen(false)}
+            onOpenProviderSetup={() => {
+              setAiOnboardingOpen(false);
+              setSettingsPanel("ai");
+              setSettingsOpen(true);
+            }}
           />
         )}
 

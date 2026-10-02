@@ -363,7 +363,7 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
                 &notes,
                 |folder| folder_is_excluded(folder, &excluded_for_embed),
                 ChunkParams::default(),
-                |text| embed_engine.embed(text),
+                |text| embed_engine.embed_passage(text),
             );
             store
         })
@@ -612,7 +612,7 @@ pub(crate) fn reembed_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str, bo
         let local = tauri::async_runtime::spawn_blocking(move || {
             let mut local = AiVectorStore::new();
             let _ = embed_note(&mut local, &note, ChunkParams::default(), |text| {
-                embed_engine.embed(text)
+                embed_engine.embed_passage(text)
             });
             local
         })

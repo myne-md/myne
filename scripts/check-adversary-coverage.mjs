@@ -80,6 +80,7 @@ const VERDICTS = {
   TB11: "scenario: ui.dishonest-bundle — the served-bundle boundary on every page load",
   TB12: "scenario: ram.runtime-loopback — the local model runtime over loopback",
   TB13: "scenario: relay.provider-egress — the remote AI provider boundary and its consent gate",
+  TB14: "out of scope for a internal-service seat: TB14 is the client's inbound fetch from Myne's own artefact origin, so impersonating that origin needs either control of Myne infrastructure or a public CA the row already assumes away (A9/A4). The one arm a seat could stand up, an origin or MITM serving bytes that do not match the compiled-in digest, is refused before anything is registered and is driven end to end by the in-repo desktop E2E scenario `ai-model-download` mdo3 (the fixture origin serves corrupted bytes and the refusal is named); no internal-service scenario exercises this boundary yet.",
 };
 
 /** The row IDs the threat model actually declares, in document order. */
