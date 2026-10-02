@@ -43,7 +43,6 @@ xcodebuild \
   -configuration "$CONFIG" \
   -sdk watchos \
   -destination generic/platform=watchOS \
-  ARCHS=arm64 \
   "${SIGN_ARGS[@]}" \
   CONFIGURATION_BUILD_DIR="$GEN_DIR/watch-build" \
   build

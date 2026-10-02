@@ -46,7 +46,12 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
-      - path: Externals
+      # `Externals` is deliberately NOT a source here. It holds the built
+      # `libapp.a`, which is linked via the `- framework: libapp.a` dependency
+      # below and found through LIBRARY_SEARCH_PATHS; listing the directory as a
+      # source made xcodegen add `libapp.a` to the app's Resources phase, and
+      # App Store validation rejects it: "The Myne.app/libapp.a binary file is
+      # not permitted" (90171).
       - path: myne-mobile_iOS
       - path: assets
         buildPhase: resources
