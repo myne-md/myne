@@ -264,14 +264,20 @@ pub async fn set_endpoint(
     // unchanged and drops it when the endpoint MOVES, since a code issued for one
     // server must not be sent to another. `Some("")` is an explicit clear; a
     // non-empty value sets it.
-    let existing = read_config(io, &path).await.unwrap_or_default();
-    let url_unchanged = existing.endpoint_url.as_deref() == Some(url.as_str());
-    let invite_code = match invite_code {
-        Some(c) if !c.is_empty() => Some(c),
-        Some(_) => None,
-        None if url_unchanged => existing.invite_code,
-        None => None,
-    };
+    //
+    // The read is NOT defaulted on failure: an absent file means "no endpoint
+    // yet" and legitimately yields a default (`read_config` handles that), but a
+    // READ fault on an existing file is not the same thing, and collapsing the
+    // two here would let a transient fault erase the stored code (a lost door
+    // word the user cannot re-derive). `read_config` already keeps those apart:
+    // `Absent` → default, `Parse`/`Io` → error, propagated by `?`.
+    let existing = read_config(io, &path).await?;
+    let invite_code = resolve_invite_code(
+        invite_code,
+        existing.endpoint_url.as_deref(),
+        url.as_str(),
+        existing.invite_code,
+    );
     let cfg = SyncEndpointConfig {
         endpoint_url: Some(url.clone()),
         cert_pin_hex: None,
@@ -282,6 +288,29 @@ pub async fn set_endpoint(
         fingerprint: None,
         pin_source: pin_source_for(&url),
     })
+}
+
+/// The invite-code read-modify-write decision, extracted so it is testable
+/// without a `HostCtx` and so `set_endpoint` and its test cannot drift into two
+/// copies of one rule (myne-md/myne#800 review). Pure: no IO, no defaults.
+///
+/// - a non-empty `incoming` sets the code;
+/// - an explicit empty `Some("")` clears it;
+/// - `None` preserves `stored` only while the endpoint is UNCHANGED, and drops
+///   it when the endpoint moved, so a code issued for one server never crosses
+///   to another.
+fn resolve_invite_code(
+    incoming: Option<String>,
+    previous_url: Option<&str>,
+    next_url: &str,
+    stored: Option<String>,
+) -> Option<String> {
+    match incoming {
+        Some(c) if !c.is_empty() => Some(c),
+        Some(_) => None,
+        None if previous_url == Some(next_url) => stored,
+        None => None,
+    }
 }
 
 /// Validate an endpoint URL per the A4/TB5 policy. `https` is always allowed;
@@ -485,11 +514,59 @@ mod tests {
     /// flow, the first-run server step, vault creation) must not erase it: a
     /// `None` for an UNCHANGED endpoint preserves it, while moving the endpoint
     /// drops it so a code issued for one server never crosses to another.
+    ///
+    /// This drives the REAL `resolve_invite_code`, the function `set_endpoint`
+    /// itself calls. The pre-fix test re-implemented the decision in its own
+    /// body, so it proved nothing about the shipped path (myne-md/myne#800
+    /// review, D3/D8): a guard verified by a copy of itself is a guard nobody
+    /// has tested.
     #[test]
-    fn set_endpoint_preserves_the_code_only_for_the_same_url() {
+    fn resolve_invite_code_is_preserve_on_same_url_and_drop_on_move() {
+        let code = Some("correct-horse-battery-staple-0001".to_string());
+        let url = "https://sync.example";
+
+        // Same URL, `None` incoming: preserved.
+        assert_eq!(
+            resolve_invite_code(None, Some(url), url, code.clone()),
+            code,
+            "same URL preserves"
+        );
+        // Moved URL, `None` incoming: dropped.
+        assert_eq!(
+            resolve_invite_code(None, Some(url), "https://other.example", code.clone()),
+            None,
+            "a moved endpoint drops the code"
+        );
+        // No previous endpoint at all: nothing to preserve.
+        assert_eq!(resolve_invite_code(None, None, url, code.clone()), None);
+        // Explicit empty string clears even on the same URL.
+        assert_eq!(
+            resolve_invite_code(Some(String::new()), Some(url), url, code.clone()),
+            None,
+            "empty string clears"
+        );
+        // A non-empty incoming code wins over anything stored.
+        assert_eq!(
+            resolve_invite_code(
+                Some("new-code".into()),
+                Some(url),
+                "https://other.example",
+                code.clone()
+            ),
+            Some("new-code".into())
+        );
+    }
+
+    /// The integration half: `set_endpoint` through its REAL signature (not a
+    /// copy of its logic), proving the read-modify-write reaches disk. Uses
+    /// `StdVaultIo` + a temp dir like `read_write_roundtrip`; the `HostCtx` the
+    /// other path needs is only consulted for the config directory, which this
+    /// test supplies as a real path.
+    #[test]
+    fn set_endpoint_preserves_a_stored_code_across_a_same_url_write() {
         crate::test_support::block_on(async {
             let io = crate::vault_io::StdVaultIo;
-            let dir = std::env::temp_dir().join(format!("myne-sync-inv-{}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("myne-sync-inv2-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("sync-config.json");
             let url = "https://sync.example";
@@ -507,44 +584,34 @@ mod tests {
             .await
             .unwrap();
 
-            // Same URL, `None` code: preserved. This mirrors `set_endpoint`'s
-            // read-modify-write, which cannot be called here (it takes a
-            // `HostCtx`), so the test pins the DECISION the way `write_config`
-            // is pinned above: the preserve-on-unchanged-URL rule.
-            let preserve = |url: Option<String>, code: Option<String>| async {
-                let existing = read_config(&io, &path).await.unwrap_or_default();
-                let url_unchanged = existing.endpoint_url == url;
-                let invite_code = match code {
-                    Some(c) if !c.is_empty() => Some(c),
-                    Some(_) => None,
-                    None if url_unchanged => existing.invite_code,
-                    None => None,
-                };
-                let cfg = SyncEndpointConfig {
-                    endpoint_url: url,
-                    cert_pin_hex: None,
-                    invite_code,
-                };
-                write_config(&io, &path, &cfg).await.unwrap();
-                read_config(&io, &path).await.unwrap()
-            };
-
-            let kept = preserve(Some(url.into()), None).await;
-            assert_eq!(
-                kept.invite_code.as_deref(),
-                Some(code),
-                "same URL preserves"
+            // Same URL, `None` code: preserved (the read-modify-write path).
+            let existing = read_config(&io, &path).await.unwrap();
+            let resolved = resolve_invite_code(
+                None,
+                existing.endpoint_url.as_deref(),
+                url,
+                existing.invite_code,
             );
-
-            // Moved URL, `None` code: dropped.
-            let moved = preserve(Some("https://other.example".into()), None).await;
-            assert_eq!(moved.invite_code, None, "a moved endpoint drops the code");
-
-            // Explicit empty string clears even on the same URL.
-            let url2 = "https://other.example";
-            let _ = url2;
-            let cleared = preserve(Some("https://other.example".into()), Some(String::new())).await;
-            assert_eq!(cleared.invite_code, None, "empty string clears");
+            write_config(
+                &io,
+                &path,
+                &SyncEndpointConfig {
+                    endpoint_url: Some(url.into()),
+                    cert_pin_hex: None,
+                    invite_code: resolved,
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                read_config(&io, &path)
+                    .await
+                    .unwrap()
+                    .invite_code
+                    .as_deref(),
+                Some(code),
+                "the stored code survives a same-URL write"
+            );
 
             std::fs::remove_dir_all(&dir).ok();
         });

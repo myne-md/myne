@@ -29,6 +29,27 @@ import type { IdentityFlowProps } from "./types";
 
 type Step = "gate" | "held" | "server" | "create" | "phrase" | "home";
 
+/**
+ * Map a failed `sync_set_endpoint` invoke to user copy. The gated-server
+ * refusals (`InviteCodeRequired` / `InviteCodeInvalid`, myne-md/myne#800) are
+ * not reachability failures: the server answered, and the remedy is the
+ * operator's invite code, so "couldn't reach the server" would send the user to
+ * fix the wrong thing. Same mapping the sync settings panel uses.
+ */
+function serverConnectError(
+  error: unknown,
+  t: (key: string) => string,
+): string {
+  const kind =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { kind?: unknown }).kind
+      : undefined;
+  if (kind === "InviteCodeRequired") return t("sync.enroll.error.inviteCodeRequired");
+  if (kind === "InviteCodeInvalid") return t("sync.enroll.error.inviteCodeInvalid");
+  if (kind === "TlsFailure") return t("sync.endpoint.tlsFailure");
+  return t("identityFlow.serverUnreachable");
+}
+
 /** Small uppercase field label, the shape every wired flow uses (`JoinFlow`,
  *  `RecoverFlow`, `CreateVaultFlow` each keep a local copy). */
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -279,9 +300,7 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
       await syncSetEndpoint(trimmed, inviteCode.trim());
       setStep("create");
     } catch (e) {
-      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
-        ? "sync.endpoint.tlsFailure"
-        : "identityFlow.serverUnreachable"));
+      setError(serverConnectError(e, t));
     } finally {
       setBusy(false);
     }
@@ -295,9 +314,7 @@ export function IdentityFlow({ onCancel }: IdentityFlowProps) {
       await syncSetEndpoint(HOSTED_SYNC_ORIGIN, inviteCode.trim());
       setStep("create");
     } catch (e) {
-      setError(t((e as { kind?: string } | null)?.kind === "TlsFailure"
-        ? "sync.endpoint.tlsFailure"
-        : "identityFlow.serverUnreachable"));
+      setError(serverConnectError(e, t));
     } finally {
       setBusy(false);
     }

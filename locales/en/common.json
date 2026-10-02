@@ -4579,8 +4579,6 @@
       "myneSync": "Use Myne Sync",
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "selfHosted": "Use my own server",
-      "connecting": "Connecting…",
-      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
