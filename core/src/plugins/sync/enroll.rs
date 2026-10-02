@@ -138,6 +138,15 @@ pub enum EnrollError {
     /// The device is registered but still awaiting approval (server 403
     /// `pending_approval`).
     PendingApproval,
+    /// The server gates new accounts behind an invite code and none was sent
+    /// (server 403 `invite_code_required`). Distinct because the remedy is: the
+    /// user must type the code the operator gave them, and re-typing their
+    /// password will not help.
+    InviteCodeRequired,
+    /// The invite code sent did not match the server's (server 403
+    /// `invite_code_invalid`). Distinct from `InviteCodeRequired` so the UI can
+    /// say "that code is wrong" rather than "a code is needed".
+    InviteCodeInvalid,
     /// The server's signature did not match — possible MITM; abort (mutual auth).
     ServerSignatureMismatch,
     /// A malformed / unparseable server response.
@@ -165,6 +174,8 @@ fn forbidden_reason(body: &[u8]) -> EnrollError {
         "frozen" => EnrollError::Frozen,
         "device_limit" => EnrollError::DeviceLimit,
         "pending_approval" => EnrollError::PendingApproval,
+        "invite_code_required" => EnrollError::InviteCodeRequired,
+        "invite_code_invalid" => EnrollError::InviteCodeInvalid,
         _ => EnrollError::Unauthenticated,
     }
 }
@@ -203,6 +214,10 @@ struct RegisterReq<'a> {
     iterations: u32,
     stored_key_hex: &'a str,
     server_key_hex: &'a str,
+    /// Present only for a gated server; omitted otherwise so an open server
+    /// receives exactly the pre-gate request body.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    invite_code: Option<&'a str>,
 }
 
 /// PBKDF2 iteration count for the SCRAM verifier. The real password-stretching
@@ -223,12 +238,26 @@ pub fn register_verifier(
     account_hash: &[u8; 16],
     secret: &[u8],
 ) -> Result<(), EnrollError> {
+    register_verifier_with_code(transport, account_hash, secret, None)
+}
+
+/// [`register_verifier`] with the shared invite code a gated server requires for
+/// a NEW account. `None` sends no field, which is correct for an open server and
+/// for a device joining an account that already exists (the server answers 409
+/// before it consults the gate, so a later device needs no code).
+pub fn register_verifier_with_code(
+    transport: &dyn SyncTransport,
+    account_hash: &[u8; 16],
+    secret: &[u8],
+    invite_code: Option<&str>,
+) -> Result<(), EnrollError> {
     // AS9 username (see module doc): hex(account_hash), used for both wire fields.
     let account_hash_hex = hex_encode(account_hash);
     let mut salt = [0u8; 16];
     getrandom::getrandom(&mut salt).map_err(|_| EnrollError::BadResponse)?;
     let iterations = SCRAM_REGISTER_ITERATIONS;
     let v = scram_client_proof(secret, &salt, iterations, &account_hash_hex, "", "", &[]);
+    let invite_code = invite_code.filter(|c| !c.is_empty());
     let body = serde_json::to_vec(&RegisterReq {
         account_hash_hex: &account_hash_hex,
         username: &account_hash_hex,
@@ -236,12 +265,14 @@ pub fn register_verifier(
         iterations,
         stored_key_hex: &hex_encode(&v.stored_key),
         server_key_hex: &hex_encode(&v.server_key),
+        invite_code,
     })
     .map_err(|_| EnrollError::BadResponse)?;
     let resp = transport.request(HttpMethod::Post, "/auth/register", &body, None)?;
     match resp.status {
         200 | 409 => Ok(()), // 409 already_registered → idempotent success
         401 => Err(EnrollError::Unauthenticated),
+        403 => Err(forbidden_reason(&resp.body)),
         _ => Err(EnrollError::BadResponse),
     }
 }
@@ -841,6 +872,67 @@ mod tests {
         );
     }
 
+    fn register_body(t: &FakeTransport) -> String {
+        let reqs = t.requests();
+        let req = reqs
+            .iter()
+            .find(|(m, p, _, _, _)| *m == HttpMethod::Post && p == "/auth/register")
+            .expect("register recorded");
+        std::str::from_utf8(&req.2).unwrap().to_string()
+    }
+
+    #[test]
+    fn register_sends_invite_code_only_when_configured() {
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Post, "/auth/register", 200, Vec::new());
+        register_verifier_with_code(&t, &ACCOUNT, SECRET, Some("beta-code-0001")).unwrap();
+        assert!(
+            register_body(&t).contains("\"invite_code\":\"beta-code-0001\""),
+            "a configured code must be on the wire"
+        );
+
+        let t2 = FakeTransport::new();
+        t2.on(HttpMethod::Post, "/auth/register", 200, Vec::new());
+        register_verifier(&t2, &ACCOUNT, SECRET).unwrap();
+        assert!(
+            !register_body(&t2).contains("invite_code"),
+            "an open server must receive the pre-gate body"
+        );
+
+        // An empty string is no code, not a zero-length secret.
+        let t3 = FakeTransport::new();
+        t3.on(HttpMethod::Post, "/auth/register", 200, Vec::new());
+        register_verifier_with_code(&t3, &ACCOUNT, SECRET, Some("")).unwrap();
+        assert!(!register_body(&t3).contains("invite_code"));
+    }
+
+    #[test]
+    fn register_maps_invite_code_refusals_to_distinct_variants() {
+        let required = FakeTransport::new();
+        required.on(
+            HttpMethod::Post,
+            "/auth/register",
+            403,
+            b"{\"error_code\":\"invite_code_required\"}".to_vec(),
+        );
+        assert_eq!(
+            register_verifier_with_code(&required, &ACCOUNT, SECRET, None).unwrap_err(),
+            EnrollError::InviteCodeRequired
+        );
+
+        let invalid = FakeTransport::new();
+        invalid.on(
+            HttpMethod::Post,
+            "/auth/register",
+            403,
+            b"{\"error_code\":\"invite_code_invalid\"}".to_vec(),
+        );
+        assert_eq!(
+            register_verifier_with_code(&invalid, &ACCOUNT, SECRET, Some("wrong")).unwrap_err(),
+            EnrollError::InviteCodeInvalid
+        );
+    }
+
     #[test]
     fn enroll_init_sends_hash_hex_username() {
         let t = FakeTransport::new();
@@ -1318,6 +1410,9 @@ pub async fn enroll_device_from_host(
     let cfg = super::config::read_config(io, &cfg_path)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
+    // The gated-server admission code, read before `endpoint_url` moves out of
+    // `cfg`, and moved into the blocking closure that registers the verifier.
+    let invite_code = cfg.invite_code.clone();
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     let account =
@@ -1430,8 +1525,13 @@ pub async fn enroll_device_from_host(
             //    is success; the first device's stored salt is what every later
             //    handshake reuses). Keyed on the canonical `account.hash` (the same
             //    value the server namespaces on), so register + enroll agree.
-            register_verifier(transport.as_ref(), &account.hash, secret.as_slice())
-                .map_err(|_| SyncDeviceError::Transport)?;
+            register_verifier_with_code(
+                transport.as_ref(),
+                &account.hash,
+                secret.as_slice(),
+                invite_code.as_deref(),
+            )
+            .map_err(SyncDeviceError::from)?;
 
             // 5. SCRAM enroll.
             let device_id = generate_device_id();
@@ -1896,7 +1996,9 @@ pub async fn join_account_from_host(
     // binding the value directly says so rather than chaining a read that can
     // only produce one thing.
     let fingerprint: Option<String> = None;
-    super::config::set_endpoint(host, io, Some(server_url), None)
+    // The join path targets an account that already exists, so no invite code is
+    // involved: the gate is consulted only on new-account registration.
+    super::config::set_endpoint(host, io, Some(server_url), None, None)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
     let cfg = super::config::read_config(

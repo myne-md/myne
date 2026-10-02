@@ -1368,19 +1368,35 @@ mod tests {
     /// record that we could not even look.
     #[test]
     fn undecodable_image_bytes_report_failed() {
-        init_ocr_for_tests();
+        // Whether OCR is available decides the honest state, so install the
+        // models FIRST and branch on it rather than accepting both variants:
+        // without weights nothing was attempted (`Unsupported`); with weights
+        // the bytes were looked at and did not decode (`Failed`). Accepting
+        // both made the assertion name a state it could not reach on a fresh
+        // clone, where `Failed` is unreachable.
+        let ocr_available = init_ocr_for_tests();
         let r = extract(
             "image/png",
             "broken.png",
             b"\x89PNG\r\n\x1a\nnot really a png",
         );
         assert_eq!(r.source_format, SourceFormat::Image);
-        assert!(
-            matches!(r.status, ExtractStatus::Failed | ExtractStatus::Unsupported),
-            "undecodable bytes must not be reported as Ok/Empty, got {:?}",
-            r.status
-        );
         assert!(r.text.is_empty());
+        if ocr_available {
+            assert_eq!(
+                r.status,
+                ExtractStatus::Failed,
+                "with weights, undecodable bytes must be Failed (not Ok/Empty), got {:?}",
+                r.status
+            );
+        } else {
+            assert_eq!(
+                r.status,
+                ExtractStatus::Unsupported,
+                "without weights nothing was attempted, so the honest state is Unsupported, got {:?}",
+                r.status
+            );
+        }
     }
 
     /// An icon-scale image is skipped before decode: nothing readable lives

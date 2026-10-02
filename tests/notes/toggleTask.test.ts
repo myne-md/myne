@@ -180,9 +180,11 @@ describe("refusals are explainable, never guesses", () => {
 
   it("names the oversized reason so a surface can explain it", async () => {
     const { d } = deps();
-    await setTaskCompleted(lineTask({ oversized: true }), true, d).catch((e: unknown) => {
-      expect(e).toBeInstanceOf(TaskWriteRefused);
-      expect((e as TaskWriteRefused).reason).toBe("oversized");
+    // `rejects.toMatchObject` rather than a `.catch()`: if a future
+    // implementation resolved instead of throwing, the catch would never run
+    // and the reason assertion would never be consulted.
+    await expect(setTaskCompleted(lineTask({ oversized: true }), true, d)).rejects.toMatchObject({
+      reason: "oversized",
     });
   });
 

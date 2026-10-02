@@ -111,6 +111,7 @@ pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
     _confirmed_fingerprint: Option<String>,
+    invite_code: Option<String>,
 ) -> Result<EndpointPinInfo, SyncConfigError> {
     if let Some(url) = endpoint_url.as_deref() {
         super::enroll::verify_join_tls(url)
@@ -125,6 +126,7 @@ pub async fn sync_set_endpoint<R: Runtime>(
         &crate::vault_io::StdVaultIo,
         endpoint_url,
         None,
+        invite_code,
     )
     .await
 }

@@ -24,10 +24,14 @@ const colorsCss = readFileSync(
 
 describe("global focus ring (load-bearing)", () => {
   it("applies var(--ring) on :focus-visible to every standard interactive selector", () => {
-    // Isolate the global focus-visible block and assert it paints the ring.
-    const block = tokensCss.slice(
-      tokensCss.indexOf("button:focus-visible"),
-    );
+    // Isolate the global focus-visible block: from the first selector to its
+    // own closing brace. Slicing to EOF would let a LATER rule satisfy the
+    // assertion after the ring was deleted from this one; `.vc-step-heading:focus`
+    // below also declares `box-shadow: var(--ring)`.
+    const start = tokensCss.indexOf("button:focus-visible");
+    expect(start, "the global :focus-visible rule is gone").toBeGreaterThanOrEqual(0);
+    const end = tokensCss.indexOf("}", start);
+    const block = tokensCss.slice(start, end + 1);
     for (const selector of [
       "button:focus-visible",
       '[role="button"]:focus-visible',
@@ -37,7 +41,7 @@ describe("global focus ring (load-bearing)", () => {
       "a:focus-visible",
       "[tabindex]:focus-visible",
     ]) {
-      expect(tokensCss, `missing focus-visible selector: ${selector}`).toContain(
+      expect(block, `missing focus-visible selector: ${selector}`).toContain(
         selector,
       );
     }

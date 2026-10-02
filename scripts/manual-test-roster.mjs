@@ -5427,6 +5427,7 @@ export const ROSTER = Object.freeze([
       "e2e/prefs-sync.e2e.ts",
       "e2e/device-join-qr.e2e.ts",
       "e2e/sync-cert-reverify.e2e.ts",
+      "e2e/invite-code-gate.e2e.ts",
     ],
     manual: [
       {

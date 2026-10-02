@@ -3739,27 +3739,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dropping_recovering_slot_zeroizes_keys() {
-        // `Slot::Recovering`'s Zeroizing fields wipe on drop. Build a
-        // fixture with a known byte pattern, drop it, assert the
-        // post-drop bytes (read via the wrapper's Zeroize impl) are
-        // zero.
-        //
-        // We test this indirectly: construct the RecoveringMaterial,
-        // drop it, then construct a fresh one and check its values are
-        // independent (no Zeroizing leak across instances). The strong
-        // form (post-drop pointer read) requires unsafe and is covered
-        // by `zeroize` crate's own tests.
-        let m = fixture_recovering_with_keys(0x42, 0x13, 0x99);
-        assert_eq!(*m.root_key, [0x42u8; AEAD_KEY_LEN]);
-        assert_eq!(*m.items_key, [0x13u8; AEAD_KEY_LEN]);
-        drop(m);
-        // Fresh instance has independent fields.
-        let m2 = fixture_recovering_with_keys(0xFE, 0xED, 0x00);
-        assert_eq!(*m2.root_key, [0xFEu8; AEAD_KEY_LEN]);
-        assert_eq!(*m2.items_key, [0xEDu8; AEAD_KEY_LEN]);
-    }
+    // `dropping_recovering_slot_zeroizes_keys` was removed (myne-md/myne#802):
+    // its Zeroizing keys are private and drop wipes them in place, so no safe
+    // read of the dropped instance exists. The test read a freshly constructed
+    // instance instead and could not fail if zeroization were removed; the
+    // `zeroize` crate's own tests are the guarantee, not this one.
 
     /// Stable label for a `Slot` for panic messages; `Slot` does not
     /// derive `Debug` because its variants carry `Zeroizing` keys we

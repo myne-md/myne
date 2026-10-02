@@ -512,12 +512,14 @@ describe("runView — filter→groupBy→sort end-to-end (task 6)", () => {
 });
 
 describe("anti-eval invariant (SYNC-7)", () => {
-  it("arithmetic / map nodes are not representable in FilterNode", () => {
+  it("the evaluator refuses an arithmetic node the type excludes", async () => {
     // @ts-expect-error — an arithmetic leaf is not part of the closed allow-list.
     const bad: FilterNode = { kind: "multiply", left: "rating", right: 4 };
-    void bad;
-    // (compile-time guarantee; the evaluator has no runtime path for it either —
-    // the `assertNever` exhaustiveness guard.)
-    expect(true).toBe(true);
+    // The compile-time exclusion is the first half; the evaluator's
+    // `assertNever` fallthrough is the runtime second half. Without this
+    // assertion that default arm could be deleted and nothing would notice.
+    await expect(evaluateFilter(bad, LIVE, resolvers({}))).rejects.toThrow(
+      /unsupported filter node/,
+    );
   });
 });

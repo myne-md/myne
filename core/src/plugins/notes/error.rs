@@ -927,133 +927,347 @@ impl From<std::io::Error> for NoteExportAttachmentsError {
 mod tests {
     use super::*;
 
-    fn serialize_create(e: &NoteCreateError) -> String {
-        serde_json::to_string(e).expect("NoteCreateError must serialize cleanly")
-    }
-    fn serialize_read(e: &NoteReadError) -> String {
-        serde_json::to_string(e).expect("NoteReadError must serialize cleanly")
+    fn json<T: serde::Serialize>(e: &T) -> String {
+        serde_json::to_string(e).expect("notes error enum must serialize cleanly")
     }
 
-    // ---- NoteCreateError serde shape ------------------------------------
-
+    /// Every unit variant across this file's ten enums serializes under
+    /// `#[serde(tag = "kind", content = "detail")]` as `{"kind":"<VariantName>"}`.
+    /// The variant-name SET is compared to the TS mirrors both directions by
+    /// `tests/types/rustEnumParity.test.ts`, so this table pins only the shared
+    /// wire shape.
     #[test]
-    fn create_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_create(&NoteCreateError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
+    fn unit_variants_serialize_with_kind_tag() {
+        let cases = [
+            (
+                json(&NoteCreateError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteCreateError::NoteAlreadyExists),
+                r#"{"kind":"NoteAlreadyExists"}"#,
+            ),
+            (
+                json(&NoteCreateError::PlaintextTooLarge),
+                r#"{"kind":"PlaintextTooLarge"}"#,
+            ),
+            (
+                json(&NoteCreateError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteCreateError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteReadError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteReadError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteReadError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteReadError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteReadError::InvalidPlaintextEncoding),
+                r#"{"kind":"InvalidPlaintextEncoding"}"#,
+            ),
+            (
+                json(&NoteReadError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteReadError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteUpdateError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteUpdateError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteUpdateError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteUpdateError::PlaintextTooLarge),
+                r#"{"kind":"PlaintextTooLarge"}"#,
+            ),
+            (
+                json(&NoteUpdateError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteUpdateError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteUpdateError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteUpdateError::BaseMismatch),
+                r#"{"kind":"BaseMismatch"}"#,
+            ),
+            (
+                json(&NoteBatchError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteBatchError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteBatchError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteBatchError::PlaintextTooLarge),
+                r#"{"kind":"PlaintextTooLarge"}"#,
+            ),
+            (
+                json(&NoteBatchError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteBatchError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteBatchError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteDeleteError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteDeleteError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteDeleteError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteDeleteError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteDeleteError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteListError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteListError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteListError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteTitleError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteTitleError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteTitleError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteTitleBatchError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteTitleBatchError::NotesDirNotADirectory),
+                r#"{"kind":"NotesDirNotADirectory"}"#,
+            ),
+            (
+                json(&NoteTitleBatchError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteExportError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteExportError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteExportError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteExportError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteExportError::InvalidPlaintextEncoding),
+                r#"{"kind":"InvalidPlaintextEncoding"}"#,
+            ),
+            (
+                json(&NoteExportError::InvalidDestination),
+                r#"{"kind":"InvalidDestination"}"#,
+            ),
+            (
+                json(&NoteExportError::TargetAlreadyExists),
+                r#"{"kind":"TargetAlreadyExists"}"#,
+            ),
+            (
+                json(&NoteExportError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::VaultNotUnlocked),
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::InvalidNoteId),
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::InvalidNoteFilename),
+                r#"{"kind":"InvalidNoteFilename"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::NoteNotFound),
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::CannotDecrypt),
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::InvalidPlaintextEncoding),
+                r#"{"kind":"InvalidPlaintextEncoding"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::InvalidDestination),
+                r#"{"kind":"InvalidDestination"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::TargetAlreadyExists),
+                r#"{"kind":"TargetAlreadyExists"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::AttachmentMissing),
+                r#"{"kind":"AttachmentMissing"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::AttachmentCorrupt),
+                r#"{"kind":"AttachmentCorrupt"}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
+    /// Every one-field/struct payload variant serializes as
+    /// `{"kind":"<Name>","detail":{…}}`.
     #[test]
-    fn create_note_already_exists_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_create(&NoteCreateError::NoteAlreadyExists),
-            r#"{"kind":"NoteAlreadyExists"}"#
-        );
-    }
-
-    #[test]
-    fn create_plaintext_too_large_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_create(&NoteCreateError::PlaintextTooLarge),
-            r#"{"kind":"PlaintextTooLarge"}"#
-        );
-    }
-
-    #[test]
-    fn create_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_create(&NoteCreateError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn create_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteCreateError::Io {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize_create(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn create_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_create(&NoteCreateError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
-
-    // ---- NoteReadError serde shape -------------------------------------
-
-    #[test]
-    fn read_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn read_invalid_note_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::InvalidNoteId),
-            r#"{"kind":"InvalidNoteId"}"#
-        );
-    }
-
-    #[test]
-    fn read_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn read_cannot_decrypt_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::CannotDecrypt),
-            r#"{"kind":"CannotDecrypt"}"#
-        );
-    }
-
-    #[test]
-    fn read_invalid_plaintext_encoding_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::InvalidPlaintextEncoding),
-            r#"{"kind":"InvalidPlaintextEncoding"}"#
-        );
-    }
-
-    #[test]
-    fn read_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn read_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteReadError::Io {
-            io_error_kind: IoFailureKind::Other,
-        };
-        assert_eq!(
-            serialize_read(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#
-        );
-    }
-
-    #[test]
-    fn read_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_read(&NoteReadError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
+    fn payload_variants_serialize_with_detail() {
+        let cases = [
+            (
+                json(&NoteCreateError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&NoteReadError::Io {
+                    io_error_kind: IoFailureKind::Other,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#,
+            ),
+            (
+                json(&NoteUpdateError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&NoteBatchError::Io {
+                    io_error_kind: IoFailureKind::NoSpace,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#,
+            ),
+            (
+                json(&NoteBatchError::CommittedPendingPublish {
+                    io_error_kind: IoFailureKind::NoSpace,
+                }),
+                r#"{"kind":"CommittedPendingPublish","detail":{"io_error_kind":"NoSpace"}}"#,
+            ),
+            (
+                json(&NoteDeleteError::Io {
+                    io_error_kind: IoFailureKind::Other,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#,
+            ),
+            (
+                json(&NoteListError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&NoteTitleError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&NoteTitleBatchError::BatchTooLarge { cap: 100 }),
+                r#"{"kind":"BatchTooLarge","detail":{"cap":100}}"#,
+            ),
+            (
+                json(&NoteTitleBatchError::Io {
+                    io_error_kind: IoFailureKind::Other,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#,
+            ),
+            (
+                json(&NoteExportError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&NoteExportAttachmentsError::Io {
+                    io_error_kind: IoFailureKind::NoSpace,
+                }),
+                r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     // ---- Closed-payload exhaustiveness pin ------------------------------
@@ -1096,132 +1310,9 @@ mod tests {
         assert_closed(&NoteReadError::NoteNotFound);
     }
 
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn create_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteCreateError = raw.into();
-        match mapped {
-            NoteCreateError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn create_from_io_error_unknown_kind_collapses_to_other() {
-        let raw = std::io::Error::from(std::io::ErrorKind::AlreadyExists);
-        let mapped: NoteCreateError = raw.into();
-        match mapped {
-            NoteCreateError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::Other);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn read_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteReadError = raw.into();
-        match mapped {
-            NoteReadError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn read_from_io_error_no_space_collapses_to_no_space() {
-        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
-        let mapped: NoteReadError = raw.into();
-        match mapped {
-            NoteReadError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteUpdateError
     // =====================================================================
-
-    fn serialize_update(e: &NoteUpdateError) -> String {
-        serde_json::to_string(e).expect("NoteUpdateError must serialize cleanly")
-    }
-
-    // ---- NoteUpdateError serde shape -----------------------------------
-
-    #[test]
-    fn update_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn update_invalid_note_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::InvalidNoteId),
-            r#"{"kind":"InvalidNoteId"}"#
-        );
-    }
-
-    #[test]
-    fn update_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn update_plaintext_too_large_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::PlaintextTooLarge),
-            r#"{"kind":"PlaintextTooLarge"}"#
-        );
-    }
-
-    #[test]
-    fn update_cannot_decrypt_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::CannotDecrypt),
-            r#"{"kind":"CannotDecrypt"}"#
-        );
-    }
-
-    #[test]
-    fn update_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn update_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteUpdateError::Io {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize_update(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn update_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_update(&NoteUpdateError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
     //
@@ -1250,112 +1341,9 @@ mod tests {
         assert_closed(&NoteUpdateError::VaultNotUnlocked);
     }
 
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn update_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteUpdateError = raw.into();
-        match mapped {
-            NoteUpdateError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn update_from_io_error_unknown_kind_collapses_to_other() {
-        // `AlreadyExists` is special-cased by the calling command upstream
-        // (routed to `NotesDirNotADirectory` per the `paths::notes_dir`
-        // accept-list). The bare `From<io::Error>` impl falls through to
-        // `Other`; this pins the residual-case behavior.
-        let raw = std::io::Error::from(std::io::ErrorKind::AlreadyExists);
-        let mapped: NoteUpdateError = raw.into();
-        match mapped {
-            NoteUpdateError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::Other);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteBatchError
     // =====================================================================
-
-    fn serialize_batch(e: &NoteBatchError) -> String {
-        serde_json::to_string(e).expect("NoteBatchError must serialize cleanly")
-    }
-
-    // ---- NoteBatchError serde shape ------------------------------------
-
-    #[test]
-    fn batch_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn batch_invalid_note_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::InvalidNoteId),
-            r#"{"kind":"InvalidNoteId"}"#
-        );
-    }
-
-    #[test]
-    fn batch_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn batch_plaintext_too_large_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::PlaintextTooLarge),
-            r#"{"kind":"PlaintextTooLarge"}"#
-        );
-    }
-
-    #[test]
-    fn batch_cannot_decrypt_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::CannotDecrypt),
-            r#"{"kind":"CannotDecrypt"}"#
-        );
-    }
-
-    #[test]
-    fn batch_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn batch_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteBatchError::Io {
-            io_error_kind: IoFailureKind::NoSpace,
-        };
-        assert_eq!(
-            serialize_batch(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#
-        );
-    }
-
-    #[test]
-    fn batch_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_batch(&NoteBatchError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
     //
@@ -1383,107 +1371,9 @@ mod tests {
         assert_closed(&NoteBatchError::VaultNotUnlocked);
     }
 
-    /// The post-commit variant's wire shape, pinned like every other: the TS
-    /// mirror narrows on `kind`, and a caller that does not recognize the tag
-    /// falls back to "the vault is unchanged" — the exact wrong answer here
-    /// (myne#300).
-    #[test]
-    fn batch_committed_pending_publish_serializes_with_kind_tag() {
-        let e = NoteBatchError::CommittedPendingPublish {
-            io_error_kind: IoFailureKind::NoSpace,
-        };
-        assert_eq!(
-            serialize_batch(&e),
-            r#"{"kind":"CommittedPendingPublish","detail":{"io_error_kind":"NoSpace"}}"#
-        );
-    }
-
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn batch_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteBatchError = raw.into();
-        match mapped {
-            NoteBatchError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn batch_from_io_error_no_space_collapses_to_no_space() {
-        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
-        let mapped: NoteBatchError = raw.into();
-        match mapped {
-            NoteBatchError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteDeleteError
     // =====================================================================
-
-    fn serialize_delete(e: &NoteDeleteError) -> String {
-        serde_json::to_string(e).expect("NoteDeleteError must serialize cleanly")
-    }
-
-    // ---- NoteDeleteError serde shape -----------------------------------
-
-    #[test]
-    fn delete_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_delete(&NoteDeleteError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn delete_invalid_note_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_delete(&NoteDeleteError::InvalidNoteId),
-            r#"{"kind":"InvalidNoteId"}"#
-        );
-    }
-
-    #[test]
-    fn delete_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_delete(&NoteDeleteError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn delete_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_delete(&NoteDeleteError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn delete_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteDeleteError::Io {
-            io_error_kind: IoFailureKind::Other,
-        };
-        assert_eq!(
-            serialize_delete(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#
-        );
-    }
-
-    #[test]
-    fn delete_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_delete(&NoteDeleteError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
 
@@ -1502,76 +1392,9 @@ mod tests {
         assert_closed(&NoteDeleteError::VaultNotUnlocked);
     }
 
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn delete_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteDeleteError = raw.into();
-        match mapped {
-            NoteDeleteError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn delete_from_io_error_no_space_collapses_to_no_space() {
-        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
-        let mapped: NoteDeleteError = raw.into();
-        match mapped {
-            NoteDeleteError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteListError
     // =====================================================================
-
-    fn serialize_list(e: &NoteListError) -> String {
-        serde_json::to_string(e).expect("NoteListError must serialize cleanly")
-    }
-
-    // ---- NoteListError serde shape -------------------------------------
-
-    #[test]
-    fn list_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_list(&NoteListError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn list_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_list(&NoteListError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn list_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteListError::Io {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize_list(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn list_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_list(&NoteListError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
 
@@ -1588,74 +1411,9 @@ mod tests {
         assert_closed(&NoteListError::VaultNotUnlocked);
     }
 
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn list_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteListError = raw.into();
-        match mapped {
-            NoteListError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn list_from_io_error_no_space_collapses_to_no_space() {
-        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
-        let mapped: NoteListError = raw.into();
-        match mapped {
-            NoteListError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteTitleError (per-item)
     // =====================================================================
-
-    fn serialize_title(e: &NoteTitleError) -> String {
-        serde_json::to_string(e).expect("NoteTitleError must serialize cleanly")
-    }
-
-    #[test]
-    fn title_cannot_decrypt_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title(&NoteTitleError::CannotDecrypt),
-            r#"{"kind":"CannotDecrypt"}"#
-        );
-    }
-
-    #[test]
-    fn title_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title(&NoteTitleError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn title_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteTitleError::Io {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize_title(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn title_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title(&NoteTitleError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     #[test]
     fn title_all_variants_have_closed_payloads_only() {
@@ -1670,68 +1428,9 @@ mod tests {
         assert_closed(&NoteTitleError::CannotDecrypt);
     }
 
-    #[test]
-    fn title_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteTitleError = raw.into();
-        match mapped {
-            NoteTitleError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteTitleBatchError (batch-level)
     // =====================================================================
-
-    fn serialize_title_batch(e: &NoteTitleBatchError) -> String {
-        serde_json::to_string(e).expect("NoteTitleBatchError must serialize cleanly")
-    }
-
-    #[test]
-    fn title_batch_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title_batch(&NoteTitleBatchError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn title_batch_notes_dir_not_a_directory_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title_batch(&NoteTitleBatchError::NotesDirNotADirectory),
-            r#"{"kind":"NotesDirNotADirectory"}"#
-        );
-    }
-
-    #[test]
-    fn title_batch_too_large_serializes_with_cap_payload() {
-        assert_eq!(
-            serialize_title_batch(&NoteTitleBatchError::BatchTooLarge { cap: 100 }),
-            r#"{"kind":"BatchTooLarge","detail":{"cap":100}}"#
-        );
-    }
-
-    #[test]
-    fn title_batch_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteTitleBatchError::Io {
-            io_error_kind: IoFailureKind::Other,
-        };
-        assert_eq!(
-            serialize_title_batch(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#
-        );
-    }
-
-    #[test]
-    fn title_batch_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_title_batch(&NoteTitleBatchError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     #[test]
     fn title_batch_all_variants_have_closed_payloads_only() {
@@ -1747,102 +1446,9 @@ mod tests {
         assert_closed(&NoteTitleBatchError::VaultNotUnlocked);
     }
 
-    #[test]
-    fn title_batch_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteTitleBatchError = raw.into();
-        match mapped {
-            NoteTitleBatchError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteExportError
     // =====================================================================
-
-    fn serialize_export(e: &NoteExportError) -> String {
-        serde_json::to_string(e).expect("NoteExportError must serialize cleanly")
-    }
-
-    // ---- NoteExportError serde shape -----------------------------------
-
-    #[test]
-    fn export_vault_not_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::VaultNotUnlocked),
-            r#"{"kind":"VaultNotUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn export_invalid_note_id_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::InvalidNoteId),
-            r#"{"kind":"InvalidNoteId"}"#
-        );
-    }
-
-    #[test]
-    fn export_note_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::NoteNotFound),
-            r#"{"kind":"NoteNotFound"}"#
-        );
-    }
-
-    #[test]
-    fn export_cannot_decrypt_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::CannotDecrypt),
-            r#"{"kind":"CannotDecrypt"}"#
-        );
-    }
-
-    #[test]
-    fn export_invalid_plaintext_encoding_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::InvalidPlaintextEncoding),
-            r#"{"kind":"InvalidPlaintextEncoding"}"#
-        );
-    }
-
-    #[test]
-    fn export_invalid_destination_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::InvalidDestination),
-            r#"{"kind":"InvalidDestination"}"#
-        );
-    }
-
-    #[test]
-    fn export_target_already_exists_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::TargetAlreadyExists),
-            r#"{"kind":"TargetAlreadyExists"}"#
-        );
-    }
-
-    #[test]
-    fn export_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteExportError::Io {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize_export(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn export_join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize_export(&NoteExportError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
 
@@ -1864,108 +1470,9 @@ mod tests {
         assert_closed(&NoteExportError::VaultNotUnlocked);
     }
 
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn export_from_io_error_routes_via_closed_enum_for_permission_denied() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteExportError = raw.into();
-        match mapped {
-            NoteExportError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn export_from_io_error_no_space_collapses_to_no_space() {
-        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
-        let mapped: NoteExportError = raw.into();
-        match mapped {
-            NoteExportError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
-    }
-
     // =====================================================================
     // NoteExportAttachmentsError
     // =====================================================================
-
-    fn serialize_export_attachments(e: &NoteExportAttachmentsError) -> String {
-        serde_json::to_string(e).expect("NoteExportAttachmentsError must serialize cleanly")
-    }
-
-    // ---- NoteExportAttachmentsError serde shape -------------------------
-
-    #[test]
-    fn export_attachments_unit_variants_serialize_with_kind_tag() {
-        for (e, expected) in [
-            (
-                NoteExportAttachmentsError::VaultNotUnlocked,
-                r#"{"kind":"VaultNotUnlocked"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::InvalidNoteId,
-                r#"{"kind":"InvalidNoteId"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::InvalidNoteFilename,
-                r#"{"kind":"InvalidNoteFilename"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::NoteNotFound,
-                r#"{"kind":"NoteNotFound"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::CannotDecrypt,
-                r#"{"kind":"CannotDecrypt"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::InvalidPlaintextEncoding,
-                r#"{"kind":"InvalidPlaintextEncoding"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::InvalidVaultMeta,
-                r#"{"kind":"InvalidVaultMeta"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::InvalidDestination,
-                r#"{"kind":"InvalidDestination"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::TargetAlreadyExists,
-                r#"{"kind":"TargetAlreadyExists"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::AttachmentMissing,
-                r#"{"kind":"AttachmentMissing"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::AttachmentCorrupt,
-                r#"{"kind":"AttachmentCorrupt"}"#,
-            ),
-            (
-                NoteExportAttachmentsError::JoinFailure,
-                r#"{"kind":"JoinFailure"}"#,
-            ),
-        ] {
-            assert_eq!(serialize_export_attachments(&e), expected);
-        }
-    }
-
-    #[test]
-    fn export_attachments_io_serializes_with_io_failure_kind_payload() {
-        let e = NoteExportAttachmentsError::Io {
-            io_error_kind: IoFailureKind::NoSpace,
-        };
-        assert_eq!(
-            serialize_export_attachments(&e),
-            r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#
-        );
-    }
 
     // ---- Closed-payload exhaustiveness pin -----------------------------
 
@@ -1989,19 +1496,5 @@ mod tests {
             }
         }
         assert_closed(&NoteExportAttachmentsError::VaultNotUnlocked);
-    }
-
-    // ---- From<std::io::Error> mapping ----------------------------------
-
-    #[test]
-    fn export_attachments_from_io_error_routes_via_closed_enum() {
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: NoteExportAttachmentsError = raw.into();
-        match mapped {
-            NoteExportAttachmentsError::Io { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected Io variant, got {other:?}"),
-        }
     }
 }
