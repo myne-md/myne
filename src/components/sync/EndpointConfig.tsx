@@ -88,9 +88,31 @@ const BTN_CONNECTED: CSSProperties = {
   cursor: "default",
 };
 
-export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => void; onEdit?: () => void } = {}) {
+export function EndpointConfig({
+  onConnected,
+  onEdit,
+  initialUrl,
+  lockedUrl = false,
+}: {
+  onConnected?: () => void;
+  onEdit?: () => void;
+  /**
+   * Seed the address on mount, for the first-run HOSTED door (myne-md/myne#800):
+   * the hosted server is the gated one, so its one-tap connection needs the
+   * invite-code field the self-hosted form already has. Seeding the SAME control
+   * rather than adding a second one is the file's own rule — "a second endpoint
+   * control would be a second contract".
+   */
+  initialUrl?: string;
+  /**
+   * Render the address read-only. The hosted door fixes the origin (`the browser
+   * fixes the origin`, and the desktop hosted door writes `HOSTED_SYNC_ORIGIN`
+   * for the same reason), so the user may enter only the invite code.
+   */
+  lockedUrl?: boolean;
+} = {}) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   // The endpoint this device is currently connected to (loaded, or set on a
   // successful connect). When the input still equals it, there is nothing to do
   // and the button rests as a disabled "Connected" (E4c).
@@ -114,6 +136,17 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
       invite_code: string | null;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
+        // A seeded hosted door keeps its fixed origin; only the invite code is
+        // hydrated (and only if the stored code belongs to that same origin,
+        // which `set_endpoint`'s read-modify-write already enforces).
+        if (lockedUrl) {
+          if (initialUrl && c.endpoint_url === initialUrl) {
+            setConnectedUrl(initialUrl);
+          }
+          setInviteCode(c.invite_code ?? "");
+          setPinSource(c.pin_source);
+          return;
+        }
         if (c.endpoint_url) {
           setUrl(c.endpoint_url);
           setConnectedUrl(c.endpoint_url);
@@ -205,6 +238,7 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
       <div style={ROW}>
         <input
           value={url}
+          readOnly={lockedUrl}
           onChange={(e) => {
             setUrl(e.target.value);
             // Changing the address invalidates a code issued for the old server;
@@ -216,7 +250,7 @@ export function EndpointConfig({ onConnected, onEdit }: { onConnected?: () => vo
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          style={INPUT}
+          style={lockedUrl ? { ...INPUT, color: "var(--fg-3)" } : INPUT}
           data-testid="sync.endpoint-input"
         />
         {isConnectedUnedited ? (

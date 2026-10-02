@@ -25,6 +25,7 @@
 import { useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
+import { Input } from "../../components/primitives/Input";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import {
@@ -182,23 +183,15 @@ export function AccountStep({
           >
             {t("sync.endpoint.inviteLabel")}
           </label>
-          <input
+          <Input
             id="create-invite-code"
+            mono
             value={inviteCode}
             onChange={(e) => onInviteCodeChange(e.target.value)}
             placeholder={t("sync.endpoint.invitePlaceholder")}
             spellCheck={false}
             autoCapitalize="off"
             autoComplete="off"
-            style={{
-              padding: "var(--space-2) var(--space-3)",
-              fontSize: "var(--text-sm)",
-              background: "var(--paper)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-1)",
-              fontFamily: "var(--font-mono)",
-            }}
             data-testid="create.invite-code"
           />
         </>
