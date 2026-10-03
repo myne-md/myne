@@ -16,4 +16,5 @@
 pub mod commands;
 pub mod device_key;
 pub mod error;
+pub mod meeting_manifest;
 pub mod queue;

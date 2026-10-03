@@ -34,7 +34,10 @@ ios-watch/
 │   ├── MyneWatchComplications.swift
 │   └── Info.plist
 └── Receiver/                           ← iPhone-side (compiled INTO the iOS app)
-    ├── WCCaptureReceiver.swift         ← WCSessionDelegate → stages plaintext
+    ├── WCCaptureReceiver.swift         ← the ONE WCSessionDelegate: stages dictated
+    │                                      text; forwards file deliveries to the meeting handler
+    ├── WCMeetingReceiver.swift         ← meeting audio chunks (myne-md/myne#812): seals on
+    │                                      arrival, never stages plaintext
     └── WCCaptureReceiverBootstrap.m    ← ObjC +load launch-hook (no AppDelegate)
 ```
 
@@ -42,6 +45,18 @@ Data flow: `CaptureView → WatchConnectivityClient.transferUserInfo` → (WC tr
 → `WCCaptureReceiver.didReceiveUserInfo` writes `<app_data_dir>/pending-captures/
 staging/<uuid>` → Rust `captures|seal_staged` → `<…>/sealed/<capture-id>` (`MYK1`)
 → on unlock, JS `drainPendingCaptures` → `note_create` + `captures|ack`.
+
+Watch meeting flow (`TransferFile`, myne-md/myne#812): the watch chunks its audio and
+sends each chunk with `transferFile(_:metadata:)` carrying `session_id`,
+`chunk_index` and `started_at`. `WCCaptureReceiver.session(_:didReceive:)` forwards
+the delivery to `WCMeetingReceiver`, which dispatches a `myne-meeting-chunk` event
+into the WebView; `mobile/src/lib/captures.ts` seals it on arrival via
+`captures|seal_meeting_chunk` (device-key based — runs while the vault is LOCKED)
+into `<…>/pending-captures/meetings/entries/`, recording it in the per-session
+manifest. **No plaintext audio is staged by our code** — the WatchConnectivity
+inbox file is handed straight to the seal, which deletes it. On unlock,
+`drainPendingMeetings` imports each chunk into the vault, transcribes it, builds
+the note with the shared `buildMeetingNote`, creates it, then acks the session.
 
 ## Wiring into the Tauri iOS project (committed spec + ios-postinit.sh)
 
@@ -139,3 +154,13 @@ MYND-467):**
    while the phone vault is locked → the note appears after unlocking the phone; the
    `captures/sealed/` queue drains; the device wrap key is created without a
    biometric prompt.
+4. **Watch meeting capture end-to-end (myne-md/myne#812).** Start a recording on
+   the wrist, let it run long enough to produce several chunks, stop it, and
+   confirm the note arrives on the phone after unlock with the audio embeds and the
+   transcript. Cover: the phone staying LOCKED through the whole meeting (the seal
+   is device-key based); a watch that loses contact mid-meeting and reconnects
+   (the not-yet-transferred chunk stays on the watch); and a `seal_meeting_chunk`
+   that runs on a cold background launch (the receiver queues the delivery until
+   the WebView exists — see `WCMeetingReceiver`). The phone-side flow logic is
+   covered by `tests/flow-logic/captures/meeting-drain.flow.ts`; this row is the
+   device half.

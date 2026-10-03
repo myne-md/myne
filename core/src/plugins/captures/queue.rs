@@ -20,6 +20,13 @@ use tauri::{AppHandle, Runtime};
 const QUEUE_DIR: &str = "pending-captures";
 const STAGING_SUBDIR: &str = "staging";
 const SEALED_SUBDIR: &str = "sealed";
+/// The watch meeting-capture lane's sub-tree (myne-md/myne#812). Same directory
+/// family as the dictation queue above and the same device key, but its own
+/// `entries/` (sealed audio) + `manifest/` (the per-session group record) so the
+/// two lanes never mix filenames.
+const MEETINGS_SUBDIR: &str = "meetings";
+const MEETING_ENTRIES_SUBDIR: &str = "entries";
+const MEETING_MANIFEST_SUBDIR: &str = "manifest";
 
 fn base<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
     Ok(crate::paths::app_data_dir(app)
@@ -35,6 +42,23 @@ pub fn staging_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureErr
 /// `<app_data_dir>/pending-captures/sealed/` — `MYK1` blobs.
 pub fn sealed_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
     Ok(base(app)?.join(SEALED_SUBDIR))
+}
+
+/// `<app_data_dir>/pending-captures/meetings/entries/` — the sealed watch audio
+/// chunks of the meeting lane (opaque AEAD entries; the same 32-hex filename
+/// convention as `sealed/` above).
+pub fn meeting_entries_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
+    Ok(base(app)?
+        .join(MEETINGS_SUBDIR)
+        .join(MEETING_ENTRIES_SUBDIR))
+}
+
+/// `<app_data_dir>/pending-captures/meetings/manifest/` — one JSON record per
+/// pending meeting session ([`super::meeting_manifest`]).
+pub fn meeting_manifest_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
+    Ok(base(app)?
+        .join(MEETINGS_SUBDIR)
+        .join(MEETING_MANIFEST_SUBDIR))
 }
 
 /// Create `dir` (and parents) if absent.

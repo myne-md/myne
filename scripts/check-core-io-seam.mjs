@@ -92,6 +92,7 @@ const ALLOWED = new Map([
   // where this guard does not look.
   ["core/src/plugins/agent/host_adapters.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],
+  ["core/src/plugins/captures/meeting_manifest.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/queue.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/export/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/share_import/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],

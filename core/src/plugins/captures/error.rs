@@ -23,6 +23,11 @@ pub enum CaptureError {
     /// Filesystem failure (bounded kind; no path string leaked).
     #[error("captures io failure")]
     Io(IoFailureKind),
+    /// An arrived watch audio chunk exceeded the codec's plaintext cap. Refused
+    /// BEFORE any sealing (and before the file is read into RAM), never
+    /// truncated: a partial chunk would silently lose audio.
+    #[error("watch audio chunk exceeds the size cap")]
+    ChunkTooLarge,
     /// Opaque backend failure (keychain API, CSPRNG, or blob codec).
     #[error("captures backend failure")]
     Backend,

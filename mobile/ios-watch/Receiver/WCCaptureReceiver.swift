@@ -10,6 +10,13 @@ import WatchConnectivity
 /// crypto and holds NO key — it only stages plaintext; the Rust seal + the JS
 /// drainer do the rest.
 ///
+/// It ALSO owns the delegate half of the watch **meeting**-capture lane
+/// (myne-md/myne#812): `didReceive file:` (WatchConnectivity `transferFile`)
+/// forwards to [`WCMeetingReceiver`], which seals each arrived audio chunk on
+/// arrival instead of staging it. Keeping both in ONE delegate is required —
+/// `WCSession.default.delegate` has exactly one slot, and a second claimer would
+/// silently stop one of the two lanes.
+///
 /// `@objc(WCCaptureReceiver)` fixes the ObjC runtime name (no module prefix) so
 /// the `+load` bootstrap (`WCCaptureReceiverBootstrap.m`) can start it via
 /// `NSClassFromString("WCCaptureReceiver")` — the app has no Swift AppDelegate to
@@ -77,11 +84,26 @@ public final class WCCaptureReceiver: NSObject, WCSessionDelegate {
         }
     }
 
+    /// WatchConnectivity `transferFile` delivery (the watch meeting lane,
+    /// myne-md/myne#812): each arrived audio chunk is handed to
+    /// [`WCMeetingReceiver`], which seals it on arrival rather than staging
+    /// plaintext. This method exists on the ONE delegate owner precisely so the
+    /// meeting lane does not claim a second `WCSession` delegate slot.
+    public func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        WCMeetingReceiver.shared.handle(file: file)
+    }
+
     public func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
-    ) {}
+    ) {
+        // A meeting chunk delivered before the WebView existed is queued in
+        // memory; flush it the moment the session is active.
+        if activationState == .activated {
+            WCMeetingReceiver.shared.flushIfPossible()
+        }
+    }
 
     public func sessionDidBecomeInactive(_ session: WCSession) {}
 

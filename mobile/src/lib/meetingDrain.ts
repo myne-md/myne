@@ -1,0 +1,168 @@
+// Watch meeting-capture drain (myne-md/myne#812, task 3) — the JS half of the
+// lane whose Rust half seals each arrived audio chunk into a device-local entry
+// (`plugin:captures|seal_meeting_chunk`) and groups them by session in the
+// pending-meeting manifest.
+//
+// It sits BESIDE `captures.ts` (`drainPendingCaptures` for the dictated queue),
+// and follows the same discipline, with one difference the meeting lane forces:
+// a dictated capture drains to a note directly, while a meeting drains to
+// *attachments* first.
+//
+//   • drainPendingMeetings() — on unlock, ask the Rust plugin to decrypt every
+//     pending session's sealed chunks and import each into the vault library as
+//     an ordinary `MYA1` attachment (host-side — the up-to-64 MiB audio never
+//     crosses the WebView). Then, per session: transcribe each imported
+//     attachment through the existing attachment-keyed command, build the body
+//     with the SHARED `buildMeetingNote` (`@myne/meeting-note`), create the note
+//     via the ordinary `noteCreate` path, and ONLY THEN delete the device-local
+//     entries + manifest record (`plugin:captures|ack_meeting_session`).
+//
+// # At-least-once
+//
+// The ack is last, exactly as `drainPendingCaptures` acks after `noteCreate`: a
+// crash between note-create and ack re-drains the session. The re-import dedups
+// on the content-addressed attachment id, so the cost is a rare duplicate note
+// rather than a lost meeting. `isDraining` serialises the whole pass, so a
+// StrictMode double-mount cannot double-create.
+//
+// # An incomplete session is still a meeting
+//
+// A session missing a chunk (the watch never delivered it, or its entry could
+// not be opened) still produces a note from the chunks that arrived, and the gap
+// is reported — the Rust drain returns `missing_chunk_indices`, and this module
+// surfaces it once with a toast. Losing one chunk is never losing the meeting.
+
+import i18n from "@myne/i18n";
+import {
+  buildMeetingNote,
+  meetingNoteHasContent,
+  type MeetingNoteCopy,
+} from "@myne/meeting-note";
+import { invoke } from "../platform/core";
+import { showToast } from "../components/ToastHost";
+import { patchTitleField } from "../dialect/surgery";
+import { noteCreate } from "./notes";
+import { startTranscription } from "./transcribe";
+
+/** One sealed chunk that drained into the vault library, in capture order
+ *  (mirror of the Rust `DrainedMeetingChunk`). */
+interface DrainedMeetingChunk {
+  /** The wire-supplied chunk index (the watch's ordering position). */
+  chunk_index: number;
+  /** The `MYA1` attachment id (hex) the note's embed resolves against. */
+  attachment_id: string;
+}
+
+/** One drained session (mirror of the Rust `DrainedMeeting`). */
+interface DrainedMeeting {
+  session_id: string;
+  /** Session start, milliseconds since the Unix epoch. */
+  started_at: number;
+  /** Successfully imported chunks, ascending by `chunk_index`. */
+  chunks: DrainedMeetingChunk[];
+  /** Chunk indices absent from `0..=max`: the session is incomplete. */
+  missing_chunk_indices: number[];
+}
+
+let isDraining = false;
+
+/**
+ * Drain every pending watch meeting into the vault. Returns the number of notes
+ * created. Serialised by `isDraining`; inert (returns 0) without a host / plugin
+ * or when the vault re-locks mid-drain.
+ */
+export async function drainPendingMeetings(): Promise<number> {
+  if (isDraining) return 0;
+  isDraining = true;
+  let created = 0;
+  try {
+    let sessions: DrainedMeeting[];
+    try {
+      // One call does the decrypt→import for EVERY session (host-side); the
+      // WebView never sees the audio bytes, only the attachment ids.
+      sessions = await invoke<DrainedMeeting[]>("plugin:captures|drain_pending_meetings");
+    } catch {
+      return 0; // no host / plugin — nothing to drain
+    }
+    for (const session of sessions) {
+      let madeNote = false;
+      try {
+        madeNote = await writeMeetingNote(session);
+      } catch {
+        // Vault locked mid-drain (or note-create failure): stop and leave the
+        // un-acked sessions for the next unlock. Never ack on failure.
+        return created;
+      }
+      // Ack only AFTER the note exists (at-least-once). The entries + manifest
+      // record go only once the note write resolved, so a failed ack leaves the
+      // session for a later drain (a rare duplicate) rather than losing it. A
+      // session with nothing worth keeping is acked without a note — otherwise
+      // an empty session would re-drain and fail on every unlock forever.
+      await invoke("plugin:captures|ack_meeting_session", {
+        sessionId: session.session_id,
+      }).catch(() => {});
+      if (madeNote) created += 1;
+
+      // The note is safe (or there was nothing to keep); report the gap
+      // (best-effort, one toast per affected session).
+      if (session.missing_chunk_indices.length > 0) {
+        showToast(i18n.t("editor.meeting.chunksMissing"));
+      }
+    }
+  } finally {
+    isDraining = false;
+  }
+  return created;
+}
+
+/**
+ * Transcribe the session's chunks, build the body with the shared builder, and
+ * create the note. Returns `true` when a note was created, `false` when the
+ * session carried nothing worth a note (all chunks failed to import). Throws
+ * only when the note could not be created — a failed transcription is not a
+ * failed meeting (the audio is still in the note), so it is caught per chunk and
+ * the transcript simply omits that chunk.
+ */
+async function writeMeetingNote(session: DrainedMeeting): Promise<boolean> {
+  const copy: MeetingNoteCopy = {
+    transcriptHeading: i18n.t("editor.meeting.transcriptHeading"),
+    machineNotice: i18n.t("editor.meeting.machineNotice"),
+  };
+  const clips = session.chunks.map((c) => ({ attachmentId: c.attachment_id }));
+
+  const parts: string[] = [];
+  for (const chunk of session.chunks) {
+    try {
+      const text = await startTranscription(chunk.attachment_id).done;
+      if (text.trim().length > 0) parts.push(text.trim());
+    } catch {
+      // Transcription unavailable / failed: the audio is still committed to the
+      // note. Omit this chunk's text rather than failing the note.
+    }
+  }
+
+  const body = buildMeetingNote(clips, parts.join("\n\n"), copy);
+  if (!meetingNoteHasContent(body)) return false;
+  const name = i18n.t("editor.meeting.noteTitle", { date: localTimestamp() });
+  await createTitledNote(body, name);
+  return true;
+}
+
+/** Create a note from an explicit body + title, at the vault root. Mirrors the
+ *  desktop `createNoteFromBody` tail (`src/notes/newNoteFromTemplate.ts`) and the
+ *  mobile `daily.ts` twin, so a meeting note carries the same `title:` frontmatter
+ *  the desktop meeting writes. `folder: null` puts it at the root, exactly where
+ *  a blank note from the same context lands. */
+async function createTitledNote(body: string, name: string): Promise<string> {
+  let bytes: Uint8Array = new TextEncoder().encode(body);
+  bytes = patchTitleField(bytes, name);
+  return await noteCreate(new TextDecoder().decode(bytes), null);
+}
+
+/** Local `YYYY-MM-DD HH:MM`, matching the desktop meeting title. UTC formatting
+ *  would title an evening meeting with the previous day west of Greenwich. */
+function localTimestamp(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
