@@ -485,7 +485,13 @@ export async function pickSelect(
   selectTestId: string,
   value: string,
 ): Promise<void> {
-  await (await session.byTestId(selectTestId)).click();
+  const trigger = await session.byTestId(selectTestId);
+  // Centre the trigger before opening: several of these rows sit below the
+  // fold of a tall Settings panel (Editor/About), where W3C /click's
+  // scroll-into-view leaves WebKit reporting "element not interactable" and
+  // the menu never opens.
+  await trigger.scrollIntoView();
+  await trigger.click();
   const option = await session.waitForElement(
     testIdSelector(`${selectTestId}-option`, { "data-value": value }),
   );
