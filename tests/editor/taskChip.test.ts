@@ -922,10 +922,11 @@ describe("recurrence rules display localized over canonical storage (task 11)", 
     teardown(view, host);
   });
 
-  // Only `locales/en/common.json` is hand-maintained; every other catalog is
-  // Weblate-managed and must not be edited in the repo. So the second language
-  // is supplied at RUNTIME here - which is a truer test anyway: it proves the
-  // label comes from the catalog rather than from anything baked into the code.
+  // Only `locales/en/common.json` matters for an English assertion; the other
+  // catalogs are authored in-repo (Weblate retired, `design-notes/ui/0629`).
+  // The second language is supplied at RUNTIME here - which is a truer test
+  // anyway: it proves the label comes from the catalog rather than from
+  // anything baked into the code.
   const useTurkish = async (): Promise<void> => {
     i18n.addResourceBundle(
       "tr",

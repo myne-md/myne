@@ -38,6 +38,7 @@ import { seedVault } from "./support/fixtures";
 import {
   closeSettings,
   createNote,
+  disableDeveloperModeInSettings,
   dismissImporterOffer,
   enableDeveloperMode,
   lockAndReunlock,
@@ -262,15 +263,7 @@ describeE2E("vm4 hiding the vim toggle does not turn vim off (#181)", () => {
         // keymap — a visibility switch that also disabled the feature would be
         // the "surprise loss" the issue rejected.
         await openSettings(s, "about");
-        await (await s.byTestId("about.developer-mode-toggle")).click();
-        await s.waitUntil(
-          async () =>
-            (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
-            "false"
-              ? true
-              : null,
-          { label: "developer_mode toggled off", timeoutMs: 10_000 },
-        );
+        await disableDeveloperModeInSettings(s);
 
         // The control is gone from Editor, while the section around it stays.
         await (await s.byTestId("settings.tab-editor")).click();

@@ -4,9 +4,11 @@
 // English is the SOURCE language (the keys' canonical text lives in
 // `locales/en/common.json`); every other locale is a translation that falls
 // back to English per-key when empty. Adding a language is a two-step change:
-// append it here AND add `locales/<code>/common.json` (start it as `{}` — run
-// `pnpm i18n:extract`, then Weblate fills it). `src/i18n/index.ts` glob-loads
-// every catalog, so no import edit is needed there. See `docs/dev/i18n.md`.
+// append it here AND add `locales/<code>/common.json` (start it as `{}`, run
+// `pnpm i18n:extract`, then translate it in-repo — there is no external
+// translation platform; Weblate was retired in `design-notes/ui/0629`).
+// `src/i18n/index.ts` glob-loads every catalog, so no import edit is needed
+// there. See `docs/dev/i18n.md`.
 //
 // Scope: the curated set that the self-hosted LibreTranslate MT engine loads
 // (LibreTranslate has no lazy model loading and the host RAM is bounded, so

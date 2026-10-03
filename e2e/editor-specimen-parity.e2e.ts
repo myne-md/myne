@@ -46,6 +46,7 @@ import {
   createNote,
   dismissImporterOffer,
   openSettings,
+  pickSelect,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -127,8 +128,8 @@ describeE2E("esp1 the typography specimen matches the editor (myne-md/myne#555)"
         }
 
         // Move the setting off its default. `md` is the default, so `xl` is a
-        // value neither element can be frozen at.
-        await (await s.byTestId("settings.editor-text-size-xl")).click();
+        // value neither element can be frozen at. #769 made this row a Select.
+        await pickSelect(s, "settings.editor-text-size", "xl");
         await s.waitUntil(
           async () => {
             const now = await typographyOf(s, SPECIMEN_BODY);

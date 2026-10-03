@@ -48,7 +48,7 @@ import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
  *  nothing for the rest, so a fifth `LoopEnd` variant would have been picked up
  *  by one site and silently not the other.
  *
- *  A total switch with static `t("…")` calls rather than a lookup table, for
+ *  A total switch with static quoted-key calls rather than a lookup table, for
  *  the reason `AiChatTab`'s own resting-cause switch states: `check-i18n.mjs`
  *  verifies static call sites, so a key living in a `Record` is a key no guard
  *  checks. Written this way the compiler catches a missing tag and the guard

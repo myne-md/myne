@@ -25,6 +25,7 @@ import {
   dismissImporterOfferIfPresent,
   ESCAPE_KEY,
   openSettings,
+  pickSelect,
   selectPickerRow,
   switchToVault,
   unlockToEditor,
@@ -427,13 +428,15 @@ describeE2E("pf5 editor typography round-trip (editor-typography)", () => {
         await s.byTestId("editor.content-frame");
 
         // Pick a NON-default preset on each control (a default would clear to
-        // null and not prove the read-back). Segments carry
-        // `${testId}-${value}` (Segmented primitive).
+        // null and not prove the read-back). #769 moved these rows to the
+        // Select primitive (`settings.editor-text-size` trigger +
+        // `-option` rows), so they are driven through `pickSelect`, not the
+        // `Segmented` `${testId}-${value}` click shape.
         await openSettings(s, "editor");
-        await (await s.byTestId("settings.editor-text-size-lg")).click();
-        await (await s.byTestId("settings.editor-line-spacing-relaxed")).click();
-        await (await s.byTestId("settings.editor-content-width-wide")).click();
-        await (await s.byTestId("settings.editor-font-family-sans")).click();
+        await pickSelect(s, "settings.editor-text-size", "lg");
+        await pickSelect(s, "settings.editor-line-spacing", "relaxed");
+        await pickSelect(s, "settings.editor-content-width", "wide");
+        await pickSelect(s, "settings.editor-font-family", "sans");
         await closeSettings(s);
 
         // Live application: each setter bumps the prefs nonce → the editor's own
@@ -462,19 +465,20 @@ describeE2E("pf5 editor typography round-trip (editor-typography)", () => {
 
         // The controls themselves read back the persisted presets (mount effect
         // loads the stored value — poll, don't snapshot the pre-effect default).
+        // The Select trigger carries the current value in `data-value` (#769).
         await openSettings(s, "editor");
-        const readsBack = async (testId: string): Promise<boolean | null> =>
-          (await (await s.byTestId(testId)).attribute("aria-checked")) === "true" || null;
-        await s.waitUntil(() => readsBack("settings.editor-text-size-lg"), {
+        const readsBack = async (testId: string, value: string): Promise<boolean | null> =>
+          (await (await s.byTestId(testId)).attribute("data-value")) === value || null;
+        await s.waitUntil(() => readsBack("settings.editor-text-size", "lg"), {
           label: "text-size reads back lg",
         });
-        await s.waitUntil(() => readsBack("settings.editor-line-spacing-relaxed"), {
+        await s.waitUntil(() => readsBack("settings.editor-line-spacing", "relaxed"), {
           label: "line-spacing reads back relaxed",
         });
-        await s.waitUntil(() => readsBack("settings.editor-content-width-wide"), {
+        await s.waitUntil(() => readsBack("settings.editor-content-width", "wide"), {
           label: "content-width reads back wide",
         });
-        await s.waitUntil(() => readsBack("settings.editor-font-family-sans"), {
+        await s.waitUntil(() => readsBack("settings.editor-font-family", "sans"), {
           label: "font-family reads back sans",
         });
       },
