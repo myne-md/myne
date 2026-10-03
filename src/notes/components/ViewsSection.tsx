@@ -374,6 +374,17 @@ export function ViewsSection({
   };
 
   const openView = (id: string) => {
+    // A row's primary action must not run while its context menu is open.
+    // WebKitGTK emits a real `click` after a right-click's `contextmenu` —
+    // measured sequence: pointerdown:b2 → mousedown:b2 → contextmenu:b2 →
+    // mouseup:b0 → click:b0 — and that click lands on the row's `onClick` →
+    // here → `setOpen(false)`, collapsing the flyout out from under the open
+    // menu. That is what left the rename input unrenderable (saved-views-entry
+    // sv1): the menu was up but its own flyout had gone. `menu` is set by
+    // `openMenu` before the synthesized click arrives, so guarding on it is
+    // deterministic and needs no timing window. The menu owns its own
+    // dismissal; a genuine row click happens with `menu === null`.
+    if (menu !== null) return;
     setOpen(false);
     onOpenView(id);
   };
