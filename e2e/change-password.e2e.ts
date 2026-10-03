@@ -140,8 +140,20 @@ describeE2E("cp2 form gating + wrong-current banner (MYND-224)", () => {
         // banner. Asserted by FULL literal so a copy collapse fails.
         await fillChangePassword(s, "definitely-not-the-password", NEW_PASSWORD);
         await submitChangePassword(s);
-        const banner = await s.byTestId("change-password.error", { timeoutMs: 20_000 });
-        expect(await banner.text()).toBe(WRONG_CURRENT_BANNER);
+        // Poll for the TEXT, not just the element: the banner mounts on the
+        // rejection and WebKitGTK's W3C getText can return "" for a beat
+        // after the node is locatable (observed here as
+        // `expected '' to be 'Wrong current password…'`, while the failure
+        // artifact's DOM already held the literal). textContent() reads the
+        // live property and is stable across that window.
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("change-password.error")).textContent()) ===
+            WRONG_CURRENT_BANNER
+              ? true
+              : null,
+          { label: "wrong-current banner shows the full literal", timeoutMs: 20_000 },
+        );
 
         // Wrong-current is retryable: the form stayed mounted.
         expect((await s.byTestIdAll("change-password.submit")).length).toBe(1);

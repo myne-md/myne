@@ -410,9 +410,9 @@ export function hasRefusals(
 /** What approving this removal on its own will do, in the user's words.
  *
  *  **A `switch` over literal keys rather than a template key**, and that is not
- *  style. `scripts/check-i18n.mjs` scans static `t("…")` literals by design (an
- *  expression-aware scanner is a scanner with a bypass), so
- *  ``t(`agent.review.removalFlag.${field}`)`` would put five user-facing
+ *  style. `scripts/check-i18n.mjs` scans static quoted-key literals by design
+ *  (an expression-aware scanner is a scanner with a bypass), so a computed
+ *  `t()` would put five user-facing
  *  sentences outside every check in this repository.
  *
  *  Exhaustive over {@link HidingField}, so a sixth marker fails to typecheck

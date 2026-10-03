@@ -1541,7 +1541,7 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **internationalization (i18n)** &nbsp; 🛠️ *Tooling*
 
-The client UI localization layer, shared by desktop, web and mobile: `react-i18next` over flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the build — there is no HTTP backend and no translation server, so no UI string is ever fetched from a third party. English is a static import; the other 30 catalogs are lazy chunks of the same build, one per locale, and a session loads only the active one (`decisions.md` 2026-08-03). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
+The client UI localization layer, shared by desktop, web and mobile: `react-i18next` over flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the build — there is no HTTP backend and no translation server, so no UI string is ever fetched from a third party. English is a static import; the other 30 catalogs are lazy chunks of the same build, one per locale, and a session loads only the active one (`decisions.md` 2026-08-03). Translations are **authored in-repo, by hand**; the self-hosted Weblate instance was retired in `decisions.md` 2026-10-03 (`docs/decisions/ui/0629`). Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
 
@@ -1555,7 +1555,7 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
-A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are owned by **Weblate**. The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and now suspended on a stated condition rather than by exception: while `translate.myne.md` has closed registration and no translators enrolled, the catalogs are filled in-repo. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are **authored in-repo, by hand** — the repository owns every catalog (the self-hosted Weblate instance was retired in `docs/decisions/ui/0629`). The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and made the standing practice on 2026-08-03/2026-08-25; since 2026-10-03 it is simply the only path. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
 
 Used in: `docs/dev/i18n.md`; `docs/dev/i18n-coverage.md`; `locales/`.
 
@@ -3778,11 +3778,11 @@ The `~x~` (subscript) and `^x^` (superscript) inline constructs, rendered with r
 
 Used in: `spec/markdown-dialect.md` §3.2
 
-### **Weblate** &nbsp; 🛠️ *Tooling*
+### **Weblate** &nbsp; 🛠️ *Tooling — retired*
 
-The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill the target languages, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`. Registration being closed with no translators enrolled is why `decisions.md` 2026-08-03 backfilled the catalogs in-repo instead; the ownership direction is unchanged.
+The self-hosted web translation platform that once owned Myne's non-English **locale catalogs**, at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only). **Retired on 2026-10-03** (`docs/decisions/ui/0629`): it had no translators enrolled and the repo was ahead of it on every locale, so the catalogs are now authored in-repo, by hand. It is kept as a glossary entry only so an older document that says "Weblate owns the catalogs" reads as historical. File mask it used was `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
 
-Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
+Used in: `docs/decisions/ui/0629`; `docs/dev/i18n.md` (historical).
 
 ### **web capability set** &nbsp; 📦 *Product* (*Myne-divergent*)
 

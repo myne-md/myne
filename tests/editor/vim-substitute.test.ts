@@ -28,7 +28,12 @@ import {
 function ex(view: EditorView, command: string): void {
   const api = vimApi()!;
   const cm = api.getCM(view)!;
-  api.Vim.handleEx(cm, command);
+  // `getCM` types the handle as the base `CodeMirror`, but `handleEx` wants the
+  // engine's `CodeMirrorV` (the same object plus the vim fields the engine adds
+  // on mount). The runtime value is that object; the cast bridges the package's
+  // two imprecise halves without an extra `@replit/codemirror-vim` import in a
+  // root-tree test (the package is a dependency of `editor/`, not the root).
+  api.Vim.handleEx(cm as Parameters<typeof api.Vim.handleEx>[0], command);
 }
 
 describe("vim :s substitution (MYND-313)", () => {

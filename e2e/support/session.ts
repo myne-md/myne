@@ -427,6 +427,26 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       args: opts.args,
     });
 
+    // Seed the device-local first-run flags BEFORE any scenario reaches the
+    // editor. `AiOnboardingSurface` (myne#805) opens whenever
+    // `myne.aiOnboardingSeen` is absent and its full-viewport backdrop then
+    // swallows every click, exactly like the importer offer the suites dismiss
+    // per-scenario — but nothing dismisses this one. The key is read at Editor
+    // mount, which is always after this, so one write here clears it for every
+    // scenario. Key literal matches `src/lib/aiOnboardingSeen.ts` (`SEEN_KEY`).
+    // Retried because `execute` can race the first document; a scenario whose
+    // SUBJECT is the onboarding clears the key itself.
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        await session.execute<void>(
+          'window.localStorage.setItem("myne.aiOnboardingSeen", "1");',
+        );
+        break;
+      } catch {
+        await sleep(100);
+      }
+    }
+
     const teardown = async () => {
       try {
         await session.deleteSession();

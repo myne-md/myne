@@ -464,8 +464,8 @@ Six feature-level dependency admissions landed with their `decisions.md` entries
 | `i18next-cli` | ^1.64.1 (**devDependency**) | Key extraction and coverage status (`pnpm i18n:extract` / `pnpm i18n:status`) | pulls `@swc/core`, whose pnpm build script is **declined** in `pnpm-workspace.yaml` so no native build runs | MIT | same |
 
 - **Zero egress, by construction.** Catalogs under `locales/` are imported **statically** and ship inside the bundle — no `i18next-backend`, no HTTP loader — so localization adds no network surface, consistent with the no-network-by-default posture.
-- **Why this stack over Lingui / FormatJS:** JSON is Weblate's first-class monolingual format and needs no babel/swc macro step in the app build — the lowest tooling surface for a Vite + React target. The `@swc/core` decline keeps that true for the extraction tool as well.
-- **Load-bearing copy is deliberately out of scope.** `@myne/copy` and `src/lib/load-bearing-copy.ts` hold strings whose exact English wording is a privacy property; E2E asserts them by full-literal equality and they are never translation keys. Localizing any of them needs its own review gate, not the open Weblate flow.
+- **Why this stack over Lingui / FormatJS:** JSON needs no babel/swc macro step in the app build — the lowest tooling surface for a Vite + React target. The `@swc/core` decline keeps that true for the extraction tool as well.
+- **Load-bearing copy is deliberately out of scope.** `@myne/copy` and `src/lib/load-bearing-copy.ts` hold strings whose exact English wording is a privacy property; E2E asserts them by full-literal equality and they are never translation keys. Localizing any of them needs its own review gate, not the ordinary catalog flow.
 - **`i18next-cli` replaced the deprecated `i18next-parser`** it warns against; it is dev-only and reaches no shipped artefact.
 
 #### Password-strength meter — `package.json`
