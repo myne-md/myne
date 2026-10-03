@@ -4,9 +4,11 @@
 //
 // `locales/en/common.json` is the SOURCE catalog (hand-maintained English).
 // Extraction ADDS newly-introduced keys; `removeUnusedKeys: false` means a key
-// a translator/Weblate already filled is never deleted by a scan. After
-// running, fill any new English value in `locales/en/common.json`, commit, and
-// Weblate picks up the new source string on its next pull.
+// that was already translated is never deleted by a scan. After running, fill
+// any new English value in `locales/en/common.json`, commit, and translate the
+// new key in whichever catalogs you are keeping current — the catalogs are
+// authored in-repo (there is no external translation platform; Weblate was
+// retired in `docs/decisions/ui/0629`).
 //
 // See `docs/dev/i18n.md` for the full add-a-string workflow.
 
@@ -17,7 +19,7 @@ export default defineConfig({
   extract: {
     // Desktop client (`src/`) + the mobile client (`mobile/src/`, MYND-485).
     // Both clients share these repo-root catalogs, so a single `pnpm i18n:extract`
-    // keeps desktop + mobile `t("…")` keys in one Weblate-managed source. The
+    // keeps desktop + mobile `t("…")` keys in one source. The
     // shared `@myne/{editor,dialect}` engines carry their own keys (already
     // resident); scanning each client's own source is what surfaces new strings.
     // Every shared tree — kept in step with `scripts/lib/shared-roots.mjs` by
@@ -47,7 +49,7 @@ export default defineConfig({
     // the default `common` namespace, so disable the `:` namespace separator.
     keySeparator: ".",
     nsSeparator: false,
-    // Stable, Weblate-friendly ordering.
+    // Stable ordering for catalogs edited by hand and in review.
     sort: true,
     // Never silently drop a key still present in a translation file — pruning a
     // removed-in-code key is a deliberate, by-hand edit.
