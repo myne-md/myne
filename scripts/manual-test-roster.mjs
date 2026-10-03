@@ -6683,6 +6683,36 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "watch.meeting-capture",
+    title: "Apple Watch meeting capture: mic → transferFile → phone seal → unlock-drain note",
+    paths: [
+      "mobile/ios-watch/MyneWatch/",
+      "mobile/ios-watch/Receiver/WCMeetingReceiver.swift",
+      "mobile/src/lib/meetingDrain.ts",
+      "mobile/src-tauri/src/plugins/captures/mod.rs",
+      "core/src/plugins/captures/meeting_manifest.rs",
+    ],
+    clients: ["ios"],
+    automatedBy: [],
+    manual: [
+      {
+        see: "With a paired Apple Watch and the iPhone LOCKED, start a meeting recording on the watch, speak for about 30 seconds and stop. The bright recording state and live elapsed counter must show on the wrist, the phone must never need unlocking for the audio to arrive, and after you unlock the phone and open Myne exactly ONE note must appear with the audio embeds in chunk order and the on-device transcript beneath them.",
+        whyNotAutomated: "The hop is WatchConnectivity transferFile from a separate watchOS app to the iPhone receiver; the watchOS simulator does not support transferFile and no automated tier in this repo crosses that transport or drives the watch microphone, so the wrist capture and the delivery can only be observed on a paired physical Watch.",
+        clients: ["ios"],
+        estimateMin: 15,
+        tier: "core",
+      },
+      {
+        see: "Record a meeting long enough to cross a chunk boundary (at least three chunks) with the phone locked, then unlock and confirm the note carries every chunk in order with none missing and none duplicated. Then repeat with a mid-session Bluetooth disconnect: move the watch out of range for a minute, keep recording, return, and stop. The not-yet-transferred chunks must stay on the watch until contact returns, and no chunk may double-count.",
+        whyNotAutomated: "Chunk boundaries over a real recording, the OS's own transfer scheduling across a Bluetooth link, and a physical out-of-range disconnect are between two devices the OS decides; no runner produces a multi-chunk WatchConnectivity session or drops a real radio link mid-transfer.",
+        clients: ["ios"],
+        estimateMin: 15,
+        tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "web.attachments.blob-url-rendering",
     title: "Attachments painting from worker-minted blob URLs, and dying on lock",
     paths: [

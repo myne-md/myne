@@ -1034,9 +1034,10 @@
     "meeting": {
       "barAria": "Meeting session",
       "cancel": "Cancel",
+      "chunksMissing": "Part of the meeting did not transfer, so the note has a gap. The audio that arrived is still there.",
       "clipFailed": "A part of the meeting could not be saved. The rest is still in the note.",
       "machineNotice": "This is a machine transcript of the meeting and may contain errors.",
-      "noteTitle": "Meeting {date}",
+      "noteTitle": "Meeting {{date}}",
       "noteWriteFailed": "The meeting's note could not be written. The recorded audio is still in your vault as attachments.",
       "saving": "Writing the note…",
       "stop": "Stop",

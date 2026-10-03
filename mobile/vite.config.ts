@@ -185,13 +185,19 @@ export default defineConfig(async () => ({
       // until it happens to a user, and it imports neither client's bindings:
       // they arrive as arguments, exactly as `agent-run-core` takes a seam.
       { find: /^@myne\/undo-last-run$/, replacement: sib("../src/notes/agent/useUndoLastRun.ts") },
-      // The `EngineError` cause taxonomy. Zero imports, so it is pure by
-      // construction, and it is the ONE reader of that wire shape: a second
-      // hand-written table is how a Rust variant a client has never heard of
+      // `@myne/engine-error`: the `EngineError` cause taxonomy. Zero imports, so
+      // it is pure by construction, and it is the ONE reader of that wire shape: a
+      // second hand-written table is how a Rust variant a client has never heard of
       // falls into the catch-all and four situations render one sentence.
       // `tests/lib/engineErrorTaxonomy.test.ts` parses the Rust enum and holds
       // this file to it, so the alias buys mobile that drift lock too.
       { find: /^@myne\/engine-error$/, replacement: sib("../src/lib/engine-error.ts") },
+      // The shared meeting-note body builder (myne-md/myne#798). Pure — no
+      // imports at all — so a watch meeting drained on mobile produces the SAME
+      // note shape the desktop meeting session produces (audio embeds in capture
+      // order, then the transcript + machine notice). A hand-copy is how the two
+      // clients would silently disagree about that layout.
+      { find: /^@myne\/meeting-note$/, replacement: sib("../src/notes/meetingNote.ts") },
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's

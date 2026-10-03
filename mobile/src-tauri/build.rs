@@ -153,11 +153,19 @@ fn main() {
             )
             .plugin(
                 // Apple Watch voice-capture queue (MYK1, §9.18): device-key
-                // sealed pending captures drained into notes on unlock. Adding a
-                // command here without a matching entry in
-                // `permissions/captures/default.toml` is a security bug.
+                // sealed pending captures drained into notes on unlock, plus the
+                // watch meeting-capture lane (myne-md/myne#812): arrived audio
+                // chunks sealed on the fly under the same device key into a
+                // pending-meeting manifest. Adding a command here without a
+                // matching entry in `permissions/captures/default.toml` is a
+                // security bug.
                 "captures",
-                tauri_build::InlinedPlugin::new().commands(&["seal_staged", "take_pending", "ack"]),
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "seal_staged",
+                    "take_pending",
+                    "ack",
+                    "seal_meeting_chunk",
+                ]),
             )
             .plugin(
                 // Share-import staging queue (MYF1, §9.20): device-key sealed

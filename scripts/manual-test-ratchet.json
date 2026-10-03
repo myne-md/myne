@@ -649,7 +649,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11274,
+  "totalMinutesCeiling": 11304,
   "gatedMinutes": 3837,
   "$comment6": [
     "CEILING RAISED 11096 -> 11120 by myne-md/myne#788, in the sanctioned",
@@ -744,5 +744,33 @@
     "roster's manual total is their composition; --record locked that in rather",
     "than either branch's number. Nothing was automated, so gatedMinutes is",
     "unchanged."
+  ],
+  "$comment9": [
+    "CEILING RAISED 11274 -> 11304 by myne-md/myne#812, in the sanctioned",
+    "direction: a new surface that genuinely needs a human, on the one client",
+    "whose transport no lane can cross. What added the minutes, named so the",
+    "raise is an argument rather than a number:",
+    "",
+    "  + the watch meeting lane, two core items (15 + 15 = 30 minutes on ios).",
+    "    The hop is WatchConnectivity transferFile from a separate watchOS app",
+    "    to the iPhone receiver; the watchOS simulator does not support",
+    "    transferFile and no automated tier in this repo crosses that transport",
+    "    or drives the watch microphone. So the two things a person must observe",
+    "    are the wrist capture itself and the delivery from a phone that stayed",
+    "    LOCKED throughout, neither of which any runner can produce. The phone",
+    "    side (seal-on-arrival, the pending-meeting manifest's grouping and",
+    "    duplicate handling, and the unlock drain) is covered by Rust and",
+    "    flow-logic tests, which is why the items start at the wrist rather than",
+    "    at the seal.",
+    "",
+    "Both items are core on a gated client, so the gate WIDENS: the release now",
+    "waits on a human having recorded a real meeting on a paired Watch and seen",
+    "the note appear after an unlock. That is the point of the raise rather than",
+    "its cost: the feature's whole claim is that a meeting survives a locked",
+    "phone, and the only place that claim can be exercised is a wrist and a",
+    "pocket. gatedMinutes rises with it (3837 recorded, the roster now reporting",
+    "4305 h/60), which is the state the floor is written for: the floor may only",
+    "move downward through --record, and the rule that matters is that gating may",
+    "not fall by more than total does. Both rose."
   ]
 }
