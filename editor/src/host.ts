@@ -358,6 +358,13 @@ export interface EditorHost {
    *  on a platform with no recorder and `/record` falls back to the default. */
   voiceRecord?: (view: EditorView) => void;
 
+  /** Start a meeting session (myne-md/myne#789). Mirrors [`voiceRecord`]:
+   *  the host owns the flow because it needs the note-creation path, the
+   *  transcription binding and the i18n catalog, none of which this package
+   *  may import. Omitted on a platform with no meeting-session backend, which
+   *  is how the `/meeting` trigger disappears rather than throwing. */
+  meetingSession?: (view: EditorView) => void;
+
   /** OPTIONAL — the capture backend the package-default `/record` recorder
    *  drives (phase3-web-client task 76). Distinct from [`voiceRecord`], which
    *  REPLACES the whole recorder UI; this fills in only the platform calls the

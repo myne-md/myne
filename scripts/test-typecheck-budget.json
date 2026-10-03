@@ -37,6 +37,7 @@
     "tests/editor/mermaid-render.test.ts": 3,
     "tests/editor/render-perf.test.ts": 3,
     "tests/editor/taskRecurrence.test.ts": 2,
+    "tests/editor/vim-substitute.test.ts": 1,
     "tests/editor/voice-record-controller.test.ts": 2,
     "tests/hooks/backupSchedulerGate.test.ts": 1,
     "tests/hooks/useDevices.test.ts": 1,
@@ -83,5 +84,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 206
+  "total": 207
 }
