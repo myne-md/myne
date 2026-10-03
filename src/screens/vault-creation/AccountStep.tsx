@@ -114,7 +114,7 @@ export function AccountStep({
 
   // Exhaustive over `SecretAction` by construction, so a third affordance is a
   // compile error here rather than a silent fall into the save sentence. The
-  // keys stay STATIC `t("…")` literals inside the arms: `check-i18n.mjs` reads
+  // keys stay STATIC quoted-key literals inside the arms: `check-i18n.mjs` reads
   // them by scanning for exactly that shape, and a table of key strings would
   // put four load-bearing keys outside everything that checks them.
   const message: Record<SecretAction, (ok: boolean) => string> = {
@@ -122,7 +122,7 @@ export function AccountStep({
       ok ? t("vaultCreation.account.copied") : t("vaultCreation.account.copyFailed"),
     // The success half branches on the capability for the same reason the phrase
     // step's copy half does: a client may not claim a guarantee it cannot make.
-    // `saveOutcomeMessage` holds that decision for both screens; the `t("…")`
+    // `saveOutcomeMessage` holds that decision for both screens; the quoted-key
     // literals stay here, where `check-i18n.mjs` can see them.
     save: (ok) =>
       saveOutcomeMessage(ok, {

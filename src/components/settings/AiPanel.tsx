@@ -235,9 +235,9 @@ const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }>
 /**
  * The message for a closed refusal reason.
  *
- * An exhaustive `switch` with **static** `t("…")` keys rather than a template
+ * An exhaustive `switch` with **static** quoted keys rather than a template
  * literal: `scripts/check-i18n.mjs` only verifies keys it can read statically,
- * so `t(\`…${reason}\`)` would let a missing catalog entry ship. This also
+ * so a computed-key `t()` would let a missing catalog entry ship. This also
  * fails to compile when a fourth `EndpointRejection` arrives, which is the
  * whole point of the Rust side keeping that enum closed.
  */
