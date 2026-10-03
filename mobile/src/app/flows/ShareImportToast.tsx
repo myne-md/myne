@@ -6,8 +6,8 @@
 //
 // NOTE: the copy here (and the "Open library" button label) is still literal
 // English. The mobile-i18n catalogs (MYND-485) have since landed; moving these
-// strings to `t("shareImport.toast.*")` is owed but tracked separately — it is
-// not part of the MYND-640 visibility fix.
+// strings into the shared toast copy family is owed but tracked separately — it
+// is not part of the MYND-640 visibility fix.
 
 import { useEffect, useState } from "react";
 import { Toast } from "../../components";

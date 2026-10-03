@@ -92,7 +92,7 @@ const NOT_ANSWERING: ReadonlySet<string> = new Set([
 ]);
 
 /** Total switches over the union rather than lookup tables, and the reason is
- *  `scripts/check-i18n.mjs`: it verifies **static `t("…")` call sites**, so a
+ *  `scripts/check-i18n.mjs`: it verifies **static quoted-key call sites**, so a
  *  key sitting in a `Record` is a key no guard checks and a typo in it renders
  *  the raw key at the user. Written this way the compiler catches a missing
  *  cause and the guard catches a missing translation. */
@@ -194,7 +194,7 @@ const bubbleStyle = (isUser: boolean): CSSProperties => ({
 /** What a run that proposed nothing AND answered nothing says (myne-md/myne#574).
  *
  *  A total switch rather than a lookup table, for the reason the file's own note
- *  above gives: `scripts/check-i18n.mjs` verifies **static** `t("…")` call
+ *  above gives: `scripts/check-i18n.mjs` verifies **static** quoted-key call
  *  sites, so a key assembled from a variable is a key it cannot see.
  *
  *  Two of the five ends mean the run never did its work — it went round in

@@ -124,8 +124,8 @@ export function SecretPhraseReveal({
   );
 
   // Exhaustive over `SecretAction`, and both arms branch on a capability.
-  // The capability test sits OUTSIDE `t(...)`: `check-i18n.mjs` matches a STATIC
-  // `t("literal")`, so `t(cond ? "a" : "b")` drops every key it selects out of
+  // The capability test sits OUTSIDE the call: `check-i18n.mjs` matches a STATIC
+  // quoted key, so `t(cond ? "a" : "b")` drops every key it selects out of
   // the only check that proves they exist in the catalog.
   const message: Record<SecretAction, (ok: boolean) => string> = {
     copy: (ok) =>

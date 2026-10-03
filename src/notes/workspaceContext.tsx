@@ -142,7 +142,7 @@ export function isPanesNotSettled(err: unknown): err is PanesNotSettledError {
  *
  * It takes RESOLVED sentences rather than translation keys, the shape
  * `saveOutcomeMessage` established one commit earlier and for the same reason:
- * `check-i18n.mjs` matches a static `t("literal")`, so a key passed as a string
+ * `check-i18n.mjs` matches a static quoted key, so a key passed as a string
  * drops out of the only check that proves it exists in the catalog. Both
  * sentences stay at the call site, where they can also stay SPECIFIC: the folder
  * rename can say the folder was left alone, which is more use than a neutral
