@@ -583,14 +583,20 @@ impl AudioSource for TapSource {
     }
 
     fn poll(&mut self) -> Vec<i16> {
+        // `append` rather than `mem::take`: the IOProc is a realtime callback,
+        // and `take` replaced the shared buffer with a fresh empty `Vec`, so the
+        // next callback's `push` re-allocated on the audio thread. Appending
+        // leaves the producer's capacity alone.
+        let mut out = Vec::new();
         match self.shared.lock() {
-            Ok(mut buf) => std::mem::take(&mut *buf),
+            Ok(mut buf) => out.append(&mut buf),
             // A poisoned lock means the callback panicked, which it cannot do:
             // every operation in it is a read plus a push. Recovering the inner
             // value rather than propagating keeps a meeting recording instead
             // of ending it.
-            Err(poisoned) => std::mem::take(&mut *poisoned.into_inner()),
+            Err(poisoned) => out.append(&mut poisoned.into_inner()),
         }
+        out
     }
 
     // No `tap_level` override, deliberately. `SourceFactory::Meeting` always

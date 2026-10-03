@@ -47,6 +47,10 @@ export interface MeetingBarHandle {
   setSystemAudioAvailable(available: boolean): void;
   /** Show the clip-import-failure warning (idempotent). */
   warnClipFailed(): void;
+  /** A clip was stored but its TRANSCRIPTION failed. Separate from
+   *  {@link warnClipFailed}, whose copy claims audio was lost: here it was not,
+   *  and the two are different statements about the user's data. */
+  warnTranscriptionFailed(): void;
   /** Switch to the finalizing state (disable controls, "Saving…"). */
   setBusy(): void;
   /** Remove the bar + run teardown callbacks. */
@@ -69,7 +73,15 @@ export function mountMeetingBar(opts: MeetingBarOptions): MeetingBarHandle {
 
   const bar = document.createElement("div");
   bar.className = "cm-voice-rec cm-meeting-rec";
-  bar.setAttribute("role", "dialog");
+  // NOT `role="dialog"`. The bar is a non-modal session control: it stays
+  // mounted while the user types in the editor, so it neither traps focus nor
+  // needs dismissing, and the dialog role promised both (a screen reader
+  // announced a modal came up and then left focus behind it, unchanged).
+  // `role="status"` is the honest role — a live region announcing the session —
+  // and `aria-live="polite"` makes the timer/warning updates reach a screen
+  // reader without stealing focus from the editor.
+  bar.setAttribute("role", "status");
+  bar.setAttribute("aria-live", "polite");
   bar.setAttribute("aria-label", i18n.t("editor.meeting.barAria"));
   bar.setAttribute("data-testid", "meeting-bar");
 
@@ -201,6 +213,13 @@ export function mountMeetingBar(opts: MeetingBarOptions): MeetingBarHandle {
     warnClipFailed(): void {
       clipWarning.hidden = false;
       clipWarning.textContent = i18n.t("editor.meeting.clipFailed");
+    },
+    warnTranscriptionFailed(): void {
+      // Distinct copy from `warnClipFailed`, deliberately: the clip IS saved,
+      // and telling the user "a part of the meeting could not be saved" on a
+      // transcription failure is a false statement about their data.
+      clipWarning.hidden = false;
+      clipWarning.textContent = i18n.t("editor.meeting.transcriptionFailed");
     },
     setBusy(): void {
       stop.disabled = true;

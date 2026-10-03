@@ -228,6 +228,7 @@ import {
 } from "../notes/sidebarState";
 import { settleFrontmatterWrite as settleFrontmatterWriteFor } from "../notes/settleFrontmatterWrite";
 import { sidebarCommands } from "../notes/sidebarCommands";
+import { setMeetingSidebarSurface } from "../notes/meetingSession";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "../platform/webviewWindow";
 import { listen } from "../platform/event";
@@ -792,6 +793,22 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+
+  // The meeting-session controller needs the sidebar surface (`refreshOne` +
+  // `open`) at STOP, to register and open the note the session created. The
+  // `EditorHost` seam only carries the `EditorView`, so the surface is bound
+  // here — the one place `useSelectedNote()` is in scope — and the `/meeting`
+  // slash command reads the binding at dispatch. Same shape `voiceRecord` uses:
+  // the trigger lives in the shared package, the flow stays desktop-side.
+  useEffect(() => {
+    setMeetingSidebarSurface({
+      refreshOne: (id) => ctx.refreshOne(id as NoteId),
+      open: (id) => ctx.open(id as NoteId),
+    });
+    return () => {
+      setMeetingSidebarSurface(null);
+    };
+  }, [ctx]);
   // First-run AI onboarding (myne-md/myne#805): offered once per DEVICE, after
   // the first successful unlock, gated on a localStorage flag so it covers every
   // entry path (create/restore/recover/join). Skippable; the app works without

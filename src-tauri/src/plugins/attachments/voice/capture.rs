@@ -466,10 +466,16 @@ impl AudioSource for CpalSource {
     }
 
     fn poll(&mut self) -> Vec<i16> {
-        match self.shared.lock() {
-            Ok(mut g) => std::mem::take(&mut *g),
-            Err(_) => Vec::new(),
+        // `append` moves the samples out while leaving the producer's buffer
+        // with its CAPACITY intact. `mem::take` replaced it with a fresh empty
+        // `Vec`, so the cpal callback re-allocated on its next buffer; the
+        // capture poll runs at ~100 Hz per source, and the callback for a real
+        // device is on an audio thread that must not allocate.
+        let mut out = Vec::new();
+        if let Ok(mut g) = self.shared.lock() {
+            out.append(&mut g);
         }
+        out
     }
 }
 

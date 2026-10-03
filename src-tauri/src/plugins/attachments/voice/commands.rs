@@ -27,6 +27,7 @@ use super::state::{ActiveSession, Clip, VoiceRecordState};
 use crate::plugins::attachments::commands::{
     attachment_import_with_dir, ImportSource, ImportedAttachment,
 };
+use crate::plugins::attachments::meeting::state::MeetingSessionState;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 
 /// Tauri event carrying the live input level (`f32` in `[0, 1]`) to the meter.
@@ -62,12 +63,22 @@ pub async fn voice_record_start<R: Runtime>(
     app: AppHandle<R>,
     vault: State<'_, VaultRuntimeState>,
     voice: State<'_, VoiceRecordState>,
+    meeting: State<'_, MeetingSessionState>,
 ) -> Result<(), VoiceRecordError> {
     if !matches!(vault.slot_kind_active().await, SlotKind::Unlocked) {
         return Err(VoiceRecordError::Locked);
     }
     let mut active = voice.active.lock().await;
     if active.is_some() {
+        return Err(VoiceRecordError::AlreadyRecording);
+    }
+    // The capture exclusion is symmetric, and it was not: `meeting_session_start`
+    // refuses while a voice recording runs, but `/record` during a meeting armed
+    // a second capture over the same microphone and (on macOS) the tap's
+    // aggregate device. Either order now refuses with `AlreadyRecording`.
+    // Voice's own mutex is always taken before the meeting one, in both commands,
+    // so the pair cannot deadlock.
+    if meeting.active.lock().await.is_some() {
         return Err(VoiceRecordError::AlreadyRecording);
     }
     let factory = CAPTURE_SOURCE;
