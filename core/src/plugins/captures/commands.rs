@@ -196,8 +196,11 @@ pub fn ack_in_dir(sealed: &Path, id: &str) -> Result<(), CaptureError> {
 // attachment shape" resolves to without a new § 10.3 magic, a new AAD role, a
 // new HKDF context, a new subkey role or a new KDF parameter, and — unlike the
 // 16 KiB `MYK1` text codec — it can hold an audio chunk. The wrap key is the
-// capture queue's own (`md.myne.captures`), minted exactly as § 9.18.2 states,
-// so this lane is Apple-only today for the same reason the queue is.
+// SHARE-IMPORT device key (`md.myne.shareimport`, § 9.20.2), deliberately
+// distinct from the capture queue's so the two device-local queues can be
+// rotated and erased independently; minted the same non-biometric,
+// `AfterFirstUnlockThisDeviceOnly` way, so it too is writable while locked. The
+// lane is Apple-only today for the same reason the capture queue is.
 //
 // The `MYF1` codec is provider-agnostic (it only ever sees a symmetric wrap key)
 // and vault-agnostic (it binds its per-entry id, not a vault identity), which is
@@ -279,16 +282,6 @@ pub fn seal_meeting_chunk_from_file(
 /// manifest. Device-key based, so it runs while the vault is locked. Called by
 /// the native WatchConnectivity receiver the moment a chunk file lands (never
 /// via a plaintext staging file — the point of sealing on arrival).
-///
-/// **Key, and why it is the SHARE-IMPORT device key, not the capture queue's.**
-/// The codec below is `MYF1` (§9.20), and §9.20.2 pins the keychain service for
-/// that queue at `md.myne.shareimport`, deliberately DISTINCT from the capture
-/// queue's `md.myne.captures` so the two device-local keys can be rotated and
-/// erased independently. Sealing an `MYF1` blob under `md.myne.captures` would
-/// work cryptographically (the codec only ever sees a symmetric key) but would
-/// make the two queues share one lifetime, which is exactly the coupling
-/// §9.20.2 exists to prevent. This lane therefore uses the share-import device
-/// key provider.
 #[tauri::command]
 pub async fn seal_meeting_chunk<R: Runtime>(
     app: AppHandle<R>,
