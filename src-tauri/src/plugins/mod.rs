@@ -44,6 +44,10 @@ pub mod memory;
 pub mod local_inference;
 pub mod notes;
 pub mod pdf_export;
+// myne-md/myne#788: the plain-file editor (device-local gate first; the file
+// IO and ingress land in later tasks). Desktop-only: the two other clients
+// carry `absent` verdicts for the whole feature.
+pub mod plain_file;
 pub mod prefs;
 pub mod quick_unlock;
 pub mod screen_capture;

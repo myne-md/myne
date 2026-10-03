@@ -163,6 +163,27 @@ impl MyneBackend for IpcBackend {
         }
         Err(map_wire_error(response.error))
     }
+
+    fn open(&self, path: &str) -> Result<(), BackendError> {
+        let response = self.request(&wire::Request::Open {
+            path: path.to_string(),
+        })?;
+        if response.ok {
+            return Ok(());
+        }
+        let error = map_wire_error(response.error);
+        // `not_found` is the shared kind for "the thing you named is not
+        // there", and its human sentence ("No matching note.") is written for
+        // a note id. For `open` the thing named is a file, so the refusal is
+        // remapped to `Io` with a file-shaped sentence, and `error_parts`
+        // emits the envelope kind `io` for it: a script branching on `kind`
+        // sees `io` for a missing file, never `not_found`. The message is the
+        // human half; the assertion in the test below pins both.
+        Err(match error {
+            BackendError::NotFound => BackendError::Io("No file at that path.".to_string()),
+            other => other,
+        })
+    }
 }
 
 /// Map a failure reply's wire `kind` onto the transport-independent
@@ -181,6 +202,7 @@ fn map_wire_error(error: Option<wire::WireError>) -> BackendError {
         Some("not_found") => BackendError::NotFound,
         Some("folder_excluded") => BackendError::FolderExcluded,
         Some("rate_limited") => BackendError::RateLimited,
+        Some("plain_file_off") => BackendError::PlainFileOff,
         _ => BackendError::Io(
             error
                 .map(|e| e.message)
@@ -273,18 +295,6 @@ mod tests {
     }
 
     #[test]
-    fn real_socket_vault_locked_error_maps_through() {
-        let dir = ShortDir::new("list-locked");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.list(), Err(BackendError::VaultLocked));
-    }
-
-    #[test]
     fn real_socket_unrecognized_error_kind_maps_to_io() {
         let dir = ShortDir::new("list-io");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
@@ -312,80 +322,12 @@ mod tests {
     }
 
     #[test]
-    fn show_no_app_data_dir_is_app_not_running() {
-        let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(backend.show("x"), Err(BackendError::AppNotRunning));
-    }
-
-    #[test]
-    fn show_marker_disabled_with_no_socket_is_cli_disabled() {
-        let dir = ShortDir::new("show-disabled");
-        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.show("x"), Err(BackendError::CliDisabled));
-    }
-
-    #[test]
-    fn show_marker_locked_with_no_socket_is_vault_locked() {
-        let dir = ShortDir::new("show-locked");
-        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.show("x"), Err(BackendError::VaultLocked));
-    }
-
-    #[test]
     fn real_socket_returns_the_note_body() {
         let dir = ShortDir::new("show-ok");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
         serve_once(listener, br#"{"ok":true,"body":"hello world"}"#.to_vec());
         let backend = IpcBackend::at(dir.path().to_path_buf());
         assert_eq!(backend.show("x"), Ok("hello world".to_string()));
-    }
-
-    #[test]
-    fn real_socket_not_found_error_maps_through() {
-        let dir = ShortDir::new("show-not-found");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"not_found","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.show("bogus"), Err(BackendError::NotFound));
-    }
-
-    #[test]
-    fn real_socket_show_vault_locked_error_maps_through() {
-        let dir = ShortDir::new("show-locked-wire");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.show("x"), Err(BackendError::VaultLocked));
-    }
-
-    #[test]
-    fn search_no_app_data_dir_is_app_not_running() {
-        let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(backend.search("x"), Err(BackendError::AppNotRunning));
-    }
-
-    #[test]
-    fn search_marker_disabled_with_no_socket_is_cli_disabled() {
-        let dir = ShortDir::new("search-disabled");
-        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.search("x"), Err(BackendError::CliDisabled));
-    }
-
-    #[test]
-    fn search_marker_locked_with_no_socket_is_vault_locked() {
-        let dir = ShortDir::new("search-locked");
-        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.search("x"), Err(BackendError::VaultLocked));
     }
 
     #[test]
@@ -416,18 +358,6 @@ mod tests {
     }
 
     #[test]
-    fn real_socket_search_vault_locked_error_maps_through() {
-        let dir = ShortDir::new("search-locked-wire");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.search("x"), Err(BackendError::VaultLocked));
-    }
-
-    #[test]
     fn search_request_carries_the_requested_query() {
         let dir = ShortDir::new("search-query");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
@@ -448,73 +378,12 @@ mod tests {
     }
 
     #[test]
-    fn create_no_app_data_dir_is_app_not_running() {
-        let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(
-            backend.create("hello", None),
-            Err(BackendError::AppNotRunning)
-        );
-    }
-
-    #[test]
-    fn create_marker_disabled_with_no_socket_is_cli_disabled() {
-        let dir = ShortDir::new("new-disabled");
-        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.create("hello", None),
-            Err(BackendError::CliDisabled)
-        );
-    }
-
-    #[test]
-    fn create_marker_locked_with_no_socket_is_vault_locked() {
-        let dir = ShortDir::new("new-locked");
-        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.create("hello", None),
-            Err(BackendError::VaultLocked)
-        );
-    }
-
-    #[test]
     fn real_socket_returns_the_new_note_id() {
         let dir = ShortDir::new("new-ok");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
         serve_once(listener, br#"{"ok":true,"id":"abc-123"}"#.to_vec());
         let backend = IpcBackend::at(dir.path().to_path_buf());
         assert_eq!(backend.create("hello", None), Ok("abc-123".to_string()));
-    }
-
-    #[test]
-    fn real_socket_folder_excluded_error_maps_through() {
-        let dir = ShortDir::new("new-excluded");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"folder_excluded","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.create("hello", Some("Private/")),
-            Err(BackendError::FolderExcluded)
-        );
-    }
-
-    #[test]
-    fn real_socket_create_vault_locked_error_maps_through() {
-        let dir = ShortDir::new("new-locked-wire");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.create("hello", None),
-            Err(BackendError::VaultLocked)
-        );
     }
 
     #[test]
@@ -582,28 +451,6 @@ mod tests {
     }
 
     #[test]
-    fn daily_no_app_data_dir_is_app_not_running() {
-        let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(backend.period("daily"), Err(BackendError::AppNotRunning));
-    }
-
-    #[test]
-    fn daily_marker_disabled_with_no_socket_is_cli_disabled() {
-        let dir = ShortDir::new("daily-disabled");
-        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.period("daily"), Err(BackendError::CliDisabled));
-    }
-
-    #[test]
-    fn daily_marker_locked_with_no_socket_is_vault_locked() {
-        let dir = ShortDir::new("daily-locked");
-        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.period("daily"), Err(BackendError::VaultLocked));
-    }
-
-    #[test]
     fn real_socket_returns_the_daily_note_body() {
         let dir = ShortDir::new("daily-ok");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
@@ -613,30 +460,6 @@ mod tests {
             backend.period("daily"),
             Ok(("today's note".to_string(), false))
         );
-    }
-
-    #[test]
-    fn real_socket_daily_folder_excluded_error_maps_through() {
-        let dir = ShortDir::new("daily-excluded");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"folder_excluded","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.period("daily"), Err(BackendError::FolderExcluded));
-    }
-
-    #[test]
-    fn real_socket_daily_vault_locked_error_maps_through() {
-        let dir = ShortDir::new("daily-locked-wire");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.period("daily"), Err(BackendError::VaultLocked));
     }
 
     #[test]
@@ -662,26 +485,6 @@ mod tests {
     }
 
     #[test]
-    fn daily_append_no_app_data_dir_is_app_not_running() {
-        let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(
-            backend.period_append("daily", "x"),
-            Err(BackendError::AppNotRunning)
-        );
-    }
-
-    #[test]
-    fn daily_append_marker_disabled_with_no_socket_is_cli_disabled() {
-        let dir = ShortDir::new("daily-append-disabled");
-        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.period_append("daily", "x"),
-            Err(BackendError::CliDisabled)
-        );
-    }
-
-    #[test]
     fn real_socket_daily_append_ok_returns_unit() {
         let dir = ShortDir::new("daily-append-ok");
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
@@ -691,29 +494,16 @@ mod tests {
     }
 
     #[test]
-    fn real_socket_daily_append_folder_excluded_error_maps_through() {
-        let dir = ShortDir::new("daily-append-excluded");
-        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-        serve_once(
-            listener,
-            br#"{"ok":false,"error":{"kind":"folder_excluded","message":"x"}}"#.to_vec(),
-        );
-        let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(
-            backend.period_append("daily", "x"),
-            Err(BackendError::FolderExcluded)
-        );
-    }
-
-    #[test]
-    fn real_socket_rate_limited_error_maps_through_on_every_command() {
-        // The limiter answers before the request is even parsed (task 10),
-        // so `rate_limited` can come back from ANY command — this asserts
-        // the shared `map_wire_error` table really does cover all six,
-        // which the previous per-command copies would not have.
-        let reply = br#"{"ok":false,"error":{"kind":"rate_limited","message":"x"}}"#;
+    fn real_socket_error_maps_through_on_every_command() {
+        // `map_wire_error` (ipc.rs:178) is ONE shared table: the mapped
+        // `BackendError` depends only on the wire `kind`, never on which of
+        // the six commands sent the request. The `rate_limited` kind is
+        // answered before the request is even parsed (task 10), so it can
+        // come back from ANY command. Driving all four kinds across the
+        // six-command table covers both axes at once; the per-command copies
+        // this replaces each restated one cell of it.
         type Call = Box<dyn Fn(&IpcBackend) -> BackendError>;
-        let cases: Vec<(&str, Call)> = vec![
+        let commands: Vec<(&str, Call)> = vec![
             ("list", Box::new(|b: &IpcBackend| b.list().unwrap_err())),
             ("show", Box::new(|b: &IpcBackend| b.show("x").unwrap_err())),
             (
@@ -733,16 +523,25 @@ mod tests {
                 Box::new(|b: &IpcBackend| b.period_append("daily", "x").unwrap_err()),
             ),
         ];
-        for (name, call) in cases {
-            let dir = ShortDir::new(&format!("rl-{name}"));
-            let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
-            serve_once(listener, reply.to_vec());
-            let backend = IpcBackend::at(dir.path().to_path_buf());
-            assert_eq!(
-                call(&backend),
-                BackendError::RateLimited,
-                "{name} must surface a rate-limited reply as RateLimited"
-            );
+        let kinds: Vec<(&str, BackendError)> = vec![
+            ("vault_locked", BackendError::VaultLocked),
+            ("not_found", BackendError::NotFound),
+            ("folder_excluded", BackendError::FolderExcluded),
+            ("rate_limited", BackendError::RateLimited),
+        ];
+        for (name, call) in commands {
+            for (kind, expected) in &kinds {
+                let reply = format!(r#"{{"ok":false,"error":{{"kind":"{kind}","message":"x"}}}}"#);
+                let dir = ShortDir::new(&format!("map-{kind}-{name}"));
+                let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+                serve_once(listener, reply.into_bytes());
+                let backend = IpcBackend::at(dir.path().to_path_buf());
+                assert_eq!(
+                    call(&backend),
+                    *expected,
+                    "{name} must map a {kind} reply through the shared table"
+                );
+            }
         }
     }
 
@@ -765,5 +564,100 @@ mod tests {
         assert_eq!(value["cmd"], "period_append");
         assert_eq!(value["period"], "daily");
         assert_eq!(value["line"], "captured thought");
+    }
+
+    #[test]
+    fn open_no_app_data_dir_is_app_not_running() {
+        let backend = IpcBackend { app_data_dir: None };
+        assert_eq!(
+            backend.open("/tmp/note.md"),
+            Err(BackendError::AppNotRunning)
+        );
+    }
+
+    #[test]
+    fn open_marker_disabled_with_no_socket_is_cli_disabled() {
+        let dir = ShortDir::new("open-disabled");
+        std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Err(BackendError::CliDisabled));
+    }
+
+    #[test]
+    fn open_marker_locked_with_no_socket_is_vault_locked() {
+        let dir = ShortDir::new("open-locked");
+        std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Err(BackendError::VaultLocked));
+    }
+
+    #[test]
+    fn real_socket_open_ok_resolves_unit() {
+        let dir = ShortDir::new("open-ok");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(listener, br#"{"ok":true}"#.to_vec());
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(backend.open("/tmp/note.md"), Ok(()));
+    }
+
+    #[test]
+    fn real_socket_open_plain_file_off_maps_through() {
+        let dir = ShortDir::new("open-off");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(
+            listener,
+            br#"{"ok":false,"error":{"kind":"plain_file_off","message":"x"}}"#.to_vec(),
+        );
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        assert_eq!(
+            backend.open("/tmp/note.md"),
+            Err(BackendError::PlainFileOff)
+        );
+    }
+
+    #[test]
+    fn real_socket_open_not_found_maps_to_the_io_envelope_kind() {
+        // The shared `not_found` sentence is written for a note id. An `open`
+        // whose file is missing is remapped to `Io`, so the EMITTED envelope
+        // kind a script branches on is `io`, and the message must not tell the
+        // user "No matching note.". Both halves are asserted against the
+        // output table, not restated here.
+        let dir = ShortDir::new("open-missing");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        serve_once(
+            listener,
+            br#"{"ok":false,"error":{"kind":"not_found","message":"x"}}"#.to_vec(),
+        );
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        let error = backend
+            .open("/tmp/gone.md")
+            .expect_err("missing file must refuse");
+        let (kind, message) = crate::output::error_parts(&error);
+        assert_eq!(kind, "io");
+        assert!(
+            matches!(error, BackendError::Io(_)),
+            "expected Io, got {error:?}"
+        );
+        assert!(!message.to_lowercase().contains("note"), "{message:?}");
+    }
+
+    #[test]
+    fn open_request_carries_the_path() {
+        let dir = ShortDir::new("open-path");
+        let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let body = framing::read_frame(&mut stream).unwrap();
+                tx.send(body).unwrap();
+                let _ = framing::write_frame(&mut stream, br#"{"ok":true}"#);
+            }
+        });
+        let backend = IpcBackend::at(dir.path().to_path_buf());
+        backend.open("/tmp/wanted.md").unwrap();
+        let sent = rx.recv().unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&sent).unwrap();
+        assert_eq!(value["cmd"], "open");
+        assert_eq!(value["path"], "/tmp/wanted.md");
     }
 }

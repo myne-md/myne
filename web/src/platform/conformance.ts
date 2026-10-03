@@ -26,6 +26,7 @@ import * as desktopKeyboard from "../../../src/platform/keyboard";
 import * as desktopFilePicker from "../../../src/platform/filePicker";
 import * as desktopOpener from "../../../src/platform/opener";
 import * as desktopPath from "../../../src/platform/path";
+import * as desktopPlainFile from "../../../src/platform/plainFile";
 import * as webAttachments from "./attachments";
 import * as webCapabilities from "./capabilities";
 import * as webClipboard from "./clipboardManager";
@@ -39,6 +40,7 @@ import * as webKeyboard from "./keyboard";
 import * as webFilePicker from "./filePicker";
 import * as webOpener from "./opener";
 import * as webPath from "./path";
+import * as webPlainFile from "./plainFile";
 
 // Modules whose shape is fully shared. A drift here is a type error naming the
 // exact export that moved.
@@ -68,6 +70,12 @@ const _download: typeof desktopDownload = webDownload;
 // desktop never sets — would be the exact drift the seam exists to prevent, and
 // this assignment is what names it.
 const _filePicker: typeof desktopFilePicker = webFilePicker;
+// The plain-file gate (myne-md/myne#788). Whole-module for the `filePicker`
+// reason: the types are ours, not Tauri's, and both arms must agree on the
+// signature even though only the desktop one has a backend behind it. The
+// browser arm routes into the Worker transport, which refuses with the typed
+// unsupported outcome because `capability.rs` classifies the plugin absent.
+const _plainFile: typeof desktopPlainFile = webPlainFile;
 
 // `core.invoke` is checked per-export rather than whole-module (task 11). This
 // is the one that matters most — it is the call shape every backend interaction
@@ -105,4 +113,5 @@ void _history;
 void _keyboard;
 void _download;
 void _filePicker;
+void _plainFile;
 void _invoke;

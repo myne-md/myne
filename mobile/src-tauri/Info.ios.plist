@@ -49,6 +49,38 @@
 	<string>Myne uses the microphone only while you record a voice note. Recordings are encrypted on this device and never sent anywhere.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Myne uses the camera when you take a photo to attach it to a note, or scan a QR code to add this device to your account. Photos are encrypted on this device; the QR carries no secret. Nothing is sent anywhere without your action.</string>
+	<!-- UIApplicationSceneManifest — REQUIRED, and the app CRASHES AT LAUNCH
+	     without it. iOS 27 (and any app built with the Xcode 27 SDK) enforces the
+	     UIScene lifecycle: at launch _UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption
+	     inspects the STATIC Info.plist and traps (EXC_BREAKPOINT) an app that has
+	     not declared the manifest — it does NOT credit the scene delegate tao
+	     registers programmatically at runtime. The delegate class name must be
+	     exactly `TaoSceneDelegate` (tao's ObjC runtime name, from
+	     #[name = "TaoSceneDelegate"] in tao's ios/scene.rs), and
+	     UIApplicationSupportsMultipleScenes must be the real boolean true, because
+	     tao gates its scene handling on that key (with false, the manifest enables
+	     the scene lifecycle but tao attaches no delegate — tauri-apps/tao#1308).
+	     Two upstream fixes must be present for this to work: tao >= 0.36.0
+	     (autorelease of the UISceneConfiguration, tauri-apps/tao#1245) and the
+	     static manifest below. tauri/wry/tao are pinned at 2.12.1 / 0.57 / 0.37 for
+	     that reason. See tauri-apps/tauri#15719. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>TaoSceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<!-- `myne://` custom URL scheme — the target of the home / lock-screen
 	     widgets + Control Center "New note" action (ios-widgets/). Delivered to
 	     the WebView by tauri-plugin-deep-link; resolved app-side into an unlock

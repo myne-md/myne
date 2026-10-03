@@ -75,9 +75,11 @@ export const TOGGLE_ROW_COMPACT_STYLE: CSSProperties = {
  *
  *  Deliberately NOT capped here. Every control the row accepts is already
  *  bounded by its own styles (`Switch` 36px, `Select`/`SearchableSelect` a
- *  320px trigger, `Segmented` by its option count, a `Button` by its label),
- *  and a cap on the slot would clip rather than shrink them — a four-option
- *  `Segmented` runs to ~320px in English and past it in the longer locales. */
+ *  320px trigger, a `Button` by its label), and a cap on the slot would clip
+ *  rather than shrink them. Every row-level picker is a `Select` since
+ *  myne-md/myne#769, so the widest case is now one trigger rather than a
+ *  four-option `Segmented` running past 320px in the longer locales — which is
+ *  part of why the override exists (docs/design/README.md "Which picker"). */
 export const CONTROL_SLOT_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",

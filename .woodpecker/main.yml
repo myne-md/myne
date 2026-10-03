@@ -468,6 +468,14 @@ steps:
       # `@tauri-apps/*` import outside `src/platform/`. Sub-second and
       # node-builtins only, so it runs BEFORE the build to fail fast.
       - node scripts/check-platform-seam.mjs
+      # Plain-surface import guard (myne-md/myne#788), the same class and the
+      # same fail-fast placement as the seam guard above: no `.ts`/`.tsx` file
+      # under `src/plain/` may import a vault-coupled module. The surface
+      # renders with the vault locked or absent, and several of those modules
+      # call `invoke` at module scope, so one import turns "works with no vault"
+      # into a runtime failure. The editor host's refusal covers only what the
+      # editor calls THROUGH the host.
+      - node scripts/check-plain-surface-imports.mjs
       # Async-execution seam guard (MYND-574 task 80). Same fail-fast placement
       # and the same reason as the platform-seam guard above: sub-second, and a
       # violation is invisible to every compiler and lint on both targets.
@@ -542,11 +550,20 @@ steps:
       # command in that plugin at runtime, silently. All 27 directories, both
       # directions.
       - node scripts/check-mobile-plugin-acl.mjs
+      # myne#803: the iOS widget + Apple Watch targets are wired only through a
+      # committed source of truth re-applied by `mobile/scripts/ios-postinit.sh`
+      # (the `tauri ios init` tree is regenerated and git-ignored). A reset drops
+      # every native extension and the app ships phone-only with nothing failing,
+      # which is exactly what happened to the v0.8.2 TestFlight build. This checks
+      # the wired spec, the version-by-build-setting rule and the mechanism, and
+      # — on a machine that has the generated project — that it was synced.
+      - node scripts/check-ios-extensions.mjs
       # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
       # narrow Rust mirror in the export rewrite share one numeric bound. Both
-      # sides claimed the published embed-layout vectors held them together, and
-      # that vector step is commented out below pending a vectors_token secret,
-      # so the stated lock ran nowhere. This one runs.
+      # sides claimed the published embed-layout vectors held them together, but
+      # the vector step below needs a VECTORS_TOKEN it only resolves on
+      # push/manual, so on pull_request the stated lock ran green and empty.
+      # This one runs on every PR.
       - node scripts/check-embed-layout-drift.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain

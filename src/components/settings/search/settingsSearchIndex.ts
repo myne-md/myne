@@ -315,6 +315,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.vimMode",
   },
   {
+    // The plain-file editor (myne-md/myne#788). Both gates, and they are
+    // independent: `capability` keeps search from navigating to a row the web
+    // bundle does not render (the plugin is absent there). NOT
+    // `developerGated`: the row is on by default and not behind Developer mode
+    // (amended 2026-10-01), so search must find the off-switch for every user
+    // rather than hiding it until Developer mode is on.
+    id: "editor.plain-file",
+    capability: "plainFile",
+    panelId: "editor",
+    testid: "settings.plain-file",
+    titleKey: "settings.plainFile.label",
+    descriptionKey: "settings.plainFile.helper",
+    keywordsKey: "settings.search.keywords.plainFile",
+  },
+  {
     id: "editor.toolbar",
     panelId: "editor",
     testid: "settings.toolbar-customize",
@@ -767,6 +782,27 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     panelId: "ai",
     titleKey: "settings.ai.modelsLabel",
     descriptionKey: "settings.ai.modelsHelper",
+    keywordsKey: "settings.search.keywords.aiModels",
+  },
+  {
+    // On-demand downloads (myne-md/myne#805). Both gates apply as everywhere in
+    // this panel; the block itself is desktop-only because the download command
+    // is, but a `localAi` host always has it, so `capability` is the right
+    // predicate here rather than a new one.
+    id: "ai.downloads",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.downloadsLabel",
+    descriptionKey: "settings.ai.downloadsHelper",
+    keywordsKey: "settings.search.keywords.aiModels",
+  },
+  {
+    id: "ai.sideload",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.sideloadDisclosure",
     keywordsKey: "settings.search.keywords.aiModels",
   },
   {

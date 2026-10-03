@@ -31,9 +31,10 @@ const STATES: AiTrustState[] = [
 describe("AI trust affordance copy (SYNC-16/SYNC-7, load-bearing)", () => {
   it("the invariant sentence is the exact literal, shown in every state", () => {
     // Bounded by threat-model.md §5: "no byte leaves the device unless the
-    // user has named a provider" + the never-downloaded ruling.
+    // user has named a provider", plus the download clause of decisions/ai/0627
+    // (a fetch is user-initiated and the origin keeps no IP logs and no analytics).
     expect(AI_TRUST_INVARIANT).toBe(
-      "Myne never sends your notes anywhere you have not named, and never downloads a model.",
+      "Myne never sends your notes anywhere you have not named. A model downloads only when you ask, from Myne's own origin, which keeps no IP logs and no analytics.",
     );
   });
 

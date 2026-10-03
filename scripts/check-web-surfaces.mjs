@@ -51,6 +51,10 @@ const V = {
     "adapted",
     "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty. Unchanged by the remote-provider controls (myne#415): they live inside this same panel, so they inherit the same rail filter and reach the browser no more than the rest of it does.",
   ],
+  "src/components/settings/AiOnboardingSurface.tsx": [
+    "adapted",
+    "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0627). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
+  ],
   "src/components/settings/MemorySection.tsx": [
     "adapted",
     "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this section is unreachable. Holds no host call of its own beyond the `memory:` bindings (Unsupported on web), so there is nothing here that would need a web substitution even if it were reachable.",
@@ -159,6 +163,10 @@ const V = {
     "adapted",
     "Rendered only where `spellCheck` is present (task 47 decided its absence on web).",
   ],
+  "src/components/settings/PlainFileSettings.tsx": [
+    "adapted",
+    "Myne-md/myne#788. SHIPS in the bundle: nothing substitutes it out, and this entry said `excluded` with no marker, which the absence half of this guard could not verify. What actually omits the row is the runtime `has(\"plainFile\")` gate in EditorPanel, and `web/wasm/src/capability.rs` classifies the whole `plain-file` plugin `Class::Unsupported`, so even if it were mounted its two bindings would answer the dispatcher's typed refusal. Same correction as `src/lib/import-source-vault.ts`: a module that ships and is unreachable is not an excluded module.",
+  ],
   "src/components/settings/StartupOpenSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/StoragePanel.tsx": [
     "excluded",
@@ -189,6 +197,11 @@ const V = {
 
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
+  "src/lib/aiOnboardingSeen.ts": ["ported", "Device-local first-run AI-onboarding seen flag (localStorage), same shape as accentColor/viewsEnabled; runs as written. On web the surface it gates is only reachable with `downloads: false`, but this module holds no host call."],
+  "src/lib/ai-model-download.ts": [
+    "typed-unsupported",
+    "Thin bindings over the `local-inference` download/`cancel` commands, which the whole plugin classifies `Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. Rendered only where `has(\"localAi\")` is true, which web is not, so nothing on web reaches these calls; the module is reachable and its backend answers a typed refusal, which is the `typed-unsupported` verdict.",
+  ],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",

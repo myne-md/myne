@@ -3,6 +3,6 @@
   "marginPct": 2,
   "marginReason": "2%, not the web guard's 10: 10% of a ~650 MiB payload is 65 MiB of invisible growth — more than the whole whisper model. 2% absorbs a dictionary update and stops a model.",
   "components": {
-    "resources": 527246521
+    "resources": 173441654
   }
 }

@@ -218,6 +218,28 @@ pub trait Engine: Send + Sync {
     /// (task 4: 384); the stub returns [`STUB_EMBED_DIM`] zeros.
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError>;
 
+    /// Embedding vector for a live retrieval **query**. Default:
+    /// [`Engine::embed`].
+    ///
+    /// A separate method because an ASYMMETRIC retrieval model needs a different
+    /// input on the query side than on the passage side. The multilingual E5
+    /// family requires a `query: ` prefix on queries and a `passage: ` prefix on
+    /// every indexed chunk; embedding a query the same way as a passage degrades
+    /// retrieval measurably, and embedding a passage with the query prefix
+    /// degrades the index. The engine decides from the model it actually loaded,
+    /// so a symmetric model (the English MiniLM family) is byte-for-byte
+    /// unaffected and inherits this default unchanged.
+    fn embed_query(&self, text: &str) -> Result<Vec<f32>, EngineError> {
+        self.embed(text)
+    }
+
+    /// Embedding vector for an indexed **passage** (one document chunk).
+    /// Default: [`Engine::embed`]. See [`Engine::embed_query`] for why the split
+    /// exists.
+    fn embed_passage(&self, text: &str) -> Result<Vec<f32>, EngineError> {
+        self.embed(text)
+    }
+
     /// Streaming text completion for `prompt` (conversational-ai-chat task 1;
     /// SYNC-7 supersede — streaming was deferred in the local-ai spike and is
     /// now added for the chat surface). Emits each newly-decoded token's text
@@ -264,17 +286,18 @@ pub trait Engine: Send + Sync {
         self.infer_streaming(&prompt, on_token)
     }
 
-    /// One-shot completion for `prompt` on the **dedicated bundled tag model**
+    /// One-shot completion for `prompt` on the **dedicated tag model**
     /// (auto-tag, MYND-651) rather than the side-loaded generation model. Same
     /// blocking prompt-in/text-out contract as [`Engine::infer`] — the caller
     /// still owns building the prompt (it holds the vault's tag vocabulary) and
     /// parsing the candidate list out of the reply.
     ///
     /// It is a separate method, not an `infer` parameter, because *which model*
-    /// is the whole point: the tag role loads a first-party GGUF that ships
-    /// inside the build itself and has no picker override, so a user who never
-    /// side-loaded a generation model still gets suggestions, and a user who did
-    /// does not get tag quality that varies with their pick.
+    /// is the whole point: the tag role loads its own GGUF, fetched on demand
+    /// from Myne's origin and verified against a compiled-in digest, or
+    /// side-loaded by the user (myne-md/myne#805; the bundled-only, no-picker
+    /// posture this used to describe is withdrawn), so tag quality does not vary
+    /// with whatever generation model the user picked.
     ///
     /// The prompt embeds note content — **never logged** (DENY-list), like every
     /// other string on this trait.
@@ -298,13 +321,12 @@ pub trait Engine: Send + Sync {
     }
 
     /// Whether this build has an auto-tag model at all (MYND-651). Cheap and
-    /// synchronous — it answers from the path resolved at construction and
-    /// loads nothing.
-    ///
-    /// It exists so the settings surface can tell the truth. The tag role is
-    /// bundled-only by design (`threat-model.md` §7: no override picker), so
-    /// unlike every other role there is no side-load the user could perform to
-    /// make it work — a build that ships no blob has no auto-tag, permanently.
+    /// synchronous — it re-resolves the stored `tag.path` override (downloaded
+    /// or side-loaded) and falls back to the bundled default without loading the
+    /// model. Since myne-md/myne#805 the tag role is selectable and storable, so
+    /// unlike the old bundled-only posture a user can obtain one, and this probe
+    /// (like `load_tag`) re-resolves at call time rather than freezing the
+    /// construction-time value.
     /// Without this the AI panel would offer a switch that persists `true` while
     /// every pass answers [`EngineError::NotReady`] and no band ever appears,
     /// with nothing anywhere saying why.
@@ -1298,6 +1320,25 @@ mod tests {
         let engine: &dyn Engine = &StubEngine;
         let v = engine.embed("hello").expect("stub embed never fails");
         assert_eq!(v.len(), STUB_EMBED_DIM);
+    }
+
+    /// An engine that does not override the split inherits the symmetric
+    /// behaviour, so adding `embed_query`/`embed_passage` changes nothing for
+    /// the stub, Ollama or the remote arm. This is the property that lets the
+    /// E5 prefixes be a Candle-only concern.
+    #[test]
+    fn default_embed_query_and_passage_delegate_to_embed() {
+        let engine: &dyn Engine = &StubEngine;
+        assert_eq!(
+            engine.embed_query("x").unwrap(),
+            engine.embed("x").unwrap(),
+            "the query default must delegate to embed"
+        );
+        assert_eq!(
+            engine.embed_passage("x").unwrap(),
+            engine.embed("x").unwrap(),
+            "the passage default must delegate to embed"
+        );
     }
 
     #[test]

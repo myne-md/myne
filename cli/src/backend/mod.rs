@@ -71,6 +71,16 @@ pub trait MyneBackend {
     /// anything is written — never silently redirected to root. Returns the
     /// new note's id.
     fn create(&self, body: &str, folder: Option<&str>) -> Result<String, BackendError>;
+
+    /// Open a local markdown file in the running app's plain-file surface
+    /// (myne-md/myne#788, task 11). This crate never opens the file: the
+    /// desktop resolves the path through its gate-checked ingest and the tab
+    /// appears in the app. `Ok(())` means a handle was minted there; the
+    /// refusal classes this crate can distinguish are [`BackendError::PlainFileOff`]
+    /// (the device-local gate is off) and [`BackendError::Io`] (an unsupported
+    /// type, a missing file, an oversized file: each with the desktop's
+    /// bounded sentence).
+    fn open(&self, path: &str) -> Result<(), BackendError>;
 }
 
 /// One ranked search hit — an id + its title, nothing else (no score, no
@@ -112,6 +122,13 @@ pub enum BackendError {
     /// response, which is why it gets a code of its own rather than
     /// collapsing into [`BackendError::Io`].
     RateLimited,
+    /// The device-local plain-file editor is off, so `open` refused before
+    /// anything was read (myne-md/myne#788). Its own code because enabling
+    /// it is a different user action from every other failure here, and
+    /// because the gate lives in Settings, not in the vault, this is NOT
+    /// [`BackendError::CliDisabled`]: the CLI door can be open while the
+    /// file editor is not.
+    PlainFileOff,
     /// Any other failure: a malformed reply, a framing error, a connection
     /// failure not explained by the door being shut, an unrecognized wire
     /// error kind. Carries a human-readable message (no secret/DENY-listed

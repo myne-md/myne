@@ -18,7 +18,7 @@ use zeroize::Zeroizing;
 
 use super::devices::SyncDeviceError;
 use super::enroll::{
-    enroll, generate_device_id, register_verifier, EnrollError, EnrollOutcome, EnrollPath,
+    enroll, generate_device_id, register_verifier_with_code, EnrollError, EnrollOutcome, EnrollPath,
 };
 use super::person_auth::{
     person_auth_path, person_auth_path_for_read, read_person_auth, write_person_auth, PersonAuth,
@@ -57,8 +57,9 @@ pub fn register_and_enroll_person(
     transport: &dyn SyncTransport,
     person_id: &[u8; 16],
     secret: &[u8],
+    invite_code: Option<&str>,
 ) -> Result<EnrollOutcome, EnrollError> {
-    register_verifier(transport, person_id, secret)?;
+    register_verifier_with_code(transport, person_id, secret, invite_code)?;
     let device_id = generate_device_id();
     let mut nonce_bytes = [0u8; 16];
     getrandom::getrandom(&mut nonce_bytes).map_err(|_| EnrollError::BadResponse)?;
@@ -157,14 +158,21 @@ pub async fn person_setup_from_host(
         let cfg = super::config::read_config(io, &cfg_path)
             .await
             .map_err(|_| SyncDeviceError::NotConfigured)?;
+        // The gated-server admission code, read before `endpoint_url` moves out.
+        let invite_code = cfg.invite_code.clone();
         let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
         let outcome: EnrollOutcome =
             crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
                 let transport = super::http_transport::build_transport(&url)
                     .map_err(|_| SyncDeviceError::Transport)?;
-                register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
-                    .map_err(SyncDeviceError::from)
+                register_and_enroll_person(
+                    transport.as_ref(),
+                    &person_id,
+                    secret.as_slice(),
+                    invite_code.as_deref(),
+                )
+                .map_err(SyncDeviceError::from)
             })
             .await
             .map_err(|_| SyncDeviceError::Internal)??;
@@ -1617,7 +1625,7 @@ mod tests {
         t.on(HttpMethod::Post, "/auth/register", 401, b"{}".to_vec());
 
         let person_id = [0x11u8; 16];
-        let err = register_and_enroll_person(&t, &person_id, &[0u8; 32]).unwrap_err();
+        let err = register_and_enroll_person(&t, &person_id, &[0u8; 32], None).unwrap_err();
         assert_eq!(err, EnrollError::Unauthenticated);
 
         let reqs = t.requests();

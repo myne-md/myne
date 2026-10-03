@@ -9,11 +9,12 @@
 //! Sync`; a single instance backs concurrent commands under `Arc`). CPU device
 //! only (`Device::Cpu`) — no GPU/network. No model set → [`EngineError::NotReady`].
 //!
-//! Two roles are **bundled** first-party task-models instead: transcription
-//! (MYND-270) and auto-tag (`infer_tags`, MYND-651). Bundling is not
-//! downloading — the weights ship inside the build itself, so
-//! SYNC-2 is intact (`decisions.md` 2026-07-19, 2026-07-31). Auto-tag also has
-//! no picker override at all, so it never re-enters the untrusted-model case.
+//! Transcription (MYND-270) is a **bundled** first-party task-model. The tag
+//! model (`infer_tags`, MYND-651) is **not** bundled since myne-md/myne#805:
+//! it is fetched on explicit user action from Myne's own origin and verified
+//! against a digest compiled into the client binary, or side-loaded, so it does
+//! re-enter the untrusted-input case exactly as transcription's override does.
+//! Downloads are digest-verified before registration (`decisions/ai/0627`).
 //!
 //! Side-load layout (the user picks the primary file; siblings live next to it):
 //! - generation: `<model>.gguf` + `tokenizer.json` in the same directory.
@@ -22,8 +23,11 @@
 //!
 //! Bundled layout (under the Tauri `resource_dir`, `model_store`):
 //! - transcription: `models/whisper/model.gguf` + `config.json` + `tokenizer.json`.
-//! - auto-tag: `models/tag/model.gguf` + `tokenizer.json` — a small quantized
-//!   Qwen2 GGUF loaded through the SAME path as the generation role.
+//! - auto-tag: downloaded or side-loaded (`tag.path`), or a bundled
+//!   `models/tag/model.gguf` + `tokenizer.json` on a build that still carries
+//!   one: a small quantized Qwen2 GGUF loaded through the SAME path as the
+//!   generation role. Since myne-md/myne#805 the desktop bundle ships no tag
+//!   model by default.
 //!
 //! Secret-handling: a prompt / note text / embedding is never logged (DENY-list)
 //! — only the closed [`EngineError`] kind escapes.
@@ -54,7 +58,9 @@ use tokenizers::Tokenizer;
 use super::chatml::sanitize_chatml;
 use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
-use super::model_store::{selected_model, selected_model_verified, ModelRole, ModelStoreError};
+use super::model_store::{
+    effective_tag_model, selected_model, selected_model_verified, ModelRole, ModelStoreError,
+};
 use super::whisper::{self, WhisperTokens};
 
 /// Cap on generated tokens per `infer` — a bound so a runaway generation can't
@@ -122,10 +128,47 @@ const TAG_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
     tokenizer: "load_tag.tokenizer",
 };
 
+/// The vocabulary size shared by every `intfloat/multilingual-e5-*` checkpoint
+/// (the XLM-R sentencepiece vocabulary). Used to recognise the E5 family at load
+/// so the asymmetric `query: ` / `passage: ` prefixes are applied to it and only
+/// it. The English `all-MiniLM-L6-v2` uses a 30,522-word BERT vocabulary and is
+/// correctly excluded; a symmetric model must NOT get the prefixes, or its
+/// retrieval quality degrades the same way the E5 family's does without them.
+const E5_MULTILINGUAL_VOCAB_SIZE: usize = 250_037;
+
+/// Which side of an asymmetric retrieval model a text is embedded for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EmbedMode {
+    /// No prefix, whatever the model family (`Engine::embed`).
+    Plain,
+    /// A live retrieval query (`Engine::embed_query`).
+    Query,
+    /// One indexed document chunk (`Engine::embed_passage`).
+    Passage,
+}
+
+/// The prefix an E5-family model needs for `mode`, or `None` for a symmetric
+/// model. Pure and unit-tested, so the query/passage asymmetry is provable
+/// without loading a 471 MB model.
+fn retrieval_prefix(is_e5: bool, mode: EmbedMode) -> Option<&'static str> {
+    if !is_e5 {
+        return None;
+    }
+    match mode {
+        EmbedMode::Query => Some("query: "),
+        EmbedMode::Passage => Some("passage: "),
+        EmbedMode::Plain => None,
+    }
+}
+
 /// A loaded embedding model + its tokenizer.
 struct LoadedEmbed {
     model: BertModel,
     tokenizer: Tokenizer,
+    /// Whether this is a multilingual E5-family model, from the vocabulary size
+    /// at load time. E5 needs the `query: ` / `passage: ` prefixes; a symmetric
+    /// model does not.
+    is_e5: bool,
     /// The device the model + its inference tensors live on (Metal GPU or CPU).
     device: Device,
     /// The model's positional-embedding limit (`config.max_position_embeddings`,
@@ -199,12 +242,14 @@ pub struct CandleEngine {
     /// `load_transcription` when the user set no `transcription.path` override,
     /// so speech-to-text works out of the box.
     bundled_transcription: Option<PathBuf>,
-    /// The bundled auto-tag task-model shipped as a Tauri resource (MYND-651;
-    /// desktop-only), resolved once at construction — `None` when none ships
-    /// (`--no-default-features` AI-free build / unfetched LFS blob). Unlike
-    /// transcription there is no override to fall back to, so `None` means
-    /// auto-tag is simply unavailable on this build (`NotReady`), never a
-    /// half-working surface.
+    /// The bundled auto-tag task-model default (MYND-651; desktop-only),
+    /// resolved once at construction: `None` when none ships
+    /// (`--no-default-features` AI-free build / unfetched LFS blob, and since
+    /// myne-md/myne#805 the shipped desktop build ships none). It is only the
+    /// FALLBACK. `load_tag` and `tag_model_available` re-resolve the user's
+    /// downloaded or side-loaded `tag.path` override at each call through
+    /// [`effective_tag_model`], so a model downloaded or removed after
+    /// construction takes effect without a restart.
     bundled_tag: Option<PathBuf>,
     /// Compute device chosen once at construction (Metal GPU on macOS, else CPU).
     device: Device,
@@ -257,10 +302,13 @@ impl CandleEngine {
         self
     }
 
-    /// Attach the bundled auto-tag task-model (MYND-651), resolved from the Tauri
-    /// `resource_dir` in `super::init`. `None` leaves the engine with no tag path
-    /// at all — there is no side-load fallback by design (`threat-model.md` §7:
-    /// no override picker). Builder-style, like [`with_bundled_transcription`].
+    /// Attach the bundled auto-tag task-model default (MYND-651), resolved from
+    /// the Tauri `resource_dir` in [`super::resolve_backend`]. This is only the
+    /// fallback: the user's downloaded or side-loaded `tag.path` override is
+    /// resolved lazily at each `load_tag`/`tag_model_available` call
+    /// (myne-md/myne#805), so passing the bundled default here never hides a
+    /// downloaded model. `None` plus no stored override means auto-tag is
+    /// absent (`NotReady`). Builder-style, like [`with_bundled_transcription`].
     pub fn with_bundled_tag_model(mut self, path: Option<PathBuf>) -> Self {
         self.bundled_tag = path;
         self
@@ -324,21 +372,35 @@ impl CandleEngine {
         Ok(loaded)
     }
 
-    /// Lazy-load the bundled auto-tag model (MYND-651). Resolution is
-    /// **bundled-only** — there is no `selected_model` lookup because the role
-    /// has no marker (`model_store::ModelRole::TagSuggestion`), so the one path
-    /// this can ever load is the first-party GGUF resolved at construction.
-    /// `NotReady` when no blob ships, so an AI-free build or an unfetched LFS
-    /// checkout leaves the feature absent instead of broken.
+    /// Lazy-load the auto-tag model (MYND-651). Resolution is not bundled-only
+    /// (myne-md/myne#805, `decisions/ai/0627`): the downloaded or side-loaded
+    /// override (`tag.path`) is resolved **at each call** through
+    /// [`effective_tag_model`], so a model downloaded or removed at runtime is
+    /// picked up without a restart, and the bundled default is only the
+    /// fallback. `NotReady` when neither is present, so an AI-free build, an
+    /// unfetched LFS checkout, or a user who has downloaded nothing leaves the
+    /// feature absent instead of broken.
     fn load_tag(&self) -> Result<LoadedGen, EngineError> {
         let started = Instant::now();
-        let Some(model_path) = self.bundled_tag.clone() else {
-            tracing::warn!(
-                target: "myne::ai",
-                stage = "load_tag",
-                "no auto-tag model — none bundled in this build"
-            );
-            return Err(EngineError::NotReady);
+        let model_path = match effective_tag_model(&self.base, self.bundled_tag.as_deref()) {
+            Ok(Some(p)) => p,
+            Ok(None) => {
+                tracing::warn!(
+                    target: "myne::ai",
+                    stage = "load_tag",
+                    "no auto-tag model: none bundled and none downloaded or side-loaded"
+                );
+                return Err(EngineError::NotReady);
+            }
+            Err(e) => {
+                tracing::error!(
+                    target: "myne::ai",
+                    stage = "load_tag.resolve",
+                    error_kind = e.kind(),
+                    "could not resolve the auto-tag model path"
+                );
+                return Err(EngineError::NotReady);
+            }
         };
         tracing::info!(
             target: "myne::ai",
@@ -459,6 +521,7 @@ impl CandleEngine {
         Ok(LoadedEmbed {
             model,
             tokenizer,
+            is_e5: config.vocab_size == E5_MULTILINGUAL_VOCAB_SIZE,
             device: self.device.clone(),
             max_tokens: config.max_position_embeddings.max(1),
         })
@@ -925,6 +988,50 @@ fn run_transcribe(
     )
 }
 
+impl CandleEngine {
+    /// Shared embedding body. Loads the embedding model lazily, prepends the
+    /// asymmetric E5 prefix when the loaded model is E5-family and `mode` asks
+    /// for one, then runs the forward pass. The three [`Engine`] embedding
+    /// methods are thin wrappers over this.
+    fn embed_inner(&self, text: &str, mode: EmbedMode) -> Result<Vec<f32>, EngineError> {
+        // Serialize all GPU work (see `compute`): a concurrent infer on the same
+        // Metal device crashes the AGX driver. Held for the whole call.
+        let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = self.embed.lock().unwrap_or_else(|p| p.into_inner());
+        if guard.is_none() {
+            *guard = Some(self.load_embed()?);
+        }
+        let loaded = guard.as_ref().expect("just loaded");
+        // Bound the prefixed string to this scope; `input` borrows it.
+        let prefixed;
+        let input = match retrieval_prefix(loaded.is_e5, mode) {
+            Some(prefix) => {
+                prefixed = format!("{prefix}{text}");
+                prefixed.as_str()
+            }
+            None => text,
+        };
+        let started = Instant::now();
+        let out = run_embed(loaded, input);
+        match &out {
+            Ok(v) => tracing::debug!(
+                target: "myne::ai",
+                op = "embed",
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                dims = v.len(),
+                "embedding complete"
+            ),
+            Err(e) => tracing::error!(
+                target: "myne::ai",
+                op = "embed",
+                error_kind = e.kind(),
+                "embedding failed"
+            ),
+        }
+        out
+    }
+}
+
 impl Engine for CandleEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         self.infer_bounded(prompt, MAX_NEW_TOKENS)
@@ -1098,12 +1205,17 @@ impl Engine for CandleEngine {
     }
 
     fn tag_model_available(&self) -> bool {
-        // The construction-time resolution IS the answer: `bundled_tag` is
-        // `None` exactly when no blob shipped, which is exactly when `load_tag`
-        // refuses. Deliberately does not stat the path again — this is the
-        // settings surface asking a cheap question, and `load_tag` remains the
-        // one authority on whether the file actually opens.
-        self.bundled_tag.is_some()
+        // Re-resolve at call time (myne-md/myne#805): a downloaded or
+        // side-loaded override must flip this without a restart.
+        // `effective_tag_model` reads the stored override first and falls back
+        // to the bundled default; `load_tag` remains the one authority on
+        // whether the file actually opens (an unreadable blob is its failure to
+        // report, not this probe's), and the settings surface keeps asking a
+        // cheap marker-read question rather than loading the model.
+        matches!(
+            effective_tag_model(&self.base, self.bundled_tag.as_deref()),
+            Ok(Some(_))
+        )
     }
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
@@ -1154,39 +1266,27 @@ impl Engine for CandleEngine {
         *self.gen.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.embed.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.transcription.lock().unwrap_or_else(|p| p.into_inner()) = None;
-        // The tag model is deliberately NOT dropped: it is bundled-only, so no
-        // pick can ever change which bytes it would reload, and dropping it would
-        // pay a full reload for a swap of an unrelated role. If it ever gains a
-        // selectable path, it must join the list above.
+        *self.tag.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        // The tag model joined the list above with myne-md/myne#805: now that
+        // `tag.path` is selectable, a download, remove or re-pick changes which
+        // bytes `load_tag` would reload, so the cached tag must drop like the
+        // others or a stale model answers the next tag pass.
     }
 
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        // Serialize all GPU work (see `compute`): a concurrent infer on the same
-        // Metal device crashes the AGX driver. Held for the whole call.
-        let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
-        let mut guard = self.embed.lock().unwrap_or_else(|p| p.into_inner());
-        if guard.is_none() {
-            *guard = Some(self.load_embed()?);
-        }
-        let loaded = guard.as_ref().expect("just loaded");
-        let started = Instant::now();
-        let out = run_embed(loaded, text);
-        match &out {
-            Ok(v) => tracing::debug!(
-                target: "myne::ai",
-                op = "embed",
-                elapsed_ms = started.elapsed().as_millis() as u64,
-                dims = v.len(),
-                "embedding complete"
-            ),
-            Err(e) => tracing::error!(
-                target: "myne::ai",
-                op = "embed",
-                error_kind = e.kind(),
-                "embedding failed"
-            ),
-        }
-        out
+        self.embed_inner(text, EmbedMode::Plain)
+    }
+
+    /// A live retrieval query. On an E5-family model this prepends `query: `;
+    /// on a symmetric model it is byte-for-byte [`Engine::embed`].
+    fn embed_query(&self, text: &str) -> Result<Vec<f32>, EngineError> {
+        self.embed_inner(text, EmbedMode::Query)
+    }
+
+    /// One indexed document chunk. On an E5-family model this prepends
+    /// `passage: `; on a symmetric model it is byte-for-byte [`Engine::embed`].
+    fn embed_passage(&self, text: &str) -> Result<Vec<f32>, EngineError> {
+        self.embed_inner(text, EmbedMode::Passage)
     }
 }
 
@@ -1298,6 +1398,37 @@ mod tests {
         assert_eq!(engine.embed("hello"), Err(EngineError::NotReady));
     }
 
+    /// The E5 asymmetric prefixes, proved at the decision seam rather than
+    /// needing a 471 MB model. Query and passage MUST differ for E5, and a
+    /// symmetric model MUST get neither (applying one would degrade MiniLM the
+    /// same way its absence degrades E5).
+    #[test]
+    fn e5_needs_distinct_query_and_passage_prefixes_and_a_symmetric_model_neither() {
+        assert_eq!(retrieval_prefix(true, EmbedMode::Query), Some("query: "));
+        assert_eq!(
+            retrieval_prefix(true, EmbedMode::Passage),
+            Some("passage: ")
+        );
+        assert_ne!(
+            retrieval_prefix(true, EmbedMode::Query),
+            retrieval_prefix(true, EmbedMode::Passage),
+            "the two sides of an asymmetric model must not collapse to one prefix"
+        );
+        assert_eq!(
+            retrieval_prefix(true, EmbedMode::Plain),
+            None,
+            "an identity/readiness probe is not a query or a passage"
+        );
+        // The control: a symmetric model gets nothing, in every mode.
+        for mode in [EmbedMode::Query, EmbedMode::Passage, EmbedMode::Plain] {
+            assert_eq!(
+                retrieval_prefix(false, mode),
+                None,
+                "{mode:?}: a symmetric model must never be prefixed"
+            );
+        }
+    }
+
     #[test]
     fn transcribe_without_a_model_is_no_model() {
         // With neither an override nor a bundled default, both the blocking and
@@ -1359,6 +1490,27 @@ mod tests {
         assert!(CandleEngine::new(tmp.path().to_path_buf())
             .with_bundled_tag_model(Some(tmp.path().join("tag.gguf")))
             .tag_model_available());
+    }
+
+    #[test]
+    fn a_stored_tag_path_is_resolved_without_a_restart() {
+        // myne-md/myne#805: the tag role gained a selectable `tag.path`, so the
+        // engine must re-resolve it at call time rather than freeze the
+        // construction-time value. A marker written AFTER construction must flip
+        // `tag_model_available` with no restart, and `invalidate_models` must
+        // drop the cached tag so the next pass reloads the new bytes.
+        let tmp = ScopedTempDir::new("candle-engine-tag-lazy").expect("tempdir");
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        assert!(!engine.tag_model_available());
+
+        let tag_path = tmp.path().join("tag.gguf");
+        std::fs::write(&tag_path, b"placeholder tag weights").expect("write tag file");
+        set_selected_model(tmp.path(), ModelRole::TagSuggestion, &tag_path)
+            .expect("record tag path");
+        assert!(
+            engine.tag_model_available(),
+            "a tag.path recorded after construction must be seen without a restart"
+        );
     }
 
     #[test]
@@ -1990,7 +2142,7 @@ mod tests {
                 if !is_substantive_chunk(slice) {
                     continue;
                 }
-                let v = engine.embed(slice).expect("embed chunk");
+                let v = engine.embed_passage(slice).expect("embed chunk");
                 store.insert_vector(ChunkKey::from_chunk(&c), v);
                 n_chunks += 1;
             }
@@ -2011,7 +2163,7 @@ mod tests {
             "how to delete a git branch",
             "which products am I tracking the price of",
         ] {
-            let qv = engine.embed(q).expect("embed query");
+            let qv = engine.embed_query(q).expect("embed query");
             let hits = top_k_matches(&qv, &store, 10, |_| false);
             eprintln!("\n########## QUERY: {q}");
             for (r, h) in hits.iter().enumerate() {

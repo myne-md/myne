@@ -70,8 +70,10 @@ fn companion_vectors_root() -> PathBuf {
 /// The native lane's skip-on-absent-companion contract (`protocol/AGENTS.md`)
 /// is right for a contributor with no companion checked out and wrong for the
 /// one CI step whose entire job is to assert: there, `[skip]` on every runner
-/// reports green having verified nothing, which is the state the
-/// `vector-verification` step in `.woodpecker/main.yml` is commented out over.
+/// reports green having verified nothing. That step is live
+/// (`.woodpecker/main.yml` `vector-verification`), and `MYNE_VECTORS_REQUIRED`
+/// turns a missing fixture into a loud panic rather than a green skip, so an
+/// expired token or a moved ref cannot return the step to green-and-empty.
 ///
 /// `MYNE_VECTORS_REQUIRED` inverts the default for that step alone. Unset —
 /// `pre-push`, a fresh clone, a contributor's laptop — keeps today's skip. Set

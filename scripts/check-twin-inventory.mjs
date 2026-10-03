@@ -1121,6 +1121,15 @@ const ROSTER = [
       "Path arithmetic on one side, an export chokepoint on the other, and the two stopped having the same SHAPE in myne-md/myne#517. Desktop re-exports `appDataDir` and `join` from Tauri and composes a destination in TypeScript, which is right there because the user picks it through the OS save dialog. Mobile has no dialog to pick with (myne-md/myne#491), so the app picks for the user, and since #517 it picks in Rust: the whole module is one `exportPath(filename)` over `plugin:export-dir|export_path`, which resolves the directory, creates it, applies the platform backup exclusion and sanitizes the filename in one call. Mobile grants no `core:path` capability at all as a result. Making the member lists match would be wrong on both sides, and matching them now would mean putting the backup exclusion behind a client that has no platform backup.",
   },
 
+  {
+    a: "src/platform/plainFile.ts",
+    b: "mobile/src/platform/plainFile.ts",
+    verdict: "screen",
+    destination: "undecided",
+    reason:
+      "The plain-file editor's gate commands (myne-md/myne#788). The feature is desktop-only by its PRD's own verdict: it needs an OS file ingress a phone has no equivalent of, and mobile's own file flows are the share sheet and the importer. Desktop's arm is the real host binding; mobile's exists so a future shared caller cannot accidentally wire itself to the desktop implementation, and it rejects at the host because the plugin is not registered there. Nothing to share: the gate is a device-local file only the desktop reads.",
+  },
+
   // ── The two Rust/TS pairs the merge brought in
   {
     a: "src/notes/setNoteCover.ts",
@@ -1393,7 +1402,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Model resolution and integrity checking, 1019 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
+      "Model resolution and integrity checking, 1435 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
     a: "core/src/inference/engine.rs",
@@ -1401,7 +1410,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2263 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2304 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1441,7 +1450,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1078 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1094 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
     a: "src/lib/agent-run.ts",

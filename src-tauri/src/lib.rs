@@ -269,6 +269,12 @@ pub fn run() {
             use tauri_plugin_deep_link::DeepLinkExt;
             app.deep_link().handle_cli_arguments(args.iter());
         }
+        // myne-md/myne#788: a second launch is also how Windows/Linux delivers
+        // a file association ("Open with Myne" on a `.md`). Ingested after the
+        // deep-link handoff: a `myne://` URL never survives the candidate
+        // filter (it is not a file path), so the order is about the window
+        // being raised, not about shadowing.
+        plugins::plain_file::ingest::ingest_args(app, args.clone());
         // The `show()` inside is load-bearing, not redundant with
         // `unminimize()`: auto-lock on idle calls `window.hide()` (orderOut on
         // macOS), which leaves the window HIDDEN rather than minimized.
@@ -363,6 +369,10 @@ pub fn run() {
         // reachable pre-unlock, because the pre-unlock set is exactly what a
         // locked-out user cannot see.
         .plugin(plugins::screen_capture::init())
+        // myne-md/myne#788: the device-local gate for the plain-file editor.
+        // Readable in every vault state by construction (its own file, not a
+        // vault.prefs field), which is the whole reason it exists.
+        .plugin(plugins::plain_file::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         .plugin(plugins::detached_window::init())
@@ -482,6 +492,59 @@ pub fn run() {
             // 19041+. The main window is declared `"visible": false` in
             // `tauri.conf.json` so this is the only `show()` call.
             screen_capture::init(app)?;
+            // myne-md/myne#788: File → Open File… (⌘O), the discoverable entry
+            // point for the plain-file editor. The in-surface Open button
+            // renders only once a file is ALREADY open (`PlainFileScreen`
+            // mounts on `files.length > 0`), so without this menu item a
+            // running app has no way to open the first file. Built by
+            // extending Tauri's platform default menu (the app/Edit/View/
+            // Window/Help submenus stay), host-side in Rust, so the capability
+            // set gains no `core:menu` grant. The handler is silent on a
+            // gate-off device and on a cancelled picker, matching the OS
+            // ingresses; the dialog command carries the typed refusal for the
+            // in-app caller.
+            {
+                use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
+                let menu = Menu::default(app.handle())?;
+                let open_item = MenuItem::with_id(
+                    app.handle(),
+                    plugins::plain_file::OPEN_FILE_MENU_ID,
+                    "Open File…",
+                    true,
+                    Some("CmdOrCtrl+O"),
+                )?;
+                // The platform default carries a File submenu on macOS and
+                // Windows but not on Linux/BSD, so create one when it is
+                // absent rather than dropping the item.
+                let mut file_submenu = None;
+                for item in menu.items()? {
+                    if let MenuItemKind::Submenu(sub) = item {
+                        if sub.text().map(|t| t == "File").unwrap_or(false) {
+                            file_submenu = Some(sub);
+                            break;
+                        }
+                    }
+                }
+                let file = match file_submenu {
+                    Some(sub) => sub,
+                    None => {
+                        let sub = Submenu::with_id(app.handle(), "file-menu", "File", true)?;
+                        menu.prepend(&sub)?;
+                        sub
+                    }
+                };
+                file.prepend(&PredefinedMenuItem::separator(app.handle())?)?;
+                file.prepend(&open_item)?;
+                app.set_menu(menu)?;
+                app.on_menu_event(|handle, event| {
+                    if event.id() == plugins::plain_file::OPEN_FILE_MENU_ID {
+                        let handle = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = plugins::plain_file::commands::open_dialog(handle).await;
+                        });
+                    }
+                });
+            }
             // MYND-121: start the authoritative, fail-closed idle-lock timer.
             // Runs for the process lifetime; no-op until a vault is Unlocked.
             auto_lock::spawn_idle_lock_timer(app.handle().clone());
@@ -641,6 +704,14 @@ pub fn run() {
             if let Ok(config_dir) = app.path().app_config_dir() {
                 let _ = std::fs::remove_dir_all(config_dir.join("themes"));
             }
+            // myne-md/myne#788: the FIRST-launch argv ingress for the
+            // plain-file editor. The second-launch path is the single-instance
+            // callback below; this covers a cold start from a file association
+            // on Windows/Linux and the E2E's argv launch. Silent while the gate
+            // is off, by design. The file is also held for the frontend to
+            // claim (`plain_file_take_unclaimed`), because this runs before the
+            // WebView could have attached its listener.
+            plugins::plain_file::ingest::ingest_args(app.handle(), std::env::args().collect());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -667,6 +738,16 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 screen_capture::show_protected(app_handle, "macos_reopen");
+            }
+            // myne-md/myne#788: macOS delivers a file open (Finder, `open -a`,
+            // drag onto the Dock icon) as an Apple Event, not as argv. Two
+            // shapes reach here: a cold launch (where the setup-time ingest
+            // above has already run and this URL list is the real delivery) and
+            // a warm app. `ingest_urls` is gate-checked and first-match-wins,
+            // so a duplicate delivery collapses onto the same handle.
+            #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                plugins::plain_file::ingest::ingest_urls(app_handle, urls.clone());
             }
             // MYND-650 task 2: terminate the arti sidecar before the process
             // goes away. A Tor client left holding circuits open after the app

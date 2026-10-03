@@ -449,11 +449,22 @@ mod tests {
     }
 
     #[test]
-    fn zeroize_is_idempotent_on_empty_store() {
+    fn zeroize_is_idempotent_after_populating() {
         let mut store = AiVectorStore::new();
+        store.insert_vector(key(nid("09"), 0, 5), vec![1.0, 2.0, 3.0]);
+        store.set_nonce(nid("09"), vec![9u8; 24]);
+        assert!(!store.is_empty(), "precondition: the store holds data");
+
         store.zeroize();
+        assert!(store.is_empty(), "first zeroize must empty the store");
+
+        // A second zeroize on the now-empty store is a no-op, not a panic and
+        // not a re-population.
         store.zeroize();
         assert!(store.is_empty());
+        assert_eq!(store.len(), 0);
+        assert!(store.iter().next().is_none());
+        assert_eq!(store.nonce(&nid("09")), None);
     }
 
     #[test]

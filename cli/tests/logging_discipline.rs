@@ -48,6 +48,10 @@ const SENTINEL_BODY: &str = "sentinel-body-the-quick-brown-fox-task13";
 const SENTINEL_TITLE: &str = "Sentinel Title task13";
 const SENTINEL_QUERY: &str = "sentinel-query-task13";
 const SENTINEL_LINE: &str = "sentinel-appended-line-task13";
+/// myne-md/myne#788: the `open` subcommand's one argument is a path, and a
+/// path is DENY-class. It stays under a home-shaped prefix so a regression
+/// that echoed it would be caught by the same assertions as the rest.
+const SENTINEL_PATH: &str = "SentinelFolder-task13/sentinel-open-task13.md";
 
 const CONTENT_SENTINELS: &[&str] = &[
     SENTINEL_NOTE_ID,
@@ -56,6 +60,7 @@ const CONTENT_SENTINELS: &[&str] = &[
     SENTINEL_TITLE,
     SENTINEL_QUERY,
     SENTINEL_LINE,
+    SENTINEL_PATH,
 ];
 
 // ---- fixture --------------------------------------------------------------
@@ -330,6 +335,37 @@ fn every_success_path_prints_its_payload_to_stdout_and_nothing_to_stderr() {
             );
             run.assert_diagnostics_are_clean(&scenario);
         }
+    }
+}
+
+/// myne-md/myne#788 (task 11): `open` succeeds silently and the PATH it was
+/// given reaches neither stream. The path is the one argument this command
+/// carries, and a shell script's `2>` redirect is exactly where an echoed
+/// argument would end up (DENY list: a full filesystem path).
+#[test]
+fn open_succeeds_silently_and_never_echoes_the_path() {
+    // Relative on purpose: the binary makes it absolute against its own cwd
+    // before it goes on the wire, and neither form may reach a stream.
+    let path = SENTINEL_PATH.to_string();
+    for json in [false, true] {
+        let desktop = FakeDesktop::new("open", Some(b"O"), Some(frame(r#"{"ok":true}"#)));
+        let mut argv = Vec::new();
+        if json {
+            argv.push("--json");
+        }
+        argv.extend_from_slice(&["open", &path]);
+        let run = desktop.run(&argv, None);
+        let scenario = format!("open success (json={json})");
+        assert_eq!(run.code, 0, "{scenario}: stderr was {:?}", run.stderr);
+        run.assert_diagnostics_are_clean(&scenario);
+        assert!(
+            !run.stderr.contains(SENTINEL_PATH),
+            "{scenario}: the path reached stderr"
+        );
+        assert!(
+            !run.stdout.contains(SENTINEL_PATH),
+            "{scenario}: the path reached stdout"
+        );
     }
 }
 

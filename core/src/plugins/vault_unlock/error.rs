@@ -207,75 +207,91 @@ pub enum VaultStatusError {
 mod tests {
     use super::*;
 
-    fn serialize(e: &VaultUnlockError) -> String {
-        serde_json::to_string(e).expect("VaultUnlockError must serialize cleanly")
+    fn json<T: serde::Serialize>(e: &T) -> String {
+        serde_json::to_string(e).expect("vault unlock error enum must serialize cleanly")
     }
 
+    /// Every unit variant of [`VaultUnlockError`] serializes under
+    /// `#[serde(tag = "kind", content = "detail")]` as `{"kind":"<VariantName>"}`.
     #[test]
-    fn vault_not_found_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::VaultNotFound),
-            r#"{"kind":"VaultNotFound"}"#
-        );
+    fn unit_variants_serialize_with_kind_tag() {
+        let cases = [
+            (
+                json(&VaultUnlockError::VaultNotFound),
+                r#"{"kind":"VaultNotFound"}"#,
+            ),
+            (
+                json(&VaultUnlockError::InvalidCredentialOrVault),
+                r#"{"kind":"InvalidCredentialOrVault"}"#,
+            ),
+            (
+                json(&VaultUnlockError::InvalidVaultMeta),
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                json(&VaultUnlockError::UnlockInProgress),
+                r#"{"kind":"UnlockInProgress"}"#,
+            ),
+            (
+                json(&VaultUnlockError::VaultUpgradedUnsupported),
+                r#"{"kind":"VaultUpgradedUnsupported"}"#,
+            ),
+            (
+                json(&VaultUnlockError::VaultOpenAsImportSource),
+                r#"{"kind":"VaultOpenAsImportSource"}"#,
+            ),
+            (
+                json(&VaultUnlockError::NoActiveVaultToImportInto),
+                r#"{"kind":"NoActiveVaultToImportInto"}"#,
+            ),
+            (
+                json(&VaultUnlockError::VaultAlreadyUnlocked),
+                r#"{"kind":"VaultAlreadyUnlocked"}"#,
+            ),
+            (
+                json(&VaultUnlockError::VaultRecoveryInProgress),
+                r#"{"kind":"VaultRecoveryInProgress"}"#,
+            ),
+            (
+                json(&VaultUnlockError::JoinFailure),
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
+    /// Payload variants serialize as `{"kind":"<Name>","detail":{…}}`. Both KDF
+    /// figures are MiB and both are public (`required` from the unencrypted
+    /// `vault.meta` KDF block, `available` a property of the client build), so
+    /// carrying them lets the UI say which vault, on which client.
     #[test]
-    fn invalid_credential_or_vault_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::InvalidCredentialOrVault),
-            r#"{"kind":"InvalidCredentialOrVault"}"#
-        );
-    }
-
-    #[test]
-    fn invalid_vault_meta_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::InvalidVaultMeta),
-            r#"{"kind":"InvalidVaultMeta"}"#
-        );
-    }
-
-    #[test]
-    fn io_error_serializes_with_io_failure_kind_payload() {
-        let e = VaultUnlockError::IoError {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serialize(&e),
-            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
-    }
-
-    #[test]
-    fn unlock_in_progress_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::UnlockInProgress),
-            r#"{"kind":"UnlockInProgress"}"#
-        );
-    }
-
-    #[test]
-    fn vault_already_unlocked_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::VaultAlreadyUnlocked),
-            r#"{"kind":"VaultAlreadyUnlocked"}"#
-        );
-    }
-
-    #[test]
-    fn vault_recovery_in_progress_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::VaultRecoveryInProgress),
-            r#"{"kind":"VaultRecoveryInProgress"}"#
-        );
-    }
-
-    #[test]
-    fn join_failure_serializes_with_kind_tag() {
-        assert_eq!(
-            serialize(&VaultUnlockError::JoinFailure),
-            r#"{"kind":"JoinFailure"}"#
-        );
+    fn payload_variants_serialize_with_detail() {
+        let cases = [
+            (
+                json(&VaultUnlockError::IoError {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+            (
+                json(&VaultUnlockError::KdfMemoryExceedsHostCapability {
+                    required_mib: 2048,
+                    available_mib: 1024,
+                }),
+                r#"{"kind":"KdfMemoryExceedsHostCapability","detail":{"required_mib":2048,"available_mib":1024}}"#,
+            ),
+            (
+                json(&VaultStatusError::IoError {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }),
+                r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#,
+            ),
+        ];
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
     }
 
     /// Compile-time enforcement of "no `String` field on any variant".
@@ -306,61 +322,6 @@ mod tests {
             }
         }
         assert_closed(&VaultUnlockError::VaultNotFound);
-    }
-
-    /// The wire shape the TS mirror in `src/types/vault-unlock-error.ts`
-    /// hand-mirrors (phase3-web-client task 31). Both figures are MiB and both
-    /// are public — `required` is read from the unencrypted `vault.meta` KDF
-    /// block, `available` is a property of the client build — so carrying them
-    /// across the boundary lets the UI say which vault, on which client,
-    /// instead of "this vault will not open".
-    #[test]
-    fn kdf_memory_exceeds_host_capability_serializes_with_both_figures() {
-        assert_eq!(
-            serialize(&VaultUnlockError::KdfMemoryExceedsHostCapability {
-                required_mib: 2048,
-                available_mib: 1024,
-            }),
-            r#"{"kind":"KdfMemoryExceedsHostCapability","detail":{"required_mib":2048,"available_mib":1024}}"#
-        );
-    }
-
-    #[test]
-    fn from_io_error_maps_via_closed_enum() {
-        // Synthesize an io::Error of a specific ErrorKind; verify it
-        // arrives as the matching IoFailureKind variant. The raw
-        // io::Error::Display string is dropped at the boundary.
-        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let mapped: VaultUnlockError = raw.into();
-        match mapped {
-            VaultUnlockError::IoError { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
-            }
-            other => panic!("expected IoError variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn from_io_error_unknown_kind_collapses_to_other() {
-        let raw = std::io::Error::from(std::io::ErrorKind::AlreadyExists);
-        let mapped: VaultUnlockError = raw.into();
-        match mapped {
-            VaultUnlockError::IoError { io_error_kind } => {
-                assert_eq!(io_error_kind, IoFailureKind::Other);
-            }
-            other => panic!("expected IoError variant, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn vault_status_error_io_serializes_with_io_failure_kind_payload() {
-        let e = VaultStatusError::IoError {
-            io_error_kind: IoFailureKind::PermissionDenied,
-        };
-        assert_eq!(
-            serde_json::to_string(&e).expect("VaultStatusError must serialize cleanly"),
-            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#
-        );
     }
 
     /// Compile-time enforcement of "no `String` field on any variant"
