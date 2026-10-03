@@ -95,6 +95,14 @@ pub async fn meeting_session_start<R: Runtime>(
     if active.is_some() {
         return Err(VoiceRecordError::AlreadyRecording);
     }
+    // Re-check the slot UNDER this lock. A `vault_lock` landing between the
+    // check above and here would have its `abort_active_session` dropped by that
+    // hook's `try_lock` (this start holds the mutex), so the session would be
+    // published into a locked vault and capture would run behind it. This narrows
+    // the window; the async retry in `abort_active_session` closes it.
+    if !matches!(vault.slot_kind_active().await, SlotKind::Unlocked) {
+        return Err(VoiceRecordError::Locked);
+    }
 
     // The meter is quantized the same way the voice flow quantizes it: the
     // poll runs at ~100 Hz and the meter has a handful of discrete states, so
@@ -268,11 +276,32 @@ pub fn abort_active_session<R: Runtime>(app: &AppHandle<R>) {
     // lock is the path that most needs that: the session is aborted silently,
     // so a leftover tray entry would be the only sign anything was running.
     crate::tray::hide(app);
-    if let Some(meeting) = app.try_state::<MeetingSessionState>() {
-        if let Ok(mut guard) = meeting.active.try_lock() {
-            if let Some(session) = guard.take() {
-                session.abort();
-            }
+    let Some(meeting) = app.try_state::<MeetingSessionState>() else {
+        return;
+    };
+    // Fast path: the slot is free, so there is nothing in flight.
+    if let Ok(mut guard) = meeting.active.try_lock() {
+        if let Some(session) = guard.take() {
+            session.abort();
         }
+        return;
     }
+    // The slot is held right now by a start between claiming it and publishing
+    // the session. Silently dropping the abort here is exactly the race that
+    // left capture running behind a locked vault (`meeting_session_start`'s own
+    // re-check narrows it; this closes it). Retry on the async runtime, so the
+    // teardown path itself still never blocks: by the time the start releases
+    // the lock, its session is published and `take()` finds it.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Some(meeting) = app.try_state::<MeetingSessionState>() else {
+            return;
+        };
+        // Bind the guard's result before matching so the temporary
+        // `MutexGuard` drops at the end of this `let`, not after `meeting`.
+        let taken = meeting.active.lock().await.take();
+        if let Some(session) = taken {
+            session.abort();
+        }
+    });
 }

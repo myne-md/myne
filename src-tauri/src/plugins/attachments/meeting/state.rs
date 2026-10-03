@@ -272,4 +272,41 @@ mod tests {
             );
         });
     }
+
+    /// The capture exclusion between voice and meeting, asserted at the level
+    /// it is enforced. The two start commands take `State<'_, _>` handles no
+    /// unit test can mint, so what is testable here is the invariant they rest
+    /// on: both sessions share ONE slot per state type, and the commands' read
+    /// of `Some` is what produces `AlreadyRecording`. This pins that a slot
+    /// holding a live session answers `Some` (so a start refuses) and that
+    /// taking it answers `None` for the next start — the same sequence the
+    /// commands perform. The cross-command direction (voice refusing while a
+    /// meeting runs, and vice versa) is enforced by both commands taking the
+    /// OTHER state's lock; that ordering is stated in `voice_record_start` so
+    /// the pair cannot deadlock, and is covered by review rather than a driver.
+    #[test]
+    fn the_slot_refuses_a_second_session_and_frees_on_take() {
+        rt().block_on(async {
+            let state = MeetingSessionState::default();
+            assert!(
+                state.active.lock().await.is_none(),
+                "a fresh state has no session"
+            );
+            *state.active.lock().await = Some(fixture_session());
+            assert!(
+                state.active.lock().await.is_some(),
+                "a live session makes the next start refuse with AlreadyRecording"
+            );
+            let taken = state.active.lock().await.take();
+            assert!(taken.is_some(), "the session is taken, not cloned");
+            assert!(
+                state.active.lock().await.is_none(),
+                "taking the session frees the slot for the next start"
+            );
+            // Drop the taken session so its capture thread is signalled.
+            if let Some(session) = taken {
+                session.abort();
+            }
+        });
+    }
 }

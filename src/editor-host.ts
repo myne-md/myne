@@ -242,6 +242,10 @@ const host: EditorHost = {
   // the transcription binding and the i18n catalog; the shared bar it mounts
   // comes back from `@myne/editor`.
   meetingSession: (view: unknown) => {
+    // The sidebar surface travels through the module binding set by
+    // `EditorChrome` (`setMeetingSidebarSurface`), not through this seam: the
+    // seam carries the `EditorView` and the controller reads the surface at
+    // stop time.
     void startMeetingSession(view);
   },
   voice: {
