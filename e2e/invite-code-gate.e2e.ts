@@ -157,9 +157,21 @@ describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
-      const banner = await a.session.byTestId("sync.enroll.error", { timeoutMs: 30_000 });
-      expect(await banner.text()).toContain("invite code");
-      expect(await banner.text()).not.toContain("password");
+      // Poll the TEXT, not just the element: WebKitGTK's W3C getText can
+      // return "" for a beat after the node is locatable (the same race
+      // change-password.e2e.ts records), which surfaced here as
+      // `expected '' to contain 'invite code'`. textContent() reads the live
+      // property and is stable across that window.
+      await a.session.waitUntil(
+        async () => {
+          const t = (await (await a.session.byTestId("sync.enroll.error")).textContent()) ?? "";
+          return t.includes("invite code") ? true : null;
+        },
+        { label: "enroll error names the invite code", timeoutMs: 30_000 },
+      );
+      const bannerText =
+        (await (await a.session.byTestId("sync.enroll.error")).textContent()) ?? "";
+      expect(bannerText).not.toContain("password");
       await closeSettings(a.session);
     } finally {
       await a.teardown();
