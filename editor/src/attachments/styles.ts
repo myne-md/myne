@@ -532,6 +532,41 @@ const CSS = `
   background-color: var(--paper-2, #f3f1eb);
 }
 
+/* Meeting-session bar (myne-md/myne#789). The box, meter, dot, timer and
+   buttons are the voice bar's own classes above, deliberately: the two are the
+   same floating surface with different contents, and a second copy of the same
+   dozen values is a second place for them to drift. Only the elements the voice
+   bar does not have are declared here. */
+.cm-meeting-rec {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(520px, 80vw);
+}
+.cm-meeting-rec-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+/* A standing platform notice, not a warning: it is true before the session
+   starts, so it must not read as something that just went wrong. */
+.cm-meeting-rec-notice {
+  font-size: 12px;
+  color: var(--fg-2, #44423d);
+}
+.cm-meeting-rec-transcript {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+.cm-meeting-rec-block {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-2, #44423d);
+}
+
 /* Transcription busy meter (voice-to-text MYND-552). The @keyframes lives here
    in the global sheet (the CM theme's StyleModule doesn't emit @keyframes); the
    bar's static box + colour come from the scoped theme. */
