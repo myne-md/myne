@@ -18,6 +18,29 @@ So: **no note titles, previews, counts, streaks, or timestamps** anywhere. The
 "deliberately excluded" panel of the design board (recent notes, counts, search,
 "vault unlocked" status, Live Activity) is excluded here too — on purpose.
 
+## Rendering modes (iOS 18 Tinted and Clear)
+
+Home Screen widgets do **not** always render in the brand colors. When the person
+picks the **Tinted** or **Clear** appearance, iOS 18 switches WidgetKit to its
+`accented` rendering mode: the system ignores view colors, removes the
+`containerBackground`, templates the hierarchy by its **alpha channel**, and
+paints the accent and primary groups in system tints. The Lock Screen uses the
+related `vibrant` mode. Light and Dark stay `fullColor`.
+
+This is why every Home widget view reads `\.widgetRenderingMode` through
+`MyneTokens` (`MyneColor.swift`) rather than using the raw `MyneColor` tokens:
+
+- a filled shape gains a `stroke` twin (`accent` plus `accentStroke`, `paper2`
+  plus `line`) so it survives losing its fill;
+- foregrounds fall back to `.primary`/`.secondary` off the `fullColor` path;
+- `MyneBrandMark` (`MyneMark.swift`) draws the bare stroked `MyneGlyph` instead
+  of the opaque `MyneLogo` tile, because two fully opaque shapes collapse into
+  one blank block once the system templates them. This collapsed tile was the
+  reported "the widget disappears in Tinted/Clear" bug (myne-md/myne#807).
+
+When adding a widget view, use `MyneTokens`, group meaningful content with
+`.widgetAccentable()`, and never assume a `MyneColor` fill will be painted.
+
 ## What's here
 
 ```
@@ -29,7 +52,8 @@ ios-widgets/
 │   ├── MyneControl.swift        ← WG-02 Control Center control "New note" (iOS 18+)
 │   ├── CaptureIntent.swift      ← NewNoteIntent (Action Button + control), opens the app
 │   ├── MyneColor.swift          ← design tokens (mirror of src/styles/tokens.css)  [SHARED]
-│   └── MyneMark.swift           ← the Myne "M" mark Shape + logo tile              [SHARED]
+│   ├── MyneMark.swift           ← the Myne "M" mark Shape + logo tile              [SHARED]
+│   └── MyneWidgetRendering.swift ← rendering-mode tokens + adaptive brand mark
 └── MyneApp/
     └── CaptureSheet.swift       ← WG-04 quick-capture surface (typing/voice/saving)
                                     — belongs to the APP target (holds plaintext)
@@ -37,39 +61,52 @@ ios-widgets/
 
 `MyneColor.swift` and `MyneMark.swift` are used by both the extension and the
 app-side `CaptureSheet`; add them to **both** targets' membership (or factor them
-into a shared Swift package).
+into a shared Swift package). They must stay compilable at the app target's
+`deploymentTarget` (iOS 15), so they carry no `WidgetRenderingMode` or other
+iOS 16+ WidgetKit API. `MyneWidgetRendering.swift` owns those, and is
+**widget-target-only** for that reason.
 
-## Wiring into the Tauri iOS project — DONE (project.yml + xcodegen)
+## Wiring into the Tauri iOS project — committed spec + ios-postinit.sh
 
-The widgets are integrated as a real, embedded WidgetKit extension that ships
-inside `Myne.app` on every `pnpm tauri ios build`. Rather than the old
-add-a-target-in-Xcode dance (which `tauri ios init` would drop), the extension
-is declared in the **xcodegen `project.yml`** that Tauri already uses to
-generate the Xcode project — the durable layer.
+The widgets ship as a real, embedded WidgetKit extension inside
+`Myne.app/PlugIns/` on every `pnpm tauri ios build`. The target is declared in
+the **committed** `mobile/src-tauri/ios/project.yml`, NOT in the regenerated
+`src-tauri/gen/apple/` tree.
 
-### The three project.yml additions (`src-tauri/gen/apple/project.yml`)
+`tauri ios init` rebuilds that tree wholesale, so a project.yml edit made there
+is transient by construction. An earlier version of this README called
+`gen/apple/project.yml` "the durable layer"; it is not — it is itself
+regenerated, and on 2026-10-01 a fresh init dropped the widget and watch targets
+and the v0.8.2 TestFlight build shipped phone-only (myne-md/myne#803). The
+durable home is the committed spec, which `mobile/scripts/ios-postinit.sh` copies
+onto `gen/apple/project.yml`, substitutes the `__MYNE_*__` placeholders from the
+live build config, and feeds to `xcodegen generate`. That script is wired into
+the package's `tauri` command (`mobile/scripts/tauri.sh`), so any `pnpm tauri
+ios dev|build|run` in `mobile/` re-applies it automatically — there is no manual
+step left to forget.
+
+What the committed spec declares for the widgets:
 
 1. A `MyneWidgets` **app-extension target** — `deploymentTarget: "17.0"` (the
-   home/StandBy views use iOS-17 `containerBackground`), sources pointed at
-   `../../../ios-widgets/MyneWidgets`, bundle id `md.myne.mobile.widgets`, an
-   `Info.plist` with `NSExtensionPointIdentifier = com.apple.widgetkit-extension`
-   (its `CFBundleVersion` must match the app's), and `WidgetKit` / `SwiftUI` /
-   `AppIntents` framework deps.
-2. `- target: MyneWidgets` added to the **app target's** `dependencies` so
-   xcodegen embeds the `.appex` into `Myne.app/PlugIns/`.
-3. On the app target: the `myne` **URL scheme** in `info.properties`
-   (`CFBundleURLTypes`), and `DEVELOPMENT_TEAM` + `CODE_SIGN_STYLE: Automatic`
-   promoted into the `app` settingGroup so a `xcodegen generate` (which rebuilds
-   the pbxproj) keeps signing for both targets.
+   home/StandBy views use iOS-17 `containerBackground`), sources
+   `../../../ios-widgets/MyneWidgets`, bundle id `md.myne.mobile.widgets`, the
+   committed `Info.plist` (`NSExtensionPointIdentifier =
+   com.apple.widgetkit-extension`), and `WidgetKit` / `SwiftUI` / `AppIntents`
+   framework deps. Its `CFBundleShortVersionString`/`CFBundleVersion` read
+   `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`, so they always equal
+   the app's — App Store validation rejects an app extension whose version
+   differs from its containing app.
+2. `- target: MyneWidgets` in the **app target's** `dependencies`, which is what
+   makes xcodegen emit the Embed-Foundation-Extensions phase into
+   `Myne.app/PlugIns/`.
+3. The `myne` **URL scheme** and the app-target signing. The URL scheme now lives
+   in the committed `src-tauri/Info.ios.plist` partial (MYND-465; the Android
+   mirror is `tauri.conf.json` `plugins.deep-link.mobile`). Signing
+   (`DEVELOPMENT_TEAM`, `CODE_SIGN_STYLE`) is substituted from
+   `APPLE_DEVELOPMENT_TEAM` / `tauri.conf.json` by the postinit script.
 
-Then `cd src-tauri/gen/apple && xcodegen generate` (Tauri also runs it on build).
-
-> Note (MYND-465): the URL-scheme half of addition 3 is now REDUNDANT — the
-> `myne` `CFBundleURLTypes` moved into the committed `src-tauri/Info.ios.plist`
-> partial (and `tauri.conf.json` `plugins.deep-link.mobile` covers the Android
-> intent-filter). After a fresh init only the signing half of addition 3 still
-> needs re-applying. The Android mirror of this whole wiring story lives in
-> `android-widgets/README.md`.
+Run by hand: `pnpm --filter myne-mobile ios:postinit`. The Android mirror of this
+whole wiring story is `android-widgets/README.md` + `scripts/android-postinit.sh`.
 
 ### The app-side deep-link half (this is what makes them *work*)
 
@@ -95,22 +132,36 @@ The Control Center control + `NewNoteIntent` (which opens `myne://capture` via
 
 ### Gotchas
 
-- **`tauri ios init` regenerates `project.yml`**, dropping these edits. `gen/apple/`
-  is git-ignored, so after a fresh init re-apply the three additions above
-  (they are small and self-contained) and re-run `xcodegen generate`.
-- **The Apple Watch companion (`ios-watch/`, §9.18) adds its OWN `project.yml`
-  edits** that `tauri ios init` also drops — the `MyneWatch` + `MyneWatchComplications`
-  targets, the `- target: MyneWatch` embed + `WatchConnectivity.framework` on the
-  app target, the `../../../ios-watch/Receiver` app source, and `SWIFT_VERSION` on
-  the app target. Re-apply them alongside the widget additions after a fresh init;
-  the full checklist + the two on-device verification points live in
-  **`ios-watch/README.md`**.
+- **`tauri ios init` regenerates `project.yml`** — that is the whole reason
+  `mobile/scripts/ios-postinit.sh` exists. You normally never run it by hand: the
+  package's `tauri` script wraps every `ios dev|build|run`. The widget and the
+  Apple Watch (`ios-watch/`, §9.18) targets are all in the one committed spec, so
+  there is no per-feature checklist to re-apply. `scripts/check-ios-extensions.mjs`
+  (pre-commit + CI) fails by name if the committed spec or the generated project
+  drifts — myne-md/myne#803.
 - **`Externals/arm64/{debug,release}/libapp.a` collision.** The app target globs
   `Externals/` as sources, so if BOTH a `tauri ios dev` (debug) and a
   `tauri ios build` (release) `libapp.a` are present, xcodegen bakes two
   copy-commands for the same `Myne.app/libapp.a` → *"Multiple commands produce"*.
   Before a release build after a dev run: `rm -rf src-tauri/gen/apple/Externals/*/debug`
   and re-run `xcodegen generate`.
+
+## Verification checklist (physical device)
+
+Like the Android mirror (`android-widgets/README.md`) and the biometric
+quick-unlock checklist, the widget surfaces depend on OS rendering that no
+automated lane reaches; run this after any change to this module:
+
+1. Add every Home widget (Open Myne, Quick capture small and medium, Encrypted).
+   On the Home Screen customization, check the **Light** and **Dark**
+   appearances, then switch to **Tinted** and then **Clear**, on a light and a
+   dark wallpaper. Confirm the brand mark, the `+`/mic glyphs and every label
+   stay visible and legible in all four, and that nothing renders as a blank
+   tile. This is the regression myne-md/myne#807 fixed.
+2. Confirm the lock-screen accessories (inline, circular, rectangular) and the
+   StandBy glance still render legibly after the change.
+3. Resize Quick capture between small and medium and confirm the medium layout's
+   two buttons both remain visible in the Tinted and Clear appearances.
 
 ## Preview
 

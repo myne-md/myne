@@ -167,6 +167,31 @@
       "remote": "Answered by {{provider}}. Your notes were sent there."
     }
   },
+  "aiOnboarding": {
+    "title": "Set up AI",
+    "intro": "Myne can search your notes by meaning, suggest tags, and chat about them. None of it is required, and you can turn it on later from Settings.",
+    "enableLabel": "Turn on AI features",
+    "semantic": {
+      "title": "Semantic search",
+      "body": "Download a multilingual embedding model (about 449 MB) so you can search by meaning, not just by words."
+    },
+    "tag": {
+      "title": "Auto-tagging",
+      "body": "Download the tag model (about 337 MB) so Myne can suggest tags as you write."
+    },
+    "chat": {
+      "title": "Chat",
+      "body": "No download. Chat runs against a model you already run yourself or a provider you name, with a consent step.",
+      "setup": "Set up a provider"
+    },
+    "download": "Download",
+    "downloading": "Downloading…",
+    "cancel": "Cancel",
+    "complete": "Ready",
+    "retry": "Retry",
+    "skip": "Skip",
+    "done": "Done"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Cancel",
@@ -2557,6 +2582,43 @@
       "defaultSlotName": "Default"
     }
   },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "Keep editing",
+      "message": "Some open files still have unsaved changes that could not be written to disk. Closing now discards them.",
+      "okLabel": "Discard and close",
+      "title": "Close Myne?"
+    },
+    "closeTab": "Close {{name}}",
+    "conflict": {
+      "body": "This file changed on disk while you were editing. Myne has not written anything.",
+      "copy": "Save a copy…",
+      "copyFailed": "The copy could not be saved. The original file is unchanged.",
+      "overwrite": "Overwrite with my changes",
+      "reload": "Reload from disk"
+    },
+    "deeplink": {
+      "body": "It lives outside every vault, so Myne will not encrypt it.",
+      "cancel": "Cancel",
+      "confirm": "Open",
+      "failed": "The file could not be opened. It may have moved or changed.",
+      "title": "Open this local file?"
+    },
+    "empty": "No file is open.",
+    "import": "Import to vault",
+    "importFailed": "The file could not be imported. Nothing was changed.",
+    "importLocked": "The vault is locked. Unlock it, then try again.",
+    "importNeedsVault": "There is no vault on this device yet. Create one, then try again.",
+    "marker": "Local file. Not encrypted, and not part of any vault.",
+    "open": "Open a local file",
+    "openFailed": "That file could not be opened.",
+    "openRefusedTooLarge": "That file is too large to open here.",
+    "openRefusedType": "Only .md and .markdown files open here.",
+    "retry": "Try saving again",
+    "saveError": "The file could not be saved. Your edits are still here.",
+    "tabs": "Open local files",
+    "unsaved": "Unsaved changes"
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Checking strength…",
@@ -3155,6 +3217,12 @@
       "off": "Off",
       "on": "On"
     },
+    "plainFile": {
+      "errorSaveSetting": "Could not save the plain-file setting.",
+      "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. On by default; turn it off here.",
+      "label": "Plain-file editor",
+      "openFilesRemain": "Files with unsaved changes are still open. Resolve them, then turn this off again."
+    },
     "views": {
       "helper": "Show the Views entry in the sidebar for saving filtered note lists. Off by default; on if you already have views.",
       "label": "Views"
@@ -3180,7 +3248,7 @@
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
+      "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
@@ -3239,7 +3307,20 @@
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models. That would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Download a model here, or open a link to get one in your browser and pick the downloaded files. A model runs on your device; if you have named a provider instead, that provider answers.",
+      "downloadsLabel": "Download models",
+      "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
+      "downloadEmbeddingSize": "Multilingual model, about 449 MB.",
+      "downloadTagLabel": "Tag model: automatic tag suggestions",
+      "downloadTagSize": "Small local model, about 337 MB.",
+      "downloadInstalled": "Installed",
+      "downloadNotInstalled": "Not installed",
+      "downloadReinstall": "Download",
+      "modelRemove": "Remove",
+      "downloading": "Downloading…",
+      "downloadFailed": "The download did not finish.",
+      "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
+      "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeyLabel": "API key",
@@ -3603,6 +3684,7 @@
         "legal": "legal privacy policy terms impressum gdpr dsgvo law enforcement abuse report data protection",
         "license": "license agpl open source legal",
         "lineNumbers": "line numbers gutter editor display",
+        "plainFile": "plain file editor markdown local disk outside vault plaintext open in place",
         "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
@@ -3809,6 +3891,8 @@
       "fixedOriginNone": "No sync server is configured for this deployment.",
       "pinPlatformTrust": "Server certificate verified by this client’s trust store.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "inviteLabel": "Invite code (only if this server asks for one)",
+      "invitePlaceholder": "The code the server’s operator gave you",
       "unreachable": "Couldn’t reach that server. Check the URL and that it’s running."
     },
     "enroll": {
@@ -3822,6 +3906,8 @@
         "awaitingApproval": "This device is already waiting for approval. Approve it from a device that is already signed in.",
         "deviceLimit": "This account has reached its device limit. Remove a device you no longer use, then try again.",
         "frozen": "This account is frozen, so no new device can be added right now. Your notes on this device are unaffected.",
+        "inviteCodeInvalid": "That invite code was not accepted. Check it and try again.",
+        "inviteCodeRequired": "This server only accepts new accounts with an invite code. Enter the code its operator gave you.",
         "notConfigured": "Set a sync server in settings before adding this device.",
         "serverMismatch": "The sync server’s identity didn’t match what this device expected. Don’t enter your credentials again until you know why.",
         "kdfTooLarge": "This device does not have enough memory to open that vault. Its encryption settings need more memory than this app can use here. Open it on a desktop computer instead.",
@@ -4588,8 +4674,6 @@
       "myneSync": "Use Myne Sync",
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "selfHosted": "Use my own server",
-      "connecting": "Connecting…",
-      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",

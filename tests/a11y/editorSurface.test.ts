@@ -41,15 +41,41 @@ function code(path: string): string {
 
 describe("the editor body's role comes from the engine", () => {
   it("CodeMirror still sets role=textbox and aria-multiline on the content element", () => {
-    // A property of a pinned dependency. Asserted rather than assumed, because
-    // a major bump could drop it and nothing else in this tree would notice.
-    const view: string = readFileSync(
-      "node_modules/@codemirror/view/dist/index.js",
-      "utf8",
-    );
-    expect(view).toContain('role: "textbox"');
-    expect(view).toContain('"aria-multiline": "true"');
-    expect(view).toContain('contentAttrs["aria-readonly"] = "true"');
+    // A property of a pinned dependency, asserted on the real rendered DOM
+    // rather than on the dependency's minified dist text: a major bump could
+    // drop it and nothing else in this tree would notice, and a dist-text grep
+    // would keep passing if the attribute stopped reaching the element.
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "hello" }),
+      parent: host,
+    });
+    try {
+      expect(view.contentDOM.getAttribute("role")).toBe("textbox");
+      expect(view.contentDOM.getAttribute("aria-multiline")).toBe("true");
+    } finally {
+      view.destroy();
+      host.remove();
+    }
+  });
+
+  it("marks the content readonly when the state is readonly", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "hello",
+        extensions: [EditorState.readOnly.of(true)],
+      }),
+      parent: host,
+    });
+    try {
+      expect(view.contentDOM.getAttribute("aria-readonly")).toBe("true");
+    } finally {
+      view.destroy();
+      host.remove();
+    }
   });
 });
 

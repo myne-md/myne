@@ -116,6 +116,11 @@ beforeEach(() => {
 });
 
 describe("editor host, per client", () => {
+  // `loadHost` imports the whole desktop host graph — the attachment, editor
+  // and AI seams, and now the meeting-session module (`src/editor-host.ts`
+  // wires `startMeetingSession`). A cold import on a loaded runner exceeds
+  // vitest's 5 s default (measured 8.6 s during a pre-push battery; ~2 s
+  // standalone), so this one gets headroom rather than a false red.
   it("desktop installs every member", async () => {
     const host = await loadHost(DESKTOP_ABSENT);
     expect(typeof host.t).toBe("function");
@@ -142,7 +147,7 @@ describe("editor host, per client", () => {
     expect(
       typeof host.clipboardWrite,
     ).toBe("function");
-  });
+  }, 15000);
 
   it("web omits the members its capability set says are absent", async () => {
     const host = await loadHost(WEB_ABSENT);

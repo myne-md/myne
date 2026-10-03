@@ -371,6 +371,8 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
 export function SyncEndpointPanel() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
+  // The shared admission code for a gated server (empty = open server).
+  const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -379,6 +381,7 @@ export function SyncEndpointPanel() {
     void syncGetEndpoint()
       .then((c) => {
         if (c.endpoint_url) setUrl(c.endpoint_url);
+        setInviteCode(c.invite_code ?? "");
       })
       .catch(() => {
         /* unconfigured — leave the field empty */
@@ -390,7 +393,7 @@ export function SyncEndpointPanel() {
     if (trimmed.length === 0) return;
     setBusy(true);
     setMsg(null);
-    void syncSetEndpoint(trimmed)
+    void syncSetEndpoint(trimmed, inviteCode.trim())
       .then((r) => {
         setMsg(t(r.pin_source === "platform_trust_store" ? "sync.settings.connectedTls" : "sync.settings.connectedLocal"));
       })
@@ -405,7 +408,11 @@ export function SyncEndpointPanel() {
       <FieldLabel mt={6}>{t("sync.settings.serverAddressLabel")}</FieldLabel>
       <input
         value={url}
-        onChange={(e) => setUrl(e.target.value)}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          // Changing the address invalidates a code issued for the old server.
+          setInviteCode("");
+        }}
         placeholder={t("sync.settings.serverAddressPlaceholder")}
         spellCheck={false}
         autoCapitalize="none"
@@ -413,6 +420,17 @@ export function SyncEndpointPanel() {
         inputMode="url"
         style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)", fontSize: 15 }}
         data-testid="sync.endpoint-input"
+      />
+      <FieldLabel mt={14}>{t("sync.endpoint.inviteLabel")}</FieldLabel>
+      <input
+        value={inviteCode}
+        onChange={(e) => setInviteCode(e.target.value)}
+        placeholder={t("sync.endpoint.invitePlaceholder")}
+        spellCheck={false}
+        autoCapitalize="none"
+        autoCorrect="off"
+        style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)" }}
+        data-testid="sync.endpoint-invite-input"
       />
       <div style={{ marginTop: 14 }}>
         <button
@@ -450,6 +468,13 @@ function enrollFailureMessage(kind: string, t: TFunction): string {
       return t("sync.settings.enrollNotConfigured");
     case "Transport":
       return t("sync.settings.enrollTransport");
+    // The gated-server refusals are not credential failures: the remedy is the
+    // operator's invite code, and the credential banner would send the user
+    // round a loop that cannot terminate.
+    case "InviteCodeRequired":
+      return t("sync.enroll.error.inviteCodeRequired");
+    case "InviteCodeInvalid":
+      return t("sync.enroll.error.inviteCodeInvalid");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }

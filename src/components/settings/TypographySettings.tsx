@@ -30,7 +30,7 @@ import {
   toWire,
   type TypographyOption,
 } from "../../editor/typography";
-import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { ERROR_STYLE } from "./panel-styles";
 import { SettingRow } from "./SettingRow";
 
@@ -128,7 +128,7 @@ export function TypographySettings() {
     setError(null);
     try {
       // Disk-first: persist before reflecting so a failure never shows a
-      // "saved" illusion (the segment + live editor stay put). The setter bumps
+      // "saved" illusion (the dropdown + live editor stay put). The setter bumps
       // the prefs nonce, so the open editor re-renders with the new preset.
       await row.persist(toWire(value, row.def));
       setSel((s) => ({ ...s, [row.field]: value }));
@@ -143,7 +143,8 @@ export function TypographySettings() {
         const label = t(row.labelKey);
         // Each option's `label` is an i18n KEY (single-homed in
         // `editor/typography.ts`); resolve it here so a language switch
-        // re-labels the segments. `value` (the wire/testid tail) is untouched.
+        // re-labels the options. `value` (the wire value, and the `data-value`
+        // each option carries) is untouched.
         const options = row.options.map((o) => ({ value: o.value, label: t(o.label) }));
         return (
           <Fragment key={row.field}>
@@ -151,15 +152,16 @@ export function TypographySettings() {
               anchorId={row.anchorId}
               label={label}
               helper={t(row.helperKey)}
-              control={
-                <Segmented
+              control={(helperId) => (
+                <Select
                   options={options}
                   value={sel[row.field]}
                   onChange={(value) => void choose(row, value)}
-                  ariaLabel={label}
+                  aria-label={label}
+                  ariaDescribedBy={helperId}
                   testId={row.testId}
                 />
-              }
+              )}
             />
           </Fragment>
         );

@@ -414,8 +414,23 @@ mod tests {
 
     #[test]
     fn sealed_frame_rejects_truncation_closed() {
-        let person_id = person_id_hash("word ".repeat(24).trim());
-        assert!(open_sealed_file(&[0u8; 10], "word ".repeat(24).trim(), &person_id).is_err());
+        // `delete_sealed_file` leaves an all-zero frame at EXACTLY
+        // `SEALED_FRAME_LEN`; only that shape is absent-equivalent, so
+        // `unlock_person_identity` re-enrols from it. A wrong-length all-zero
+        // frame (a torn write, a filesystem zero-fill) must NOT read as erased,
+        // or unlock would mint a fresh keypair over a recoverable frame and
+        // orphan every wrap sealed to the old fingerprint. Both halves are
+        // asserted, so dropping the length check in `is_erased_frame` fails.
+        let phrase = "word ".repeat(24);
+        let phrase = phrase.trim();
+        let person_id = person_id_hash(phrase);
+
+        assert!(is_erased_frame(&vec![0u8; SEALED_FRAME_LEN]));
+        assert!(!is_erased_frame(&[0u8; 10]));
+        assert!(matches!(
+            open_sealed_file(&[0u8; 10], phrase, &person_id),
+            Err(PersonIdentityError::CannotDecrypt)
+        ));
     }
 
     #[test]

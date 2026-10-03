@@ -278,10 +278,22 @@ describe("the happy path still reaches the writer, so the negatives are not vacu
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it("the padding constant is the one the card is measured with", () => {
-    // Guards the arithmetic above against the card and the raster disagreeing
-    // about how big the card is.
-    expect(SELECTION_CARD_PADDING).toBeGreaterThan(0);
+  it("the padding constant is the one the card is measured with", async () => {
+    // Drive the real export rather than asserting the constant is positive:
+    // noteImageExport.ts:182 builds the SVG at `selection + padding*2` and
+    // :196-197 rasters exactly that size, so a card that stopped using the
+    // constant changes both the SVG width and the canvas dimensions below.
+    selectRealRange(); // rect is 184x84; see selectRealRange
+    const probe = stubCanvas(new Blob([new Uint8Array([1])]));
+    saveMock.mockResolvedValue("/tmp/card.png");
+    expect(await exportSelectionAsImage()).toBe("ok");
+
+    const cardSide = (content: number): number => content + SELECTION_CARD_PADDING * 2;
+    const svgBlob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0] as Blob;
+    expect(await svgBlob.text()).toContain(`width="${cardSide(184)}"`);
+    // Raster supersampling is RASTER_SCALE (2).
+    expect(probe.created[0].width).toBe(cardSide(184) * 2);
+    expect(probe.created[0].height).toBe(cardSide(84) * 2);
   });
 });
 

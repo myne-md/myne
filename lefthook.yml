@@ -52,6 +52,22 @@ pre-commit:
       glob: "*.{ts,tsx,js,jsx,mts,cts}"
       run: node scripts/check-platform-seam.mjs {staged_files}
 
+    plain-surface-imports:
+      # myne-md/myne#788: the plain-file surface renders the user's own file with
+      # the vault locked or absent, and several vault-coupled modules call
+      # `invoke` at module scope, so a single direct import in `src/plain/` turns
+      # "works with no vault" into a runtime failure that no compiler reports.
+      # The host refusal covers only what the editor calls THROUGH the host; a
+      # direct import never passes through it.
+      #
+      # Globbed to the tree the rule is about: every import SITE lives under
+      # `src/plain/`, so a docs-only, protocol-only or core-only commit cannot
+      # change the answer and does not pay the scan. The `run:` takes no
+      # {staged_files}: the glob decides WHETHER it runs, and it sweeps the
+      # whole tree when it does.
+      glob: "{src/plain/**,scripts/check-plain-surface-imports.mjs}"
+      run: node scripts/check-plain-surface-imports.mjs
+
     core-task-seam:
       # phase3-web-client task 80: `crate::task` is the only place in `core/`
       # allowed to reach tokio's execution surface. The reason this is a hook
@@ -213,6 +229,23 @@ pre-commit:
       # platform backup).
       glob: "{mobile/**,scripts/check-mobile-plugin-acl.mjs}"
       run: node scripts/check-mobile-plugin-acl.mjs
+
+    ios-extensions:
+      # myne#803: the iOS widget + Apple Watch targets live only in the
+      # committed `mobile/src-tauri/ios/project.yml`, re-applied by
+      # `mobile/scripts/ios-postinit.sh` (the `tauri ios init` tree is
+      # regenerated and git-ignored). A reset silently drops every native
+      # extension: Myne.app ships with no PlugIns/ and no Watch/, no compiler or
+      # test reports anything, and it is only visible on a device — which is how
+      # the v0.8.2 TestFlight build went out phone-only. On a machine with the
+      # generated project this also fails while it is unsynced, the exact
+      # "ran init and forgot" state.
+      #
+      # Globbed like its mobile neighbours above: every side of the property is
+      # under mobile/ (plus this guard), so a docs- or protocol-only commit has
+      # nothing here to break.
+      glob: "{mobile/**,scripts/check-ios-extensions.mjs}"
+      run: node scripts/check-ios-extensions.mjs
 
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
@@ -929,6 +962,12 @@ pre-push:
       # reach — the *textual* sync of both sentinel blocks (const formatting +
       # the .md spec block) against the generator output. Migrate to Woodpecker
       # CI when it lands.
+      #
+      # Globbed to the only two places the drift can be authored: the const and
+      # its generator live together in `account_number.rs`, and the spec block
+      # is the file's §4.2 table. A push touching neither cannot change the
+      # answer and does not pay the protocol test compile.
+      glob: "{protocol/src/account_number.rs,docs/spec/account-number.md}"
       env:
         CARGO_TARGET_DIR: target/pre-push
       run: |
@@ -953,70 +992,51 @@ pre-push:
         exit $fail
 
     clippy:
+      # Globbed: only a Rust or toolchain change can move the lint result, so a
+      # docs-only or TS-only push skips the workspace clippy rebuild. The same
+      # applies to `cargo-test` below, which shares the target and the reason.
+      #
+      # TWO patterns, and the root one is load-bearing rather than tidy:
+      # lefthook's `**/` matches ONE OR MORE directories, so `**/*.toml` misses
+      # the root `Cargo.toml` / `rust-toolchain.toml` / `Cargo.lock` entirely.
+      # Verified against 2.1.15 by injection: a root `Cargo.lock` change skipped
+      # this command under the single `**/*` pattern.
+      glob:
+        - "*.{rs,toml,lock}"
+        - "**/*.{rs,toml,lock}"
       env:
         CARGO_TARGET_DIR: target/pre-push
       run: cargo clippy --workspace --all-targets -- -D warnings
 
-    clippy-wasm:
-      # The HOST clippy above cannot see a large body of Rust
-      # (phase3-web-client task 77). `--workspace --all-targets` builds for the
-      # host triple, so every `#[cfg(target_arch = "wasm32")]` arm in
-      # `myne-core` and `protocol` is skipped entirely — a clippy error, a
-      # broken `cfg`, or a plain compile break there passes both `pre-push` and
-      # every host CI step.
-      #
-      # That body is no longer small: the sync port put the browser transport
-      # factory, the wasm arm of `task::run_blocking_future`, the session token
-      # store's selection and the TOFU-pin refusal behind that cfg. The web
-      # ENTRY crate was already gated in CI; these two were the hole.
-      #
-      # No `rustup target add`: `rust-toolchain.toml` pins
-      # `targets = ["wasm32-unknown-unknown"]`, so a machine that can build this
-      # repo already has it. A gate that installs its own target is one that
-      # silently does not run wherever the line was forgotten.
-      env:
-        CARGO_TARGET_DIR: target/pre-push
-      run: cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
-
-    test-web-wasm:
-      # The wasm ENTRY crate's host-triple unit tests (phase3-web-client task 77).
-      #
-      # `cargo test --workspace` below DOES include this crate, so locally these
-      # already ran — the gap this closes is CI's, where the Rust test steps name
-      # `-p protocol` and `-p myne-desktop -p myne-core` and reach `myne-web-wasm`
-      # through neither. Named separately here so the two sides list the same
-      # thing and a future `--workspace` narrowing does not silently drop it.
-      env:
-        CARGO_TARGET_DIR: target/pre-push
-      run: cargo test -p myne-web-wasm
-
-    desktop-ai-free:
-      # The AI-free auditable variant, which NOTHING here compiled until
-      # myne-md/myne#529 shipped a desktop crate that did not build in it.
-      #
-      # `--no-default-features` drops candle and every AI plugin, and it is the
-      # build `design-notes/ai/0337` and `threat-model.md` describe as the one
-      # that "never compiles the AI path" -- the variant an auditor or a
-      # self-hoster builds to check that claim. Every gate above builds the
-      # DEFAULT features, so a module that reaches into `local_inference`
-      # without a `#[cfg]` compiles perfectly for a developer and for
-      # `cargo test --workspace`, and fails only in CI's `tauri-compile`.
-      #
-      # That is exactly what happened: four consecutive pipelines went red on
-      # this one command while every local gate stayed green, and the failure
-      # was invisible from the PR because the bot's CI comment cannot name a
-      # step. `check`, not `build`: no link, ~10s warm, and a compile error is
-      # the whole failure mode.
-      env:
-        CARGO_TARGET_DIR: target/pre-push
-      run: cargo check -p myne-desktop --no-default-features
+    # `clippy-wasm`, `test-web-wasm` and `desktop-ai-free` used to sit here.
+    # All three moved to CI-ONLY deliberately: each is exactly, or strictly
+    # dominated by, a step `.woodpecker/main.yml` already runs —
+    # `wasm-protocol` carries both wasm clippys and `cargo test -p
+    # myne-web-wasm` (main.yml:232-254), and `tauri-compile` carries
+    # `cargo clippy -p myne-desktop --all-targets --no-default-features`
+    # (main.yml:841), which is strictly stronger than the `cargo check
+    # --no-default-features` this file used to run. `cargo test --workspace`
+    # below covers the web-wasm test crate locally too, so nothing here lost a
+    # local gate; the three were the redundant, and slowest-throughput, half of
+    # the battery.
 
     cargo-test:
+      glob:
+        - "*.{rs,toml,lock}"
+        - "**/*.{rs,toml,lock}"
       env:
         CARGO_TARGET_DIR: target/pre-push
       run: cargo test --workspace
 
     pnpm-build:
+      # Globbed to the trees `pnpm build` actually compiles. A Rust-only or
+      # docs-only push cannot change the bundle, so it skips the Vite/tsc pass.
+      # The root pattern is not decoration: lefthook's `**/` matches one-or-more
+      # directories, so the root `package.json` / `vite.config.ts` /
+      # `tsconfig.json` / `index.html` need `*.{…}` beside `**/*.{…}`.
+      glob:
+        - "*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
+        - "**/*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
       run: pnpm build
 
     vitest:
@@ -1024,6 +1044,14 @@ pre-push:
       # include:["src"], so `pnpm-build` above type-checks src but never runs
       # or type-checks the specs — Vitest is their only local gate (CI runs it
       # too). Closes the "JS test red only surfaces after push" gap.
+      #
+      # Globbed with `pnpm-build` above. The handful of specs that read a Rust
+      # file (tests/scripts/*.test.ts) are guard-injection specs whose guards
+      # already run in `pre-commit` against exactly those staged paths, so a
+      # Rust-only push loses no local coverage it did not keep there.
+      glob:
+        - "*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
+        - "**/*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
       run: pnpm test
 
 # Reject accidental AI co-author / attribution trailers in commit messages

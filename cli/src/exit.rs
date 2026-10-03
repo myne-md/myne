@@ -24,6 +24,10 @@ pub const FOLDER_EXCLUDED: i32 = 7;
 /// failure where retrying is pointless — and so it never has to guess from
 /// a hang, which is the outcome this replaces.
 pub const RATE_LIMITED: i32 = 8;
+/// The device-local plain-file editor is off, so `open` refused (myne-md/myne#788).
+/// Distinct from `CLI_DISABLED`: the CLI door can be open while the file
+/// editor is not, and the switch that fixes it lives in Settings.
+pub const PLAIN_FILE_OFF: i32 = 9;
 
 /// Map a [`BackendError`] to its exit code. One arm per variant — a new
 /// `BackendError` variant added without a matching arm here fails to
@@ -36,6 +40,7 @@ pub fn from_backend_error(err: &BackendError) -> i32 {
         BackendError::NotFound => NOT_FOUND,
         BackendError::FolderExcluded => FOLDER_EXCLUDED,
         BackendError::RateLimited => RATE_LIMITED,
+        BackendError::PlainFileOff => PLAIN_FILE_OFF,
         BackendError::Io(_) => IO,
     }
 }
@@ -53,6 +58,7 @@ mod tests {
             (BackendError::NotFound, NOT_FOUND),
             (BackendError::FolderExcluded, FOLDER_EXCLUDED),
             (BackendError::RateLimited, RATE_LIMITED),
+            (BackendError::PlainFileOff, PLAIN_FILE_OFF),
             (BackendError::Io("x".into()), IO),
         ];
         let mut seen = std::collections::HashSet::new();

@@ -74,7 +74,6 @@ import { FailClosedError } from "../components/FailClosedError";
 import { StorageLost } from "./StorageLost";
 import { DeviceRevoked } from "./DeviceRevoked";
 import { useSyncStatus } from "../hooks/useSyncStatus";
-import { has } from "../platform/capabilities";
 import { deleteVault } from "../lib/vault-delete";
 import {
   openDetachedWindow,
@@ -109,6 +108,12 @@ import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
+import { AiOnboardingSurface } from "../components/settings/AiOnboardingSurface";
+import {
+  readAiOnboardingSeen,
+  writeAiOnboardingSeen,
+} from "../lib/aiOnboardingSeen";
+import { has } from "../platform/capabilities";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
@@ -127,6 +132,7 @@ import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import { onExitIntent, setUnsavedGuard } from "../platform/exit-signals";
 import { takeDeepLinkNoteId, useNoteRoute } from "../lib/routing";
+import { takeRequestedNoteOpen } from "../notes/pendingNoteOpen";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   noteList,
@@ -786,6 +792,19 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // First-run AI onboarding (myne-md/myne#805): offered once per DEVICE, after
+  // the first successful unlock, gated on a localStorage flag so it covers every
+  // entry path (create/restore/recover/join). Skippable; the app works without
+  // AI. It lives here, in the chrome, because the modal mounts are local to
+  // `EditorChrome`. Initialised from the flag so it opens on the first render
+  // after unlock and closes for the rest of the process.
+  const [aiOnboardingOpen, setAiOnboardingOpen] = useState<boolean>(
+    () => !readAiOnboardingSeen(),
+  );
+  const closeAiOnboarding = useCallback(() => {
+    writeAiOnboardingSeen();
+    setAiOnboardingOpen(false);
+  }, []);
   // Task-chip ink is a device-local display choice (myne-md/myne#656 item 4).
   // Published as a CSS variable at the document root so BOTH the panel rows and
   // the editor's inline chips follow it by construction - no per-surface
@@ -2679,6 +2698,24 @@ function EditorChrome({
       />
       <SnapshotFailedIndicator />
       <AiHydrationProbe />
+      {/* First-run AI onboarding (myne-md/myne#805): offered once per device,
+          after the first successful unlock. Gated on `localAi` as a whole: a
+          host with no AI at all (web, per `decisions/ai/0627`) renders nothing,
+          rather than an opt-in and a Chat card whose provider setup that host
+          cannot open. Desktop offers the download cards; mobile mounts its own
+          copy with `downloads={false}` (opt-in + Chat only). */}
+      {has("localAi") ? (
+        <AiOnboardingSurface
+          open={aiOnboardingOpen}
+          onClose={closeAiOnboarding}
+          downloads={true}
+          onOpenProviderSetup={() => {
+            closeAiOnboarding();
+            setSettingsPanel("ai");
+            setSettingsOpen(true);
+          }}
+        />
+      ) : null}
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
@@ -4286,6 +4323,13 @@ function SidebarBootstrap() {
           .catch(() => {});
         const target = takeDeepLinkNoteId();
         if (target !== null && ids.includes(target)) ctx.select(target);
+        // The plain-file Import action (myne-md/myne#788) creates its note
+        // while this screen is unmounted (the plain surface renders INSTEAD of
+        // the stage), so it leaves a one-shot request that lands here. Checked
+        // against the live list for the same reason the deep link is: the note
+        // may have been deleted before the surface closed.
+        const imported = takeRequestedNoteOpen();
+        if (imported !== null && ids.includes(imported)) ctx.select(imported);
       } catch (e) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
