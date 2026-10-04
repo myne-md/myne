@@ -106,6 +106,11 @@ mod tests {
     use super::*;
     use crate::plugins::attachments::voice::capture::SourceFactory;
     use crate::plugins::attachments::voice::state::Clip;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    // `super::*` brings in `tokio::sync::Mutex` (the state's own lock), so the
+    // std one the gate's `Condvar` pairs with is aliased rather than shadowing
+    // it silently.
+    use std::sync::{Arc, Condvar, Mutex as StdMutex};
     use std::time::Duration;
     use tokio::sync::mpsc::unbounded_channel;
 
@@ -131,18 +136,112 @@ mod tests {
         })
     }
 
+    /// Flips `finished` when the capture thread drops its clip sink. That drop
+    /// is the last step `MeetingSession::spawn`'s closure takes before the
+    /// thread exits (`run_session` returns, then `drop(clip_sink)`), so it names
+    /// the moment the blocking tests below care about without reading a clock.
+    ///
+    /// It lives in the clip sink rather than on the session because the sink is
+    /// moved INTO the capture thread: it cannot be observed from outside, but it
+    /// is dropped from inside, which is exactly the boundary being asserted.
+    struct ExitFlag(Arc<AtomicBool>);
+    impl Drop for ExitFlag {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    /// A one-shot latch the tests use to park the capture thread INSIDE a poll.
+    ///
+    /// `run_session` calls its level sink on every loop iteration, so a sink
+    /// that blocks holds the thread between one stop check and the next, where
+    /// it provably cannot stop until [`open`](Gate::open) is called. That turns
+    /// "the thread had not stopped yet" from a race into a fact — the property
+    /// the wall-clock assertion this replaced could not express, because a fast
+    /// runner finishes the thread before the check while a slow runner fails an
+    /// `abort` that never blocked at all.
+    #[derive(Default)]
+    struct Gate {
+        state: StdMutex<GateState>,
+        cv: Condvar,
+    }
+
+    #[derive(Default)]
+    struct GateState {
+        arrived: bool,
+        opened: bool,
+    }
+
+    impl Gate {
+        /// Called on the capture thread: announce arrival once, then block
+        /// until the test opens the gate. Polls after the open pass straight
+        /// through, so the thread is free to reach its stop check and exit.
+        fn arrive_and_wait(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.arrived = true;
+            self.cv.notify_all();
+            while !state.opened {
+                state = self.cv.wait(state).unwrap();
+            }
+        }
+
+        /// Called on the test thread: return once the capture thread is parked.
+        fn await_arrival(&self) {
+            let mut state = self.state.lock().unwrap();
+            while !state.arrived {
+                state = self.cv.wait(state).unwrap();
+            }
+        }
+
+        fn open(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.opened = true;
+            self.cv.notify_all();
+        }
+    }
+
+    /// Spin until `flag` is set. The ceiling is a liveness bound, not the
+    /// invariant: it answers "the thread eventually stops", which holds however
+    /// slow the runner is and so cannot flake in either direction.
+    fn wait_until(flag: &AtomicBool) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            if flag.load(Ordering::SeqCst) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        false
+    }
+
     /// A session over the fixture source: a synthetic 440 Hz tone, so the state
     /// machine is exercised with no device, no permission and no vault. Must be
-    /// called inside a runtime.
+    /// called inside a runtime. The exit flag is discarded here; the tests that
+    /// assert on the thread's lifetime use [`fixture_session_with`] instead.
     fn fixture_session() -> MeetingSession {
+        fixture_session_with(Box::new(|_, _| {}), &Arc::new(AtomicBool::new(false)))
+    }
+
+    /// The same session with the level sink and the thread-exit flag supplied,
+    /// for the tests that assert on the capture thread's lifetime rather than
+    /// its output. Must be called inside a runtime.
+    fn fixture_session_with(
+        level_sink: Box<dyn Fn(f32, Option<f32>) + Send>,
+        finished: &Arc<AtomicBool>,
+    ) -> MeetingSession {
         let (clip_tx, clip_rx) = unbounded_channel::<Clip>();
+        let exit = ExitFlag(finished.clone());
         let clip_sink: Box<dyn Fn(Zeroizing<Vec<i16>>, u32) + Send> =
             Box::new(move |samples, rate| {
                 let _ = clip_tx.send((samples, rate));
+                // Keep `exit` owned by this closure: dropping the closure drops
+                // it, and that drop IS the thread-exit signal. A bare `exit`
+                // would be moved out and dropped on every call instead.
+                let _ = exit.0.load(Ordering::Relaxed);
             });
         MeetingSession::spawn(
             SourceFactory::Fixture,
-            Box::new(|_, _| {}),
+            level_sink,
             clip_sink,
             counting_consumer(clip_rx),
         )
@@ -256,20 +355,84 @@ mod tests {
         });
     }
 
+    /// `abort` must return without waiting for the capture thread;
+    /// [`cancel_capture`](MeetingSession::cancel_capture) next door must wait
+    /// for it. That difference is the invariant, and it is asserted by ORDERING
+    /// rather than by a clock.
+    ///
+    /// The version this replaces wrapped `abort()` in
+    /// `Instant::now()` … `elapsed() < 50 ms`. That measured the runner, not
+    /// `abort`: `abort` sends `Cancel` on an unbounded channel and drops `self`,
+    /// so it never joins — but a container that descheduled this thread for one
+    /// scheduling quantum right after `Instant::now()` reported over 50 ms and
+    /// failed, at roughly 2 runs in 5. Raising the threshold would only move the
+    /// flake, since no wall-clock bound can distinguish "returned promptly" from
+    /// "was preempted".
+    ///
+    /// So the capture thread is parked instead. Its level sink blocks on a gate
+    /// the test opens, which makes "the thread has not stopped" a fact (it is
+    /// blocked inside a poll and cannot reach its stop check), and a flag
+    /// captured by the clip sink flips when the thread drops it on the way out.
+    /// After `abort()` returns the flag must still be clear — a join could not
+    /// have returned — and once the gate opens the flag must become set, proving
+    /// `abort` really did signal the thread rather than merely detach a live one.
     #[test]
     fn abort_does_not_block() {
         rt().block_on(async {
-            let session = fixture_session();
-            std::thread::sleep(Duration::from_millis(30));
-            // The teardown path is sync and must not wait for the capture
-            // thread: it signals cancel and detaches. If it blocked, a vault
-            // lock would hang, which is the failure this shape prevents.
-            let started = std::time::Instant::now();
+            let finished = Arc::new(AtomicBool::new(false));
+            let gate = Arc::new(Gate::default());
+            let gate_cb = gate.clone();
+            let level_sink: Box<dyn Fn(f32, Option<f32>) + Send> =
+                Box::new(move |_, _| gate_cb.arrive_and_wait());
+
+            let session = fixture_session_with(level_sink, &finished);
+            // The thread is now parked in its first poll: it has already passed
+            // one stop check (which found nothing) and cannot reach the next.
+            gate.await_arrival();
+            assert!(
+                !finished.load(Ordering::SeqCst),
+                "a parked capture thread cannot have exited"
+            );
+
             session.abort();
             assert!(
-                started.elapsed() < Duration::from_millis(50),
-                "abort must not wait for the capture thread"
+                !finished.load(Ordering::SeqCst),
+                "abort waited for the capture thread: the flag is set only by the \
+                 thread dropping its sink, which is the thing a join waits for"
             );
+
+            // The signal was still delivered: the thread stops the moment it is
+            // free to run. This is the half that stops the assertion above
+            // passing for the wrong reason — an `abort` that signalled nothing
+            // and simply detached a live capture thread.
+            gate.open();
+            assert!(
+                wait_until(&finished),
+                "abort must signal Cancel, not merely detach the thread"
+            );
+        });
+    }
+
+    /// The other half of the same claim, and the one a clock cannot express
+    /// either: `cancel_capture` JOINS the capture thread, so the flag is
+    /// guaranteed set by the time it returns, however fast or slow the runner.
+    /// Asserted on the same flag as [`abort_does_not_block`] so the two read as
+    /// one statement — clear after `abort`, set after `cancel_capture`.
+    #[test]
+    fn cancel_capture_returns_only_after_the_thread_stops() {
+        rt().block_on(async {
+            let finished = Arc::new(AtomicBool::new(false));
+            // No gate here, and that is deliberate: the join is what is under
+            // test, so the thread must be free to run.
+            let session = fixture_session_with(Box::new(|_, _| {}), &finished);
+            let consumer = tokio::task::spawn_blocking(move || session.cancel_capture())
+                .await
+                .expect("the capture thread joins");
+            assert!(
+                finished.load(Ordering::SeqCst),
+                "cancel_capture joins, so the thread has already stopped when it returns"
+            );
+            let _ = consumer.await;
         });
     }
 
