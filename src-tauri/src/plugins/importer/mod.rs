@@ -32,6 +32,7 @@
 //! `build.rs InlinedPlugin::commands` lock-stepped — adding a command without
 //! the matching `commands.allow` entry is a security regression).
 
+pub mod backup_source;
 pub mod commands;
 pub mod error;
 pub mod hold;
@@ -62,6 +63,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             myne_core::plugins::vault_unlock::import_source::import_source_list_notes,
             myne_core::plugins::vault_unlock::import_source::import_source_read_note,
             myne_core::plugins::vault_unlock::import_source::import_source_reseal_attachment,
+            // Opening a `.myne-backup` container as an import source
+            // (myne-md/myne#816). Desktop-side because it stages the container
+            // with the `backup_container` reader, which lives in this crate.
+            backup_source::import_source_open_backup,
+            backup_source::import_source_close_backup,
             // Only the MERGE is registered. `import_source_dictionary` is the
             // read half and has no caller across IPC: the frontend needs the
             // read and the write together, so registering the read alone would

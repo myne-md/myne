@@ -91,13 +91,12 @@ impl core::fmt::Debug for SourceDictionaryWords {
 pub async fn import_source_dictionary<R: Runtime>(
     source_vault_id: String,
     state: State<'_, VaultRuntimeState>,
-    app: AppHandle<R>,
+    _app: AppHandle<R>,
 ) -> Result<SourceDictionaryWords, ImportSourceDictionaryError> {
     use myne_core::plugins::vault_unlock::import_source;
 
     let source_id = myne_core::vault_id::VaultId::parse_optional(Some(source_vault_id.as_str()))
         .ok_or(ImportSourceDictionaryError::SessionClosed)?;
-    let host = myne_core::host::tauri_host::TauriHost::new(app);
 
     // Borrow rather than take: `with_keys` lends the key material for the length
     // of the closure and cannot hand it out, so no caller here can hold a second
@@ -112,8 +111,15 @@ pub async fn import_source_dictionary<R: Runtime>(
             .await
             .ok_or(ImportSourceDictionaryError::SessionClosed)?;
 
-    let source_root = myne_core::paths::vault_root_for_id_from_host(&host, source_id)
-        .map_err(|_| ImportSourceDictionaryError::SessionClosed)?;
+    // The source ROOT comes from the open slot, not from the id: a local vault
+    // resolves `vaults/<id>/`, a `.myne-backup` resolves the staging directory
+    // its members were extracted into (myne-md/myne#816). Resolving from the id
+    // would answer `SessionClosed` for every backup import and silently drop the
+    // dictionary carry.
+    let source_root = state
+        .import_source_root(source_id)
+        .await
+        .ok_or(ImportSourceDictionaryError::SessionClosed)?;
 
     // The SOURCE's generation and account hash. Both are the source's: the
     // dictionary KEK derives under the vault's own generation and the blob's AAD

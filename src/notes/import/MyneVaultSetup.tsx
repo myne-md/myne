@@ -58,6 +58,20 @@ export interface MyneVaultSetupProps {
   /** The vault being imported INTO. Excluded from the list. */
   readonly activeVaultId: string | null;
   /**
+   * The picked `.myne-backup` file (myne-md/myne#816). When set, the step shows
+   * that file instead of the local-vault list, and `onReady` carries
+   * `backupPath` rather than `sourceVaultId`.
+   */
+  readonly backupPath?: string | undefined;
+  /**
+   * True for the Myne source (myne-md/myne#816): the step picks a
+   * `.myne-backup` file rather than a local vault, and the local-vault list is
+   * not shown. Set by the modal from the chosen source id.
+   */
+  readonly backupMode?: boolean | undefined;
+  /** Open the OS picker for the backup file (only meaningful in backup mode). */
+  readonly onChooseFile?: (() => void) | undefined;
+  /**
    * Called with the user's choices. This component does NOT open the source
    * slot; the caller does, inside the same try/finally that closes it.
    *
@@ -67,7 +81,14 @@ export interface MyneVaultSetupProps {
    * the TTL swept them, and the import ran behind a closed modal.
    */
   readonly onReady: (args: {
-    sourceVaultId: string;
+    /**
+     * Exactly one of `sourceVaultId` (a local vault) or `backupPath` (an
+     * extracted `.myne-backup`) is set. The Myne import source is a backup file
+     * now (myne-md/myne#816); the local-vault branch is kept reachable for the
+     * substituted web stub and any future re-introduction.
+     */
+    sourceVaultId?: string;
+    backupPath?: string;
     importLabel: string;
     credential: { password: string } | { recoveryPhrase: string };
   }) => void;
@@ -288,6 +309,9 @@ function PhraseGrid({
 
 export function MyneVaultSetup({
   activeVaultId,
+  backupPath,
+  backupMode = false,
+  onChooseFile,
   onReady,
   onCancel,
   onBack,
@@ -297,7 +321,11 @@ export function MyneVaultSetup({
   initialKind,
 }: MyneVaultSetupProps): ReactElement {
   const { t } = useTranslation();
-  const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
+  // A backup source needs no vault listing: the file IS the source. Seed the
+  // list empty and skip the probe so the loading/empty gates below do not fire.
+  const [vaults, setVaults] = useState<VaultSummary[] | null>(
+    backupMode ? [] : null,
+  );
   const [chosen, setChosen] = useState<string>(initialChosen ?? NO_VAULT);
   const [kind, setKind] = useState<CredentialKind>(initialKind ?? "password");
   // Secret cells start EMPTY on every mount, including a retry. See
@@ -310,6 +338,7 @@ export function MyneVaultSetup({
   const [label, setLabel] = useState(initialLabel ?? "");
 
   useEffect(() => {
+    if (backupMode) return;
     let live = true;
     void listVaults().then((res) => {
       if (!live) return;
@@ -427,7 +456,13 @@ export function MyneVaultSetup({
   const secretReady = kind === "password" ? password.length > 0 : cells.every((c) => c.trim() !== "");
 
   const submit = useCallback(() => {
-    if (chosen === NO_VAULT || !secretReady || labelIllegal) return;
+    if (
+      (backupMode ? backupPath === undefined : chosen === NO_VAULT) ||
+      !secretReady ||
+      labelIllegal
+    ) {
+      return;
+    }
     const credential =
       kind === "password" ? { password } : { recoveryPhrase: phrase };
     // The secret leaves THIS component's state as it is handed over. It still
@@ -436,8 +471,24 @@ export function MyneVaultSetup({
     // an import would be a longer window for no reason.
     setPassword("");
     setCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-    onReady({ sourceVaultId: chosen, importLabel: label, credential });
-  }, [chosen, kind, password, phrase, secretReady, labelIllegal, label, onReady]);
+    onReady({
+      sourceVaultId: backupMode ? undefined : chosen,
+      backupPath: backupMode ? backupPath : undefined,
+      importLabel: label,
+      credential,
+    });
+  }, [
+    backupMode,
+    backupPath,
+    chosen,
+    kind,
+    password,
+    phrase,
+    secretReady,
+    labelIllegal,
+    label,
+    onReady,
+  ]);
 
   if (vaults === null) {
     return (
@@ -447,9 +498,10 @@ export function MyneVaultSetup({
     );
   }
 
-  if (vaults.length === 0) {
+  if (vaults.length === 0 && !backupMode) {
     // An empty list explains itself rather than rendering an empty box. This is
-    // the ordinary state for a user with one vault, not an error.
+    // the ordinary state for a user with one vault, not an error. A backup
+    // source skips this: its list is empty by construction.
     return (
       <>
         <div style={BODY_STYLE} data-testid="import-myne.empty">
@@ -498,18 +550,67 @@ export function MyneVaultSetup({
         </div>
 
         <div style={FIELD}>
-          <span style={FIELD_LABEL}>{t("notes.import.myne.vaultLabel")}</span>
-          {/* `Select`, never a native `<select>`: `docs/design/README.md`'s
-              picker table forbids the OS popup outright, because it does not
-              match the app chrome. Option count here is the vault count, which
-              is 1 to a handful, so `Select` rather than `SearchableSelect`. */}
-          <Select
-            value={chosen}
-            options={options}
-            onChange={setChosen}
-            aria-label={t("notes.import.myne.vaultLabel")}
-            testId="import-myne.vault"
-          />
+          <span style={FIELD_LABEL}>
+            {backupMode
+              ? t("notes.import.myne.backupLabel")
+              : t("notes.import.myne.vaultLabel")}
+          </span>
+          {!backupMode ? (
+            /* `Select`, never a native `<select>`: `docs/design/README.md`'s
+               picker table forbids the OS popup outright, because it does not
+               match the app chrome. Option count here is the vault count, which
+               is 1 to a handful, so `Select` rather than `SearchableSelect`. */
+            <Select
+              value={chosen}
+              options={options}
+              onChange={setChosen}
+              aria-label={t("notes.import.myne.vaultLabel")}
+              testId="import-myne.vault"
+            />
+          ) : (
+            /* The picked `.myne-backup`, chosen through the OS picker
+               (myne-md/myne#816). */
+            <div
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+              }}
+            >
+              {backupPath !== undefined ? (
+                <span
+                  data-testid="import-myne.backup-path"
+                  title={backupPath}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--fg-1)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {backupPath}
+                </span>
+              ) : (
+                <span
+                  data-testid="import-myne.backup-none"
+                  style={{ flex: 1, fontSize: "var(--text-sm)", color: "var(--fg-3)" }}
+                >
+                  {t("notes.import.myne.noBackupChosen")}
+                </span>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => onChooseFile?.()}
+                data-testid="import-myne.choose-backup"
+              >
+                {t("notes.import.myne.chooseBackup")}
+              </Button>
+            </div>
+          )}
         </div>
 
         <div style={FIELD}>

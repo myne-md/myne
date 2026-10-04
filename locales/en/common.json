@@ -2144,8 +2144,11 @@
       "myne": {
         "loading": "Looking for your other vaults…",
         "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
-        "vaultLabel": "Import from",
-        "vaultPlaceholder": "Choose a vault",
+      "vaultLabel": "Import from",
+      "backupLabel": "Backup file",
+      "chooseBackup": "Choose backup file",
+      "noBackupChosen": "No backup file chosen",
+      "vaultPlaceholder": "Choose a vault",
         "passwordLabel": "That vault's password",
         "phraseLabel": "That vault's 24-word recovery phrase",
         "wordAria": "Word {{number}} of 24",
@@ -2157,9 +2160,10 @@
         "opening": "Opening…",
         "unnamedVault": "Vault {{n}}",
         "errors": {
-          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
-          "busy": "Another vault operation is running. Wait for it to finish and try again.",
-          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first."
+      "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+      "busy": "Another vault operation is running. Wait for it to finish and try again.",
+      "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first.",
+      "backupInvalid": "That file could not be read as a Myne backup. Check the file and try again."
         },
         "done": {
           "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
@@ -2181,11 +2185,11 @@
       },
       "source": {
         "myne": {
-          "label": "Myne vault",
-          "pickerTitle": "Choose the vault to import from",
-          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
-          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
-          "short": "Another vault on this device"
+      "label": "Myne vault",
+      "pickerTitle": "Choose the .myne-backup file to import from",
+      "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+      "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+      "short": "An exported .myne-backup file"
         },
         "obsidian": {
           "label": "Obsidian",

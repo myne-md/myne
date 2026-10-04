@@ -1,4 +1,5 @@
-// Vault-to-vault import (myne-md/myne#464).
+// Import notes from a `.myne-backup` (myne-md/myne#816; formerly vault-to-vault
+// import, myne-md/myne#464).
 //
 // ONE scenario over ONE fixture, and both halves of that are deliberate.
 //
@@ -9,12 +10,26 @@
 // could not fire.
 //
 // One run, because every run of this flow pays a full Argon2id derivation for
-// the source credential inside the scenario's own budget, on the CI runner. Ten
-// rules as ten scenarios would be ten derivations to assert what one run shows,
-// and `check-e2e-floor.mjs` counts scenarios that EXECUTED rather than
+// the backup's credential inside the scenario's own budget, on the CI runner.
+// Ten rules as ten scenarios would be ten derivations to assert what one run
+// shows, and `check-e2e-floor.mjs` counts scenarios that EXECUTED rather than
 // scenarios that exist.
 //
 // ─────────────────────────────────────────────────────────────────────────────
+// HOW THE BACKUP IS PRODUCED AND PICKED, since neither is driveable directly.
+//
+// The source vault is EXPORTED to a real `.myne-backup` through the production
+// `plugin:backup|vault_export_backup` command, invoked from the page seat. Locked
+// export is supported by design (SYNC-6), so the target vault stays the open one
+// and no second unlock is needed.
+//
+// The OS file picker cannot be driven by WebDriver, so `plugin:dialog|open` is
+// intercepted from the page seat — the same sanctioned stub `note-export.e2e.ts`
+// uses for `plugin:dialog|save`: the wrapper goes on the writable global `fetch`,
+// only that one IPC URL is answered, and every other request reaches the native
+// fetch. Everything past the picker is the real import.
+// ─────────────────────────────────────────────────────────────────────────────
+//
 // ONE BOOT DETAIL THAT COST THE FIRST THREE RUNS, kept here because it is the
 // kind of thing that reads as flake rather than as a precondition.
 //
@@ -37,6 +52,7 @@
 // exclusion) and by `plugins::importer::source_dictionary::tests` (the read,
 // through the real encoder).
 
+import path from "node:path";
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVaults, type ImportSourceSuite } from "./support/fixtures";
@@ -45,6 +61,7 @@ import {
   dismissImporterOffer,
   noteRowIds,
   openSettings,
+  pageSeatInvoke,
   selectPickerRow,
   unlockToEditor,
 } from "./support/flows";
@@ -71,20 +88,48 @@ async function waitForPhase(
   );
 }
 
-describeE2E("mvi1 import notes from another Myne vault (myne-md/myne#464)", () => {
+/**
+ * Answer `plugin:dialog|open` with `chosen`, from the page seat. Returns whether
+ * the patch took (a non-writable `fetch` would silently keep the real transport
+ * and open a real, undriveable dialog).
+ */
+async function patchDialogOpen(s: Session, chosen: string): Promise<boolean> {
+  return await s.execute<boolean>(
+    "(() => {" +
+      "  const url = window.__TAURI_INTERNALS__.convertFileSrc('plugin:dialog|open', 'ipc');" +
+      "  const origFetch = window.fetch.bind(window);" +
+      "  window.__e2eDialogOpenPath = arguments[0];" +
+      "  window.fetch = function (input, init) {" +
+      "    const u = typeof input === 'string' ? input : (input && input.url);" +
+      "    if (u === url) {" +
+      "      return Promise.resolve(new Response(JSON.stringify(window.__e2eDialogOpenPath), {" +
+      "        headers: { 'content-type': 'application/json', 'Tauri-Response': 'ok' }," +
+      "      }));" +
+      "    }" +
+      "    return origFetch(input, init);" +
+      "  };" +
+      "  return window.fetch !== origFetch;" +
+      "})()",
+    [chosen],
+  );
+}
+
+describeE2E("mvi1 import notes from a .myne-backup (myne-md/myne#816)", () => {
   // Vault-count precondition: 2 (weak KDF). The LAST is the import SOURCE.
   it("carries notes, renames a linked collision, and leaves the source alone", async () => {
     let targetPassword = "";
     let targetVaultId = "";
+    let sourceVaultId = "";
     let sourcePassword = "";
     let suite: ImportSourceSuite | undefined;
     await scenario(
-      "mvi1-vault-import",
+      "mvi1-backup-import",
       {
         seed: (dir) => {
           const vaults = seedVaults(dir, { count: 2, importSourceSuite: true });
           targetPassword = vaults[0].password;
           targetVaultId = vaults[0].vaultId;
+          sourceVaultId = vaults[vaults.length - 1].vaultId;
           sourcePassword = vaults[vaults.length - 1].password;
           suite = vaults[vaults.length - 1].importSourceSuite;
         },
@@ -106,6 +151,24 @@ describeE2E("mvi1 import notes from another Myne vault (myne-md/myne#464)", () =
         await createNote(s, fx.collidingUnlinkedTitle);
         const before = await noteRowIds(s, 2);
 
+        // Export the SOURCE vault to a real `.myne-backup`. The export reads an
+        // EXISTING vault from disk and supports the locked state (SYNC-6), so the
+        // target vault stays the open one.
+        const backupPath = path.join(app.dataHome, "source.myne-backup");
+        const exported = await pageSeatInvoke(
+          s,
+          "plugin:backup|vault_export_backup",
+          { vaultId: sourceVaultId, destination: backupPath },
+          60_000,
+        );
+        if (exported.err !== undefined) {
+          throw new Error("export failed: " + JSON.stringify(exported.err));
+        }
+
+        // The OS picker is undriveable; hand the import the file we just wrote.
+        const patched = await patchDialogOpen(s, backupPath);
+        expect(patched).toBe(true);
+
         await openSettings(s, "storage");
         await (await s.byTestId("storage.import")).click();
         await waitForPhase(s, "pick");
@@ -118,24 +181,12 @@ describeE2E("mvi1 import notes from another Myne vault (myne-md/myne#464)", () =
 
         // The fidelity disclosure is shown BEFORE the run, not after it. Both
         // halves, because this source's `loses` key is the one that says the
-        // interesting thing (version history, trash, templates) and it was
-        // defined and rendered nowhere until it was wired here.
+        // interesting thing (version history, trash, templates).
         expect(await (await s.byTestId("import.source-survives")).text()).not.toBe("");
         expect(await (await s.byTestId("import.source-loses")).text()).not.toBe("");
 
-        // The vault chooser is the `Select` primitive, not a native `<select>`,
-        // so its options live in a body-level portal that exists only while the
-        // menu is open. Clicking the trigger first is not incidental: without it
-        // `byTestIdAll` finds zero options and the count assertion below reads
-        // as "the list is empty" when the list was simply closed.
-        await (await s.byTestId("import-myne.vault")).click();
-        // Two entries: the placeholder plus exactly one real vault. The vault we
-        // are IN is not offered, because a vault cannot be its own source, and
-        // that is the assertion the count is making.
-        const options = await s.byTestIdAll("import-myne.vault-option");
-        expect(options).toHaveLength(2);
-        await options[1].click();
-
+        // Pick the backup (stubbed picker), then the backup's own credential.
+        await (await s.byTestId("import-myne.choose-backup")).click();
         await (await s.byTestId("import-myne.secret")).sendKeys(sourcePassword);
         // `replaceText`, not clear()+sendKeys: this is a React controlled input
         // that `MyneVaultSetup` prefills, and W3C clear bypasses React's value
@@ -145,12 +196,8 @@ describeE2E("mvi1 import notes from another Myne vault (myne-md/myne#464)", () =
 
         await waitForPhase(s, "summary");
 
-        // The completion step owes two sentences, and this is the assertion that
-        // they are actually rendered rather than only written: version history
-        // stayed behind, and the source vault is unchanged and still syncing.
-        // Asserted on their TEXT rather than on a visibility predicate, because
-        // `Element` in this harness has no `isDisplayed` and `byTestId` already
-        // throws when the element is absent.
+        // The completion step owes two sentences: version history stayed behind,
+        // and the source vault is unchanged and still syncing.
         expect(await (await s.byTestId("import-myne.history-stays")).text()).not.toBe("");
         expect(
           await (await s.byTestId("import-myne.source-unchanged")).text(),
@@ -162,32 +209,21 @@ describeE2E("mvi1 import notes from another Myne vault (myne-md/myne#464)", () =
         //
         // Four notes are added on top of the two the scenario created: the
         // linking note, the renamed collision, the untitled note, and the
-        // import report (this fixture always leaves something behind, so the
-        // report is always written). The unlinked collision is SKIPPED, and the
-        // trashed note and the template stay behind. The count is the first
-        // assertion because it fails loudly when any of those rules flips.
+        // import report. The unlinked collision is SKIPPED, and the trashed note
+        // and the template stay behind. The count is the first assertion
+        // because it fails loudly when any of those rules flips.
         const after = await noteRowIds(s, before.length + 4);
         expect(after.length).toBe(before.length + 4);
 
-        // And the rules by NAME, not only by count. A count is satisfied by any
-        // four notes, so on its own it cannot tell the rename rule firing from
-        // the skip rule failing: both leave four.
+        // And the rules by NAME, not only by count.
         const titles = await sidebarTitles(s);
-        //  1. The LINKED collision was renamed with the import label, so the
-        //     imported note is present under its new name and the target's own
-        //     note of the old name is untouched.
         expect(titles).toContain(`${fx.collidingLinkedTitle} (${IMPORT_LABEL})`);
         expect(titles).toContain(fx.collidingLinkedTitle);
-        //  2. The UNLINKED collision was skipped, so there is exactly ONE note
-        //     by that name and no `(Eski laptop)` twin. This is the assertion
-        //     that separates "renamed everything" from "renamed what is linked".
         expect(titles).not.toContain(
           `${fx.collidingUnlinkedTitle} (${IMPORT_LABEL})`,
         );
-        //  3. The trashed note and the template stayed in the source.
         expect(titles).not.toContain(fx.trashedTitle);
         expect(titles).not.toContain(fx.templateTitle);
-        //  4. The linking note crossed.
         expect(titles).toContain(fx.linkingNoteTitle);
       },
     );
