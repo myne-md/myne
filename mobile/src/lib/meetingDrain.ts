@@ -60,8 +60,11 @@ interface DrainedMeeting {
   started_at: number;
   /** Successfully imported chunks, ascending by `chunk_index`. */
   chunks: DrainedMeetingChunk[];
-  /** Chunk indices absent from `0..=max`: the session is incomplete. */
+  /** Chunk indices gone for good (never delivered, or unopenable). Safe to ack. */
   missing_chunk_indices: number[];
+  /** Chunk indices whose import failed TRANSIENTLY. Their entries must survive,
+   *  so they are NOT acked and the session re-drains on the next unlock. */
+  retryable_chunk_indices: number[];
 }
 
 let isDraining = false;
@@ -93,18 +96,25 @@ export async function drainPendingMeetings(): Promise<number> {
         // un-acked sessions for the next unlock. Never ack on failure.
         return created;
       }
-      // Ack only AFTER the note exists (at-least-once). The entries + manifest
-      // record go only once the note write resolved, so a failed ack leaves the
-      // session for a later drain (a rare duplicate) rather than losing it. A
-      // session with nothing worth keeping is acked without a note — otherwise
-      // an empty session would re-drain and fail on every unlock forever.
+      // Ack only AFTER the note exists (at-least-once), and only the chunks the
+      // drain RESOLVED: imported, or gone for good. A chunk whose import failed
+      // transiently (no space, a momentary error) keeps its sealed entry and its
+      // manifest row, and the session re-drains on the next unlock. Deleting it
+      // here turned "the import failed this once" into permanent audio loss.
+      const resolved = [
+        ...session.chunks.map((c) => c.chunk_index),
+        ...session.missing_chunk_indices,
+      ];
       await invoke("plugin:captures|ack_meeting_session", {
         sessionId: session.session_id,
+        resolvedChunkIndices: resolved,
       }).catch(() => {});
       if (madeNote) created += 1;
 
       // The note is safe (or there was nothing to keep); report the gap
-      // (best-effort, one toast per affected session).
+      // (best-effort, one toast per affected session). A retryable chunk is NOT
+      // reported: its audio is still queued and comes back next unlock, so
+      // telling the user it is missing would be wrong.
       if (session.missing_chunk_indices.length > 0) {
         showToast(i18n.t("editor.meeting.chunksMissing"));
       }
@@ -143,7 +153,10 @@ async function writeMeetingNote(session: DrainedMeeting): Promise<boolean> {
 
   const body = buildMeetingNote(clips, parts.join("\n\n"), copy);
   if (!meetingNoteHasContent(body)) return false;
-  const name = i18n.t("editor.meeting.noteTitle", { date: localTimestamp() });
+  // Title from the SESSION START, not from now. The phone can stay locked for
+  // hours after the meeting ends, so titling from `now` dated a 09:00 walking
+  // 1:1 at 18:00. `started_at` is the one field that carries the real moment.
+  const name = i18n.t("editor.meeting.noteTitle", { date: localTimestamp(session.started_at) });
   await createTitledNote(body, name);
   return true;
 }
@@ -159,10 +172,12 @@ async function createTitledNote(body: string, name: string): Promise<string> {
   return await noteCreate(new TextDecoder().decode(bytes), null);
 }
 
-/** Local `YYYY-MM-DD HH:MM`, matching the desktop meeting title. UTC formatting
- *  would title an evening meeting with the previous day west of Greenwich. */
-function localTimestamp(): string {
-  const now = new Date();
+/** Local `YYYY-MM-DD HH:MM` from a millisecond epoch (the session's start),
+ *  matching the desktop meeting title's shape. UTC formatting would title an
+ *  evening meeting with the previous day west of Greenwich, and titling from the
+ *  drain time would date a meeting by when the phone happened to be unlocked. */
+function localTimestamp(epochMillis: number): string {
+  const when = new Date(epochMillis);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
 }

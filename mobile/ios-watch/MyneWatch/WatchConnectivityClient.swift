@@ -8,6 +8,11 @@ import WatchConnectivity
 /// watch app closing before delivery, unlike `sendMessage`). The watch holds NO
 /// vault key; it only ships plaintext text over the OS-encrypted WatchConnectivity
 /// transport, which the phone seals into the encrypted queue (§9.18).
+///
+/// It ALSO owns the single watch-side `WCSessionDelegate` slot on behalf of the
+/// meeting lane (myne-md/myne#812): [`MeetingTransfer`] reuses this delegate for
+/// `didFinish fileTransfer:` rather than claiming the slot a second time — one
+/// delegate, two lanes, exactly as `WCCaptureReceiver` does on the phone.
 final class WatchConnectivityClient: NSObject, WCSessionDelegate {
     static let shared = WatchConnectivityClient()
 
@@ -69,5 +74,20 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate {
         for text in queued {
             session.transferUserInfo([Self.captureKey: text])
         }
+        // Flush any meeting chunks buffered before activation finished (same
+        // cold-launch race, separate queue — see `MeetingTransfer`).
+        MeetingTransfer.shared.flushIfActivated()
+    }
+
+    /// `transferFile` completion for the meeting lane (myne-md/myne#812). This
+    /// delegate is the app's ONE `WCSession` delegate owner, so the meeting
+    /// transfer routes here and deletes its local chunk from this callback. The
+    /// dictated-capture lane never calls `transferFile` and is unaffected.
+    func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        MeetingTransfer.shared.didFinish(fileTransfer: fileTransfer, error: error)
     }
 }

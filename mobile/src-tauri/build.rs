@@ -164,7 +164,14 @@ fn main() {
                     "seal_staged",
                     "take_pending",
                     "ack",
+                    // The watch meeting lane. All three are declared (not just
+                    // the seal) so the `InlinedPlugin` roster matches the
+                    // `generate_handler!` registration and the ACL grant: a command
+                    // reachable through two of the three and absent from this list
+                    // is the drift `check-mobile-plugin-acl.mjs` exists to refuse.
                     "seal_meeting_chunk",
+                    "drain_pending_meetings",
+                    "ack_meeting_session",
                 ]),
             )
             .plugin(

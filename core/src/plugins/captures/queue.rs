@@ -27,6 +27,12 @@ const SEALED_SUBDIR: &str = "sealed";
 const MEETINGS_SUBDIR: &str = "meetings";
 const MEETING_ENTRIES_SUBDIR: &str = "entries";
 const MEETING_MANIFEST_SUBDIR: &str = "manifest";
+/// The app-owned inbox the native receiver MOVES each delivered WatchConnectivity
+/// file into (`WCMeetingReceiver.moveIntoInbox`). It is the ONLY directory
+/// `seal_meeting_chunk` will read a source from, which is what keeps that command
+/// from becoming an arbitrary-host-file read reachable from the WebView while the
+/// vault is locked.
+const MEETING_INBOX_SUBDIR: &str = "inbox";
 
 fn base<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
     Ok(crate::paths::app_data_dir(app)
@@ -59,6 +65,13 @@ pub fn meeting_manifest_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, C
     Ok(base(app)?
         .join(MEETINGS_SUBDIR)
         .join(MEETING_MANIFEST_SUBDIR))
+}
+
+/// `<app_data_dir>/pending-captures/meetings/inbox/` — the app-owned directory
+/// the native receiver moves each delivered chunk file into. `seal_meeting_chunk`
+/// accepts a source path only from under this directory.
+pub fn meeting_inbox_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, CaptureError> {
+    Ok(base(app)?.join(MEETINGS_SUBDIR).join(MEETING_INBOX_SUBDIR))
 }
 
 /// Create `dir` (and parents) if absent.

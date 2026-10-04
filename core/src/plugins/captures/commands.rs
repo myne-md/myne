@@ -207,26 +207,58 @@ pub fn ack_in_dir(sealed: &Path, id: &str) -> Result<(), CaptureError> {
 // what lets a device that has never unlocked hold the audio. The manifest is
 // what turns a bag of sealed entries into one ordered meeting.
 
+/// The three device-local directories the meeting lane touches. Grouped rather
+/// than passed as three positional paths: they are always used together, and a
+/// free function taking eight arguments is one transposition away from sealing a
+/// chunk into the manifest directory.
+#[derive(Debug, Clone, Copy)]
+pub struct MeetingDirs<'a> {
+    /// Sealed chunk entries (`pending-captures/meetings/entries/`).
+    pub entries: &'a Path,
+    /// Per-session manifest records (`pending-captures/meetings/manifest/`).
+    pub manifest: &'a Path,
+    /// App-owned inbox the native receiver moves deliveries into; the ONLY
+    /// directory a seal source may come from.
+    pub inbox: &'a Path,
+}
+
 /// Read `source`, refuse it if its plaintext exceeds the `MYF1` cap **before
-/// reading it into RAM**, seal it into an entry under `entries/`, then record
+/// reading it into RAM**, seal it into an entry under `dirs.entries`, then record
 /// `(session_id, chunk_index) → entry_id` in the session manifest under
-/// `manifest/`.
+/// `dirs.manifest`.
 ///
-/// Returns the entry id (hex) when this call newly sealed + recorded a chunk;
-/// `Ok(None)` when the chunk was a duplicate of one already recorded (the
-/// redundant just-sealed entry is removed) or when the source was empty (a
-/// zero-length chunk can never be audio). Self-consistent: an entry is written
-/// only if it is then recorded, and a duplicate drops the redundant entry, so a
-/// crash cannot leave an orphaned entry silently double-draining.
+/// `dirs.inbox` is the app-owned directory the native receiver moves deliveries
+/// into, and `source` MUST live directly under it. That constraint is the whole
+/// reason this function takes paths at all: without it the command reads any host
+/// path the app can read and seals it under the device-local key, which is an
+/// arbitrary-file read reachable from a compromised WebView while the vault is
+/// locked. Every other pre-unlock reader in this plugin works on a fixed
+/// directory for the same reason.
+///
+/// The seal writes twice (entry, then manifest append), and `source` is NOT
+/// deleted here — the caller owns the receiver's inbox file and removes it after
+/// the seal resolves, so a failed manifest append can remove the orphan entry
+/// first.
+///
+/// Returns `Ok(())` after a successful seal + record. A duplicate
+/// `(session_id, chunk_index)` is not an error: the redundant just-sealed entry is
+/// removed and the call succeeds, so a re-delivered chunk is idempotent.
 pub fn seal_meeting_chunk_from_file(
-    entries: &Path,
-    manifest: &Path,
+    dirs: &MeetingDirs<'_>,
     key: &[u8; 32],
     session_id: &str,
     chunk_index: u32,
     started_at: u64,
     source: &Path,
 ) -> Result<Option<String>, CaptureError> {
+    // The source must name a file DIRECTLY under the app-owned inbox. Compared
+    // on the parent directory rather than on a canonicalised prefix: the path is
+    // built by our own receiver and never user-supplied, so this rejects a
+    // traversal-shaped or foreign path without a filesystem resolve (which would
+    // follow symlinks and race).
+    if source.parent() != Some(dirs.inbox) {
+        return Err(CaptureError::Backend);
+    }
     // Refuse BEFORE allocation (the §9.18.4 / §9.20.4 discipline, at the
     // attachment-sized cap this lane's audio needs): a hostile or corrupt length
     // must never drive a multi-MiB read, and a chunk is never truncated.
@@ -238,7 +270,7 @@ pub fn seal_meeting_chunk_from_file(
         return Ok(None);
     }
 
-    queue::ensure_dir(entries)?;
+    queue::ensure_dir(dirs.entries)?;
     let plaintext = Zeroizing::new(std::fs::read(source).map_err(io)?);
     // Belt to the metadata pre-check above: a file that grew between the stat
     // and the read is still refused as over-cap rather than passed to the codec
@@ -250,29 +282,31 @@ pub fn seal_meeting_chunk_from_file(
     getrandom(&mut id).map_err(|_| CaptureError::Backend)?;
     let blob = encode_share_import_blob(key, &id, &plaintext).map_err(|_| CaptureError::Backend)?;
     let entry_id = queue::hex_lower(&id);
-    crate::atomic_write::atomic_write_private(&entries.join(&entry_id), &blob, true).map_err(io)?;
+    crate::atomic_write::atomic_write_private(&dirs.entries.join(&entry_id), &blob, true)
+        .map_err(io)?;
 
-    match meeting_manifest::append_chunk(manifest, session_id, started_at, chunk_index, &entry_id) {
-        // Newly recorded → the seal stands. Best-effort drop the plaintext
-        // source (the receiver's handed-off file) so the transient window is as
-        // short as possible; a failed delete costs one re-seal on retry.
-        Ok(true) => {
-            let _ = std::fs::remove_file(source);
-            Ok(Some(entry_id))
-        }
+    match meeting_manifest::append_chunk(
+        dirs.manifest,
+        session_id,
+        started_at,
+        chunk_index,
+        &entry_id,
+    ) {
+        // Newly recorded → the seal stands. The source is the caller's to
+        // remove (it owns the receiver's inbox file); a failed delete there
+        // costs one re-seal on retry, never a lost chunk.
+        Ok(true) => Ok(Some(entry_id)),
         // Duplicate: the recorded entry is the one we keep, so drop the
-        // redundant blob we just wrote rather than orphan it, and drop the
-        // redundant source too.
+        // redundant blob we just wrote rather than orphan it.
         Ok(false) => {
-            let _ = std::fs::remove_file(entries.join(&entry_id));
-            let _ = std::fs::remove_file(source);
+            let _ = std::fs::remove_file(dirs.entries.join(&entry_id));
             Ok(None)
         }
         // The record could not be written (bad session id, IO, corrupt
         // manifest). Remove the entry we just sealed too, so the queue cannot
         // fill with entries no manifest points at.
         Err(e) => {
-            let _ = std::fs::remove_file(entries.join(&entry_id));
+            let _ = std::fs::remove_file(dirs.entries.join(&entry_id));
             Err(e)
         }
     }
@@ -293,6 +327,7 @@ pub async fn seal_meeting_chunk<R: Runtime>(
     let _guard = QUEUE_LOCK.lock().await;
     let entries = queue::meeting_entries_dir(&app)?;
     let manifest = queue::meeting_manifest_dir(&app)?;
+    let inbox = queue::meeting_inbox_dir(&app)?;
     // §9.20.2: an `MYF1` blob is sealed under the SHARE-IMPORT device key
     // (`md.myne.shareimport`), which is deliberate — that key is distinct from
     // the capture queue's so the two device-local queues can be rotated and
@@ -300,15 +335,24 @@ pub async fn seal_meeting_chunk<R: Runtime>(
     // same way; the codec is provider-agnostic.
     let key = crate::plugins::share_import::device_key::get_or_create()
         .map_err(|_| CaptureError::Backend)?;
-    seal_meeting_chunk_from_file(
-        &entries,
-        &manifest,
+    let dirs = MeetingDirs {
+        entries: &entries,
+        manifest: &manifest,
+        inbox: &inbox,
+    };
+    let sealed = seal_meeting_chunk_from_file(
+        &dirs,
         &key,
         &session_id,
         chunk_index,
         started_at,
         Path::new(&path),
-    )
+    )?;
+    // The seal succeeded (or the chunk was a duplicate): the app-owned inbox file
+    // is done. Best-effort remove it so the plaintext window is as short as the
+    // round trip allows; a failed delete costs one re-seal on the next delivery.
+    let _ = std::fs::remove_file(Path::new(&path));
+    Ok(sealed)
 }
 
 /// One sealed chunk that drained into the vault's attachment library, in
@@ -323,11 +367,19 @@ pub struct DrainedMeetingChunk {
 }
 
 /// One pending meeting session drained into the vault. Returns the session id,
-/// its start time, the chunks that imported successfully in chunk order, and the
-/// chunk indices that could NOT be imported (a chunk the watch never delivered,
-/// or an entry that failed to open). The caller still builds a note from
-/// `chunks` and reports `missing` — an incomplete session is a note with a gap,
-/// never a lost meeting.
+/// its start time, the chunks that imported successfully in chunk order, the
+/// chunk indices the watch never delivered (or whose entry can never open), and
+/// the chunk indices whose import failed TRANSIENTLY.
+///
+/// **The two failure lists are not the same thing, and collapsing them lost
+/// audio.** `missing` is a chunk that is gone for good (never delivered, or an
+/// entry that cannot be opened under this key), so its entry may be deleted with
+/// the session. `retryable` is a chunk whose import failed for a reason that may
+/// clear (no space, a momentary IO error), so its sealed entry MUST survive the
+/// ack and be re-drained on the next unlock. An earlier revision reported one
+/// `missing` list and acked the whole session, which deleted a chunk that had
+/// merely failed to import: permanent data loss behind a "some audio missing"
+/// toast.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct DrainedMeeting {
     /// The opaque watch-supplied session id.
@@ -336,21 +388,28 @@ pub struct DrainedMeeting {
     pub started_at: u64,
     /// Successfully imported chunks, ascending by `chunk_index` (embed order).
     pub chunks: Vec<DrainedMeetingChunk>,
-    /// Chunk indices absent from `0..=max(chunk_index)`: a chunk the watch never
-    /// delivered, or one whose entry could not be opened. Non-empty means the
-    /// session is incomplete.
+    /// Chunk indices absent from `0..=max(chunk_index)`, or whose entry can never
+    /// be opened. Gone for good; the caller may ack them away.
     pub missing_chunk_indices: Vec<u32>,
+    /// Chunk indices whose import failed for a reason that may clear. Their
+    /// entries must NOT be deleted: the caller leaves the session un-acked (or
+    /// acks only the resolved chunks) so the next unlock retries them.
+    pub retryable_chunk_indices: Vec<u32>,
 }
 
-/// Every chunk index in `0..=max`, minus the indices actually present. The
-/// watch's indices start at 0 (task 7's chunker), so a session whose first chunk
-/// never arrived is incomplete too — reporting only interior holes would hide
-/// it.
-fn missing_chunk_indices(present: &[u32]) -> Vec<u32> {
-    let Some(max) = present.iter().copied().max() else {
+/// Every chunk index in `0..=max`, minus the indices that actually resolved.
+/// "Resolved" means imported successfully OR failed transiently, because a
+/// retryable chunk is not missing: it is still on disk and will be retried, so
+/// counting it as a permanent gap would tell the user audio is gone when it is
+/// not. The watch's indices start at 0, so a session whose first chunk never
+/// arrived is incomplete too — reporting only interior holes would hide it.
+fn missing_chunk_indices(present: &[u32], retryable: &[u32]) -> Vec<u32> {
+    let mut seen: Vec<u32> = present.iter().chain(retryable).copied().collect();
+    let Some(max) = seen.iter().copied().max() else {
         return Vec::new();
     };
-    (0..=max).filter(|i| !present.contains(i)).collect()
+    seen.sort_unstable();
+    (0..=max).filter(|i| !seen.contains(i)).collect()
 }
 
 /// Drain every pending meeting session into the vault as ordinary attachments:
@@ -394,11 +453,13 @@ pub async fn drain_pending_meetings<R: Runtime>(
     for session in sessions {
         let mut chunks = Vec::new();
         let mut present = Vec::new();
+        let mut retryable = Vec::new();
         for chunk in &session.chunks {
             // Open the sealed entry: filename/header agreement first (best-
             // effort — a stray name is skipped rather than opened), then decode.
             let Some(mut blob) = read_validated_entry(&entries, &key, &chunk.entry_id) else {
-                // A chunk that cannot be opened is a hole, not a failure.
+                // A chunk whose entry can never open is a permanent hole, not a
+                // retry: it is reported in `missing` and its entry may be acked.
                 continue;
             };
             let source = ImportSource::Bytes {
@@ -427,20 +488,25 @@ pub async fn drain_pending_meetings<R: Runtime>(
                     });
                 }
                 // Re-locked mid-drain — stop everything and leave the queue for
-                // the next unlock (the captures/share-import contract).
+                // the next unlock (the captures/share-import contract). Every
+                // chunk still queued keeps its entry, because the caller never
+                // acks a session the drain did not return.
                 Err(AttachmentImportError::Locked) => return Ok(out),
-                // Any other import failure leaves this chunk missing and the
-                // drain continues: one bad chunk must not wedge the meeting.
-                Err(_) => {}
+                // A transient import failure (no space, a momentary IO error).
+                // The entry MUST survive: report it retryable so the caller does
+                // not ack it away, and let the next unlock retry. Continuing the
+                // loop is deliberate — one bad chunk must not wedge the others.
+                Err(_) => retryable.push(chunk.chunk_index),
             }
         }
         chunks.sort_by_key(|c| c.chunk_index);
-        let missing = missing_chunk_indices(&present);
+        let missing = missing_chunk_indices(&present, &retryable);
         out.push(DrainedMeeting {
             session_id: session.session_id,
             started_at: session.started_at,
             chunks,
             missing_chunk_indices: missing,
+            retryable_chunk_indices: retryable,
         });
     }
     Ok(out)
@@ -470,29 +536,40 @@ fn read_validated_entry(
     decode_share_import_blob(key, &blob).ok()
 }
 
-/// Acknowledge a drained meeting session: delete each of its sealed entries and
-/// then its manifest record. Called by the WebView **only after** the meeting's
-/// note exists (at-least-once). Deleting a session that is already gone is a
-/// successful no-op. An entry id that is not the queue's 32-hex shape is
-/// rejected by the manifest read, so a hostile record cannot traverse.
+/// Acknowledge a drained meeting session: delete the sealed entries that are
+/// RESOLVED and drop their manifest record.
+///
+/// Called by the WebView **only after** the meeting's note exists (at-least-once).
+/// `resolved_chunk_indices` are the chunks the drain actually accounted for
+/// (imported, or permanently unopenable). An entry whose chunk is NOT in that
+/// list failed TRANSIENTLY, so it is SKIPPED here and survives, together with its
+/// manifest row: deleting it would turn "the import failed this once" into
+/// permanent audio loss. The session record stays until every chunk resolves, so
+/// the next unlock re-drains the remainder.
+///
+/// Deleting a session that is already gone is a successful no-op. An entry id
+/// that is not the queue's 32-hex shape is rejected by the manifest read, so a
+/// hostile record cannot traverse.
 #[tauri::command]
 pub async fn ack_meeting_session<R: Runtime>(
     app: AppHandle<R>,
     session_id: String,
+    resolved_chunk_indices: Vec<u32>,
 ) -> Result<(), CaptureError> {
     let _guard = QUEUE_LOCK.lock().await;
     let manifest = queue::meeting_manifest_dir(&app)?;
     let entries = queue::meeting_entries_dir(&app)?;
-    ack_meeting_session_in_dirs(&entries, &manifest, &session_id)
+    ack_meeting_session_in_dirs(&entries, &manifest, &session_id, &resolved_chunk_indices)
 }
 
-/// OS-free core of [`ack_meeting_session`]: delete the session's sealed entries,
-/// then its manifest record. Explicit dirs so the whole thing unit-tests without
-/// an `AppHandle` or a keychain.
+/// OS-free core of [`ack_meeting_session`]: delete the RESOLVED chunks' sealed
+/// entries, then drop the session record. Explicit dirs so the whole thing
+/// unit-tests without an `AppHandle` or a keychain.
 pub fn ack_meeting_session_in_dirs(
     entries: &Path,
     manifest: &Path,
     session_id: &str,
+    resolved_chunk_indices: &[u32],
 ) -> Result<(), CaptureError> {
     // Read the record FIRST, so the entries it names are removed before the
     // record that names them disappears.
@@ -501,6 +578,11 @@ pub fn ack_meeting_session_in_dirs(
         None => return Ok(()),
     };
     for chunk in &session.chunks {
+        // A chunk the caller did not resolve failed transiently: keep its entry
+        // for the next unlock rather than deleting audio that is still needed.
+        if !resolved_chunk_indices.contains(&chunk.chunk_index) {
+            continue;
+        }
         if !queue::is_capture_id(&chunk.entry_id) {
             continue;
         }
@@ -510,7 +592,19 @@ pub fn ack_meeting_session_in_dirs(
             Err(e) => return Err(io(e)),
         }
     }
-    meeting_manifest::delete_session(manifest, session_id)
+    // The record survives while any chunk is still on disk: a retryable chunk
+    // needs its manifest row to be found again on the next drain. "Still on
+    // disk" is the test, not "not in this call's list", because a chunk resolved
+    // by an EARLIER ack has already had its entry removed.
+    let any_entry_left = session
+        .chunks
+        .iter()
+        .any(|c| queue::is_capture_id(&c.entry_id) && entries.join(&c.entry_id).exists());
+    if any_entry_left {
+        Ok(())
+    } else {
+        meeting_manifest::delete_session(manifest, session_id)
+    }
 }
 
 /// Seal every staged plaintext capture into the encrypted queue. Device-key
@@ -702,30 +796,36 @@ mod tests {
 
     // ── watch meeting-capture lane (myne-md/myne#812) ──────────────────────
 
-    /// Mint a fresh, unique source path under `root` (per call — tests run in
-    /// parallel and the production seal deletes the source, so a shared name
-    /// would race).
-    fn unique_src(root: &Path) -> std::path::PathBuf {
+    /// Mint a fresh, unique source path inside the test INBOX (per call — tests
+    /// run in parallel and the production seal deletes the source, so a shared
+    /// name would race). `inbox` is the directory the seal requires the source to
+    /// live under, mirroring the app-owned inbox the native receiver uses.
+    fn unique_src(inbox: &Path) -> std::path::PathBuf {
         let mut sfx = [0u8; 8];
         getrandom(&mut sfx).unwrap();
-        root.join(format!("chunk-src-{}", queue::hex_lower(&sfx)))
+        inbox.join(format!("chunk-src-{}", queue::hex_lower(&sfx)))
     }
 
-    /// Drop a synthetic "arrived chunk" file and seal it. Returns the entry id
-    /// (hex) the seal recorded.
+    /// Drop a synthetic "arrived chunk" file into the inbox and seal it. Returns
+    /// the entry id (hex) the seal recorded. `inbox` is both the source directory
+    /// and the constraint the seal enforces.
     fn seal_chunk(
-        root: &Path,
+        inbox: &Path,
         entries: &Path,
         manifest: &Path,
         session_id: &str,
         chunk_index: u32,
         bytes: &[u8],
     ) -> String {
-        let src = unique_src(root);
+        let src = unique_src(inbox);
         std::fs::write(&src, bytes).unwrap();
-        seal_meeting_chunk_from_file(
+        let dirs = MeetingDirs {
             entries,
             manifest,
+            inbox,
+        };
+        seal_meeting_chunk_from_file(
+            &dirs,
             &KEY,
             session_id,
             chunk_index,
@@ -808,7 +908,18 @@ mod tests {
         std::fs::write(&src, &big).unwrap();
 
         assert_eq!(
-            seal_meeting_chunk_from_file(&entries, &manifest, &KEY, "sess-1", 0, 1, &src),
+            seal_meeting_chunk_from_file(
+                &MeetingDirs {
+                    entries: &entries,
+                    manifest: &manifest,
+                    inbox: &root
+                },
+                &KEY,
+                "sess-1",
+                0,
+                1,
+                &src
+            ),
             Err(CaptureError::ChunkTooLarge)
         );
         // The source is left in place (the receiver can retry with a smaller
@@ -834,8 +945,11 @@ mod tests {
         let dup_src = unique_src(&root);
         std::fs::write(&dup_src, b"second delivery").unwrap();
         let second = seal_meeting_chunk_from_file(
-            &entries,
-            &manifest,
+            &MeetingDirs {
+                entries: &entries,
+                manifest: &manifest,
+                inbox: &root,
+            },
             &KEY,
             "sess-1",
             0,
@@ -901,7 +1015,19 @@ mod tests {
         let src = root.join("empty");
         std::fs::write(&src, b"").unwrap();
         assert_eq!(
-            seal_meeting_chunk_from_file(&entries, &manifest, &KEY, "sess-1", 0, 1, &src).unwrap(),
+            seal_meeting_chunk_from_file(
+                &MeetingDirs {
+                    entries: &entries,
+                    manifest: &manifest,
+                    inbox: &root
+                },
+                &KEY,
+                "sess-1",
+                0,
+                1,
+                &src
+            )
+            .unwrap(),
             None
         );
         assert_eq!(queue::list_files(&entries).len(), 0);
@@ -921,10 +1047,95 @@ mod tests {
         let src = root.join("src");
         std::fs::write(&src, b"audio").unwrap();
         assert_eq!(
-            seal_meeting_chunk_from_file(&entries, &manifest, &KEY, "../../escape", 0, 1, &src),
+            seal_meeting_chunk_from_file(
+                &MeetingDirs {
+                    entries: &entries,
+                    manifest: &manifest,
+                    inbox: &root
+                },
+                &KEY,
+                "../../escape",
+                0,
+                1,
+                &src
+            ),
             Err(CaptureError::Backend)
         );
         assert_eq!(queue::list_files(&entries).len(), 0, "no orphan entry");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// **The arbitrary-read guard.** The seal accepts a source only from directly
+    /// under the app-owned inbox. A path anywhere else — a sibling directory, a
+    /// traversal-shaped name, or a file outside the container — is refused, so a
+    /// compromised WebView cannot point this pre-unlock command at a host file.
+    #[test]
+    fn a_source_outside_the_inbox_is_refused() {
+        let root = tmp();
+        let entries = root.join("entries");
+        let manifest = root.join("manifest");
+        let inbox = root.join("inbox");
+        std::fs::create_dir_all(&inbox).unwrap();
+
+        // A real file OUTSIDE the inbox (a sibling) must be refused.
+        let outside = root.join("secret");
+        std::fs::write(&outside, b"not audio").unwrap();
+        assert_eq!(
+            seal_meeting_chunk_from_file(
+                &MeetingDirs {
+                    entries: &entries,
+                    manifest: &manifest,
+                    inbox: &inbox
+                },
+                &KEY,
+                "sess-1",
+                0,
+                1,
+                &outside
+            ),
+            Err(CaptureError::Backend),
+            "a source outside the inbox must be refused"
+        );
+
+        // A traversal-shaped name that resolves outside is refused too.
+        let traversal = inbox.join("../secret");
+        assert_eq!(
+            seal_meeting_chunk_from_file(
+                &MeetingDirs {
+                    entries: &entries,
+                    manifest: &manifest,
+                    inbox: &inbox
+                },
+                &KEY,
+                "sess-1",
+                0,
+                1,
+                &traversal
+            ),
+            Err(CaptureError::Backend)
+        );
+
+        // Nothing was sealed for either attempt.
+        assert_eq!(queue::list_files(&entries).len(), 0);
+
+        // The same content INSIDE the inbox seals fine, proving the refusal is
+        // the location and not the bytes.
+        let inside = unique_src(&inbox);
+        std::fs::write(&inside, b"not audio").unwrap();
+        assert!(seal_meeting_chunk_from_file(
+            &MeetingDirs {
+                entries: &entries,
+                manifest: &manifest,
+                inbox: &inbox
+            },
+            &KEY,
+            "sess-1",
+            0,
+            1,
+            &inside
+        )
+        .unwrap()
+        .is_some());
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -933,14 +1144,26 @@ mod tests {
     #[test]
     fn missing_indices_report_a_hole_and_a_lost_first_chunk() {
         // Interior hole: {0,2} is missing 1.
-        assert_eq!(missing_chunk_indices(&[0, 2]), vec![1]);
+        assert_eq!(missing_chunk_indices(&[0, 2], &[]), vec![1]);
         // A lost FIRST chunk is a gap too (indices start at 0).
-        assert_eq!(missing_chunk_indices(&[1, 2]), vec![0]);
+        assert_eq!(missing_chunk_indices(&[1, 2], &[]), vec![0]);
         // Contiguous → no gap.
-        assert!(missing_chunk_indices(&[0, 1, 2]).is_empty());
+        assert!(missing_chunk_indices(&[0, 1, 2], &[]).is_empty());
         // A singleton at 4 means chunks 0..=3 never arrived: they are holes.
-        assert_eq!(missing_chunk_indices(&[4]), vec![0, 1, 2, 3]);
-        assert!(missing_chunk_indices(&[]).is_empty());
+        assert_eq!(missing_chunk_indices(&[4], &[]), vec![0, 1, 2, 3]);
+        assert!(missing_chunk_indices(&[], &[]).is_empty());
+    }
+
+    /// A chunk that failed TRANSIENTLY is not missing: its audio is still on
+    /// disk and comes back on the next unlock, so reporting it as a permanent
+    /// gap would tell the user audio is gone when it is only delayed.
+    #[test]
+    fn a_retryable_chunk_is_not_reported_as_missing() {
+        // {0 imported, 1 retryable, 2 imported} → nothing is missing.
+        assert!(missing_chunk_indices(&[0, 2], &[1]).is_empty());
+        // A retryable chunk still bounds the range: {0 imported, 3 retryable}
+        // means 1 and 2 never arrived at all.
+        assert_eq!(missing_chunk_indices(&[0], &[3]), vec![1, 2]);
     }
 
     /// A restored entry decodes to the exact bytes that were sealed, and a
@@ -966,10 +1189,10 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Acknowledge deletes the session's sealed entries AND its manifest record,
-    /// leaves a sibling session untouched, and is idempotent.
+    /// Acknowledge deletes the RESOLVED chunks' sealed entries, leaves a sibling
+    /// session untouched, and is idempotent.
     #[test]
-    fn ack_deletes_entries_and_record_for_one_session_only() {
+    fn ack_deletes_resolved_entries_and_record_for_one_session_only() {
         let root = tmp();
         let entries = root.join("entries");
         let manifest = root.join("manifest");
@@ -977,7 +1200,8 @@ mod tests {
         let a1 = seal_chunk(&root, &entries, &manifest, "sess-a", 1, b"a1");
         let b0 = seal_chunk(&root, &entries, &manifest, "sess-b", 0, b"b0");
 
-        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a").unwrap();
+        // Both of sess-a's chunks resolved → both entries go and the record goes.
+        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a", &[0, 1]).unwrap();
         assert!(!entries.join(&a0).exists());
         assert!(!entries.join(&a1).exists());
         assert!(entries.join(&b0).exists(), "sess-b entries survive");
@@ -994,7 +1218,52 @@ mod tests {
         );
 
         // Idempotent: acking again is a successful no-op.
-        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a").unwrap();
+        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a", &[0, 1]).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// **The data-loss regression this suite exists for.** A chunk whose import
+    /// failed transiently is NOT in the resolved set, so its sealed entry AND its
+    /// manifest row survive the ack and the session re-drains next unlock.
+    /// Deleting it would turn a one-off `NoSpace` into permanent audio loss behind
+    /// a "some audio missing" toast.
+    #[test]
+    fn a_retryable_chunk_keeps_its_entry_and_record_across_an_ack() {
+        let root = tmp();
+        let entries = root.join("entries");
+        let manifest = root.join("manifest");
+        let a0 = seal_chunk(&root, &entries, &manifest, "sess-a", 0, b"a0");
+        let a1 = seal_chunk(&root, &entries, &manifest, "sess-a", 1, b"a1");
+
+        // Chunk 0 imported; chunk 1 failed transiently → resolved = [0].
+        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a", &[0]).unwrap();
+
+        assert!(!entries.join(&a0).exists(), "the resolved entry is deleted");
+        assert!(
+            entries.join(&a1).exists(),
+            "the RETRYABLE entry must survive the ack"
+        );
+        let session = meeting_manifest::read_session(&manifest, "sess-a")
+            .unwrap()
+            .expect("the record survives while a chunk is unresolved");
+        // The record keeps the WHOLE session (both chunks), because the retry
+        // re-drains it and chunk 0 dedups on the content-addressed attachment id.
+        assert_eq!(session.chunks.len(), 2);
+        assert_eq!(
+            session
+                .chunks
+                .iter()
+                .map(|c| c.chunk_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+
+        // Once the retry resolves too, the ack cleans up.
+        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a", &[1]).unwrap();
+        assert!(!entries.join(&a1).exists());
+        assert!(meeting_manifest::read_session(&manifest, "sess-a")
+            .unwrap()
+            .is_none());
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1013,7 +1282,9 @@ mod tests {
         std::fs::remove_file(entries.join(&a1)).unwrap();
 
         assert!(read_validated_entry(&entries, &KEY, &a1).is_none());
-        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a").unwrap();
+        // Both chunks are accounted for (0 imported, 1 permanently missing), so
+        // the ack cleans the session up rather than retrying an absent file.
+        ack_meeting_session_in_dirs(&entries, &manifest, "sess-a", &[0, 1]).unwrap();
         assert!(meeting_manifest::read_session(&manifest, "sess-a")
             .unwrap()
             .is_none());

@@ -1439,15 +1439,38 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           __meetingAcks?: string[];
           __meetingAcked?: string[];
           __meetingAckFailures?: number;
+          __meetingResolved?: Record<string, number[]>;
         };
         const id = String(args.sessionId ?? "");
+        const resolved = Array.isArray(args.resolvedChunkIndices)
+          ? (args.resolvedChunkIndices as number[])
+          : [];
         (w.__meetingAcks ??= []).push(id);
         const failed = w.__meetingAckFailures ?? 0;
         if (failed > 0) {
           w.__meetingAckFailures = failed - 1;
           throw { kind: "Backend" };
         }
-        (w.__meetingAcked ??= []).push(id);
+        // Record the RESOLVED indices too, so a test can assert the H3 contract:
+        // a retryable chunk is not in the list and its session is not fully
+        // acked away. `__meetingAcked` means "every chunk resolved" (the record
+        // is gone), matching the Rust `ack_meeting_session_in_dirs` behaviour
+        // where the manifest row survives while any entry is still on disk.
+        (w.__meetingResolved ??= {})[id] = resolved;
+        const session = (config.pendingMeetings ?? []).find((s) => s.session_id === id);
+        // "Fully resolved" means every chunk that could be accounted for is in
+        // the ack: the imported/missing ones AND the retryable ones. A retryable
+        // chunk is NOT resolved (its entry stays for the next unlock), so the
+        // session is not fully acked while one exists — the H3 contract.
+        const retryable = session?.retryable_chunk_indices ?? [];
+        const allResolved =
+          !session ||
+          (session.chunks.every((c) => resolved.includes(c.chunk_index)) &&
+            session.missing_chunk_indices.every((i) => resolved.includes(i)) &&
+            retryable.every((i) => resolved.includes(i)));
+        if (allResolved) {
+          (w.__meetingAcked ??= []).push(id);
+        }
         return null;
       },
       // ── Share-import surface (§9.20 OS share-sheet drain) ──
