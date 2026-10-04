@@ -34,6 +34,13 @@ case "${2:-}" in
       echo "error: src-tauri/gen/apple/project.yml is missing — run 'pnpm tauri ios init' first" >&2
       exit 1
     fi
+    # Xcode 27 + swift-rs 1.0.8: cargo never puts the tauri Swift package's
+    # `-lTauri` on the final link, so the SRString symbols stay undefined. The
+    # wrapper force-loads the archive for the final libmyne_mobile_lib link
+    # only. Both triples are set so a device build and a simulator build each get
+    # it. See mobile/scripts/ios-link.sh and ios-app-store-release.md §4b.
+    export CARGO_TARGET_AARCH64_APPLE_IOS_LINKER="$PWD/scripts/ios-link.sh"
+    export CARGO_TARGET_AARCH64_APPLE_IOS_SIM_LINKER="$PWD/scripts/ios-link.sh"
     run_tauri "$@"
     ;;
   *)
