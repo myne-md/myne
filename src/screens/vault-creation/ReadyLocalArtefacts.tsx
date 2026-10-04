@@ -71,8 +71,15 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
       }
       // `vaultId` is always populated here (CreateVault passes the committed id
       // once commit succeeds); the null arm is type-level defense only —
-      // sole-vault targeting would misfire under multi-vault.
-      await exportBackup(destination, vaultId ?? undefined);
+      // sole-vault targeting would misfire under multi-vault. Refuse rather
+      // than invoke with a missing target: the command takes `vault_id` as a
+      // required string (myne-md/myne#250), so an undefined one is an
+      // argument deserialization failure, not a clean error.
+      if (vaultId == null) {
+        setBackupState("error");
+        return;
+      }
+      await exportBackup(destination, vaultId);
       setBackupState("done");
     } catch (e) {
       logErrorKind(e, "ready-step-backup-failed");
