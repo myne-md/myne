@@ -54,6 +54,7 @@ use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use tokio::sync::{RwLock, Semaphore};
 use zeroize::Zeroizing;
@@ -995,6 +996,7 @@ impl VaultRuntimeState {
             items_key,
             items_key_id,
             opened_at,
+            vault_root,
         } = material;
         let mut guard = self.slots.write().await;
         if !guard.values().any(|s| matches!(s, Slot::Unlocked(_))) {
@@ -1014,6 +1016,7 @@ impl VaultRuntimeState {
                     items_key,
                     items_key_id,
                     opened_at,
+                    vault_root,
                 },
             )
             .unwrap_or(Slot::Empty))
@@ -1041,11 +1044,13 @@ impl VaultRuntimeState {
                 items_key,
                 items_key_id,
                 opened_at,
+                vault_root,
             }) => Some(ImportSourceMaterial {
                 root_key,
                 items_key,
                 items_key_id,
                 opened_at,
+                vault_root,
             }),
             // Unreachable given the guard above; restore defensively.
             Some(other) => {
@@ -1053,6 +1058,19 @@ impl VaultRuntimeState {
                 None
             }
             None => None,
+        }
+    }
+
+    /// The root of the source vault an open import slot reads from, or `None`
+    /// when no import source is open for `id`. A local vault yields
+    /// `vaults/<id>/`; a `.myne-backup` import yields the temporary extraction
+    /// directory (myne-md/myne#816). The readers resolve their paths from this
+    /// rather than re-deriving a vault directory from the id.
+    pub async fn import_source_root(&self, id: VaultId) -> Option<PathBuf> {
+        let guard = self.slots.read().await;
+        match guard.get(&id) {
+            Some(Slot::ImportSource { vault_root, .. }) => Some(vault_root.clone()),
+            _ => None,
         }
     }
 
@@ -1935,6 +1953,12 @@ pub enum Slot {
         items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
         items_key_id: [u8; 16],
         opened_at: u64,
+        /// The source vault's root, resolved when the slot was opened. A local
+        /// vault resolves to `vaults/<id>/`; a `.myne-backup` import resolves
+        /// to the temporary directory its members were extracted into
+        /// (myne-md/myne#816). Held here rather than re-derived from the id so
+        /// the readers work for both without a second resolution path.
+        vault_root: PathBuf,
     },
 }
 
@@ -1992,6 +2016,8 @@ pub struct ImportSourceMaterial {
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
     pub opened_at: u64,
+    /// See [`Slot::ImportSource::vault_root`].
+    pub vault_root: PathBuf,
 }
 
 /// Discriminator for the [`Slot`] enum, exposed across IPC by the
@@ -3774,6 +3800,9 @@ pub fn fixture_import_source(
         items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         items_key_id: [items_id_byte; 16],
         opened_at,
+        // The fixture is not a real root; tests that read through a source use
+        // `open`/`open_at_root`, which set it.
+        vault_root: PathBuf::new(),
     }
 }
 

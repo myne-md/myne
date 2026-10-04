@@ -49,7 +49,7 @@ use crate::plugins::vault_unlock::state::{
 };
 use crate::vault_id::VaultId;
 use crate::vault_io::VaultIo;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
 /// Which credential the caller is presenting for the source vault.
@@ -95,6 +95,31 @@ impl SourceCredential {
 /// [`close`] takes it, the TTL sweep drops it, or vault teardown drops it.
 pub async fn open(
     source_id: VaultId,
+    credential: SourceCredential,
+    state: &VaultRuntimeState,
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+) -> Result<(), VaultUnlockError> {
+    let vault_root = crate::paths::vault_root_for_id_from_host(host, source_id).map_err(|_| {
+        tracing::error!(
+            stage = "resolve_root",
+            error_kind = "VaultNotFound",
+            "could not resolve the source vault's root directory"
+        );
+        VaultUnlockError::VaultNotFound
+    })?;
+    open_at_root(source_id, vault_root, credential, state, host, io).await
+}
+
+/// Open a source vault at an EXPLICIT root (myne-md/myne#816). The local-vault
+/// path resolves `vaults/<id>/` in [`open`] above; a `.myne-backup` import
+/// passes the temporary directory its container members were extracted into.
+/// Everything else (the slot guards, the permit, the meta read, the
+/// derivation, the population) is identical, which is the point of the split:
+/// a backup source is read through exactly the same path as a local one.
+pub async fn open_at_root(
+    source_id: VaultId,
+    vault_root: PathBuf,
     credential: SourceCredential,
     state: &VaultRuntimeState,
     host: &dyn HostCtx,
@@ -185,14 +210,6 @@ pub async fn open(
         }
     };
 
-    let vault_root = crate::paths::vault_root_for_id_from_host(host, source_id).map_err(|_| {
-        tracing::error!(
-            stage = "resolve_root",
-            error_kind = "VaultNotFound",
-            "could not resolve the source vault's root directory"
-        );
-        VaultUnlockError::VaultNotFound
-    })?;
     let meta_path = vault_root.join("vault.meta");
 
     let (meta_preview, meta_version, bytes) = read_meta(io, &meta_path).await?;
@@ -213,6 +230,7 @@ pub async fn open(
                 items_key: keys.items_key,
                 items_key_id: keys.items_key_id,
                 opened_at,
+                vault_root: vault_root.clone(),
             }
         }
         SourceCredential::RecoveryPhrase(phrase) => {
@@ -222,7 +240,7 @@ pub async fn open(
             // duration, including the auto-lock tick and in-flight note IO.
             let meta = meta_preview.clone();
             crate::task::run_blocking(move || {
-                derive_from_phrase(&meta, meta_version, phrase, opened_at)
+                derive_from_phrase(&meta, meta_version, phrase, opened_at, vault_root)
             })
             .await
             .map_err(|_| VaultUnlockError::JoinFailure)??
@@ -339,6 +357,7 @@ fn derive_from_phrase(
     version: protocol::MetaVersion,
     phrase: Zeroizing<String>,
     opened_at: u64,
+    vault_root: PathBuf,
 ) -> Result<ImportSourceMaterial, VaultUnlockError> {
     use crate::plugins::vault_recover::commands::{derive_items_key, derive_root_key_from_phrase};
     use crate::plugins::vault_recover::error::VaultRecoveryError;
@@ -356,6 +375,7 @@ fn derive_from_phrase(
         items_key,
         items_key_id: meta.items_key_id,
         opened_at,
+        vault_root,
     })
 }
 
@@ -532,7 +552,7 @@ pub enum ImportSourceReadError {
 pub async fn list_note_ids(
     source_id: VaultId,
     state: &VaultRuntimeState,
-    host: &dyn HostCtx,
+    _host: &dyn HostCtx,
     io: &dyn VaultIo,
 ) -> Result<Vec<String>, ImportSourceReadError> {
     // The slot is not used for the listing itself, only as the authorisation:
@@ -542,8 +562,13 @@ pub async fn list_note_ids(
         return Err(ImportSourceReadError::SessionClosed);
     }
 
-    let vault_root = crate::paths::vault_root_for_id_from_host(host, source_id)
-        .map_err(|_| ImportSourceReadError::SessionClosed)?;
+    // The root comes from the OPEN SLOT, not from the id: a local vault and a
+    // `.myne-backup` extraction both satisfy this, and only the slot knows
+    // which (myne-md/myne#816).
+    let vault_root = state
+        .import_source_root(source_id)
+        .await
+        .ok_or(ImportSourceReadError::SessionClosed)?;
     let notes_dir = vault_root.join("notes");
 
     let entries = io.read_dir(&notes_dir).await.map_err(|io_error_kind| {
@@ -585,7 +610,7 @@ pub async fn read_note(
     source_id: VaultId,
     note_id: String,
     state: &VaultRuntimeState,
-    host: &dyn HostCtx,
+    _host: &dyn HostCtx,
     io: &dyn VaultIo,
 ) -> Result<String, ImportSourceReadError> {
     use crate::plugins::notes::note_id::NoteId;
@@ -616,8 +641,12 @@ pub async fn read_note(
         }
     };
 
-    let vault_root = crate::paths::vault_root_for_id_from_host(host, source_id)
-        .map_err(|_| ImportSourceReadError::SessionClosed)?;
+    // Root from the open slot: works for a local vault and a `.myne-backup`
+    // extraction alike (myne-md/myne#816).
+    let vault_root = state
+        .import_source_root(source_id)
+        .await
+        .ok_or(ImportSourceReadError::SessionClosed)?;
     let path = vault_root
         .join("notes")
         .join(format!("{}.myn", note_id.as_uuid()));
@@ -791,7 +820,7 @@ mod import_source_read_tests {
     /// names, so a caller passing `test_vault_id()` itself would be asking for a
     /// vault that is its own import source. That is refused by the `Unlocked`
     /// slot kind before it reaches here, and no caller does it.
-    fn open_slot(state: &VaultRuntimeState, id: VaultId) {
+    fn open_slot(state: &VaultRuntimeState, id: VaultId, base: &std::path::Path) {
         block_on(async {
             state
                 .set_unlocked(
@@ -799,8 +828,13 @@ mod import_source_read_tests {
                     fixture_unlocked_with_keys(0x11, 0x22, 0x33),
                 )
                 .await;
+            // The slot now carries the source ROOT (myne-md/myne#816), and the
+            // readers resolve from it rather than from `vaults/<id>`. A fixture
+            // slot with no root would resolve nothing.
+            let mut material = fixture_import_source(0x44, 0x5A, 0x66, 0);
+            material.vault_root = crate::paths::vault_root_for_id_from_base(base, id);
             state
-                .set_import_source(id, fixture_import_source(0x44, 0x5A, 0x66, 0))
+                .set_import_source(id, material)
                 .await
                 .expect("a target vault is unlocked in this fixture");
         });
@@ -903,7 +937,7 @@ mod import_source_read_tests {
         let id = test_vault_id_b();
         let state = VaultRuntimeState::default();
         unlock_target(&state);
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1032,7 +1066,7 @@ mod import_source_read_tests {
         let body = "---\ntitle: Project\n---\n\nBody with a [[Link]].\n";
         let note_id = seed_note(tmp.path(), id, body);
         let state = VaultRuntimeState::default();
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1097,7 +1131,7 @@ mod import_source_read_tests {
         std::fs::write(notes.join(format!("{uuid}.myn")), blob).expect("write blob");
 
         let state = VaultRuntimeState::default();
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1146,7 +1180,7 @@ mod import_source_read_tests {
         let id = test_vault_id_b();
         let note_id = seed_note(tmp.path(), id, "body\n");
         let state = VaultRuntimeState::default();
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1176,7 +1210,7 @@ mod import_source_read_tests {
         std::fs::write(notes.join("not-a-uuid.myn"), b"junk").expect("stray");
         std::fs::write(notes.join("README.txt"), b"junk").expect("stray");
         let state = VaultRuntimeState::default();
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1231,7 +1265,7 @@ mod import_source_read_tests {
         std::fs::write(notes.join(format!("{uuid}.myn")), blob).expect("write");
 
         let state = VaultRuntimeState::default();
-        open_slot(&state, id);
+        open_slot(&state, id, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1359,8 +1393,12 @@ pub async fn reseal_attachment(
         }
     };
 
-    let source_root = crate::paths::vault_root_for_id_from_host(host, source_id)
-        .map_err(|_| ImportSourceAttachmentError::SessionClosed)?;
+    // Source root from the open slot, so a `.myne-backup` import re-seals from
+    // its extraction directory too (myne-md/myne#816).
+    let source_root = state
+        .import_source_root(source_id)
+        .await
+        .ok_or(ImportSourceAttachmentError::SessionClosed)?;
 
     // The source's own generation and account hash. Both are the SOURCE's:
     // deriving the catalog KEK under the target's generation, or binding the
@@ -1620,7 +1658,7 @@ mod import_source_reseal_tests {
         root
     }
 
-    fn open_both(state: &VaultRuntimeState) {
+    fn open_both(state: &VaultRuntimeState, base: &std::path::Path) {
         block_on(async {
             state
                 .set_unlocked(
@@ -1628,11 +1666,11 @@ mod import_source_reseal_tests {
                     fixture_unlocked_with_keys(0xB1, 0xB2, 0xB3),
                 )
                 .await;
+            let mut material = fixture_import_source(0xA1, 0xA2, 0xA3, 0);
+            material.vault_root =
+                crate::paths::vault_root_for_id_from_base(base, test_vault_id_b());
             state
-                .set_import_source(
-                    test_vault_id_b(),
-                    fixture_import_source(0xA1, 0xA2, 0xA3, 0),
-                )
+                .set_import_source(test_vault_id_b(), material)
                 .await
                 .expect("a target vault is unlocked in this fixture");
         });
@@ -1648,7 +1686,7 @@ mod import_source_reseal_tests {
         let src_id = seed_source_attachment(tmp.path(), bytes, "diagram.png", "image/png", 1234);
         let target_dir = seed_target(tmp.path());
         let state = VaultRuntimeState::default();
-        open_both(&state);
+        open_both(&state, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1704,7 +1742,7 @@ mod import_source_reseal_tests {
         );
         let target_dir = seed_target(tmp.path());
         let state = VaultRuntimeState::default();
-        open_both(&state);
+        open_both(&state, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1750,7 +1788,7 @@ mod import_source_reseal_tests {
         );
         let target_dir = seed_target(tmp.path());
         let state = VaultRuntimeState::default();
-        open_both(&state);
+        open_both(&state, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1827,7 +1865,7 @@ mod import_source_reseal_tests {
         );
         let target_dir = seed_target(tmp.path());
         let state = VaultRuntimeState::default();
-        open_both(&state);
+        open_both(&state, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -1849,7 +1887,7 @@ mod import_source_reseal_tests {
         let tmp = ScopedTempDir::new("reseal-badid").expect("temp");
         let target_dir = seed_target(tmp.path());
         let state = VaultRuntimeState::default();
-        open_both(&state);
+        open_both(&state, tmp.path());
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
