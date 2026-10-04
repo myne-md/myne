@@ -7,6 +7,10 @@ import WidgetKit
 /// default), landing the user on the dictation surface — the fastest path to a
 /// voice quick-capture from the watch face. Purely a launcher: it carries NO
 /// vault content (the watch is outside the plaintext trust boundary, §9.18).
+///
+/// The rectangular family ALSO carries a `myne-watch://meeting` link so the
+/// meeting recorder has its own entry point from the watch face (myne-md/myne#812);
+/// the capture launcher is untouched, so the dictation path stays one tap.
 struct MyneComplicationEntry: TimelineEntry {
     let date: Date
 }
@@ -47,6 +51,14 @@ struct MyneComplicationView: View {
             HStack(spacing: 6) {
                 mark.frame(width: 18, height: 18)
                 Text("New note")
+                Spacer(minLength: 0)
+                // A distinct tap target for the meeting recorder. `.widgetURL` on
+                // the whole view would override the default launch, so the meeting
+                // link is a `Link` INSIDE the otherwise-default complication: the
+                // body still launches the capture surface, this opens the recorder.
+                Link(destination: URL(string: "myne-watch://meeting")!) {
+                    Image(systemName: "record.circle")
+                }
             }
         }
     }

@@ -50,7 +50,25 @@ function threeChunkSession() {
       { chunk_index: 2, attachment_id: C },
     ],
     missing_chunk_indices: [] as number[],
+    retryable_chunk_indices: [] as number[],
   };
+}
+
+/** The session ids whose ENTIRE chunk set resolved (mirror of the Rust ack,
+ *  where the manifest row survives while any entry is still on disk). */
+async function readMeetingAcked(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __meetingAcked?: string[] }).__meetingAcked ?? [],
+  );
+}
+
+/** The resolved chunk indices the drain sent for a session. */
+async function readMeetingResolved(page: Page): Promise<Record<string, number[]>> {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __meetingResolved?: Record<string, number[]> })
+        .__meetingResolved ?? {},
+  );
 }
 
 const HEADER = "## Transcript\n\n_This is a machine transcript of the meeting and may contain errors._\n\n";
@@ -95,6 +113,7 @@ test.describe("Apple Watch pending-meeting drain", () => {
             { chunk_index: 2, attachment_id: C },
           ],
           missing_chunk_indices: [1],
+          retryable_chunk_indices: [],
         },
       ],
     });
@@ -134,6 +153,42 @@ test.describe("Apple Watch pending-meeting drain", () => {
     await expect.poll(() => meetingNotes(page)).toHaveLength(2);
     // …and the second attempt acks, clearing the session.
     await expect.poll(() => readMeetingAcks(page)).toEqual(["sess-a", "sess-a"]);
+  });
+
+  test("a retryable chunk is not acked away (no permanent audio loss)", async ({ page }) => {
+    // **The H3 regression.** Chunks 0 and 2 imported; chunk 1 failed to import
+    // TRANSIENTLY (no space, a momentary IO error). The drain must send only the
+    // RESOLVED indices to `ack_meeting_session`, so chunk 1's sealed entry and its
+    // manifest row survive and the session re-drains next unlock. Acking the
+    // whole session would delete audio that was merely delayed.
+    await installMockIpc(page, {
+      pendingMeetings: [
+        {
+          session_id: "sess-retry",
+          started_at: 1_700_000_000_000,
+          chunks: [
+            { chunk_index: 0, attachment_id: A },
+            { chunk_index: 2, attachment_id: C },
+          ],
+          missing_chunk_indices: [],
+          retryable_chunk_indices: [1],
+        },
+      ],
+    });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+
+    // The note is still written from what arrived.
+    await expect.poll(() => meetingNotes(page)).toHaveLength(1);
+
+    // The ack carried ONLY the resolved indices: 1 is absent, so the Rust side
+    // keeps its entry + manifest row.
+    await expect.poll(() => readMeetingAcks(page), { timeout: 8000 }).toEqual(["sess-retry"]);
+    expect(await readMeetingResolved(page)).toEqual({ "sess-retry": [0, 2] });
+
+    // And the whole session is NOT marked fully acked, because chunk 1 is still
+    // queued on the phone.
+    expect(await readMeetingAcked(page)).not.toContain("sess-retry");
   });
 
   test("no pending meetings → no notes created, no acks", async ({ page }) => {
