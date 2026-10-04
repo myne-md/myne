@@ -112,7 +112,7 @@ describe.skipIf(!serverSupported)("ic · invite-code gate over the wire", () => 
 const uiSupported = harnessSupported().ok && serverSupported;
 
 describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
-  it("ic5: a seeded invite code prefills the Settings then Sync field", async () => {
+  it("ic5: a connected server hides the invite-code field", async () => {
     const srv = await startSyncServer({ inviteCode: INVITE });
     let password = "";
     const a = await launchDevice(0, {
@@ -127,8 +127,20 @@ describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
       await dismissImporterOffer(a.session);
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
-      const field = await a.session.byTestId("sync.endpoint-invite-input");
-      expect(await field.attribute("value")).toBe(INVITE);
+      // The endpoint is seeded and connected, so the invite field is hidden
+      // (myne-md/myne#815). The code is still hydrated into state and sent on a
+      // reconnect; only the field that looked like a requirement is gone.
+      await a.session.waitUntil(
+        async () =>
+          (await a.session.byTestIdAll("sync.endpoint-invite-input")).length === 0
+            ? true
+            : null,
+        { label: "invite field hidden when connected", timeoutMs: 15_000 },
+      );
+      // The connect control rests as the disabled "Connected".
+      expect(
+        await (await a.session.byTestId("sync.endpoint-connect")).enabled(),
+      ).toBe(false);
       await closeSettings(a.session);
     } finally {
       await a.teardown();
