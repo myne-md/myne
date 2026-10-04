@@ -22,10 +22,40 @@
 //! byte of a model reaches a log or an error message.
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
+
+/// Reports total bytes written so far, across the whole artefact, on a
+/// best-effort basis. Called on every sink write; a caller that forwards to the
+/// WebView throttles it (the UI does not need one event per 64 KiB chunk).
+pub type DownloadProgressFn = Arc<dyn Fn(u64) + Send + Sync>;
+
+/// A `Write` sink that adds every byte written to a running total (seeded with
+/// the bytes of any earlier files) and reports it. The total is clamped to the
+/// artefact's approximate size so the bar never exceeds 100% when the estimate
+/// is low.
+struct ProgressWriter<W: Write> {
+    inner: W,
+    written: u64,
+    total: u64,
+    on_write: DownloadProgressFn,
+}
+
+impl<W: Write> Write for ProgressWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.written = self.written.saturating_add(n as u64);
+        (self.on_write)(self.written.min(self.total));
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
 
 use super::cancel::CancelToken;
 use super::cancellable_io::CancelledFn;
@@ -79,6 +109,13 @@ pub struct Artifact {
     /// The artefact's files. The **first** is the primary, whose path the role
     /// marker records.
     pub files: &'static [ArtifactFile],
+    /// Approximate total size of the artefact, in bytes, for the download
+    /// progress bar ONLY (myne-md/myne#814). Never a security check: the trust
+    /// anchor is the compiled-in `sha256_hex` per file, and this number is the
+    /// same "about N MB" the settings copy states. The bar clamps at 100%, so a
+    /// size that is a little off reaches the end of the bar and then the row
+    /// flips to "Installed".
+    pub approx_total_bytes: u64,
 }
 
 /// The compiled-in artefact table. Only the multilingual embedding model is
@@ -92,6 +129,8 @@ pub const ARTIFACTS: &[Artifact] = &[
         role: ModelRole::Embedding,
         url_prefix: "/models/embedding/1a55775f5344",
         dest_dir: "embedding-1a55775f5344",
+        // "about 449 MB" in the settings copy; 449 MiB.
+        approx_total_bytes: 449 * 1024 * 1024,
         files: &[
             ArtifactFile {
                 name: "model.safetensors",
@@ -112,6 +151,8 @@ pub const ARTIFACTS: &[Artifact] = &[
         role: ModelRole::TagSuggestion,
         url_prefix: "/models/tag/05df94f8140a",
         dest_dir: "tag-05df94f8140a",
+        // "about 337 MB" in the settings copy; 337 MiB.
+        approx_total_bytes: 337 * 1024 * 1024,
         files: &[
             ArtifactFile {
                 name: "model.gguf",
@@ -135,6 +176,8 @@ pub static FIXTURE_ARTIFACTS: &[Artifact] = &[Artifact {
     role: ModelRole::Embedding,
     url_prefix: "/fixture/embedding",
     dest_dir: "fixture-embedding",
+    // Fixture bytes are tiny; a small non-zero total keeps the bar determinate.
+    approx_total_bytes: 4096,
     files: &[ArtifactFile {
         name: "model.safetensors",
         // sha256("myne-e2e-fixture-embedding-model-bytes"), the exact bytes
@@ -278,6 +321,7 @@ pub fn download_and_install(
     artifact: &Artifact,
     download_id: &str,
     cancelled: &CancelledFn,
+    progress: &DownloadProgressFn,
 ) -> Result<PathBuf, ModelDownloadCommandError> {
     // Staging is keyed by the caller-minted `download_id`, NOT the artefact id:
     // two concurrent downloads of the same artefact must not share a directory,
@@ -290,18 +334,30 @@ pub fn download_and_install(
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(ModelStoreError::from)?;
 
+    // Bytes of the files already fully written, so the progress total is
+    // cumulative across the artefact rather than resetting per file.
+    let mut done_bytes: u64 = 0;
     for file in artifact.files {
         let dest = staging.join(file.name);
         let (host, port) = download_origin();
-        let mut out = match std::fs::File::create(&dest) {
+        let out = match std::fs::File::create(&dest) {
             Ok(f) => f,
             Err(e) => {
                 let _ = std::fs::remove_dir_all(&staging);
                 return Err(ModelStoreError::from(e).into());
             }
         };
-        let result = fetch_one(artifact, file, &host, port, &mut out, cancelled);
-        drop(out);
+        let mut writer = ProgressWriter {
+            inner: out,
+            written: done_bytes,
+            total: artifact.approx_total_bytes,
+            on_write: progress.clone(),
+        };
+        let result = fetch_one(artifact, file, &host, port, &mut writer, cancelled);
+        done_bytes = writer.written;
+        // Drop closes the file before the next iteration reuses the staging dir
+        // and before the hash-verify pass in `install_downloaded_bundle` reads it.
+        drop(writer);
         if let Err(e) = result {
             let _ = std::fs::remove_dir_all(&staging);
             return Err(e.into());
@@ -396,5 +452,27 @@ mod tests {
         assert!(!pred());
         reg.cancel("b");
         assert!(pred());
+    }
+
+    /// The progress sink reports cumulative bytes and clamps at the total, so a
+    /// low estimate never drives the bar past 100% (myne-md/myne#814).
+    #[test]
+    fn progress_writer_reports_cumulative_bytes_clamped_to_total() {
+        let seen = Arc::new(Mutex::new(Vec::<u64>::new()));
+        let sink = Arc::clone(&seen);
+        let progress: DownloadProgressFn = Arc::new(move |n| {
+            sink.lock().expect("progress sink poisoned").push(n);
+        });
+        let mut w = ProgressWriter {
+            inner: Vec::<u8>::new(),
+            written: 0,
+            total: 10,
+            on_write: progress,
+        };
+        w.write_all(&[0u8; 4]).expect("write");
+        w.write_all(&[0u8; 4]).expect("write");
+        w.write_all(&[0u8; 8]).expect("write");
+        assert_eq!(*seen.lock().expect("progress sink poisoned"), vec![4, 8, 10]);
+        assert_eq!(w.written, 16, "the raw count keeps advancing past the estimate");
     }
 }

@@ -202,6 +202,10 @@ const V = {
     "typed-unsupported",
     "Thin bindings over the `local-inference` download/`cancel` commands, which the whole plugin classifies `Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. Rendered only where `has(\"localAi\")` is true, which web is not, so nothing on web reaches these calls; the module is reachable and its backend answers a typed refusal, which is the `typed-unsupported` verdict.",
   ],
+  "src/lib/ai-download-store.ts": [
+    "typed-unsupported",
+    "Module-scope state over the `local-inference` download/cancel commands and their progress event (myne-md/myne#814). Same verdict and reason as `ai-model-download.ts`, which it wraps: the plugin is `Class::Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. No AI surface renders on web (`localAi` is absent), so nothing reaches it; `typed-unsupported` rather than `excluded` because its backend answers a typed refusal rather than the code being absent.",
+  ],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
