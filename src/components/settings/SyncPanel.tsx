@@ -50,7 +50,11 @@ import {
   undoConflictVersion,
 } from "../../notes/conflictCopy";
 import { Button } from "../primitives/Button";
+import { IconButton } from "../primitives/IconButton";
 import { Input } from "../primitives/Input";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { toast } from "../toast/toastStore";
 import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
@@ -164,6 +168,29 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // Rendering the empty state first would flash the "Add an identity" CTA on a
   // device that holds one.
   const identityLoaded = person !== null || identityReady || identityOwnerCode != null;
+  // Copy the public identity code. Outcome-only feedback, never the value
+  // (`lib/clipboard.ts`), the same arm `MemberRosterPanel` uses
+  // (myne-md/myne#818).
+  const copyIdentityCode = () => {
+    if (!identityCode) return;
+    setIdentityCopyFeedback(null);
+    void copyText(clipboardWriteText, identityCode, {
+      onSuccess: {
+        kind: "toast",
+        run: () => {
+          setIdentityCopyFeedback("success");
+          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+        },
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => {
+          setIdentityCopyFeedback("error");
+          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
+        },
+      },
+    });
+  };
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
   const betaTerms = useBetaTermsGate();
@@ -174,6 +201,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   const [termsOpen, setTermsOpen] = useState(false);
   // The later-add identity door (myne-md/myne#768).
   const [identityOpen, setIdentityOpen] = useState(false);
+  // The identity-code copy outcome, for the icon-chip + inline line
+  // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
+  const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
+    "success" | "error" | null
+  >(null);
   useEffect(() => {
     onDialogOpenChange?.(termsOpen);
     return () => onDialogOpenChange?.(false);
@@ -408,24 +440,50 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
               <p style={HELPER_STYLE} data-testid="sync.panel.identity-locked">
                 {t("sync.panel.identity.lockedHelper")}
               </p>
-              {identityCode ? (
-                <Input
-                  readOnly
-                  mono
-                  aria-label={t("sync.panel.identity.codeLabel")}
-                  value={identityCode}
-                  data-testid="sync.panel.identity-code"
-                  style={{ userSelect: "all" }}
-                  onFocus={(e) => e.target.select()}
-                />
-              ) : null}
-              <Button
-                variant="secondary"
-                onClick={() => setIdentityOpen(true)}
-                data-testid="sync.panel.unlock-identity"
+              {/* Identity box with its actions inline, matching the
+                  sync-server row: the copy chip and the unlock button sit at
+                  the end of the box rather than on their own full-width row
+                  (myne-md/myne#818). */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  alignItems: "center",
+                }}
               >
-                {t("sync.status.unlockIdentityCta")}
-              </Button>
+                {identityCode ? (
+                  <Input
+                    readOnly
+                    mono
+                    aria-label={t("sync.panel.identity.codeLabel")}
+                    value={identityCode}
+                    data-testid="sync.panel.identity-code"
+                    style={{ flex: 1, minWidth: 0, userSelect: "all" }}
+                    onFocus={(e) => e.target.select()}
+                  />
+                ) : null}
+                {identityCode ? (
+                  <IconButton
+                    icon={
+                      identityCopyFeedback === "success"
+                        ? "check"
+                        : identityCopyFeedback === "error"
+                          ? "circle-x"
+                          : "copy"
+                    }
+                    label={t("personIdentityCode.copy")}
+                    onClick={copyIdentityCode}
+                    testId="sync.panel.copy-identity"
+                  />
+                ) : null}
+                <Button
+                  variant="secondary"
+                  onClick={() => setIdentityOpen(true)}
+                  data-testid="sync.panel.unlock-identity"
+                >
+                  {t("sync.status.unlockIdentityCta")}
+                </Button>
+              </div>
             </>
           )}
         </div>

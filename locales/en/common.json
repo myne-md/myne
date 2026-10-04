@@ -3309,6 +3309,8 @@
       "downloadReinstall": "Download",
       "modelRemove": "Remove",
       "downloading": "Downloading…",
+      "downloadingPercent": "Downloading… {{percent}}%",
+      "downloadCancel": "Cancel",
       "downloadFailed": "The download did not finish.",
       "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
       "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
@@ -4250,6 +4252,8 @@
       "loading": "Loading…",
       "newTemplate": "New template",
       "newTemplateName": "Untitled template",
+      "nameLabel": "Template name",
+      "create": "Create",
       "removeFromTemplates": "Remove from templates",
       "removeRowLabel": "Remove {{name}} from templates (keeps the note)",
       "title": "Note templates"

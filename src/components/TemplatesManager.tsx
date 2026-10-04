@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
+import { Input } from "./primitives/Input";
 import { ModalShell } from "./primitives/ModalShell";
 import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
 import {
@@ -169,6 +170,10 @@ export function TemplatesManager({
   const newTemplateName = t("templates.manager.newTemplateName");
   // `null` = loading; `[]` = loaded-but-empty (first-run empty state).
   const [templates, setTemplates] = useState<TitleRecord[] | null>(null);
+  // The inline "name your template" step (myne-md/myne#820): creating a
+  // template asks for a name rather than silently minting "Untitled template".
+  const [naming, setNaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
 
   const refresh = useCallback(() => {
     setTemplates(null);
@@ -192,15 +197,18 @@ export function TemplatesManager({
   );
 
   const handleNew = useCallback(() => {
-    void createTemplate(newTemplateName, "")
+    const name = draftName.trim() || newTemplateName;
+    void createTemplate(name, "")
       .then((id) => {
+        setNaming(false);
+        setDraftName("");
         onOpenNote(id as NoteId);
         onClose();
       })
       .catch(() => {
         // Surface stays open on failure; the list is unchanged.
       });
-  }, [onOpenNote, onClose, newTemplateName]);
+  }, [onOpenNote, onClose, newTemplateName, draftName]);
 
   return (
     <ModalShell
@@ -213,14 +221,55 @@ export function TemplatesManager({
       closeLabel={t("templates.manager.closeLabel")}
     >
       <div style={TOOLBAR_STYLE}>
-        <Button
-          variant="primary"
-          icon="file-plus"
-          onClick={handleNew}
-          data-testid="templates.new"
-        >
-          {t("templates.manager.newTemplate")}
-        </Button>
+        {!naming ? (
+          <Button
+            variant="primary"
+            icon="file-plus"
+            onClick={() => {
+              setDraftName(newTemplateName);
+              setNaming(true);
+            }}
+            data-testid="templates.new"
+          >
+            {t("templates.manager.newTemplate")}
+          </Button>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "center",
+              flex: 1,
+            }}
+          >
+            <Input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleNew();
+                if (e.key === "Escape") setNaming(false);
+              }}
+              aria-label={t("templates.manager.nameLabel")}
+              autoFocus
+              data-testid="templates.new-name"
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="primary"
+              onClick={handleNew}
+              data-testid="templates.new-create"
+            >
+              {t("templates.manager.create")}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setNaming(false)}
+              data-testid="templates.new-cancel"
+            >
+              {t("common.cancel")}
+            </Button>
+          </div>
+        )}
       </div>
 
       {templates === null ? (

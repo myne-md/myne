@@ -282,29 +282,40 @@ export function EndpointConfig({
       {/* The invite code for a gated server (myne-md/myne#800). Optional: an
           open server ignores it, and a self-host operator never sets one. It
           sits under the address because it is part of "which server, and what
-          does it ask for", not a separate setting. */}
-      <label
-        style={{ ...HELP, marginTop: "var(--space-1)" }}
-        htmlFor="sync-endpoint-invite"
-      >
-        {t("sync.endpoint.inviteLabel")}
-      </label>
-      <div style={ROW}>
-        <input
-          id="sync-endpoint-invite"
-          value={inviteCode}
-          onChange={(e) => {
-            setInviteCode(e.target.value);
-            onEdit?.();
-          }}
-          placeholder={t("sync.endpoint.invitePlaceholder")}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-          style={INPUT}
-          data-testid="sync.endpoint-invite-input"
-        />
-      </div>
+          does it ask for", not a separate setting.
+
+          Hidden once the server is connected (myne-md/myne#815): the code is
+          only for admission, so asking for it again on an already-connected
+          endpoint reads as if it were still required. The value stays in state
+          (hydrated from `sync_get_endpoint`) and is still sent on a reconnect;
+          editing the address clears it and re-reveals the field, because a code
+          issued for the old server must not go to the new one. */}
+      {!isConnectedUnedited && (
+        <>
+          <label
+            style={{ ...HELP, marginTop: "var(--space-1)" }}
+            htmlFor="sync-endpoint-invite"
+          >
+            {t("sync.endpoint.inviteLabel")}
+          </label>
+          <div style={ROW}>
+            <input
+              id="sync-endpoint-invite"
+              value={inviteCode}
+              onChange={(e) => {
+                setInviteCode(e.target.value);
+                onEdit?.();
+              }}
+              placeholder={t("sync.endpoint.invitePlaceholder")}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoComplete="off"
+              style={INPUT}
+              data-testid="sync.endpoint-invite-input"
+            />
+          </div>
+        </>
+      )}
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">
         {t("sync.endpoint.tlsHelp")}
