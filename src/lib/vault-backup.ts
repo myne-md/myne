@@ -13,13 +13,21 @@ import {
   type RestoreOutcome,
 } from "../types/backup-export-error";
 
-/** `backup:vault_export_backup` — write a verified `.myne-backup`. */
+/**
+ * `backup:vault_export_backup` — write a verified `.myne-backup`.
+ *
+ * `vaultId` is REQUIRED and is the vault to export, not an optional hint: the
+ * command takes `vault_id: String` (myne-md/myne#250 made the target explicit)
+ * and rejects a missing one at argument deserialization, which surfaces as an
+ * unrecognised IPC error and the "unknown failure" copy. Making it a required
+ * parameter here turns a caller that forgets it into a compile error instead.
+ */
 export function exportBackup(
   destination: string,
-  vaultId?: string,
+  vaultId: string,
 ): Promise<ExportSummary> {
   return invoke<ExportSummary>("plugin:backup|vault_export_backup", {
-    vaultId: vaultId ?? null,
+    vaultId,
     destination,
   });
 }
