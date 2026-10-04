@@ -2657,6 +2657,7 @@ function EditorChrome({
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
+        vaultId={vaultId}
         onShowToast={showToastMessage}
       />
       <VaultExportModal
