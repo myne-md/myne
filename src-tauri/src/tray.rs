@@ -32,10 +32,15 @@ pub const TRAY_ID: &str = "meeting-session";
 /// would leave the transcript unwritten.
 pub const TRAY_STOP_EVENT: &str = "meeting:tray-stop";
 
-/// Show the indicator. Idempotent: a second call while one is up is a no-op,
-/// so a start path that is retried cannot stack indicators.
+/// Show the indicator. Idempotent, and it also RE-SHOWS an indicator a previous
+/// session hid (the tray outlives the session, see [`hide`]): a second start on
+/// a long-lived process must not be left with an invisible indicator because the
+/// first session took it down.
 pub fn show<R: Runtime>(app: &AppHandle<R>) {
-    if app.tray_by_id(TRAY_ID).is_some() {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        // Already built by an earlier session. Make it visible again rather than
+        // building a second one, which cannot stack anyway (same id).
+        let _ = tray.set_visible(true);
         return;
     }
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
@@ -75,10 +80,31 @@ pub fn set_elapsed<R: Runtime>(app: &AppHandle<R>, elapsed: Duration) {
     }
 }
 
-/// Remove the indicator. Idempotent, and a no-op when none was ever created,
-/// so the stop and cancel paths can both call it unconditionally.
+/// Hide the indicator. Idempotent, and a no-op when none was ever created, so
+/// the stop and cancel paths can both call it unconditionally.
+///
+/// **Hide, never remove, and the difference is not cosmetic.**
+/// `remove_tray_by_id` terminates the application on macOS in Tauri 2.12.1: with
+/// the meeting tray as the process's only `TrayIcon`, taking it down tears down
+/// the NSStatusItem that the window/run-loop lifecycle is holding, the
+/// `RunEvent::ExitRequested` handler runs, and the process exits with
+/// `SIGTERM`-equivalent status 143. Both `meeting_session_stop` and
+/// `meeting_session_cancel` call this on their first line, so BOTH the Stop
+/// button and the menubar click closed the app instead of ending the session.
+/// Verified by isolation rather than inferred: with `remove_tray_by_id` short
+/// circuited, Stop and Cancel both behave and the app stays up; no panic, no
+/// WebKit crash report and no macOS crash report is produced either way, because
+/// nothing crashes — the run loop simply ends.
+///
+/// `set_visible(false)` reaches the same user-visible state (no icon) without
+/// touching that lifetime, so the indicator costs one hidden NSStatusItem per
+/// process rather than a session-ending bug. The tooltip update in
+/// [`set_elapsed`] stays correct for the same reason: it finds the tray by id
+/// whether or not it is visible.
 pub fn hide<R: Runtime>(app: &AppHandle<R>) {
-    let _ = app.remove_tray_by_id(TRAY_ID);
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_visible(false);
+    }
 }
 
 /// `M:SS` past an hour, `H:MM:SS` beyond it, matching the recording bar's own
