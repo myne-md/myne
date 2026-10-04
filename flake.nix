@@ -15,11 +15,8 @@
   # against Myne-initiated downloads: Nix is not a Myne client, an AppImage is
   # not a model, and the fetch happens because the user ran `nix run`.
   #
-  # Deliberately still v0.6.0 through the v0.8.0 cut: that release shipped no
-  # x86-64 AppImage (amd64 desktop builds skipped on the build host), and
-  # advancing only the aarch64 arm would leave `packages` describing two
-  # different releases under one `version`. Both arms move together next time
-  # an amd64 AppImage exists.
+  # Updated to v0.9.0 on 2026-10-03; both arches ship an AppImage again, so both
+  # arms move together.
   description = "Myne — calm, end-to-end-encrypted markdown notes";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -31,12 +28,12 @@
       srcFor = system: pkgs:
         {
           "x86_64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.6.0/Myne_0.6.0_amd64.AppImage";
-            sha256 = "a8af41651734544710e1e6c7ba211086dad8be00d825a1701a2741d54e6bbe3a";
+            url = "https://downloads.myne.md/releases/v0.9.0/Myne_0.9.0_amd64.AppImage";
+            sha256 = "sha256-Rt7U3pidUDGwibbVLGrVE484TREeHHPTDxK1jrie7ws=";
           };
           "aarch64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.6.0/Myne_0.6.0_aarch64.AppImage";
-            sha256 = "c18010da272b5e874b3f3669ed2079ce3b217beb6d190d38a8b9a8f3ae23ac1c";
+            url = "https://downloads.myne.md/releases/v0.9.0/Myne_0.9.0_aarch64.AppImage";
+            sha256 = "sha256-Dy5SFhFz5LN4LDPhFG1fQ0PrfpXhmUyfVz0jOPtVjvw=";
           };
         }.${system};
     in {
@@ -45,7 +42,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           myne = pkgs.appimageTools.wrapType2 {
             pname = "myne";
-            version = "0.6.0";
+            version = "0.9.0";
             src = srcFor system pkgs;
           };
         in { default = myne; myne = myne; });
