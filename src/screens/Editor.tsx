@@ -2657,6 +2657,7 @@ function EditorChrome({
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
+        vaultId={vaultId}
         onShowToast={showToastMessage}
       />
       <VaultExportModal
@@ -2680,9 +2681,18 @@ function EditorChrome({
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         onOpenNote={(id) => {
-          void ctx.open(id).catch(() => {
-            /* selection failure surfaces via sidebar UX */
-          });
+          // Refresh the note into the cache BEFORE selecting it. A template
+          // created moments ago is not in `ctx.cache` yet, and the open bridge
+          // treats an id that is not live as a DELETED note and refuses to open
+          // it (myne#655) — which is why a freshly created template could not
+          // be opened for editing, and why it also slipped through the palette's
+          // `isTemplate` filter (myne-md/myne#820).
+          void ctx
+            .refreshOne(id)
+            .then(() => ctx.open(id))
+            .catch(() => {
+              /* selection failure surfaces via sidebar UX */
+            });
         }}
       />
       <SnapshotsPanel

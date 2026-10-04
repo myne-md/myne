@@ -59,6 +59,13 @@ const PROGRESS_ROW_STYLE: CSSProperties = {
 interface BackupExportModalProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * The vault to export. `null` while the active id is still resolving. The
+   * command takes `vault_id` as a REQUIRED string, so a null target renders an
+   * error instead of invoking with a missing argument, which the backend
+   * answers with an unrecognised IPC error (myne-md/myne#817).
+   */
+  vaultId: string | null;
   /** Toast line on verified success ("success = verified", SYNC-4). */
   onShowToast: (message: string) => void;
 }
@@ -66,6 +73,7 @@ interface BackupExportModalProps {
 export function BackupExportModal({
   open,
   onClose,
+  vaultId,
   onShowToast,
 }: BackupExportModalProps) {
   const { t } = useTranslation();
@@ -76,8 +84,8 @@ export function BackupExportModal({
   // The parent passes inline closures (unstable identities); routing them
   // through refs keeps the effect keyed on `open` alone — a parent
   // re-render mid-export must not tear down the progress subscription.
-  const callbacksRef = useRef({ onClose, onShowToast, t });
-  callbacksRef.current = { onClose, onShowToast, t };
+  const callbacksRef = useRef({ onClose, onShowToast, t, vaultId });
+  callbacksRef.current = { onClose, onShowToast, t, vaultId };
   // Once-per-open guard for the native save dialog: under StrictMode the
   // effect double-invokes on mount (cleanup between), and the ref —
   // surviving that remount — keeps a second dialog from opening.
@@ -91,6 +99,19 @@ export function BackupExportModal({
     if (startedRef.current) return;
     startedRef.current = true;
     setState({ step: "running", progress: null });
+
+    // The command requires the vault id; without one there is nothing to
+    // export, and invoking anyway is what produced the "unknown failure"
+    // copy. Read through the ref so a resolved id arriving later does not
+    // re-run this effect and tear down the progress subscription.
+    const targetVaultId = callbacksRef.current.vaultId;
+    if (targetVaultId === null) {
+      setState({
+        step: "error",
+        message: t("backup.errors.export.vaultNotFound"),
+      });
+      return;
+    }
 
     let unlisten: (() => void) | null = null;
     let disposed = false;
@@ -128,7 +149,7 @@ export function BackupExportModal({
         return;
       }
       try {
-        await exportBackup(destination);
+        await exportBackup(destination, targetVaultId);
         callbacksRef.current.onShowToast(
           callbacksRef.current.t("backup.export.successToast"),
         );

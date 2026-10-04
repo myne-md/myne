@@ -23,11 +23,11 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
 use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
@@ -1106,6 +1106,22 @@ pub async fn remove_model<R: Runtime>(
     Ok(())
 }
 
+/// Backend event name for on-demand model download progress
+/// (myne-md/myne#814). Payload is [`ModelDownloadProgress`].
+pub const MODEL_DOWNLOAD_PROGRESS_EVENT: &str = "local-inference://model-download-progress";
+
+/// Progress payload: the caller-minted download id, the artefact id, and the
+/// bytes written so far against the artefact's approximate total. Counts and
+/// two already UI-facing ids only, so it is DENY-list clean.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelDownloadProgress {
+    pub download_id: String,
+    pub artifact: String,
+    pub downloaded: u64,
+    pub total: u64,
+}
+
 /// Download a model artefact on explicit user action, verifying every file
 /// against the digest compiled into this binary before registering it
 /// (myne-md/myne#805, `decisions/ai/0627`).
@@ -1135,13 +1151,51 @@ pub async fn download_model<R: Runtime>(
     let cancelled = download::cancelled_fn(&token);
     // A clone for the blocking task: the original stays borrowed by the guard.
     let staging_id = download_id.clone();
+    // Progress to the WebView, throttled to one event per ~120 ms (plus the
+    // first and the final frame) so a 450 MB fetch does not emit thousands of
+    // IPC events. Best-effort: a failed emit only drops a frame.
+    let progress: download::DownloadProgressFn = {
+        let emitter = app.clone();
+        // A clone, because `download_id` is still borrowed by `guard` for the
+        // whole command and cannot be moved into this closure.
+        let progress_download_id = download_id.clone();
+        let artifact_id = artifact.id.to_string();
+        let total = artifact.approx_total_bytes;
+        let last = Arc::new(Mutex::new(None::<std::time::Instant>));
+        Arc::new(move |downloaded: u64| {
+            let now = std::time::Instant::now();
+            {
+                let mut last = last.lock().expect("download progress throttle poisoned");
+                let at_end = downloaded >= total;
+                let due = match *last {
+                    None => true,
+                    Some(t) => {
+                        now.duration_since(t) >= std::time::Duration::from_millis(120)
+                    }
+                };
+                if !at_end && !due {
+                    return;
+                }
+                *last = Some(now);
+            }
+            let _ = emitter.emit(
+                MODEL_DOWNLOAD_PROGRESS_EVENT,
+                ModelDownloadProgress {
+                    download_id: progress_download_id.clone(),
+                    artifact: artifact_id.clone(),
+                    downloaded,
+                    total,
+                },
+            );
+        })
+    };
     // Drop the cached engine models BEFORE the install renames the previous
     // bundle aside: a memory-mapped embedding model can make the OS refuse the
     // rename on some platforms, so release the mapping first, exactly as
     // `remove_model` does.
     engine_state.invalidate_all_models();
     let joined = tokio::task::spawn_blocking(move || {
-        download::download_and_install(&base, artifact, &staging_id, &cancelled)
+        download::download_and_install(&base, artifact, &staging_id, &cancelled, &progress)
     })
     .await;
     drop(guard);
