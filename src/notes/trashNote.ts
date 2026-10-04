@@ -14,6 +14,7 @@
 // note was trashed (surfaced as the Trash panel's relative age).
 
 import { patchArchivedField, patchTrashedField } from "../dialect";
+import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 
@@ -31,6 +32,12 @@ const decoder = new TextDecoder();
  * shapes).
  */
 export async function trashNote(noteId: string): Promise<void> {
+  // Persist any dirty pane FIRST (myne-md/myne#819). Without this a pane
+  // holding the pre-trash buffer autosaves `trashed:` back off after the write
+  // and the note returns from the trash, still editable. This is the exact
+  // losing direction `flushBeforeFrontmatterWrite`'s own roster calls out as
+  // worse than a reverted field.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   // Clear archived first (no-op when absent), then set trashed — keeps the
   // archive ⊥ trash invariant when deleting straight from the Archive view.
@@ -47,6 +54,9 @@ export async function trashNote(noteId: string): Promise<void> {
  * `noteRead` / `noteUpdate` propagate.
  */
 export async function restoreNote(noteId: string): Promise<void> {
+  // Twin of `trashNote`'s flush (myne-md/myne#819): restoring a note that is
+  // open and dirty must not race the pane's autosave either.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const restored = patchTrashedField(encoder.encode(current), null);
   await noteUpdate(noteId, decoder.decode(restored));
