@@ -68,4 +68,44 @@ describe("TemplatesManager create flow", () => {
     );
     expect(onOpenNote).toHaveBeenCalledWith("note-1");
   });
+
+  it("does not create a second template while the first is in flight", async () => {
+    let resolveCreate!: (id: string) => void;
+    createTemplate.mockReturnValue(
+      new Promise<string>((r) => {
+        resolveCreate = r;
+      }),
+    );
+    const onOpenNote = vi.fn();
+    render(<TemplatesManager open onClose={() => {}} onOpenNote={onOpenNote} />);
+    fireEvent.click(await screen.findByTestId("templates.new"));
+    const create = screen.getByTestId("templates.new-create");
+    // A double-click (or held Enter) inside one IPC round trip.
+    fireEvent.click(create);
+    fireEvent.click(create);
+    expect(createTemplate).toHaveBeenCalledOnce();
+    resolveCreate("note-1");
+    await waitFor(() => expect(onOpenNote).toHaveBeenCalledWith("note-1"));
+  });
+
+  it("cancels the naming step on Escape without closing the modal", async () => {
+    const onClose = vi.fn();
+    render(<TemplatesManager open onClose={onClose} onOpenNote={() => {}} />);
+    fireEvent.click(await screen.findByTestId("templates.new"));
+    const input = await screen.findByTestId("templates.new-name");
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Back on the list step, modal still open.
+    expect(screen.queryByTestId("templates.new-name")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a create failure inline instead of swallowing it", async () => {
+    createTemplate.mockRejectedValue(new Error("boom"));
+    const onClose = vi.fn();
+    render(<TemplatesManager open onClose={onClose} onOpenNote={() => {}} />);
+    fireEvent.click(await screen.findByTestId("templates.new"));
+    fireEvent.click(await screen.findByTestId("templates.new-create"));
+    expect(await screen.findByTestId("templates.error")).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

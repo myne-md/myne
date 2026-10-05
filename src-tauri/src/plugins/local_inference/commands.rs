@@ -1169,9 +1169,7 @@ pub async fn download_model<R: Runtime>(
                 let at_end = downloaded >= total;
                 let due = match *last {
                     None => true,
-                    Some(t) => {
-                        now.duration_since(t) >= std::time::Duration::from_millis(120)
-                    }
+                    Some(t) => now.duration_since(t) >= std::time::Duration::from_millis(120),
                 };
                 if !at_end && !due {
                     return;
@@ -1194,6 +1192,14 @@ pub async fn download_model<R: Runtime>(
     // rename on some platforms, so release the mapping first, exactly as
     // `remove_model` does.
     engine_state.invalidate_all_models();
+    // Keep a handle to the progress emitter and the approximate total so a
+    // GUARANTEED final frame can be emitted after the fetch (myne-md/myne#826).
+    // `download_and_install` reports the write count clamped to `total`, so an
+    // overestimated `approx_total_bytes` means the count never reaches `total`,
+    // `at_end` stays false, and the "final frame" the comment above promises can
+    // be swallowed by the 120 ms throttle.
+    let final_progress = progress.clone();
+    let final_total = artifact.approx_total_bytes;
     let joined = tokio::task::spawn_blocking(move || {
         download::download_and_install(&base, artifact, &staging_id, &cancelled, &progress)
     })
@@ -1204,6 +1210,9 @@ pub async fn download_model<R: Runtime>(
             kind: crate::io_failure_kind::IoFailureKind::Other,
         })
     })??;
+    // Force one last frame at 100% now that the fetch has completed, so the bar
+    // never freezes below 100% while the invoke resolves.
+    final_progress(final_total);
     // Invalidate again so a model that loaded between the pre-invalidate and the
     // rename is dropped too.
     engine_state.invalidate_all_models();

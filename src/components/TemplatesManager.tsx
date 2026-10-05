@@ -156,6 +156,15 @@ const LOADING_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
 };
 
+/** Inline create/open failure line (myne-md/myne#824) — non-blocking, above the list. */
+const ERROR_STYLE: CSSProperties = {
+  margin: 0,
+  padding: "var(--space-2) var(--space-5)",
+  color: "var(--danger)",
+  fontSize: "var(--text-sm)",
+  flex: "0 0 auto",
+};
+
 function displayName(rec: TitleRecord, fallback: string): string {
   return rec.title?.trim() || fallback;
 }
@@ -174,6 +183,12 @@ export function TemplatesManager({
   // template asks for a name rather than silently minting "Untitled template".
   const [naming, setNaming] = useState(false);
   const [draftName, setDraftName] = useState("");
+  // In-flight guard: Enter key auto-repeat or a double-click would otherwise
+  // fire `createTemplate` several times and mint duplicate templates
+  // (myne-md/myne#824).
+  const [creating, setCreating] = useState(false);
+  // Create/open failure is surfaced inline rather than swallowed (myne-md/myne#824).
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setTemplates(null);
@@ -182,9 +197,16 @@ export function TemplatesManager({
       .catch(() => setTemplates([]));
   }, []);
 
-  // Load (and reload) whenever the surface opens.
+  // Load (and reload) whenever the surface opens, and clear the transient
+  // naming/error state so reopening starts on the list (myne-md/myne#824).
   useEffect(() => {
     if (open) refresh();
+    else {
+      setNaming(false);
+      setDraftName("");
+      setCreating(false);
+      setError(null);
+    }
   }, [open, refresh]);
 
   // Re-fetch authoritative state after a row mutation, success or failure
@@ -197,7 +219,10 @@ export function TemplatesManager({
   );
 
   const handleNew = useCallback(() => {
+    if (creating) return; // re-entry guard (Enter key-repeat / double-click)
     const name = draftName.trim() || newTemplateName;
+    setCreating(true);
+    setError(null);
     void createTemplate(name, "")
       .then((id) => {
         setNaming(false);
@@ -206,9 +231,11 @@ export function TemplatesManager({
         onClose();
       })
       .catch(() => {
-        // Surface stays open on failure; the list is unchanged.
-      });
-  }, [onOpenNote, onClose, newTemplateName, draftName]);
+        // Surface stays open on failure; show why (myne-md/myne#824).
+        setError(t("templates.manager.createFailed"));
+      })
+      .finally(() => setCreating(false));
+  }, [onOpenNote, onClose, newTemplateName, draftName, creating, t]);
 
   return (
     <ModalShell
@@ -246,8 +273,19 @@ export function TemplatesManager({
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleNew();
-                if (e.key === "Escape") setNaming(false);
+                if (e.key === "Enter") {
+                  // preventDefault stops a native form-ish default and pairs
+                  // with the re-entry guard so held Enter cannot mint dupes.
+                  e.preventDefault();
+                  handleNew();
+                }
+                if (e.key === "Escape") {
+                  // Cancel naming WITHOUT closing the modal (myne-md/myne#824):
+                  // stop the event before ModalShell's window-level Escape
+                  // handler sees it.
+                  e.stopPropagation();
+                  if (!creating) setNaming(false);
+                }
               }}
               aria-label={t("templates.manager.nameLabel")}
               autoFocus
@@ -257,13 +295,16 @@ export function TemplatesManager({
             <Button
               variant="primary"
               onClick={handleNew}
+              disabled={creating}
               data-testid="templates.new-create"
             >
               {t("templates.manager.create")}
             </Button>
             <Button
               variant="ghost"
-              onClick={() => setNaming(false)}
+              onClick={() => {
+                if (!creating) setNaming(false);
+              }}
               data-testid="templates.new-cancel"
             >
               {t("common.cancel")}
@@ -271,6 +312,11 @@ export function TemplatesManager({
           </div>
         )}
       </div>
+      {error !== null && (
+        <p role="alert" style={ERROR_STYLE} data-testid="templates.error">
+          {error}
+        </p>
+      )}
 
       {templates === null ? (
         <div style={LOADING_STYLE}>{t("templates.manager.loading")}</div>

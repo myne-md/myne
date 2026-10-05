@@ -66,6 +66,7 @@ import {
 } from "@myne/editor/cover-signal";
 import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
 import { setNoteCover } from "../notes/setNoteCover";
+import { refreshThenOpen } from "../notes/openFreshNote";
 import { backfillDeliberateFolders } from "../notes/folderBackfill";
 import { COVER_FIELD_KEY } from "../dialect";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
@@ -2686,13 +2687,13 @@ function EditorChrome({
           // treats an id that is not live as a DELETED note and refuses to open
           // it (myne#655) — which is why a freshly created template could not
           // be opened for editing, and why it also slipped through the palette's
-          // `isTemplate` filter (myne-md/myne#820).
-          void ctx
-            .refreshOne(id)
-            .then(() => ctx.open(id))
-            .catch(() => {
-              /* selection failure surfaces via sidebar UX */
-            });
+          // `isTemplate` filter (myne-md/myne#820). The ordering lives in
+          // `refreshThenOpen` so it is pinned by a test (myne-md/myne#824).
+          void refreshThenOpen(ctx, id).catch(() => {
+            // A rejected refresh means `open` never ran; surface it rather than
+            // swallowing (myne-md/myne#824).
+            showAttachmentToast(t("templates.manager.openFailed"));
+          });
         }}
       />
       <SnapshotsPanel
@@ -3585,13 +3586,26 @@ function CommandPaletteHost({
         paletteWs.detachNote(id);
       },
       onArchiveNote: () => {
-        if (ctx.selectedId !== null) void ctx.archiveWithRollback(ctx.selectedId).catch(() => {});
+        if (ctx.selectedId !== null) {
+          // Surfaced (not swallowed): `archiveNote` now flushes dirty panes
+          // first and REJECTS when one does not settle (myne-md/myne#819), so
+          // the palette action can now fail where it previously could not.
+          void ctx.archiveWithRollback(ctx.selectedId).catch(() => {
+            showAttachmentToast(t("notes.list.archiveSingleError"));
+          });
+        }
       },
       onRenameNote: () => {
         if (ctx.selectedId !== null) ctx.startRename(ctx.selectedId);
       },
       onTrashNote: () => {
-        if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
+        if (ctx.selectedId !== null) {
+          // Same as `onArchiveNote`: `trashNote`'s flush rejection must reach
+          // the user rather than being swallowed.
+          void ctx.trashWithRollback(ctx.selectedId).catch(() => {
+            showAttachmentToast(t("notes.list.trashSingleError"));
+          });
+        }
       },
       onEmptyTrash: (viaKey: boolean) => {
         // Permanent purge - request the count-aware confirm instead of firing
@@ -4266,6 +4280,11 @@ function CommandPaletteHost({
             void ctx
               .emptyTrashWithSync(ids)
               .then((result) => {
+                // Close the tabs of the notes that WERE purged, so none stays
+                // editable after its blob is gone (myne-md/myne#819; the palette
+                // Empty-trash twin of TrashPanel's close-on-success). A failed
+                // purge rolled back and the note still exists, so its tab stays.
+                for (const id of result.purged) paletteWs.closeNoteEverywhere(id);
                 // Best-effort bulk purge - report a remaining count on partial
                 // failure (the palette has no status line, so toast it).
                 if (result.failed.length > 0) {

@@ -3083,7 +3083,7 @@ Used in: MYND-651, `decisions.md` 2026-07-31
 
 *(Aliases: import source vault. Myne-divergent: yes — the term only exists because Myne can import from its own format.)*
 
-In a **vault import**, the vault notes are read FROM. Always another local vault on the same device, never the one currently unlocked, and never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. Contrast **target vault**.
+In a **vault import**, the vault notes are read FROM. A local vault on the same device, never the one currently unlocked, or an externally exported `.myne-backup` file (myne-md/myne#816). Never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. A backup source is read by extracting the container's ciphertext members into a private staging directory and pointing the same slot at that root. Contrast **target vault**.
 
 Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
@@ -3486,7 +3486,7 @@ Used in: `spec/protocol.md` (titled v0.1)
 
 *(Aliases: Myne vault import. Myne-divergent: yes.)*
 
-Bringing notes from one Myne vault into another, as the first entry in the import-source picker. It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
+Bringing notes from a Myne vault into another, from either a local vault on this device or an externally exported `.myne-backup` file, as the entries in the import-source picker (myne-md/myne#816 added the backup source). It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. For a backup source, the credential is the backup's OWN password or recovery phrase, not the target vault's. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
 
 Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 

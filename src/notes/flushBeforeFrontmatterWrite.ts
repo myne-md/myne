@@ -46,22 +46,23 @@
 
 // # Which writers call this, and which deliberately do not
 //
-// Callers today: `setNoteCover.ts`, both converts in `templates.ts`, and the
+// Callers today: `setNoteCover.ts`, both converts in `templates.ts`, the
 // trash/restore/delete writers `trashNote.ts` + `deleteNote.ts`
-// (myne-md/myne#819). `folderActions.ts` and `renameInbound.ts` call
+// (myne-md/myne#819), and the archive pair `archiveNote`/`unarchiveNote`
+// (myne-md/myne#825's tab-close-on-archive made their losing direction a
+// silent un-archive). `folderActions.ts` and `renameInbound.ts` call
 // `renameFlushHooks().flushOpenPanes()` directly, because they flush once for a
 // BATCH rather than per note.
 //
-// The SEVEN that remain and do NOT flush are the read-patch-write writers whose
-// losing direction was accepted as out of scope: `archiveNote` (and its
-// unarchive twin), `moveNote`, `folderNote`, `renameNote`, `completeNote` and
-// `lib/writing-assistant.ts`. Every one of them is reachable from the sidebar
-// context menu or the palette while the same note is open and dirty, so the
-// race is not hypothetical there either. They are not simply wired up here,
-// because doing so is a BEHAVIOUR change per writer rather than a missing line:
-// this function REJECTS on an unsettled pane, and a caller that inherits that
-// rejection turns the action into one that can fail while a save is failing
-// somewhere else. Each needs its own answer.
+// The FIVE that remain and do NOT flush are the read-patch-write writers whose
+// losing direction was accepted as out of scope: `moveNote`, `folderNote`,
+// `renameNote`, `completeNote` and `lib/writing-assistant.ts`. Every one of them
+// is reachable from the sidebar context menu or the palette while the same note
+// is open and dirty, so the race is not hypothetical there either. They are not
+// simply wired up here, because doing so is a BEHAVIOUR change per writer rather
+// than a missing line: this function REJECTS on an unsettled pane, and a caller
+// that inherits that rejection turns the action into one that can fail while a
+// save is failing somewhere else. Each needs its own answer.
 //
 // `trashNote`/`restoreNote`/`deleteNoteRouted` were the two whose answer was
 // never in doubt and are now wired here. Their losing direction is not a

@@ -371,6 +371,10 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
 export function SyncEndpointPanel() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
+  // The endpoint this device is currently connected to, so the invite field can
+  // hide once connected (myne-md/myne#822) — the same behaviour desktop/web
+  // gained in #815, mirrored here so the mobile twin does not drift.
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   // The shared admission code for a gated server (empty = open server).
   const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -380,7 +384,10 @@ export function SyncEndpointPanel() {
     if (!HAS_TAURI) return;
     void syncGetEndpoint()
       .then((c) => {
-        if (c.endpoint_url) setUrl(c.endpoint_url);
+        if (c.endpoint_url) {
+          setUrl(c.endpoint_url);
+          setConnectedUrl(c.endpoint_url);
+        }
         setInviteCode(c.invite_code ?? "");
       })
       .catch(() => {
@@ -395,6 +402,7 @@ export function SyncEndpointPanel() {
     setMsg(null);
     void syncSetEndpoint(trimmed, inviteCode.trim())
       .then((r) => {
+        setConnectedUrl(trimmed);
         setMsg(t(r.pin_source === "platform_trust_store" ? "sync.settings.connectedTls" : "sync.settings.connectedLocal"));
       })
       .catch((e: unknown) => setMsg(t((e as { kind?: string } | null)?.kind === "TlsFailure"
@@ -402,6 +410,13 @@ export function SyncEndpointPanel() {
         : "sync.settings.connectError")))
       .finally(() => setBusy(false));
   };
+
+  // Connected & unedited: the input still matches the endpoint in use, so the
+  // invite field is hidden (it is for admission only) and the button rests as a
+  // disabled "Connected".
+  const trimmedUrl = url.trim();
+  const isConnectedUnedited =
+    connectedUrl !== null && trimmedUrl.length > 0 && trimmedUrl === connectedUrl;
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.endpoint-config">
@@ -421,27 +436,42 @@ export function SyncEndpointPanel() {
         style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)", fontSize: 15 }}
         data-testid="sync.endpoint-input"
       />
-      <FieldLabel mt={14}>{t("sync.endpoint.inviteLabel")}</FieldLabel>
-      <input
-        value={inviteCode}
-        onChange={(e) => setInviteCode(e.target.value)}
-        placeholder={t("sync.endpoint.invitePlaceholder")}
-        spellCheck={false}
-        autoCapitalize="none"
-        autoCorrect="off"
-        style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)" }}
-        data-testid="sync.endpoint-invite-input"
-      />
+      {!isConnectedUnedited && (
+        <>
+          <FieldLabel mt={14}>{t("sync.endpoint.inviteLabel")}</FieldLabel>
+          <input
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            placeholder={t("sync.endpoint.invitePlaceholder")}
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)" }}
+            data-testid="sync.endpoint-invite-input"
+          />
+        </>
+      )}
       <div style={{ marginTop: 14 }}>
-        <button
-          type="button"
-          onClick={connect}
-          disabled={busy}
-          style={primaryBtn(busy)}
-          data-testid="sync.endpoint-connect"
-        >
-          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-        </button>
+        {isConnectedUnedited ? (
+          <button
+            type="button"
+            disabled
+            style={primaryBtn(busy)}
+            data-testid="sync.endpoint-connect"
+          >
+            {t("sync.endpoint.connected")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={busy}
+            style={primaryBtn(busy)}
+            data-testid="sync.endpoint-connect"
+          >
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </button>
+        )}
       </div>
 
       {msg && (

@@ -30,9 +30,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Runtime, State};
 
 use myne_core::host::tauri_host::TauriHost;
-use myne_core::plugins::vault_unlock::import_source::{
-    self, open_at_root, SourceCredential,
-};
+use myne_core::plugins::vault_unlock::import_source::{self, open_at_root, SourceCredential};
 use myne_core::vault_io::StdVaultIo;
 
 use crate::backup_container::{
@@ -79,8 +77,13 @@ pub enum ImportSourceOpenBackupError {
     /// The user cancelled the extraction.
     #[error("operation cancelled")]
     Cancelled,
-    /// Any other vault-open failure (a KDF ceiling, a join failure, a recovery
-    /// in progress). Not distinguished for the user, who has one remedy: retry.
+    /// The host cannot service the backup vault's KDF memory cost. Kept as its
+    /// own variant (myne-md/myne#827) because the remedy differs from a generic
+    /// open failure: this device is too small, not the file wrong.
+    #[error("this device cannot service the backup vault's memory cost")]
+    KdfMemoryExceedsHostCapability,
+    /// Any other vault-open failure (a join failure, a recovery in progress).
+    /// Not distinguished for the user, who has one remedy: retry.
     #[error("could not open the backup vault")]
     VaultOpenFailed,
     /// Filesystem failure, reduced to the closed kind.
@@ -121,8 +124,10 @@ impl From<VaultUnlockError> for ImportSourceOpenBackupError {
             VaultUnlockError::NoActiveVaultToImportInto => Self::NoActiveVaultToImportInto,
             VaultUnlockError::VaultOpenAsImportSource => Self::VaultOpenAsImportSource,
             VaultUnlockError::IoError { io_error_kind } => Self::Io { io_error_kind },
+            VaultUnlockError::KdfMemoryExceedsHostCapability { .. } => {
+                Self::KdfMemoryExceedsHostCapability
+            }
             VaultUnlockError::VaultNotFound
-            | VaultUnlockError::KdfMemoryExceedsHostCapability { .. }
             | VaultUnlockError::VaultUpgradedUnsupported
             | VaultUnlockError::VaultAlreadyUnlocked
             | VaultUnlockError::VaultRecoveryInProgress
@@ -160,6 +165,26 @@ fn sweep_stale_staging(base: &Path) {
     }
 }
 
+/// Create the staging directory with owner-only permissions (0700 on Unix), so
+/// its listing is not world-readable: the member names are note-id filenames, a
+/// DENY-list correlation tag (`src-tauri/AGENTS.md`), even though the bodies are
+/// ciphertext (myne-md/myne#827). On non-Unix the platform default stands, which
+/// is the same posture the rest of the device-local stores take.
+fn create_staging_dir_private(staging: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .recursive(true)
+            .create(staging)
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(staging)
+    }
+}
+
 /// Tauri command: extract `backup_path` into a private staging directory and
 /// open it as a read-only import source, returning the minted source vault id.
 ///
@@ -176,20 +201,24 @@ pub async fn import_source_open_backup<R: Runtime>(
 ) -> Result<String, ImportSourceOpenBackupError> {
     let credential = SourceCredential::from_ipc(password, recovery_phrase)
         .ok_or(ImportSourceOpenBackupError::InvalidCredentialOrVault)?;
-    let base = crate::paths::app_data_dir(&app).map_err(|_| {
-        ImportSourceOpenBackupError::Io {
-            io_error_kind: IoFailureKind::Other,
-        }
+    let base = crate::paths::app_data_dir(&app).map_err(|_| ImportSourceOpenBackupError::Io {
+        io_error_kind: IoFailureKind::Other,
     })?;
 
     let source_id = VaultId::mint();
     let staging = staging_root(&base, source_id);
     let backup = PathBuf::from(backup_path);
+    // A cancel flag the extraction and the Argon2id open both poll, so the
+    // modal's Cancel is not inert during the longest phase of the flow
+    // (myne-md/myne#827). The import engine's run loop owns the same intent
+    // frontend-side; this wires it into the blocking extraction.
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     // Extraction is blocking (fs + hashing); keep it off the async runtime.
     let extract = {
         let staging = staging.clone();
         let backup = backup.clone();
+        let cancelled = cancelled.clone();
         tokio::task::spawn_blocking(move || -> Result<(), ImportSourceOpenBackupError> {
             sweep_stale_staging(
                 staging
@@ -198,12 +227,12 @@ pub async fn import_source_open_backup<R: Runtime>(
                     .unwrap_or_else(|| Path::new(".")),
             );
             let _ = std::fs::remove_dir_all(&staging);
-            std::fs::create_dir_all(&staging).map_err(|e| ImportSourceOpenBackupError::Io {
+            create_staging_dir_private(&staging).map_err(|e| ImportSourceOpenBackupError::Io {
                 io_error_kind: from_io_error_kind(e.kind()),
             })?;
             let hooks = ContainerHooks {
                 progress: None,
-                cancelled: None,
+                cancelled: Some(cancelled.clone()),
             };
             let records = read_and_verify_container_hooked(&backup, &hooks)?;
             extract_all_members(&backup, &records, &staging, &hooks, &[])?;
@@ -238,7 +267,10 @@ pub async fn import_source_open_backup<R: Runtime>(
         return Err(e.into());
     }
 
-    tracing::info!(event = "import_source_backup_opened", "a backup was opened for reading");
+    tracing::info!(
+        event = "import_source_backup_opened",
+        "a backup was opened for reading"
+    );
     Ok(source_id.to_string())
 }
 

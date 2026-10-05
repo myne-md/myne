@@ -38,6 +38,15 @@ export interface EmptyTrashResult {
  * independent (`Promise.allSettled`) — one failure does not abort the rest.
  * Never rejects; surfaces results via {@link EmptyTrashResult} so the UI can
  * report how many notes remain in the trash.
+ *
+ * Each `deleteNoteRouted` runs its own `flushBeforeFrontmatterWrite`
+ * (myne-md/myne#819), so an empty-trash pays N flushes and a single unsettled
+ * pane fails all N. That is DELIBERATE: `flushAll` walks every pane, so the
+ * property "no permanent delete proceeds while any pane's save is failing" is
+ * the safety we want, and N is the size of the user's own trash set. Batching
+ * one flush ahead of the loop would drop that property for the panes the batch
+ * later touches (a keystroke mid-batch). Kept as-is, and written down here so
+ * the next reader does not "optimise" it into a per-batch flush.
  */
 export async function emptyTrash(
   trashedIds: string[],

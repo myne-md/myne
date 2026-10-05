@@ -127,10 +127,20 @@ export async function startModelDownload(
   patch(artifact, { status: "downloading", downloaded: 0, total: 0, cause: undefined });
   try {
     await downloadModel(artifact, id);
+    // Guard the terminal patch by the MINTED ID, not the artifact (myne-md/myne#826):
+    // a cancel deletes this id's marker (and a restart points the artifact at a
+    // NEW id), so a late resolution from an old fetch must not overwrite the
+    // state the user (or the newer fetch) has since set.
+    if (activeByArtifact.get(artifact) !== id) return;
     activeByArtifact.delete(artifact);
     downloadToArtifact.delete(id);
     patch(artifact, { status: "complete", cause: undefined });
   } catch (err) {
+    // Same id guard as the success arm. Without it a user cancel (backend
+    // rejects with ModelDownloadError::Cancelled) lands here and relabels
+    // 'cancelled' as 'failed', and a cancel-then-restart lets the old rejection
+    // clear the new fetch's marker.
+    if (activeByArtifact.get(artifact) !== id) return;
     activeByArtifact.delete(artifact);
     downloadToArtifact.delete(id);
     patch(artifact, {

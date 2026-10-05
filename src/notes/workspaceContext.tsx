@@ -983,3 +983,14 @@ export function useWorkspace(): WorkspaceApi {
   }
   return ctx;
 }
+
+/**
+ * The workspace API, or `null` when there is no provider. For a hook whose
+ * OTHER behaviour is testable without a workspace and whose tab-closing is only
+ * meaningful when panes exist (`useFolderManagement`, whose callers in the app
+ * are always inside the provider but whose unit tests inject only `ctx`).
+ * Prefer [`useWorkspace`] where a missing provider is a real bug.
+ */
+export function useWorkspaceOptional(): WorkspaceApi | null {
+  return useContext(WorkspaceContext);
+}

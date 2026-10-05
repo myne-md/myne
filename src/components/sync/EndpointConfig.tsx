@@ -125,6 +125,10 @@ export function EndpointConfig({
   const [inviteCode, setInviteCode] = useState("");
   // `null` means loopback HTTP, never an unverified remote TLS session.
   const [pinSource, setPinSource] = useState<PinSource>(null);
+  // On the LOCKED hosted door the address is read-only, so editing it can never
+  // fire the address `onChange` that re-reveals the invite field. This flag is
+  // the manual escape hatch for that door (myne-md/myne#822).
+  const [revealCode, setRevealCode] = useState(false);
 
   useEffect(() => {
     // `cert_pin_hex` is on the wire and is always `null` since 0620. It is not
@@ -173,6 +177,7 @@ export function EndpointConfig({
     })
       .then((r) => {
         setConnectedUrl(trimmed);
+        setRevealCode(false);
         onConnected?.();
         setPinSource(r.pin_source);
         // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
@@ -207,6 +212,11 @@ export function EndpointConfig({
     connectedUrl !== null &&
     trimmedUrl.length > 0 &&
     trimmedUrl === connectedUrl;
+  // The invite field shows while unconnected, OR when the user asked to
+  // re-enter it on the locked hosted door (myne-md/myne#822). On that door the
+  // address is read-only and the code is the ONLY thing that can be wrong, so
+  // without this a wrong/rotated code is uncorrectable.
+  const showInviteField = !isConnectedUnedited || revealCode;
 
   return (
     <div
@@ -253,7 +263,7 @@ export function EndpointConfig({
           style={lockedUrl ? { ...INPUT, color: "var(--fg-3)" } : INPUT}
           data-testid="sync.endpoint-input"
         />
-        {isConnectedUnedited ? (
+        {isConnectedUnedited && !revealCode ? (
           <button
             type="button"
             disabled
@@ -286,11 +296,16 @@ export function EndpointConfig({
 
           Hidden once the server is connected (myne-md/myne#815): the code is
           only for admission, so asking for it again on an already-connected
-          endpoint reads as if it were still required. The value stays in state
-          (hydrated from `sync_get_endpoint`) and is still sent on a reconnect;
-          editing the address clears it and re-reveals the field, because a code
-          issued for the old server must not go to the new one. */}
-      {!isConnectedUnedited && (
+          endpoint reads as if it were still required. The value stays hydrated
+          from `sync_get_endpoint`, and on the self-hosted door editing the
+          address clears it and re-reveals the field (a code issued for the old
+          server must not go to the new one). On the LOCKED hosted door the
+          address is read-only, so that path cannot fire; there the "Change
+          invite code" control below re-reveals the field instead
+          (myne-md/myne#822). It is NOT true that the code is still sent on a
+          reconnect: every reconnect requires an address change (or a deliberate
+          re-entry here), and both re-send whatever is in the field. */}
+      {showInviteField && (
         <>
           <label
             style={{ ...HELP, marginTop: "var(--space-1)" }}
@@ -315,6 +330,20 @@ export function EndpointConfig({
             />
           </div>
         </>
+      )}
+      {/* The locked hosted door has no way to re-reveal the invite field by
+          editing the read-only address, so it gets an explicit control
+          (myne-md/myne#822). Hidden on the self-hosted door, where editing the
+          address already re-reveals the field. */}
+      {lockedUrl && isConnectedUnedited && !revealCode && (
+        <button
+          type="button"
+          onClick={() => setRevealCode(true)}
+          style={{ ...HELP, alignSelf: "flex-start", background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--accent)" }}
+          data-testid="sync.endpoint-change-invite"
+        >
+          {t("sync.endpoint.changeInviteCode")}
+        </button>
       )}
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">

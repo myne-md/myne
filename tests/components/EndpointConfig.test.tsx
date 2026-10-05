@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 //
-// The sync endpoint control's invite-code field (myne-md/myne#815).
+// The sync endpoint control's invite-code field (myne-md/myne#815, corrected by
+// myne-md/myne#822).
 //
 // The field is for admission only, so it is rendered while the endpoint is not
-// yet connected and hidden once it is. The stored code stays in state and is
-// still sent on a reconnect; these cases pin both halves of that.
+// yet connected and hidden once it is. These cases pin the show/hide/prefill
+// behaviour ONLY. They do NOT pin a "still sent on a reconnect" path, because
+// there is none: every reconnect goes through an address change (or the locked
+// door's explicit "Change invite code" reveal), and both send whatever is in the
+// field. The previous header claimed to pin that half; it did not, and the claim
+// was false (myne-md/myne#822).
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -55,5 +60,38 @@ describe("EndpointConfig invite field", () => {
       "sync.endpoint-invite-input",
     )) as HTMLInputElement;
     await waitFor(() => expect(field.value).toBe("stored-code"));
+  });
+
+  it("re-reveals the invite field on the locked hosted door (myne-md/myne#822)", async () => {
+    // On this door the address is read-only, so editing it can never re-reveal
+    // the field; the explicit control is the only escape from a wrong/rotated
+    // code. Without it a connected user cannot correct the code at all.
+    invoke.mockResolvedValue(
+      endpoint({
+        endpoint_url: "https://sync.myne.md",
+        invite_code: "seed-code",
+      }),
+    );
+    const { getByTestId, queryByTestId } = render(
+      <EndpointConfig
+        initialUrl="https://sync.myne.md"
+        lockedUrl
+      />,
+    );
+    // Connected: field hidden, no address editing possible.
+    await waitFor(() =>
+      expect(
+        (getByTestId("sync.endpoint-connect") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    expect(queryByTestId("sync.endpoint-invite-input")).toBeNull();
+    // The escape hatch reveals it AND re-enables Connect.
+    (getByTestId("sync.endpoint-change-invite") as HTMLButtonElement).click();
+    await waitFor(() =>
+      expect(getByTestId("sync.endpoint-invite-input")).toBeTruthy(),
+    );
+    expect(
+      (getByTestId("sync.endpoint-connect") as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 });

@@ -5,8 +5,10 @@
 //             refused with distinguishing `error_code`s, the correct code
 //             registers, and an open server ignores the field. These need only
 //             the spawned server (no app), so they are the deterministic half.
-//   ic5: a seeded sync config prefills the Settings then Sync invite field
-//             through the real IPC read.
+//   ic5: a connected server HIDES the Settings then Sync invite field (the
+//             stored code stays hydrated for a reconnect) — the field is shown
+//             while unconnected and hidden once the endpoint connects
+//             (myne-md/myne#815; header corrected by myne-md/myne#822).
 //   ic6: enrolling with no code shows the required refusal inline.
 //   ic7: the FIRST-RUN HOSTED door (identity setup on Welcome) offers the
 //             invite-code field with the origin locked — the hosted server is

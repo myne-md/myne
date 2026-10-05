@@ -472,7 +472,13 @@ mod tests {
         w.write_all(&[0u8; 4]).expect("write");
         w.write_all(&[0u8; 4]).expect("write");
         w.write_all(&[0u8; 8]).expect("write");
-        assert_eq!(*seen.lock().expect("progress sink poisoned"), vec![4, 8, 10]);
-        assert_eq!(w.written, 16, "the raw count keeps advancing past the estimate");
+        assert_eq!(
+            *seen.lock().expect("progress sink poisoned"),
+            vec![4, 8, 10]
+        );
+        assert_eq!(
+            w.written, 16,
+            "the raw count keeps advancing past the estimate"
+        );
     }
 }

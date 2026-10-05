@@ -2185,12 +2185,17 @@ function PopulatedList({
     const id = undoToast;
     setUndoToast(null);
     void ctx.restoreWithRollback(id).catch((err) => {
+      // `restoreNote` now flushes dirty panes first and rejects when one does
+      // not settle (myne-md/myne#819). That rejection is user-reachable, so it
+      // gets the same non-blocking message the trash path shows rather than a
+      // DEV-only log.
+      setTrashError(t("notes.trash.restoreError"));
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.warn("[NoteList] restore (undo) failed:", err);
       }
     });
-  }, [undoToast, ctx]);
+  }, [undoToast, ctx, t]);
 
   // ---- folder notes (MYND-370) -------------------------------------------
   // Create a new index note for `folderPath`, settle it into the cache (so the
@@ -2306,7 +2311,11 @@ function PopulatedList({
       ? (navIds.find((nid) => !victims.has(nid)) ?? null)
       : null;
     try {
-      await ctx.bulkTrashWithSync(ids);
+      const result = await ctx.bulkTrashWithSync(ids);
+      // Close every trashed note's tabs (myne-md/myne#819): the single-note path
+      // above does, and a stale still-editable buffer autosaved back would
+      // resurrect the note. Only the ones that actually trashed.
+      for (const id of result.trashed) ws.closeNoteEverywhere(id);
       setBulkUndo(ids);
       if (openIsVictim) {
         if (survivor !== null) {
@@ -2325,7 +2334,7 @@ function PopulatedList({
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds, t]);
+  }, [ctx, navIds, t, ws]);
 
   // Bulk archive (MYND-331 / MYND-367): archive the whole multi-selection
   // (recoverable from the Archive section), then collapse the set. If the OPEN
@@ -2341,7 +2350,11 @@ function PopulatedList({
       ? (navIds.find((nid) => !victims.has(nid)) ?? null)
       : null;
     try {
-      await ctx.bulkArchiveWithSync(ids);
+      const result = await ctx.bulkArchiveWithSync(ids);
+      // Same as the single-note archive path (myne-md/myne#819): archiving takes
+      // the notes out of the live tree, so close their tabs — a stale buffer
+      // autosaved back would drop `archived:`. Only the ones that archived.
+      for (const id of result.archived) ws.closeNoteEverywhere(id);
       if (openIsVictim) {
         if (survivor !== null) {
           void ctx.open(survivor).catch(() => {
@@ -2359,17 +2372,24 @@ function PopulatedList({
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds, t]);
+  }, [ctx, navIds, t, ws]);
 
   // "Undo" on the bulk-trash toast → restore every just-trashed note.
   const handleUndoBulk = useCallback(() => {
     const ids = bulkUndo;
     setBulkUndo(null);
     if (ids === null) return;
-    void Promise.allSettled(
-      ids.map((id) => ctx.restoreWithRollback(id)),
-    ).catch(() => {});
-  }, [bulkUndo, ctx]);
+    // `allSettled` never rejects, so a `.catch` here was dead code and every
+    // per-note failure was dropped. Each `restoreNote` now flushes first and can
+    // reject (myne-md/myne#819); inspect the results and report any failure.
+    void Promise.allSettled(ids.map((id) => ctx.restoreWithRollback(id))).then(
+      (results) => {
+        if (results.some((r) => r.status === "rejected")) {
+          setTrashError(t("notes.trash.restoreError"));
+        }
+      },
+    );
+  }, [bulkUndo, ctx, t]);
 
   // Bulk "Move N notes to…" submenu: Vault root + every folder (depth-indented).
   // Folder path is the item id → addressable by `data-item-id` in E2E.

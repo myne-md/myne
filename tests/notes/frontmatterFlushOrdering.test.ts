@@ -28,6 +28,7 @@ import {
 } from "../../src/notes/renameFlushHook";
 import { setNoteCover } from "../../src/notes/setNoteCover";
 import { restoreNote, trashNote } from "../../src/notes/trashNote";
+import { archiveNote, unarchiveNote } from "../../src/notes/archiveNote";
 import { deleteNoteRouted } from "../../src/notes/deleteNote";
 import {
   convertNoteToTemplate,
@@ -107,6 +108,11 @@ const WRITERS: ReadonlyArray<{ name: string; run: (id: string) => Promise<void> 
   // is a resurrected note, not a reverted field, so they joined the roster.
   { name: "trashNote", run: trashNote },
   { name: "restoreNote", run: restoreNote },
+  // The archive pair (myne-md/myne#825): #825 closes the archived note's tabs,
+  // so a dirty pane's autosave-on-unmount is a second writer that would silently
+  // un-archive. Same losing direction, same flush.
+  { name: "archiveNote", run: archiveNote },
+  { name: "unarchiveNote", run: unarchiveNote },
   // `forceTombstone` keeps the routed delete on the frontmatter path the mock
   // can drive, instead of probing for a sync endpoint.
   { name: "deleteNoteRouted", run: (id) => deleteNoteRouted(id, true) },
