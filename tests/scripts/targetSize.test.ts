@@ -11,6 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { SHARED_ROOTS } from "../../scripts/lib/shared-roots.mjs";
 
 const ROOT: string = fileURLToPath(new URL("../..", import.meta.url));
 const FIXTURE_NAME = "__target_fixture__.tsx";
@@ -20,10 +21,7 @@ let scratch: string | null = null;
 function fixture(body: string): void {
   if (scratch !== null) rmSync(scratch, { recursive: true, force: true });
   scratch = mkdtempSync(join(tmpdir(), "target-fixture-"));
-  for (const root of [
-    "src", "editor/src", "dialect/src", "copy/src",
-    "client-core/src", "ornaments/src", "web/src", "mobile/src",
-  ]) {
+  for (const root of SHARED_ROOTS) {
     mkdirSync(join(scratch, root), { recursive: true });
   }
   mkdirSync(join(scratch, "src", "components"), { recursive: true });
