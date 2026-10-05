@@ -25,6 +25,7 @@ import {
   unknownExtensionMessage,
 } from "./lib/scanned-assets.mjs";
 import { join } from "node:path";
+import { VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
 
 const DIST = process.argv[2] ?? "web/dist";
 
@@ -39,79 +40,10 @@ const DIST = process.argv[2] ?? "web/dist";
 // configured sync origin, so the browser blocks the request before it is made.
 // That is the guarantee. This list exists so that the *next* one gets read by a
 // person rather than shipped silently.
-const KNOWN = new Map([
-  // — Newly VISIBLE with #273, not newly present: the scan used to read `.js`
-  //   and `.css` only, so the bundle's 1.2 MB `pdf.worker.min-*.mjs` and 3.9 MB
-  //   `myne_web_wasm_bg-*.wasm` were never read and these four sat unrecorded
-  //   in the served tree while this script printed "all recorded". All four are
-  //   string constants, and `web/csp.ts` pins `default-src 'none'`.
-  ["http://ns.adobe.com", "pdf.js: XMP metadata NAMESPACE identifier — an XML namespace URI, never fetched"],
-  ["http://www.apache.org", "pdf.js: Apache-2.0 licence header text"],
-  ["http://www.xfa.org", "pdf.js: XFA form namespace identifier — an XML namespace URI, never fetched"],
-  ["https://docs.rs", "rust: a doc link in a panic/error string compiled into the wasm"],
-  // — Myne's own AI settings panel (#415/#189), not a vendored library. The AI
-  //   panel names Ollama as the local model runtime and offers a link to it;
-  //   `AiPanel.tsx` hands that URL to `openUrl`, an OS handoff into the USER's
-  //   own browser through the platform seam. Nothing in the app fetches it, and
-  //   the panel deliberately offers no "pull a model" affordance — which is what
-  //   keeps "Myne never downloads models" true without an exception. CSP
-  //   (`default-src 'none'`) blocks it at runtime regardless.
-  ["https://ollama.com", "myne AI panel: the local-runtime link the user's own browser opens (openUrl, never fetched)"],
-  // — Excalidraw's own services. Its collaboration, library-browser and AI
-  //   features point at these. Myne uses none of them: drawing notes are local
-  //   and the assets are self-hosted (`excalidraw-asset-path`). CSP-blocked.
-  ["https://libraries.excalidraw.com", "excalidraw: library browser (unused; CSP-blocked)"],
-  ["https://app.excalidraw.com", "excalidraw: upstream app links (doc text)"],
-  ["https://plus.excalidraw.com", "excalidraw: upstream paid tier (doc text)"],
-  ["https://docs.excalidraw.com", "excalidraw: documentation links"],
-  ["http://docs.excalidraw.com", "excalidraw: documentation links"],
-  ["https://json.excalidraw.com", "excalidraw: share-link backend (unused; CSP-blocked)"],
-  ["https://oss-collab.excalidraw.com", "excalidraw: collaboration server (unused; CSP-blocked)"],
-  ["https://oss-ai.excalidraw.com", "excalidraw: AI endpoint (unused; CSP-blocked)"],
-  ["https://excalidraw-room-persistence.firebaseio.com", "excalidraw: collab persistence (unused; CSP-blocked)"],
-  [
-    "https://us-central1-excalidraw-room-persistence.cloudfunctions.net",
-    "excalidraw: collab persistence (unused; CSP-blocked)",
-  ],
-  // — Embed allowlists. Excalidraw recognises these hosts when a user pastes an
-  //   embeddable link. Myne surfaces no embed affordance; the constants ship
-  //   with the library.
-  ["https://player.vimeo.com", "excalidraw: embed host allowlist"],
-  ["https://www.youtube.com", "excalidraw: embed host allowlist"],
-  ["https://youtube.com", "excalidraw: embed host allowlist"],
-  ["https://twitter.com", "excalidraw: embed host allowlist"],
-  ["https://x.com", "excalidraw: embed host allowlist"],
-  ["https://platform.twitter.com", "excalidraw: embed host allowlist"],
-  ["https://reddit.com", "excalidraw: embed host allowlist"],
-  ["https://embed.reddit.com", "excalidraw: embed host allowlist"],
-  ["https://gist.github.com", "excalidraw: embed host allowlist"],
-  ["https://github.com", "excalidraw: embed host allowlist / doc links"],
-  ["https://giphy.com", "excalidraw: embed host allowlist"],
-  ["https://www.figma.com", "excalidraw: embed host allowlist"],
-  ["https://huggingface.co", "excalidraw/mermaid: doc links"],
-  // — Mermaid and its parser stack: documentation links in errors and comments.
-  ["https://mermaid.js.org", "mermaid: documentation links"],
-  ["https://chevrotain.io", "mermaid: parser library doc links"],
-  ["https://langium.org", "mermaid: parser library doc links"],
-  ["https://esm.sh", "mermaid: upstream CDN reference in a comment"],
-  // — Toolchain and standards references in vendored code.
-  ["http://www.w3.org", "SVG/XML namespace URIs — not network addresses"],
-  ["https://react.dev", "react: error-message documentation links"],
-  ["https://rolldown.rs", "bundler banner"],
-  ["https://en.wikipedia.org", "vendored doc link"],
-  // Excalidraw's "follow us" / "report an issue" footer links, rendered as
-  // `<a href>` in its help dialog. Inert markup, not a fetch — and Myne does
-  // not surface that dialog. Verified by reading the call site.
-  ["https://discord.gg", "excalidraw: help-dialog social link (inert <a href>)"],
-  // — Placeholders in example/doc strings, not addresses.
-  ["http://example.com", "placeholder in library docs"],
-  ["https://foo.bar", "placeholder in library docs"],
-  ["https://your-server.example", "placeholder in Myne's own copy"],
-  ["https://sync.example.com", "placeholder in Myne's own copy"],
-  ["http://127.0.0.1", "loopback — the local sync-server development target"],
-  // — Myne's own.
-  ["https://myne.md", "Myne's own site"],
-]);
+// The origins, with a reason each, in ONE place shared with
+// `check-stories-bundle.mjs` (myne-md/myne#832) so the two lists cannot drift.
+// `KNOWN` stays the local name the loops below read.
+export const KNOWN = VENDORED_ORIGINS;
 
 if (!existsSync(DIST)) {
   console.error(`web third-party check: no bundle at ${DIST} — run \`pnpm web:build\` first.`);

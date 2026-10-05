@@ -7,10 +7,16 @@
 import type { StoryDescriptor, StoryGroup } from "./types";
 import { PRIMITIVE_STORIES } from "./stories/primitives";
 import { SCREEN_STORIES } from "./stories/screens";
+import { SETTINGS_STORIES } from "./stories/settings";
+import { COMPONENT_STORIES } from "./stories/components";
+import { AI_STORIES } from "./stories/ai-panels";
 
 export const STORIES: readonly StoryDescriptor[] = [
   ...PRIMITIVE_STORIES,
+  ...COMPONENT_STORIES,
+  ...AI_STORIES,
   ...SCREEN_STORIES,
+  ...SETTINGS_STORIES,
 ];
 
 /** Story ids are unique and URL-safe; catch a duplicate at load, not at click. */

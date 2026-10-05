@@ -6,31 +6,33 @@
 //   --which mobile|desktop|both   what to shoot (default: both)
 //   --mobile-out <path>           mobile PNG path (default: /tmp/myne-mobile-ai.png)
 //   --desktop-out <path>          desktop PNG path (default: /tmp/myne-desktop-ai.png)
-//   --keep-tmp                    leave the generated temp files in place (debug)
 //
 // Before/after comes from running twice: shoot the branch, `git stash push`
 // the UI files, shoot again, `git stash pop`. The script only ever shoots the
 // current working tree.
 //
 // How each lane works (full reasoning: `docs/dev/ui-screenshots.md`):
+// - desktop: the story catalogue (`pnpm stories`, port 1423) mounts the real
+//   `AiChatTab` through its ONE fake-IPC host. The shot navigates to the
+//   `ai-panel/chat/default` story and screenshots the stage. This replaced a
+//   per-shot temp vite config whose resolveId plugin stubbed IPC modules, so
+//   there is now a single fake-IPC host for the desktop AI panel
+//   (myne-md/myne#832 task 14).
 // - mobile: a generated Playwright flow spec drives the REAL mobile app served
 //   by its vite dev server with mock Tauri IPC (`mobile/tests/flow-logic/`).
-// - desktop: the desktop tree has no browser harness, so a generated preview
-//   page mounts the REAL `AiChatTab` under a temp vite config whose resolveId
-//   plugin stubs only the IPC-touching modules (stores, i18n, styles stay real).
-// Temp files are deleted afterwards, so no guard and no bundle ever sees them.
 //
 // Zero dependencies beyond what the repo already installs (vite at the root,
 // `@playwright/test` in the mobile workspace).
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MOBILE_DIR = join(ROOT, "mobile");
-const PREVIEW_PORT = 1430;
+const STORIES_PORT = 1423;
+const STORIES_STORY = "ai-panel/chat/default";
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -120,205 +122,66 @@ async function shotMobile(out) {
 }
 
 // --------------------------------------------------------------- desktop ---
-
-const STUBS = {
-  "stub-usePrefs.ts": `export function usePrefs() {
-  return { prefs: { ai_enabled: true, ai_provider: null } };
-}
-`,
-  "stub-useAiModelReady.ts": `export function useAiSurfaceState() {
-  return { kind: "available" };
-}
-export function useAiBackendClass() {
-  return "in_process_local";
-}
-export function useAiRetrievalState() {
-  return { embedding: { kind: "unavailable" }, indexReady: false };
-}
-`,
-  "stub-agent-run.ts": `export async function agentPreviewGrant() {
-  return { noteCount: 1, excludedCount: 0, newTotal: 1 };
-}
-export async function agentCancel() {
-  return true;
-}
-export async function agentCapability() {
-  return { passed: true, passes: 3, threshold: { attempts: 3, required: 3 } };
-}
-export async function agentStart() {
-  throw new Error("preview: no backend");
-}
-export async function agentApply() {
-  throw new Error("preview: no backend");
-}
-export async function agentApproveScope() {
-  throw new Error("preview: no backend");
-}
-export function splitForBulkApproval() {
-  return { edits: [], newNotes: [] };
-}
-export async function agentLastRun() {
-  return null;
-}
-export async function agentUndo() {
-  return null;
-}
-`,
-  "stub-ai-capability.ts": `export async function aiCapabilityReport() {
-  return { compiled: false };
-}
-export function answeredByOf() {
-  return { kind: "none" };
-}
-export function providerLabelOf() {
-  return null;
-}
-`,
-  "stub-chatPersist.ts": `export function installChatPersistence() {}
-export async function hydrateActiveConversation() {}
-export function isChatHydrateFailed() {
-  return false;
-}
-export function isChatPersistLagging() {
-  return false;
-}
-export function subscribeChatPersistHealth() {
-  return () => {};
-}
-`,
-  "main.tsx": `import "../src/i18n";
-import "@myne/client-core/tokens.css";
-import "../src/styles/tokens.css";
-import "@myne/ornaments/ornaments.css";
-import React, { useEffect } from "react";
-import { createRoot } from "react-dom/client";
-import { AiChatTab } from "../src/notes/components/AiChatTab";
-import { sendAgentTurn } from "../src/notes/ai/chatStore";
-import { beginRun, currentRunEpoch, openRun, reportRunProgress } from "../src/notes/agent/agentStore";
-
-document.documentElement.dataset.theme = "dark";
-
-function Preview() {
-  useEffect(() => {
-    sendAgentTurn("can you translate this note to english?", "This note");
-    beginRun();
-    const epoch = currentRunEpoch();
-    openRun(
-      { runId: "preview-run", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
-      epoch,
-    );
-    reportRunProgress({ iterations: 0, notesRead: 0, charsOffDevice: null }, epoch);
-  }, []);
-  return (
-    <div id="preview-root" style={{ width: 320, height: 1000, display: "flex", background: "var(--bg-1)" }}>
-      <AiChatTab openNoteId="n1" folders={[]} />
-    </div>
-  );
-}
-
-createRoot(document.getElementById("root")!).render(<Preview />);
-`,
-};
-
-const PREVIEW_HTML = `<!doctype html>
-<html><head><meta charset="utf-8" /><title>AI panel preview (generated)</title></head>
-<body><div id="root"></div><script type="module" src="/preview-ai-tmp/main.tsx"></script></body></html>
-`;
-
-const PREVIEW_CONFIG = `import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-const STUBS = [
-  ["hooks/usePrefs", "/preview-ai-tmp/stub-usePrefs.ts"],
-  ["hooks/useAiModelReady", "/preview-ai-tmp/stub-useAiModelReady.ts"],
-  ["lib/agent-run", "/preview-ai-tmp/stub-agent-run.ts"],
-  ["lib/ai-capability", "/preview-ai-tmp/stub-ai-capability.ts"],
-  ["notes/ai/chatPersist", "/preview-ai-tmp/stub-chatPersist.ts"],
-];
-function stubPlugin() {
-  return {
-    name: "preview-stubs",
-    enforce: "pre",
-    resolveId(source, importer) {
-      if (!importer || source.startsWith("/preview-ai-tmp/")) return null;
-      for (const [tail, stub] of STUBS) {
-        if (source === tail || source.endsWith("/" + tail)) return stub;
-      }
-      return null;
-    },
-  };
-}
-export default defineConfig({ plugins: [stubPlugin(), react()], server: { port: ${PREVIEW_PORT}, strictPort: true } });
-`;
+//
+// The desktop lane is now the story catalogue: one fake-IPC host (`pnpm stories`),
+// and this shot is a thin Playwright navigation to a story URL. The temp preview
+// config that used to live here (a resolveId plugin stubbing usePrefs, agent-run,
+// ai-capability, chatPersist) is gone.
 
 const SHOT_SCRIPT = `const { chromium } = require(${JSON.stringify(join(MOBILE_DIR, "node_modules", "@playwright", "test"))});
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 360, height: 1080 } });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 1080 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto("http://localhost:${PREVIEW_PORT}/preview-ai.html", { waitUntil: "networkidle" });
-  await page.waitForSelector('[data-testid="ai.chat-tab"]', { timeout: 20000 });
+  await page.goto("http://localhost:${STORIES_PORT}/#${STORIES_STORY}", { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-testid="stories.story"]', { timeout: 20000 });
   await page.waitForTimeout(800);
-  await page.locator("#preview-root").screenshot({ path: process.env.SHOT_OUT });
+  await page.locator('[data-testid="stories.story"]').screenshot({ path: process.env.SHOT_OUT });
   if (errors.length > 0) throw new Error("PAGE ERRORS: " + errors.join(" | "));
   console.log("no page errors");
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });
 `;
 
-async function shotDesktop(out, keepTmp) {
-  const dir = join(ROOT, "preview-ai-tmp");
-  const files = [join(ROOT, "preview-ai.html"), join(ROOT, "vite.preview.config.ts")];
+async function shotDesktop(out) {
   const script = join(tmpdir(), `shot-desktop-${Date.now()}.cjs`);
+  writeFileSync(script, SHOT_SCRIPT);
+  const server = spawn("npx", ["vite", "--config", "stories/vite.config.ts"], {
+    cwd: ROOT,
+    stdio: "ignore",
+    detached: true,
+  });
+  server.unref();
   try {
-    const { mkdirSync } = await import("node:fs");
-    mkdirSync(dir, { recursive: true });
-    for (const [name, content] of Object.entries(STUBS)) writeFileSync(join(dir, name), content);
-    writeFileSync(files[0], PREVIEW_HTML);
-    writeFileSync(files[1], PREVIEW_CONFIG);
-    writeFileSync(script, SHOT_SCRIPT);
-    const server = spawn("npx", ["vite", "--config", "vite.preview.config.ts"], {
-      cwd: ROOT,
-      stdio: "ignore",
-      detached: true,
+    await waitFor(`http://localhost:${STORIES_PORT}/`);
+    await run(process.execPath, [script], {
+      cwd: MOBILE_DIR,
+      env: { ...process.env, SHOT_OUT: out },
     });
-    server.unref();
-    try {
-      await waitFor(`http://localhost:${PREVIEW_PORT}/preview-ai.html`);
-      await run(process.execPath, [script], {
-        cwd: MOBILE_DIR,
-        env: { ...process.env, SHOT_OUT: out },
-      });
-    } finally {
-      try {
-        process.kill(-server.pid);
-      } catch {
-        server.kill();
-      }
-    }
   } finally {
-    if (!keepTmp) {
-      rmSync(dir, { recursive: true, force: true });
-      for (const f of files) rmSync(f, { force: true });
-      rmSync(script, { force: true });
+    try {
+      process.kill(-server.pid);
+    } catch {
+      server.kill();
     }
+    rmSync(script, { force: true });
   }
   console.log(`desktop shot: ${out}`);
 }
 
 const which = arg("--which", "both");
-const keepTmp = process.argv.includes("--keep-tmp");
 const mobileOut = resolve(arg("--mobile-out", "/tmp/myne-mobile-ai.png"));
 const desktopOut = resolve(arg("--desktop-out", "/tmp/myne-desktop-ai.png"));
 
 if (!["mobile", "desktop", "both"].includes(which)) {
-  console.error("usage: node scripts/shot-ai-panels.mjs [--which mobile|desktop|both] [--mobile-out P] [--desktop-out P] [--keep-tmp]");
+  console.error("usage: node scripts/shot-ai-panels.mjs [--which mobile|desktop|both] [--mobile-out P] [--desktop-out P]");
   process.exit(1);
 }
 
 try {
   if (which === "mobile" || which === "both") await shotMobile(mobileOut);
-  if (which === "desktop" || which === "both") await shotDesktop(desktopOut, keepTmp);
+  if (which === "desktop" || which === "both") await shotDesktop(desktopOut);
   console.log("done");
 } catch (e) {
   console.error(String(e?.message ?? e));

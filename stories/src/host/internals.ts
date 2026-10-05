@@ -20,6 +20,8 @@ export interface FakeInternals {
   transformCallback(cb: unknown): unknown;
   unregisterCallback(): void;
   convertFileSrc(path: string, protocol?: string): string;
+  /** Read by `@tauri-apps/api/window`'s `getCurrentWindow()`. */
+  metadata: { currentWindow: { label: string } };
 }
 
 /**
@@ -48,6 +50,9 @@ function makeInternals(fixture: Fixture | undefined): FakeInternals {
     transformCallback: (cb) => cb,
     unregisterCallback: () => undefined,
     convertFileSrc: (path, protocol = "asset") => `${protocol}://localhost/${path}`,
+    // `getCurrentWindow()` reads this before it constructs a Window, so a screen
+    // whose mount effect reaches the window API needs it present.
+    metadata: { currentWindow: { label: "main" } },
   };
 }
 
@@ -55,6 +60,13 @@ function makeInternals(fixture: Fixture | undefined): FakeInternals {
 export function installStoryHost(fixture?: Fixture): void {
   (globalThis as { __TAURI_INTERNALS__?: FakeInternals }).__TAURI_INTERNALS__ =
     makeInternals(fixture);
+  // `@tauri-apps/api/event`'s unlisten path reads `__TAURI_EVENT_PLUGIN_INTERNALS__.unregisterListener`.
+  // Without it, every event-subscribing surface rejects on unmount, which makes
+  // Vitest exit non-zero even though the render succeeded. The host owns this,
+  // not each story: a per-story workaround is a second fake host by another name.
+  (
+    globalThis as { __TAURI_EVENT_PLUGIN_INTERNALS__?: { unregisterListener(): void } }
+  ).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined };
 }
 
 /** Alias that reads better at a call site that is swapping mid-session. */
