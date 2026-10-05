@@ -27,8 +27,8 @@
     (-34018) at runtime. `bundle.macOS.files` embeds
     `Myne_Mac_Development.provisionprofile` at Contents/embedded.provisionprofile
     so both halves hold. The profile is device-bound (only registered Macs launch
-    the bundle) and expires; regenerate it with the `macos-development-profile`
-    procedure when it goes stale.
+    the bundle) and expires; regenerate it with the macOS signing section of
+    `operations/runbooks/local-multiplatform-build.md` when it goes stale.
 
     NOTE: `tauri dev` runs an UNSIGNED binary, so biometric still fails there.
     These entitlements apply to `tauri build` (configured via
