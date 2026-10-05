@@ -40,10 +40,10 @@ describe("check-web-no-phrase", () => {
     expect(result.output).toContain("unlock.member-phrase");
   });
 
-  it("still catches the pre-existing member-roster marker", () => {
-    const result = run('const marker = "member-roster.phrase-input";');
+  it("catches the person-identity unlock marker", () => {
+    const result = run('const marker = "sync.panel.identity-unlock.phrase-input";');
     expect(result.code).not.toBe(0);
-    expect(result.output).toContain("member-roster.phrase-input");
+    expect(result.output).toContain("sync.panel.identity-unlock.phrase-input");
   });
 
   it("catches the identity-setup marker", () => {

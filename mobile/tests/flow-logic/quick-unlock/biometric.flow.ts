@@ -124,4 +124,25 @@ test.describe("biometric quick-unlock — settings", () => {
     await expect(page.getByText("Face ID isn't available on this device.")).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
   });
+
+  test("BiometricAuthFailed names the real cause, toggle stays off", async ({ page }) => {
+    // iOS reports errSecAuthFailed from SecItemAdd when it cannot create the
+    // biometric item, most often because no Face ID / Touch ID is enrolled.
+    // Before myne-md/myne#830 that fell through to the generic "Couldn't set up
+    // quick unlock"; the copy must offer enrolment as the remedy.
+    await installMockIpc(page, {
+      biometricSetupError: { kind: "BiometricAuthFailed" },
+    });
+    await openQuickUnlockPanel(page);
+
+    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
+    await toggle.click();
+
+    await expect(
+      page.getByText(
+        "Face ID couldn't be set up. Make sure it is enabled in your device settings, or use a PIN instead.",
+      ),
+    ).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
 });

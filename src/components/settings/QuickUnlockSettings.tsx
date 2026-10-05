@@ -59,6 +59,8 @@ function errorMessage(e: unknown): string {
         return i18n.t("settings.quickUnlock.errorPinNotDigits");
       case "HardwareUnavailable":
         return i18n.t("settings.quickUnlock.errorHardwareUnavailable");
+      case "BiometricAuthFailed":
+        return i18n.t("settings.quickUnlock.errorBiometricAuthFailed");
       case "Cancelled":
         return i18n.t("settings.quickUnlock.errorCancelled");
       // Setup and disable take the auth permit now (myne#378). The `default:`
@@ -88,6 +90,10 @@ export function QuickUnlockSettings() {
   // it unusable (an unsigned build → `errSecMissingEntitlement`, no hardware, or
   // a biometric set change). Retrying cannot succeed until the build is signed,
   // so a button that just errors again would be a lie.
+  //
+  // `BiometricAuthFailed` (`errSecAuthFailed`) is deliberately NOT in that list:
+  // it often means no fingerprint is enrolled, which the user can fix in System
+  // Settings and then retry, so this gate must leave the button visible.
   const [biometricUnavailable, setBiometricUnavailable] = useState(false);
 
   // Fetch current status on mount. In a non-Tauri context (dev/tests) invoke

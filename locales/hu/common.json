@@ -4013,7 +4013,6 @@
       "invitationPending": "Még nem fogadta el",
       "invitationsFailed": "A meghívók betöltése nem sikerült.",
       "title": "Trezor tagok",
-      "personHint": "Nyissa fel a tagazonosságát a helyreállítási kifejezéssel.",
       "personUnlock": "Tag-identitás felnyitása",
       "personReady": "Tag-identitás felnyitva.",
       "ownerCodeHint": "Ossza meg ezt a kódot a meghívott személlyel, hogy ellenőrizhesse: a trezor az Öné. Csak nyilvános információt tartalmaz.",

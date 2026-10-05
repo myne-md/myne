@@ -238,6 +238,17 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "sync",
     "MemberRosterPanel",
   ),
+  // The person-identity session unlock, moved out of MemberRosterPanel
+  // (myne-md/myne#831). Same rule as above: the phrase prompt is substituted out
+  // of the served artefact rather than hidden by a runtime gate.
+  [path.join(repoRoot, "src", "components", "sync", "PersonIdentityUnlock")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "PersonIdentityUnlock",
+  ),
   [path.join(repoRoot, "src", "components", "sync", "MemberVaultUnlockCard")]: path.join(
     repoRoot,
     "web",

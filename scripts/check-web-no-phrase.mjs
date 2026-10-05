@@ -78,14 +78,16 @@ const DIST = join("web", "dist");
  */
 const MARKERS = [
   {
-    needle: "member-roster.phrase-input",
+    needle: "sync.panel.identity-unlock.phrase-input",
     meaning:
-      "the B2B member-identity phrase prompt (myne-md/myne#698). Unlocking a " +
-      "member identity to send an invite is neither a recovery nor creation, so " +
-      "it is one of the non-recovery phrase paths and must never reach served " +
-      "code. It is substituted out of the bundle at build time " +
-      "(`web/vite.config.ts`), the same mechanism as the enrolment and import " +
-      "grids; this needle is what makes that absence a checked property",
+      "the B2B member-identity phrase prompt (myne-md/myne#698, moved to the " +
+      "Sync panel's Identity block by myne-md/myne#831). Unlocking a person " +
+      "identity to send an invite is neither a recovery nor creation, so it is " +
+      "one of the non-recovery phrase paths and must never reach served code. " +
+      "It is substituted out of the bundle at build time " +
+      "(`web/vite.config.ts`, PersonIdentityUnlock), the same mechanism as the " +
+      "enrolment and import grids; this needle is what makes that absence a " +
+      "checked property",
   },
   {
     needle: "unlock.member-phrase",

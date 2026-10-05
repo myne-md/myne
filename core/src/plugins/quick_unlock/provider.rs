@@ -38,12 +38,13 @@ pub struct ProviderSecret {
 /// error detail (`../../AGENTS.md` secret-handling logging discipline).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderError {
-    // `UserCancelled` / `HardwareUnavailable` / `CredentialMissing` are
-    // constructed on macOS (the biometric provider + command branch) and by the
-    // test `MockProvider`. On non-macOS lib builds (Linux/Windows CI) only
-    // `HardwareUnavailable` is constructed, so the other two stay
-    // `#[allow(dead_code)]` there; the allows are inert on macOS where the code
-    // path constructs them.
+    // `UserCancelled` and `CredentialMissing` are constructed on Apple targets
+    // (the biometric provider) and, for `UserCancelled`, by the test
+    // `MockProvider`. `HardwareUnavailable` and `BiometricAuthFailed` come from
+    // `store_error_from_osstatus` below, whose production caller is Apple-only,
+    // so on a non-test Linux build each of these is dead and the `allow` markers
+    // are what keep that from warning. They are inert on an Apple target and
+    // under `cfg(test)`, where a code path constructs them.
     /// The user dismissed the biometric prompt. Caller falls back to password
     /// silently (not an error to surface loudly).
     #[allow(dead_code)]
@@ -51,6 +52,15 @@ pub enum ProviderError {
     /// The biometric hardware / OS facility is unavailable on this device.
     #[allow(dead_code)]
     HardwareUnavailable,
+    /// The OS refused the biometric operation with `errSecAuthFailed` (-25293),
+    /// so a biometric credential could not be created. An empty enrolment set is
+    /// a common cause on the STORE path, but the status is broad (lockout,
+    /// denied access), so this deliberately does NOT claim "no biometric
+    /// enrolled": the UI names the likely remedy rather than asserting the
+    /// cause. Produced only by the store path; the retrieve path keeps `-25293`
+    /// as `Backend` (myne-md/myne#830).
+    #[allow(dead_code)]
+    BiometricAuthFailed,
     /// The stored provider credential is gone (e.g. the keychain item was
     /// removed, or the biometric set changed and the OS invalidated it).
     #[allow(dead_code)]
@@ -58,6 +68,30 @@ pub enum ProviderError {
     /// An opaque backend failure (keychain API error, Argon2id failure, CSPRNG
     /// unavailable). Detail is deliberately not carried across this boundary.
     Backend,
+}
+
+/// `errSecMissingEntitlement` (-34018): this process may not use the Keychain
+/// item, regardless of hardware. The dominant cause is an unsigned binary.
+#[allow(dead_code)] // production caller is the Apple-gated `apple::map_store_error`
+pub(crate) const ERR_SEC_MISSING_ENTITLEMENT: i32 = -34018;
+/// `errSecAuthFailed` (-25293): a biometric evaluation failed. Broad by design
+/// (empty enrolment, lockout, denied access), so callers must not assume one
+/// cause.
+#[allow(dead_code)] // production caller is the Apple-gated `apple::map_store_error`
+pub(crate) const ERR_SEC_AUTH_FAILED: i32 = -25293;
+
+/// Pure decision over an Apple Keychain OSStatus from the STORE path,
+/// deliberately target-agnostic so a Linux CI `cargo test` exercises it. Its
+/// only production caller, `apple::map_store_error`, sits behind
+/// `#[cfg(any(target_os = "macos", target_os = "ios"))]`, so without this split
+/// the mapping would be asserted on a developer Mac alone (myne-md/myne#830).
+#[allow(dead_code)] // see above: dead only on a non-test non-Apple build
+pub(crate) fn store_error_from_osstatus(code: i32) -> ProviderError {
+    match code {
+        ERR_SEC_MISSING_ENTITLEMENT => ProviderError::HardwareUnavailable,
+        ERR_SEC_AUTH_FAILED => ProviderError::BiometricAuthFailed,
+        _ => ProviderError::Backend,
+    }
 }
 
 /// The pluggable source of a quick-unlock `wrap_key`. One implementation per
@@ -188,6 +222,26 @@ mod tests {
     fn mock_kind_is_reported() {
         let provider = MockProvider::new(PROVIDER_KIND_BIOMETRIC, 0x01);
         assert_eq!(provider.kind(), PROVIDER_KIND_BIOMETRIC);
+    }
+
+    #[test]
+    fn store_error_mapping_is_pinned_on_every_target() {
+        // Runs on Linux CI, unlike the caller in `apple.rs` (macOS/iOS-gated).
+        // The OSStatus values are the contract with the OS, so pin them here.
+        assert_eq!(
+            ERR_SEC_MISSING_ENTITLEMENT, -34018,
+            "errSecMissingEntitlement"
+        );
+        assert_eq!(ERR_SEC_AUTH_FAILED, -25293, "errSecAuthFailed");
+        assert_eq!(
+            store_error_from_osstatus(ERR_SEC_MISSING_ENTITLEMENT),
+            ProviderError::HardwareUnavailable
+        );
+        assert_eq!(
+            store_error_from_osstatus(ERR_SEC_AUTH_FAILED),
+            ProviderError::BiometricAuthFailed
+        );
+        assert_eq!(store_error_from_osstatus(-1), ProviderError::Backend);
     }
 
     #[test]

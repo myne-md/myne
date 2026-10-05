@@ -4139,7 +4139,6 @@
       "invitationPending": "Încă neacceptată",
       "invitationsFailed": "Invitațiile dvs. nu au putut fi încărcate.",
       "title": "Membrii depozitului",
-      "personHint": "Deblocați-vă identitatea de membru cu fraza de recuperare.",
       "personUnlock": "Deblochează identitatea de membru",
       "personReady": "Identitatea de membru a fost deblocată.",
       "ownerCodeHint": "Trimiteți acest cod persoanei pe care o invitați, ca să poată verifica că depozitul e al dvs. Conține doar informații publice.",
