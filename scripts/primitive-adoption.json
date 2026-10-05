@@ -99,7 +99,7 @@
   "mobile/src/app/flows/AttachmentsSheet.tsx": 13,
   "mobile/src/app/flows/CreateVaultFlow.tsx": 7,
   "mobile/src/app/flows/EditorFlow.tsx": 21,
-  "mobile/src/app/flows/IdentityFlow.tsx": 1,
+  "mobile/src/app/flows/IdentityFlow.tsx": 2,
   "mobile/src/app/flows/JoinFlow.tsx": 5,
   "mobile/src/app/flows/PickerFlow.tsx": 2,
   "mobile/src/app/flows/RecordingSheet.tsx": 1,
