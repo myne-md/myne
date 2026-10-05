@@ -10,7 +10,6 @@
 
 import type { ReactNode } from "react";
 import { ActionStatus } from "@app/components/ActionStatus";
-import { AccountStep } from "@app/screens/vault-creation/AccountStep";
 import { AccountBootstrap } from "@app/screens/AccountBootstrap";
 import { CreateVault } from "@app/screens/CreateVault";
 import { AgentReview } from "@app/screens/AgentReview";
@@ -36,6 +35,12 @@ import { DeviceJoinQr } from "@app/components/sync/DeviceJoinQr";
 import { DeviceManagementPanel } from "@app/components/sync/DeviceManagementPanel";
 import { Editor } from "@app/screens/Editor";
 import { EncryptingStep } from "@app/screens/vault-creation/EncryptingStep";
+import { KitStep } from "@app/screens/vault-creation/KitStep";
+import { NameStep } from "@app/screens/vault-creation/NameStep";
+import { AuthShell } from "@app/screens/AuthShell";
+import { ChoiceRow } from "@app/components/ChoiceList";
+import { PhraseGrid } from "@app/components/PhraseGrid";
+import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
 import { EnrollPhraseCredential } from "@app/components/sync/EnrollPhraseCredential";
@@ -66,7 +71,6 @@ import { PasswordResetStep } from "@app/screens/vault-recover/PasswordResetStep"
 import { PasswordStep } from "@app/screens/vault-creation/PasswordStep";
 import { PasswordStrength } from "@app/components/PasswordStrength";
 import { PhraseEntryStep } from "@app/screens/vault-recover/PhraseEntryStep";
-import { PhraseStep } from "@app/screens/vault-creation/PhraseStep";
 import { ProvisioningStep } from "@app/screens/vault-creation/ProvisioningStep";
 import { QuickPicker } from "@app/components/QuickPicker";
 import { QuickUnlockEntry } from "@app/components/QuickUnlockEntry";
@@ -563,7 +567,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "unlocked",
     render: () => (
       <SidebarStateProvider>
-        <AttachmentsLibrary onClose={noop} />
+        <AttachmentsLibrary />
       </SidebarStateProvider>
     ),
   },
@@ -651,8 +655,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       <BackupExportModal
         open
         onClose={noop}
+        onOpenDrill={noop}
         vaultId={VAULT_ID}
-        onShowToast={noop}
       />
     ),
   },
@@ -807,7 +811,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "JoinDeviceModal",
     state: "default",
-    render: () => <JoinDeviceModal onCancel={noop} onJoined={noop} />,
+    render: () => <JoinDeviceModal onCancel={noop} onJoined={noop} onRecovering={noop} />,
   },
   {
     id: "components/memberrosterpanel/default",
@@ -1108,20 +1112,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <PasswordStep error={null} onBack={noop} onSubmit={noop} />,
   },
   {
-    id: "components/phrasestep/default",
-    group: "components",
-    surface: "PhraseStep",
-    state: "default",
-    render: () => (
-      <PhraseStep
-        phrase={[...PHRASE]}
-        revealed
-        dispatch={noop}
-        onCancelSession={noop}
-      />
-    ),
-  },
-  {
     id: "components/confirmstep/default",
     group: "components",
     surface: "ConfirmStep",
@@ -1131,24 +1121,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         phrase={[...PHRASE]}
         positions={[1, 9, 17, 24]}
         inputs={{}}
-        dispatch={noop}
-      />
-    ),
-  },
-  {
-    id: "components/accountstep/default",
-    group: "components",
-    surface: "AccountStep",
-    state: "default",
-    render: () => (
-      <AccountStep
-        accountNumber="MY-ABCD-EFGH-JKMN-PQRS-TVWX"
-        acknowledged={false}
         committing={false}
         error={null}
-        inviteCode=""
-        onInviteCodeChange={noop}
-        showInviteCode
         dispatch={noop}
       />
     ),
@@ -1362,5 +1336,76 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onAutoUnlockFailed={noop}
       />
     ),
+  },
+  {
+    id: "components/authshell/default",
+    group: "components",
+    surface: "AuthShell",
+    state: "default",
+    render: () => (
+      <AuthShell>
+        <div style={{ padding: "var(--space-4)" }}>Auth body</div>
+      </AuthShell>
+    ),
+  },
+  {
+    id: "components/namestep/default",
+    group: "components",
+    surface: "NameStep",
+    state: "default",
+    render: () => (
+      <NameStep value="" onChange={noop} onSubmit={noop} onBack={noop} />
+    ),
+  },
+  {
+    id: "components/kitstep/default",
+    group: "components",
+    surface: "KitStep",
+    state: "default",
+    render: () => (
+      <KitStep
+        phrase={[...PHRASE]}
+        accountNumber="MY-ABCD-EFGH-JKMN-PQRS-TVWX"
+        vaultName="My vault"
+        revealed
+        dispatch={noop}
+      />
+    ),
+  },
+  {
+    id: "components/choicelist/default",
+    group: "components",
+    surface: "ChoiceList",
+    state: "default",
+    render: () => (
+      <ChoiceRow
+        title="Sync this vault"
+        body="Keep an encrypted copy on the server."
+        action={<span>Choose</span>}
+        last
+      />
+    ),
+  },
+  {
+    id: "components/phrasegrid/default",
+    group: "components",
+    surface: "PhraseGrid",
+    state: "default",
+    render: () => (
+      <PhraseGrid
+        phrase={[...PHRASE]}
+        revealed
+        onReveal={noop}
+        onHide={noop}
+        testIdPrefix="stories.phrase"
+      />
+    ),
+  },
+  {
+    id: "components/secretdisplaycaveats/default",
+    group: "components",
+    surface: "SecretDisplayCaveats",
+    state: "default",
+    render: () => <SecretDisplayCaveats testIdPrefix="stories.secret" />,
   },
 ];
