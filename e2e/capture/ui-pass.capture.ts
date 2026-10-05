@@ -200,6 +200,19 @@ runner(
         },
       );
 
+      // ── Sync endpoint (design pass: the fields and their buttons are the
+      //    Input/Button primitives rather than hand-rolled controls) ──────
+      await frame(
+        s,
+        "09-sync-endpoint",
+        "Settings → Sync: the server address and the invite-code fields with " +
+          "their Connect / Change-invite-code controls.",
+        async () => {
+          await openSettings(s, "sync");
+          await sleep(900);
+        },
+      );
+
       // Developer mode, from INSIDE the open modal: `enableDeveloperMode`
       // reaches About by the gear, and clicking the gear again on an open
       // modal is a close rather than an open. The agent tab is behind this
