@@ -455,6 +455,25 @@ pre-commit:
       # timeout — which reads like flake rather than like a stale helper.
       run: node scripts/check-e2e-menu-testids.mjs
 
+    story-coverage:
+      # myne-md/myne#832: the design-system story catalogue exists to make
+      # "which screen, which state" answerable, and it stops being that the
+      # moment it falls behind the tree. Nothing else notices a missing story:
+      # it breaks no build and fails no type. A RATCHET over the recorded debt,
+      # so the set of surfaces without a story may only shrink. Runs unfiltered
+      # (no glob) because a docs-only commit can add a screen just as easily as
+      # a code one, and the guard is a directory walk that costs milliseconds.
+      run: node scripts/check-story-coverage.mjs
+
+    stories-isolation:
+      # myne-md/myne#832: the catalogue is a separate Vite target, so it cannot
+      # enter an app bundle by construction. This is the guard on that
+      # construction: the moment an app build config or a Tauri bundle manifest
+      # references `stories/`, the guarantee becomes an accident. Unfiltered for
+      # the same reason as `story-coverage`: the configs it reads are not the
+      # files a glob would key on.
+      run: node scripts/check-stories-isolation.mjs
+
     woodpecker-substitution:
       # A single-dollar brace token anywhere in a Woodpecker workflow file,
       # INCLUDING inside a comment, fails Woodpecker's envsubst pass and kills

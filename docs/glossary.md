@@ -1102,6 +1102,12 @@ The web client's ceiling on the bytes a browser must fetch before it can run the
 
 Used in: `decisions.md` 2026-07-28; `scripts/check-web-bundle-budget.mjs`, `web/bundle-baseline.json`
 
+### **fixture** &nbsp; 🛠️ *Tooling*
+
+One named set of canned `invoke` responses plus the boot state that makes a catalogue state reachable (myne-md/myne#832). A fixture lives in `stories/fixtures/` and is referenced by name from a [story catalogue](#story-catalogue) entry, so situations that recur (no vault, locked, unlocked, a corrupt `vault.meta`) are defined once and shared. Fixtures are synthetic by contract: `tests/stories/fixtures.test.ts` and `scripts/check-stories-bundle.mjs` reject a recovery phrase or an account-number-shaped string, because a hand-authored fixture is exactly how a secret would reach a served page. See also [story host](#story-host).
+
+Used in: `decisions.md` 2026-10-05; `stories/fixtures/index.ts`
+
 ### **focus mode** &nbsp; 📦 *Product*
 
 The editor's distraction-free writing state (MYND-348): a `Mod-Shift-F` toggle fades the in-app chrome (sidebars, tab strip, [bottom bar](#bottom-bar), floated title-bar cluster) and centers the column, so only the words remain. The fade is **in-app only** — a CSS rule keyed on the editor root's `data-focus-active` attribute, never OS fullscreen (no Tauri window-API capability is added). The active state is **ephemeral** React state (opt in each session, never auto-entered, not persisted to any blob). Exit via the toggle or **Esc** at low keymap precedence (the editor's autocomplete / multi-cursor consume Esc first). v1 also ships [typewriter scroll](#typewriter-scroll) and [line-focus dimming](#line-focus-dimming), each a Settings → Editor toggle (the `editor_focus_typewriter` / `editor_focus_dim_inactive` MYP1 fields, default on); the command palette and Settings open over focus and return to it on close. Threat-neutral (UI state + two cosmetic prefs fields). See also [typewriter scroll](#typewriter-scroll), [line-focus dimming](#line-focus-dimming).
@@ -2749,6 +2755,18 @@ The one assertion suite that pins the behaviour of the [platform seam](#platform
 **Known gap, recorded rather than implied away.** The [platform seam](#platform-seam) got a third implementation in myne#492, `mobile/src/platform/`, and it has no contract driver: `tests/platform/` holds two subjects, not three. So the coverage claim above is exact and deliberately narrower than "every implementation", which is what this entry used to say while a third seam shipped outside it. The suite is already parameterised for a third subject (it takes a `supports` set), so closing the gap is a driver file rather than a redesign; until it lands, mobile's seam is verified by its own specs and by the twin-drift warning, not by this contract.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
+
+### **story catalogue** &nbsp; 🛠️ *Tooling*
+
+A dev-only, in-repo catalogue of every component, screen and state in the shared `src/` tree, mounted from the **real** components (myne-md/myne#832). It lives at `stories/` on the `web/` model (its own Vite target, no `package.json`, root scripts) and is served by `pnpm stories` on :1423. One entry per (surface × state) is declared in `stories/src/registry.ts`, so every state is addressable by URL; `scripts/check-story-coverage.mjs` is a ratchet that fails when a component or screen lands without a story, and `scripts/check-stories-isolation.mjs` fails if any app build config or Tauri bundle manifest references `stories/`, so "deployable" cannot become "shipped to users". It is not a shipped surface: it carries no backend, makes no network call, and stands outside every app bundle. See also [story host](#story-host), [fixture](#fixture).
+
+Used in: `decisions.md` 2026-10-05; `stories/README.md`
+
+### **story host** &nbsp; 🛠️ *Tooling*
+
+The single module (`stories/src/host/internals.ts`) that installs a fake `window.__TAURI_INTERNALS__` before any app module body runs, so the desktop [platform seam](#platform-seam) (`src/platform/*`) is mounted **unmodified** and every `invoke(cmd, args)` routes to a [fixture](#fixture)'s canned data (myne-md/myne#832). It is the mechanism `mobile/tests/flow-logic/mock-ipc.ts` and the E2E page seat already use, reused rather than reinvented: no app source changes and no second UI codebase to drift. It is the one file under `stories/src` permitted to name the Tauri runtime global, the same reasoned exemption `src/lib/app-window.ts` holds.
+
+Used in: `decisions.md` 2026-10-05; `stories/src/host/internals.ts`
 
 ### **save readout** &nbsp; 📦 *Product*
 
