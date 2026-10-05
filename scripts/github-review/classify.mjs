@@ -12,7 +12,7 @@
 // Env:
 //   REVIEW_PACKET    path to the packet JSON written by build-context.mjs
 //   REVIEW_SKILL     path to pr-review-bot SKILL.md
-//   REVIEW_MODEL     provider/model (default: opencode-go/deepseek-v4-flash)
+//   REVIEW_MODEL     provider/model (default: opencode-go/deepseek-v4.1-flash)
 //   REVIEW_OUT       where the verdict is written
 //   REVIEW_DIR       working directory (the checked-out PR branch)
 //   OPENCODE_API_KEY the opencode-go provider key
@@ -25,7 +25,7 @@ const __dirname = dirname(new URL(import.meta.url).pathname);
 
 const PACKET = process.env.REVIEW_PACKET || join(__dirname, '..', '.review', 'packet.json');
 const SKILL = process.env.REVIEW_SKILL || join(__dirname, '..', '..', '..', 'agent-tooling', 'skills', 'pr-review-bot', 'SKILL.md');
-const MODEL = process.env.REVIEW_MODEL || 'opencode-go/deepseek-v4-flash';
+const MODEL = process.env.REVIEW_MODEL || 'opencode-go/deepseek-v4.1-flash';
 const OUT = process.env.REVIEW_OUT || join(dirname(PACKET), 'verdict.json');
 const DIR = process.env.REVIEW_DIR || process.env.GITHUB_WORKSPACE || process.cwd();
 const TIMEOUT_MS = Number(process.env.REVIEW_TIMEOUT_MS || 1800000);

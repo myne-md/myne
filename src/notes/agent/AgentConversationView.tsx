@@ -3,7 +3,7 @@
 //
 // It was `AgentFocusView`, the second of two views you navigated between. There
 // is one screen now — the history rail beside this column
-// (`design-notes/ai/0627`) — so this is a COLUMN rather than a view, and the
+// (`design-notes/ai/0637`) — so this is a COLUMN rather than a view, and the
 // back control that used to head it is gone: there is nothing to go back to
 // when the thing you would go back to is beside you.
 //

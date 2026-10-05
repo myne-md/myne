@@ -19,6 +19,7 @@ import {
 } from "@myne/editor/host/notes/blockAnchors";
 import { useIndexNonce } from "./indexNonce";
 import { useResolverNotes } from "./resolverNotes";
+import { rowsEqual } from "./rowsEqual";
 import { vaultBlockAnchors } from "./vaultIndices";
 
 /**
@@ -50,7 +51,21 @@ export function useVaultBlockAnchors(): readonly EditorVaultBlockAnchor[] {
       } catch {
         return; // best-effort — leave the prior set
       }
-      if (!cancelled && seq === fetchSeq.current) setRows(fetched);
+      if (!cancelled && seq === fetchSeq.current) {
+        // Identity-stable when unchanged (the same per-autosave churn the
+        // heading twin carries; see `rowsEqual`).
+        setRows((prev) =>
+          rowsEqual(prev, fetched, [
+            "noteId",
+            "noteTitle",
+            "noteFolder",
+            "blockId",
+            "preview",
+          ])
+            ? prev
+            : fetched,
+        );
+      }
     })();
     return () => {
       cancelled = true;

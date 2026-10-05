@@ -1,6 +1,6 @@
 // Agent-hub suite (myne-md/myne#771 task 17). The deep agent surface is a
 // singleton workspace TAB holding ONE screen — the history rail beside the open
-// conversation (`decisions/@@ai/0628@@`, amended by `decisions/ai/0627`) — reached
+// conversation (`decisions/@@ai/0638@@`, amended by `decisions/ai/0637`) — reached
 // from the palette, from the ribbon and from the light panel's one exit
 // control. This pins that contract through the REAL editor UI:
 //
@@ -81,7 +81,7 @@ describeE2E("ah1 the agent opens as a singleton tab, rail and conversation both"
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
         // BOTH columns, which is the whole of what changed: the history rail
         // beside the conversation rather than a list you navigate out of
-        // (`decisions/ai/0627`). A scenario asserting only one of them would
+        // (`decisions/ai/0637`). A scenario asserting only one of them would
         // pass against either shape.
         await s.byTestId("agent.rail", { timeoutMs: 15_000 });
         await s.byTestId("agent.focus", { timeoutMs: 15_000 });
@@ -162,7 +162,7 @@ describeE2E("ah3 the light panel's exit reaches the deep surface", () => {
         await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         // The panel is NOT retired by the tab: it keeps its place in the right
         // panel's vocabulary, and the two are a depth pair rather than a
-        // migration (`decisions/@@ai/0628@@`).
+        // migration (`decisions/@@ai/0638@@`).
         expect((await s.byTestIdAll("ai.focus-agent")).length).toBeGreaterThan(0);
       },
     );
@@ -175,7 +175,7 @@ describeE2E("ah4 the tab remembers which conversation it was left on", () => {
     // The "last-used" behaviour, and the reason no preference records it:
     // revealing an open tab keeps its `agentView`, so the memory IS the tab.
     // A second record of one fact would be wrong after any path that did not
-    // write it (`decisions/@@ai/0628@@`, `decisions/ai/0627`).
+    // write it (`decisions/@@ai/0638@@`, `decisions/ai/0637`).
     let password = "";
     await scenario(
       "ah4-agent-last-view",

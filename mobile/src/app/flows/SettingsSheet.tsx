@@ -1205,7 +1205,7 @@ function CategoryRow({
 
 // ── SettingsSheet ─────────────────────────────────────────────────────────────
 
-type Panel =
+export type Panel =
   | "root"
   // category detail panels
   | "account"
@@ -1476,6 +1476,9 @@ export interface SettingsSheetProps {
   onClose: () => void;
   onLock: () => void;
   onDeleteVaultSuccess: () => void;
+  /** Panel to open on mount. Defaults to `root`. The first-run AI onboarding
+   *  opens `ai` directly (myne-md/myne#805). */
+  initialPanel?: Panel;
 }
 
 function strengthLevel(len: number): "Weak" | "Fair" | "Good" | "Strong" {
@@ -1485,10 +1488,10 @@ function strengthLevel(len: number): "Weak" | "Fair" | "Good" | "Strong" {
   return "Strong";
 }
 
-export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }: SettingsSheetProps) {
+export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel }: SettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
-  const [panel, setPanel] = useState<Panel>("root");
+  const [panel, setPanel] = useState<Panel>(initialPanel ?? "root");
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredChoice());
   const [toast, setToast] = useState<string | null>(null);
   // Phase-2 sync (MYND-459): honest enrollment status for the Sync section, plus

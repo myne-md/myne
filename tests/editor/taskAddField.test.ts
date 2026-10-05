@@ -412,14 +412,16 @@ describe("the + menu stays open behind the field editor (myne-md/myne#656)", () 
   it("a commit keeps the menu open for a second field", () => {
     openMenu("- [ ] pay the rent\n");
     menuRow("due").click();
-    // The due control is the Myne calendar (myne#614): pick a day button.
-    const day = document.querySelector<HTMLButtonElement>(
-      'button.cm-date-day[data-date="2026-09-09"]',
-    );
+    // The due control is the Myne calendar (myne#614): pick a day button. The
+    // date is read off the rendered cell instead of hardcoded, because the
+    // calendar opens on the CURRENT month: this pinned 2026-09-09 and started
+    // failing on 2026-10-01, when that day is no longer rendered.
+    const day = document.querySelector<HTMLButtonElement>("button.cm-date-day[data-date]");
     expect(day).not.toBeNull();
+    const iso = day!.getAttribute("data-date")!;
     day!.click();
     commit();
-    expect(m!.view.state.doc.toString()).toContain("[due:: 2026-09-09]");
+    expect(m!.view.state.doc.toString()).toContain(`[due:: ${iso}]`);
     expect(menu()).not.toBeNull();
   });
 

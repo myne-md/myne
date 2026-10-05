@@ -32,9 +32,10 @@ import { BODY_STYLE, FOOTER_STYLE } from "./modalChrome";
 import { runMyneVaultImport, type MyneImportExtras } from "./myneRun";
 import { createVaultOnlyPorts } from "./ports";
 import {
-  asVaultUnlockError,
   importSourceClose,
+  importSourceCloseBackup,
   importSourceOpen,
+  importSourceOpenBackup,
 } from "../../lib/import-source-vault";
 import { activeVaultId } from "../../lib/vault-list";
 import type { TFunction } from "i18next";
@@ -278,10 +279,12 @@ export function ObsidianImportModal({
   const startMyneImport = useCallback(
     ({
       sourceVaultId,
+      backupPath,
       importLabel,
       credential,
     }: {
-      sourceVaultId: string;
+      sourceVaultId?: string;
+      backupPath?: string;
       importLabel: string;
       credential: { password: string } | { recoveryPhrase: string };
     }) => {
@@ -291,13 +294,16 @@ export function ObsidianImportModal({
       // Remember the non-secret cells BEFORE the unmount, so the retryable arm
       // below comes back to a filled form rather than an empty one.
       setSetupCells({
-        chosen: sourceVaultId,
+        chosen: sourceVaultId ?? backupPath ?? "",
         label: importLabel,
         kind: "password" in credential ? "password" : "phrase",
       });
       setProgress({ done: 0, total: 0 });
       setPhase("running");
       void (async () => {
+        // The source's close, set once the open succeeds. `null` while nothing
+        // is open, so the `finally` is a no-op on an early return.
+        let closeSource: (() => Promise<void>) | null = null;
         try {
           // The OPEN happens HERE, inside the same try/finally as the close.
           // It used to happen in the credential step, which left an
@@ -306,9 +312,23 @@ export function ObsidianImportModal({
           // root_key and items_key sat resident until the 30-minute TTL swept
           // them, and the import then ran headless behind a closed modal. One
           // owner for the whole slot lifetime makes that unrepresentable.
-          await importSourceOpen(sourceVaultId, credential);
+          //
+          // A `.myne-backup` source opens through `importSourceOpenBackup`,
+          // which stages the container and returns the minted source id
+          // (myne-md/myne#816); a local vault keeps the original path.
+          let openedId: string;
+          if (backupPath !== undefined) {
+            openedId = await importSourceOpenBackup(backupPath, credential);
+            closeSource = () => importSourceCloseBackup(openedId);
+          } else if (sourceVaultId !== undefined) {
+            await importSourceOpen(sourceVaultId, credential);
+            openedId = sourceVaultId;
+            closeSource = () => importSourceClose(sourceVaultId);
+          } else {
+            return;
+          }
           const out = await runMyneVaultImport(
-            sourceVaultId,
+            openedId,
             policy,
             createVaultOnlyPorts(),
             {
@@ -341,15 +361,28 @@ export function ObsidianImportModal({
           //
           // Everything else is a real import failure and keeps the terminal
           // phase, where that sentence is true.
-          const kind = asVaultUnlockError(err)?.kind;
+          // The backup-open error enum is snake_case (myne-md/myne#816); the
+          // local-vault `VaultUnlockError` is PascalCase. Both land here, so
+          // each credential-shaped case names both spellings.
+          // Read `kind` as an open string: this arm now sees BOTH the local
+          // `VaultUnlockError` (PascalCase) and the backup-open enum
+          // (snake_case), so a narrowed union would reject the backup spellings.
+          const kind = (err as { kind?: string } | null)?.kind;
           const retryable =
-            kind === "InvalidCredentialOrVault"
+            kind === "InvalidCredentialOrVault" ||
+            kind === "invalid_credential_or_vault"
               ? t("notes.import.myne.errors.credential")
-              : kind === "UnlockInProgress"
+              : kind === "UnlockInProgress" || kind === "unlock_in_progress"
                 ? t("notes.import.myne.errors.busy")
-                : kind === "VaultOpenAsImportSource"
+                : kind === "VaultOpenAsImportSource" ||
+                    kind === "vault_open_as_import_source"
                   ? t("notes.import.myne.errors.alreadyOpen")
-                  : null;
+                  : kind === "not_a_backup_file" ||
+                      kind === "damaged_backup" ||
+                      kind === "invalid_vault_meta" ||
+                      kind === "io"
+                    ? t("notes.import.myne.errors.backupInvalid")
+                    : null;
           if (retryable !== null) {
             setSetupError(retryable);
             setPhase("setup");
@@ -376,7 +409,7 @@ export function ObsidianImportModal({
           // loop here: a second attempt would fail for the same reason and the
           // real backstop is host-side.
           try {
-            await importSourceClose(sourceVaultId);
+            if (closeSource !== null) await closeSource();
           } catch {
             // Deliberately silent to the USER: they cannot act on it, and the
             // window is already bounded above. Not silent to the developer.
@@ -497,13 +530,16 @@ export function ObsidianImportModal({
           />
         )}
 
-        {phase === "setup" && spec.pick === "vault" && (
-          // The Myne source picks a VAULT, not a path, so it gets its own setup
-          // step: a list of the user's other local vaults, a credential for the
-          // chosen one, and the import label. `SetupBody` below is built around
-          // a picked folder and has nothing to show here.
+        {phase === "setup" && source === "myne" && (
+          // The Myne source takes a `.myne-backup` and needs a credential for
+          // it, so it keeps its own setup step (myne-md/myne#816). `SetupBody`
+          // below is built around a plaintext picked folder and has nothing to
+          // show for an encrypted source.
           <MyneVaultSetup
             activeVaultId={activeVault}
+            backupMode
+            backupPath={folder?.root ?? undefined}
+            onChooseFile={() => void chooseFolder()}
             onReady={startMyneImport}
             onCancel={handleClose}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
@@ -513,7 +549,7 @@ export function ObsidianImportModal({
             initialKind={setupCells?.kind}
           />
         )}
-        {phase === "setup" && spec.pick !== "vault" && (
+        {phase === "setup" && source !== "myne" && (
           <SetupBody
             spec={spec}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}

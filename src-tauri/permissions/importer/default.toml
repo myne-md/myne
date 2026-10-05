@@ -33,7 +33,19 @@ permissions = [
     "allow-import-source-read-note",
     "allow-import-source-reseal-attachment",
     "allow-import-source-merge-dictionary",
+    "allow-import-source-open-backup",
+    "allow-import-source-close-backup",
 ]
+
+[[permission]]
+identifier = "allow-import-source-open-backup"
+description = "Allow invoking importer:import_source_open_backup (extract a `.myne-backup` container into a private staging directory and open it as a read-only import source). The container is verified all-or-nothing by the same reader the restore path uses, so a damaged or tampered backup is refused; the credential is the BACKUP's own password or recovery phrase; the source slot is not an unlock and is dropped by import_source_close_backup, by the core TTL, or by vault teardown. Staging holds the container's ciphertext members only, never plaintext, and lives outside vaults/ so the picker never lists it."
+commands.allow = ["import_source_open_backup"]
+
+[[permission]]
+identifier = "allow-import-source-close-backup"
+description = "Allow invoking importer:import_source_close_backup (drop a backup import source's read-only key slot and remove its staging directory). Idempotent, so the frontend calls it on every exit path."
+commands.allow = ["import_source_close_backup"]
 
 [[permission]]
 identifier = "allow-import-source-merge-dictionary"

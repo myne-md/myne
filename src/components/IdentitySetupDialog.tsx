@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
 import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "./ChoiceList";
+import { Input } from "./primitives/Input";
 import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
@@ -38,7 +39,13 @@ interface IdentitySetupDialogProps {
 }
 
 /** Which failure the single error slot is showing. */
-type ErrorKind = "generic" | "alreadyHeld" | "notConfigured" | "tlsFailure";
+type ErrorKind =
+  | "generic"
+  | "alreadyHeld"
+  | "notConfigured"
+  | "tlsFailure"
+  | "inviteCodeRequired"
+  | "inviteCodeInvalid";
 
 /**
  * Read the serialized `SyncDeviceError::kind` off a rejected invoke. The plugin
@@ -52,6 +59,12 @@ function errorKindOf(error: unknown): ErrorKind {
   if (kind === "AlreadyHeldIdentity") return "alreadyHeld";
   if (kind === "NotConfigured") return "notConfigured";
   if (kind === "TlsFailure") return "tlsFailure";
+  // A gated server refuses identity creation without (or with a wrong) invite
+  // code. Named distinctly so the user learns the remedy is the operator's
+  // code, which a generic "try again" would loop them away from
+  // (myne-md/myne#800).
+  if (kind === "InviteCodeRequired") return "inviteCodeRequired";
+  if (kind === "InviteCodeInvalid") return "inviteCodeInvalid";
   return "generic";
 }
 
@@ -72,6 +85,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   const [result, setResult] = useState<PersonSetupView | null>(null);
   // True when a sealed identity exists on this device even if it never enrolled.
   const [heldIdentity, setHeldIdentity] = useState(false);
+  // The held identity's public code, shown while it is held/locked so the dialog
+  // shows THAT identity rather than only a recover form (myne-md/myne#792
+  // follow-up). Public material; also shown in the member roster when unlocked.
+  const [heldCode, setHeldCode] = useState<string | null>(null);
   const [confirmForget, setConfirmForget] = useState(false);
   // Whether the 24-word recovery grid is open. Closed by default so a person
   // creating their FIRST identity is not met by twenty-four empty fields; a
@@ -97,7 +114,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     let alive = true;
     void personStatus()
       .then((status) => {
-        if (alive) setHeldIdentity(status.sealed_keypair_present);
+        if (alive) {
+          setHeldIdentity(status.sealed_keypair_present);
+          setHeldCode(status.identity_code);
+        }
       })
       .catch(() => {
         /* probe failed: keep the default Create affordance and let the
@@ -151,6 +171,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setResult(null);
     setError(null);
     setRecoveryCells(emptyRecoveryCells());
+    setHeldCode(null);
     setConfirmForget(false);
     setRecoverOpen(false);
     onClose();
@@ -164,7 +185,11 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
         ? "identitySetup.errorNotConfigured"
         : error === "alreadyHeld"
           ? "identitySetup.errorAlreadyHeld"
-          : "identitySetup.error";
+          : error === "inviteCodeRequired"
+            ? "sync.enroll.error.inviteCodeRequired"
+            : error === "inviteCodeInvalid"
+              ? "sync.enroll.error.inviteCodeInvalid"
+              : "identitySetup.error";
 
   return (
     <ModalShell
@@ -245,13 +270,27 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
           {heldIdentity ? (
             // A held identity cannot be opened by a freshly generated phrase, so
             // Create is replaced by the notice + Recover, with an explicit
-            // destructive forget for a user who does not have the phrase.
-            <div
-              data-testid="identity-setup.held"
-              style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}
-            >
-              {t("identitySetup.heldIntro")}
-            </div>
+            // destructive forget for a user who does not have the phrase. The
+            // public code is shown so "an identity is held" names WHICH one.
+            <>
+              <div
+                data-testid="identity-setup.held"
+                style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}
+              >
+                {t("identitySetup.heldIntro")}
+              </div>
+              {heldCode ? (
+                <Input
+                  readOnly
+                  mono
+                  aria-label={t("sync.panel.identity.codeLabel")}
+                  value={heldCode}
+                  data-testid="identity-setup.held-code"
+                  style={{ userSelect: "all" }}
+                  onFocus={(e) => e.target.select()}
+                />
+              ) : null}
+            </>
           ) : !recoverOpen ? (
             // The fork, as two rows that say where each leads. Recovering is
             // the rarer path, so its twenty-four fields stay behind its button.

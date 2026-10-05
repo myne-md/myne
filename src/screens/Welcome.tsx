@@ -10,6 +10,13 @@ import { SearchableSelect } from "../components/primitives/SearchableSelect";
 import { setLanguage } from "../i18n";
 import { SUPPORTED_CODES, SUPPORTED_LANGUAGES, type LanguageCode } from "../i18n/config";
 
+// There is deliberately NO plain-file gate toggle on this screen
+// (myne-md/myne#788, amended 2026-10-01). The gate is ON by default and the
+// surface is reachable from the app menu's File → Open File…, so a vault-less
+// device needs no control here to use it. The only switch now lives in
+// Settings → Editor, where a user with a vault can turn the surface back off;
+// a device with no vault has no Settings to host it.
+
 interface WelcomeProps {
   onCreateVault: () => void;
   /** Fresh-install restore door (MYND-56; the user-guide UX contract). */

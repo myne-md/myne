@@ -29,7 +29,7 @@ At vault creation the client generates a 24-word BIP-39 phrase per `protocol.md`
 
 The 24 words MUST be presented on a dedicated step within the vault-creation flow, with the following normative properties.
 
-**The step is the recovery kit** (`decisions/ui/0632`, myne-md/myne#468). The phrase and the account number are shown together, on ONE step, laid out as a preview of the single file Save writes: a header naming the vault and the date, the phrase section, the account-number section. They were two consecutive steps; the account step arrived after the §2.3 challenge had already been passed and read as an epilogue, and no product surveyed asks a user to absorb two back-to-back "keep this forever" moments. The document layout is itself the statement that both secrets go into one file, so a client MUST NOT add a warning box restating it.
+**The step is the recovery kit** (`decisions/ui/0642`, myne-md/myne#468). The phrase and the account number are shown together, on ONE step, laid out as a preview of the single file Save writes: a header naming the vault and the date, the phrase section, the account-number section. They were two consecutive steps; the account step arrived after the §2.3 challenge had already been passed and read as an epilogue, and no product surveyed asks a user to absorb two back-to-back "keep this forever" moments. The document layout is itself the statement that both secrets go into one file, so a client MUST NOT add a warning box restating it.
 
 - **Layout** — 4-column grid of numbered word cells (4×6 or 6×4 visually equivalent), one BIP-39 word per cell, position indices 1–24 visible to the user. The grid MUST be laid out left-to-right in every locale, including right-to-left ones, while the page keeps the locale's direction: the ORDER of the words is part of the secret, BIP-39's checksum does not catch a permutation, and §2.4 means a mis-copied order is never discoverable. A mobile client MAY reveal the grid in halves where 24 words do not fit legibly.
 - **Why the words are English** — the step MUST say, once, that the words are the BIP-39 English wordlist on every client and are not translated. Without it an untranslated grid in a translated interface reads as a missing translation, and a user who translates the words back has destroyed their only backup.
@@ -49,7 +49,7 @@ The 24 words MUST be presented on a dedicated step within the vault-creation flo
   - A CANCELLED save dialog MUST report nothing. The user closed it; announcing it is the client narrating the user's own action back at them, and it trains them to ignore the line that matters.
   - A success MUST claim only what the client actually observed. A native save dialog returns after the write, so "saved" is true. A browser download returns when the page hands the bytes to the browser, which chooses the destination and reports neither a block, a cancelled destination prompt, nor a failed write; on that path the client MUST say the download was started rather than that the file was saved. Stating a landing the client never saw is the same defect as saying nothing, wearing a reassuring sentence.
 - **Extension exposure (web client)** — the phrase grid, once revealed, is readable by any browser extension holding host permissions on the origin, which no content-security policy prevents and the page cannot detect (`threat-model.md` A19). The web client MUST say so on this step. Native clients have no equivalent surface and MUST NOT carry the notice, which would be a false symmetry.
-- **Acknowledgement CTA** — a single action transitions to the confirmation step (§2.3), labeled to communicate that the user attests they have saved the kit. It is the ONLY acknowledgement on the step; there is no checkbox (§2.3 is what gates creation, and `protocol.md` §7.2 says a checkbox is not evidence). Save is the visually primary action on this step, because saving is the step's job; the acknowledgement and Copy are secondary. *(Revised 2026-09-27, `decisions/ui/0632`: this bullet previously made the acknowledgement primary and Save a ghost, when the phrase had a step of its own.)*
+- **Acknowledgement CTA** — a single action transitions to the confirmation step (§2.3), labeled to communicate that the user attests they have saved the kit. It is the ONLY acknowledgement on the step; there is no checkbox (§2.3 is what gates creation, and `protocol.md` §7.2 says a checkbox is not evidence). Save is the visually primary action on this step, because saving is the step's job; the acknowledgement and Copy are secondary. *(Revised 2026-09-27, `decisions/ui/0642`: this bullet previously made the acknowledgement primary and Save a ghost, when the phrase had a step of its own.)*
 - **Print** is NOT offered. `window.print()` does nothing in some WebViews, so a Print control would silently fail on a shown-once screen; the honest route would stage the phrase into a second rendering surface, which is a threat-model change and is not made here.
 
 ### 2.3 Type-back confirmation challenge
@@ -149,7 +149,7 @@ The spec deliberately avoids promising "the phrase is zeroized" without qualific
 
 ### 3.6 Read-only verification (the drill)
 
-A client MUST offer a way to check, on an UNLOCKED vault, whether a phrase the user types opens that vault (`decisions/security/0630`, myne-md/myne#468). §2.4 means a phrase mis-copied at creation is otherwise discovered on the day it is needed, which is the day the password is already gone.
+A client MUST offer a way to check, on an UNLOCKED vault, whether a phrase the user types opens that vault (`decisions/security/0640`, myne-md/myne#468). §2.4 means a phrase mis-copied at creation is otherwise discovered on the day it is needed, which is the day the password is already gone.
 
 - **Read-only.** The command derives the recovery wrap-key under the vault's recovery salt domain, attempts the AEAD-open of `enc_root_key_recovery`, discards the result, and returns a boolean. It MUST NOT transition any slot (in particular it MUST NOT populate `Recovering`, which would demand a password reset from a user who was only checking) and MUST NOT write.
 - **Unlock-gated.** It MUST refuse when no vault is unlocked. This is what bounds it as an oracle: a caller at a locked app cannot reach it, and a caller at an unlocked app already holds the plaintext.
@@ -160,7 +160,7 @@ A client MUST offer a way to check, on an UNLOCKED vault, whether a phrase the u
 
 ### 3.7 Joining a new device with the phrase
 
-A device join MAY use the phrase instead of the password (`decisions/sync/0631`, myne-md/myne#468), for a user who has lost every other device and so has nobody to approve a password join.
+A device join MAY use the phrase instead of the password (`decisions/sync/0641`, myne-md/myne#468), for a user who has lost every other device and so has nobody to approve a password join.
 
 - **Path.** The enrolment sends the `recovery` path (`server-protocol.md`), which the server self-approves.
 - **Opening the vault** uses the same pipeline as §3.2–§3.4, so the vault is `Recovering` afterwards and the §4 mandatory password reset follows before it can be used.

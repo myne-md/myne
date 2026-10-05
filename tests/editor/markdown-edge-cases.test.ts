@@ -25,6 +25,12 @@
 //   N — Smart-toggle cursor behavior (Obsidian)    — N1-N5
 //   O — Repeated / progressive toggle              — O1-O4
 //
+// myne-md/myne#802 trimmed this file: categories F and J were removed, along
+// with the parser-only pins G4 and the exact duplicates I3, K2, K3, M1, M3 and
+// O3-O4. The category list above is the catalog's original roster, not a claim
+// about which cases still run; the `it(...)` bodies below are the source of
+// truth for surviving coverage.
+//
 // TDD discipline: tests document EXPECTED behavior. Some cases will fail
 // against the current `wrap-toggle.ts` implementation — those are the
 // tier-1/2/3 fixes flagged in the research report. Skip-marked tests
@@ -34,7 +40,6 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { toggleWrap } from "../../src/editor/wrap-toggle";
 import { assertParsedState } from "./_parse-budget";
@@ -97,35 +102,6 @@ function applyToggleMd(
     doc: nextState.doc.toString(),
     selection: { from: sel.from, to: sel.to },
   };
-}
-
-/** Parse `doc` through @codemirror/lang-markdown and return the list of
- * non-trivial syntax tree node names with their byte ranges. Used to pin
- * CommonMark parse expectations (mod-3 ambiguity, GFM strike, escapes,
- * link/code precedence). */
-type ParsedNode = { name: string; from: number; to: number; text: string };
-function parseNodes(doc: string): ParsedNode[] {
-  const state = EditorState.create({
-    doc,
-    extensions: [markdown({ base: markdownLanguage })],
-  });
-  assertParsedState(state);
-  const tree = syntaxTree(state);
-  const nodes: ParsedNode[] = [];
-  tree.iterate({
-    from: 0,
-    to: doc.length,
-    enter: (node) => {
-      if (node.name === "Document" || node.name === "Paragraph") return;
-      nodes.push({
-        name: node.name,
-        from: node.from,
-        to: node.to,
-        text: doc.slice(node.from, node.to),
-      });
-    },
-  });
-  return nodes;
 }
 
 // =============================================================================
@@ -321,44 +297,6 @@ describe("E. Adjacent / nested emphasis", () => {
 });
 
 // =============================================================================
-// Category F — Mod-3 ambiguity (CommonMark Rule 9) — parse-level expectations
-// =============================================================================
-
-describe("F. CommonMark Rule 9 mod-3 ambiguity (parse-level pins)", () => {
-  // These tests don't exercise toggleWrap; they document expected
-  // @lezer/markdown parses that future AST-aware toggles should respect.
-  it("F1: `*foo**bar*` parses as Emphasis (rule 9 mod-3 rejects `**`)", () => {
-    const nodes = parseNodes("*foo**bar*");
-    const emphasis = nodes.find((n) => n.name === "Emphasis");
-    expect(emphasis).toBeDefined();
-    expect(emphasis!.text).toBe("*foo**bar*");
-    // No StrongEmphasis node — the `**` is consumed as literal inside.
-    expect(nodes.find((n) => n.name === "StrongEmphasis")).toBeUndefined();
-  });
-  it("F2: `**foo*bar**` parses as StrongEmphasis (inner `*` literal)", () => {
-    const nodes = parseNodes("**foo*bar**");
-    const strong = nodes.find((n) => n.name === "StrongEmphasis");
-    expect(strong).toBeDefined();
-    // Lezer's StrongEmphasis node spans the full `**...**` including the
-    // marker bytes (per resolveMarkers `start = open.to - size`,
-    // `end = close.from + size`).
-    expect(strong!.text).toBe("**foo*bar**");
-    expect(nodes.find((n) => n.name === "Emphasis")).toBeUndefined();
-  });
-  it("F3: `foo***bar***baz` — Emphasis outer, StrongEmphasis inner (CommonMark Rule 14)", () => {
-    const nodes = parseNodes("foo***bar***baz");
-    const emphasis = nodes.find((n) => n.name === "Emphasis");
-    const strong = nodes.find((n) => n.name === "StrongEmphasis");
-    expect(emphasis).toBeDefined();
-    expect(strong).toBeDefined();
-    // Per CommonMark Rule 14, `<em><strong>...` is preferred over
-    // `<strong><em>...` — so StrongEmphasis sits INSIDE Emphasis.
-    expect(strong!.from).toBeGreaterThanOrEqual(emphasis!.from);
-    expect(strong!.to).toBeLessThanOrEqual(emphasis!.to);
-  });
-});
-
-// =============================================================================
 // Category G — Code / link / image precedence (CommonMark Rule 17)
 // =============================================================================
 
@@ -379,14 +317,6 @@ describe("G. Code / link / image precedence (Rule 17)", () => {
     // toggleWrap refuses via the URL-straddle AST check; doc unchanged.
     const r = applyToggleMd("*", "*", "[foo](url)", 1, 8);
     expect(r.doc).toBe("[foo](url)");
-  });
-  it("G4: parse pin — `*[foo*](bar)` is link with literal `*` (Rule 17)", () => {
-    const nodes = parseNodes("*[foo*](bar)");
-    const link = nodes.find((n) => n.name === "Link");
-    expect(link).toBeDefined();
-    // No Emphasis node should be formed — the `*`s straddle a link
-    // boundary, link wins per Rule 17.
-    expect(nodes.find((n) => n.name === "Emphasis")).toBeUndefined();
   });
   it("G5: bold on image alt text", () => {
     expect(applyToggle("**", "**", "![alt](src)", 2, 5).doc).toBe(
@@ -447,32 +377,6 @@ describe("I. Frontmatter region (toggle policy)", () => {
     const r = applyToggle("**", "**", doc, 11, 18);
     expect(r.doc).toBe(doc);
   });
-  it.skip("I3: `---` line in body parses as HorizontalRule, not closing frontmatter", () => {
-    // Covered by tests/editor/hr-frontmatter.test.ts. Kept here as a
-    // catalog cross-reference (no separate assertion).
-    expect("covered-elsewhere").toBe("covered-elsewhere");
-  });
-});
-
-// =============================================================================
-// Category J — Wikilink / atomic-range
-// =============================================================================
-
-describe("J. Wikilink atomic-range edge cases (catalog cross-ref)", () => {
-  it.skip("J1: bold toggle inside `[[Note]]` chip — atomic, selection snaps", () => {
-    // Already partially covered by atomic-range.test.ts A4. Kept here
-    // as a toggle-specific cross-reference.
-    expect("placeholder").toBe("placeholder");
-  });
-  it.skip("J2: italic toggle across `text [[Note]] more` chip boundary", () => {
-    expect("placeholder").toBe("placeholder");
-  });
-  it.skip("J3: toggle between adjacent chips `[[A]][[B]]`", () => {
-    expect("placeholder").toBe("placeholder");
-  });
-  it.skip("J4: `![[Embed]]` chip atomic interaction with bold-toggle", () => {
-    expect("placeholder").toBe("placeholder");
-  });
 });
 
 // =============================================================================
@@ -482,15 +386,6 @@ describe("J. Wikilink atomic-range edge cases (catalog cross-ref)", () => {
 describe("K. GFM strikethrough", () => {
   it("K1: strike toggle on `~~strike~~` unwraps", () => {
     expect(applyToggle("~~", "~~", "~~strike~~", 2, 8).doc).toBe("strike");
-  });
-  it("K2: single-tilde `~strike~` parses as plain text (lezer requires `~~`)", () => {
-    const nodes = parseNodes("~strike~");
-    // No Strikethrough node — lezer's GFM strikethrough needs exactly `~~`.
-    expect(nodes.find((n) => n.name === "Strikethrough")).toBeUndefined();
-  });
-  it("K3: three tildes `~~~strike~~~` not strikethrough (GFM Ex 493)", () => {
-    const nodes = parseNodes("~~~strike~~~");
-    expect(nodes.find((n) => n.name === "Strikethrough")).toBeUndefined();
   });
   it("K4: strike toggle on text containing single `~` inside (`strike~stuff`)", () => {
     // `~~strike~stuff~~` — the interior single `~` is fine, not a marker.
@@ -528,28 +423,10 @@ describe("L. Multi-paragraph / multi-line selections", () => {
 // =============================================================================
 
 describe("M. Escape sequences", () => {
-  it("M1: parse pin — `\\*foo\\*` is literal, not italic", () => {
-    const nodes = parseNodes("\\*foo\\*");
-    // No Emphasis — both `*`s are backslash-escaped.
-    expect(nodes.find((n) => n.name === "Emphasis")).toBeUndefined();
-    // The backslash escapes themselves should be recognized as Escape
-    // nodes by lezer.
-    const escapes = nodes.filter((n) => n.name === "Escape");
-    expect(escapes.length).toBe(2);
-  });
   it.skip("M2: italic toggle on already-escaped `\\*foo\\*` strips escapes", () => {
     // Toggle on `\*foo\*` should produce `*foo*` (italic) — i.e.,
     // recognize the escapes were preventing emphasis and now we want it.
     expect(applyToggle("*", "*", "\\*foo\\*", 2, 5).doc).toBe("*foo*");
-  });
-  it("M3: parse pin — `**foo\\*\\***` is StrongEmphasis containing escaped `**`", () => {
-    const nodes = parseNodes("**foo\\*\\***");
-    const strong = nodes.find((n) => n.name === "StrongEmphasis");
-    expect(strong).toBeDefined();
-    expect(strong!.text).toBe("**foo\\*\\***");
-    // Escaped `\*` inside should be Escape nodes, not Emphasis markers.
-    const escapes = nodes.filter((n) => n.name === "Escape");
-    expect(escapes.length).toBe(2);
   });
   it("M4: backslash-escape inside selection preserved literally", () => {
     expect(applyToggle("**", "**", "foo\\bar", 0, 7).doc).toBe("**foo\\bar**");
@@ -561,21 +438,9 @@ describe("M. Escape sequences", () => {
 // =============================================================================
 
 describe("N. Smart-toggle cursor behavior (Obsidian 0.14.4+ model)", () => {
-  it("N1: cursor before closer of `*foo*` + italic → cursor jumps past closer", () => {
-    const r = applyToggle("*", "*", "*foo*", 4, 4);
-    expect(r.doc).toBe("*foo*");
-    expect(r.selection).toEqual({ from: 5, to: 5 });
-  });
-  it("N2: cursor before closer of `**foo**` + bold → cursor jumps past closer", () => {
-    const r = applyToggle("**", "**", "**foo**", 5, 5);
-    expect(r.doc).toBe("**foo**");
-    expect(r.selection).toEqual({ from: 7, to: 7 });
-  });
-  it("N3: cursor after opener of `*foo*` + italic → cursor jumps past opener", () => {
-    const r = applyToggle("*", "*", "*foo*", 1, 1);
-    expect(r.doc).toBe("*foo*");
-    expect(r.selection).toEqual({ from: 0, to: 0 });
-  });
+  // N1-N3 of the catalog (cursor before the closer / after the opener) are the
+  // exact shapes already pinned by C3-C5, so they are not repeated here. The two
+  // cases below are the ones C does not cover.
   it("N4: cursor mid-span of `*foo*bar` + italic → moves to right edge of span", () => {
     const r = applyToggle("*", "*", "*foo*bar", 3, 3);
     expect(r.doc).toBe("*foo*bar");
@@ -629,10 +494,6 @@ describe("O. Repeated / progressive toggle (idempotency, layering)", () => {
     );
     expect(after2.doc).toBe("***foo***");
   });
-  it("O3: `***foo***` + bold-toggle leaves italic", () => {
-    expect(applyToggle("**", "**", "***foo***", 3, 6).doc).toBe("*foo*");
-  });
-  it("O4: `***foo***` + italic-toggle leaves bold", () => {
-    expect(applyToggle("*", "*", "***foo***", 3, 6).doc).toBe("**foo**");
-  });
+  // O3/O4 (the nested-layer toggles) are the same shapes already pinned by
+  // E1/E2, so they are not repeated here.
 });

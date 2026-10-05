@@ -64,16 +64,27 @@ function selectWord(view: EditorView): void {
 // resolves, so neither polarity can be asserted after a fixed tick count. The two
 // directions need different treatment, because only one of them can be waited out:
 
-/** Wait for the toolbar to appear. Deliberately NOT a hand-rolled `Date.now()`
+/** The two positive cases wait for the toolbar to appear, and both bounds are
+ *  explicit rather than inherited. Deliberately NOT a hand-rolled `Date.now()`
  *  deadline: a private wall-clock budget makes a real pass look like a flake the
  *  moment the machine is busy (this file runs in the lefthook pre-push gate and in
  *  CI alongside other steps, and a 600ms budget measurably failed ~1-in-3 under a
- *  parallel vitest process). `expect.poll` retries until VITEST's own test timeout,
- *  so a loaded box gets slower, not red — and a genuine regression still fails,
- *  just later. This assertion guards the DEFAULT, which is the half desktop
- *  depends on, so it must never cry wolf. */
+ *  parallel vitest process). But leaving the poll to inherit VITEST's own test
+ *  timeout is the other failure: a slow-but-correct show (measured at ~8s under a
+ *  loaded runner) dies as "Test timed out in 5000ms", which is byte-identical to
+ *  the report a genuinely-absent toolbar produces, so the two worlds cannot be
+ *  told apart. `POLL_TIMEOUT_MS` is therefore set BELOW `TEST_TIMEOUT_MS`: a real
+ *  regression fails at the poll with its own message, and a loaded box has room to
+ *  be slow without turning red. This assertion guards the DEFAULT, which is the
+ *  half desktop depends on, so it must never cry wolf. */
+const TEST_TIMEOUT_MS = 20_000;
+const POLL_TIMEOUT_MS = 15_000;
+
 async function expectToolbarShown(): Promise<void> {
-  await expect.poll(() => toolbarEl() !== null, { interval: 16 }).toBe(true);
+  await expect.poll(() => toolbarEl() !== null, {
+    interval: 16,
+    timeout: POLL_TIMEOUT_MS,
+  }).toBe(true);
 }
 
 /** Negative-case budget. Absence cannot be polled for — there is no event to wait
@@ -104,13 +115,13 @@ afterEach(() => {
 });
 
 describe("myneExtensions selectionToolbar flag", () => {
-  it("defaults ON — a selection surfaces the floating toolbar (desktop)", async () => {
+  it("defaults ON — a selection surfaces the floating toolbar (desktop)", { timeout: TEST_TIMEOUT_MS }, async () => {
     mounted = mount();
     selectWord(mounted.view);
     await expectToolbarShown();
   });
 
-  it("explicit true behaves like the default", async () => {
+  it("explicit true behaves like the default", { timeout: TEST_TIMEOUT_MS }, async () => {
     mounted = mount(true);
     selectWord(mounted.view);
     await expectToolbarShown();

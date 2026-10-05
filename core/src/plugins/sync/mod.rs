@@ -93,6 +93,8 @@ pub mod poke_listener;
 // loop deliberately has no host.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod member_key_store;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod person_vault_carrier;
 // The person account, membership and invite plane: host-only, like the
 // `rustls_transport` it drives. Gated off wasm32 (the web client is
 // capability-absent for B2B), so its `TauriHost`/`rustls_transport` references

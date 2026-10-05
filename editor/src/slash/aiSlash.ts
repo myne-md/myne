@@ -143,7 +143,7 @@ export function removeTriggerThen(
     // normal transaction with `userEvent: "slash.apply"`, so undo already
     // brings it back, and re-inserting would fight the undo stack.
     void action(v).catch((err: unknown) => {
-      // Two direct `i18n.t("…")` call sites rather than one with a computed
+      // Two direct `i18n.t()` call sites rather than one with a computed
       // key: `scripts/check-i18n.mjs` verifies STATIC call sites, and a key
       // assembled inside the call is a key no guard checks.
       showAttachmentToast(

@@ -67,13 +67,25 @@ JS `drainPendingShares` → `drain_pending_shares` → `seal_staged_in_dir` (fra
 `MYF1` seal under the app's own device key, delete plaintext) → `drain_in_dir` →
 `attachment_import` + `share_ack`.
 
-## Wiring into the Tauri iOS project (`src-tauri/gen/apple/project.yml`)
+## Wiring into the Tauri iOS project
+
+> **STATUS: NOT WIRED — deliberately, and this is the one extension still absent
+> from the shipped app.** The widget (`ios-widgets/`) and Apple Watch
+> (`ios-watch/`) targets are committed and re-applied by
+> `mobile/scripts/ios-postinit.sh` (myne-md/myne#803); this share extension is
+> not yet in `mobile/src-tauri/ios/project.yml`. The reason is external, not code:
+> the App Group capability must be enabled on the App ID (and the profile
+> regenerated) before the app-group entitlement will sign. The Ad Hoc profile on
+> the v0.8.2 archive carried no `com.apple.security.application-groups`, so
+> adding this target today would fail signing, not ship the feature. Wire it —
+> and the app-target `entitlements.properties` below — once the capability is on
+> the App ID, then add it to the committed spec and to
+> `scripts/check-ios-extensions.mjs`'s target list.
 
 `gen/apple/` is git-ignored and rebuilt by `tauri ios init`, so these edits are
 **re-applied after every init** (then `cd src-tauri/gen/apple && xcodegen generate`;
-`tauri ios build` also runs xcodegen). This is the **THIRD** re-apply concern,
-after `ios-widgets/README.md` and `ios-watch/README.md`. The edits (present in the
-committed working tree; mirror them after an init):
+`tauri ios build` also runs xcodegen). The edits (present in the committed
+working tree; mirror them after an init):
 
 1. **`MyneShareExtension` target** — `type: app-extension, platform: iOS`,
    `deploymentTarget: "14.0"` (UTType is iOS 14+), sources

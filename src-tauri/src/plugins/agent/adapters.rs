@@ -96,7 +96,7 @@ impl ScopeSearcher for SearchAdapter<'_> {
         // (SYNC-16). The index stays on the device even when generation does not.
         let engine = self.state.embedding_engine().map_err(agent_error_of)?;
         let owned = zeroize::Zeroizing::new(query.to_string());
-        let vector = tokio::task::spawn_blocking(move || engine.embed(&owned))
+        let vector = tokio::task::spawn_blocking(move || engine.embed_query(&owned))
             .await
             .map_err(|_| AgentError::ReadFailed)?
             .map_err(agent_error_of)?;

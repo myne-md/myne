@@ -1402,6 +1402,8 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[serde(rename_all = "camelCase")]
             struct Args {
                 endpoint_url: Option<String>,
+                #[serde(default)]
+                invite_code: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -1420,6 +1422,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 vault_io(),
                 a.endpoint_url,
                 None,
+                a.invite_code,
             )
             .await
             {

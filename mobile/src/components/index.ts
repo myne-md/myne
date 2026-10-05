@@ -45,3 +45,10 @@ export { RecoveryDrillBlock } from "./RecoveryDrillBlock";
 // The per-provider consent screen (myne-md/myne#456). Its clauses come from
 // `@myne/copy` verbatim, so they are byte-identical to the desktop screen's.
 export { AiConsentScreen } from "./AiConsentScreen";
+// First-run AI onboarding twin (myne-md/myne#805). Mobile-native: the shared
+// desktop surface reads the desktop platform seam, so this recuts it.
+export {
+  AiOnboardingSheet,
+  readAiOnboardingSeen,
+  writeAiOnboardingSeen,
+} from "./AiOnboardingSheet";

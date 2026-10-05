@@ -15,8 +15,8 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
-import { personStatus } from "../../lib/personAccount";
-import { setPersonIdentityState } from "../sync/personIdentityState";
+import { personStatus, type PersonStatusView } from "../../lib/personAccount";
+import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
@@ -50,6 +50,11 @@ import {
   undoConflictVersion,
 } from "../../notes/conflictCopy";
 import { Button } from "../primitives/Button";
+import { IconButton } from "../primitives/IconButton";
+import { Input } from "../primitives/Input";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { toast } from "../toast/toastStore";
 import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
@@ -116,11 +121,15 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
+  // The full device-local person status, not just `enrolled`: the Identity block
+  // below shows the existing identity (its public code) while it is locked, which
+  // `enrolled` alone cannot answer (myne-md/myne#792 follow-up).
+  const [person, setPerson] = useState<PersonStatusView | null>(null);
   useEffect(() => {
     let alive = true;
     void personStatus()
       .then((s) => {
-        if (alive) setPersonEnrolled(s.enrolled);
+        if (alive) setPerson(s);
       })
       .catch(() => {});
     return () => {
@@ -132,10 +141,9 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // reads it, and without this it stayed on the phrase grid) and kick one cycle
   // so the status dot clears now rather than at the top of the retry ladder.
   const handleIdentityCreated = useCallback(() => {
-    setPersonEnrolled(true);
     void personStatus()
       .then((s) => {
-        setPersonEnrolled(s.enrolled);
+        setPerson(s);
         setPersonIdentityState({
           ready: s.identity_unlocked,
           ownerCode: s.identity_code,
@@ -144,6 +152,45 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       .catch(() => {});
     void syncNow();
   }, [syncNow]);
+  // A device holds an identity if it enrolled a token OR sealed a keypair it can
+  // still recover (#780): the latter means "you have an identity, recover it",
+  // not "add one". Merged with the shared identity store so an unlock done
+  // through the member roster below (which writes that store) reflects here
+  // without waiting for a re-probe (myne-md/myne#792 review).
+  const { ready: identityReady, ownerCode: identityOwnerCode } = usePersonIdentityState();
+  const hasIdentity =
+    identityReady ||
+    identityOwnerCode != null ||
+    (person ? person.enrolled || person.sealed_keypair_present : false);
+  const identityUnlocked = identityReady || (person?.identity_unlocked ?? false);
+  const identityCode = identityOwnerCode ?? person?.identity_code ?? null;
+  // Nothing is known until the device-local probe (or the shared store) answers.
+  // Rendering the empty state first would flash the "Add an identity" CTA on a
+  // device that holds one.
+  const identityLoaded = person !== null || identityReady || identityOwnerCode != null;
+  // Copy the public identity code. Outcome-only feedback, never the value
+  // (`lib/clipboard.ts`), the same arm `MemberRosterPanel` uses
+  // (myne-md/myne#818).
+  const copyIdentityCode = () => {
+    if (!identityCode) return;
+    setIdentityCopyFeedback(null);
+    void copyText(clipboardWriteText, identityCode, {
+      onSuccess: {
+        kind: "toast",
+        run: () => {
+          setIdentityCopyFeedback("success");
+          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+        },
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => {
+          setIdentityCopyFeedback("error");
+          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
+        },
+      },
+    });
+  };
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
   const betaTerms = useBetaTermsGate();
@@ -154,7 +201,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   const [termsOpen, setTermsOpen] = useState(false);
   // The later-add identity door (myne-md/myne#768).
   const [identityOpen, setIdentityOpen] = useState(false);
-  const [personEnrolled, setPersonEnrolled] = useState(false);
+  // The identity-code copy outcome, for the icon-chip + inline line
+  // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
+  const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
+    "success" | "error" | null
+  >(null);
   useEffect(() => {
     onDialogOpenChange?.(termsOpen);
     return () => onDialogOpenChange?.(false);
@@ -360,21 +411,81 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
-      {/* Identity block (myne-md/myne#768): a user who owns a vault and skipped
-          the identity door adds one here, beside the endpoint and enrolment
-          surfaces. Absent once an identity exists, because there is then nothing
-          to add and the block would be a permanent offer of a no-op. */}
-      {hasCapability("memberSharing") && !personEnrolled && (
+      {/* Identity block (myne-md/myne#768). Shown whenever sharing is available:
+          with no identity on this device it offers to add one; with an identity
+          it shows THAT identity (its public code) and, while the private identity
+          is locked for the session (decisions/protocol/0612), the unlock action.
+          Before, the block vanished once an identity existed, so a locked
+          identity had no surface here at all (myne-md/myne#792 follow-up). */}
+      {hasCapability("memberSharing") && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.identity" data-setting-row="true">
           <span style={LABEL_STYLE}>{t("sync.panel.identity.label")}</span>
-          <p style={HELPER_STYLE}>{t("sync.panel.identity.helper")}</p>
-          <Button
-            variant="secondary"
-            onClick={() => setIdentityOpen(true)}
-            data-testid="sync.panel.add-identity"
-          >
-            {t("sync.panel.identity.cta")}
-          </Button>
+          {!identityLoaded ? null : !hasIdentity ? (
+            <>
+              <p style={HELPER_STYLE}>{t("sync.panel.identity.helper")}</p>
+              <Button
+                variant="secondary"
+                onClick={() => setIdentityOpen(true)}
+                data-testid="sync.panel.add-identity"
+              >
+                {t("sync.panel.identity.cta")}
+              </Button>
+            </>
+          ) : identityUnlocked ? (
+            <p style={HELPER_STYLE} data-testid="sync.panel.identity-unlocked">
+              {t("sync.panel.identity.unlockedHelper")}
+            </p>
+          ) : (
+            <>
+              <p style={HELPER_STYLE} data-testid="sync.panel.identity-locked">
+                {t("sync.panel.identity.lockedHelper")}
+              </p>
+              {/* Identity box with its actions inline, matching the
+                  sync-server row: the copy chip and the unlock button sit at
+                  the end of the box rather than on their own full-width row
+                  (myne-md/myne#818). */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  alignItems: "center",
+                }}
+              >
+                {identityCode ? (
+                  <Input
+                    readOnly
+                    mono
+                    aria-label={t("sync.panel.identity.codeLabel")}
+                    value={identityCode}
+                    data-testid="sync.panel.identity-code"
+                    style={{ flex: 1, minWidth: 0, userSelect: "all" }}
+                    onFocus={(e) => e.target.select()}
+                  />
+                ) : null}
+                {identityCode ? (
+                  <IconButton
+                    icon={
+                      identityCopyFeedback === "success"
+                        ? "check"
+                        : identityCopyFeedback === "error"
+                          ? "circle-x"
+                          : "copy"
+                    }
+                    label={t("personIdentityCode.copy")}
+                    onClick={copyIdentityCode}
+                    testId="sync.panel.copy-identity"
+                  />
+                ) : null}
+                <Button
+                  variant="secondary"
+                  onClick={() => setIdentityOpen(true)}
+                  data-testid="sync.panel.unlock-identity"
+                >
+                  {t("sync.status.unlockIdentityCta")}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

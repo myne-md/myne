@@ -30,6 +30,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import type { ProposedEdit } from "../../src/lib/agent-run";
+import type { ProposedNote } from "../../src/lib/agent-protocol";
 import { AgentReview } from "../../src/screens/AgentReview";
 import {
   beginRun,
@@ -52,7 +53,7 @@ const ORDINARY: ProposedEdit = {
   replacement: "one two three (edited)",
 };
 
-function settleWith(edits: ProposedEdit[]) {
+function settleWith(edits: ProposedEdit[], newNotes: ProposedNote[] = []) {
   beginRun();
   settleStep({
     view: {
@@ -62,7 +63,7 @@ function settleWith(edits: ProposedEdit[]) {
       modelGrants: 0,
       cancelled: false,
     },
-    proposal: { edits, newNotes: [], summary: "s" },
+    proposal: { edits, newNotes, summary: "s" },
     end: { kind: "finished" },
     iterations: 1,
     notesRead: 1,
@@ -100,5 +101,17 @@ describe("Approve all", () => {
     const button = screen.getByTestId("agentReview.approveAll");
     expect(button.hasAttribute("disabled")).toBe(false);
     expect(button.textContent).toBe("agent.review.approveAll:1");
+  });
+
+  it("is enabled when the only work is an approved new note", () => {
+    // The other arm of the production gate (`approvedNewNoteIndices(agent)
+    // .length > 0`, AgentReview.tsx:174). myne-md/myne#802 deleted the three
+    // vacuous `agentBulkApproval` tests that covered a helper defined in the
+    // test file, so this drives the real gate through the store instead: a
+    // create-only proposal still has work for the bulk action to send.
+    settleWith([], [{ title: "New note", body: "b", folder: null }]);
+    mount();
+    const button = screen.getByTestId("agentReview.approveAll");
+    expect(button.hasAttribute("disabled")).toBe(false);
   });
 });

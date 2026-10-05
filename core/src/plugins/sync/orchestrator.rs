@@ -3527,6 +3527,18 @@ pub(crate) async fn sync_meta_phase(
     // it moving.
     let may_push = allow_push || dirty;
 
+    // A B2B vault carries an owner membership binding, and the server's
+    // `vaultMetaWriteAccount` refuses a device token for the `vault.meta` write
+    // (403 `owner_required`): it requires the OWNER's per-vault membership token,
+    // which `ensure_owner_member_token` stores device-locally on the first B2B
+    // action. Prefer it when this device holds one, so the owner's roster/epoch
+    // changes actually reach the server; a pre-B2B vault has no owner binding and
+    // keeps the device token. Resolved once, before `state` is mutated below.
+    let put_token = state
+        .owner_member_token_hex
+        .clone()
+        .unwrap_or_else(|| token.to_string());
+
     // Authed GET of THIS device's own server meta (no ?account=, not pre-auth).
     let resp = match transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) {
         Ok(r) => r,
@@ -3539,7 +3551,7 @@ pub(crate) async fn sync_meta_phase(
             // pending change and may push; else nothing to do.
             if dirty
                 && may_push
-                && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
+                && super::enroll::put_vault_meta(transport, &put_token, &local_bytes).is_ok()
             {
                 state.meta_baseline_hex = Some(local_hash);
                 let _ = clear_vault_meta_dirty(io, vault_root).await;
@@ -3578,13 +3590,86 @@ pub(crate) async fn sync_meta_phase(
     // the same epoch cannot be tie-broken and is refused. A MEMBER device (no
     // `root_key`) adopts but never writes `vault.meta`.
     let is_ntv6 = |b: &[u8]| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice());
-    if is_ntv6(&local_bytes) || is_ntv6(&server_bytes) {
+    let local_is_ntv6 = is_ntv6(&local_bytes);
+    let server_is_ntv6 = is_ntv6(&server_bytes);
+    if local_is_ntv6 || server_is_ntv6 {
         let member = root_key.is_none();
+        // One-sided generation transition, LOCAL side (myne-md/myne#795): this
+        // device performed the owner-only `NTV5`->`NTV6` migration and the server
+        // still holds the pre-B2B copy. This is the ONLY path that carries a
+        // migrated `vault.meta` to the server — the migration itself does not push,
+        // and the both-sides-`NTV6` logic below cannot merge a one-sided frame — so
+        // without it the server keeps serving `NTV5` and a member's accept, which
+        // fetches the server copy and requires `NTV6`, dies at parse. A MEMBER never
+        // holds `root_key`, so it can never have migrated; never adopt the older
+        // server copy here.
+        if local_is_ntv6 && !server_is_ntv6 {
+            if !member
+                && may_push
+                && super::enroll::put_vault_meta(transport, &put_token, &local_bytes).is_ok()
+            {
+                state.meta_baseline_hex = Some(local_hash);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
+                tracing::info!(
+                    stage = "meta_phase",
+                    event = "ntv6_generation_pushed",
+                    "published a local NTV5->NTV6 generation transition to the server"
+                );
+                return MetaPhaseOutcome::Pushed;
+            }
+            return MetaPhaseOutcome::Skipped;
+        }
+        // One-sided generation transition, SERVER side: another owner device
+        // migrated this vault. Adopt the server's `NTV6` bytes verbatim, verified
+        // under our root key when we hold one (mirrors the newer-epoch adopt below).
+        if !local_is_ntv6 && server_is_ntv6 {
+            let Ok(server_ntv6) = protocol::parse_vault_meta_ntv6(&server_bytes) else {
+                return MetaPhaseOutcome::Skipped;
+            };
+            if let Some(root_key) = root_key {
+                let group = match protocol::unlock_group_key_ntv6(
+                    &server_ntv6,
+                    &protocol::OwnerKey::new(*root_key),
+                ) {
+                    Ok(group) => group,
+                    Err(_) => return MetaPhaseOutcome::Skipped,
+                };
+                if protocol::person_invite::open_group_roster(
+                    &group,
+                    &server_ntv6.base.account_number_hash,
+                    server_ntv6.group_key_epoch,
+                    &server_ntv6.signed_roster_envelope,
+                )
+                .is_none()
+                {
+                    return MetaPhaseOutcome::Skipped;
+                }
+            }
+            if io
+                .write(
+                    &meta_path,
+                    &server_bytes,
+                    crate::vault_io::WriteOpts::default(),
+                )
+                .await
+                .is_ok()
+            {
+                state.blobs.clear();
+                state.meta_baseline_hex = Some(server_hash);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
+                tracing::info!(
+                    stage = "meta_phase",
+                    event = "ntv6_generation_adopted",
+                    "adopted a peer's NTV5->NTV6 generation transition"
+                );
+                return MetaPhaseOutcome::Adopted;
+            }
+            return MetaPhaseOutcome::Skipped;
+        }
         let (Ok(local_ntv6), Ok(server_ntv6)) = (
             protocol::parse_vault_meta_ntv6(&local_bytes),
             protocol::parse_vault_meta_ntv6(&server_bytes),
         ) else {
-            // A one-sided `NTV6` (a generation transition) is not merged here.
             return MetaPhaseOutcome::Skipped;
         };
         let local_epoch = local_ntv6.group_key_epoch;
@@ -3687,7 +3772,7 @@ pub(crate) async fn sync_meta_phase(
             // A member never pushes `vault.meta`; the roster is owner-authored.
             if !member
                 && may_push
-                && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
+                && super::enroll::put_vault_meta(transport, &put_token, &local_bytes).is_ok()
             {
                 state.meta_baseline_hex = Some(local_hash);
                 let _ = clear_vault_meta_dirty(io, vault_root).await;
@@ -3782,7 +3867,7 @@ pub(crate) async fn sync_meta_phase(
 
     // Only I changed (server unchanged since my baseline) → push my meta.
     if local_changed && !server_changed {
-        if may_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
+        if may_push && super::enroll::put_vault_meta(transport, &put_token, &local_bytes).is_ok() {
             state.meta_baseline_hex = Some(local_hash);
             let _ = clear_vault_meta_dirty(io, vault_root).await;
             return MetaPhaseOutcome::Pushed;
@@ -3844,7 +3929,7 @@ pub(crate) async fn sync_meta_phase(
         // Server already holds the winner — nothing to push; we are converged.
         let _ = clear_vault_meta_dirty(io, vault_root).await;
     } else if may_push {
-        let _ = super::enroll::put_vault_meta(transport, token, &merged_bytes);
+        let _ = super::enroll::put_vault_meta(transport, &put_token, &merged_bytes);
         let _ = clear_vault_meta_dirty(io, vault_root).await;
     }
     // (!may_push && merged != server: keep dirty so a later push cycle propagates.
@@ -4452,10 +4537,18 @@ async fn sync_cycle_attempt(
 
     let mut conversations_pulled: usize = 0;
     // A non-skipped chats phase (a non-empty merged roster) only exists for an
-    // owner; a member's phase is skipped with an empty roster, so this loop is
-    // inert and the expect is unreachable for them.
-    let chats_root_key = root_key.expect("a non-skipped chats phase implies an owner root key");
+    // owner: a member's phase is skipped with an EMPTY roster (its conversations
+    // ride the person-private `MYY5` profile plane), so this loop body never runs
+    // for one. The owner key is resolved INSIDE the loop for exactly that reason.
+    // It used to sit before the loop as an unconditional `root_key.expect(...)`,
+    // which fired on every member cycle and panicked the whole attempt before any
+    // content was pulled — the member saw the generic "Sync error" and pulled
+    // nothing (no notes, no prefs/name). Guarding here keeps the owner-only unwrap
+    // off an empty (member) loop.
     for (conv_hex, entry) in chats_phase.merged.iter() {
+        let Some(chats_root_key) = root_key else {
+            break;
+        };
         let Some(conv_id) = from_hex16(conv_hex) else {
             // The catalog is canonical JSON from our own writer; a malformed
             // id is a schema violation, not a download candidate.
@@ -7282,6 +7375,89 @@ mod tests {
         assert_eq!(
             st.cursor, 1,
             "the cursor still advances (bounded staleness)"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A member session holds no `root_key`, and its chats phase is `skipped`
+    /// with an empty roster. The owner-only unwrap before the conversation loop
+    /// used to run unconditionally and panicked every member cycle, which
+    /// surfaced as the generic "Sync error" and pulled nothing (no notes, no
+    /// prefs/name). This drives one full cycle with `root_key = None` on the
+    /// group tier and asserts it runs to completion instead of unwinding.
+    #[test]
+    fn a_member_cycle_does_not_panic_on_the_owner_only_chats_phase() {
+        use base64::Engine as _;
+        use protocol::person_key::PersonKeyPair;
+        use protocol::vault_head::VAULT_HEAD_FORMAT_V2;
+
+        let (dir, notes) = fresh_vault("member-cycle");
+        let account_number_hash = [0x5c; 16];
+        // The member's own identity; deterministic seeds keep the test stable.
+        let person = PersonKeyPair::generate_raw(&[0x11; 64], &[0x22; 32], &[0x33; 32]);
+        let person_public = person.public_half();
+        let ctx = SignedHeadCtx::new(person, account_number_hash, vec![person_public]);
+
+        // The server serves a signed head so the cycle adopts it rather than
+        // authoring a genesis (which would need a push route this test omits).
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V2,
+            account_number_hash,
+            manifest_hash: [0u8; 32],
+            seq: 1,
+            prev_head_hash: Vec::new(),
+            version_vector: vec![VvEntry {
+                device_id: [0x99; 16],
+                counter: 1,
+            }],
+        };
+        let sealed = ctx.sign(&head, &mut rng).unwrap();
+        let head_frag = (
+            base64::engine::general_purpose::STANDARD.encode(&sealed.record),
+            hex(&sealed.head_id),
+        );
+
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body_with_head("", 1, &head_frag),
+        );
+        // The empty page must not advance the cursor, or the engine keeps asking
+        // for the next one and hits an unrouted path.
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1",
+            200,
+            pull_body("", 1),
+        );
+
+        let items_key = [0x44u8; 32];
+        let items_key_id = [0x55u8; 16];
+        let shared = SharedSingletonKey::Group(zeroize::Zeroizing::new([0x77u8; 32]));
+        let res = blocking(run_sync_cycle(
+            &IO,
+            &t,
+            None,
+            &shared,
+            account_number_hash,
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            PushGate::Allowed,
+            MetaVersion::V0_2,
+            Some(AttachmentKeys {
+                items_key: &items_key,
+                items_key_id: &items_key_id,
+            }),
+            Some(&ctx),
+        ));
+        assert!(
+            res.is_ok(),
+            "a member cycle must run to completion, not panic on an owner-only unwrap: {res:?}"
         );
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -13878,6 +14054,50 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
+        // A B2B vault's `vault.meta` PUT is OWNER-authorized: the server refuses a
+        // device token with 403 `owner_required`. When this device holds the
+        // owner's per-vault membership token, the push must carry IT, or the
+        // roster/epoch never reaches the server and a member joins against a
+        // stale roster (its own heads then fail to verify, wedging sync).
+        #[test]
+        fn a_b2b_meta_push_uses_the_owner_membership_token() {
+            let dir = scratch("owner-token");
+            let baseline = meta_bytes(0xAA); // what the server still has
+            let local = meta_bytes(0xCC); // our changed meta
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                owner_member_token_hex: Some("owner-tok".to_string()),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
+            t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+
+            let out = blocking(sync_meta_phase(
+                &IO,
+                &t,
+                "device-tok",
+                &dir,
+                &mut st,
+                true,
+                None,
+            ));
+            assert_eq!(out, MetaPhaseOutcome::Pushed);
+            let put_token = t
+                .requests()
+                .into_iter()
+                .find(|(m, p, _, _, _)| *m == HttpMethod::Put && p == "/vault.meta")
+                .and_then(|(_, _, _, tok, _)| tok);
+            assert_eq!(
+                put_token.as_deref(),
+                Some("owner-tok"),
+                "the meta PUT must carry the owner membership token, not the device token"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
         // myne#293 — a poll cycle (allow_push=false) with the DIRTY MARKER set
         // must push anyway.
         //
@@ -15229,6 +15449,27 @@ mod tests {
             .expect("serialize NTV6")
         }
 
+        /// A structurally valid `NTV5` (v0.2, pre-B2B) `vault.meta`, the shape the
+        /// server still holds after an owner migrated locally but never pushed.
+        fn ntv5_meta_bytes() -> Vec<u8> {
+            protocol::encode_vault_meta_v0_2_raw(
+                &[7u8; 32],
+                &[9u8; 32],
+                &[0x07u8; 16],
+                "pw",
+                "abandon abandon abandon",
+                &[0x33u8; 16],
+                &protocol::DEFAULT_V0_1_KDF_PARAMS,
+                &[2u8; protocol::ARGON2_SALT_LEN],
+                &[4u8; protocol::ARGON2_SALT_LEN],
+                &[5u8; protocol::AEAD_NONCE_LEN],
+                &[6u8; protocol::AEAD_NONCE_LEN],
+                &[8u8; protocol::AEAD_NONCE_LEN],
+            )
+            .expect("encode NTV5")
+            .to_vec()
+        }
+
         fn scratch(tag: &str) -> crate::test_support::ScopedTempDir {
             crate::test_support::ScopedTempDir::new(tag).expect("temp dir")
         }
@@ -15332,6 +15573,65 @@ mod tests {
                         .iter()
                         .any(|r| r.1 == "/vault.meta" && r.0 == HttpMethod::Put),
                     "a member must never write vault.meta"
+                );
+            });
+        }
+
+        // myne-md/myne#795: after the owner migrates NTV5->NTV6 locally, the server
+        // still holds the NTV5 copy (the migration never pushes). The meta phase
+        // must PUBLISH the local NTV6 generation, not skip it, or a member's accept
+        // fetches NTV5 and dies at parse forever.
+        #[test]
+        fn a_one_sided_local_ntv6_is_pushed_and_never_adopts_the_server_ntv5() {
+            blocking(async {
+                let local = ntv6_meta_bytes(1);
+                let server = ntv5_meta_bytes();
+                let (dir, mut st) = seeded("gen-push", &local).await;
+                mark_vault_meta_dirty(&IO, dir.path()).await.unwrap();
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server);
+                t.on(HttpMethod::Put, "/vault.meta", 200, b"{}".to_vec());
+                let out =
+                    sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, Some(&[7u8; 32]))
+                        .await;
+                assert_eq!(out, MetaPhaseOutcome::Pushed);
+                assert!(
+                    t.requests()
+                        .iter()
+                        .any(|r| r.0 == HttpMethod::Put && r.1 == "/vault.meta"),
+                    "the migrated NTV6 meta must be PUT to the server"
+                );
+                assert_eq!(
+                    read_local(&dir).await,
+                    local,
+                    "the local NTV6 meta must not be overwritten by the server's NTV5"
+                );
+                assert_eq!(
+                    st.meta_baseline_hex.as_deref(),
+                    Some(super::super::sha256_hex(&local).as_str())
+                );
+            });
+        }
+
+        // A member never holds `root_key`, so it can never have migrated; it must
+        // not push when it somehow sees a one-sided local NTV6.
+        #[test]
+        fn a_one_sided_local_ntv6_is_not_pushed_by_a_member() {
+            blocking(async {
+                let local = ntv6_meta_bytes(1);
+                let server = ntv5_meta_bytes();
+                let (dir, mut st) = seeded("gen-member", &local).await;
+                mark_vault_meta_dirty(&IO, dir.path()).await.unwrap();
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server);
+                t.on(HttpMethod::Put, "/vault.meta", 200, b"{}".to_vec());
+                let out = sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, None).await;
+                assert_eq!(out, MetaPhaseOutcome::Skipped);
+                assert!(
+                    !t.requests()
+                        .iter()
+                        .any(|r| r.0 == HttpMethod::Put && r.1 == "/vault.meta"),
+                    "a member must never push vault.meta"
                 );
             });
         }

@@ -28,6 +28,7 @@
 
 import { consentIsDeviceScoped } from "@myne/copy";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -74,7 +75,8 @@ import {
   type AiTrustState,
 } from "../../lib/load-bearing-copy";
 import { Input } from "../primitives/Input";
-import { Segmented } from "../primitives/Segmented";
+import { Button } from "../primitives/Button";
+import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
@@ -83,6 +85,12 @@ import {
   HOVER_TRANSITION,
 } from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
+import { removeModel, type DownloadArtifactId } from "../../lib/ai-model-download";
+import {
+  cancelModelDownloadFor,
+  startModelDownload,
+  useModelDownload,
+} from "../../lib/ai-download-store";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
@@ -151,6 +159,10 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
     name: "whisper-base (multilingual)",
     url: "https://huggingface.co/openai/whisper-base",
   },
+  tag: {
+    name: "Qwen2.5-0.5B-Instruct (GGUF)",
+    url: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+  },
 };
 
 /**
@@ -211,14 +223,20 @@ const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }>
     nameKey: "settings.ai.modelFilter.gguf",
     extensions: ["gguf"],
   },
+  tag: {
+    // The tag role is a Qwen2 GGUF (`load_tag` via `from_gguf`), so the same
+    // `.gguf` filter applies.
+    nameKey: "settings.ai.modelFilter.gguf",
+    extensions: ["gguf"],
+  },
 };
 
 /**
  * The message for a closed refusal reason.
  *
- * An exhaustive `switch` with **static** `t("…")` keys rather than a template
+ * An exhaustive `switch` with **static** quoted keys rather than a template
  * literal: `scripts/check-i18n.mjs` only verifies keys it can read statically,
- * so `t(\`…${reason}\`)` would let a missing catalog entry ship. This also
+ * so a computed-key `t()` would let a missing catalog entry ship. This also
  * fails to compile when a fourth `EndpointRejection` arrives, which is the
  * whole point of the Rust side keeping that enum closed.
  */
@@ -325,6 +343,186 @@ function ModelRoleBlock(props: {
   );
 }
 
+/** One downloadable model the desktop can fetch on demand (myne-md/myne#805).
+ *  `artifact` is a compiled-in id; the UI never constructs a URL or a digest.
+ *  Shown only when the host resolves a stored path for the role (downloaded or
+ *  side-loaded), so the same row answers "is it installed" and "fetch it again". */
+function DownloadedModelRow(props: {
+  artifact: DownloadArtifactId;
+  /** The model-store role this artefact registers (for remove). */
+  role: string;
+  label: string;
+  sizeText: string;
+  path: string | null;
+  aiEnabled: boolean;
+  onChanged: () => void;
+  onShowToast?: (message: string) => void;
+}) {
+  const { t } = useTranslation();
+  // The download lives in the module-scope store, so it survives this row
+  // unmounting when the user switches Settings panels (myne-md/myne#814).
+  const download = useModelDownload(props.artifact);
+  const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+
+  const downloading = download.status === "downloading";
+  const busy = downloading || removing;
+  const percent =
+    download.total > 0
+      ? Math.min(100, Math.round((download.downloaded / download.total) * 100))
+      : 0;
+
+  // Surface a terminal failure once: inline copy plus a toast, one cause to one
+  // message (the checksum branch names itself).
+  const announcedRef = useRef(false);
+  useEffect(() => {
+    if (download.status !== "failed") {
+      announcedRef.current = false;
+      return;
+    }
+    if (announcedRef.current) return;
+    announcedRef.current = true;
+    const message =
+      download.cause === "checksum"
+        ? t("settings.ai.downloadFailedChecksum")
+        : t("settings.ai.downloadFailed");
+    setError(message);
+    props.onShowToast?.(message);
+    // `props.onShowToast` and `t` are stable enough for this one-shot; the
+    // `announcedRef` guard makes a re-run idempotent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [download.status, download.cause]);
+
+  // A completed download (this mount or a background one) reloads the stored
+  // path so the row flips to "Installed".
+  const completedRef = useRef(false);
+  useEffect(() => {
+    if (download.status === "complete" && !completedRef.current) {
+      completedRef.current = true;
+      props.onChanged();
+    }
+    if (download.status !== "complete") completedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [download.status]);
+
+  const remove = async () => {
+    setRemoving(true);
+    setError(null);
+    try {
+      await removeModel(props.role);
+      props.onChanged();
+    } catch {
+      setError(t("settings.ai.downloadFailed"));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  return (
+    <SettingRow
+      anchorId={`ai.download.${props.artifact}`}
+      label={props.label}
+      helper={props.sizeText}
+      testId={`ai.download-row-${props.artifact}`}
+      error={error}
+      control={(helperId) =>
+        downloading ? (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "center",
+            }}
+          >
+            <div
+              data-testid={`ai.download-progress-${props.artifact}`}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              style={{
+                width: 120,
+                height: 6,
+                background: "var(--paper-3)",
+                borderRadius: "var(--radius-2)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${percent}%`,
+                  height: "100%",
+                  background: "var(--accent)",
+                  transition: "width var(--duration-fast) var(--ease-standard)",
+                }}
+              />
+            </div>
+            <span
+              data-testid={`ai.download-percent-${props.artifact}`}
+              aria-describedby={helperId}
+              style={{
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-2)",
+                fontFamily: "var(--font-mono)",
+                minWidth: "4ch",
+              }}
+            >
+              {t("settings.ai.downloadingPercent", { percent })}
+            </span>
+            <Button
+              variant="ghost"
+              onClick={() => cancelModelDownloadFor(props.artifact)}
+              data-testid={`ai.download-cancel-${props.artifact}`}
+            >
+              {t("settings.ai.downloadCancel")}
+            </Button>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "center",
+            }}
+          >
+            <span
+              data-testid={`ai.download-state-${props.artifact}`}
+              style={{
+                fontSize: "var(--text-sm)",
+                color: props.path ? "var(--accent)" : "var(--fg-3)",
+                fontFamily: "var(--font-mono)",
+              }}
+              aria-describedby={helperId}
+            >
+              {props.path
+                ? t("settings.ai.downloadInstalled")
+                : t("settings.ai.downloadNotInstalled")}
+            </span>
+            <Button
+              variant="secondary"
+              disabled={!props.aiEnabled || busy}
+              onClick={() => void startModelDownload(props.artifact)}
+              data-testid={`ai.download-button-${props.artifact}`}
+            >
+              {t("settings.ai.downloadReinstall")}
+            </Button>
+            {props.path && (
+              <Button
+                variant="ghost"
+                disabled={!props.aiEnabled || busy}
+                onClick={() => void remove()}
+                data-testid={`ai.remove-button-${props.artifact}`}
+              >
+                {t("settings.ai.modelRemove")}
+              </Button>
+            )}
+          </div>
+        )
+      }
+    />
+  );
+}
+
 export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
   const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled, setChatHistoryBudget } =
@@ -335,6 +533,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     generation: null,
     embedding: null,
     transcription: null,
+    tag: null,
   });
   /** The host's own view of which backend is active (myne-md/myne#466). `null`
    *  until the first report lands, which renders as "nothing is answering" —
@@ -509,12 +708,25 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       : { kind: "in-process" };
   const autoTag = prefs.auto_tag_enabled;
 
-  // Load the persisted device-local model paths on open (both roles). A missing
+  // Read every role's persisted path from the host. Shared by the mount effect
+  // and the download rows' `onChanged`, so a completed download updates the
+  // installed state without remounting the panel (myne-md/myne#805).
+  const reloadModelPaths = useCallback(() => {
+    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
+      loadModelPath(role)
+        .then((p) => setModelPaths((prev) => ({ ...prev, [role]: p })))
+        .catch(() => {
+          /* feature off / not set: keep local state */
+        });
+    });
+  }, []);
+
+  // Load the persisted device-local model paths on open (all roles). A missing
   // command (the `local-inference` feature is off) degrades silently to no
   // persisted path — the panel stays usable.
   useEffect(() => {
     let alive = true;
-    (["generation", "embedding", "transcription"] as const).forEach((role) => {
+    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => {
           if (alive) setModelPaths((prev) => ({ ...prev, [role]: p }));
@@ -1019,6 +1231,54 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         />
       </div>
 
+      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0628`).
+          The AI-shaped weights are no longer bundled: a user who skipped
+          onboarding enables AI and fetches them here, and the same rows answer
+          "is it installed" from the device-local model store. No file name and
+          no quantisation label is shown, only the feature and its size. */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.downloads"
+        data-setting-row="true"
+        data-testid="ai.downloads-section"
+      >
+        <label style={LABEL_STYLE}>{t("settings.ai.downloadsLabel")}</label>
+        <p style={HELPER_STYLE}>{t("settings.ai.downloadsHelper")}</p>
+        <DownloadedModelRow
+          artifact="embedding-e5-small"
+          role="embedding"
+          label={t("settings.ai.modelEmbeddingLabel")}
+          sizeText={t("settings.ai.downloadEmbeddingSize")}
+          path={modelPaths.embedding}
+          aiEnabled={aiEnabled}
+          onChanged={reloadModelPaths}
+          onShowToast={onShowToast}
+        />
+        <DownloadedModelRow
+          artifact="tag"
+          role="tag"
+          label={t("settings.ai.downloadTagLabel")}
+          sizeText={t("settings.ai.downloadTagSize")}
+          path={modelPaths.tag}
+          aiEnabled={aiEnabled}
+          onChanged={reloadModelPaths}
+          onShowToast={onShowToast}
+        />
+      </div>
+
+      {/* Side-load disclosure (myne-md/myne#805). Developer mode lets a user
+          point Myne at a model they sourced themselves; the disclosure states
+          that plainly, because a side-loaded model is the untrusted-input case
+          `threat-model.md` §7 now carries. */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.sideload"
+        data-setting-row="true"
+        data-testid="ai.sideload-disclosure"
+      >
+        <p style={HELPER_STYLE}>{t("settings.ai.sideloadDisclosure")}</p>
+      </div>
+
       {/* Local model runtime (ai-ollama-local task 8, SYNC-17/SYNC-18).
 
           The alternative to side-loading a file: point Myne at a runtime the
@@ -1175,7 +1435,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <label style={LABEL_STYLE}>{t("settings.ai.providerLabel")}</label>
         <p style={HELPER_STYLE}>{t("settings.ai.providerHelper")}</p>
         <div style={{ marginTop: "var(--space-1)" }}>
-          <Segmented
+          <Select
             options={[
               { value: "none", label: t("settings.ai.providerNone") },
               ...REMOTE_PROVIDERS.map((p) => ({
@@ -1185,7 +1445,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             ]}
             value={pendingProvider ?? prefs.ai_provider ?? "none"}
             onChange={(v) => chooseProvider(v === "none" ? null : v)}
-            ariaLabel={t("settings.ai.providerLabel")}
+            aria-label={t("settings.ai.providerLabel")}
             testId="ai.provider-choice"
           />
         </div>

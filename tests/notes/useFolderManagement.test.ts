@@ -140,7 +140,7 @@ function makeCtx(records: TitleRecord[], over: Partial<UseSelectedNoteReturn> = 
     trashWithRollback: vi.fn(),
     restoreWithRollback: vi.fn(),
     emptyTrashWithSync: vi.fn(),
-    bulkTrashWithSync: vi.fn(() => Promise.resolve()),
+    bulkTrashWithSync: vi.fn(() => Promise.resolve({ trashed: [], failed: [] })),
     bulkMoveWithSync: vi.fn(() => Promise.resolve({ moved: [], failed: [] })),
     refreshOne: vi.fn(() => Promise.resolve()),
     refreshAll: vi.fn(),

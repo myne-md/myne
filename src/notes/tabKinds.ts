@@ -74,7 +74,7 @@ export const ATTACHMENTS_TAB_ID = "attachments";
 
 /** The note-template library (myne-md/myne#779). One library per vault, so
  *  opening it twice reveals the first. It was a MODAL, which
- *  `design-notes/ui/0623` classifies as the wrong shape for it: you browse a
+ *  `design-notes/ui/0633` classifies as the wrong shape for it: you browse a
  *  template library, rename in it and delete from it, and none of that is a
  *  question the app is asking you. */
 export const TEMPLATES_TAB_ID = "templates";

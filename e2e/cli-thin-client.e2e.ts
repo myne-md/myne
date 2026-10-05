@@ -67,6 +67,7 @@ import { KEY, pressKey } from "./support/keyboard";
 import {
   closeSettings,
   createNote,
+  disableDeveloperModeInSettings,
   dismissImporterOffer,
   enableDeveloperMode,
   openSettings,
@@ -583,15 +584,7 @@ describeE2E("cli6 hiding the Terminal-access control does not close the door (#1
         // the control it governs disappears, the preference it does not govern
         // (`cli_enabled`) is untouched.
         await openSettings(s, "about");
-        await (await s.byTestId("about.developer-mode-toggle")).click();
-        await s.waitUntil(
-          async () =>
-            (await (await s.byTestId("about.developer-mode-toggle")).attribute("aria-checked")) ===
-            "false"
-              ? true
-              : null,
-          { label: "developer_mode toggled off", timeoutMs: 10_000 },
-        );
+        await disableDeveloperModeInSettings(s);
 
         // The control is gone from Privacy…
         await (await s.byTestId("settings.tab-privacy")).click();

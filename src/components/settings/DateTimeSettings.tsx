@@ -23,7 +23,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
-import { Segmented } from "../primitives/Segmented";
 import { Select } from "../primitives/Select";
 import { prefsRead, setDateFormat, setTimeFormat, setTimezone } from "../../lib/prefs";
 import {
@@ -137,12 +136,11 @@ export function DateTimeSettings() {
         helper={t("settings.dateTime.dateHelper")}
         error={dateError}
         control={
-          // DATE_FORMATS has 5 members, over the docs/design count rule
-          // (Segmented for 2 to 4 options, Select for 5 to 12), so this row is
-          // a Select (myne-md/myne#668; the deferral #391 opened and closed
-          // without folding in). The time row below stays Segmented (3
-          // options); the zone row is a free-text input. The choice is by
-          // option count, not by taste (docs/design/README.md "Which picker").
+          // Every row-level picker in Settings is a `Select`, whatever its
+          // option count — the count rule's Settings-list override
+          // (docs/design/README.md "Which picker"; myne-md/myne#769, which
+          // finished what #668 started on this row alone). The zone row below
+          // is a free-text input because a timezone is not a fixed list.
           <Select
             options={dateOptions}
             value={dateFormat}
@@ -158,11 +156,11 @@ export function DateTimeSettings() {
         helper={t("settings.dateTime.timeHelper")}
         error={timeError}
         control={
-          <Segmented
+          <Select
             options={timeOptions}
             value={timeFormat}
             onChange={(v) => void chooseTime(v as TimeFormat)}
-            ariaLabel={t("settings.dateTime.timeLabel")}
+            aria-label={t("settings.dateTime.timeLabel")}
             testId="settings.time-format"
           />
         }

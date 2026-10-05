@@ -162,6 +162,21 @@ describe("MemberRosterPanel phrase input", () => {
     }
   });
 
+  it("keeps the recovery-phrase grid collapsed until the user asks for it", () => {
+    render(<MemberRosterPanel />);
+    try {
+      // myne#796 follow-up: the panel must not sit with an always-open phrase
+      // field; the grid appears only after the user chooses to enter it.
+      expect(screen.queryByTestId("member-roster.phrase-grid")).toBeNull();
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
+      expect(screen.getByTestId("member-roster.phrase-grid")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("member-roster.person-unlock-cancel"));
+      expect(screen.queryByTestId("member-roster.phrase-grid")).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("does not publish an unlock that resolves after a session reset", async () => {
     let resolveUnlock!: (view: MockUnlockView) => void;
     mockUnlockPerson = () =>
@@ -237,7 +252,7 @@ describe("MemberRosterPanel removal", () => {
 });
 
 describe("MemberRosterPanel key-generation state", () => {
-  it("shows the epoch and distinguishes a key change from an owner-confirmed relink", () => {
+  it("distinguishes a key change from an owner-confirmed relink", () => {
     mockAuthority = "owner";
     mockGroupKeyEpoch = 3;
     mockMembers = [
@@ -256,9 +271,8 @@ describe("MemberRosterPanel key-generation state", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.getByTestId("member-roster.epoch").textContent).toBe(
-        "sync.memberRoster.epoch",
-      );
+      // The internal group-key epoch is no longer surfaced (myne#795 UI pass).
+      expect(screen.queryByTestId("member-roster.epoch")).toBeNull();
       // The two continuity states render as DIFFERENT elements: a key change is
       // the danger-toned verify prompt, an owner-confirmed relink is neutral.
       expect(screen.getByTestId("member-roster.key-changed")).toBeDefined();
@@ -328,6 +342,40 @@ describe("MemberRosterPanel roles", () => {
     } finally {
       mockAuthority = "owner";
       cleanup();
+    }
+  });
+});
+
+// myne#795 UI pass: the panel is grouped into titled sections and the owner row
+// no longer renders the vault label (which read as "Untitled vault").
+describe("MemberRosterPanel layout", () => {
+  it("groups the roster into identity, members and invitations sections", () => {
+    mockAuthority = "owner";
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.identity-section")).toBeDefined();
+      expect(screen.getByTestId("member-roster.members-section")).toBeDefined();
+      expect(screen.getByTestId("member-roster.invitations-section")).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("labels the owner row You instead of the stored vault name", () => {
+    mockAuthority = "owner";
+    const previous = mockMembers;
+    mockMembers = [
+      { ...previous[0], fingerprint_hex: "ff".repeat(32), display_name: "Untitled vault", role: "owner" },
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.name").textContent).toBe(
+        "sync.memberRoster.youBadge",
+      );
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockAuthority = "owner";
     }
   });
 });

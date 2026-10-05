@@ -149,7 +149,7 @@ export function isPanesNotSettled(err: unknown): err is PanesNotSettledError {
  *
  * It takes RESOLVED sentences rather than translation keys, the shape
  * `saveOutcomeMessage` established one commit earlier and for the same reason:
- * `check-i18n.mjs` matches a static `t("literal")`, so a key passed as a string
+ * `check-i18n.mjs` matches a static quoted key, so a key passed as a string
  * drops out of the only check that proves it exists in the catalog. Both
  * sentences stay at the call site, where they can also stay SPECIFIC: the folder
  * rename can say the folder was left alone, which is more use than a neutral
@@ -1080,4 +1080,15 @@ export function useWorkspace(): WorkspaceApi {
     throw new Error("useWorkspace must be used inside <WorkspaceProvider>");
   }
   return ctx;
+}
+
+/**
+ * The workspace API, or `null` when there is no provider. For a hook whose
+ * OTHER behaviour is testable without a workspace and whose tab-closing is only
+ * meaningful when panes exist (`useFolderManagement`, whose callers in the app
+ * are always inside the provider but whose unit tests inject only `ctx`).
+ * Prefer [`useWorkspace`] where a missing provider is a real bug.
+ */
+export function useWorkspaceOptional(): WorkspaceApi | null {
+  return useContext(WorkspaceContext);
 }

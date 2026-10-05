@@ -44,6 +44,11 @@ const WATCHED = [
   "src/hooks",
   "mobile/src/lib",
   "mobile/src/hooks",
+  // The mobile platform seam. It was invisible to this guard until myne#788's
+  // review: a per-client seam module with no importer (its desktop mirror is
+  // what imports it in the other client) is exactly the shape, and the tree
+  // sat outside every WATCHED root.
+  "mobile/src/platform",
   // The shared decision layer (myne-md/myne#242). It joined
   // `scripts/lib/shared-roots.mjs` in the change that created it and NOT this
   // list, which is the gap this guard exists to close one tree over: a new
@@ -93,6 +98,13 @@ const EXEMPT = new Map([
   ["web/src/platform/window.ts", "platform-seam twin"],
   ["web/src/platform/webviewWindow.ts", "platform-seam twin"],
   ["web/src/platform/deepLink.ts", "platform-seam twin"],
+  ["web/src/platform/plainFile.ts", "platform-seam twin (myne-md/myne#788): substituted for src/platform/plainFile.ts at web build time"],
+  // The mobile mirror of the same seam module. Mobile has no OS file ingress,
+  // so nothing imports it yet; it is the per-client refusing shape the
+  // twin-inventory records as a `screen` verdict (myne-md/myne#788), not dead
+  // code. Recorded here because `mobile/src/platform` was outside every
+  // WATCHED root, so this class was invisible to this guard.
+  ["mobile/src/platform/plainFile.ts", "platform-seam twin (myne-md/myne#788): the refusing mobile mirror of src/platform/plainFile.ts; no mobile flow opens a plain file yet"],
   ["mobile/src/lib/graph-layout.worker.ts", "worker entry — `WikiGraph.tsx` loads it with `new Worker(new URL(…, import.meta.url))`, a real edge that a static import scan cannot see"],
   // Same shape as the mobile twin above, measured the first time `src/notes`
   // joined WATCHED (myne#587): `GraphCanvas.tsx` loads the worker through

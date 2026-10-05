@@ -151,6 +151,23 @@ describe("IdentitySetupDialog", () => {
     await waitFor(() => expect(personSetup).toHaveBeenCalled());
   });
 
+  // The held identity's PUBLIC code is shown, so "an identity is held" names
+  // WHICH one rather than only offering a recovery form (myne-md/myne#792
+  // follow-up).
+  it("shows the held identity's public code when an identity is held", async () => {
+    personStatus.mockReset().mockResolvedValue({
+      enrolled: false,
+      identity_unlocked: false,
+      person_id_hex: null,
+      identity_code: "MYNE-PERSON-1:abc",
+      sealed_keypair_present: true,
+    });
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+
+    const code = (await screen.findByTestId("identity-setup.held-code")) as HTMLInputElement;
+    expect(code.value).toBe("MYNE-PERSON-1:abc");
+  });
+
   // The stale-probe path: the backend still holds an identity even though the
   // status read said otherwise, so the typed error must reveal the forget path.
   it("reveals the forget path when the backend reports a held identity", async () => {

@@ -43,12 +43,20 @@ Data flow: `CaptureView → WatchConnectivityClient.transferUserInfo` → (WC tr
 staging/<uuid>` → Rust `captures|seal_staged` → `<…>/sealed/<capture-id>` (`MYK1`)
 → on unlock, JS `drainPendingCaptures` → `note_create` + `captures|ack`.
 
-## Wiring into the Tauri iOS project (`src-tauri/gen/apple/project.yml`)
+## Wiring into the Tauri iOS project (committed spec + ios-postinit.sh)
 
-`gen/apple/` is git-ignored and rebuilt by `tauri ios init`, so these edits are
-**re-applied after every init** (then `cd src-tauri/gen/apple && xcodegen generate`;
-`tauri ios build` also runs xcodegen). The edits (all present in the committed
-working tree; mirror them after an init):
+The watch app is declared in the **committed**
+`mobile/src-tauri/ios/project.yml`, NOT in the regenerated
+`src-tauri/gen/apple/` tree. `tauri ios init` rebuilds that tree wholesale, so a
+project.yml edit made there is transient — and on 2026-10-01 it dropped the watch
+app silently and the v0.8.2 TestFlight build shipped phone-only
+(myne-md/myne#803). The committed spec is copied onto `gen/apple/project.yml` and
+`xcodegen generate` is run by `mobile/scripts/ios-postinit.sh`, which is wired
+into the package's `tauri` command (`mobile/scripts/tauri.sh`) so every `pnpm
+tauri ios dev|build|run` in `mobile/` re-applies it. Run it by hand with
+`pnpm --filter myne-mobile ios:postinit`.
+
+The committed spec declares:
 
 1. **`MyneWatch` target** — `type: application, platform: watchOS`,
    sources `../../../ios-watch/MyneWatch` + `../../../ios-watch/Shared`, Info.plist
@@ -64,15 +72,26 @@ working tree; mirror them after an init):
 2. **`MyneWatchComplications` target** — watchOS `app-extension`,
    `com.apple.widgetkit-extension`, embedded into `MyneWatch` via a
    `- target: MyneWatchComplications` dependency, bundle id
-   `md.myne.mobile.watchkitapp.complication`.
-3. **On the iOS app target (`myne-mobile_iOS`):** `- target: MyneWatch` (embeds the
-   watch app into `Watch/`), `- sdk: WatchConnectivity.framework`, the
-   `- path: ../../../ios-watch/Receiver` source, `SWIFT_VERSION: "5.0"` in
-   `settings.base` (the app compiles Swift only because of the receiver), and
-   `OTHER_LDFLAGS: ["-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]` in `settings.base` —
-   force-retains the receiver class, which is reached only via `NSClassFromString`
-   from the `+load` bootstrap and would otherwise be at risk of a silent dead-code
-   strip (apple/swift SR-3333).
+   `md.myne.mobile.watchkitapp.ext`. (`.ext`, not `.complication`: Apple bundle IDs
+   are globally unique and `…watchkitapp.complication` was already taken, so it
+   could not be registered. The extension only has to be a dot-child of the watch
+   app's id.) It also compiles `../../../ios-watch/Shared` — `MyneMark()` is used
+   by the complication view, so that file is a source of BOTH watch targets
+   (omitting it fails the compile).
+3. **On the iOS app target (`myne-mobile_iOS`):** the watch is NOT a target
+   dependency. `tauri ios build` archives the scheme under `-sdk iphoneos`, and
+   that flag overrides a target's `SDKROOT`, so a linked watch target is compiled
+   against the iOS SDK and every watchOS WidgetKit API in the complication fails
+   as "only available in iOS 16+", killing the archive. Instead two script phases
+   do the work: `mobile/scripts/ios-watch-build.sh` builds `MyneWatch` with an
+   explicit `-sdk watchos` and stages it at `gen/apple/watch-build/`, and
+   `mobile/scripts/ios-watch-embed.sh` copies it to `Myne.app/Watch/` (Apple
+   requires exactly that path). The app still carries `- sdk:
+   WatchConnectivity.framework`, the `- path: ../../../ios-watch/Receiver` source,
+   `SWIFT_VERSION: "5.0"`, and `OTHER_LDFLAGS: ["$(inherited)",
+   "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]` — which force-retains the receiver
+   class, reached only via `NSClassFromString` from the `+load` bootstrap and
+   otherwise at risk of a silent dead-code strip (apple/swift SR-3333).
 
 ## Build / CI reality
 

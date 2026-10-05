@@ -1,0 +1,268 @@
+# Myne iOS XcodeGen project — the SOURCE OF TRUTH, committed outside the
+# git-ignored `src-tauri/gen/apple/` tree (which `tauri ios init` regenerates
+# wholesale and would otherwise reset to a phone-only app).
+#
+# `mobile/scripts/ios-postinit.sh` copies this file onto
+# `src-tauri/gen/apple/project.yml`, substitutes the __MYNE_*__ placeholders
+# below from the live build config, and runs `xcodegen generate`. That script is
+# the one true re-apply step for iOS, the way `android-postinit.sh` is for
+# Android. See `mobile/AGENTS.md` and the `ios-widgets` / `ios-watch` READMEs.
+#
+# Source paths in this file are written RELATIVE TO `src-tauri/gen/apple/` (where
+# the file ends up), NOT relative to this file's own directory. Do not "fix" the
+# `../../../ios-*` paths.
+#
+# __MYNE_DEVELOPMENT_TEAM__ / __MYNE_MARKETING_VERSION__ /
+# __MYNE_CURRENT_PROJECT_VERSION__ are substituted by ios-postinit.sh.
+name: myne-mobile
+options:
+  bundleIdPrefix: md.myne.mobile
+  deploymentTarget:
+    iOS: "15.0"
+fileGroups: [../../src]
+configs:
+  debug: debug
+  release: release
+settingGroups:
+  app:
+    base:
+      PRODUCT_NAME: Myne
+      PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile
+targetTemplates:
+  app:
+    type: application
+    sources:
+      - path: Sources
+    scheme:
+      environmentVariables:
+        RUST_BACKTRACE: full
+        RUST_LOG: info
+    settings:
+      groups: [app]
+targets:
+  myne-mobile_iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Assets.xcassets
+      # `Externals` is deliberately NOT a source here. It holds the built
+      # `libapp.a`, which is linked via the `- framework: libapp.a` dependency
+      # below and found through LIBRARY_SEARCH_PATHS; listing the directory as a
+      # source made xcodegen add `libapp.a` to the app's Resources phase, and
+      # App Store validation rejects it: "The Myne.app/libapp.a binary file is
+      # not permitted" (90171).
+      - path: myne-mobile_iOS
+      - path: assets
+        buildPhase: resources
+        type: folder
+      - path: LaunchScreen.storyboard
+      # The Apple Watch companion's iPhone-side receiver (§9.18): the
+      # WatchConnectivity delegate + the +load bootstrap, compiled INTO the app.
+      - path: ../../../ios-watch/Receiver
+    info:
+      path: myne-mobile_iOS/Info.plist
+      properties:
+        LSRequiresIPhoneOS: true
+        UILaunchStoryboardName: LaunchScreen
+        UIRequiredDeviceCapabilities: [arm64, metal]
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+    entitlements:
+      path: myne-mobile_iOS/myne-mobile_iOS.entitlements
+    scheme:
+      environmentVariables:
+        RUST_BACKTRACE: full
+        RUST_LOG: info
+    settings:
+      base:
+        MARKETING_VERSION: __MYNE_MARKETING_VERSION__
+        CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
+        ENABLE_BITCODE: false
+        ARCHS: [arm64]
+        VALID_ARCHS: arm64
+        LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+        EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        # The app compiles Swift only because of the watch Receiver source
+        # (ios-watch/Receiver). Without this, xcodegen leaves the Swift dialect to
+        # Xcode's default and the receiver fails the CONFIGURATION check.
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
+        # ObjC +load reaches the receiver class only via NSClassFromString, so
+        # force-retain it against the dead-code strip (apple/swift SR-3333).
+        #
+        # The second flag force-loads the swift-rs Swift package's globalized
+        # archive. The Rust `libapp.a` retains swift_rs's `_string_from_bytes` /
+        # `_retain_object` / `_release_object` references as UNDEFINED into THIS
+        # (the app) link, and under Xcode 27's SwiftPM layout those definitions
+        # ship local (`t`) in `libTauri.a`, so they are invisible to the symbol
+        # resolver and the app link fails with `Undefined symbols ... _string_from_bytes`.
+        # `mobile/scripts/ios-link.sh` globalizes them and stages the result at
+        # this stable path (the tauri-<hash> build dir is not addressable from
+        # the pbxproj). `-force_load` then pulls the globalized definitions in.
+        # See operations/runbooks/ios-app-store-release.md §4b.
+        OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver", "-Wl,-force_load,$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)/libTauri.globalized.a"]
+      groups: [app]
+    dependencies:
+      - framework: libapp.a
+        embed: false
+      - sdk: CoreGraphics.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: QuartzCore.framework
+      - sdk: Security.framework
+      - sdk: UIKit.framework
+      - sdk: WebKit.framework
+      # `MyneWidgets` is a normal target dependency: it is iOS, so Tauri's
+      # `xcodebuild archive -sdk iphoneos` compiles it correctly and xcodegen
+      # emits the Embed-Foundation-Extensions phase into PlugIns/.
+      - target: MyneWidgets
+      # `MyneWatch` is deliberately NOT a target dependency. `tauri ios build`
+      # archives the scheme under `-sdk iphoneos`, and THAT flag wins over a
+      # target's `SDKROOT`, so a watch target linked this way is compiled against
+      # the iOS SDK: every watchOS WidgetKit API in the complication then fails as
+      # "'AccessoryWidgetBackground' is only available in iOS 16.0 or newer" and
+      # the whole archive dies — the exact break this spec's SDKROOT lines cannot
+      # fix. Instead `mobile/scripts/ios-watch-build.sh` builds MyneWatch under the
+      # real watchOS SDK and copies the result into `Myne.app/Watch/` here.
+      - sdk: WatchConnectivity.framework
+    preBuildScripts:
+      - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+        name: Build Rust Code
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a
+          - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a
+      # Build the Apple Watch app + complication under the REAL watchOS SDK and
+      # stage them for embedding. This has to be a script rather than a target
+      # dependency: `tauri ios build` archives under `-sdk iphoneos`, and that flag
+      # overrides a target's own SDKROOT, so a linked watch target compiles
+      # against the iOS SDK and dies on every watchOS WidgetKit API. The script
+      # uses `xcodebuild -sdk watchos` explicitly.
+      - script: |
+          set -euo pipefail
+          "${SRCROOT}/../../../scripts/ios-watch-build.sh"
+        name: Build & Stage Apple Watch
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(SRCROOT)/watch-build/MyneWatch.app
+    # The staged watch app is copied into Myne.app/Watch/ by this phase. xcodegen
+    # has no `files:` for a directory that does not exist at generate time, so the
+    # copy is a script phase too (Apple requires the watch app at Watch/ exactly).
+    postCompileScripts:
+      - script: |
+          set -euo pipefail
+          "${SRCROOT}/../../../scripts/ios-watch-embed.sh"
+        name: Embed Apple Watch Content
+        basedOnDependencyAnalysis: false
+  MyneWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: ../../../ios-widgets/MyneWidgets
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.widgets
+        # Points at a COPY under gen/ (made by ios-postinit.sh), never the
+        # committed source: Xcode's ProcessInfoPlistFile rewrites the
+        # INFOPLIST_FILE in place, so pointing it at ios-widgets/ left the repo
+        # dirty after every build with the version expanded to a literal.
+        INFOPLIST_FILE: ext-plists/MyneWidgets-Info.plist
+        MARKETING_VERSION: __MYNE_MARKETING_VERSION__
+        CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_DEBUG_DYLIB: "NO"
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: AppIntents.framework
+  MyneWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: ../../../ios-watch/MyneWatch
+        excludes:
+          - Info.plist
+      - path: ../../../ios-watch/Shared
+    settings:
+      base:
+        # SDKROOT=watchos is LOAD-BEARING: without it xcodebuild compiles the
+        # watch targets against the iphoneos SDK, and every watchOS WidgetKit API
+        # fails as "only available in iOS 16+" (watchOS 9 == iOS 16 in the
+        # availability mapping). The build then dies on the complication, not the
+        # watch app, which is what makes the cause hard to read.
+        SDKROOT: watchos
+        PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.watchkitapp
+        # A copy under gen/, not the committed source — see MyneWidgets above.
+        INFOPLIST_FILE: ext-plists/MyneWatch-Info.plist
+        MARKETING_VERSION: __MYNE_MARKETING_VERSION__
+        CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "4"
+        # Required, or the watch app grid shows a blank placeholder: the iOS
+        # app's Tauri-generated Assets.xcassets is NOT in this target's sources;
+        # the committed MyneWatch/Assets.xcassets is.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SKIP_INSTALL: YES
+    dependencies:
+      - target: MyneWatchComplications
+      - sdk: WatchConnectivity.framework
+      - sdk: SwiftUI.framework
+  MyneWatchComplications:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "10.0"
+    # `AccessoryWidgetBackground` and the accessory widget families the view
+    # switches on are watchOS 9+; SDKROOT=watchsimulator was letting deployemos=10
+    # compile-check against the iOS SDK in older Xcode, which mis-gated them.
+    sources:
+      - path: ../../../ios-watch/MyneWatchComplications
+        excludes:
+          - Info.plist
+      # MyneWatchTheme.swift (the Myne tokens + the "M" mark) is shared by BOTH
+      # watch targets — the complication draws MyneMark() in its accessory view.
+      - path: ../../../ios-watch/Shared
+    settings:
+      base:
+        # See the MyneWatch target: the watch targets need SDKROOT=watchos or the
+        # complication's WidgetKit APIs fail as "only available in iOS 16+".
+        SDKROOT: watchos
+        # `.ext`, NOT `.complication`: Apple bundle IDs are globally unique and an
+        # `md.myne.mobile.watchkitapp.complication` identifier was already taken
+        # elsewhere in this team's account, so it could not be registered. The
+        # extension must still be a dot-child of the watch app's id.
+        PRODUCT_BUNDLE_IDENTIFIER: md.myne.mobile.watchkitapp.ext
+        # A copy under gen/, not the committed source — see MyneWidgets above.
+        INFOPLIST_FILE: ext-plists/MyneWatchComplications-Info.plist
+        MARKETING_VERSION: __MYNE_MARKETING_VERSION__
+        CURRENT_PROJECT_VERSION: __MYNE_CURRENT_PROJECT_VERSION__
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework

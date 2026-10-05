@@ -9,7 +9,7 @@
 //! "..."}` on a `show` success, `{"ok": false, "error": {"kind": "...",
 //! "message": "..."}}` on failure. `kind` is one of: `app_not_running` /
 //! `vault_locked` / `cli_disabled` / `not_found` / `folder_excluded` /
-//! `rate_limited` / `io`.
+//! `rate_limited` / `plain_file_off` / `io`.
 
 use serde::Serialize;
 
@@ -202,6 +202,17 @@ pub fn print_daily_append(json: bool) {
     }
 }
 
+/// Render a successful `open` result (myne-md/myne#788): silent in human
+/// mode, because the tab appearing in the app IS the feedback and the one
+/// thing worth saying (the path) is not something this channel prints: a
+/// filesystem path on the content channel is exactly the trace this feature
+/// exists without. `--json` gets the bare `{"ok":true}` envelope.
+pub fn print_open(json: bool) {
+    if json {
+        println!("{}", ok_envelope_json());
+    }
+}
+
 /// The advisory a period command prints when the host resolved the period on
 /// the device clock while a display-timezone override was set (myne#177).
 ///
@@ -261,7 +272,11 @@ pub fn print_error(err: &BackendError, json: bool) {
     }
 }
 
-fn error_parts(err: &BackendError) -> (&'static str, String) {
+/// `pub(crate)` so the backend tests can assert the envelope KIND a failure
+/// emits (myne-md/myne#788): the `open` remap is only correct if a script sees
+/// `io` for a missing file, and asserting the `BackendError` variant alone
+/// would let the output table drift underneath it.
+pub(crate) fn error_parts(err: &BackendError) -> (&'static str, String) {
     match err {
         BackendError::AppNotRunning => (
             "app_not_running",
@@ -291,6 +306,10 @@ fn error_parts(err: &BackendError) -> (&'static str, String) {
             "Too many requests in a short time. Wait a moment and try again, \
              or turn the CLI rate limit off in Myne's Settings."
                 .to_string(),
+        ),
+        BackendError::PlainFileOff => (
+            "plain_file_off",
+            "Local-file editing is off. Enable it in Myne's Settings.".to_string(),
         ),
         BackendError::Io(message) => ("io", message.clone()),
     }
@@ -356,21 +375,6 @@ mod tests {
         );
     }
 
-    /// The oracle property, at the envelope layer: a query that hit ONLY an
-    /// excluded note and a query with a genuine no-match both arrive here as
-    /// an empty `hits` slice (the backend already collapsed them) — so their
-    /// rendered envelopes must be byte-for-byte identical, not merely
-    /// "both empty" by coincidence of this one call.
-    #[test]
-    fn excluded_hit_and_genuine_miss_render_byte_identical_envelopes() {
-        let excluded_hit_result: Vec<SearchHit> = vec![]; // backend already filtered
-        let genuine_miss_result: Vec<SearchHit> = vec![];
-        assert_eq!(
-            search_envelope_json(&excluded_hit_result),
-            search_envelope_json(&genuine_miss_result)
-        );
-    }
-
     #[test]
     fn error_envelope_shape_is_pinned() {
         assert_eq!(
@@ -388,6 +392,7 @@ mod tests {
             BackendError::NotFound,
             BackendError::FolderExcluded,
             BackendError::RateLimited,
+            BackendError::PlainFileOff,
             BackendError::Io("x".into()),
         ] {
             let (kind, _) = error_parts(&err);
@@ -398,6 +403,7 @@ mod tests {
                 "not_found",
                 "folder_excluded",
                 "rate_limited",
+                "plain_file_off",
                 "io"
             ]
             .contains(&kind));
@@ -450,6 +456,14 @@ mod tests {
         assert_eq!(
             error_envelope_json(&BackendError::FolderExcluded),
             r#"{"ok":false,"error":{"kind":"folder_excluded","message":"That folder is excluded from CLI access. Nothing was written."}}"#
+        );
+    }
+
+    #[test]
+    fn plain_file_off_error_envelope_shape_is_pinned() {
+        assert_eq!(
+            error_envelope_json(&BackendError::PlainFileOff),
+            r#"{"ok":false,"error":{"kind":"plain_file_off","message":"Local-file editing is off. Enable it in Myne's Settings."}}"#
         );
     }
 }

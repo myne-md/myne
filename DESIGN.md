@@ -179,7 +179,7 @@ The system explicitly rejects the privacy-product visual canon. There is no lock
 - Inter Variable for UI sans, JetBrains Mono Variable for cryptographic identifiers (slashed zero on, `ss02 + zero + calt`).
 - 1px hairlines (`#e3e2dd`) for every divider; 2px borders are forbidden.
 - Flat at rest. Shadows live only on overlays (command palette, dropdowns, toasts, tooltips), never on the editor surface or on cards.
-- Two motion tiers (`design-notes/ui/0622`). **Restrained** is the default and covers hover/focus/press/disclosure/panel: 120/180/260ms, exponential ease-out only. **Expressive** is opt-in for rare moments (first arrival, shared-element travel, a held gesture): 80ms press feedback, a named 380ms ceiling-breaker, emphasized and spring curves, capped stagger. `prefers-reduced-motion` disables transitions globally in **both**. A keyboard-initiated or 100+/day action gets no motion in either tier, and there are no pulsing state indicators in either.
+- Two motion tiers (`design-notes/ui/0632`). **Restrained** is the default and covers hover/focus/press/disclosure/panel: 120/180/260ms, exponential ease-out only. **Expressive** is opt-in for rare moments (first arrival, shared-element travel, a held gesture): 80ms press feedback, a named 380ms ceiling-breaker, emphasized and spring curves, capped stagger. `prefers-reduced-motion` disables transitions globally in **both**. A keyboard-initiated or 100+/day action gets no motion in either tier, and there are no pulsing state indicators in either.
 
 ## 2. Colors: The Paper-and-Ink Palette
 

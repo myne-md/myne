@@ -45,11 +45,21 @@ use myne_core::plugins::notes::note_id::NoteId;
 
 /// The chunker-logic generation, bound into the `vault.embeddings`
 /// model-identity tuple (`protocol.md` §9.17.2). **Bump this whenever a change
-/// to the windowing model would shift chunk boundaries for the same input.** An
+/// would make a persisted vector incomparable with a freshly-embedded query** ,
+/// including a change to the windowing model (which shifts chunk boundaries) and
+/// a change to the embedding INPUT convention, because the identity tuple is the
+/// whole pipeline's generation and the spec binds no separate field for it. An
 /// incremented value invalidates every persisted embedding index
-/// (fall-to-rebuild, §9.17.4) so stale chunk spans can never misalign vectors
-/// with note text after an app update changes chunking.
-pub const CHUNKER_VERSION: u16 = 1;
+/// (fall-to-rebuild, §9.17.4) so stale vectors can never be served as fresh.
+///
+/// **2** (myne-md/myne#805, task 4): the multilingual E5 family now requires the
+/// asymmetric `query: ` / `passage: ` prefixes (`engine_candle.rs`). A pre-change
+/// index was computed without them and would be served as valid while producing
+/// cosines that no longer match a prefixed query, so every prior index is
+/// discarded and rebuilt. The bump is deliberate and one-directional: it also
+/// discards an index built by a symmetric model, which is harmless because it
+/// rebuilds identically.
+pub const CHUNKER_VERSION: u16 = 2;
 
 /// Tunable window parameters — a code-point budget (token proxy until the real
 /// tokenizer lands at merge, SYNC-7/13).
@@ -510,12 +520,17 @@ mod tests {
     }
 
     #[test]
-    fn no_model_or_ipc_dependency_is_pure() {
-        // Compile-time guard by construction: this module imports only
-        // core::ops::Range + NoteId. The test documents the invariant (task-1
-        // acceptance 4) — a future `use` of an engine/http/tauri command here
-        // would be caught in review against this note.
-        let md = "sanity";
-        let _ = chunk_note(nid(), md, ChunkParams::default());
+    fn pure_over_inputs_yields_deterministic_well_formed_chunks() {
+        // `chunk_note` is pure over `(NoteId, &str)`: it imports no engine,
+        // IPC or I/O, so the same input must yield byte-identical,
+        // well-formed chunks on every call. A `use` of a model/http/tauri
+        // command here would let the result depend on something outside the
+        // arguments and fail the equality half.
+        let md = "sanity prose for the default budget\n\n# Heading\n\nbody text under it";
+        let first = chunk_note(nid(), md, ChunkParams::default());
+        let second = chunk_note(nid(), md, ChunkParams::default());
+        assert_eq!(first, second, "same input must yield the same chunks");
+        assert!(!first.is_empty(), "non-empty prose must yield chunks");
+        assert_well_formed(md, &first);
     }
 }

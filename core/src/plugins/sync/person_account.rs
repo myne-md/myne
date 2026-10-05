@@ -18,7 +18,7 @@ use zeroize::Zeroizing;
 
 use super::devices::SyncDeviceError;
 use super::enroll::{
-    enroll, generate_device_id, register_verifier, EnrollError, EnrollOutcome, EnrollPath,
+    enroll, generate_device_id, register_verifier_with_code, EnrollError, EnrollOutcome, EnrollPath,
 };
 use super::person_auth::{
     person_auth_path, person_auth_path_for_read, read_person_auth, write_person_auth, PersonAuth,
@@ -57,8 +57,9 @@ pub fn register_and_enroll_person(
     transport: &dyn SyncTransport,
     person_id: &[u8; 16],
     secret: &[u8],
+    invite_code: Option<&str>,
 ) -> Result<EnrollOutcome, EnrollError> {
-    register_verifier(transport, person_id, secret)?;
+    register_verifier_with_code(transport, person_id, secret, invite_code)?;
     let device_id = generate_device_id();
     let mut nonce_bytes = [0u8; 16];
     getrandom::getrandom(&mut nonce_bytes).map_err(|_| EnrollError::BadResponse)?;
@@ -157,14 +158,21 @@ pub async fn person_setup_from_host(
         let cfg = super::config::read_config(io, &cfg_path)
             .await
             .map_err(|_| SyncDeviceError::NotConfigured)?;
+        // The gated-server admission code, read before `endpoint_url` moves out.
+        let invite_code = cfg.invite_code.clone();
         let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
         let outcome: EnrollOutcome =
             crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
                 let transport = super::http_transport::build_transport(&url)
                     .map_err(|_| SyncDeviceError::Transport)?;
-                register_and_enroll_person(transport.as_ref(), &person_id, secret.as_slice())
-                    .map_err(SyncDeviceError::from)
+                register_and_enroll_person(
+                    transport.as_ref(),
+                    &person_id,
+                    secret.as_slice(),
+                    invite_code.as_deref(),
+                )
+                .map_err(SyncDeviceError::from)
             })
             .await
             .map_err(|_| SyncDeviceError::Internal)??;
@@ -188,6 +196,14 @@ pub async fn person_setup_from_host(
             mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
         };
 
+        // Vault-bound carrier (myne-md/myne#792): seal the keypair under the
+        // active owner vault's root_key so its next unlock installs this session
+        // with no phrase. Best-effort; only fires for an unlocked NTV6 owner
+        // vault.
+        super::person_vault_carrier::refresh_carrier_best_effort(
+            host, io, state, &person_id, &pair,
+        )
+        .await;
         let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
             pair,
             person_id,
@@ -854,8 +870,10 @@ pub async fn accept_invite_from_host(
     let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
     let person_id = protocol::person_id_hash(normalized.as_str());
     let generation = state.person_session_generation().await;
-    let owner = super::invite::decode_person_identity_code(owner_code)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let owner = super::invite::decode_person_identity_code(owner_code).map_err(|e| {
+        tracing::warn!(stage = "accept_owner_code", error = ?e, "b2b accept failed");
+        SyncDeviceError::BadRequest
+    })?;
 
     let auth_path = person_auth_path_for_read(host).map_err(|_| SyncDeviceError::Internal)?;
     let auth = read_person_auth(io, &auth_path)
@@ -864,6 +882,10 @@ pub async fn accept_invite_from_host(
         .filter(|a| !a.token_hex.is_empty())
         .ok_or(SyncDeviceError::NotEnrolled)?;
     if auth.person_id_hex != crate::account::person_identity::hex_lower(&person_id) {
+        tracing::warn!(
+            stage = "accept_phrase_mismatch",
+            "b2b accept failed: the entered phrase is not this device's identity"
+        );
         return Err(SyncDeviceError::NotEnrolled);
     }
     let member = crate::account::person_identity::open_person_identity_without_mutation(
@@ -874,6 +896,7 @@ pub async fn accept_invite_from_host(
     .await
     .map_err(|error| {
         use crate::account::person_identity::PersonIdentityError as E;
+        tracing::warn!(stage = "accept_open_identity", error = ?error, "b2b accept failed");
         match error {
             E::BadPhrase | E::CannotDecrypt => SyncDeviceError::BadRequest,
             E::Io | E::Csprng => SyncDeviceError::Transport,
@@ -896,28 +919,44 @@ pub async fn accept_invite_from_host(
     .await
     .map_err(|_| SyncDeviceError::Internal)??;
 
-    let account_hash = super::devices::hex16(&claimed.vault_account_hash_hex)
-        .ok_or(SyncDeviceError::BadRequest)?;
+    let account_hash = super::devices::hex16(&claimed.vault_account_hash_hex).ok_or_else(|| {
+        tracing::warn!(stage = "accept_claim_account_hash", "b2b accept failed");
+        SyncDeviceError::BadRequest
+    })?;
     let payload = {
         use base64::Engine as _;
         base64::engine::general_purpose::STANDARD
             .decode(&claimed.payload_b64)
-            .map_err(|_| SyncDeviceError::BadRequest)?
+            .map_err(|e| {
+                tracing::warn!(stage = "accept_claim_payload_b64", error = ?e, "b2b accept failed");
+                SyncDeviceError::BadRequest
+            })?
     };
-    let package = protocol::person_invite::decode_signed_group_package(&payload)
-        .ok_or(SyncDeviceError::BadRequest)?;
+    let package =
+        protocol::person_invite::decode_signed_group_package(&payload).ok_or_else(|| {
+            tracing::warn!(stage = "accept_decode_package", "b2b accept failed");
+            SyncDeviceError::BadRequest
+        })?;
 
-    let b2b =
-        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|e| {
+        tracing::warn!(stage = "accept_parse_ntv6", error = ?e, "b2b accept failed");
+        SyncDeviceError::BadRequest
+    })?;
     if b2b.base.account_number_hash != account_hash {
+        tracing::warn!(stage = "accept_account_hash_mismatch", "b2b accept failed");
         return Err(SyncDeviceError::BadRequest);
     }
     let (group_key, epoch, owner_fingerprint_hex) =
         super::invite::accept_group_package(&owner.public, &member, &package, &account_hash)
-            .map_err(|_| SyncDeviceError::BadRequest)?;
+            .map_err(|e| {
+                tracing::warn!(stage = "accept_group_package", error = ?e, "b2b accept failed");
+                SyncDeviceError::BadRequest
+            })?;
     let group = protocol::GroupKey::new(*group_key);
-    let items_key =
-        protocol::unlock_items_key_ntv6(&b2b, &group).map_err(|_| SyncDeviceError::BadRequest)?;
+    let items_key = protocol::unlock_items_key_ntv6(&b2b, &group).map_err(|e| {
+        tracing::warn!(stage = "accept_unlock_items_key", error = ?e, "b2b accept failed");
+        SyncDeviceError::BadRequest
+    })?;
     let items_key_id = b2b.base.items_key_id;
 
     // Materialize a fresh local member vault: create-only meta, a member slot
@@ -946,7 +985,10 @@ pub async fn accept_invite_from_host(
         &items_key,
     )
     .await
-    .map_err(|_| SyncDeviceError::Internal)?;
+    .map_err(|_| {
+        tracing::warn!(stage = "accept_member_key_store", "b2b accept failed");
+        SyncDeviceError::Internal
+    })?;
 
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
@@ -996,6 +1038,10 @@ pub async fn accept_invite_from_host(
         )
         .await;
     if installed.is_none() {
+        tracing::warn!(
+            stage = "accept_slot_install",
+            "b2b accept failed: slot busy or session changed"
+        );
         let _ = io.remove_dir_all(&vault_dir).await;
         return Err(SyncDeviceError::Transport);
     }
@@ -1579,7 +1625,7 @@ mod tests {
         t.on(HttpMethod::Post, "/auth/register", 401, b"{}".to_vec());
 
         let person_id = [0x11u8; 16];
-        let err = register_and_enroll_person(&t, &person_id, &[0u8; 32]).unwrap_err();
+        let err = register_and_enroll_person(&t, &person_id, &[0u8; 32], None).unwrap_err();
         assert_eq!(err, EnrollError::Unauthenticated);
 
         let reqs = t.requests();

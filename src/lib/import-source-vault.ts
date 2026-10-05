@@ -58,6 +58,40 @@ export async function importSourceClose(sourceVaultId: string): Promise<void> {
 }
 
 /**
+ * Open an externally exported `.myne-backup` as a read-only import source
+ * (myne-md/myne#816).
+ *
+ * The host extracts the container's members into a private staging directory
+ * (verified all-or-nothing by the same reader the restore path uses) and opens
+ * the import slot AT that root, returning the minted source id the other
+ * `importSource*` calls address. The credential is the BACKUP's own password or
+ * recovery phrase; exactly one is required.
+ *
+ * Close it with {@link importSourceCloseBackup}, which also removes the staging
+ * directory.
+ */
+export async function importSourceOpenBackup(
+  backupPath: string,
+  credential: { password: string } | { recoveryPhrase: string },
+): Promise<string> {
+  return await invoke<string>("plugin:importer|import_source_open_backup", {
+    backupPath,
+    password: "password" in credential ? credential.password : null,
+    recoveryPhrase:
+      "recoveryPhrase" in credential ? credential.recoveryPhrase : null,
+  });
+}
+
+/** Close a backup import source and remove its staging directory. Idempotent. */
+export async function importSourceCloseBackup(
+  sourceVaultId: string,
+): Promise<void> {
+  await invoke<void>("plugin:importer|import_source_close_backup", {
+    sourceVaultId,
+  });
+}
+
+/**
  * The source vault's note ids, oldest first.
  *
  * Ids only and no decryption: one `read_dir` rather than one AEAD open per

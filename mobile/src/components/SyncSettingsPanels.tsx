@@ -371,6 +371,12 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
 export function SyncEndpointPanel() {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
+  // The endpoint this device is currently connected to, so the invite field can
+  // hide once connected (myne-md/myne#822) — the same behaviour desktop/web
+  // gained in #815, mirrored here so the mobile twin does not drift.
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
+  // The shared admission code for a gated server (empty = open server).
+  const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -378,7 +384,11 @@ export function SyncEndpointPanel() {
     if (!HAS_TAURI) return;
     void syncGetEndpoint()
       .then((c) => {
-        if (c.endpoint_url) setUrl(c.endpoint_url);
+        if (c.endpoint_url) {
+          setUrl(c.endpoint_url);
+          setConnectedUrl(c.endpoint_url);
+        }
+        setInviteCode(c.invite_code ?? "");
       })
       .catch(() => {
         /* unconfigured — leave the field empty */
@@ -390,8 +400,9 @@ export function SyncEndpointPanel() {
     if (trimmed.length === 0) return;
     setBusy(true);
     setMsg(null);
-    void syncSetEndpoint(trimmed)
+    void syncSetEndpoint(trimmed, inviteCode.trim())
       .then((r) => {
+        setConnectedUrl(trimmed);
         setMsg(t(r.pin_source === "platform_trust_store" ? "sync.settings.connectedTls" : "sync.settings.connectedLocal"));
       })
       .catch((e: unknown) => setMsg(t((e as { kind?: string } | null)?.kind === "TlsFailure"
@@ -400,12 +411,23 @@ export function SyncEndpointPanel() {
       .finally(() => setBusy(false));
   };
 
+  // Connected & unedited: the input still matches the endpoint in use, so the
+  // invite field is hidden (it is for admission only) and the button rests as a
+  // disabled "Connected".
+  const trimmedUrl = url.trim();
+  const isConnectedUnedited =
+    connectedUrl !== null && trimmedUrl.length > 0 && trimmedUrl === connectedUrl;
+
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.endpoint-config">
       <FieldLabel mt={6}>{t("sync.settings.serverAddressLabel")}</FieldLabel>
       <input
         value={url}
-        onChange={(e) => setUrl(e.target.value)}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          // Changing the address invalidates a code issued for the old server.
+          setInviteCode("");
+        }}
         placeholder={t("sync.settings.serverAddressPlaceholder")}
         spellCheck={false}
         autoCapitalize="none"
@@ -414,16 +436,42 @@ export function SyncEndpointPanel() {
         style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)", fontSize: 15 }}
         data-testid="sync.endpoint-input"
       />
+      {!isConnectedUnedited && (
+        <>
+          <FieldLabel mt={14}>{t("sync.endpoint.inviteLabel")}</FieldLabel>
+          <input
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            placeholder={t("sync.endpoint.invitePlaceholder")}
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)" }}
+            data-testid="sync.endpoint-invite-input"
+          />
+        </>
+      )}
       <div style={{ marginTop: 14 }}>
-        <button
-          type="button"
-          onClick={connect}
-          disabled={busy}
-          style={primaryBtn(busy)}
-          data-testid="sync.endpoint-connect"
-        >
-          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-        </button>
+        {isConnectedUnedited ? (
+          <button
+            type="button"
+            disabled
+            style={primaryBtn(busy)}
+            data-testid="sync.endpoint-connect"
+          >
+            {t("sync.endpoint.connected")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={busy}
+            style={primaryBtn(busy)}
+            data-testid="sync.endpoint-connect"
+          >
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </button>
+        )}
       </div>
 
       {msg && (
@@ -450,6 +498,13 @@ function enrollFailureMessage(kind: string, t: TFunction): string {
       return t("sync.settings.enrollNotConfigured");
     case "Transport":
       return t("sync.settings.enrollTransport");
+    // The gated-server refusals are not credential failures: the remedy is the
+    // operator's invite code, and the credential banner would send the user
+    // round a loop that cannot terminate.
+    case "InviteCodeRequired":
+      return t("sync.enroll.error.inviteCodeRequired");
+    case "InviteCodeInvalid":
+      return t("sync.enroll.error.inviteCodeInvalid");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }

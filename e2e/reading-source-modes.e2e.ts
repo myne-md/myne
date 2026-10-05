@@ -22,7 +22,13 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { createNote, dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
+import {
+  createNote,
+  dismissImporterOffer,
+  openSettings,
+  pickSelect,
+  unlockToEditor,
+} from "./support/flows";
 import { type Session } from "./support/webdriver";
 
 /** Current view mode reflected on the bottom-bar CTA's `data-view-mode`. */
@@ -98,21 +104,22 @@ describeE2E("rsm2 default view mode persists in vault.prefs (reading-source-mode
 
         // Open Settings → Editor. The default is "live" (canonical default).
         await openSettings(s, "editor");
-        const live = await s.byTestId("settings.default-view-mode-live");
-        expect(await live.attribute("aria-checked")).toBe("true");
+        // The row is a `Select` (#769); its trigger publishes the selected
+        // value as `data-value`, so the assertion is locale-independent and
+        // needs no menu open. One value replaces the radiogroup's pair of
+        // aria-checked reads: a Select cannot hold two, so "live deselects" is
+        // what `data-value === "reading"` below already says.
+        const picker = await s.byTestId("settings.default-view-mode");
+        expect(await picker.attribute("data-value")).toBe("live");
 
-        // Choose "reading" → the radio flips, "live" deselects.
-        await (await s.byTestId("settings.default-view-mode-reading")).click();
+        // Choose "reading".
+        await pickSelect(s, "settings.default-view-mode", "reading");
         await s.waitUntil(
           async () =>
-            (await (await s.byTestId("settings.default-view-mode-reading")).attribute(
-              "aria-checked",
-            )) === "true" || null,
+            (await (await s.byTestId("settings.default-view-mode")).attribute("data-value")) ===
+              "reading" || null,
           { label: "reading default selected" },
         );
-        expect(
-          await (await s.byTestId("settings.default-view-mode-live")).attribute("aria-checked"),
-        ).toBe("false");
 
         // Re-open the panel (navigate away and back) → the choice survived the
         // disk-first persist (editor_default_view_mode === "reading").
@@ -120,9 +127,8 @@ describeE2E("rsm2 default view mode persists in vault.prefs (reading-source-mode
         await (await s.byTestId("settings.tab-editor")).click();
         await s.waitUntil(
           async () =>
-            (await (await s.byTestId("settings.default-view-mode-reading")).attribute(
-              "aria-checked",
-            )) === "true" || null,
+            (await (await s.byTestId("settings.default-view-mode")).attribute("data-value")) ===
+              "reading" || null,
           { label: "reading default persisted across panel re-open" },
         );
       },
