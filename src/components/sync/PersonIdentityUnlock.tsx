@@ -55,6 +55,10 @@ export function PersonIdentityUnlock({
   const { t } = useTranslation();
   const [phraseCells, setPhraseCells] = useState<string[]>(emptyCells);
   const [error, setError] = useState(false);
+  // The generation guard in personIdentityState only drops an unlock that
+  // resolves after a session reset; it does not stop two in-flight submits
+  // racing each other, so the button carries its own guard.
+  const [busy, setBusy] = useState(false);
 
   const setPhraseCell = (index: number, value: string) => {
     setError(false);
@@ -86,6 +90,8 @@ export function PersonIdentityUnlock({
     };
 
   const unlock = async () => {
+    if (busy) return;
+    setBusy(true);
     const unlockGeneration = getPersonIdentityGeneration();
     try {
       const view = await personUnlock(buildPhraseCredential(phraseCells));
@@ -102,6 +108,8 @@ export function PersonIdentityUnlock({
       onOpenChange(false);
     } catch {
       setError(true);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -126,7 +134,7 @@ export function PersonIdentityUnlock({
             variant="primary"
             style={{ alignSelf: "flex-start" }}
             data-testid="sync.panel.identity-unlock.submit"
-            disabled={!phraseCells.every((cell) => cell.length > 0)}
+            disabled={busy || !phraseCells.every((cell) => cell.length > 0)}
             onClick={() => void unlock()}
           >
             {t("sync.memberRoster.personUnlock")}

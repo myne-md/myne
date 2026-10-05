@@ -123,21 +123,25 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
+  // The shared person-identity store: the roster's Lock/Forget and this panel's
+  // own unlock all write it, so it is the one "is the identity ready for this
+  // session" signal.
+  const { ready: identityReady, ownerCode: identityOwnerCode } = usePersonIdentityState();
   // The full device-local person status, not just `enrolled`: the Identity block
   // below shows the existing identity (its public code) while it is locked, which
-  // `enrolled` alone cannot answer (myne-md/myne#792 follow-up).
+  // `enrolled` alone cannot answer (myne-md/myne#792 follow-up). It is re-probed
+  // whenever the shared store changes, so a lock or forget taken in the member
+  // roster re-derives the block here instead of leaving a mount-time snapshot
+  // claiming the identity is still unlocked (myne-md/myne#831 review).
   const [person, setPerson] = useState<PersonStatusView | null>(null);
-  useEffect(() => {
-    let alive = true;
+  const probePerson = useCallback(() => {
     void personStatus()
-      .then((s) => {
-        if (alive) setPerson(s);
-      })
+      .then((s) => setPerson(s))
       .catch(() => {});
-    return () => {
-      alive = false;
-    };
   }, []);
+  useEffect(() => {
+    probePerson();
+  }, [probePerson, identityReady, identityOwnerCode]);
   // After the identity dialog recovers or creates an identity, the session now
   // holds it. Reflect that in the shared identity store (the roster's unlock gate
   // reads it, and without this it stayed on the phrase grid) and kick one cycle
@@ -156,10 +160,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   }, [syncNow]);
   // A device holds an identity if it enrolled a token OR sealed a keypair it can
   // still recover (#780): the latter means "you have an identity, recover it",
-  // not "add one". Merged with the shared identity store so an unlock done
-  // through the member roster below (which writes that store) reflects here
-  // without waiting for a re-probe (myne-md/myne#792 review).
-  const { ready: identityReady, ownerCode: identityOwnerCode } = usePersonIdentityState();
+  // not "add one".
   const hasIdentity =
     identityReady ||
     identityOwnerCode != null ||
@@ -220,7 +221,12 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // IdentitySetupDialog was the same latent gap). ModalShell calls
   // `preventDefault` but does not stop propagation, so without this Escape
   // closed the whole Settings modal as well as the child.
-  const childModalOpen = termsOpen || identityOpen || qrOpen;
+  // The member roster owns child dialogs of its own (invite, remove) and reports
+  // them here rather than straight to the shell, so this panel stays the ONE
+  // writer of the shell's flag and last-writer-wins cannot clear it while a
+  // dialog is still up (myne-md/myne#831 review).
+  const [rosterDialogOpen, setRosterDialogOpen] = useState(false);
+  const childModalOpen = termsOpen || identityOpen || qrOpen || rosterDialogOpen;
   useEffect(() => {
     onDialogOpenChange?.(childModalOpen);
     return () => onDialogOpenChange?.(false);
@@ -520,7 +526,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
-        <SyncStatusIndicator onUnlockIdentity={() => setIdentityUnlockOpen(true)} />
+        <SyncStatusIndicator
+          onUnlockIdentity={
+            hasCapability("memberSharing") ? () => setIdentityUnlockOpen(true) : undefined
+          }
+        />
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
@@ -645,7 +655,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       {hasCapability("memberSharing") ? (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.members" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>{t("sync.memberRoster.title")}</span>
-          <MemberRosterPanel onDialogOpenChange={onDialogOpenChange} />
+          <MemberRosterPanel onDialogOpenChange={setRosterDialogOpen} />
         </div>
       ) : null}
 
