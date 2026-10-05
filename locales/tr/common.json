@@ -4013,7 +4013,6 @@
       "invitationPending": "Henüz kabul edilmedi",
       "invitationsFailed": "Davetleriniz yüklenemedi.",
       "title": "Kasa üyeleri",
-      "personHint": "Üye kimliğinizi kurtarma ifadenizle açın.",
       "personUnlock": "Üye kimliğini aç",
       "personReady": "Üye kimliği açıldı.",
       "ownerCodeHint": "Kasanın size ait olduğunu doğrulayabilsinler için davet ettiğiniz kişiyle bu kodu paylaşın. Yalnızca herkese açık bilgi içerir.",

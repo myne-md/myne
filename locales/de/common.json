@@ -4013,7 +4013,6 @@
       "invitationPending": "Noch nicht angenommen",
       "invitationsFailed": "Ihre Einladungen konnten nicht geladen werden.",
       "title": "Tresor-Mitglieder",
-      "personHint": "Entsperren Sie Ihre Mitgliedsidentität mit Ihrer Wiederherstellungsphrase.",
       "personUnlock": "Mitgliedsidentität entsperren",
       "personReady": "Mitgliedsidentität entsperrt.",
       "ownerCodeHint": "Teilen Sie diesen Code mit der eingeladenen Person, damit sie prüfen kann, dass der Tresor Ihnen gehört. Er enthält nur öffentliche Informationen.",
