@@ -14,6 +14,7 @@ import {
   enumerateSurfaces,
   readStorySurfaces,
   planRecord,
+  duplicateBasenames,
   NON_SURFACE,
 } from "../../scripts/check-story-coverage.mjs";
 
@@ -187,5 +188,24 @@ describe("check-story-coverage story-only surfaces", () => {
       storyOnly: { AiChatTab: "outside the roots" },
     });
     expect(problems.some((p) => p.includes("AiChatTab"))).toBe(true);
+  });
+});
+
+describe("check-story-coverage.duplicateBasenames", () => {
+  it("names two files that share a basename under the surface roots", () => {
+    const dir = mkdtempSync(join(tmpdir(), "stories-dup-"));
+    mkdirSync(join(dir, "src/components"), { recursive: true });
+    mkdirSync(join(dir, "src/screens"), { recursive: true });
+    writeFileSync(join(dir, "src/components/Thing.tsx"), "export function A(){return null}");
+    writeFileSync(join(dir, "src/screens/Thing.tsx"), "export function B(){return null}");
+    const dups = duplicateBasenames(dir, ["src/components", "src/screens"]);
+    expect(dups.map(([name]) => name)).toContain("Thing");
+  });
+
+  it("does not flag a unique basename", () => {
+    const dir = mkdtempSync(join(tmpdir(), "stories-uniq-"));
+    mkdirSync(join(dir, "src/components"), { recursive: true });
+    writeFileSync(join(dir, "src/components/Only.tsx"), "export function A(){return null}");
+    expect(duplicateBasenames(dir, ["src/components"])).toEqual([]);
   });
 });

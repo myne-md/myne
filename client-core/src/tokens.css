@@ -266,6 +266,10 @@
      and barely separated a modal from an already-near-black page. Both values
      here are the canon's, adopted on the merits. */
   --scrim: rgba(11, 11, 9, 0.4);
+  /* A picture mat: opaque and the same black in EVERY theme, because a tinted
+     mat shifts every colour in the screenshot it frames. Deliberately not
+     `--scrim` (translucent and theme-tinted). */
+  --mat-black: #000;
 
   /* -- Radii ---------------------------------------------------------- */
   --radius-1: 3px;
@@ -298,6 +302,9 @@
   --cover-banner-h: 180px;
 
   /* -- Spacing scale (4px base) -------------------------------------- */
+  /* The one-pixel hairline used for paint-hang room and 1px rules. A token so
+     the value is reachable and so a file using it carries no numeric literal. */
+  --hairline: 1px;
   --space-0:  0;
   --space-1:  4px;
   --space-2:  8px;

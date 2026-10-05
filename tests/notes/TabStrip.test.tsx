@@ -152,8 +152,13 @@ describe("the active tab breaks the strip's bottom rule", () => {
     setup();
     const row = tabAt(1).parentElement as HTMLElement;
     expect(row.style.overflowY, "not the row this test is about").toBe("hidden");
-    expect(row.style.paddingBottom, "the overhang is clipped by the row").toBe("1px");
-    expect(row.style.marginBottom, "and the strip grew a pixel").toBe("-1px");
+    // The two values are the `--hairline` token (myne-md/myne#773 moved the
+    // literal into the shared sheet). Asserted on the inline style text: jsdom's
+    // CSSOM does not resolve `var()` for a longhand, so `row.style.paddingBottom`
+    // is not readable here.
+    const inline = row.getAttribute("style") ?? "";
+    expect(inline, "the overhang is clipped by the row").toContain("padding-bottom: var(--hairline)");
+    expect(inline, "and the strip grew a pixel").toContain("margin-bottom: calc(var(--hairline) * -1)");
   });
 
   it("leaves every inactive tab's stretch of the rule intact", () => {
