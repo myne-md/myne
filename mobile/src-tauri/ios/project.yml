@@ -102,7 +102,18 @@ targets:
         DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
         # ObjC +load reaches the receiver class only via NSClassFromString, so
         # force-retain it against the dead-code strip (apple/swift SR-3333).
-        OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]
+        #
+        # The second flag force-loads the swift-rs Swift package's globalized
+        # archive. The Rust `libapp.a` retains swift_rs's `_string_from_bytes` /
+        # `_retain_object` / `_release_object` references as UNDEFINED into THIS
+        # (the app) link, and under Xcode 27's SwiftPM layout those definitions
+        # ship local (`t`) in `libTauri.a`, so they are invisible to the symbol
+        # resolver and the app link fails with `Undefined symbols ... _string_from_bytes`.
+        # `mobile/scripts/ios-link.sh` globalizes them and stages the result at
+        # this stable path (the tauri-<hash> build dir is not addressable from
+        # the pbxproj). `-force_load` then pulls the globalized definitions in.
+        # See myne-ops/runbooks/ios-app-store-release.md §4b.
+        OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver", "-Wl,-force_load,$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)/libTauri.globalized.a"]
       groups: [app]
     dependencies:
       - framework: libapp.a
