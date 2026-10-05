@@ -4013,7 +4013,6 @@
       "invitationPending": "尚未接受",
       "invitationsFailed": "无法加载你的邀请。",
       "title": "保险库成员",
-      "personHint": "用你的恢复短语解锁成员身份。",
       "personUnlock": "解锁成员身份",
       "personReady": "成员身份已解锁。",
       "ownerCodeHint": "与你邀请的人共享此代码，以便他们验证保险库属于你。它只包含公开信息。",

@@ -5778,8 +5778,10 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/sync/JoinDeviceModal.tsx",
       "src/components/sync/DeviceJoinQr.tsx",
+      "src/components/sync/DeviceJoinQrDialog.tsx",
       "src/components/sync/DeviceManagementPanel.tsx",
        "src/components/sync/MemberRosterPanel.tsx",
+      "src/components/sync/PersonIdentityUnlock.tsx",
        "src/components/sync/MemberVaultUnlockCard.tsx",
        "src/hooks/useRoster.ts",
       "src/lib/invite.ts",

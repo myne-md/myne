@@ -4013,7 +4013,6 @@
       "invitationPending": "아직 수락 안 됨",
       "invitationsFailed": "초대를 불러올 수 없습니다.",
       "title": "볼트 멤버",
-      "personHint": "복구 문구로 멤버 신원을 잠금 해제합니다.",
       "personUnlock": "멤버 신원 잠금 해제",
       "personReady": "멤버 신원이 잠금 해제되었습니다.",
       "ownerCodeHint": "초대할 사람과 이 코드를 공유해 볼트가 내 것임을 검증하게 하세요. 공개 정보만 담습니다.",
