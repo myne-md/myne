@@ -23,24 +23,15 @@ import {
   partitionAssets,
   unknownExtensionMessage,
 } from "./lib/scanned-assets.mjs";
+import { VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
 
 // ── pinned origins ───────────────────────────────────────────────────────────
 //
-// Every entry is an origin that appears in the catalogue today, with why. The
-// catalogue imports the real app, so this is the same class of vendored string
-// constants the web bundle carries: documentation links, XML namespace URIs and
-// vendored-library endpoints. None is fetchable: the catalogue makes no network
-// call and its own deploy will pin `connect-src 'none'`.
-export const KNOWN_ORIGINS = new Map([
-  ["http://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
-  ["https://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
-  ["http://www.w3.org", "SVG/XML namespace URIs, not network addresses"],
-  ["https://react.dev", "react: error-message documentation links"],
-  ["https://github.com", "vendored doc links"],
-  ["https://raw.githubusercontent.com", "vendored doc links"],
-  ["https://myne.md", "Myne's own site"],
-  ["https://sync.myne.md", "the documented production sync origin, a placeholder in Myne's own copy"],
-]);
+// The catalogue now mounts real screens, so it pulls in the same vendored
+// libraries the web bundle does (Excalidraw, Mermaid, pdf.js). The origin list
+// is shared with `check-web-third-party.mjs` through `lib/vendored-origins.mjs`
+// so the two cannot drift.
+export const KNOWN_ORIGINS = VENDORED_ORIGINS;
 
 // ── the BIP-39 word list ─────────────────────────────────────────────────────
 //
@@ -73,12 +64,17 @@ export const ALLOWED_ACCOUNT_STRINGS = new Map([
 
 // ── runtime globals ──────────────────────────────────────────────────────────
 //
-// A global a scenario can call is a global any script on the page can call. The
-// catalogue installs exactly one, its fake host, and that is the only one it may
-// ship. Any `__myne*` hook would fail here, the same posture
-// `check-web-no-test-hooks.mjs` takes for the web bundle.
+// A global a scenario can call is a global any script on the page can call, so
+// the catalogue may ship only Tauri's OWN runtime keys, which the mounted
+// `@tauri-apps/api` reads and which the fake host answers. Any `__myne*` test
+// hook fails here, the same posture `check-web-no-test-hooks.mjs` takes for the
+// web bundle.
 export const GLOBAL_SHAPE = /__(?:TAURI[A-Z0-9_]*__|myne[A-Za-z0-9_]*)/g;
-export const ALLOWED_GLOBALS = new Set(["__TAURI_INTERNALS__"]);
+export const ALLOWED_GLOBALS = new Set([
+  "__TAURI_INTERNALS__",
+  "__TAURI_TO_IPC_KEY__",
+  "__TAURI_EVENT_PLUGIN_INTERNALS__",
+]);
 
 /**
  * The pure classification of one file's text, so the spec can drive it without

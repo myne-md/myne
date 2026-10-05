@@ -65,7 +65,8 @@ describe("check-stories-bundle.findBundleProblems", () => {
     expect(problems.some((p) => p.includes("__myneTestHook"))).toBe(true);
   });
 
-  it("has exactly one allowed global (the host's)", () => {
-    expect([...ALLOWED_GLOBALS]).toEqual(["__TAURI_INTERNALS__"]);
+  it("allows only Tauri's own runtime keys, never a __myne hook", () => {
+    for (const g of ALLOWED_GLOBALS) expect(g.startsWith("__TAURI")).toBe(true);
+    expect([...ALLOWED_GLOBALS].some((g) => g.startsWith("__myne"))).toBe(false);
   });
 });

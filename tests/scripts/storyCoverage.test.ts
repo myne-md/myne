@@ -21,9 +21,19 @@ function surfaces(...names: string[]): Map<string, string> {
   return new Map(names.map((n) => [n, `src/components/${n}.tsx`]));
 }
 
+/** `compare` with the story-only surface set emptied, so a case is not affected
+ *  by the real `AiChatTab` story. A separate case exercises that set. */
+function run(args: {
+  surfaces: Map<string, string>;
+  storySurfaces: Map<string, boolean>;
+  roster: { floor?: number; debt?: string[] };
+}) {
+  return compare({ ...args, storyOnly: {} });
+}
+
 describe("check-story-coverage.compare", () => {
   it("passes when every surface is covered", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 1, debt: [] },
@@ -32,7 +42,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("names a NEW surface with no story", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button", "BrandNew"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 2, debt: [] },
@@ -43,7 +53,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("allows a recorded debt entry", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button", "Old"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 2, debt: ["Old"] },
@@ -52,7 +62,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("fails a debt entry whose surface now has a story (stale debt)", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 1, debt: ["Button"] },
@@ -62,7 +72,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("fails a debt entry whose surface is gone (stale record)", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 1, debt: ["Ghost"] },
@@ -71,7 +81,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("fails a story naming a surface that does not exist", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button"),
       storySurfaces: new Map([["Buton", true]]),
       roster: { floor: 1, debt: [] },
@@ -80,7 +90,7 @@ describe("check-story-coverage.compare", () => {
   });
 
   it("fails when the scan covers less than the recorded floor", () => {
-    const problems = compare({
+    const problems = run({
       surfaces: surfaces("Button"),
       storySurfaces: new Map([["Button", true]]),
       roster: { floor: 99, debt: [] },
@@ -152,5 +162,30 @@ describe("check-story-coverage scan", () => {
     writeFileSync(join(dir, "other.tsx"), "// surface: \"Ghost\"\nexport const x = 1;");
     const found = readStorySurfaces(dir);
     expect([...found.keys()]).toEqual(["Button"]);
+  });
+});
+
+describe("check-story-coverage story-only surfaces", () => {
+  it("accepts a story for a surface outside the denominator", () => {
+    const problems = compare({
+      surfaces: surfaces("Button"),
+      storySurfaces: new Map([
+        ["Button", true],
+        ["AiChatTab", true],
+      ]),
+      roster: { floor: 1, debt: [] },
+      storyOnly: { AiChatTab: "outside the roots" },
+    });
+    expect(problems).toEqual([]);
+  });
+
+  it("fails a story-only entry with no story (stale)", () => {
+    const problems = compare({
+      surfaces: surfaces("Button"),
+      storySurfaces: new Map([["Button", true]]),
+      roster: { floor: 1, debt: [] },
+      storyOnly: { AiChatTab: "outside the roots" },
+    });
+    expect(problems.some((p) => p.includes("AiChatTab"))).toBe(true);
   });
 });

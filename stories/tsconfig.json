@@ -8,5 +8,5 @@
       "@stories/*": ["./src/*"]
     }
   },
-  "include": ["src", "fixtures"]
+  "include": ["src", "fixtures", "../src/vite-env.d.ts"]
 }

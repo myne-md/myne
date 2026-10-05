@@ -94,7 +94,9 @@ function StoryStage({ story }: { story: StoryDescriptor }) {
       >
         {story.id}
       </div>
-      <div style={{ width: story.viewport ?? "100%" }}>{story.render()}</div>
+      <div style={{ width: story.viewport ?? "100%" }} data-testid="stories.story">
+        {story.render()}
+      </div>
     </div>
   );
 }

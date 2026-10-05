@@ -48,6 +48,21 @@ export const NON_SURFACE = Object.freeze({
     "layout helper: the shared chrome around a wizard step, not a step itself",
 });
 
+/**
+ * Surfaces a story covers that live OUTSIDE the coverage denominator, each with
+ * its reason. They are not gated by the ratchet (they are not under a surface
+ * root), but a story that declares them must not fail the "story names a surface
+ * that does not exist" rule. Compared both ways: the guard fails if one of these
+ * has no story any more.
+ */
+/**
+ * @type {Readonly<Record<string, string>>}
+ */
+export const STORY_ONLY_SURFACES = Object.freeze({
+  AiChatTab:
+    "the desktop AI chat panel lives under src/notes/components, outside the surface roots; the screenshot harness shoots it from the catalogue (myne-md/myne#832 task 14)",
+});
+
 /** Walk a directory recursively for `.tsx` files. */
 function walkTsx(dir) {
   const out = [];
@@ -119,7 +134,8 @@ function loadRoster(path) {
  * The comparison, as a pure function over already-read inputs, so the test can
  * drive it without a real tree.
  */
-export function compare({ surfaces, storySurfaces, roster }) {
+export function compare({ surfaces, storySurfaces, roster, storyOnly }) {
+  const only = storyOnly ?? STORY_ONLY_SURFACES;
   const problems = [];
   const debt = new Set(roster.debt ?? []);
 
@@ -146,9 +162,17 @@ export function compare({ surfaces, storySurfaces, roster }) {
   }
 
   for (const name of storySurfaces.keys()) {
-    if (!surfaces.has(name)) {
+    if (!surfaces.has(name) && !(name in only)) {
       problems.push(
         `A story declares surface "${name}", but no such surface exists under ${SURFACE_ROOTS.join(" or ")}. Fix the surface name or the file it refers to.`,
+      );
+    }
+  }
+
+  for (const name of Object.keys(only)) {
+    if (!storySurfaces.has(name)) {
+      problems.push(
+        `story-only surfaces records "${name}" as covered by a story outside the surface roots, but no story declares it. Remove the stale entry.`,
       );
     }
   }
