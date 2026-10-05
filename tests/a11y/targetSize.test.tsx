@@ -92,12 +92,15 @@ describe("the compact controls adopt it", () => {
     const RAISED = [
       "src/components/primitives/IconButton.tsx",
       "src/notes/components/NoteRow.tsx",
-      "src/notes/components/ViewsSection.tsx",
       "src/notes/components/TaskListPanel.tsx",
       "src/components/attachments/AttachmentsLibrary.tsx",
       "src/notes/components/ColorGroupEditor.tsx",
       "src/notes/components/TabStrip.tsx",
     ];
+    // `ViewsSection.tsx` left this list when its compact controls moved onto the
+    // primitives (`IconButton` carries `MIN_TARGET` itself; the row and the
+    // search box are `Button`/`Input`), so the file no longer needs the token
+    // spelled at its own call site.
     for (const path of RAISED) {
       expect(code(path), path).toContain("MIN_TARGET");
     }

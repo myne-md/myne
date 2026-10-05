@@ -13,16 +13,20 @@
 // A caller's `style` still wins, so the mono account-number fields and the
 // width-constrained ones keep their call-site layout unchanged.
 
-import { type InputHTMLAttributes } from "react";
+import { type InputHTMLAttributes, type Ref } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   mono?: boolean;
+  /** Forwarded to the underlying `<input>`, so a caller that focuses or selects
+   *  the field directly (the saved-views search) can keep using the primitive. */
+  ref?: Ref<HTMLInputElement>;
 }
 
-export function Input({ invalid, mono, className, ...rest }: InputProps) {
+export function Input({ invalid, mono, className, ref, ...rest }: InputProps) {
   return (
     <input
+      ref={ref}
       {...rest}
       className={className === undefined ? "myne-input" : `myne-input ${className}`}
       data-mono={mono === true ? "true" : undefined}
