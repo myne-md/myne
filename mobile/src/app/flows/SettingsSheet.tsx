@@ -1970,7 +1970,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       setPinError(
         kind === "HardwareUnavailable"
           ? t("settings.quickUnlock.biometricUnavailable", { method: biometric })
-          : t("settings.quickUnlock.setupError"),
+          : kind === "BiometricAuthFailed"
+            ? t("settings.quickUnlock.biometricAuthFailed", { method: biometric })
+            : t("settings.quickUnlock.setupError"),
       );
     } finally {
       setBioBusy(false);

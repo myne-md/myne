@@ -26,6 +26,12 @@ export type QuickUnlockError =
   | { kind: "RequiresFullPassword" }
   | { kind: "Cancelled" }
   | { kind: "HardwareUnavailable" }
+  /** The OS refused the biometric store (`errSecAuthFailed`), so a biometric
+   *  credential could not be created. Most often no biometric is enrolled, but
+   *  the status is broad, so the copy names the likely remedy rather than
+   *  asserting the cause. Distinct from `HardwareUnavailable` (this BUILD
+   *  cannot use the facility). myne-md/myne#830. */
+  | { kind: "BiometricAuthFailed" }
   | { kind: "WrongCredential"; detail: { remaining: number } }
   | { kind: "AttemptsExhausted" }
   | { kind: "PinTooShort" }
