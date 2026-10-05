@@ -150,6 +150,17 @@ runner(
       );
 
       await unlockToEditor(s, password);
+
+      await frame(
+        s,
+        "15-importer-offer",
+        "The first-run importer offer overlay: what a new user meets when the " +
+          "editor first opens.",
+        async () => {
+          await sleep(900);
+        },
+      );
+
       await dismissImporterOffer(s);
 
       // ── The shell ─────────────────────────────────────────────────────
