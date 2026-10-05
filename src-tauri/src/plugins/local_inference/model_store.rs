@@ -70,15 +70,15 @@ pub enum ModelRole {
     /// Speech-to-text model (`transcribe`) — Whisper, voice-to-text MYND-550
     /// (SYNC-V3). Side-loaded + swappable independently of the other two.
     Transcription,
-    /// Tag-suggestion model (auto-tag, MYND-651) — **bundled-only**. Unlike the
-    /// three roles above it has no marker file, no picker, and no IPC role
-    /// string: the weights are the first-party GGUF at
-    /// [`BUNDLED_TAG_MODEL_SUBPATH`] and nothing else can take their place. That
-    /// is not an omission but the documented gate — `threat-model.md` §7 states
-    /// auto-tag has "no override picker, so it never re-enters the
-    /// untrusted-input case at all", and a user-selectable path would walk that
-    /// back. The `None`s below and [`ModelRole::parse`] refusing `"tag"` are what
-    /// make the sentence true in code rather than only in prose.
+    /// Tag-suggestion model (auto-tag, MYND-651). Historically **bundled-only**
+    /// (no marker file, no picker, no IPC role string). Since myne-md/myne#805
+    /// (`decisions/ai/0627`) it is a selectable, user-storable role like the
+    /// other three: a downloaded or side-loaded path (`tag.path`) takes
+    /// precedence over the bundled default, and [`ModelRole::parse`] accepts
+    /// `"tag"`. The fetch is verified against a SHA-256 compiled into the client
+    /// binary before the model is registered; a Developer-mode side-load of a
+    /// user-supplied file re-enters the same untrusted-input case the
+    /// transcription override already carries.
     TagSuggestion,
 }
 
@@ -90,7 +90,7 @@ impl ModelRole {
             ModelRole::Generation => Some("generation.path"),
             ModelRole::Embedding => Some("embedding.path"),
             ModelRole::Transcription => Some("transcription.path"),
-            ModelRole::TagSuggestion => None,
+            ModelRole::TagSuggestion => Some("tag.path"),
         }
     }
 
@@ -109,15 +109,16 @@ impl ModelRole {
     }
 
     /// Parse the IPC role string (`"generation"` / `"embedding"` /
-    /// `"transcription"`) — the command layer's only re-entry point for a
-    /// UI-supplied role. There is deliberately **no** string for
-    /// [`ModelRole::TagSuggestion`]: the bundled tag model is not selectable, so
-    /// no IPC caller can name it.
+    /// `"transcription"` / `"tag"`): the command layer's only re-entry point
+    /// for a UI-supplied role. `"tag"` joined this set with myne-md/myne#805
+    /// (`decisions/ai/0627`), when the auto-tag model became a downloaded,
+    /// user-storable role rather than a bundled-only one.
     pub fn parse(s: &str) -> Option<ModelRole> {
         match s {
             "generation" => Some(ModelRole::Generation),
             "embedding" => Some(ModelRole::Embedding),
             "transcription" => Some(ModelRole::Transcription),
+            "tag" => Some(ModelRole::TagSuggestion),
             _ => None,
         }
     }
@@ -133,8 +134,8 @@ pub enum ModelStoreError {
     #[error("model path is inside the vault tree")]
     InsideVaultTree,
     /// The IPC role string was not `"generation"` / `"embedding"` (a UI/codegen
-    /// bug, not user-facing input), or the role names a **bundled-only** model
-    /// that has no user-selectable path ([`ModelRole::TagSuggestion`]).
+    /// bug, not user-facing input), or the role names a model with no
+    /// user-selectable path.
     #[error("unknown model role")]
     InvalidRole,
     /// A marker records a model path and **the file it names is not there**
@@ -152,6 +153,13 @@ pub enum ModelStoreError {
     /// writing a marker, reduced to a closed, path-free kind.
     #[error("model store io failure")]
     Io { kind: IoFailureKind },
+    /// A downloaded artifact's SHA-256 did not match the digest compiled into
+    /// the client binary (myne-md/myne#805, `decisions/ai/0627`). The staged
+    /// bytes are deleted and nothing is registered. The expected digest is never
+    /// read from the origin that served the bytes, so a tampered or truncated
+    /// download reaches this arm rather than becoming a model.
+    #[error("downloaded model failed its digest check")]
+    DigestMismatch,
 }
 
 impl ModelStoreError {
@@ -162,6 +170,7 @@ impl ModelStoreError {
             ModelStoreError::InvalidRole => "invalid_role",
             ModelStoreError::RecordedModelMissing => "recorded_model_missing",
             ModelStoreError::Io { .. } => "io",
+            ModelStoreError::DigestMismatch => "digest_mismatch",
         }
     }
 }
@@ -323,10 +332,10 @@ pub fn set_selected_model(
     role: ModelRole,
     model_path: &Path,
 ) -> Result<PathBuf, ModelStoreError> {
-    // A bundled-only role has no selectable path — refuse BEFORE touching the
-    // filesystem so a rejected pick records nothing anywhere. This is the
-    // "no override picker" gate of `threat-model.md` §7, enforced at the one
-    // function that could otherwise create one.
+    // Every role is selectable since myne-md/myne#805 (TagSuggestion gained a
+    // stored path). This guard is kept as a safety net for a future
+    // bundled-only role: refuse BEFORE touching the filesystem so a rejected
+    // pick records nothing anywhere.
     let Some(marker_name) = role.marker_file_name() else {
         return Err(ModelStoreError::InvalidRole);
     };
@@ -387,11 +396,88 @@ pub fn selected_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, Mo
     }
 }
 
-/// Read back the recorded model path for `role`, or `None` if none is set.
+/// Remove the recorded model for `role`, deleting a **downloaded** bundle if the
+/// recorded path lives under `<models>/` (myne-md/myne#805).
 ///
-/// A **bundled-only** role ([`ModelRole::TagSuggestion`]) has no marker file, so
-/// this is always `Ok(None)` for it — an override cannot exist even if a stray
-/// file of some other name is dropped into `models/`.
+/// Only a file the app owns is deleted. A **side-loaded** path points at a file
+/// the user chose elsewhere on disk; removing the marker must not delete their
+/// file, so a path outside `models/` is only unregistered. This is the
+/// "manage a model, remove it" half of the Settings surface: a downloaded model
+/// is reclaimable, a side-loaded one is merely forgotten.
+///
+/// Idempotent: removing a role that has no recorded path is `Ok(())`, and so is
+/// removing one whose bytes are already gone — a `NotFound` on the byte-deletion
+/// arm is treated as success so the marker still gets dropped.
+pub fn remove_selected_model(base: &Path, role: ModelRole) -> Result<(), ModelStoreError> {
+    let Some(marker_name) = role.marker_file_name() else {
+        return Ok(());
+    };
+    let dir = models_dir_from_base(base);
+    // The recorded path, if any. Read before the marker is deleted.
+    let recorded = selected_model(base, role)?;
+
+    // Delete the model bytes only when they live under `models/`: the one
+    // directory the app owns. A side-loaded path elsewhere is the user's file.
+    // A `NotFound` is success: the marker must still be dropped.
+    let delete_result = if let Some(path) = recorded {
+        let owned_dir = ensure_models_dir(base)?;
+        if is_under(&path, &owned_dir) {
+            // A downloaded bundle records its PRIMARY FILE inside
+            // `<models>/<dest_dir>/`, so removing the parent directory reclaims
+            // the whole set (model + tokenizer/config siblings). A marker that
+            // names a file directly under `models/` is a single-file install.
+            match path.parent() {
+                Some(parent) if parent != owned_dir.as_path() && is_under(parent, &owned_dir) => {
+                    std::fs::remove_dir_all(parent).or_else(ignore_not_found)
+                }
+                _ => std::fs::remove_file(&path).or_else(ignore_not_found),
+            }
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    };
+    delete_result?;
+
+    // Drop the role's markers (path marker, and the hash marker for the roles
+    // that carry one) so a stale hash cannot outlive the model it described.
+    for name in [Some(marker_name), role.hash_marker_file_name()]
+        .into_iter()
+        .flatten()
+    {
+        match std::fs::remove_file(dir.join(name)) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
+/// Treat a `NotFound` IO error as success, so an already-gone file does not
+/// block the marker cleanup that follows (idempotent remove).
+fn ignore_not_found(e: std::io::Error) -> Result<(), ModelStoreError> {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        Ok(())
+    } else {
+        Err(e.into())
+    }
+}
+
+/// Whether `candidate` is `dir` or lives inside it.
+///
+/// Symlinks are resolved on both sides when the path exists, so a symlinked
+/// subdirectory under `models/` cannot make a lexical match delete a file
+/// outside it. A path that does not exist yet (a marker naming a since-deleted
+/// file) falls back to lexical normalization, where `models/../other` is still
+/// not mistaken for a child of `models/`.
+fn is_under(candidate: &Path, dir: &Path) -> bool {
+    let resolved = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| normalize_lexical(p));
+    resolved(candidate).starts_with(resolved(dir))
+}
+
+/// Read back the recorded model path for `role`, or `None` if none is set.
 pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, ModelStoreError> {
     let Some(marker_name) = role.marker_file_name() else {
         return Ok(None);
@@ -481,13 +567,14 @@ pub fn selected_model_verified(
 pub const BUNDLED_TRANSCRIPTION_SUBPATH: [&str; 3] = ["models", "whisper", "model.gguf"];
 
 /// Path components (under the Tauri `resource_dir`) of the **bundled** auto-tag
-/// task-model (MYND-651; `decisions.md` 2026-07-31 "Auto-tag runs on a bundled
-/// task-model and renders inline"): `<resource_dir>/models/tag/model.gguf`, with
-/// a sibling `tokenizer.json` (the `load_tag` layout). A quantized
-/// Qwen2.5-0.5B-Instruct GGUF (Apache-2.0; `LICENSING.md`) — the same Qwen2
-/// architecture family the generation role loads, which is why it needs no new
-/// runtime. Desktop-only, and unlike transcription there is **no** picker
-/// override: this path is the only tag model there is.
+/// task-model (MYND-651) `<resource_dir>/models/tag/model.gguf`, with a sibling
+/// `tokenizer.json` (the `load_tag` layout). A quantized Qwen2.5-0.5B-Instruct
+/// GGUF (Apache-2.0; `LICENSING.md`): the same Qwen2 architecture family the
+/// generation role loads, which is why it needs no new runtime. Desktop-only.
+/// Since myne-md/myne#805 (`decisions/ai/0627`) the desktop installer no longer
+/// ships this file; it remains here as the **fallback resolver** for a build
+/// that does carry one, and `effective_tag_model` prefers a downloaded or
+/// side-loaded path (`tag.path`) over it.
 pub const BUNDLED_TAG_MODEL_SUBPATH: [&str; 3] = ["models", "tag", "model.gguf"];
 
 /// The bundled default transcription model path IFF it is actually present on
@@ -500,9 +587,10 @@ pub fn bundled_transcription_model(resource_dir: &Path) -> Option<PathBuf> {
 
 /// The bundled auto-tag model path IFF it is actually present on disk (MYND-651).
 /// `None` on an `--no-default-features` AI-free build or a checkout whose LFS
-/// blob was not fetched — and because there is no override to fall back to, that
-/// `None` is simply "no auto-tag on this build": the engine answers `NotReady`
-/// and the feature stays absent rather than half-working.
+/// blob was not fetched. Since myne-md/myne#805 this is only the *fallback*
+/// input to [`effective_tag_model`]; a `None` here plus no stored `tag.path`
+/// means "no auto-tag on this device", and the engine answers `NotReady` so the
+/// feature stays absent rather than half-working.
 pub fn bundled_tag_model(resource_dir: &Path) -> Option<PathBuf> {
     bundled_model(resource_dir, BUNDLED_TAG_MODEL_SUBPATH)
 }
@@ -531,6 +619,161 @@ pub fn effective_transcription_model(
         return Ok(Some(p));
     }
     Ok(bundled.map(|p| p.to_path_buf()))
+}
+
+/// The auto-tag model actually used: the downloaded or side-loaded **override**
+/// (`tag.path`) if set, else the **bundled** default (myne-md/myne#805,
+/// `decisions/ai/0627`). One source of truth shared by the engine loader and the
+/// capability report, so a downloaded model and a side-loaded one converge on
+/// one resolution exactly as transcription's override does. `bundled` is `None`
+/// on a build with no bundled model, making the result override-only.
+pub fn effective_tag_model(
+    base: &Path,
+    bundled: Option<&Path>,
+) -> Result<Option<PathBuf>, ModelStoreError> {
+    if let Some(p) = selected_model(base, ModelRole::TagSuggestion)? {
+        return Ok(Some(p));
+    }
+    Ok(bundled.map(|p| p.to_path_buf()))
+}
+
+/// One file inside a downloadable artefact, with the SHA-256 compiled into the
+/// client binary (myne-md/myne#805, `decisions/ai/0627`). `sha256_hex` is
+/// lowercase hex; it is decoded at install time rather than written as a byte
+/// array literal so the table stays greppable and typo-resistant.
+pub struct ArtifactFile {
+    /// Bare file name, exactly as the origin's hashed path spells it.
+    pub name: &'static str,
+    /// Lowercase-hex SHA-256, never read from the serving origin.
+    pub sha256_hex: &'static str,
+}
+
+/// Decode a 64-char lowercase-hex SHA-256 into 32 bytes, or `None`.
+fn hex_to_32(hex: &str) -> Option<[u8; 32]> {
+    if hex.len() != 64 {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
+/// Install a downloaded **multi-file** artefact for `role` (myne-md/myne#805).
+///
+/// A model is rarely one file: the tag loader reads a sibling `tokenizer.json`
+/// and the embedding loader reads a sibling `config.json` + `tokenizer.json`
+/// (`engine_candle.rs`), so all of them must land together in one directory for
+/// the loader's bare `models/<dir>/<file>` layout to resolve.
+///
+/// `staged_dir` holds the fetched files, downloaded outside the final location.
+/// Every file is hashed and compared against its compiled-in digest **before**
+/// anything is registered: on any mismatch the whole staging directory is
+/// deleted and [`ModelStoreError::DigestMismatch`] is returned, so a tampered or
+/// truncated download can never become a model. On success the staging directory
+/// is renamed (same filesystem, atomic) to `<models>/<dest_dir_name>` and the
+/// role's path marker records the primary file.
+///
+/// `dest_dir_name` and the file names are validated as bare names, so an
+/// artefact table cannot be made to write outside `models/`.
+pub fn install_downloaded_bundle(
+    base: &Path,
+    role: ModelRole,
+    staged_dir: &Path,
+    dest_dir_name: &str,
+    files: &[ArtifactFile],
+) -> Result<PathBuf, ModelStoreError> {
+    if role.marker_file_name().is_none() {
+        return Err(ModelStoreError::InvalidRole);
+    }
+    // The primary file is the table's first entry; its path is what the marker
+    // records. Validate names before any IO.
+    let Some(primary) = files.first() else {
+        return Err(ModelStoreError::InvalidRole);
+    };
+    if !is_bare_name(dest_dir_name) || files.iter().any(|f| !is_bare_name(f.name)) {
+        return Err(ModelStoreError::InvalidRole);
+    }
+
+    // Verify every file BEFORE registering anything.
+    for file in files {
+        let Some(expected) = hex_to_32(file.sha256_hex) else {
+            // A malformed compiled-in digest is a code defect, not user input.
+            let _ = std::fs::remove_dir_all(staged_dir);
+            return Err(ModelStoreError::InvalidRole);
+        };
+        let staged = staged_dir.join(file.name);
+        let actual = compute_file_sha256(&staged)?;
+        if actual != expected {
+            let _ = std::fs::remove_dir_all(staged_dir);
+            return Err(ModelStoreError::DigestMismatch);
+        }
+    }
+
+    let dir = ensure_models_dir(base)?;
+    let dest = dir.join(dest_dir_name);
+    let backup_prefix = format!("{dest_dir_name}.old-");
+    // Recover from a crash during a PREVIOUS install: if `dest` is absent but an
+    // `.old-*` copy of it survives, the crash landed between the two renames and
+    // the old copy is the only one. Promote it back before proceeding. Also clear
+    // any other orphaned `.old-*` copies (they are superseded now).
+    if !dest.exists() {
+        if let Some(orphan) = find_old_backup(&dir, &backup_prefix) {
+            let _ = std::fs::rename(&orphan, &dest);
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with(&backup_prefix) {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
+    }
+    // Replace in place with as small a no-model window as possible. The old
+    // copy is moved aside with a same-filesystem rename (O(1)) BEFORE the
+    // verified staging directory is renamed in, rather than deleted first: a
+    // crash between the two renames leaves the previous copy under a temp name
+    // instead of leaving the role with nothing, and the slow part (deleting a
+    // multi-hundred-MB dir) happens after the new model is already visible.
+    let mut backup: Option<PathBuf> = None;
+    if dest.exists() {
+        let tmp = dir.join(format!("{dest_dir_name}.old-{}", std::process::id()));
+        // Clear a leftover from an earlier crashed install before reusing the name.
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::rename(&dest, &tmp)?;
+        backup = Some(tmp);
+    }
+    if let Err(e) = std::fs::rename(staged_dir, &dest) {
+        // Put the previous copy back so a failed rename does not lose it.
+        if let Some(b) = &backup {
+            let _ = std::fs::rename(b, &dest);
+        }
+        return Err(e.into());
+    }
+    if let Some(b) = backup {
+        let _ = std::fs::remove_dir_all(&b);
+    }
+    set_selected_model(base, role, &dest.join(primary.name))
+}
+
+/// Whether `name` is a bare file/directory name (no separators, not `.`/`..`).
+fn is_bare_name(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains('/') && !name.contains('\\')
+}
+
+/// The first orphaned `<prefix>*` directory under `dir`, if any (used to recover
+/// a copy moved aside by a crashed install).
+fn find_old_backup(dir: &Path, prefix: &str) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(prefix) {
+            return Some(entry.path());
+        }
+    }
+    None
 }
 
 /// Return the embedding model hash, backfilling it (compute + persist) from the
@@ -866,41 +1109,88 @@ mod tests {
     }
 
     #[test]
-    fn tag_role_is_bundled_only_and_has_no_selectable_path() {
-        // `threat-model.md` §7 states auto-tag has "no override picker, so it
-        // never re-enters the untrusted-input case at all". These four
-        // assertions are what make that a property of the code: no IPC role
-        // string reaches the role, no marker can be written for it, and reading
-        // one back is unconditionally `None`.
-        let tmp = ScopedTempDir::new("local-inf-tag-bundled-only").expect("scoped tempdir");
+    fn tag_role_is_selectable_and_stores_its_path() {
+        // myne-md/myne#805 (`decisions/ai/0627`): auto-tag's model is no longer
+        // bundled-only. It is a selectable, user-storable role, so a downloaded
+        // or side-loaded path can be recorded and read back, and the model
+        // resolves through `effective_tag_model` with the bundled default as the
+        // fallback.
+        let tmp = ScopedTempDir::new("local-inf-tag-selectable").expect("scoped tempdir");
         let base = tmp.path();
 
-        // 1. No IPC re-entry point — the command layer cannot name the role.
-        assert_eq!(ModelRole::parse("tag"), None);
+        // 1. An IPC re-entry point exists.
+        assert_eq!(ModelRole::parse("tag"), Some(ModelRole::TagSuggestion));
         assert_eq!(ModelRole::parse("tag-suggestion"), None);
 
-        // 2. Writing a pick is refused, with no filesystem side effect.
+        // 2. A pick is accepted and recorded.
         let dl = base.join("downloads");
         std::fs::create_dir_all(&dl).unwrap();
-        let model = dl.join("attacker-qwen.gguf");
+        let model = dl.join("qwen-tag.gguf");
         std::fs::write(&model, b"not really a model").unwrap();
-        assert_eq!(
-            set_selected_model(base, ModelRole::TagSuggestion, &model),
-            Err(ModelStoreError::InvalidRole)
-        );
-        assert!(
-            !models_dir_from_base(base).exists(),
-            "a refused pick must not even create the models dir"
-        );
+        let stored =
+            set_selected_model(base, ModelRole::TagSuggestion, &model).expect("tag is selectable");
 
-        // 3. Reading back is always `None`, even next to a real generation pick.
-        set_selected_model(base, ModelRole::Generation, &model).expect("generation is selectable");
-        assert!(selected_model(base, ModelRole::Generation)
-            .unwrap()
-            .is_some());
+        // 3. It reads back, and `effective_tag_model` prefers it over the
+        //    bundled default.
         assert_eq!(
             selected_model(base, ModelRole::TagSuggestion).unwrap(),
-            None
+            Some(stored.clone())
+        );
+        let bundled = base.join("resource-tag.gguf");
+        assert_eq!(
+            effective_tag_model(base, Some(&bundled)).unwrap(),
+            Some(stored)
+        );
+
+        // 4. With no stored pick, the bundled default is used, and `None` when
+        //    neither is present.
+        let tmp2 = ScopedTempDir::new("local-inf-tag-fallback").expect("scoped tempdir");
+        assert_eq!(
+            effective_tag_model(tmp2.path(), Some(&bundled)).unwrap(),
+            Some(bundled.clone())
+        );
+        assert_eq!(effective_tag_model(tmp2.path(), None).unwrap(), None);
+    }
+
+    #[test]
+    fn install_downloaded_bundle_refuses_a_path_traversal_name() {
+        // The bundle installer validates `dest_dir_name` and every file name as
+        // bare names before any IO, so the compiled-in artefact table cannot be
+        // made to write outside `models/`. (The single-file installer that used
+        // to carry this test had no production caller and was removed.)
+        let tmp = ScopedTempDir::new("local-inf-bundle-name").expect("scoped tempdir");
+        let base = tmp.path();
+        let staging = base.join("staged").join("tag");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("model.gguf"), b"x").unwrap();
+
+        let files = [ArtifactFile {
+            name: "model.gguf",
+            sha256_hex: "",
+        }];
+
+        assert_eq!(
+            install_downloaded_bundle(
+                base,
+                ModelRole::TagSuggestion,
+                &staging,
+                "../escape",
+                &files
+            ),
+            Err(ModelStoreError::InvalidRole)
+        );
+        assert_eq!(
+            install_downloaded_bundle(
+                base,
+                ModelRole::TagSuggestion,
+                &staging,
+                "tag",
+                &[ArtifactFile {
+                    name: "../escape.gguf",
+                    sha256_hex: ""
+                }]
+            ),
+            Err(ModelStoreError::InvalidRole)
         );
     }
 
@@ -1015,5 +1305,131 @@ mod tests {
         set_selected_model(base, ModelRole::Generation, &gen).unwrap();
         // Generation does not feed the embedding identity → no hash recorded.
         assert_eq!(selected_embedding_model_hash(base).unwrap(), None);
+    }
+
+    /// Leak a computed digest into a `&'static str` for an `ArtifactFile` in a
+    /// test. The production table carries literals; this lets a test build the
+    /// table's shape from real bytes without hand-computing a digest.
+    fn leak(s: String) -> &'static str {
+        Box::leak(s.into_boxed_str())
+    }
+
+    #[test]
+    fn install_downloaded_bundle_verifies_every_file_then_registers_the_primary() {
+        use sha2::{Digest, Sha256};
+        let tmp = ScopedTempDir::new("local-inf-bundle-ok").expect("scoped tempdir");
+        let base = tmp.path();
+        let staging = base.join("staged").join("tag");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("model.gguf"), b"weights").unwrap();
+        std::fs::write(staging.join("tokenizer.json"), b"tokenizer").unwrap();
+
+        let files = [
+            ArtifactFile {
+                name: "model.gguf",
+                sha256_hex: leak(format!("{:x}", Sha256::digest(b"weights"))),
+            },
+            ArtifactFile {
+                name: "tokenizer.json",
+                sha256_hex: leak(format!("{:x}", Sha256::digest(b"tokenizer"))),
+            },
+        ];
+
+        let installed =
+            install_downloaded_bundle(base, ModelRole::TagSuggestion, &staging, "tag-test", &files)
+                .expect("a matching bundle installs");
+
+        assert!(installed.ends_with("model.gguf"));
+        assert!(installed.is_file());
+        // Every sibling landed together, so the loader's bare-name layout resolves.
+        assert!(installed.parent().unwrap().join("tokenizer.json").is_file());
+        assert!(
+            !staging.exists(),
+            "the staging dir is consumed by the rename"
+        );
+        assert_eq!(
+            selected_model(base, ModelRole::TagSuggestion).unwrap(),
+            Some(installed)
+        );
+    }
+
+    #[test]
+    fn install_downloaded_bundle_rejects_a_mismatch_and_removes_staging() {
+        use sha2::{Digest, Sha256};
+        let tmp = ScopedTempDir::new("local-inf-bundle-bad").expect("scoped tempdir");
+        let base = tmp.path();
+        let staging = base.join("staged").join("tag");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("model.gguf"), b"tampered").unwrap();
+        std::fs::write(staging.join("tokenizer.json"), b"tokenizer").unwrap();
+
+        let files = [
+            ArtifactFile {
+                name: "model.gguf",
+                sha256_hex: leak(format!("{:x}", Sha256::digest(b"original"))),
+            },
+            ArtifactFile {
+                name: "tokenizer.json",
+                sha256_hex: leak(format!("{:x}", Sha256::digest(b"tokenizer"))),
+            },
+        ];
+
+        assert_eq!(
+            install_downloaded_bundle(base, ModelRole::TagSuggestion, &staging, "tag-test", &files),
+            Err(ModelStoreError::DigestMismatch)
+        );
+        assert!(
+            !staging.exists(),
+            "a failed digest check removes the staging dir"
+        );
+        assert!(!models_dir_from_base(base).join("tag-test").exists());
+        assert_eq!(
+            selected_model(base, ModelRole::TagSuggestion).unwrap(),
+            None
+        );
+    }
+
+    /// Removing a DOWNLOADED model deletes the app-owned bytes and drops the
+    /// markers. Removing a SIDE-LOADED one forgets it but leaves the user's file
+    /// untouched: those are the two behaviours the Settings "remove" button
+    /// rests on (myne-md/myne#805 task 7).
+    #[test]
+    fn remove_deletes_an_owned_download_but_only_forgets_a_side_load() {
+        let tmp = ScopedTempDir::new("local-inf-remove").expect("scoped tempdir");
+        let base = tmp.path();
+
+        // A downloaded bundle installed into models/ under the app's control.
+        let dl = base.join("downloads");
+        std::fs::create_dir_all(&dl).unwrap();
+        let owned_dir = models_dir_from_base(base).join("embedding-abc");
+        std::fs::create_dir_all(&owned_dir).unwrap();
+        let owned = owned_dir.join("model.safetensors");
+        std::fs::write(&owned, b"weights").unwrap();
+        set_selected_model(base, ModelRole::Embedding, &owned).expect("record owned");
+
+        remove_selected_model(base, ModelRole::Embedding).expect("remove owned");
+        assert!(!owned.exists(), "the app-owned model file is deleted");
+        assert!(
+            selected_model(base, ModelRole::Embedding)
+                .unwrap()
+                .is_none(),
+            "the marker is dropped"
+        );
+
+        // A side-loaded file OUTSIDE models/: the user's own file.
+        let user_file = dl.join("my-model.gguf");
+        std::fs::write(&user_file, b"user weights").unwrap();
+        set_selected_model(base, ModelRole::Generation, &user_file).expect("record side-load");
+        remove_selected_model(base, ModelRole::Generation).expect("remove side-load");
+        assert!(
+            user_file.exists(),
+            "a side-loaded file the user chose is never deleted"
+        );
+        assert!(selected_model(base, ModelRole::Generation)
+            .unwrap()
+            .is_none());
+
+        // Idempotent: removing a role with nothing recorded is fine.
+        remove_selected_model(base, ModelRole::Transcription).expect("idempotent");
     }
 }

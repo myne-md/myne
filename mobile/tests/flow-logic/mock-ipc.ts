@@ -282,11 +282,30 @@ export interface MockConfig {
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
   transcribe?: { text: string } | { error: "not_ready" | "too_long" | "failed" };
+  /** Whether the device-local `myne.aiOnboardingSeen` flag is set before boot.
+   *  Defaults to `true`, so the first-run `AiOnboardingSheet` stays closed and
+   *  its full-viewport scrim cannot swallow the clicks of every editor-mounted
+   *  spec (myne#805). Set `false` to assert the onboarding itself. */
+  aiOnboardingSeen?: boolean;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
 export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<void> {
   await page.addInitScript((config: MockConfig) => {
+    // Device-local first-run surfaces are seeded SEEN by default (myne#805).
+    // `AiOnboardingSheet` opens whenever `myne.aiOnboardingSeen` is absent and
+    // its full-viewport scrim then intercepts every click, which took out the
+    // whole editor-mounted flow tier. A spec that actually exercises onboarding
+    // opts out with `aiOnboardingSeen: false`.
+    try {
+      if (config.aiOnboardingSeen === false) {
+        localStorage.removeItem("myne.aiOnboardingSeen");
+      } else {
+        localStorage.setItem("myne.aiOnboardingSeen", "1");
+      }
+    } catch {
+      /* storage disabled — the app offers onboarding, which is its own case */
+    }
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
       // myne#177: the real host always sends this (serde emits a BTreeMap as

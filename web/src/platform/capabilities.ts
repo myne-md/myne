@@ -80,6 +80,14 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // No API grants a page an arbitrary write path. Task 48's download flow is a
   // differently-shaped affordance, not this one.
   "nativeSaveAs",
+  // The sandboxed editor for the user's own on-disk files (myne-md/myne#788).
+  // A page has no OS file ingress, no native open dialog and no handler
+  // registration, and the surface exists to be independent of vault state in a
+  // way a browser session (one vault per origin, sync required) is not. The
+  // whole `plain-file` plugin is `Class::Unsupported` in `capability.rs`; this
+  // entry is the other half of that decision, so a menu or palette entry can
+  // never be offered against commands that refuse.
+  "plainFile",
   // `decisions.md` 2026-07-26: the 24-word recovery phrase is "never generated
   // by, displayed by, or typed into served code". Creation generates and shows
   // it; recovery types it. Both are normative removals, not scope cuts.

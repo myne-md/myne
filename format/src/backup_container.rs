@@ -323,7 +323,12 @@ pub fn validate_member_path(path: &str) -> Result<(), BackupContainerError> {
 /// deliberately NOT `NoteId::parse` (v7-strict — §9.11.3's grammar carries
 /// no version constraint; reusing the v7 validator would silently shrink
 /// backup membership).
-fn is_disk_uuid(s: &str) -> bool {
+///
+/// PUBLIC so the import reader's `notes/` listing filter uses the SAME shape the
+/// container allowlist admits (myne-md/myne#827): a stricter filter there would
+/// extract a member the allowlist accepted and then silently drop it from the
+/// listing. One definition, two callers, no drift.
+pub fn is_disk_uuid(s: &str) -> bool {
     let b = s.as_bytes();
     if b.len() != 36 {
         return false;

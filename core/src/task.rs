@@ -318,6 +318,22 @@ mod tests {
 
     #[test]
     fn yield_now_is_a_plain_cooperative_yield() {
-        rt().block_on(yield_now());
+        // A no-op would still let this test's own `assert!` compile, so the
+        // property is that the await point actually hands control back to the
+        // executor: the spawned task below runs only if `yield_now` yields.
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        rt().block_on(async {
+            let ran = Arc::new(AtomicBool::new(false));
+            let flag = ran.clone();
+            tokio::spawn(async move {
+                flag.store(true, Ordering::SeqCst);
+            });
+            yield_now().await;
+            assert!(
+                ran.load(Ordering::SeqCst),
+                "yield_now must let a ready task run before it resumes"
+            );
+        });
     }
 }

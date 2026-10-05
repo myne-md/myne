@@ -58,6 +58,7 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
+import { refreshThenOpen } from "../openFreshNote";
 import {
   itemKey,
   parseItemKey,
@@ -1655,7 +1656,15 @@ export function PaneView({
             onOpenNote={(id) => {
               // Opening a template REPLACES this tab with it, which is what
               // "open" means in a pane. No separate close.
-              void ctx.open(id).catch(() => {});
+              //
+              // Refresh it into the cache FIRST. A template created moments ago
+              // is not in `ctx.cache` yet, and the open bridge treats an id that
+              // is not live as a DELETED note and refuses to open it (myne#655) —
+              // which is why a freshly created template could not be opened for
+              // editing, and why it also slipped through the palette's
+              // `isTemplate` filter (myne-md/myne#820). The ordering lives in
+              // `refreshThenOpen` so a test can pin it (myne-md/myne#824).
+              void refreshThenOpen(ctx, id).catch(() => {});
             }}
           />
         ),

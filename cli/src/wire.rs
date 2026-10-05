@@ -43,6 +43,13 @@ pub enum Request {
         period: String,
         line: String,
     },
+    /// myne-md/myne#788 (plaintext-file-editor task 11). Opens a local
+    /// markdown file in the running app's plain-file surface. The path is
+    /// re-validated desktop-side (gate, extension, size) before anything is
+    /// read; this crate never opens the file.
+    Open {
+        path: String,
+    },
 }
 
 /// The `error` object of a failure reply.
@@ -304,5 +311,23 @@ mod tests {
         assert!(reply.notes.is_none());
         assert!(reply.results.is_none());
         assert!(reply.error.is_none());
+    }
+
+    #[test]
+    fn open_request_encodes_to_the_documented_shape() {
+        let json = serde_json::to_string(&Request::Open {
+            path: "/tmp/note.md".to_string(),
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"cmd":"open","path":"/tmp/note.md"}"#);
+    }
+
+    #[test]
+    fn decodes_a_plain_file_off_error_reply() {
+        let reply: RawResponse =
+            serde_json::from_str(r#"{"ok":false,"error":{"kind":"plain_file_off","message":"x"}}"#)
+                .unwrap();
+        assert!(!reply.ok);
+        assert_eq!(reply.error.unwrap().kind, "plain_file_off");
     }
 }

@@ -54,6 +54,7 @@ use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use tokio::sync::{RwLock, Semaphore};
 use zeroize::Zeroizing;
@@ -222,6 +223,13 @@ struct PersonSession {
     profile: Option<PersonProfileSession>,
     pending_transition: Option<Vec<u8>>,
     generation: u64,
+    /// Set by an explicit `sync_person_lock` (not a vault lock or switch). While
+    /// true, the vault-bound carrier must NOT auto-reinstall the identity at a
+    /// later owner-vault unlock: the user asked for it to be locked, and a lock
+    /// that the next unlock silently reverses is not a lock (myne-md/myne#792
+    /// review, threat-model AS21 "until the explicit person lock"). Cleared by
+    /// any real install (a phrase unlock).
+    explicit_lock: bool,
 }
 
 impl PersonSession {
@@ -271,6 +279,7 @@ impl VaultRuntimeState {
             pair,
             person_id: None,
         });
+        session.explicit_lock = false;
     }
 
     pub async fn set_person_identity_and_id(
@@ -283,6 +292,20 @@ impl VaultRuntimeState {
             pair,
             person_id: Some(person_id),
         });
+        session.explicit_lock = false;
+    }
+
+    /// Record an explicit `sync_person_lock`: suppress carrier auto-install until
+    /// the next real install.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn set_person_explicit_lock(&self) {
+        self.person_session.write().await.explicit_lock = true;
+    }
+
+    /// Whether an explicit person lock is in force for this process.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) async fn person_explicit_lock(&self) -> bool {
+        self.person_session.read().await.explicit_lock
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -333,6 +356,7 @@ impl VaultRuntimeState {
                 profile_key,
             });
         session.pending_transition = install.transition;
+        session.explicit_lock = false;
         true
     }
 
@@ -972,6 +996,7 @@ impl VaultRuntimeState {
             items_key,
             items_key_id,
             opened_at,
+            vault_root,
         } = material;
         let mut guard = self.slots.write().await;
         if !guard.values().any(|s| matches!(s, Slot::Unlocked(_))) {
@@ -991,6 +1016,7 @@ impl VaultRuntimeState {
                     items_key,
                     items_key_id,
                     opened_at,
+                    vault_root,
                 },
             )
             .unwrap_or(Slot::Empty))
@@ -1018,11 +1044,13 @@ impl VaultRuntimeState {
                 items_key,
                 items_key_id,
                 opened_at,
+                vault_root,
             }) => Some(ImportSourceMaterial {
                 root_key,
                 items_key,
                 items_key_id,
                 opened_at,
+                vault_root,
             }),
             // Unreachable given the guard above; restore defensively.
             Some(other) => {
@@ -1030,6 +1058,19 @@ impl VaultRuntimeState {
                 None
             }
             None => None,
+        }
+    }
+
+    /// The root of the source vault an open import slot reads from, or `None`
+    /// when no import source is open for `id`. A local vault yields
+    /// `vaults/<id>/`; a `.myne-backup` import yields the temporary extraction
+    /// directory (myne-md/myne#816). The readers resolve their paths from this
+    /// rather than re-deriving a vault directory from the id.
+    pub async fn import_source_root(&self, id: VaultId) -> Option<PathBuf> {
+        let guard = self.slots.read().await;
+        match guard.get(&id) {
+            Some(Slot::ImportSource { vault_root, .. }) => Some(vault_root.clone()),
+            _ => None,
         }
     }
 
@@ -1360,6 +1401,7 @@ impl VaultRuntimeState {
                         profile_key,
                     });
             person.pending_transition = install.transition;
+            person.explicit_lock = false;
         } else {
             person.identity = None;
             person.profile = None;
@@ -1911,6 +1953,12 @@ pub enum Slot {
         items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
         items_key_id: [u8; 16],
         opened_at: u64,
+        /// The source vault's root, resolved when the slot was opened. A local
+        /// vault resolves to `vaults/<id>/`; a `.myne-backup` import resolves
+        /// to the temporary directory its members were extracted into
+        /// (myne-md/myne#816). Held here rather than re-derived from the id so
+        /// the readers work for both without a second resolution path.
+        vault_root: PathBuf,
     },
 }
 
@@ -1968,6 +2016,8 @@ pub struct ImportSourceMaterial {
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
     pub opened_at: u64,
+    /// See [`Slot::ImportSource::vault_root`].
+    pub vault_root: PathBuf,
 }
 
 /// Discriminator for the [`Slot`] enum, exposed across IPC by the
@@ -3715,27 +3765,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dropping_recovering_slot_zeroizes_keys() {
-        // `Slot::Recovering`'s Zeroizing fields wipe on drop. Build a
-        // fixture with a known byte pattern, drop it, assert the
-        // post-drop bytes (read via the wrapper's Zeroize impl) are
-        // zero.
-        //
-        // We test this indirectly: construct the RecoveringMaterial,
-        // drop it, then construct a fresh one and check its values are
-        // independent (no Zeroizing leak across instances). The strong
-        // form (post-drop pointer read) requires unsafe and is covered
-        // by `zeroize` crate's own tests.
-        let m = fixture_recovering_with_keys(0x42, 0x13, 0x99);
-        assert_eq!(*m.root_key, [0x42u8; AEAD_KEY_LEN]);
-        assert_eq!(*m.items_key, [0x13u8; AEAD_KEY_LEN]);
-        drop(m);
-        // Fresh instance has independent fields.
-        let m2 = fixture_recovering_with_keys(0xFE, 0xED, 0x00);
-        assert_eq!(*m2.root_key, [0xFEu8; AEAD_KEY_LEN]);
-        assert_eq!(*m2.items_key, [0xEDu8; AEAD_KEY_LEN]);
-    }
+    // `dropping_recovering_slot_zeroizes_keys` was removed (myne-md/myne#802):
+    // its Zeroizing keys are private and drop wipes them in place, so no safe
+    // read of the dropped instance exists. The test read a freshly constructed
+    // instance instead and could not fail if zeroization were removed; the
+    // `zeroize` crate's own tests are the guarantee, not this one.
 
     /// Stable label for a `Slot` for panic messages; `Slot` does not
     /// derive `Debug` because its variants carry `Zeroizing` keys we
@@ -3766,6 +3800,9 @@ pub fn fixture_import_source(
         items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         items_key_id: [items_id_byte; 16],
         opened_at,
+        // The fixture is not a real root; tests that read through a source use
+        // `open`/`open_at_root`, which set it.
+        vault_root: PathBuf::new(),
     }
 }
 

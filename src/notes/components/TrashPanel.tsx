@@ -26,6 +26,7 @@ import {
   type NoteId,
 } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
+import { useWorkspace } from "../workspaceContext";
 import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PanelEmptyState } from "./PanelEmptyState";
 import {
@@ -81,6 +82,7 @@ export type TrashPanelProps = {
 export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [status, setStatus] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -136,9 +138,16 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
     if (confirm.kind === "single") {
       const id = confirm.id;
       setConfirm(null);
-      await ctx.deleteWithRollback(id).catch(() => {
+      try {
+        await ctx.deleteWithRollback(id);
+        // Permanently deleting a note that is open must close its tabs, or the
+        // pane keeps showing an editable buffer for a note that no longer
+        // exists (myne-md/myne#819). Only on SUCCESS: a failed delete rolled
+        // back and the note still exists, so its tab must stay.
+        ws.closeNoteEverywhere(id);
+      } catch {
         setStatus(t("notes.trash.deleteError"));
-      });
+      }
       return;
     }
     // empty trash — best-effort bulk purge with a remaining count on failure.
@@ -149,12 +158,16 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
     setConfirm(null);
     const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
     const result = await ctx.emptyTrashWithSync(ids);
+    // Close the tabs of the notes that WERE purged, so none stays editable
+    // after its blob is gone (myne-md/myne#819). A failed purge rolled back and
+    // the note still exists, so its tab stays.
+    for (const id of result.purged) ws.closeNoteEverywhere(id);
     if (result.failed.length > 0) {
       setStatus(
         t("notes.trash.emptyPartialFailure", { count: result.failed.length }),
       );
     }
-  }, [confirm, ctx, t]);
+  }, [confirm, ctx, t, ws]);
 
   if (!open) return null;
 

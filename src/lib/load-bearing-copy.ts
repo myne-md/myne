@@ -385,7 +385,7 @@ export type AiTrustState =
  * and tells the user nothing.
  */
 export const AI_TRUST_INVARIANT =
-  "Myne never sends your notes anywhere you have not named, and never downloads a model.";
+  "Myne never sends your notes anywhere you have not named. A model downloads only when you ask, from Myne's own origin, which keeps no IP logs and no analytics.";
 
 /**
  * The A7 residual, shown in every state and **unchanged** from the pre-provider

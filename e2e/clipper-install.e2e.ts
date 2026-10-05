@@ -80,10 +80,16 @@ describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)",
         await waitEnabled(s, "false");
 
         // Flip ON — writes the flag + installs the manifests, returns enabled=true.
+        // Centre the toggle first: the Account panel scrolls and this row sits
+        // below its fold, where W3C `/click`'s scroll-into-view under
+        // WebKitGTK leaves it reporting "element not interactable" forever.
+        // Same discipline as `pickSelect` / `enableDeveloperModeInSettings`.
+        await (await s.byTestId("settings.clipper-install-toggle")).scrollIntoView();
         await (await s.byTestId("settings.clipper-install-toggle")).click();
         await waitEnabled(s, "true");
 
         // Flip back OFF — removes the manifests, returns enabled=false.
+        await (await s.byTestId("settings.clipper-install-toggle")).scrollIntoView();
         await (await s.byTestId("settings.clipper-install-toggle")).click();
         await waitEnabled(s, "false");
 

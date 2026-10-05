@@ -123,6 +123,15 @@ export function CreateVault({
     makeInitialState,
   );
   const [autoUnlocking, setAutoUnlocking] = useState(false);
+  // The shared invite code for a gated sync server (myne-md/myne#800).
+  //
+  // The field that collected it lived on the account step, which this branch
+  // folded into `KitStep`. The provisioning leg runs immediately after `begin`
+  // (before `kit`), so a field on any later step could never reach
+  // `sync_set_endpoint`; the code is entered on the sync-connection surface
+  // instead (`IdentitySetupDialog` → `EndpointConfig`). Kept as an empty
+  // literal rather than deleted so the provisioning call below keeps its shape.
+  const inviteCode = "";
 
   const sessionTokenRef = useRef<string | null>(null);
   // The id of the vault `commit` just wrote to (`vaults/<id>/`), captured from
@@ -454,9 +463,10 @@ export function CreateVault({
         );
         const serverUrl = cfg?.endpoint_url ?? (await deploymentSyncOrigin());
         if (serverUrl === null) throw new Error("no sync endpoint configured");
-        if (cfg?.endpoint_url == null) {
+        if (cfg?.endpoint_url == null || inviteCode.trim().length > 0) {
           await invoke("plugin:sync|sync_set_endpoint", {
             endpointUrl: serverUrl,
+            inviteCode: inviteCode.trim(),
           });
         }
 

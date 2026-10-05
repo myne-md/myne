@@ -30,6 +30,8 @@ import {
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   openSettings,
+  pickSelect,
+  selectOptionValues,
   unlockToEditor,
 } from "./support/flows";
 import {
@@ -90,9 +92,15 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
         // control is never a knob whose meaning is stated nowhere.
         await s.byTestId("settings.reminders-horizon-row");
         await s.byTestId("settings.reminders-horizon-helper");
-        for (const days of [1, 3, 5, 7]) {
-          await s.byTestId(`settings.reminders-horizon-picker-${days}`);
-        }
+        // The horizon row is a `Select` (#769), so its four choices live in a
+        // body portal that exists only while the menu is open — the helper
+        // opens it, reads the roster and shuts it again.
+        expect(await selectOptionValues(s, "settings.reminders-horizon-picker")).toEqual([
+          "1",
+          "3",
+          "5",
+          "7",
+        ]);
 
         // ── The horizon survives a real AEAD round-trip ──
         // Presence alone cannot fail on the defect this issue IS: a control
@@ -100,13 +108,12 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
         // shortest horizon, and the lock / re-unlock below re-reads it from
         // disk the same way it re-reads the switch.
         expect(
-          await (await s.byTestId("settings.reminders-horizon-picker-7")).attribute("data-active"),
-        ).toBe("true");
-        await (await s.byTestId("settings.reminders-horizon-picker-1")).click();
+          await (await s.byTestId("settings.reminders-horizon-picker")).attribute("data-value"),
+        ).toBe("7");
+        await pickSelect(s, "settings.reminders-horizon-picker", "1");
         await s.waitUntil(async () =>
-          (await (await s.byTestId("settings.reminders-horizon-picker-1")).attribute(
-            "data-active",
-          )) === "true"
+          (await (await s.byTestId("settings.reminders-horizon-picker")).attribute("data-value")) ===
+          "1"
             ? true
             : null,
         );
@@ -140,8 +147,8 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
         await (await s.byTestId("settings.reminders-toggle")).click();
         await s.waitUntil(async () => ((await toggleState(s)) === "true" ? true : null));
         expect(
-          await (await s.byTestId("settings.reminders-horizon-picker-1")).attribute("data-active"),
-        ).toBe("true");
+          await (await s.byTestId("settings.reminders-horizon-picker")).attribute("data-value"),
+        ).toBe("1");
       },
     );
   });

@@ -1,7 +1,7 @@
 // The agent pane (myne-md/myne#771): the agent tab's body, mounted in the centre
 // pane by `PaneView` the way `GraphPane` and `TasksPane` are.
 //
-// **One screen, not two views** (`docs/decisions/ai/0627`). The history rail
+// **One screen, not two views** (`docs/decisions/ai/0637`). The history rail
 // sits beside the open conversation, which is the shape every chat application
 // has, and the reason it is universal is that the two are looked at together:
 // you scan the list for the one you meant while reading the one you have.

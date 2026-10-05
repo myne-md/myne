@@ -485,7 +485,13 @@ export async function pickSelect(
   selectTestId: string,
   value: string,
 ): Promise<void> {
-  await (await session.byTestId(selectTestId)).click();
+  const trigger = await session.byTestId(selectTestId);
+  // Centre the trigger before opening: several of these rows sit below the
+  // fold of a tall Settings panel (Editor/About), where W3C /click's
+  // scroll-into-view leaves WebKit reporting "element not interactable" and
+  // the menu never opens.
+  await trigger.scrollIntoView();
+  await trigger.click();
   const option = await session.waitForElement(
     testIdSelector(`${selectTestId}-option`, { "data-value": value }),
   );
@@ -519,6 +525,38 @@ export async function pickSelect(
     // Some Selects keep the option in the DOM while closed (portal unmounted
     // is the normal path; if not, the value check below is the real gate).
   });
+}
+
+/** The values a `Select`'s menu offers, in order, leaving the menu closed.
+ *
+ *  A `Segmented` published every choice in the row's own markup, so a scenario
+ *  asserting "all four horizons are offered" could just find four testids.
+ *  `Select` renders its options into a body PORTAL that exists only while the
+ *  menu is open, so the same assertion needs the menu opened, read and shut
+ *  again — and a scenario hand-rolling that is a scenario that will leave the
+ *  menu open and fail the NEXT interaction instead of this one (#769). */
+export async function selectOptionValues(
+  session: Session,
+  selectTestId: string,
+): Promise<string[]> {
+  await (await session.byTestId(selectTestId)).click();
+  await session.waitForElement(testIdSelector(`${selectTestId}-option`));
+  const options = await session.byTestIdAll(`${selectTestId}-option`);
+  const values: string[] = [];
+  for (const option of options) {
+    values.push((await option.attribute("data-value")) ?? "");
+  }
+  // Re-click the trigger to close: clicking an OPTION would choose it, and
+  // reading a roster must not change the setting it read.
+  await (await session.byTestId(selectTestId)).click();
+  await session.waitUntil(
+    async () => {
+      const open = await session.findElements(testIdSelector(`${selectTestId}-option`));
+      return open.length === 0 ? true : null;
+    },
+    { label: `${selectTestId} menu to close after reading its roster` },
+  );
+  return values;
 }
 
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
@@ -641,13 +679,45 @@ export async function enableDeveloperModeInSettings(session: Session): Promise<v
   const checked = async () =>
     await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked");
   if ((await checked()) !== "true") {
-    await (await session.byTestId("about.developer-mode-toggle")).click();
+    const toggle = await session.byTestId("about.developer-mode-toggle");
+    // The About panel scrolls (build channel, build, threat model, legal,
+    // license, then this toggle), so the control sits below the modal body's
+    // fold. The W3C `/click` scroll-into-view only guarantees the border box
+    // intersects the viewport and WebKitGTK reports "element not
+    // interactable" indefinitely for one clipped inside an overflowing modal
+    // body — which is every reach to this toggle after the legal rows landed
+    // in 2026-08. Centre it in its container first, the `scrollIntoView`
+    // discipline `pickSelect` uses.
+    await toggle.scrollIntoView();
+    await toggle.click();
   }
   await session.waitUntil(async () => ((await checked()) === "true" ? true : null), {
     label: "developer_mode toggled on",
     timeoutMs: 10_000,
   });
   await session.waitForElement(testIdSelector("settings.developer-group"));
+}
+
+/**
+ * Turn Developer mode OFF from Settings → About, the mirror of
+ * {@link enableDeveloperModeInSettings}. Caller already has Settings open and
+ * reaches About by the rail. Centres the toggle in its scroll container before
+ * clicking, for the reason that function's own `scrollIntoView` comment gives:
+ * it sits below the fold of the About panel's overflowing body.
+ */
+export async function disableDeveloperModeInSettings(session: Session): Promise<void> {
+  await (await session.byTestId("settings.tab-about")).click();
+  const checked = async () =>
+    await (await session.byTestId("about.developer-mode-toggle")).attribute("aria-checked");
+  if ((await checked()) !== "false") {
+    const toggle = await session.byTestId("about.developer-mode-toggle");
+    await toggle.scrollIntoView();
+    await toggle.click();
+  }
+  await session.waitUntil(async () => ((await checked()) === "false" ? true : null), {
+    label: "developer_mode toggled off",
+    timeoutMs: 10_000,
+  });
 }
 
 export async function enableAi(session: Session): Promise<void> {

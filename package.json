@@ -1,7 +1,7 @@
 {
   "name": "myne",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.9.1",
   "license": "AGPL-3.0",
   "type": "module",
   "packageManager": "pnpm@11.8.0",
@@ -17,6 +17,7 @@
     "mobile:test": "pnpm --filter myne-mobile test",
     "mobile:test:flow": "pnpm --filter myne-mobile test:flow",
     "mobile:ios": "pnpm --filter myne-mobile tauri ios dev",
+    "mobile:ios:build": "pnpm --filter myne-mobile tauri ios build",
     "mobile:android": "pnpm --filter myne-mobile tauri android dev",
     "tauri": "tauri",
     "sidecar": "node scripts/build-cli-sidecar.mjs --profile debug && node scripts/build-tor-sidecar.mjs --profile debug",
@@ -58,7 +59,7 @@
     "@myne/dialect": "workspace:*",
     "@myne/editor": "workspace:*",
     "@myne/ornaments": "workspace:*",
-    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-deep-link": "2.4.9",
     "@tauri-apps/plugin-dialog": "^2.7.1",
@@ -80,7 +81,7 @@
     "w3c-keyname": "2.2.8"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.2",
+    "@tauri-apps/cli": "^2.12.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/react": "16.3.2",
     "@types/d3-force": "3.0.10",

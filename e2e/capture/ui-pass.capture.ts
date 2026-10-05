@@ -203,7 +203,7 @@ runner(
       // Developer mode, from INSIDE the open modal: `enableDeveloperMode`
       // reaches About by the gear, and clicking the gear again on an open
       // modal is a close rather than an open. The agent tab is behind this
-      // switch by decision (`docs/decisions/ai/0626`).
+      // switch by decision (`docs/decisions/ai/0636`).
       await safe("developer mode", async () => {
         await enableDeveloperModeInSettings(s);
         await sleep(400);

@@ -16,6 +16,7 @@
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
 import {
+  useCallback,
   useEffect,
   useState,
   type CSSProperties,
@@ -39,6 +40,51 @@ import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../components/sync/EnrollPhraseCredential";
+
+/** How often the pending-invite list re-polls while the identity home is
+ *  mounted and visible. The relay has no push channel for a person account, so
+ *  a list that is only fetched on mount never shows an invite that arrives while
+ *  the screen is open (myne-md/myne#794). 5 s matches `useSyncStatus`'
+ *  `STATUS_POLL_MS`; the request is one small relay GET. */
+const INVITE_POLL_MS = 5000;
+
+/** Whether a freshly fetched invite list differs from the one on screen. Used to
+ *  skip the state update when nothing changed, so a 5 s poll does not re-render
+ *  the list (and disturb an open Accept form) for no reason. */
+function sameInvites(previous: InviteSummary[] | null, next: InviteSummary[]): boolean {
+  if (previous === null || previous.length !== next.length) return false;
+  return previous.every(
+    (invite, index) =>
+      invite.invite_id_hex === next[index].invite_id_hex && invite.claimed === next[index].claimed,
+  );
+}
+
+/** Map a rejected `sync_person_accept_invite` to the message the user should
+ *  see. Every failure used to collapse into one sentence, which is why a real
+ *  failure on a member device was indistinguishable from a wrong owner code
+ *  (myne-md/myne#794 manual-testing finding). The invoke rejects with the
+ *  serialized `SyncDeviceError`, whose `kind` is a closed enum; anything else
+ *  falls back to the generic message. */
+export function acceptErrorKey(error: unknown): string {
+  const kind =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { kind?: unknown }).kind
+      : undefined;
+  switch (kind) {
+    case "BadRequest":
+      return "identityHome.acceptErrorBadRequest";
+    case "DeviceNotFound":
+      return "identityHome.acceptErrorNotFound";
+    case "NotEnrolled":
+      return "identityHome.acceptErrorNotEnrolled";
+    case "Unauthenticated":
+      return "identityHome.acceptErrorUnauthenticated";
+    case "Transport":
+      return "identityHome.acceptErrorTransport";
+    default:
+      return "identityHome.acceptError";
+  }
+}
 
 const BLOCK_STYLE: CSSProperties = {
   display: "flex",
@@ -257,20 +303,43 @@ export function IdentityHome({
     });
   };
 
+  // A silent fetch keeps the last good list on a transient failure; only the
+  // FIRST load (silent=false) may surface the "Could not load invites" banner,
+  // so a poll failing every 5 s cannot flicker the screen into an error.
+  const loadInvites = useCallback(async (silent: boolean) => {
+    try {
+      const list = await personListInvites();
+      setInvites((previous) => (sameInvites(previous, list) ? previous : list));
+      setFailed(false);
+    } catch {
+      if (!silent) setFailed(true);
+    }
+  }, []);
+
+  // Fetch on mount, then keep the list fresh while the screen is open: a poll
+  // (the relay has no person-account push) plus an immediate refetch when the
+  // window regains focus or the tab becomes visible. Without this, an invite
+  // that arrives while the identity home is already mounted never appears until
+  // the app is restarted (myne-md/myne#794).
   useEffect(() => {
     let alive = true;
-    void (async () => {
-      try {
-        const list = await personListInvites();
-        if (alive) setInvites(list);
-      } catch {
-        if (alive) setFailed(true);
-      }
-    })();
+    const run = (silent: boolean) => {
+      if (alive) void loadInvites(silent);
+    };
+    run(false);
+    const timer = setInterval(() => run(true), INVITE_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") run(true);
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [loadInvites]);
 
   const pending = (invites ?? []).filter((i) => !i.claimed);
 
@@ -485,8 +554,11 @@ export function IdentityHome({
                                 );
                                 setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
                                 onAccepted();
-                              } catch {
-                                setAcceptError(t("identityHome.acceptError"));
+                              } catch (error) {
+                                // Surface WHICH failure it was, not only "could
+                                // not be accepted": the kinds are a closed enum
+                                // and carry no secret (myne-md/myne#794).
+                                setAcceptError(t(acceptErrorKey(error)));
                               }
                             }}
                           >

@@ -1,35 +1,20 @@
-# Bundled auto-tag model (desktop) — tag suggestion (MYND-651)
+# Auto-tag model (desktop): tag suggestion (MYND-651)
 
-This directory is where the **dedicated on-device tag-suggestion model** ships
-with the desktop app, so the inline tag-suggestion band works out of the box
-once the user turns on AI (Settings → Developer → AI) *and* the dedicated
-auto-tag toggle. It is **desktop-only** (no Candle on web; mobile is deferred to
-MYND-653).
+**This directory no longer ships a model.** Since myne-md/myne#805
+(`decisions/ai/0627`) the auto-tag weights are **downloaded on demand** from
+`downloads.myne.md` and verified against a SHA-256 compiled into the desktop
+binary; they are no longer bundled in the installer. The `tag` role remains
+selectable (a downloaded or side-loaded `tag.path`), and a build with neither a
+downloaded nor a side-loaded tag model has no auto-tag at all.
 
-Unlike the transcription model next door, this one has **no user-override
-picker** — there is no "choose a tag model" setting, no `tag.path` marker, and
-no IPC role string that names it (`model_store::ModelRole::TagSuggestion` is
-bundled-only by construction). That is deliberate: `threat-model.md` §7 records
-that auto-tag therefore never re-enters the untrusted-model case, and a picker
-would walk that back. Adding one is a threat-model change first and a code
-change second.
+What stays here:
+- `README.md`: this file, the provenance record for the artefact.
+- `MODEL-LICENSE`: the Apache-2.0 licence text for the weights.
 
-## What ships here
-
-| File | What | Tracking | In the tree? |
-|---|---|---|---|
-| `model.gguf` | quantized Qwen2.5-0.5B-Instruct GGUF (llama.cpp layout) — the tag model | **Git LFS** (`.gitattributes` `*.gguf`) | ✅ yes |
-| `tokenizer.json` | the Qwen2.5 tokenizer | normal git | ✅ yes |
-| `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git | ✅ yes |
-
-The engine (`src-tauri/src/plugins/local_inference/engine_candle.rs`, `load_tag`)
-loads `model.gguf` through the **same** `Qwen2::from_gguf` path
-(`candle_transformers::models::quantized_qwen2`) as the side-loaded generation
-model — same architecture family, so the second model costs no new runtime and
-no new dependency. If `model.gguf` is absent (an `--no-default-features` AI-free
-build, or a checkout whose LFS blob was not fetched) `infer_tags` returns
-`NotReady` and the feature is simply unavailable; there is no fallback to the
-generation model, and nothing panics.
+`model.gguf` and `tokenizer.json` were removed from the bundle in myne-md/myne#805
+task 5; their bytes live at `/models/tag/05df94f8140a/` on the origin and are
+fetched only when the user asks. **The SHA-256 below remains the provenance
+anchor** the client's compiled-in digest table is checked against.
 
 ## Provenance (this model)
 
@@ -98,6 +83,9 @@ Measured, so it is never re-derived. The dtype census of the **shipped** file:
 - Which is why the lever taken was redundancy, not precision.
 
 ## Producing / updating the model
+
+**The recipe below is what produced the artefact now hosted at
+`/models/tag/05df94f8140a/`; it no longer produces a bundled file.**
 
 **Use a GGUF in the llama.cpp layout.** `candle_transformers`'
 `quantized_qwen2::ModelWeights::from_gguf` reads the architecture from GGUF

@@ -189,7 +189,7 @@ export default defineConfig(async () => ({
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
       // The run indicator, shared for the reason the cost line is: it is a
-      // NAMED motion-canon exemption (`docs/decisions/ai/0625`), and every one
+      // NAMED motion-canon exemption (`docs/decisions/ai/0635`), and every one
       // of the conditions that exemption rests on — bounded by the run, paused
       // when hidden or off-screen, one static frame under reduced motion,
       // budgeted, `aria-hidden` — is a property of the implementation rather

@@ -255,7 +255,7 @@ export async function saveJsonAsFile(
  * the value is shown exactly once.
  *
  * It takes RESOLVED sentences rather than translation keys, and that is not an
- * accident of style: `check-i18n.mjs` matches a static `t("literal")`, so a key
+ * accident of style: `check-i18n.mjs` matches a static quoted key, so a key
  * passed as a string would drop out of the only check that proves it exists in
  * the catalog. Measured on this very pair of screens, moving two keys inside a
  * `t(cond ? … : …)` took the guard's count from 2543 to 2541 while adding two

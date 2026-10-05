@@ -23,7 +23,7 @@
 // (`.myne-empty__wash`). Static: no animation, no canvas, no loop, so it needs
 // no motion-canon exemption and costs nothing while it sits on screen.
 //
-// It replaced the `01` binary field (`docs/decisions/ui/0633`). The field read
+// It replaced the `01` binary field (`docs/decisions/ui/0643`). The field read
 // as developer and privacy iconography — "encryption as theme", arriving as
 // texture — on surfaces a general user meets every day, which is exactly the
 // look `PRODUCT.md`'s anti-references refuse. The wash takes its colour from

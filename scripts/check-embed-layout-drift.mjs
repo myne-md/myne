@@ -16,12 +16,11 @@
 //
 // Both files said, and the decision entry said, that the two halves are "held
 // together by the published `embed-layout` vectors". They are not, on any
-// machine. `.woodpecker/main.yml`'s `vector-verification` step is commented out in
-// full pending a `vectors_token` secret, `MYNE_VECTORS_REQUIRED` is set nowhere
-// outside that commented block, and both runners skip silently when the
-// companion repository is absent, which is the default in CI and in a fresh
-// clone. So the claim described a lock that runs nowhere, and the number could
-// drift in either direction with every gate green.
+// machine. `.woodpecker/main.yml`'s `vector-verification` step needs a
+// `VECTORS_TOKEN` it only resolves on push/manual, so on pull_request it exits 0
+// with `skipping`, and the byte-level runners skip silently when the companion
+// repository is absent. So the claim described a lock that does not run on PRs,
+// and the number could drift in either direction with every gate green.
 //
 // This is the smallest check that actually runs. It does not re-implement the
 // grammar: it extracts the one constant both sides declare and compares them,

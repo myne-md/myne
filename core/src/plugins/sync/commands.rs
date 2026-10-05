@@ -111,6 +111,7 @@ pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
     _confirmed_fingerprint: Option<String>,
+    invite_code: Option<String>,
 ) -> Result<EndpointPinInfo, SyncConfigError> {
     if let Some(url) = endpoint_url.as_deref() {
         super::enroll::verify_join_tls(url)
@@ -125,6 +126,7 @@ pub async fn sync_set_endpoint<R: Runtime>(
         &crate::vault_io::StdVaultIo,
         endpoint_url,
         None,
+        invite_code,
     )
     .await
 }
@@ -435,6 +437,17 @@ pub async fn sync_person_unlock<R: Runtime>(
         identity_code: super::invite::encode_person_identity_code(&person_id, &public),
     };
     let profile = derive_person_profile_key(&host, state.inner(), normalized.as_str()).await;
+    // Vault-bound carrier (myne-md/myne#792): seal the keypair under the active
+    // owner vault's root_key so its next unlock installs this session with no
+    // phrase. Best-effort; only fires for an unlocked NTV6 owner vault.
+    super::person_vault_carrier::refresh_carrier_best_effort(
+        &host,
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &person_id,
+        &pair,
+    )
+    .await;
     let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
         pair,
         person_id,
@@ -512,7 +525,21 @@ pub async fn sync_person_lock<R: Runtime>(
     let _ = state.inner().clear_person_session().await;
     if forget.unwrap_or(false) {
         let host = crate::host::tauri_host::TauriHost::new(app.clone());
+        // Erase every vault-bound carrier first: leaving one behind would
+        // silently re-install the identity at the next owner-vault unlock. A
+        // failed erase fails the forget rather than reporting success.
+        super::person_vault_carrier::delete_all_person_vault_carriers(
+            &host,
+            &crate::vault_io::StdVaultIo,
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
         super::person_account::forget_person_from_host(&host, &crate::vault_io::StdVaultIo).await?;
+    } else {
+        // An explicit lock must not be silently reversed by the next owner-vault
+        // unlock (myne-md/myne#792 review): record it so the carrier install
+        // stands down until a real (phrase) unlock.
+        state.inner().set_person_explicit_lock().await;
     }
     Ok(())
 }
@@ -674,6 +701,15 @@ pub async fn start_b2b_migration_from_host(
                     sync_state.rekey_rebase_pending = true;
                     let _ = super::state::write_sync_state(io, &root, &sync_state).await;
                 }
+            }
+            // The vault is `NTV6` now: seal the person-identity carrier under the
+            // held root_key so a later unlock installs the session with no phrase
+            // (myne-md/myne#792). Best-effort.
+            if let Some(person_id) = state.clone_person_id().await {
+                super::person_vault_carrier::refresh_carrier_best_effort(
+                    host, io, state, &person_id, &owner,
+                )
+                .await;
             }
             Ok(B2bMigrationView {
                 group_key_epoch: 1,
@@ -984,6 +1020,14 @@ pub async fn create_invite_from_host(
     )
     .await?;
 
+    // Publish the (migrated) `vault.meta` BEFORE the invite can be claimed
+    // (myne-md/myne#795): a member's accept fetches the server copy and requires
+    // `NTV6`, but the NTV5->NTV6 migration does not push one. Best-effort — the
+    // sync loop's meta phase now pushes a one-sided local `NTV6` on its next cycle
+    // — so this only closes the race between the invite being posted and that
+    // cycle, which is the window a member can claim in.
+    let _ = push_vault_meta_now_from_host(host, state).await;
+
     let frame = super::person_account::hex_to_bytes(&view.invite_wire)
         .ok_or(SyncDeviceError::BadRequest)?;
     super::person_account::post_sealed_invite(
@@ -1259,12 +1303,13 @@ pub async fn sync_list_roster<R: Runtime>(
     let host = crate::host::tauri_host::TauriHost::new(app.clone());
     let io = crate::vault_io::StdVaultIo;
     let slot = state.inner().slot_read_active().await;
+    // `root_key` is `None` on a member session (it holds no owner tier); the
+    // legacy `MYV1`/`NTV5` arm below is owner-only, while the `NTV6` arm reads
+    // the roster off the group tier so a member can list it too.
     let (root_key, authority, group_key) = match &*slot {
-        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => (
-            uv.root_key.clone().ok_or(SyncDeviceError::NotOwner)?,
-            uv.authority(),
-            uv.group_key.clone(),
-        ),
+        crate::plugins::vault_unlock::state::Slot::Unlocked(uv) => {
+            (uv.root_key.clone(), uv.authority(), uv.group_key.clone())
+        }
         _ => return Err(SyncDeviceError::NotEnrolled),
     };
     drop(slot);
@@ -1282,10 +1327,11 @@ pub async fn sync_list_roster<R: Runtime>(
         .await
         .map_err(|_| SyncDeviceError::Transport)?;
     // The `NTV6` generation carries the owner-signed roster, not the legacy
-    // membership envelope. Verify it under the pinned owner public half (the
-    // held person identity on the owner's device; a member's pinned owner key is
-    // Grill 4) and surface the group-key epoch + per-row continuity so the UI can
-    // show the key-generation state.
+    // membership envelope. Verify it under the owner's public half and surface
+    // the group-key epoch + per-row continuity so the UI can show the
+    // key-generation state. An OWNER session holds that identity directly; a
+    // MEMBER session holds only the owner's public half, pinned out-of-band at
+    // accept (`owner_identity_code`), exactly as `signed_head_ctx` resolves it.
     if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
         let b2b =
             protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
@@ -1299,13 +1345,28 @@ pub async fn sync_list_roster<R: Runtime>(
             &b2b.signed_roster_envelope,
         )
         .ok_or(SyncDeviceError::BadRequest)?;
-        let owner = state
-            .inner()
-            .clone_person_identity()
-            .await
-            .ok_or(SyncDeviceError::NotOwner)?;
+        let owner_public =
+            if authority == crate::plugins::vault_unlock::state::VaultAuthority::Owner {
+                state
+                    .inner()
+                    .clone_person_identity()
+                    .await
+                    .ok_or(SyncDeviceError::NotOwner)?
+                    .public_half()
+            } else {
+                // A member holds the owner's public half only as the pinned
+                // out-of-band code recorded at invite accept.
+                let code = super::state::read_sync_state(&io, &root)
+                    .await
+                    .map_err(|_| SyncDeviceError::Transport)?
+                    .owner_identity_code
+                    .ok_or(SyncDeviceError::BadRequest)?;
+                super::invite::decode_person_identity_code(&code)
+                    .map_err(|_| SyncDeviceError::BadRequest)?
+                    .public
+            };
         let roster = protocol::person_invite::verify_group_roster(
-            &owner.public_half(),
+            &owner_public,
             &envelope,
             &b2b.base.account_number_hash,
         )
@@ -1322,6 +1383,9 @@ pub async fn sync_list_roster<R: Runtime>(
         });
     }
 
+    // The legacy `MYV1`/`NTV5` roster is sealed under the owner root tier, so a
+    // member session (which has none) has nothing to list here.
+    let root_key = root_key.ok_or(SyncDeviceError::NotOwner)?;
     let meta = protocol::parse_vault_meta_any(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let hash = meta.account_number_hash;
     let roster = match meta.membership.as_ref().and_then(|m| m.roster.as_ref()) {
@@ -1453,6 +1517,7 @@ impl RosterMemberView {
 pub async fn sync_remove_member<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     member_fingerprint_hex: String,
 ) -> Result<(), SyncDeviceError> {
     // The parked pipeline refuses everyone with `RemovalUnavailable`; check
@@ -1501,6 +1566,13 @@ pub async fn sync_remove_member<R: Runtime>(
         &rotation.reclaim_sync_ids_hex,
     )
     .await?;
+    // The rotation re-keyed every content blob locally, but a member removal is
+    // not a note edit, so nothing else bumps the sync scheduler: without this the
+    // re-keyed content waits for an unrelated edit to open a push window, and the
+    // server keeps serving the OLD `itemsKey`'s ciphertext. A member who joins
+    // after the removal would then pull notes their (new) `itemsKey` cannot open.
+    // Mark the scheduler dirty so the re-keyed content pushes on the next cycle.
+    hooks.bump_local_change();
     Ok(())
 }
 

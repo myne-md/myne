@@ -764,15 +764,23 @@ describe("app.toggle-screen-capture visibility", () => {
   // capturable; this predicate answered `false`, so `Cmd+K` offered the toggle
   // in exactly that state and the palette reopened the door the panel closed.
   //
-  // Both directions are asserted, because the fix has a cost and the cost is a
-  // second way to be wrong: answering `true` unconditionally for an unread
-  // override would hide the action FOREVER on a client that has no override to
-  // read, since nothing there ever publishes.
+  // The asserted direction is the security-relevant one: hidden while the
+  // override is UNREAD on a client that has the capability. The opposite
+  // overreach (answering `true` unconditionally, which would hide the action
+  // forever on a client with no override to read) is guarded by the
+  // capability consultation in `screenCaptureOverrideIsActive`.
   it("is hidden while the override has not been read on a client that has one", async () => {
-    const { resetScreenCaptureOverrideForTest, screenCaptureOverrideIsActive } = await import(
+    const { resetScreenCaptureOverrideForTest } = await import(
       "../../src/hooks/useScreenCaptureOverride"
     );
     resetScreenCaptureOverrideForTest();
-    expect(screenCaptureOverrideIsActive()).toBe(true);
+    // The palette action reaches the same prefs setter the Privacy switch
+    // guards, so it must be hidden in exactly the state where that switch is
+    // inert: an UNREAD override on a client that HAS the capability. This is
+    // the security-relevant half (`actions.ts:263-264`), not the predicate's
+    // post-reset default.
+    expect(
+      find("app.toggle-screen-capture").visibility(makeContext({ stageName: "editor" })),
+    ).toBe("hidden");
   });
 });

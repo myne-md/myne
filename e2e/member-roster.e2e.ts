@@ -104,6 +104,9 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+        // The recovery-phrase grid is collapsed by default; reveal it before
+        // filling it (myne-md/myne#796 follow-up).
+        await (await app.session.byTestId("member-roster.person-unlock-open")).click();
         // Unlock the person identity; first enrolment mints the owner.
         // The 24-word grid opens behind the card's Unlock button.
         await (await app.session.byTestId("member-roster.person-unlock-open")).click();

@@ -837,14 +837,35 @@ pub async fn push_vault_meta_now_via_io(
     else {
         return false;
     };
-    // Stored per-device token only. A still-pending device no-ops (its meta is
+    // Stored per-device token. A still-pending device no-ops (its meta is
     // seeded when enrollment completes), and does NOT get marked dirty.
-    let token = match crate::plugins::sync::token_store::default_store()
+    let device_token = match crate::plugins::sync::token_store::default_store()
         .read(io, &dir)
         .await
     {
         Ok(Some(t)) => t,
         _ => return false,
+    };
+    // The meta PUT is owner-authorized on a B2B vault (the server's
+    // `vaultMetaWriteAccount` refuses a device token with 403 `owner_required`),
+    // so prefer the owner's per-vault membership token when this device holds
+    // one — otherwise a credential change or roster update never reaches the
+    // server on a shared vault. A pre-B2B vault has no owner binding and keeps
+    // the device token.
+    let owner_token_hex = crate::plugins::sync::state::read_sync_state(io, &dir)
+        .await
+        .ok()
+        .and_then(|s| s.owner_member_token_hex)
+        .filter(|t| !t.is_empty());
+    let token_hex = match owner_token_hex {
+        Some(t) => t,
+        None => {
+            let mut hex = String::with_capacity(device_token.len() * 2);
+            for b in &device_token {
+                hex.push_str(&format!("{b:02x}"));
+            }
+            hex
+        }
     };
     // Through the seam, like every other read on this path (task 87). It was the
     // last `std::fs` call in the production half of this file — and it sat on the
@@ -853,10 +874,6 @@ pub async fn push_vault_meta_now_via_io(
     let Ok(meta_bytes) = meta_read else {
         return false;
     };
-    let mut token_hex = String::with_capacity(token.len() * 2);
-    for b in &token {
-        token_hex.push_str(&format!("{b:02x}"));
-    }
     let url_moved = url.clone();
     // `run_blocking`, not `spawn_blocking`: the native arm dispatches to a tokio
     // worker so a round trip does not park one, and the wasm arm runs inline —

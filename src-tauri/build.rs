@@ -392,6 +392,11 @@ fn main() {
                 "import_source_read_note",
                 "import_source_reseal_attachment",
                 "import_source_merge_dictionary",
+                // Open a `.myne-backup` container as an import source
+                // (myne-md/myne#816): the same namespace and the same
+                // read-only source slot as the local-vault commands above.
+                "import_source_open_backup",
+                "import_source_close_backup",
             ]),
         )
         .plugin(
@@ -451,6 +456,30 @@ fn main() {
             // never authorizes the `plugin:graph-layout|<cmd>` invoke.
             tauri_build::InlinedPlugin::new()
                 .commands(&["graph_layout_read", "graph_layout_write"]),
+        )
+        .plugin(
+            "plain-file",
+            // myne-md/myne#788: the sandboxed editor for the user's own
+            // on-disk markdown files. The commands are declared here so each
+            // gets an auto-generated `allow-`/`deny-` pair; each also needs a
+            // matching `commands.allow` entry in
+            // `permissions/plain-file/default.toml` or the ACL resolver never
+            // authorizes the `plugin:plain-file|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "gate_get",
+                "gate_set",
+                "plain_file_read",
+                "plain_file_write",
+                "plain_file_save_copy",
+                "plain_file_close",
+                "plain_file_take_unclaimed",
+                // The in-app dialog and the two deep-link commands
+                // (`plain_file_resolve_path` for the confirmation's canonical
+                // display, `plain_file_open_confirmed` for the open itself).
+                "plain_file_open_dialog",
+                "plain_file_resolve_path",
+                "plain_file_open_confirmed",
+            ]),
         )
         .plugin(
             "memory",
@@ -739,6 +768,9 @@ fn main() {
                 "get_ai_endpoint",
                 "set_ai_endpoint",
                 "list_provider_models",
+                "download_model",
+                "cancel_model_download",
+                "remove_model",
             ]),
         );
     }

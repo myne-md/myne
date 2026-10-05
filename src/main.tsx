@@ -12,6 +12,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { RootErrorBoundary } from "./components/RootErrorBoundary";
 import { initThemeDeepLinks } from "./lib/themeDeepLink";
+import { initOpenFileDeepLinks } from "./plain/openFileDeepLink";
 import { installGlobalFailureHandlers } from "./lib/global-failure";
 // The shared token layer (myne-md/myne#478), one source for every design token,
 // consumed by all three clients. FIRST, because the app-shell sheet below and
@@ -32,6 +33,12 @@ import "@myne/ornaments/ornaments.css";
 // component effect: StrictMode double-invokes effects, and this must subscribe
 // exactly once.
 void initThemeDeepLinks();
+
+// myne-md/myne#788 task 12: `myne://open-file` links, subscribed at module
+// scope for the same cold-launch reason. The handler gate-checks and resolves
+// host-side before anything is latched, so a link that arrives while the gate
+// is off (or before `App` mounts) is either dropped or safely parked.
+void initOpenFileDeepLinks();
 
 // Failures outside React render — a rejected seam call, a Worker error, a throw
 // in an event handler — reach nothing but the console otherwise (task 114). On

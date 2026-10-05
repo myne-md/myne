@@ -3,8 +3,10 @@
 // Component tests for `src/components/settings/AiPanel.tsx` (ai-ux-surface
 // MYND-408 + the model-acquisition "Option A" surface). Focus: the two per-role
 // side-load pickers (generation + embedding) and the "Recommended models"
-// browser links that open in the user's OWN browser via the opener plugin —
-// Myne never downloads a model (SYNC-1/2 no-egress). `openUrl` / the file dialog
+// browser links that open in the user's OWN browser via the opener plugin.
+// Since myne-md/myne#805 the panel also fetches a model on explicit user action
+// from Myne's own origin (digest-verified), so Myne no longer never downloads a
+// model; the side-load path remains for user-sourced files. `openUrl` / the file dialog
 // / `ai-model-store` / `usePrefs` / i18n are mocked at their module boundaries.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

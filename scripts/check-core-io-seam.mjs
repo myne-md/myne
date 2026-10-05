@@ -140,6 +140,14 @@ const ALLOWED = new Map([
       "is how a ratchet quietly stops describing anything.",
   ],
   ["core/src/plugins/vault_recover/account_number_select.rs", "task 32 (recovery entry points)"],
+  [
+    "core/src/plugins/vault_unlock/import_source.rs",
+    "host-only by construction: the importer is a desktop-only capability (web " +
+      "classifies the whole `importer` plugin `Class::Unsupported`), there is no " +
+      "browser arm to port, and the one production `std::fs` (staging cleanup " +
+      "on TTL/teardown, myne-md/myne#827) is `#[cfg(not(target_arch = \"wasm32\"))]` " +
+      "with a wasm no-op twin. The rest are `#[cfg(test)]` fixtures.",
+  ],
   ["core/src/snapshot_store.rs", "task 83 (snapshots — the capture hook decides first)"],
   ["core/src/vault_registry.rs", "task 12 (vault registry scan)"],
   ["core/src/vault_sweep.rs", "task 72 (vault delete)"],

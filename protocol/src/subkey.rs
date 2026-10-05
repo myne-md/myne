@@ -272,6 +272,15 @@ const ROLE_STR_GROUP_ROSTER_KEY: &[u8] = b"group-roster-key";
 /// `"membership-blob"`.
 const ROLE_STR_MEMBERSHIP_KEY: &[u8] = b"membership-key";
 
+/// Registered role string for the device-local vault-bound person-identity
+/// carrier (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`; `protocol.md` §3.4). Seals
+/// the person keypair, at rest, under the owner's `root_key`, so an `NTV6`
+/// owner-vault unlock re-installs the person identity without the recovery
+/// phrase. Root-tier and owner-only: a member holds no `root_key`. Load-bearing
+/// (`hkdf-sha256` vector); DISTINCT from the AAD role string
+/// `"person-vault-carrier-blob"`.
+const ROLE_STR_PERSON_VAULT_CARRIER: &[u8] = b"person-vault-carrier";
+
 /// Registered role string for the v0.1 agent-memory catalog KEK (encrypts the
 /// `vault.agent-memory` singleton: `agent_memory_blob.rs`, `MYN1`,
 /// `protocol.md` § 9.25, myne-md/myne#697). Load-bearing: drift silently
@@ -366,10 +375,11 @@ pub enum OwnerRole {
     AgentMemoryKey,
     AgentPersonalityKey,
     AgentPersonalitySyncId,
+    PersonVaultCarrier,
 }
 
 impl OwnerRole {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::GroupKeyWrap,
         Self::ServerAuth,
         Self::MembershipKey,
@@ -383,6 +393,7 @@ impl OwnerRole {
         Self::AgentMemoryKey,
         Self::AgentPersonalityKey,
         Self::AgentPersonalitySyncId,
+        Self::PersonVaultCarrier,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -400,6 +411,7 @@ impl OwnerRole {
             Self::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
             Self::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
             Self::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
+            Self::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
         }
     }
 }
@@ -525,7 +537,8 @@ impl SubkeyRole {
             | Self::AgentMemoryCatalogSyncId
             | Self::AgentMemoryKey
             | Self::AgentPersonalityKey
-            | Self::AgentPersonalitySyncId => None,
+            | Self::AgentPersonalitySyncId
+            | Self::PersonVaultCarrier => None,
         }
     }
 }
@@ -732,6 +745,14 @@ pub enum SubkeyRole {
     /// `ThemesSyncId`); the singleton's KEK stays `AgentPersonalityKey`.
     /// Domain-separated from every other role.
     AgentPersonalitySyncId,
+    /// KEK for the device-local, vault-bound person-identity carrier
+    /// (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`; `protocol.md` §3.4). Seals the
+    /// person keypair, at rest, under the owner's `root_key`, so an `NTV6`
+    /// owner-vault unlock installs the person session without the recovery
+    /// phrase (decisions/protocol/0612 amended). Root-derived and owner-only (a
+    /// member holds no `root_key`); never synced. Distinct
+    /// from the AAD role `"person-vault-carrier-blob"`.
+    PersonVaultCarrier,
 }
 
 impl SubkeyRole {
@@ -747,7 +768,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 26] = [
+    pub const ALL: [SubkeyRole; 27] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -774,6 +795,7 @@ impl SubkeyRole {
         SubkeyRole::AgentMemoryKey,
         SubkeyRole::AgentPersonalityKey,
         SubkeyRole::AgentPersonalitySyncId,
+        SubkeyRole::PersonVaultCarrier,
     ];
 
     /// Registered role string (the part appended after the
@@ -807,6 +829,7 @@ impl SubkeyRole {
             SubkeyRole::AgentMemoryKey => ROLE_STR_AGENT_MEMORY_KEY,
             SubkeyRole::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
             SubkeyRole::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
+            SubkeyRole::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
         }
     }
 }
@@ -954,6 +977,7 @@ mod tests {
                 SubkeyRole::AgentMemoryKey => 23,
                 SubkeyRole::AgentPersonalityKey => 24,
                 SubkeyRole::AgentPersonalitySyncId => 25,
+                SubkeyRole::PersonVaultCarrier => 26,
             }
         }
 
@@ -973,6 +997,31 @@ mod tests {
                     a.role_str(),
                     b.role_str(),
                     "{a:?} and {b:?} share a role string — domain separation lost"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_registered_role_derives_a_distinct_subkey() {
+        // Domain separation (spec § 3.2.2): every registered role's `info`
+        // string is distinct (`all_covers_every_registered_role`), and
+        // `derive_subkey` is exactly HKDF(`prefix || role_str`)
+        // (`derive_subkey_concatenates_prefix_and_role_string`), so distinct
+        // roles MUST derive distinct subkeys. This states that once over the
+        // WHOLE registry, which the per-role pairwise copies it replaces each
+        // restated for a hand-picked subset. The load-bearing case is the
+        // id-vs-KEK families (`catalog-sync-id` / `prefs-sync-id` /
+        // `themes-sync-id` against their `*-key` KEKs, §9.10.1): a collision
+        // there would let one store's id be another store's key.
+        let root = [0u8; 32];
+        for (i, a) in SubkeyRole::ALL.iter().enumerate() {
+            let derived_a = derive_subkey(&root, *a);
+            for b in SubkeyRole::ALL.iter().skip(i + 1) {
+                assert_ne!(
+                    *derived_a,
+                    *derive_subkey(&root, *b),
+                    "{a:?} and {b:?} derive the SAME subkey: domain separation lost"
                 );
             }
         }
@@ -1043,17 +1092,6 @@ mod tests {
     }
 
     #[test]
-    fn personal_dict_key_is_distinct_from_other_root_key_blobs() {
-        // The dictionary KEK must differ from prefs/search/workspace KEKs so
-        // the blob families are domain-separated (HKDF info-string property).
-        let root = [0u8; 32];
-        let dict = derive_subkey(&root, SubkeyRole::PersonalDictKey);
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-    }
-
-    #[test]
     fn server_auth_role_string_matches_spec_registry() {
         // MYND-420 registry entry "myne.v0.1 server-auth" (§3.4 + §11.1). The
         // SCRAM-SHA-256-PLUS credential secret is HKDF(root_key, "server-auth");
@@ -1062,43 +1100,11 @@ mod tests {
     }
 
     #[test]
-    fn server_auth_is_distinct_from_other_roles() {
-        // The server-auth secret must be domain-separated from every blob KEK and
-        // from the vault-head MAC key (a server-auth leak must not imply any other).
-        let root = [0u8; 32];
-        let sa = derive_subkey(&root, SubkeyRole::ServerAuth);
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-    }
-
-    #[test]
     fn vault_indices_key_role_string_matches_spec_registry() {
         // MYND-271 registry entry "myne.v0.1 vault-indices-key" (§ 9.8; design
         // MYND-31). Frozen + load-bearing: drift silently changes the
         // vault.indices KEK.
         assert_eq!(SubkeyRole::VaultIndicesKey.role_str(), b"vault-indices-key");
-    }
-
-    #[test]
-    fn vault_indices_key_is_distinct_from_other_root_key_blobs() {
-        // The vault-indices KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families are domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from search-index-key —
-        // vault.indices (structured metadata) and vault.search (BM25) are
-        // separate families, one KEK each.
-        let root = [0u8; 32];
-        let vi = derive_subkey(&root, SubkeyRole::VaultIndicesKey);
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(
-            *vi,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
     }
 
     #[test]
@@ -1128,49 +1134,12 @@ mod tests {
     }
 
     #[test]
-    fn attachment_text_key_is_distinct_from_other_root_key_blobs() {
-        // The attachment-text KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families stay domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from search-index-key,
-        // since extracted text feeds the search index but the cache is its own
-        // blob family.
-        let root = [0u8; 32];
-        let at = derive_subkey(&root, SubkeyRole::AttachmentTextKey);
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(
-            *at,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-    }
-
-    #[test]
     fn catalog_sync_id_role_string_matches_spec_registry() {
         // MYND-468 registry entry "myne.v0.1 catalog-sync-id" (§3.4;
         // sync-protocol.md §8.1). Derives the catalog's reserved 16-byte
         // sync blob-id; drift silently splits the catalog into a second
         // sync record on every existing account.
         assert_eq!(SubkeyRole::CatalogSyncId.role_str(), b"catalog-sync-id");
-    }
-
-    #[test]
-    fn catalog_sync_id_is_distinct_from_other_roles() {
-        // The sync blob-id derivation must be domain-separated from the
-        // catalog KEK (an id is public-ish sync metadata; the KEK is key
-        // material) and from the other identifier derivation
-        // (attachments-id-hmac) and the head MAC key.
-        let root = [0u8; 32];
-        let cs = derive_subkey(&root, SubkeyRole::CatalogSyncId);
-        assert_ne!(
-            *cs,
-            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
-        );
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
-        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
     }
 
     #[test]
@@ -1183,21 +1152,6 @@ mod tests {
     }
 
     #[test]
-    fn prefs_sync_id_is_distinct_from_other_roles() {
-        // The prefs sync blob-id derivation must be domain-separated from
-        // the prefs KEK (the id is public-ish sync metadata; the KEK is key
-        // material — the §9.10.1-class id/KEK pair), from the sibling
-        // identifier derivation (catalog-sync-id), and from the other
-        // non-KEK roles.
-        let root = [0u8; 32];
-        let ps = derive_subkey(&root, SubkeyRole::PrefsSyncId);
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
     fn themes_sync_id_role_string_matches_spec_registry() {
         // MYND-486 registry entry "myne.v0.1 themes-sync-id" (§3.4;
         // sync-protocol.md §10.x). Derives vault.themes' reserved 16-byte
@@ -1207,44 +1161,10 @@ mod tests {
     }
 
     #[test]
-    fn themes_sync_id_is_distinct_from_other_roles() {
-        // The themes sync blob-id derivation must be domain-separated from
-        // the themes KEK (the id is public-ish sync metadata; the KEK is key
-        // material — the §9.10.1-class id/KEK pair), from the sibling
-        // identifier derivations (catalog-sync-id / prefs-sync-id), and from
-        // the other non-KEK roles.
-        let root = [0u8; 32];
-        let ts = derive_subkey(&root, SubkeyRole::ThemesSyncId);
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::PrefsSyncId));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
-        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
     fn custom_themes_key_role_string_matches_spec_registry() {
         // MYND-486 registry entry "myne.v0.1 custom-themes-key" (§ 9.21).
         // Frozen + load-bearing: drift silently changes the vault.themes KEK.
         assert_eq!(SubkeyRole::CustomThemesKey.role_str(), b"custom-themes-key");
-    }
-
-    #[test]
-    fn custom_themes_key_is_distinct_from_other_root_key_blobs() {
-        // The custom-themes KEK must differ from EVERY other root_key-derived
-        // blob KEK so the blob families are domain-separated (HKDF info-string
-        // property). Most load-bearing: distinctness from personal-dictionary-key
-        // — vault.themes (MYT1) is the structural twin of vault.dictionary (MYD1),
-        // one KEK each.
-        let root = [0u8; 32];
-        let ct = derive_subkey(&root, SubkeyRole::CustomThemesKey);
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
     }
 
     #[test]
@@ -1259,36 +1179,6 @@ mod tests {
         // Registry entry "myne.v0.2 membership-key" (§3.4; §9.3.1). KEK for the
         // sealed vault membership field; drift silently changes the KEK.
         assert_eq!(SubkeyRole::MembershipKey.role_str(), b"membership-key");
-    }
-
-    #[test]
-    fn membership_key_is_distinct_from_other_root_key_blobs() {
-        // The membership KEK must differ from every other root_key-derived blob
-        // KEK so the families stay domain-separated (HKDF info-string property).
-        let root = [0u8; 32];
-        let mk = derive_subkey(&root, SubkeyRole::MembershipKey);
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
-        assert_ne!(*mk, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
-    }
-
-    #[test]
-    fn graph_layout_key_is_distinct_from_other_root_key_blobs() {
-        // vault.graph (layout cache) is its own blob family — its KEK must be
-        // domain-separated from its structural siblings, most importantly the
-        // other rebuildable caches (search / indices / embeddings) whose blobs
-        // sit next to it, so a blob of one kind can never AEAD-verify as another.
-        let root = [0u8; 32];
-        let gl = derive_subkey(&root, SubkeyRole::GraphLayoutKey);
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::AiEmbeddingsKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SessionStateKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::PrefsKey));
-        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
     }
 
     #[test]
@@ -1507,6 +1397,7 @@ mod tests {
                 SubkeyRole::AgentMemoryKey => "agent-memory-key",
                 SubkeyRole::AgentPersonalityKey => "agent-personality-key",
                 SubkeyRole::AgentPersonalitySyncId => "agent-personality-sync-id",
+                SubkeyRole::PersonVaultCarrier => "person-vault-carrier",
             }
         }
 
@@ -1879,18 +1770,34 @@ mod tests {
         let zero_root: [u8; 32] = [0u8; 32];
         let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
 
-        let cases: [(&str, &str, &[u8; 32], bool); 2] = [
+        let cases: [(&str, &str, &[u8; 32], bool, SubkeyRole); 4] = [
             (
                 "zero-root-membership-key",
                 "All-zero root_key with the MembershipKey role (§3.4; §9.3.1). KEK for the sealed vault membership field (the account/vault split, decisions.md 2026-09-07); role string 'membership-key' (14 ASCII bytes). Derived under the v0.2 context prefix because the field is NTV5-only: info is 'myne.v0.2 membership-key' (24 bytes). root_key-derived (like prefs/search/workspace), so it is itemsKey-independent. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
                 &zero_root,
                 false,
+                SubkeyRole::MembershipKey,
             ),
             (
                 "prn-alpha-membership-key",
                 "Pseudorandom alpha root with the MembershipKey role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.2 membership-key') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'membership-key' is DISTINCT from the AAD role string 'membership-blob' (aad_membership_blob): two different load-bearing strings in the same feature.",
                 &alpha,
                 true,
+                SubkeyRole::MembershipKey,
+            ),
+            (
+                "zero-root-person-vault-carrier",
+                "All-zero root_key with the PersonVaultCarrier role (§3.4; myne-md/myne#792). KEK for the device-local, vault-bound person-identity carrier (device-local, `<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`), which seals the person keypair under the owner root_key so an NTV6 owner-vault unlock installs the person session without the recovery phrase; role string 'person-vault-carrier' (20 ASCII bytes). info is 'myne.v0.2 person-vault-carrier'. Root-derived and owner-only (a member holds no root_key); never synced. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
+                &zero_root,
+                false,
+                SubkeyRole::PersonVaultCarrier,
+            ),
+            (
+                "prn-alpha-person-vault-carrier",
+                "Pseudorandom alpha root with the PersonVaultCarrier role. The informational_info_utf8_hex field carries the canonical 30-byte HKDF info bytes ('myne.v0.2 person-vault-carrier') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'person-vault-carrier' is DISTINCT from the AAD role string 'person-vault-carrier-blob' (aad_person_vault_carrier): two different load-bearing strings in the same feature.",
+                &alpha,
+                true,
+                SubkeyRole::PersonVaultCarrier,
             ),
         ];
 
@@ -1899,11 +1806,11 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4 + §10.7\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the membership KEK: the one role that derives under the v0.2 context prefix (info='myne.v0.2 '||role) because its field is NTV5-only. Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the v0.2 context prefix (info='myne.v0.2 '||role): the membership KEK (its field is NTV5-only) and the device-local vault-bound PersonVaultCarrier KEK (myne-md/myne#792). Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
-        for (i, (slug, desc, root, include_info)) in cases.iter().enumerate() {
-            let subkey = derive_subkey_v0_2(root, SubkeyRole::MembershipKey);
+        for (i, (slug, desc, root, include_info, role)) in cases.iter().enumerate() {
+            let subkey = derive_subkey_v0_2(root, *role);
 
             dump.push_str("    {\n");
             dump.push_str(&alloc::format!(
@@ -1918,11 +1825,14 @@ mod tests {
                 "      \"input_root_key_hex\": \"{}\",\n",
                 hex_lower(root.as_slice())
             ));
-            dump.push_str("      \"input_role\": \"membership-key\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_role\": \"{}\",\n",
+                core::str::from_utf8(role.role_str()).expect("role str is ASCII")
+            ));
             if *include_info {
                 let mut info = alloc::vec::Vec::new();
                 info.extend_from_slice(HKDF_PREFIX_V0_2);
-                info.extend_from_slice(SubkeyRole::MembershipKey.role_str());
+                info.extend_from_slice(role.role_str());
                 dump.push_str(&alloc::format!(
                     "      \"informational_info_utf8_hex\": \"{}\",\n",
                     hex_lower(&info)
@@ -1974,6 +1884,7 @@ mod tests {
                 OwnerRole::AgentMemoryKey => 10,
                 OwnerRole::AgentPersonalityKey => 11,
                 OwnerRole::AgentPersonalitySyncId => 12,
+                OwnerRole::PersonVaultCarrier => 13,
             }
         }
 

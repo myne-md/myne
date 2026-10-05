@@ -274,17 +274,38 @@ export function AiChatTab({
             testId="ai.history-button"
             onClick={() => setHistoryOpen(true)}
           />
-          <IconButton
-            icon="bookmark"
-            label={t("editor.chrome.rightPanel.aiChat.memory")}
-            tooltip
-            // A disclosure, so it says whether it is open. It is a toggle in
-            // behaviour and was silent about it: a screen-reader user pressed
-            // it twice and heard the same thing both times.
-            expanded={memoryOpen}
-            testId="ai.memory-button"
-            onClick={() => setMemoryOpen((open) => !open)}
-          />
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <IconButton
+              icon="bookmark"
+              label={t("editor.chrome.rightPanel.aiChat.memory")}
+              tooltip
+              // A disclosure, so it says whether it is open. It is a toggle in
+              // behaviour and was silent about it: a screen-reader user pressed
+              // it twice and heard the same thing both times.
+              expanded={memoryOpen}
+              testId="ai.memory-button"
+              onClick={() => setMemoryOpen((open) => !open)}
+            />
+            {/* The popover and its button share ONE `position: relative`
+                container, so the popover's `bottom: 100%; right: 0` anchors to
+                the BUTTON rather than to wherever it sits in the flow. Before
+                this it rendered down by the composer (its old `{memoryOpen ? …}`
+                slot), so opening it from the header icon painted the card below
+                the header, half outside the panel and over the composer
+                (myne-md/myne#574). */}
+            {memoryOpen ? (
+              <MemoryPopover
+                onClose={() => setMemoryOpen(false)}
+                onOpenSettings={() => {
+                  setMemoryOpen(false);
+                  // The settings shell opens from the Editor, which passes the
+                  // opener down. Absent in isolation: the link then just closes.
+                  onOpenSettings?.();
+                }}
+                onShowToast={onShowToast ?? (() => {})}
+              />
+            ) : null}
+          </div>
           {onFocusAgent !== undefined ? (
             <IconButton
               icon="maximize-2"
@@ -473,18 +494,6 @@ export function AiChatTab({
 
       {historyOpen ? (
         <ChatHistoryModal open onClose={() => setHistoryOpen(false)} />
-      ) : null}
-      {memoryOpen ? (
-        <MemoryPopover
-          onClose={() => setMemoryOpen(false)}
-          onOpenSettings={() => {
-            setMemoryOpen(false);
-            // The settings shell opens from the Editor, which passes the
-            // opener down. Absent in isolation: the link then just closes.
-            onOpenSettings?.();
-          }}
-          onShowToast={onShowToast ?? (() => {})}
-        />
       ) : null}
     </div>
   );

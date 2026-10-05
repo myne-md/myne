@@ -147,9 +147,46 @@ export function applyCacheUpdate(
   id: NoteId,
   record: TitleRecord,
 ): SidebarState {
+  // Identity-preserving when nothing the sidebar renders changed (myne ref:
+  // the long-note save flicker). A save stamps `updated:` on disk and the pane
+  // refreshes its own row after every successful save, so this ran once per
+  // autosave with a record differing only in `updatedAt`. Allocating a fresh
+  // `cache` Map and state object re-rendered EVERY sidebar consumer for a row
+  // that did not visibly change, which on a long note shows as a flicker each
+  // time the autosave fires.
+  //
+  // Compared on the fields the sidebar/sorting actually read; `error` is a
+  // transient read problem that must still surface, so it participates too.
+  const prev = state.cache.get(id);
+  if (prev !== undefined && titleRecordsEqual(prev, record)) return state;
   const cache = new Map(state.cache);
   cache.set(id, record);
   return { ...state, cache };
+}
+
+/** Deep-equal over every `TitleRecord` field the sidebar derives from. Not a
+ *  reference compare: a save produces a NEW record object with identical
+ *  visible fields, which is exactly the case this exists to collapse. */
+function titleRecordsEqual(a: TitleRecord, b: TitleRecord): boolean {
+  return (
+    a.title === b.title &&
+    a.folder === b.folder &&
+    a.trashed === b.trashed &&
+    a.deleted === b.deleted &&
+    a.archived === b.archived &&
+    a.template === b.template &&
+    a.folderIndex === b.folderIndex &&
+    a.conflict === b.conflict &&
+    a.conflictOf === b.conflictOf &&
+    a.hasSource === b.hasSource &&
+    a.kind === b.kind &&
+    a.done === b.done &&
+    a.error === b.error &&
+    // `updatedAt` is a Date; compare by value, null-safe.
+    (a.updatedAt === null || b.updatedAt === null
+      ? a.updatedAt === b.updatedAt
+      : a.updatedAt.getTime() === b.updatedAt.getTime())
+  );
 }
 
 /**

@@ -15,7 +15,7 @@
 //
 //   - a plural base the locale has NONE of must NOT fail. That is an
 //     untranslated key, which is the normal state between an English string
-//     landing and Weblate filling it. A guard that failed there would block
+//     landing and it being translated in-repo. A guard that failed there would block
 //     every English copy edit, which is the trade `check-i18n.mjs` already
 //     refused; the distinction between "no categories" and "some categories"
 //     is what makes check 2 gate-able at all.

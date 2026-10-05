@@ -113,12 +113,20 @@ interface BackupExportModalProps {
    *  drill in Settings (myne-md/myne#468). Owned by the parent because opening
    *  Settings is the Editor's, not this modal's. */
   onOpenDrill: () => void;
+  /**
+   * The vault to export. `null` while the active id is still resolving. The
+   * command takes `vault_id` as a REQUIRED string, so a null target renders an
+   * error instead of invoking with a missing argument, which the backend
+   * answers with an unrecognised IPC error (myne-md/myne#817).
+   */
+  vaultId: string | null;
 }
 
 export function BackupExportModal({
   open,
   onClose,
   onOpenDrill,
+  vaultId,
 }: BackupExportModalProps) {
   const { t } = useTranslation();
   const [state, setState] = useState<ExportState>({
@@ -129,12 +137,13 @@ export function BackupExportModal({
   // user retires the line while this modal is open, the local state below is
   // what hides it, so the stored value need not be re-read.
   const [drillSeen, setDrillSeen] = useState(hasSeenBackupDrillLine);
-  // The parent passes an inline closure (unstable identity); routing it through
-  // a ref keeps the effect keyed on `open` alone — a parent re-render mid-export
-  // must not tear down the progress subscription. `onOpenDrill` is only read
-  // from the render, where the prop is always current, so it needs no ref.
-  const callbacksRef = useRef({ onClose });
-  callbacksRef.current = { onClose };
+  // The parent passes inline closures (unstable identities); routing them
+  // through a ref keeps the effect keyed on `open` alone — a parent re-render
+  // mid-export must not tear down the progress subscription. `onOpenDrill` is
+  // only read from the render, where the prop is always current, so it needs no
+  // ref.
+  const callbacksRef = useRef({ onClose, vaultId });
+  callbacksRef.current = { onClose, vaultId };
   // Once-per-open guard for the native save dialog: under StrictMode the
   // effect double-invokes on mount (cleanup between), and the ref —
   // surviving that remount — keeps a second dialog from opening.
@@ -148,6 +157,19 @@ export function BackupExportModal({
     if (startedRef.current) return;
     startedRef.current = true;
     setState({ step: "running", progress: null });
+
+    // The command requires the vault id; without one there is nothing to
+    // export, and invoking anyway is what produced the "unknown failure"
+    // copy. Read through the ref so a resolved id arriving later does not
+    // re-run this effect and tear down the progress subscription.
+    const targetVaultId = callbacksRef.current.vaultId;
+    if (targetVaultId === null) {
+      setState({
+        step: "error",
+        message: t("backup.errors.export.vaultNotFound"),
+      });
+      return;
+    }
 
     let unlisten: (() => void) | null = null;
     let disposed = false;
@@ -185,7 +207,7 @@ export function BackupExportModal({
         return;
       }
       try {
-        await exportBackup(destination);
+        await exportBackup(destination, targetVaultId);
         setState({ step: "success", filename: fileNameOf(destination) });
       } catch (raw) {
         // `exportFailureMessage`, not `exportErrorMessage(raw as …)`: the cast

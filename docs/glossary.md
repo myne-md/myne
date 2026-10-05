@@ -137,15 +137,15 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **agent focus** &nbsp; 📦 *Product*
 
-The conversation COLUMN of the [agent hub](#agent-hub) tab: the open [conversation](#conversation), with the note it is anchored to one click away, the run's live state, and the full [conversational AI chat](#conversational-ai-chat) surface. It sits beside the history rail rather than replacing it — the tab is one screen (`decisions/ai/0627`), and "focus" names the column, not a mode you enter. Reached by opening a row in the rail, by the "Agent: open on note" palette verb, or by the light panel's one exit control. It was the second of two VIEWS until 0623, and the two-view behaviour survives only where a pane is too narrow for both columns. Distinct from the light panel, which also shows one conversation: the panel is the shallow end, with no list, no search and no history chrome.
+The conversation COLUMN of the [agent hub](#agent-hub) tab: the open [conversation](#conversation), with the note it is anchored to one click away, the run's live state, and the full [conversational AI chat](#conversational-ai-chat) surface. It sits beside the history rail rather than replacing it — the tab is one screen (`decisions/ai/0637`), and "focus" names the column, not a mode you enter. Reached by opening a row in the rail, by the "Agent: open on note" palette verb, or by the light panel's one exit control. It was the second of two VIEWS until 0633, and the two-view behaviour survives only where a pane is too narrow for both columns. Distinct from the light panel, which also shows one conversation: the panel is the shallow end, with no list, no search and no history chrome.
 
-Used in: `decisions/@@ai/0628@@`; `decisions/ai/0627`
+Used in: `decisions/@@ai/0638@@`; `decisions/ai/0637`
 
 ### **agent hub** &nbsp; 📦 *Product*
 
-The deep surface for [agentic note editing](#agentic-note-editing): a singleton workspace tab listing every [conversation](#conversation) in the vault, newest first, searchable, each row openable, renameable and deletable, and each carrying its [note anchor](#note-anchor) when it has one. The tab is ONE screen — the history rail beside [agent focus](#agent-focus), the conversation column (`decisions/ai/0627`; it was two views until then, and that shape survives only where a pane is too narrow for both) — and the duplicate-forbid invariant makes "open the agent" a reveal rather than a second tab, from the palette, the ribbon and the panel alike. It is **not a stage** (it does not take the window, and a note stays open beside it), **not a modal** (you browse it rather than answer it, `decisions/ui/0623`), and **not a replacement for the light AI panel**, which keeps its place in the right panel's vocabulary as the shallow end of a depth pair. Behind the same `developer_mode` + `ai_enabled` gate as every other `ai.*` surface (`decisions/ai/0626`).
+The deep surface for [agentic note editing](#agentic-note-editing): a singleton workspace tab listing every [conversation](#conversation) in the vault, newest first, searchable, each row openable, renameable and deletable, and each carrying its [note anchor](#note-anchor) when it has one. The tab is ONE screen — the history rail beside [agent focus](#agent-focus), the conversation column (`decisions/ai/0637`; it was two views until then, and that shape survives only where a pane is too narrow for both) — and the duplicate-forbid invariant makes "open the agent" a reveal rather than a second tab, from the palette, the ribbon and the panel alike. It is **not a stage** (it does not take the window, and a note stays open beside it), **not a modal** (you browse it rather than answer it, `decisions/ui/0633`), and **not a replacement for the light AI panel**, which keeps its place in the right panel's vocabulary as the shallow end of a depth pair. Behind the same `developer_mode` + `ai_enabled` gate as every other `ai.*` surface (`decisions/ai/0636`).
 
-Used in: `decisions/@@ai/0628@@`; `decisions/ai/0626`; `decisions/ai/0627`
+Used in: `decisions/@@ai/0638@@`; `decisions/ai/0636`; `decisions/ai/0637`
 
 ### **agent memory** &nbsp; 📦 *Product*
 
@@ -350,7 +350,7 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
 
 ### **auto-tag** &nbsp; 📦 *Product*
 
-On-device tag suggestion ([local inference](#local-inference), MYND-651): a **dedicated bundled task-model** (a small quantized Qwen2 GGUF shipped as a Tauri resource, like the transcription model — not the side-loaded generation model) reads the open note a debounce interval after typing settles and proposes a few tags, surfaced in the [tag suggestion band](#tag-suggestion-band). Candidates are open-vocabulary, then folded and ranked against the vault's own [tag index](#tag-index) under the §3.7.8 tag-identity rule — existing tags preferred (solid chips), a genuinely new tag coined only when nothing fits (dashed `+` chip). Accepting writes the tag into the note's frontmatter `tags:` list (idempotent under the fold); suggestions themselves are **RAM-only**, never persisted. Off by default behind its own `auto_tag_enabled` pref (an additive `vault.prefs`/`MYP1` field) *under* the `ai_enabled` beta opt-in, enforced host-side; an [AI-excluded folder](#ai-excluded-folder) short-circuits before any model call. Desktop-only (no Candle on web; mobile deferred to MYND-653). Replaces the earlier command-palette + AI-Chat-tab tag surface (MYND-411). See `decisions.md` 2026-07-31; `threat-model.md` §7 "Local AI".
+On-device tag suggestion ([local inference](#local-inference), MYND-651): a **dedicated on-demand task-model** (a small quantized Qwen2 GGUF, fetched from Myne's own artefact origin on explicit user action and verified against a SHA-256 compiled into the client binary, or side-loaded in Developer mode; no longer bundled since myne-md/myne#805, `decisions/ai/0628`) reads the open note a debounce interval after typing settles and proposes a few tags, surfaced in the [tag suggestion band](#tag-suggestion-band). Candidates are open-vocabulary, then folded and ranked against the vault's own [tag index](#tag-index) under the §3.7.8 tag-identity rule — existing tags preferred (solid chips), a genuinely new tag coined only when nothing fits (dashed `+` chip). Accepting writes the tag into the note's frontmatter `tags:` list (idempotent under the fold); suggestions themselves are **RAM-only**, never persisted. Off by default behind its own `auto_tag_enabled` pref (an additive `vault.prefs`/`MYP1` field) *under* the `ai_enabled` beta opt-in, enforced host-side; an [AI-excluded folder](#ai-excluded-folder) short-circuits before any model call. Desktop-only (no Candle on web; mobile deferred to MYND-653). Replaces the earlier command-palette + AI-Chat-tab tag surface (MYND-411). See `decisions.md` 2026-07-31; `threat-model.md` §7 "Local AI".
 
 Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-31
 
@@ -1258,9 +1258,9 @@ Used in: `docs/spec/protocol.md` §9.3.3
 
 *(Alias: the orb.)*
 
-The small animated mark on the [agent hub](#agent-hub) tab that says a run is in flight, beside the word that says the same thing. It animates only while the run is RUNNING — not while a settled run's view is still open — pauses when the tab is hidden or the mark is off-screen, holds one static frame under `prefers-reduced-motion`, and is `aria-hidden`, because the state's meaning is in the text next to it. It is a **named exemption** in the motion canon rather than a permitted pattern: `PRODUCT.md` principle 4 forbids a pulsing state indicator, `decisions/ui/0622` established the by-name mechanism, and `scripts/check-motion-canon.mjs` knows both of its keyframes (`decisions/ai/0625`). It is **not a spinner** — a spinner says "waiting for IO" and turns at IO's pace; this reports a model working — and **not a progress bar**: nothing about an agent run is measurable in advance.
+The small animated mark on the [agent hub](#agent-hub) tab that says a run is in flight, beside the word that says the same thing. It animates only while the run is RUNNING — not while a settled run's view is still open — pauses when the tab is hidden or the mark is off-screen, holds one static frame under `prefers-reduced-motion`, and is `aria-hidden`, because the state's meaning is in the text next to it. It is a **named exemption** in the motion canon rather than a permitted pattern: `PRODUCT.md` principle 4 forbids a pulsing state indicator, `decisions/ui/0632` established the by-name mechanism, and `scripts/check-motion-canon.mjs` knows both of its keyframes (`decisions/ai/0635`). It is **not a spinner** — a spinner says "waiting for IO" and turns at IO's pace; this reports a model working — and **not a progress bar**: nothing about an agent run is measurable in advance.
 
-Used in: `decisions/ai/0625`; `decisions/ui/0622`
+Used in: `decisions/ai/0635`; `decisions/ui/0632`
 
 ### **roster continuity** &nbsp; 📋 *Protocol*
 
@@ -1299,6 +1299,12 @@ Used in: `spec/sync-protocol.md` (vault head)
 The vault-scoped pseudonymous identifier a signed [vault head](#vault-head) carries so a peer can resolve which key signed it (`decisions/protocol/0603`, myne-md/myne#711). It is a deterministic function of the author's person public halves and the vault's `account_number_hash` under the hash domain `"myne.head-author v1|"`, so the same person shows a different id in each vault and the server cannot link one person across vaults. A verifier derives the candidate ids from the roster's public halves and matches; a single-user vault resolves it against the device's own person key. Deliberately not the raw [person fingerprint](#person-keypair).
 
 Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/sync-protocol.md` §3
+
+### **invite code** &nbsp; 📦 *Product*
+
+A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0625`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
+
+Used in: `docs/decisions/sync/0625-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
 
 ### **invite relay** &nbsp; 📦 *Product*
 
@@ -1555,7 +1561,7 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **internationalization (i18n)** &nbsp; 🛠️ *Tooling*
 
-The client UI localization layer, shared by desktop, web and mobile: `react-i18next` over flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the build — there is no HTTP backend and no translation server, so no UI string is ever fetched from a third party. English is a static import; the other 30 catalogs are lazy chunks of the same build, one per locale, and a session loads only the active one (`decisions.md` 2026-08-03). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
+The client UI localization layer, shared by desktop, web and mobile: `react-i18next` over flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the build — there is no HTTP backend and no translation server, so no UI string is ever fetched from a third party. English is a static import; the other 30 catalogs are lazy chunks of the same build, one per locale, and a session loads only the active one (`decisions.md` 2026-08-03). Translations are **authored in-repo, by hand**; the self-hosted Weblate instance was retired in `decisions.md` 2026-10-03 (`docs/decisions/ui/0629`). Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
 
@@ -1569,7 +1575,7 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
-A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are owned by **Weblate**. The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and now suspended on a stated condition rather than by exception: while `translate.myne.md` has closed registration and no translators enrolled, the catalogs are filled in-repo. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are **authored in-repo, by hand** — the repository owns every catalog (the self-hosted Weblate instance was retired in `docs/decisions/ui/0629`). The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and made the standing practice on 2026-08-03/2026-08-25; since 2026-10-03 it is simply the only path. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
 
 Used in: `docs/dev/i18n.md`; `docs/dev/i18n-coverage.md`; `locales/`.
 
@@ -1706,7 +1712,7 @@ The right-panel tab answering **both** directions of a note's [bidirectional lin
 
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
-On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no model download by Myne and no telemetry, ever**; what replaced the rest is *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31) — are **first-party weights bundled inside the desktop build itself**, covered by that release's minisign-signed `SHA256SUMS` rather than by any signature on the build. (This entry said "the signed, reproducible desktop build" until 2026-08-25 and both words were wrong for desktop: see **code-signed releases** and **reproducible builds** in this file, and entry 0534.) Bundling is not downloading: no runtime fetch path exists in either case, which is the property the never-downloaded commitment actually protects. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
+On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no telemetry, ever**, and **no model download the user did not ask for**; a model is fetched only on explicit user action from Myne's own origin and verified against a compiled-in digest (myne-md/myne#805, `decisions/ai/0628`), and *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31, unbundled by myne-md/myne#805) — are **first-party weights**: transcription still ships bundled inside the desktop build, while the tag model is fetched on explicit user action from Myne's own origin and verified against a compiled-in digest, or side-loaded. (This entry said "the signed, reproducible desktop build" until 2026-08-25 and both words were wrong for desktop: see **code-signed releases** and **reproducible builds** in this file, and entry 0534.) The never-downloaded commitment is superseded (myne-md/myne#805, `decisions/ai/0628`): the tag model is fetched on explicit user action from Myne's own origin and verified against a compiled-in digest, which is the one runtime fetch path on the AI surface. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
 
 ### **AI provider** &nbsp; 📦 *Product* (*Myne-divergent*)
 
@@ -1901,7 +1907,7 @@ The small Rust stdio host in the Tauri core that receives a keyless clip handoff
 
 The note a [conversation](#conversation) is about, when it is about one: an optional note id on the conversation's catalog row, written at creation when a run starts with a single note in its [agent scope](#agent-scope). A field on the existing row rather than a new blob family, deliberately — the catalog already syncs, so the [agent hub](#agent-hub) lists anchors without opening every conversation file. A conversation without one is **vault-general**, which is the hub's own case and not a degraded state. The anchor is a label, never a permission: it says what a conversation was about and grants nothing, and what a run may touch is the [agent scope](#agent-scope) alone.
 
-Used in: `protocol.md` §9.23; `decisions/@@ai/0628@@`
+Used in: `protocol.md` §9.23; `decisions/@@ai/0638@@`
 
 ### **note-task** &nbsp; 📦 *Product*
 
@@ -1930,6 +1936,12 @@ Used in: `spec/protocol.md` §9.1, §5.2
 Host-side newtype around the per-note UUIDv7 (`note_uuid`). Generated server-side by the `note_create` Tauri command (`NoteId::new_v7`) and returned to the UI as the canonical lowercase-hyphenated 36-char form; the UI never produces a `NoteId` — only consumes the string returned by `note_create` and passes it back unchanged to subsequent reads/updates. `NoteId::parse(&str)` is **strict**: 36 chars + lowercase ASCII letter/digit/hyphen + hyphens at fixed positions 8/13/18/23 + `uuid::Uuid::parse_str` succeeds + `version_num == 7`. Each rejection routes through a `pub(crate) InvalidNoteIdCause` (5 sub-causes) emitted via `tracing::debug!` for ops debugging, then collapses to the single public `InvalidNoteId` IPC variant per the unlock-error-discipline boundary policy (`decisions.md` 2026-04-26). The strict contract delivers three structural defenses: path-traversal becomes impossible (no UI string reaches a path component without `parse` succeeding), filesystem case-sensitivity inconsistency between APFS / ext4 is structurally prevented, and the backend-gen v7-only contract is double-pinned (a v4 UUID submitted by a buggy/hostile UI is rejected at `WrongVersion` before any path concat).
 
 Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7 backend-gen" + "NoteId strict parse"; `core/src/plugins/notes/note_id.rs`
+
+### **model artefact origin** &nbsp; 📦 *Product*
+
+`downloads.myne.md`, Myne's own static artefact origin, which hosts the AI model weights the desktop client fetches on demand rather than bundling (myne-md/myne#805; `decisions/ai/0628`). Distinct from a [remote AI provider](#remote-ai-provider) and from a [local model runtime](#local-model-runtime): a fetch from this origin carries no note content and no credential, only a request for a named model file, so the only thing it can reveal is that this device chose to fetch a model. The trust anchor is a SHA-256 **compiled into the client binary**, never the origin's own `SHA256SUMS` or `index.json` (which are discovery and display only), so a tampered origin cannot serve bytes that agree with the check. The origin keeps no IP logs and no analytics (threat-model **TB14**). The non-LLM utility models (OCR, Whisper) stay bundled; only the LLM-shaped embeddings and tag weights are downloaded.
+
+Used in: `decisions/ai/0628`; `threat-model.md` §3 TB14, §7; `src-tauri/src/plugins/local_inference/download.rs`
 
 ### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
@@ -2196,6 +2208,24 @@ the invite is sealed. Not an AEAD/magic value and not an AAD role.
 
 Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
+### **person-identity carrier** &nbsp; 🗝️ *Key/identifier*
+
+The device-local, per-vault copy of a person's [person keypair](#person-keypair)
+that lets an `NTV6` owner vault install the person session at unlock without
+re-entering the recovery phrase (`myne-md/myne#792`, `decisions/protocol/0622`,
+amending `decisions/protocol/0612`). One JSON envelope per vault at
+`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`, AEAD-sealed under a
+`root_key` subkey (`SubkeyRole::PersonVaultCarrier`, HKDF context
+`person-vault-carrier`) with the AAD role `person-vault-carrier-blob` binding the
+vault id and the person id. Written when the identity is unlocked while an owner
+vault is open; read by the vault-unlock pipeline; erased by person forget and by
+vault delete. Owner-only (a member holds no `root_key`); never synced. Its
+exposure is the deliberate equivalent of the identity itself: the vault credential
+opens it, which is the trade `decisions/protocol/0622` records and
+`myne-md/myne#793` is to decouple.
+
+Used in: `docs/spec/protocol.md` §3.4 / §5.2; `docs/decisions/protocol/0622-person-identity-carrier-is-vault-bound-device-local.md`; `myne-md/myne#792`.
+
 ### **person keypair** &nbsp; 🗝️ *Key/identifier*
 
 The B2B identity substrate's per-member cryptographic identity
@@ -2291,6 +2321,12 @@ Used in: `vision.md`, `decisions.md`
 ### **pending capture** &nbsp; 📦 *Product*
 
 A short piece of dictated note text captured on the native-SwiftUI Apple Watch companion and relayed to the paired phone over WatchConnectivity, held in a **device-local encrypted queue** (`MYK1`, `spec/protocol.md` §9.18 — one file per capture at `captures/<capture-id>`) until the vault is next unlocked on the phone, at which point it is drained into that vault as an ordinary new note. Sealed under a device-local keychain `wrap_key` (non-biometric, `afterFirstUnlockThisDeviceOnly`; **not** `root_key`-derived, since the queue must be writable while the vault is locked), it is **vault-agnostic** — it binds the per-entry `capture_id` rather than a vault identity, and drains into whichever vault unlocks first. The watch holds no vault keys and runs no crypto (the same outside-the-trust-boundary posture as the home-screen widget); the queue is never synced or backed up. V1 is voice quick-capture only — no reading, editing, or Siri intent. (`decisions.md` 2026-07-12)
+
+### **plain-file editor** &nbsp; 📦 *Product*
+
+The desktop surface that opens a user's own on-disk `.md`/`.markdown` and edits it in place with **no vault interaction**: a tab in the main window when the vault is unlocked, and the same surface standalone when the vault is locked or the device has none (myne-md/myne#788; `decisions/clients/0625`). Its gate is the **device-local** `plain-file.json` under `<app_config_dir>` (sibling of `tor-routing.json`; ON by default: an absent file reads as enabled, while an unreadable or malformed one reads as disabled), not a `vault.prefs` field, because the states the surface must work in are exactly the states in which `vault.prefs` cannot be read; the gate is page-flippable like every other device setting and is not a security boundary against page compromise. IO is **host-validated**: a path arrives from an OS ingress, the native dialog, the CLI, or a `myne://open-file` deep link parsed in JS, and no path becomes an opaque handle without the host-side gate check, canonicalisation, `.md`/`.markdown` check on the CANONICAL path and 64 MiB cap. A deep-linked file opens only after the user confirms the canonical target the host resolved (the resolve reads no content and mints no handle; the confirmed open re-validates from scratch). Writes are atomic base-hash compare-and-swaps, so an external edit or deletion refuses rather than clobbers. It leaves **zero traces** (no recents, no `vault.workspace` entry, no on-disk buffer, no snapshot, no `.bak`), renders with built-in palettes only (the custom vault palette never reaches it), and is marked as local and unencrypted by text, icon and colour together. Not a plaintext mode for the vault: nothing about the vault changes, and no vault note ever becomes plaintext on disk.
+
+Used in: `threat-model.md` §7; `decisions/clients/0625`
 
 ### **platform backup** &nbsp; ⚠️ *Threat*
 
@@ -3075,7 +3111,7 @@ Used in: MYND-651, `decisions.md` 2026-07-31
 
 *(Aliases: import source vault. Myne-divergent: yes — the term only exists because Myne can import from its own format.)*
 
-In a **vault import**, the vault notes are read FROM. Always another local vault on the same device, never the one currently unlocked, and never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. Contrast **target vault**.
+In a **vault import**, the vault notes are read FROM. A local vault on the same device, never the one currently unlocked, or an externally exported `.myne-backup` file (myne-md/myne#816). Never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. A backup source is read by extracting the container's ciphertext members into a private staging directory and pointing the same slot at that root. Contrast **target vault**.
 
 Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
@@ -3478,7 +3514,7 @@ Used in: `spec/protocol.md` (titled v0.1)
 
 *(Aliases: Myne vault import. Myne-divergent: yes.)*
 
-Bringing notes from one Myne vault into another, as the first entry in the import-source picker. It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
+Bringing notes from a Myne vault into another, from either a local vault on this device or an externally exported `.myne-backup` file, as the entries in the import-source picker (myne-md/myne#816 added the backup source). It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. For a backup source, the credential is the backup's OWN password or recovery phrase, not the target vault's. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
 
 Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
@@ -3770,11 +3806,11 @@ The `~x~` (subscript) and `^x^` (superscript) inline constructs, rendered with r
 
 Used in: `spec/markdown-dialect.md` §3.2
 
-### **Weblate** &nbsp; 🛠️ *Tooling*
+### **Weblate** &nbsp; 🛠️ *Tooling — retired*
 
-The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill the target languages, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`. Registration being closed with no translators enrolled is why `decisions.md` 2026-08-03 backfilled the catalogs in-repo instead; the ownership direction is unchanged.
+The self-hosted web translation platform that once owned Myne's non-English **locale catalogs**, at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only). **Retired on 2026-10-03** (`docs/decisions/ui/0629`): it had no translators enrolled and the repo was ahead of it on every locale, so the catalogs are now authored in-repo, by hand. It is kept as a glossary entry only so an older document that says "Weblate owns the catalogs" reads as historical. File mask it used was `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
 
-Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
+Used in: `docs/decisions/ui/0629`; `docs/dev/i18n.md` (historical).
 
 ### **web capability set** &nbsp; 📦 *Product* (*Myne-divergent*)
 

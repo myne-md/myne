@@ -45,6 +45,10 @@ pub mod compute_priority;
 /// two runtimes and a real vault on disk — nothing the unit tests around it do.
 #[cfg(test)]
 mod compute_priority_integration;
+/// On-demand model downloads (myne-md/myne#805): the compiled-in artefact
+/// table, staging/verify/register orchestration and the per-download cancel
+/// registry. The socket itself lives in `myne_core::inference::model_download`.
+pub mod download;
 pub mod embeddings_persist;
 pub mod endpoint_config;
 pub mod engine_candle;
@@ -115,9 +119,9 @@ use tauri::{Manager, Runtime};
 /// be scanned + dangle in the feature-OFF build.
 const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
-  "description": "On-device AI inference + retrieval commands (infer/embed/semantic_search) for the main window; no core/fs/dialog/clipboard. This grant confers no network capability, but that is a property of the ACL entry, not of the AI path: since decisions.md 2026-08-09 the path may open a socket to a user-named provider.",
+  "description": "On-device AI inference + retrieval commands (infer/embed/semantic_search) for the main window; no core/fs/dialog/clipboard. This grant confers no network capability, but that is a property of the ACL entry, not of the AI path: since decisions.md 2026-08-09 the path may open a socket to a user-named provider, and since myne-md/myne#805 it may also fetch a model on explicit user action from the compiled-in origin downloads.myne.md (no note content, digest-verified before registration; decisions/ai/0627, threat-model TB14).",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models", "local-inference:allow-download-model", "local-inference:allow-cancel-model-download", "local-inference:allow-remove-model"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -175,7 +179,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::ai_capability_report,
             commands::get_ai_endpoint,
             commands::set_ai_endpoint,
-            commands::list_provider_models
+            commands::list_provider_models,
+            commands::download_model,
+            commands::cancel_model_download,
+            commands::remove_model
         ])
         .setup(|app, _api| {
             // Path resolution only — the engine decision itself lives in
@@ -233,6 +240,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // is pending. The single `compute` mutex cannot express an ordering
             // on its own — this is that ordering.
             app.manage(compute_priority::ComputePriority::default());
+            // Per-download cancel tokens (myne-md/myne#805): the download
+            // command registers here for the length of its fetch, and
+            // `cancel_model_download` cancels one by the id the surface minted.
+            app.manage(download::DownloadCancels::default());
             app.add_capability(LOCAL_INFERENCE_CAPABILITY)?;
             Ok(())
         })
@@ -295,9 +306,10 @@ pub(crate) fn resolve_backend(
         // AI-free `--no-default-features` build, or a checkout whose LFS model
         // blob was not fetched), leaving STT side-load-only.
         let bundled_transcription = resource_dir.and_then(model_store::bundled_transcription_model);
-        // The bundled auto-tag task-model (MYND-651). Same present-or-nothing
-        // resolution, but with no side-load fallback: `None` means this build
-        // simply has no auto-tag.
+        // The auto-tag task-model: the downloaded or side-loaded override
+        // (`tag.path`) if set, else the bundled default (MYND-651; override
+        // added with myne-md/myne#805, `decisions/ai/0627`). `None` from both
+        // arms means this build simply has no auto-tag.
         let bundled_tag = resource_dir.and_then(model_store::bundled_tag_model);
         state::Backend::new(
             "candle",
@@ -305,6 +317,10 @@ pub(crate) fn resolve_backend(
             std::sync::Arc::new(
                 engine_candle::CandleEngine::new(base)
                     .with_bundled_transcription(bundled_transcription)
+                    // The bundled default only. `load_tag` re-resolves the
+                    // stored `tag.path` override lazily at each call, so a model
+                    // downloaded at runtime takes effect without a restart
+                    // (myne-md/myne#805).
                     .with_bundled_tag_model(bundled_tag),
             ),
         )

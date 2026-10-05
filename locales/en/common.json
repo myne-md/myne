@@ -194,6 +194,31 @@
       "remote": "Answered by {{provider}}. Your notes were sent there."
     }
   },
+  "aiOnboarding": {
+    "title": "Set up AI",
+    "intro": "Myne can search your notes by meaning, suggest tags, and chat about them. None of it is required, and you can turn it on later from Settings.",
+    "enableLabel": "Turn on AI features",
+    "semantic": {
+      "title": "Semantic search",
+      "body": "Download a multilingual embedding model (about 449 MB) so you can search by meaning, not just by words."
+    },
+    "tag": {
+      "title": "Auto-tagging",
+      "body": "Download the tag model (about 337 MB) so Myne can suggest tags as you write."
+    },
+    "chat": {
+      "title": "Chat",
+      "body": "No download. Chat runs against a model you already run yourself or a provider you name, with a consent step.",
+      "setup": "Set up a provider"
+    },
+    "download": "Download",
+    "downloading": "Downloading…",
+    "cancel": "Cancel",
+    "complete": "Ready",
+    "retry": "Retry",
+    "skip": "Skip",
+    "done": "Done"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Cancel",
@@ -2167,8 +2192,11 @@
       "myne": {
         "loading": "Looking for your other vaults…",
         "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
-        "vaultLabel": "Import from",
-        "vaultPlaceholder": "Choose a vault",
+      "vaultLabel": "Import from",
+      "backupLabel": "Backup file",
+      "chooseBackup": "Choose backup file",
+      "noBackupChosen": "No backup file chosen",
+      "vaultPlaceholder": "Choose a vault",
         "passwordLabel": "That vault's password",
         "phraseLabel": "That vault's 24-word recovery phrase",
         "wordAria": "Word {{number}} of 24",
@@ -2180,9 +2208,10 @@
         "opening": "Opening…",
         "unnamedVault": "Vault {{n}}",
         "errors": {
-          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
-          "busy": "Another vault operation is running. Wait for it to finish and try again.",
-          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first."
+      "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+      "busy": "Another vault operation is running. Wait for it to finish and try again.",
+      "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first.",
+      "backupInvalid": "That file could not be read as a Myne backup. Check the file and try again."
         },
         "done": {
           "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
@@ -2204,11 +2233,11 @@
       },
       "source": {
         "myne": {
-          "label": "Myne vault",
-          "pickerTitle": "Choose the vault to import from",
-          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
-          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
-          "short": "Another vault on this device"
+      "label": "Myne vault",
+      "pickerTitle": "Choose the .myne-backup file to import from",
+      "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+      "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+      "short": "An exported .myne-backup file"
         },
         "obsidian": {
           "label": "Obsidian",
@@ -2606,6 +2635,43 @@
     "workspace": {
       "defaultSlotName": "Default"
     }
+  },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "Keep editing",
+      "message": "Some open files still have unsaved changes that could not be written to disk. Closing now discards them.",
+      "okLabel": "Discard and close",
+      "title": "Close Myne?"
+    },
+    "closeTab": "Close {{name}}",
+    "conflict": {
+      "body": "This file changed on disk while you were editing. Myne has not written anything.",
+      "copy": "Save a copy…",
+      "copyFailed": "The copy could not be saved. The original file is unchanged.",
+      "overwrite": "Overwrite with my changes",
+      "reload": "Reload from disk"
+    },
+    "deeplink": {
+      "body": "It lives outside every vault, so Myne will not encrypt it.",
+      "cancel": "Cancel",
+      "confirm": "Open",
+      "failed": "The file could not be opened. It may have moved or changed.",
+      "title": "Open this local file?"
+    },
+    "empty": "No file is open.",
+    "import": "Import to vault",
+    "importFailed": "The file could not be imported. Nothing was changed.",
+    "importLocked": "The vault is locked. Unlock it, then try again.",
+    "importNeedsVault": "There is no vault on this device yet. Create one, then try again.",
+    "marker": "Local file. Not encrypted, and not part of any vault.",
+    "open": "Open a local file",
+    "openFailed": "That file could not be opened.",
+    "openRefusedTooLarge": "That file is too large to open here.",
+    "openRefusedType": "Only .md and .markdown files open here.",
+    "retry": "Try saving again",
+    "saveError": "The file could not be saved. Your edits are still here.",
+    "tabs": "Open local files",
+    "unsaved": "Unsaved changes"
   },
   "password": {
     "createForm": {
@@ -3211,6 +3277,12 @@
       "off": "Off",
       "on": "On"
     },
+    "plainFile": {
+      "errorSaveSetting": "Could not save the plain-file setting.",
+      "helper": "Open and edit the .md files you already have on disk, in place, without adding them to a vault. These files are plaintext: Myne does not encrypt them, and changes to them are not synced or backed up. On by default; turn it off here.",
+      "label": "Plain-file editor",
+      "openFilesRemain": "Files with unsaved changes are still open. Resolve them, then turn this off again."
+    },
     "views": {
       "helper": "Show the Views entry in the sidebar for saving filtered note lists. Off by default; on if you already have views.",
       "label": "Views"
@@ -3236,7 +3308,7 @@
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
+      "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
@@ -3295,7 +3367,22 @@
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models. That would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Download a model here, or open a link to get one in your browser and pick the downloaded files. A model runs on your device; if you have named a provider instead, that provider answers.",
+      "downloadsLabel": "Download models",
+      "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
+      "downloadEmbeddingSize": "Multilingual model, about 449 MB.",
+      "downloadTagLabel": "Tag model: automatic tag suggestions",
+      "downloadTagSize": "Small local model, about 337 MB.",
+      "downloadInstalled": "Installed",
+      "downloadNotInstalled": "Not installed",
+      "downloadReinstall": "Download",
+      "modelRemove": "Remove",
+      "downloading": "Downloading…",
+      "downloadingPercent": "Downloading… {{percent}}%",
+      "downloadCancel": "Cancel",
+      "downloadFailed": "The download did not finish.",
+      "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
+      "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeyLabel": "API key",
@@ -3667,6 +3754,7 @@
         "legal": "legal privacy policy terms impressum gdpr dsgvo law enforcement abuse report data protection",
         "license": "license agpl open source legal",
         "lineNumbers": "line numbers gutter editor display",
+        "plainFile": "plain file editor markdown local disk outside vault plaintext open in place",
         "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
@@ -3880,7 +3968,10 @@
       "fingerprintCopied": "Fingerprint copied.",
       "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand.",
       "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
-      "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity."
+      "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
+      "inviteLabel": "Invite code (only if this server asks for one)",
+      "invitePlaceholder": "The code the server’s operator gave you",
+      "changeInviteCode": "Change invite code"
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -3893,6 +3984,8 @@
         "awaitingApproval": "This device is already waiting for approval. Approve it from a device that is already signed in.",
         "deviceLimit": "This account has reached its device limit. Remove a device you no longer use, then try again.",
         "frozen": "This account is frozen, so no new device can be added right now. Your notes on this device are unaffected.",
+        "inviteCodeInvalid": "That invite code was not accepted. Check it and try again.",
+        "inviteCodeRequired": "This server only accepts new accounts with an invite code. Enter the code its operator gave you.",
         "notConfigured": "Set a sync server in settings before adding this device.",
         "serverMismatch": "The sync server’s identity didn’t match what this device expected. Don’t enter your credentials again until you know why.",
         "kdfTooLarge": "This device does not have enough memory to open that vault. Its encryption settings need more memory than this app can use here. Open it on a desktop computer instead.",
@@ -3971,7 +4064,10 @@
       "identity": {
         "label": "Identity",
         "helper": "An identity lets people invite you to a vault, and lets one identity own several vaults.",
-        "cta": "Add an identity"
+        "cta": "Add an identity",
+        "codeLabel": "Your identity code",
+        "lockedHelper": "This device holds an identity. It is locked for this session; unlock it with your recovery phrase to sign sync and invites.",
+        "unlockedHelper": "This device holds an identity, unlocked for this session."
       },
       "server": {
         "label": "Sync server"
@@ -4072,18 +4168,23 @@
       "epoch": "Group key epoch {{epoch}}",
       "ownerBadge": "Owner",
       "memberBadge": "Member",
+      "youBadge": "You",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Remove {{name}}? Once the key rotation completes they lose access to future changes. This cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "removalLimits": "Removing a member would stop their access to future changes only. It cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "inviteReady": "Invite ready for {{fingerprint}}…",
       "invitationsHeading": "Invitations you sent",
+      "noInvitations": "No invitations sent yet.",
       "invitationClaimed": "Accepted",
       "invitationPending": "Not accepted yet",
       "invitationsFailed": "Could not load your invitations.",
       "title": "Vault members",
       "personHint": "Unlock it with your identity's recovery phrase to invite or manage members.",
+      "identityHeading": "Your identity",
+      "membersHeading": "Members",
       "personUnlock": "Unlock member identity",
+      "personUnlockOpen": "Enter recovery phrase",
       "personReady": "Member identity unlocked.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
       "personLock": "Lock member identity",
@@ -4250,6 +4351,10 @@
       "loading": "Loading…",
       "newTemplate": "New template",
       "newTemplateName": "Untitled template",
+      "nameLabel": "Template name",
+      "create": "Create",
+      "createFailed": "Couldn't create the template. Try again.",
+      "openFailed": "Couldn't open the template. Try again.",
       "removeFromTemplates": "Remove from templates",
       "removeRowLabel": "Remove {{name}} from templates (keeps the note)",
       "title": "Note templates"
@@ -4678,6 +4783,7 @@
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "connecting": "Connecting…",
       "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
+      "selfHosted": "Use my own server",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
@@ -4783,6 +4889,11 @@
     "acceptSubmit": "Accept and unlock",
     "acceptPhraseLabel": "Your recovery phrase",
     "acceptError": "The invite could not be accepted.",
+    "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
+    "acceptErrorNotFound": "This invitation is no longer available. It may already have been used or withdrawn. Ask the owner to send a new invite.",
+    "acceptErrorNotEnrolled": "This device is not the identity this invitation was addressed to. Open the identity the invite was sent to, then accept.",
+    "acceptErrorTransport": "Could not reach the sync server. Check your connection and try again.",
+    "acceptErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
     "acceptInvalid": "That is not a valid owner identity code.",
     "shareCodeHeading": "Your invite code",
     "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",

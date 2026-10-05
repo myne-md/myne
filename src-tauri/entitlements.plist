@@ -19,13 +19,24 @@
     `<string>$(AppIdentifierPrefix)md.myne.desktop</string>`. With ad-hoc
     signing (`codesign -s -`) the literal identifier below is used.
 
+    LOAD-BEARING on macOS 26+: a restricted entitlement is only honored when a
+    provisioning profile that authorizes it is embedded. Without the profile,
+    AMFI refuses to spawn the app ("Launchd job spawn failed", POSIX 163) even
+    though a `codesign` verify pass and notarization checks pass; with the
+    entitlement stripped instead, the Keychain returns errSecMissingEntitlement
+    (-34018) at runtime. `bundle.macOS.files` embeds
+    `Myne_Mac_Development.provisionprofile` at Contents/embedded.provisionprofile
+    so both halves hold. The profile is device-bound (only registered Macs launch
+    the bundle) and expires; regenerate it with the macOS signing section of
+    `myne-ops/runbooks/local-multiplatform-build.md` when it goes stale.
+
     NOTE: `tauri dev` runs an UNSIGNED binary, so biometric still fails there.
     These entitlements apply to `tauri build` (configured via
     bundle.macOS.entitlements) or when the dev binary is signed manually.
   -->
   <key>keychain-access-groups</key>
   <array>
-    <string>md.myne.desktop</string>
+    <string>D8UWYY2KY7.md.myne.desktop</string>
   </array>
 </dict>
 </plist>

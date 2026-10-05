@@ -10,7 +10,9 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## Linked work
 
-- Closes #
+<!-- Cite the issue without a closing keyword: the issue stays open until a human verifies the change on the default branch. -->
+
+- Refs #
 
 ## Type of change
 
@@ -26,7 +28,7 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## Checklist
 
-- [ ] Conventional-commit subject; the issue is linked with `Closes #n` above.
+- [ ] Conventional-commit subject; the issue is referenced above with a non-closing keyword (`Refs #n`), so the merge does not close it.
 - [ ] Lint + tests pass locally (`cargo clippy --workspace --all-targets -- -D warnings`, `pnpm build`, `pnpm test`).
 - [ ] A new user-facing flow ships with its `data-testid` pass + an E2E scenario on the right harness (`e2e/` desktop, `e2e-web/` web).
 - [ ] Docs / specs / glossary / decisions updated where behavior changed.

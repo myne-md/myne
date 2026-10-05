@@ -123,11 +123,17 @@ fi
 # `--features voice-capture-stub` (myne#389 item D): the deterministic 440 Hz
 # capture source is a COMPILE-time variant now, not an env knob, so the voice
 # scenarios need it built in. Additive to the default features.
+# `--features local-inference-stub`: what `.woodpecker/e2e.yml` builds, and the
+# reason this runner used to OOM an 8 GiB VM. Bare defaults pull the real
+# `local-inference` Candle engine, and the final `myne_desktop_lib` rustc then
+# needs more than the whole VM. The stub keeps the AI feature (and its deps)
+# enabled while compiling the stub body, exactly as CI does, so a local run
+# matches the CI binary and `MYNE_E2E_AI=1` works here too.
 # `touch src-tauri/src/lib.rs`: the frontend is EMBEDDED at compile time, so a
 # frontend-only change relinks nothing and the binary keeps the bundle it
 # embedded when it was last compiled, which with a shared target volume can be
 # another worktree's. scripts/e2e-buildrun.sh carries the worked example.
-BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub'
+BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi
