@@ -33,7 +33,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
@@ -80,10 +79,6 @@ import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
 import { removeModel, type DownloadArtifactId } from "../../lib/ai-model-download";
 import {
@@ -124,18 +119,6 @@ const LINK_STYLE: CSSProperties = {
   gap: "var(--space-1)",
   alignSelf: "flex-start",
   transition: "color var(--duration-fast) var(--ease-standard)",
-};
-
-/** Hover for an accent text link: shift to the hover-accent so the pointer-over
- *  reads even though the link is already underlined + accent-colored (a bg block
- *  would look wrong on inline link text). */
-const linkHover = {
-  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent-hover)";
-  },
-  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent)";
-  },
 };
 
 /**
@@ -289,7 +272,7 @@ function ModelRoleBlock(props: {
           type="button"
           data-testid={props.testIdRecommend}
           onClick={props.onOpenRecommend}
-          {...linkHover}
+          className="myne-text-link"
           style={LINK_STYLE}
         >
           {props.recommendName}
@@ -312,32 +295,15 @@ function ModelRoleBlock(props: {
         >
           {props.path ?? props.noneLabel}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           data-testid={props.testIdChoose}
           disabled={props.disabled}
           onClick={props.onChoose}
-          {...hoverSurface({
-            restBg: "var(--paper-2)",
-            hoverBg: "var(--paper-3)",
-            disabled: props.disabled,
-          })}
-          style={{
-            font: "inherit",
-            fontSize: "var(--text-sm)",
-            padding: "var(--space-1) var(--space-2)",
-            borderRadius: "var(--radius-1)",
-            border: "1px solid var(--line-1)",
-            background: "var(--paper-2)",
-            color: "var(--fg-1)",
-            cursor: props.disabled ? "default" : "pointer",
-            opacity: props.disabled ? 0.5 : 1,
-            whiteSpace: "nowrap",
-            transition: HOVER_TRANSITION,
-          }}
+          style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
         >
           {props.chooseLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1028,19 +994,15 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         </p>
         <button
           type="button"
+          className="myne-text-link"
           data-testid="ai.trust-disclosure-toggle"
           aria-expanded={disclosureOpen}
           onClick={() => setDisclosureOpen((o) => !o)}
           style={{
-            background: "none",
-            border: "none",
             padding: 0,
             marginTop: "var(--space-1)",
-            color: "var(--fg-2)",
             font: "inherit",
             fontSize: "var(--text-sm)",
-            textDecoration: "underline",
-            cursor: "pointer",
           }}
         >
           {t("settings.ai.disclosureToggle")}
@@ -1318,7 +1280,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             type="button"
             data-testid="ai.endpoint-runtime-link"
             onClick={openLocalRuntime}
-            {...linkHover}
+            className="myne-text-link"
             style={LINK_STYLE}
           >
             {LOCAL_RUNTIME.name}
@@ -1500,7 +1462,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-key-revoke"
                 disabled={!aiEnabled}
                 onClick={() => void revokeKey()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerKeyRevoke")}
@@ -1572,7 +1534,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-model-load"
                 disabled={!aiEnabled || !hasKey || modelsLoading}
                 onClick={() => void loadModels()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerModelLoad")}
@@ -1586,7 +1548,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                   type="button"
                   data-testid="ai.provider-model-show-all"
                   onClick={() => setShowAllModels((v) => !v)}
-                  {...linkHover}
+                  className="myne-text-link"
                   style={LINK_STYLE}
                 >
                   {showAllModels

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type ChangeEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Screen,
@@ -8,6 +8,8 @@ import {
   Lead,
   FooterBar,
   Button,
+  MonoField,
+  MonoBox,
   RecoveryGrid,
   Checkbox,
   Banner,
@@ -69,96 +71,6 @@ function FieldLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/** A labelled monospace field, the same shape `JoinFlow` uses for server and
- *  account input. Local because `JoinFlow`'s copy is not exported. */
-function MonoField({
-  value,
-  onChange,
-  placeholder,
-  testId,
-  inputMode,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  testId: string;
-  inputMode?: "url";
-}) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        height: 52,
-        border: `1.5px solid ${focused ? "var(--accent)" : "var(--line-2)"}`,
-        borderRadius: "var(--radius-2)",
-        background: "var(--bg-1)",
-        padding: "0 14px",
-        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
-      }}
-    >
-      {/* A raw `<input>`: mobile has no real text-input primitive yet
-          (`components/inputs.tsx`'s `Field` is a presentational mock that
-          renders a div, not a field), so the real control lives here and is
-          recorded in `scripts/primitive-adoption.json` (myne-md/myne#788). */}
-      <input
-        value={value}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        placeholder={placeholder}
-        inputMode={inputMode}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoComplete="off"
-        data-testid={testId}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          border: "none",
-          outline: "none",
-          background: "transparent",
-          padding: 0,
-          fontFamily: "var(--font-mono)",
-          fontSize: "var(--text-md)",
-          letterSpacing: "var(--tracking-wide)",
-          color: "var(--fg-1)",
-        }}
-      />
-    </div>
-  );
-}
-
-/** A read-only monospace value in a field (the identity code on the home step).
- *  The code is a few kilobytes of hex (`MYNE-PERSON-1:` + the public halves), so
- *  it renders in a single-line read-only input that scrolls, exactly as the
- *  desktop `IdentityHome` shows it. A wrapping box turns it into an unreadable
- *  wall and pushes everything below it off screen. */
-function MonoBox({ value, testId }: { value: string; testId: string }) {
-  return (
-    // Read-only monospace display; same missing-primitive reason as `RawField`
-    // above. Recorded in `scripts/primitive-adoption.json`.
-    <input
-      readOnly
-      value={value}
-      data-testid={testId}
-      aria-label={testId}
-      style={{
-        display: "block",
-        width: "100%",
-        height: 52,
-        border: "1.5px solid var(--line-2)",
-        borderRadius: "var(--radius-2)",
-        background: "var(--bg-1)",
-        padding: "0 14px",
-        fontFamily: "var(--font-mono)",
-        fontSize: "var(--text-xs)",
-        color: "var(--fg-2)",
-      }}
-    />
-  );
-}
 
 /** The canonical acknowledgement row (myne#728): a checkbox glyph inside a
  *  named toggle button, with the sentence beside it as the accessible name.

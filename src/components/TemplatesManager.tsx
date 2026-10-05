@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
-import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { HOVER_TRANSITION } from "./primitives/hoverSurface";
 import {
   createTemplate,
   convertTemplateToNote,
@@ -108,18 +108,6 @@ const REMOVE_BUTTON_STYLE: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "var(--radius-1)",
   whiteSpace: "nowrap",
-  transition: HOVER_TRANSITION,
-};
-
-const DELETE_BUTTON_STYLE: CSSProperties = {
-  background: "transparent",
-  border: 0,
-  color: "var(--danger)",
-  cursor: "pointer",
-  padding: 6,
-  display: "inline-flex",
-  alignItems: "center",
-  borderRadius: "var(--radius-1)",
   transition: HOVER_TRANSITION,
 };
 
@@ -347,14 +335,13 @@ export function TemplatesManager({
             const name = displayName(rec, newTemplateName);
             return (
               <div key={id} role="listitem" style={ROW_STYLE} data-testid="templates.row">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     onOpenNote(id);
                     onClose();
                   }}
                   style={ROW_OPEN_STYLE}
-                  {...hoverSurface()}
                   aria-label={t("templates.manager.editTemplateLabel", { name })}
                   data-testid="templates.row-open"
                 >
@@ -364,27 +351,25 @@ export function TemplatesManager({
                     style={{ color: "var(--fg-3)" }}
                   />
                   <span style={ROW_NAME_STYLE}>{name}</span>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => afterMutation(convertTemplateToNote(id))}
                   style={REMOVE_BUTTON_STYLE}
-                  {...hoverSurface()}
                   aria-label={t("templates.manager.removeRowLabel", { name })}
                   data-testid="templates.row-remove"
                 >
                   {t("templates.manager.removeFromTemplates")}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => afterMutation(deleteTemplate(id))}
-                  style={DELETE_BUTTON_STYLE}
-                  {...hoverSurface()}
+                  style={{ color: "var(--danger)", padding: "var(--space-1)" }}
                   aria-label={t("templates.manager.deleteRowLabel", { name })}
                   data-testid="templates.row-delete"
                 >
                   <Icon name="trash-2" size={16} />
-                </button>
+                </Button>
               </div>
             );
           })}

@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "../../components/primitives/Button";
 import {
   memoryDelete,
   memoryList,
@@ -181,14 +182,14 @@ export function MemoryPopover(props: {
               <p data-testid="ai.memory-popover-load-failed" style={TEXT_STYLE}>
                 {t("editor.chrome.rightPanel.aiChat.memoryPopoverLoadFailed")}
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 data-testid="ai.memory-popover-retry"
                 style={SMALL_BUTTON_STYLE}
                 onClick={() => void reload()}
               >
                 {t("editor.chrome.rightPanel.aiChat.memoryPopoverRetry")}
-              </button>
+              </Button>
             </div>
           ) : rows === null ? null : rows.length === 0 ? (
             <p data-testid="ai.memory-popover-empty" style={TEXT_STYLE}>
@@ -204,8 +205,8 @@ export function MemoryPopover(props: {
                 ) : (
                   <p style={TEXT_STYLE}>{texts[row.id] ?? ""}</p>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   data-testid="ai.memory-popover-delete"
                   onClick={() => {
                     void memoryDelete(row.id)
@@ -224,28 +225,28 @@ export function MemoryPopover(props: {
                   style={SMALL_BUTTON_STYLE}
                 >
                   {t("editor.chrome.rightPanel.aiChat.memoryPopoverDelete")}
-                </button>
+                </Button>
               </div>
             ))
           )}
         </div>
         <div style={FOOTER_STYLE}>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             data-testid="ai.memory-popover-settings"
             onClick={props.onOpenSettings}
             style={SMALL_BUTTON_STYLE}
           >
             {t("editor.chrome.rightPanel.aiChat.memoryPopoverSettings")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             data-testid="ai.memory-popover-close"
             onClick={props.onClose}
             style={SMALL_BUTTON_STYLE}
           >
             {t("editor.chrome.rightPanel.aiChat.memoryPopoverClose")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
