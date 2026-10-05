@@ -67,6 +67,11 @@ const RENDERS_NOTHING = new Set([
   // a lie (there is no reachable surface) and returning markup would defeat the
   // substitution. See `web/vite.config.ts` SUBSTITUTED_MODULES.
   join("web", "src", "components", "sync", "MemberRosterPanel.tsx"),
+  // The person-identity session unlock, moved out of MemberRosterPanel
+  // (myne-md/myne#831). Same rule: the real component prompts for the recovery
+  // phrase, so the web build substitutes `null`. A testid would be a lie and
+  // returning markup would defeat the substitution.
+  join("web", "src", "components", "sync", "PersonIdentityUnlock.tsx"),
   // The member-vault phrase unlock is substituted out for the same reason as
   // the member roster: a browser must not ship this credential path.
   join("web", "src", "components", "sync", "MemberVaultUnlockCard.tsx"),

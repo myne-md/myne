@@ -4263,7 +4263,6 @@
       "invitationPending": "Jeszcze niezaakceptowane",
       "invitationsFailed": "Nie udało się wczytać zaproszeń.",
       "title": "Członkowie skarbca",
-      "personHint": "Odblokuj swoją tożsamość członka frazą odzyskiwania.",
       "personUnlock": "Odblokuj tożsamość członka",
       "personReady": "Tożsamość członka odblokowana.",
       "ownerCodeHint": "Udostępnij ten kod osobie, którą zapraszasz, aby mogła zweryfikować, że skarbiec jest Twój. Zawiera tylko informacje publiczne.",

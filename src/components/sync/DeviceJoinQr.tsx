@@ -110,7 +110,7 @@ const ERROR: CSSProperties = {
 // is always fresh (and scannable) while the panel is open.
 const REFRESH_BUFFER_SECS = 15;
 
-export function DeviceJoinQr() {
+export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {}) {
   const { t } = useTranslation();
   const [account, setAccount] = useState("");
   const [svg, setSvg] = useState<string | null>(null);
@@ -177,7 +177,9 @@ export function DeviceJoinQr() {
 
   return (
     <div style={ROOT} data-testid="sync.device-join-qr">
-      <div style={LABEL}>{t("sync.deviceJoinQr.title")}</div>
+      {/* The dialog supplies the title (myne-md/myne#831); the inline block
+          keeps its own heading. */}
+      {showTitle ? <div style={LABEL}>{t("sync.deviceJoinQr.title")}</div> : null}
       <div style={HINT}>{t("sync.deviceJoinQr.hint")}</div>
       <label style={LABEL} htmlFor="device-join-qr-account">
         {t("sync.deviceJoinQr.accountLabel")}

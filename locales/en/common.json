@@ -4095,7 +4095,6 @@
       "title": "Vault members",
       "identityHeading": "Your identity",
       "membersHeading": "Members",
-      "personHint": "Unlock your member identity with your recovery phrase.",
       "personUnlock": "Unlock member identity",
       "personUnlockOpen": "Enter recovery phrase",
       "personReady": "Member identity unlocked.",
