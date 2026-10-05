@@ -9,6 +9,11 @@
 
 import "./host/install";
 import "@myne/client-core/tokens.css";
+// The component layer (myne-md/myne#773): every primitive's appearance lives
+// here as `.myne-*` classes, so without it the catalogue renders browser-default
+// controls. Imported in the same order as `src/main.tsx` (client-core tokens,
+// then client-core components, then the app-shell sheet, then ornaments).
+import "@myne/client-core/components.css";
 import "@app/styles/tokens.css";
 import "@myne/ornaments/ornaments.css";
 import React from "react";
