@@ -53,9 +53,10 @@ describe("import source catalog", () => {
     expect(IMPORT_SOURCES.obsidian.pick).toBe("directory");
     expect(IMPORT_SOURCES.notion.pick).toBe("directory");
     expect(IMPORT_SOURCES.html.pick).toBe("directory");
-    // Neither: the Myne source picks one of the user's other local vaults from
-    // the list the app already keeps, so there is no path to browse to.
-    expect(IMPORT_SOURCES.myne.pick).toBe("vault");
+    // The Myne source takes an externally exported `.myne-backup` FILE, not a
+    // local vault from the device's own list (myne-md/myne#816, which changed
+    // this from `"vault"`). This assertion is the roster that caught it.
+    expect(IMPORT_SOURCES.myne.pick).toBe("file");
   });
 
   it("gives the single-file sources a native-dialog extension filter", () => {
