@@ -197,3 +197,30 @@ describe("the Touch ID affordance is absent wherever it cannot work", () => {
     }
   });
 });
+
+describe("a biometric enrolment failure names its real cause", () => {
+  it("offers enrolment as the remedy, not the generic error, and keeps the affordance", async () => {
+    // macOS returns errSecAuthFailed from SecItemAdd when it cannot create the
+    // biometric item, most often because no fingerprint is enrolled. Before
+    // myne-md/myne#830 that fell through to the opaque backend error, so the
+    // feature read as broken with no explanation. The button must STAY here
+    // (unlike HardwareUnavailable): enrolling a fingerprint makes a retry
+    // succeed.
+    enrolmentError = { kind: "BiometricAuthFailed" };
+    await openSetup();
+    fireEvent.click(await screen.findByTestId("settings.quick-unlock-setup-biometric"));
+
+    expect(
+      await screen.findByText(copy("settings.quickUnlock.errorBiometricAuthFailed")),
+      "the real cause (make sure a fingerprint is enrolled) is not shown",
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(copy("settings.quickUnlock.errorGeneric")),
+      "the generic 'Could not configure quick unlock' must not be the answer here",
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("settings.quick-unlock-setup-biometric"),
+      "the affordance is gone, but enrolling a fingerprint would make a retry work",
+    ).not.toBeNull();
+  });
+});

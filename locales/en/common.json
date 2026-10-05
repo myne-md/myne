@@ -3452,6 +3452,7 @@
       "quickUnlockSubtitle": "Re-enter with {{method}} or a PIN after auto-lock"
     },
     "quickUnlock": {
+      "errorBiometricAuthFailed": "Touch ID couldn't be set up. Make sure a fingerprint is enrolled in System Settings, or use a PIN instead.",
       "errorBusy": "Another vault operation is in progress. Try again in a moment.",
       "errorCancelled": "Cancelled.",
       "errorGeneric": "Could not configure quick unlock.",
@@ -3481,6 +3482,7 @@
       "turnOffError": "Couldn't turn off quick unlock",
       "biometricOnToast": "{{method}} quick unlock is on",
       "biometricUnavailable": "{{method}} isn't available on this device.",
+      "biometricAuthFailed": "{{method}} couldn't be set up. Make sure it is enabled in your device settings, or use a PIN instead.",
       "warningBanner": "A convenience gate only. With a PIN your password is required again after a restart; a fingerprint or face check covers a restart too.",
       "biometricToggleSubtitle": "Unlock with {{method}} after auto-lock",
       "pinOnLead": "PIN quick unlock is ",
