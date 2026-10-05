@@ -5,7 +5,7 @@
 // and the shared primitives for controls. A catalogue that broke the rules it
 // exists to show would be the one place the rules stop applying.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Input } from "@app/components/primitives/Input";
 import { Button } from "@app/components/primitives/Button";
@@ -40,6 +40,13 @@ const STAGE_STYLE: CSSProperties = {
   minWidth: 0,
   overflow: "auto",
   background: "var(--bg-1)",
+  // Make the stage the containing block for `position: fixed` descendants. A
+  // modal story renders its `ModalShell` inside the stage, and the shell's
+  // backdrop is `position: fixed; inset: 0`: without this it covers the WHOLE
+  // viewport, rail included, so the catalogue cannot be navigated away from a
+  // modal story. A transform (unlike `overflow`) makes the stage the containing
+  // block, so the backdrop is confined to the stage box.
+  transform: "translateZ(0)",
 };
 
 /**
@@ -104,6 +111,25 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // A modal story's focus trap inerts everything outside the modal, including
+  // this rail (the app's `overlay-inert` helper), which makes the catalogue
+  // unnavigable. The rail is catalogue chrome, not app content, so it opts out
+  // and keeps opting out: the trap re-applies `inert` whenever the modal
+  // re-renders, so this observes rather than fixing once.
+  const railRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const restore = () => {
+      if (rail.hasAttribute("inert")) rail.removeAttribute("inert");
+      if (rail.getAttribute("aria-hidden") === "true") rail.removeAttribute("aria-hidden");
+    };
+    restore();
+    const observer = new MutationObserver(restore);
+    observer.observe(rail, { attributes: true, attributeFilter: ["inert", "aria-hidden"] });
+    return () => observer.disconnect();
+  }, []);
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return storiesByGroup();
@@ -122,7 +148,7 @@ export function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "var(--font-sans)" }}>
-      <nav style={RAIL_STYLE} aria-label="Stories" data-testid="stories.rail">
+      <nav ref={railRef} style={RAIL_STYLE} aria-label="Stories" data-testid="stories.rail">
         <Input
           type="search"
           placeholder="Search stories"
