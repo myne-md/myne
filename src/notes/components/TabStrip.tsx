@@ -105,8 +105,8 @@ const scrollAreaStyle: CSSProperties = {
   // without this the hang was cut off at this element's padding edge and the
   // rule ran straight under the active tab. Padding extends the clip region;
   // the equal negative margin keeps the strip's own height unchanged.
-  paddingBottom: 1,
-  marginBottom: -1,
+  paddingBottom: "var(--hairline)",
+  marginBottom: "calc(var(--hairline) * -1)",
 };
 
 /** Height of the small strip buttons (+ / overflow). Matched to the floated

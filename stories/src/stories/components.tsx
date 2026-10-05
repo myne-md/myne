@@ -115,13 +115,13 @@ import { WebReloadNotice } from "@app/components/WebReloadNotice";
 import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 import type { StoryDescriptor } from "../types";
+import { DEFAULT_PREFS, FIXTURE_VAULT_ID } from "../../fixtures";
 import type { CommandContext } from "@app/commands/registry";
 import type { VaultRecoverState } from "@app/screens/vault-recover/reducer";
 
 const noop = () => {};
 const asyncNoop = async (): Promise<void> => {};
 
-const VAULT_ID = "00000000-0000-7000-8000-000000000001";
 
 /** 24 synthetic word tokens — deliberately not BIP-39 words. */
 const PHRASE: readonly string[] = Array.from(
@@ -158,7 +158,7 @@ const UNLOCKED_FIXTURE = {
   handlers: {
     "plugin:vault-unlock|vault_list": () => [
       {
-        id: VAULT_ID,
+        id: FIXTURE_VAULT_ID,
         status: { kind: "Exists" },
         label: null,
         icon: null,
@@ -166,81 +166,7 @@ const UNLOCKED_FIXTURE = {
       },
     ],
     "plugin:vault-unlock|vault_slot_kind": () => "Unlocked",
-    "plugin:prefs|prefs_read": () => ({
-      screen_capture_protection: true,
-      show_note_timestamps: true,
-      reminders_enabled: true,
-      reminder_horizon_days: null,
-      show_task_marker: true,
-      transcription_enabled: true,
-      deliberate_folders: [],
-      ai_enabled: false,
-      attachment_compression_enabled: true,
-      attachment_ocr_enabled: true,
-      ai_excluded_folders: [],
-      developer_mode: false,
-      chat_history_budget: null,
-      archived_folders: [],
-      auto_lock_seconds: null,
-      auto_tag_enabled: false,
-      ai_provider: null,
-      ai_provider_consent: null,
-      ai_provider_model: null,
-      active_workspace: null,
-      custom_theme: null,
-      daily_date_format: null,
-      daily_folder: null,
-      daily_template: null,
-      periodic_notes: {},
-      favorites: [],
-      item_order: {},
-      editor_layout: null,
-      date_format: null,
-      time_format: null,
-      timezone: null,
-      editor_content_width: null,
-      editor_default_view_mode: null,
-      editor_focus_dim_inactive: null,
-      editor_focus_typewriter: null,
-      editor_font_family: null,
-      editor_line_spacing: null,
-      editor_text_size: null,
-      editor_line_numbers: null,
-      editor_vim_mode: null,
-      archive_disabled: null,
-      cli_enabled: false,
-      cli_excluded_folders: [],
-      cli_rate_limit_disabled: null,
-      theme: null,
-      folder_icons: {},
-      folder_notes_enabled: false,
-      device_names: {},
-      hidden_bar_items: [],
-      bar_items_order: [],
-      color_groups: [],
-      right_panel_active_tab: null,
-      right_panel_hidden_tabs: [],
-      right_panel_tab_order: [],
-      editor_toolbar_order: [],
-      editor_toolbar_hidden: [],
-      editor_slash_order: [],
-      editor_slash_hidden: [],
-      item_colors: {},
-      keymap: {},
-      label: null,
-      icon: null,
-      last_backup_at: null,
-      new_note_location: null,
-      new_note_location_folder: null,
-      startup_open: null,
-      startup_open_note: null,
-      spell_enabled: null,
-      spell_languages: [],
-      saved_views: [],
-      view_order: [],
-      ribbon_items: null,
-      ribbon_visible: true,
-    }),
+    "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
   },
 };
 
@@ -658,7 +584,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         open
         onClose={noop}
         onOpenDrill={noop}
-        vaultId={VAULT_ID}
+        vaultId={FIXTURE_VAULT_ID}
       />
     ),
   },
@@ -838,7 +764,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "MemberVaultUnlockCard",
     state: "default",
     render: () => (
-      <MemberVaultUnlockCard vaultId={VAULT_ID} onUnlocked={noop} />
+      <MemberVaultUnlockCard vaultId={FIXTURE_VAULT_ID} onUnlocked={noop} />
     ),
   },
   {
@@ -1016,7 +942,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "unlocked",
     render: () => (
       <SettingsModal
-        vaultId={VAULT_ID}
+        vaultId={FIXTURE_VAULT_ID}
         open
         onClose={noop}
         onDeleteVaultSuccess={noop}
@@ -1067,7 +993,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "locked",
     render: () => (
       <QuickUnlockEntry
-        vaultId={VAULT_ID}
+        vaultId={FIXTURE_VAULT_ID}
         method="pin"
         onUnlocked={noop}
         onUnavailable={noop}
@@ -1165,14 +1091,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ReadyStep",
     state: "default",
-    render: () => <ReadyStep onDone={noop} vaultId={VAULT_ID} />,
+    render: () => <ReadyStep onDone={noop} vaultId={FIXTURE_VAULT_ID} />,
   },
   {
     id: "components/readylocalartefacts/default",
     group: "components",
     surface: "ReadyLocalArtefacts",
     state: "default",
-    render: () => <ReadyLocalArtefacts pending={false} vaultId={VAULT_ID} />,
+    render: () => <ReadyLocalArtefacts pending={false} vaultId={FIXTURE_VAULT_ID} />,
   },
 
   // ── Vault-recover flow steps ─────────────────────────────────────────────

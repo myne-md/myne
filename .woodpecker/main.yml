@@ -582,7 +582,7 @@ steps:
       # and never shows on keyboard focus — plus a hard failure for an icon-only
       # control with no accessible name (WCAG 2.2 AA 4.1.2).
       - node scripts/check-tooltip-convention.mjs
-      # The motion canon (myne#772, design-notes/ui/0622): no `ease-in` on a
+      # The motion canon (myne#772, design-notes/ui/0632): no `ease-in` on a
       # UI entrance, no `infinite` outside a named+reasoned allowlist, no raw
       # duration past the 300ms ceiling, no transition on a layout-triggering
       # property without a recorded reason. Every one of those is invisible to

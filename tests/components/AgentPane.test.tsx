@@ -72,7 +72,7 @@ afterEach(() => cleanup());
 describe("AgentPane: one screen, both columns", () => {
   // It was two views with a back control between them, and the tests below
   // used to assert which one was showing. There is one screen now
-  // (`design-notes/ai/0627`): the history rail beside the open conversation,
+  // (`design-notes/ai/0637`): the history rail beside the open conversation,
   // both mounted, at every width. The narrow arm hides one of them in CSS,
   // which is a fallback rather than a mode — so there is no `data-agent-view`
   // to assert on and nothing that "renders the Hub" as opposed to Focus.

@@ -1,6 +1,6 @@
 // Agent-hub suite (myne-md/myne#771 task 17). The deep agent surface is a
 // singleton workspace TAB holding ONE screen — the history rail beside the open
-// conversation (`decisions/@@ai/0638@@`, amended by `decisions/ai/0637`) — reached
+// conversation (`decisions/ai/0634`, amended by `decisions/ai/0637`) — reached
 // from the palette, from the ribbon and from the light panel's one exit
 // control. This pins that contract through the REAL editor UI:
 //
@@ -162,7 +162,7 @@ describeE2E("ah3 the light panel's exit reaches the deep surface", () => {
         await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         // The panel is NOT retired by the tab: it keeps its place in the right
         // panel's vocabulary, and the two are a depth pair rather than a
-        // migration (`decisions/@@ai/0638@@`).
+        // migration (`decisions/ai/0634`).
         expect((await s.byTestIdAll("ai.focus-agent")).length).toBeGreaterThan(0);
       },
     );
@@ -175,7 +175,7 @@ describeE2E("ah4 the tab remembers which conversation it was left on", () => {
     // The "last-used" behaviour, and the reason no preference records it:
     // revealing an open tab keeps its `agentView`, so the memory IS the tab.
     // A second record of one fact would be wrong after any path that did not
-    // write it (`decisions/@@ai/0638@@`, `decisions/ai/0637`).
+    // write it (`decisions/ai/0634`, `decisions/ai/0637`).
     let password = "";
     await scenario(
       "ah4-agent-last-view",

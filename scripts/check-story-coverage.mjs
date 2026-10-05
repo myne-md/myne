@@ -26,7 +26,7 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
 /** The trees whose modules are user-visible surfaces. */
-export const SURFACE_ROOTS = ["src/components", "src/screens"];
+export const SURFACE_ROOTS = ["src/components", "src/screens", "src/notes/components"];
 
 /** The directory the coverage scan reads story surfaces from. */
 export const STORIES_DIR = "stories/src/stories";
@@ -97,6 +97,25 @@ export function enumerateSurfaces(rootDir = ROOT, roots = SURFACE_ROOTS) {
   }
   for (const name of Object.keys(NON_SURFACE)) surfaces.delete(name);
   return surfaces;
+}
+
+/**
+ * Basenames shared by two files under the surface roots, excluding the reasoned
+ * `NON_SURFACE` helpers. `enumerateSurfaces` keys its Map by basename, so two
+ * files sharing one would silently collapse to a single entry and a story for
+ * either would read as covering both; this is what refuses that instead.
+ */
+export function duplicateBasenames(rootDir = ROOT, roots = SURFACE_ROOTS) {
+  const seen = new Map();
+  for (const rel of roots) {
+    for (const file of walkTsx(join(rootDir, rel))) {
+      const name = surfaceName(file);
+      if (name === "index" || name in NON_SURFACE) continue;
+      if (!seen.has(name)) seen.set(name, []);
+      seen.get(name).push(relative(rootDir, file));
+    }
+  }
+  return [...seen.entries()].filter(([, files]) => files.length > 1);
 }
 
 /**
@@ -238,6 +257,11 @@ function main(argv) {
   }
 
   const problems = compare({ surfaces, storySurfaces, roster });
+  for (const [name, files] of duplicateBasenames(rootDir)) {
+    problems.push(
+      `"${name}" is the basename of ${files.length} files (${files.join(", ")}), so the coverage Map collapses them into one entry and a story for either reads as covering both. Rename one file, or record it in NON_SURFACE with a reason.`,
+    );
+  }
   const covered = surfaces.size - (roster.debt ?? []).length;
   if (problems.length > 0) {
     console.error("check-story-coverage: FAIL");

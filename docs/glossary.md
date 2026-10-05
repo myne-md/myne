@@ -139,13 +139,13 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 The conversation COLUMN of the [agent hub](#agent-hub) tab: the open [conversation](#conversation), with the note it is anchored to one click away, the run's live state, and the full [conversational AI chat](#conversational-ai-chat) surface. It sits beside the history rail rather than replacing it — the tab is one screen (`decisions/ai/0637`), and "focus" names the column, not a mode you enter. Reached by opening a row in the rail, by the "Agent: open on note" palette verb, or by the light panel's one exit control. It was the second of two VIEWS until 0633, and the two-view behaviour survives only where a pane is too narrow for both columns. Distinct from the light panel, which also shows one conversation: the panel is the shallow end, with no list, no search and no history chrome.
 
-Used in: `decisions/@@ai/0638@@`; `decisions/ai/0637`
+Used in: `decisions/ai/0634`; `decisions/ai/0637`
 
 ### **agent hub** &nbsp; 📦 *Product*
 
 The deep surface for [agentic note editing](#agentic-note-editing): a singleton workspace tab listing every [conversation](#conversation) in the vault, newest first, searchable, each row openable, renameable and deletable, and each carrying its [note anchor](#note-anchor) when it has one. The tab is ONE screen — the history rail beside [agent focus](#agent-focus), the conversation column (`decisions/ai/0637`; it was two views until then, and that shape survives only where a pane is too narrow for both) — and the duplicate-forbid invariant makes "open the agent" a reveal rather than a second tab, from the palette, the ribbon and the panel alike. It is **not a stage** (it does not take the window, and a note stays open beside it), **not a modal** (you browse it rather than answer it, `decisions/ui/0633`), and **not a replacement for the light AI panel**, which keeps its place in the right panel's vocabulary as the shallow end of a depth pair. Behind the same `developer_mode` + `ai_enabled` gate as every other `ai.*` surface (`decisions/ai/0636`).
 
-Used in: `decisions/@@ai/0638@@`; `decisions/ai/0636`; `decisions/ai/0637`
+Used in: `decisions/ai/0634`; `decisions/ai/0636`; `decisions/ai/0637`
 
 ### **agent memory** &nbsp; 📦 *Product*
 
@@ -1369,6 +1369,12 @@ The `==text==` inline construct, rendered with a muted warm-amber `--highlight` 
 
 Used in: `spec/markdown-dialect.md` §3.2, §5
 
+### **motion tier** &nbsp; 📦 *Product*
+
+One of the two named levels of permitted animation (`design-notes/ui/0632`): **restrained** (the default, and the only tier a decoration may use) and **expressive** (an interaction that is itself the feedback, named per use in `PRODUCT.md` principle 4). The tier is declared in the DOM as `data-motion="restrained" | "expressive"`, and `scripts/check-motion-canon.mjs` fails any `infinite` animation that is not on its named allowlist. `prefers-reduced-motion` zeroes transitions in BOTH tiers; only a `data-motion="essential"` indeterminate-progress indicator is exempt, and it slows rather than stops.
+
+Used in: `design-notes/ui/0632`; `PRODUCT.md` principle 4; `scripts/check-motion-canon.mjs`
+
 ### **multi-color highlight** &nbsp; 📦 *Product*
 
 A 5-color highlight palette — yellow (default), green, blue, pink, purple — usable within a single note (decisions.md 2026-06-15). Because `==text==` carries no color, a non-yellow highlight is stored as the portable [embedded HTML](#embedded-html-rendering) form `<mark class="hl-green|hl-blue|hl-pink|hl-purple">text</mark>` (the toolbar's color swatches emit it; yellow keeps emitting `==text==`). The `hl-*` class set is **closed** and enforced at the DOMPurify boundary (`ALLOWED_ATTR` widened to `[title, class]`, then an `uponSanitizeAttribute` hook keeps `class` only as one allowlisted token on a `<mark>`); an unknown/multi-class value is stripped and falls back to the default-yellow `<mark>` render, with note bytes preserved verbatim (§6 C1). Not Pandoc attribute syntax (§7 still excludes that) — a fixed closed vocabulary, not general `.class` parsing. The per-color washes are the `--highlight-{green,blue,pink,purple}` tokens.
@@ -1913,7 +1919,7 @@ The small Rust stdio host in the Tauri core that receives a keyless clip handoff
 
 The note a [conversation](#conversation) is about, when it is about one: an optional note id on the conversation's catalog row, written at creation when a run starts with a single note in its [agent scope](#agent-scope). A field on the existing row rather than a new blob family, deliberately — the catalog already syncs, so the [agent hub](#agent-hub) lists anchors without opening every conversation file. A conversation without one is **vault-general**, which is the hub's own case and not a degraded state. The anchor is a label, never a permission: it says what a conversation was about and grants nothing, and what a run may touch is the [agent scope](#agent-scope) alone.
 
-Used in: `protocol.md` §9.23; `decisions/@@ai/0638@@`
+Used in: `protocol.md` §9.23; `decisions/ai/0634`
 
 ### **note-task** &nbsp; 📦 *Product*
 
@@ -2756,18 +2762,6 @@ The one assertion suite that pins the behaviour of the [platform seam](#platform
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 
-### **story catalogue** &nbsp; 🛠️ *Tooling*
-
-A dev-only, in-repo catalogue of every component, screen and state in the shared `src/` tree, mounted from the **real** components (myne-md/myne#832). It lives at `stories/` on the `web/` model (its own Vite target, no `package.json`, root scripts) and is served by `pnpm stories` on :1423. One entry per (surface × state) is declared in `stories/src/registry.ts`, so every state is addressable by URL; `scripts/check-story-coverage.mjs` is a ratchet that fails when a component or screen lands without a story, and `scripts/check-stories-isolation.mjs` fails if any app build config or Tauri bundle manifest references `stories/`, so "deployable" cannot become "shipped to users". It is not a shipped surface: it carries no backend, makes no network call, and stands outside every app bundle. See also [story host](#story-host), [fixture](#fixture).
-
-Used in: `decisions.md` 2026-10-05; `stories/README.md`
-
-### **story host** &nbsp; 🛠️ *Tooling*
-
-The single module (`stories/src/host/internals.ts`) that installs a fake `window.__TAURI_INTERNALS__` before any app module body runs, so the desktop [platform seam](#platform-seam) (`src/platform/*`) is mounted **unmodified** and every `invoke(cmd, args)` routes to a [fixture](#fixture)'s canned data (myne-md/myne#832). It is the mechanism `mobile/tests/flow-logic/mock-ipc.ts` and the E2E page seat already use, reused rather than reinvented: no app source changes and no second UI codebase to drift. It is the one file under `stories/src` permitted to name the Tauri runtime global, the same reasoned exemption `src/lib/app-window.ts` holds.
-
-Used in: `decisions.md` 2026-10-05; `stories/src/host/internals.ts`
-
 ### **save readout** &nbsp; 📦 *Product*
 
 The bottom-bar line that says what the current window owes the open note (myne-md/myne#566, reshaped by myne-md/myne#603). Five states, each with its own glyph, so the state is readable without reading the words:
@@ -3056,6 +3050,18 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-27 (MYND-462)
 Adversary class A10. Nation-state-class adversary with zero-day capabilities, supply-chain access, hardware-implant capability, and the legal power to compel operator cooperation. Myne's status against A10 is Best-effort: boring, well-vetted primitives plus a published spec, with no claim of defense against zero-days or hardware implants beyond what A2 covers.
 
 Used in: `threat-model.md` §1 (A10)
+
+### **story catalogue** &nbsp; 🛠️ *Tooling*
+
+A dev-only, in-repo catalogue of every component, screen and state in the shared `src/` tree, mounted from the **real** components (myne-md/myne#832). It lives at `stories/` on the `web/` model (its own Vite target, no `package.json`, root scripts) and is served by `pnpm stories` on :1423. One entry per (surface × state) is declared in `stories/src/registry.ts`, so every state is addressable by URL; `scripts/check-story-coverage.mjs` is a ratchet that fails when a component or screen lands without a story, and `scripts/check-stories-isolation.mjs` fails if any app build config or Tauri bundle manifest references `stories/`, so "deployable" cannot become "shipped to users". It is not a shipped surface: it carries no backend, makes no network call, and stands outside every app bundle. See also [story host](#story-host), [fixture](#fixture).
+
+Used in: `decisions.md` 2026-10-05; `stories/README.md`
+
+### **story host** &nbsp; 🛠️ *Tooling*
+
+The single module (`stories/src/host/internals.ts`) that installs a fake `window.__TAURI_INTERNALS__` before any app module body runs, so the desktop [platform seam](#platform-seam) (`src/platform/*`) is mounted **unmodified** and every `invoke(cmd, args)` routes to a [fixture](#fixture)'s canned data (myne-md/myne#832). It is the mechanism `mobile/tests/flow-logic/mock-ipc.ts` and the E2E page seat already use, reused rather than reinvented: no app source changes and no second UI codebase to drift. It is the one file under `stories/src` permitted to name the Tauri runtime global, the same reasoned exemption `src/lib/app-window.ts` holds.
+
+Used in: `decisions.md` 2026-10-05; `stories/src/host/internals.ts`
 
 ### **stray attachment file** &nbsp; 📋 *Protocol*
 
