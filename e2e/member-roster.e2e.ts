@@ -69,7 +69,7 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         // path needs a held identity, so the phrase form is what a fresh
         // process shows.
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
-        await app.session.byTestId("member-roster.person-unlock");
+        await app.session.byTestId("sync.panel.identity-unlock");
         const invitationObservationEndsAt = Date.now() + 1_000;
         await app.session.waitUntil(
           async () => {
@@ -104,16 +104,19 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
-        // The recovery-phrase grid is collapsed by default; reveal it before
-        // filling it (myne-md/myne#796 follow-up).
-        await (await app.session.byTestId("member-roster.person-unlock-open")).click();
+        // The identity unlock is the Sync panel's Identity block, collapsed by
+        // default; the member roster no longer carries its own grid
+        // (myne-md/myne#831).
+        await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
         // Unlock the person identity; first enrolment mints the owner.
         for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
-            index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+            index === 0
+              ? "sync.panel.identity-unlock.phrase-input"
+              : `sync.panel.identity-unlock.phrase-cell-${index + 1}`;
           await (await app.session.byTestId(testId)).replaceText(word);
         }
-        await (await app.session.byTestId("member-roster.person-unlock-button")).click();
+        await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
         await app.session.byTestId("member-roster.person-ready");
         await (await app.session.byTestId("member-roster.copy-owner-code")).click();
         await app.session.waitUntil(
@@ -178,14 +181,17 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await dismissImporterOffer(app.session);
            await openSettings(app.session, "sync");
           await app.session.byTestId("member-roster");
-          // The recovery-phrase grid is collapsed by default (myne#796).
-          await (await app.session.byTestId("member-roster.person-unlock-open")).click();
+          // The identity unlock now lives in the Sync panel's Identity block
+          // (myne-md/myne#831); it is collapsed by default.
+          await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
           for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
             const testId =
-              index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+              index === 0
+                ? "sync.panel.identity-unlock.phrase-input"
+                : `sync.panel.identity-unlock.phrase-cell-${index + 1}`;
             await (await app.session.byTestId(testId)).replaceText(word);
           }
-          await (await app.session.byTestId("member-roster.person-unlock-button")).click();
+          await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
            await app.session.byTestId("member-roster.person-ready");
            // The sent-invitation fetch is gated on a SHARED vault
            // (myne-md/myne#783): an `NTV5` vault has no roster, so the hook

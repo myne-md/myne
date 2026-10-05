@@ -81,6 +81,10 @@ describe.skipIf(!supported)(
         // canonical seeded account round-trips through the production flow.
         await openSettings(a.session);
         await (await a.session.byTestId("settings.tab-sync")).click();
+        // The QR lives in a dialog opened from the Devices header icon
+        // (myne-md/myne#831), not an always-visible block.
+        await (await a.session.byTestId("sync.device-join-qr.open")).click();
+        await a.session.byTestId("sync.device-join-qr.dialog");
         await (
           await a.session.byTestId("sync.device-join-qr.account-input")
         ).sendKeys(account);

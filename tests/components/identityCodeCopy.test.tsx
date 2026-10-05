@@ -8,7 +8,6 @@ import {
 } from "../../src/components/sync/personIdentityState";
 
 const writeTextMock = vi.hoisted(() => vi.fn());
-const unlockPersonMock = vi.hoisted(() => vi.fn());
 const personListInvitesMock = vi.hoisted(() => vi.fn());
 const personAcceptInviteMock = vi.hoisted(() => vi.fn());
 const inspectInviteCodeMock = vi.hoisted(() => vi.fn());
@@ -38,7 +37,6 @@ vi.mock("../../src/hooks/useRoster", () => ({
     loading: false,
     error: null,
     reload: vi.fn(),
-    unlockPerson: unlockPersonMock,
     lockPerson: vi.fn().mockResolvedValue(undefined),
     inviting: false,
     lastInvite: null,
@@ -88,17 +86,10 @@ function expectedIdentityPhrase(): string {
 }
 
 function fillPhrase(): void {
-  // The roster's recovery-phrase grid is collapsed by default (myne#796);
-  // reveal it before typing into it.
-  fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
-  for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
-    fireEvent.change(
-      screen.getByTestId(
-        index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`,
-      ),
-      { target: { value: index === 0 ? "abandon" : "about" } },
-    );
-  }
+  // Identity code copy is asserted once the identity is unlocked. The roster no
+  // longer owns a phrase grid (myne-md/myne#831); the fixture seeds the shared
+  // store the panel reads.
+  setPersonIdentityState({ ready: true, ownerCode: OWNER_CODE });
 }
 
 const surfaces = [
@@ -110,12 +101,8 @@ const surfaces = [
     feedbackTestId: "member-roster.copy-feedback",
     render: () => render(<MemberRosterPanel />),
 
-     prepare: async () => {
-       fillPhrase();
-       await act(async () => {
-
-        fireEvent.click(screen.getByTestId("member-roster.person-unlock-button"));
-      });
+    prepare: async () => {
+      fillPhrase();
       await screen.findByTestId("member-roster.person-ready");
     },
   },
@@ -142,11 +129,6 @@ const surfaces = [
 
 beforeEach(() => {
   writeTextMock.mockReset().mockResolvedValue(undefined);
-  unlockPersonMock.mockReset().mockResolvedValue({
-    fingerprint_hex: "00".repeat(32),
-    person_id_hex: "11".repeat(16),
-    identity_code: OWNER_CODE,
-  });
   personListInvitesMock.mockReset().mockResolvedValue([]);
   personAcceptInviteMock.mockReset().mockResolvedValue(undefined);
   inspectInviteCodeMock.mockReset();
