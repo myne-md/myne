@@ -1,0 +1,19 @@
+{
+  "primitives/button/variants": "d79aeb32121cca34",
+  "primitives/button/disabled": "7e3c9ef74db6f0b3",
+  "primitives/iconbutton/default": "1206198f6f54c17e",
+  "primitives/iconbutton/disabled": "50fbd1d5f18783d0",
+  "primitives/input/default": "d7ccd7b05cab4c30",
+  "primitives/input/invalid": "43caa4f84922443c",
+  "primitives/input/mono-disabled": "0ab223340df8bf40",
+  "primitives/segmented/default": "94ab5e35c033c91f",
+  "primitives/switch/on-off-and-disabled": "83f3cfe54d229c8d",
+  "primitives/select/default": "0771c2bb97321414",
+  "primitives/tooltip/default": "9b1ac911d53e08e9",
+  "primitives/spinner/default": "97b961d157de78c2",
+  "screens/welcome/default": "e338a47565e11466",
+  "screens/accountnumberentry/default": "bcd692cf0c3049f3",
+  "screens/storagelost/evicted-with-unsynced-notes": "2fce673255dc02d4",
+  "screens/storagelost/unopenable-local-only": "6982f7d3738f23d4",
+  "screens/devicerevoked/default": "379d1441c0d39a66"
+}

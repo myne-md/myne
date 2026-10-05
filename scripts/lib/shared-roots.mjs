@@ -40,6 +40,11 @@ export const SHARED_ROOTS = Object.freeze([
   // package the website consumes. Stated here so the omission reads as a decision.
   "web/src",
   "mobile/src",
+  // The design-system story catalogue (myne-md/myne#832). It is a fourth
+  // consumer of the shared tree, not a client: it mounts real `src/` components
+  // through one fake-IPC story host. Listed here so the token, seam and i18n
+  // guards scan it like every other shared tree.
+  "stories/src",
 ]);
 
 /**
