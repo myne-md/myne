@@ -73,11 +73,27 @@ describe("ai-download-store", () => {
     resolveDownload("/models/tag/model.gguf");
   });
 
-  it("marks cancelled immediately and asks the host to cancel", async () => {
-    downloadModel.mockReturnValue(new Promise(() => {}));
+  it("keeps the cancelled state when the backend then rejects the cancelled fetch", async () => {
+    // The fixture MUST let the invoke reject AFTER the cancel, or the catch in
+    // startModelDownload never runs and the test passes with the relabel bug
+    // fully present (myne-md/myne#826). A never-settling promise was exactly
+    // that vacuous fixture.
+    let rejectDownload!: (e: unknown) => void;
+    downloadModel.mockReturnValue(
+      new Promise<string>((_res, rej) => {
+        rejectDownload = rej;
+      }),
+    );
     const store = await freshStore();
-    void store.startModelDownload("tag");
+    const started = store.startModelDownload("tag");
+    // Let startModelDownload reach the `await downloadModel(...)`.
+    await Promise.resolve();
     store.cancelModelDownloadFor("tag");
+    expect(store.getModelDownloadState("tag").status).toBe("cancelled");
+    // The host cancels by rejecting the invoke, as ModelDownloadError::Cancelled.
+    rejectDownload({ kind: "download", detail: "Cancelled" });
+    await started;
+    // The id-guarded catch must NOT relabel a deliberate cancel as failed.
     expect(store.getModelDownloadState("tag").status).toBe("cancelled");
     expect(cancelModelDownload).toHaveBeenCalledWith("dl-1");
   });

@@ -10,9 +10,10 @@
 // while the private identity is locked for the session, the unlock action.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
+const writeTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
@@ -20,7 +21,11 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  writeText: writeTextMock,
+}));
 
+import { getToasts, resetToasts } from "../../src/components/toast/toastStore";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
 function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
@@ -30,6 +35,8 @@ function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
 
 beforeEach(() => {
   invokeMock.mockReset();
+  writeTextMock.mockReset().mockResolvedValue(undefined);
+  resetToasts();
 });
 afterEach(() => {
   cleanup();
@@ -89,5 +96,51 @@ describe("the Identity block, per device identity state", () => {
     });
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
+  });
+
+  it("copies the identity code with outcome feedback (myne-md/myne#823)", async () => {
+    // The chip's BEHAVIOUR, not just its presence: a test that only asserts the
+    // testid exists passes with an empty `copyIdentityCode` body. This is the
+    // third identity-code-copy surface (the other two are in
+    // identityCodeCopy.test.tsx, which the locked harness here cannot drive).
+    mount({
+      syncState: "idle",
+      person: {
+        enrolled: true,
+        identity_unlocked: false,
+        identity_code: "MYNE-PERSON-1:deadbeef",
+        sealed_keypair_present: true,
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId("sync.panel.copy-identity")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sync.panel.copy-identity"));
+    });
+    await waitFor(() =>
+      expect(writeTextMock).toHaveBeenCalledWith("MYNE-PERSON-1:deadbeef"),
+    );
+    expect(getToasts().at(-1)?.variant).toBe("info");
+    expect(getToasts().at(-1)?.message).toBe("Identity code copied");
+  });
+
+  it("reports a clipboard failure on the identity chip (myne-md/myne#823)", async () => {
+    writeTextMock.mockRejectedValueOnce(new Error("clipboard unavailable"));
+    mount({
+      syncState: "idle",
+      person: {
+        enrolled: true,
+        identity_unlocked: false,
+        identity_code: "MYNE-PERSON-1:deadbeef",
+        sealed_keypair_present: true,
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId("sync.panel.copy-identity")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sync.panel.copy-identity"));
+    });
+    await waitFor(() => expect(getToasts().at(-1)?.variant).toBe("error"));
+    expect(getToasts().at(-1)?.message).toBe("Couldn't copy the identity code");
   });
 });

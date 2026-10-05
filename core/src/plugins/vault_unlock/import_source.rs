@@ -308,10 +308,21 @@ pub async fn close(source_id: VaultId, state: &VaultRuntimeState) {
 /// source opened for reading has no reason to outlive the target vault's
 /// session, and leaving it resident past a lock would put a second vault's keys
 /// on the wrong side of the guarantee A6 rests on.
+///
+/// Also removes each source's staging directory when it lives under
+/// `import-staging/` (myne-md/myne#827). Without this a backup import leaves its
+/// ciphertext extraction on disk until a later open happens to sweep it (24h+),
+/// or forever if none does. The path test is deliberate: a LOCAL vault source's
+/// root is the user's real `vaults/<id>/`, which this must never delete.
 pub async fn close_all(state: &VaultRuntimeState) {
     let dropped = state.drop_import_sources().await;
     if !dropped.is_empty() {
         let n = dropped.len();
+        for slot in &dropped {
+            if let Slot::ImportSource { vault_root, .. } = slot {
+                remove_staging_for(vault_root);
+            }
+        }
         drop(dropped);
         tracing::info!(
             event = "import_sources_closed_on_teardown",
@@ -321,8 +332,35 @@ pub async fn close_all(state: &VaultRuntimeState) {
     }
 }
 
+/// Remove a backup source's extraction directory, identified by its
+/// `…/import-staging/<id>/` shape. A local vault root fails the test and is left
+/// alone. Best-effort: a failure is a swept-later directory, not a correctness
+/// problem.
+///
+/// The `std::fs` is gated to native, the same way every other staging path is:
+/// the importer is a desktop-only capability (the web client classifies the
+/// whole `importer` plugin `Class::Unsupported`), so there is no browser arm to
+/// port this to, and the wasm build must still compile the surrounding
+/// `close_all` / `sweep_expired` (which the `#[cfg]` leaves as a no-op there).
+#[cfg(not(target_arch = "wasm32"))]
+fn remove_staging_for(vault_root: &std::path::Path) {
+    let under_staging = vault_root
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|name| name == "import-staging")
+        .unwrap_or(false);
+    if under_staging {
+        let _ = std::fs::remove_dir_all(vault_root);
+    }
+}
+
+/// Non-wasm no-op twin so the native-only call sites compile everywhere.
+#[cfg(target_arch = "wasm32")]
+fn remove_staging_for(_vault_root: &std::path::Path) {}
+
 /// Sweep an expired import slot. Returns whether one was dropped, so a caller
-/// driving this on a timer can log the transition rather than the tick.
+/// driving this on a timer can log the transition rather than the tick. Like
+/// `close_all`, it removes a backup source's staging directory as well.
 pub async fn sweep_expired(
     state: &VaultRuntimeState,
     ttl: core::time::Duration,
@@ -336,6 +374,9 @@ pub async fn sweep_expired(
         .await;
     match dropped {
         Some(slot) => {
+            if let Slot::ImportSource { vault_root, .. } = &slot {
+                remove_staging_for(vault_root);
+            }
             drop(slot);
             tracing::info!(
                 event = "import_source_expired",
@@ -571,21 +612,34 @@ pub async fn list_note_ids(
         .ok_or(ImportSourceReadError::SessionClosed)?;
     let notes_dir = vault_root.join("notes");
 
-    let entries = io.read_dir(&notes_dir).await.map_err(|io_error_kind| {
-        tracing::error!(
-            stage = "read_dir",
-            error_kind = "Io",
-            io_failure_kind = ?io_error_kind,
-            "source notes directory listing failed"
-        );
-        ImportSourceReadError::Io { io_error_kind }
-    })?;
+    let entries = match io.read_dir(&notes_dir).await {
+        Ok(entries) => entries,
+        // A backup of a vault with ZERO notes carries no `notes/` member at all
+        // (the writer only emits members that exist), so a missing directory is
+        // an empty vault, not a failure (myne-md/myne#827). Any other IO error
+        // is still an error.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return Ok(Vec::new()),
+        Err(io_error_kind) => {
+            tracing::error!(
+                stage = "read_dir",
+                error_kind = "Io",
+                io_failure_kind = ?io_error_kind,
+                "source notes directory listing failed"
+            );
+            return Err(ImportSourceReadError::Io { io_error_kind });
+        }
+    };
 
     let mut ids: Vec<String> = entries
         .into_iter()
         .filter(|e| !e.is_dir)
         .filter_map(|e| e.name.strip_suffix(".myn").map(str::to_owned))
-        .filter(|stem| crate::plugins::notes::note_id::NoteId::parse(stem).is_ok())
+        // Match the container allowlist's UUID shape, NOT `NoteId::parse`
+        // (v7-strict). The allowlist accepts any RFC-4122 version (§9.11.3's
+        // grammar carries no version constraint), so a stricter filter here
+        // would extract a member and then silently drop it from the listing,
+        // importing nothing with no report row (myne-md/myne#827).
+        .filter(|stem| myne_format::backup_container::is_disk_uuid(stem))
         .collect();
     // Sorted so a run is reproducible and a progress bar advances in a stable
     // order across re-imports; UUIDv7 sorts by creation time, so this is also

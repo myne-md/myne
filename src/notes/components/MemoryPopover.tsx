@@ -19,13 +19,13 @@ import {
 
 const OVERLAY_STYLE: CSSProperties = {
   position: "absolute",
-  // The popover mounts at the BOTTOM of the tab column (after the composer),
-  // so opening downward (top: 100%) lands past the viewport edge and the
-  // Close row stops being hit-testable (myne-md/myne#697, mem1 0/12). Open
-  // upward from the anchor instead, capped against the viewport.
-  bottom: "100%",
+  // The popover is anchored to the memory button (a `position: relative`
+  // wrapper in the chat header), so it opens DOWNWARD from the header into the
+  // chat area. The old `bottom: 100%` opened upward, which worked only because
+  // the popover used to live near the composer at the bottom of the tab.
+  top: "100%",
   right: 0,
-  marginBottom: "var(--space-1)",
+  marginTop: "var(--space-1)",
   zIndex: 30,
   width: 300,
   // The right panel narrows below 300px on small viewports: without this cap
