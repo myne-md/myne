@@ -639,7 +639,7 @@ pub async fn list_note_ids(
         // grammar carries no version constraint), so a stricter filter here
         // would extract a member and then silently drop it from the listing,
         // importing nothing with no report row (myne-md/myne#827).
-        .filter(|stem| myne_format::backup_container::is_disk_uuid(stem))
+        .filter(|stem| myne_format::disk_uuid::is_disk_uuid(stem))
         .collect();
     // Sorted so a run is reproducible and a progress bar advances in a stable
     // order across re-imports; UUIDv7 sorts by creation time, so this is also
