@@ -33,7 +33,7 @@ import {
   setPeriodicNoteSetting,
 } from "../../lib/prefs";
 import { listTemplates, type TitleRecord } from "../../notes";
-import { listFolderPaths, type FolderPathOption } from "../../notes/listFolderPaths";
+import { listFolderPaths, resolveFolderOption, type FolderPathOption } from "../../notes/listFolderPaths";
 import {
   PERIODS,
   PERIOD_DEFAULTS,
@@ -323,7 +323,12 @@ export function PeriodicNotesSettings() {
               folderPaths.length > 0 ? (
                 <SearchableSelect
                   options={folderOptions}
-                  selected={[settings[period].folder || PERIOD_DEFAULTS[period].folder]}
+                  selected={[
+                    resolveFolderOption(
+                      folderOptions.map((o) => o.value),
+                      settings[period].folder || PERIOD_DEFAULTS[period].folder,
+                    ),
+                  ]}
                   onChange={(next) => {
                     const chosen = next[0];
                     if (chosen === undefined) return;
