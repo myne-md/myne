@@ -999,10 +999,14 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           aria-expanded={disclosureOpen}
           onClick={() => setDisclosureOpen((o) => !o)}
           style={{
+            background: "none",
+            border: "none",
             padding: 0,
             marginTop: "var(--space-1)",
+            color: "var(--fg-2)",
             font: "inherit",
             fontSize: "var(--text-sm)",
+            cursor: "pointer",
           }}
         >
           {t("settings.ai.disclosureToggle")}

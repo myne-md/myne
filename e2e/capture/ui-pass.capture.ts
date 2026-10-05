@@ -213,6 +213,16 @@ runner(
         },
       );
 
+      await frame(
+        s,
+        "10-settings-files",
+        "Settings → Files: the plain-file editor settings.",
+        async () => {
+          await openSettings(s, "files");
+          await sleep(900);
+        },
+      );
+
       // Developer mode, from INSIDE the open modal: `enableDeveloperMode`
       // reaches About by the gear, and clicking the gear again on an open
       // modal is a close rather than an open. The agent tab is behind this
@@ -238,6 +248,21 @@ runner(
         await sleep(400);
         await closeSettings(s);
         await sleep(600);
+      });
+
+      await frame(
+        s,
+        "11-settings-ai",
+        "Settings → Developer → AI: the model rows and their download / " +
+          "choose / remove controls.",
+        async () => {
+          await openSettings(s, "ai");
+          await sleep(1200);
+        },
+      );
+      await safe("close settings", async () => {
+        await closeSettings(s);
+        await sleep(500);
       });
 
       await frame(
