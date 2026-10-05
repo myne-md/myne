@@ -4139,7 +4139,6 @@
       "invitationPending": "Todavía no aceptada",
       "invitationsFailed": "No se pudieron cargar tus invitaciones.",
       "title": "Miembros de la bóveda",
-      "personHint": "Desbloquea tu identidad de miembro con tu frase de recuperación.",
       "personUnlock": "Desbloquear identidad de miembro",
       "personReady": "Identidad de miembro desbloqueada.",
       "ownerCodeHint": "Comparte este código con la persona que invitas para que pueda verificar que la bóveda es tuya. Solo contiene información pública.",

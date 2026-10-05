@@ -64,10 +64,10 @@ describe("the Identity block, per device identity state", () => {
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
     const code = screen.getByTestId("sync.panel.identity-code") as HTMLInputElement;
     expect(code.value).toBe("MYNE-PERSON-1:deadbeef");
-    // The copy chip sits beside the code, and the unlock action is inline on the
-    // same row (myne-md/myne#818).
+    // The copy chip sits beside the code; the unlock is the inline phrase
+    // entry below the row (myne-md/myne#831).
     expect(screen.getByTestId("sync.panel.copy-identity")).toBeTruthy();
-    expect(screen.getByTestId("sync.panel.unlock-identity")).toBeTruthy();
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
     // The Add CTA is not shown; the identity already exists.
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
   });
@@ -84,7 +84,7 @@ describe("the Identity block, per device identity state", () => {
     });
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-unlocked")).toBeTruthy());
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
-    expect(screen.queryByTestId("sync.panel.unlock-identity")).toBeNull();
+    expect(screen.queryByTestId("sync.panel.identity-unlock")).toBeNull();
   });
 
   it("treats a sealed-but-unenrolled identity as 'recover', not 'add'", async () => {
