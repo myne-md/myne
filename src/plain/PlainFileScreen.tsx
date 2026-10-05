@@ -254,28 +254,25 @@ export function PlainFileScreen() {
                   flexShrink: 0,
                 }}
               >
-                {/* A raw `<button role="tab">` rather than `<Button>`: this is
-                    the tab WIDGET, not a styled button — the same shape
-                    `TabStrip` renders (there as a `role="tab"` div), and
-                    `Button`'s variants would fight the active-tab surface the
-                    parent row paints. Recorded in `primitive-adoption.json` as
-                    the one legitimate raw control in this file
+                {/* The tab WIDGET: `<Button variant="ghost">` carrying
+                    `role="tab"`, so it is the primitive rather than a
+                    hand-rolled control while keeping the tab semantics. The
+                    variant supplies the hover surface; the inline style strips
+                    the button padding and inherits the tab's own type, so the
+                    row keeps painting the active-tab background
                     (myne-md/myne#788). */}
-                <button
+                <Button
+                  variant="ghost"
                   role="tab"
                   aria-selected={isActive}
                   data-testid="plain-file.tab"
                   onClick={() => setActive(file.handle)}
                   style={{
                     ...MIN_TARGET,
-                    display: "flex",
-                    alignItems: "center",
+                    padding: 0,
                     gap: "var(--space-1)",
-                    border: "none",
-                    background: "transparent",
                     color: "inherit",
                     font: "inherit",
-                    cursor: "pointer",
                   }}
                 >
                   {file.name}
@@ -309,7 +306,7 @@ export function PlainFileScreen() {
                       testId="plain-file.tab-failed"
                     />
                   )}
-                </button>
+                </Button>
                 <IconButton
                   icon="x"
                   iconSize={14}

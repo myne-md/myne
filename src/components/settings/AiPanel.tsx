@@ -450,10 +450,16 @@ function DownloadedModelRow(props: {
             >
               <div
                 style={{
-                  width: `${percent}%`,
+                  width: "100%",
                   height: "100%",
                   background: "var(--accent)",
-                  transition: "width var(--duration-fast) var(--ease-standard)",
+                  transformOrigin: "left",
+                  // A determinate fill animated with `transform: scaleX`, not
+                  // `width`: scaling runs on the compositor, while a `width`
+                  // transition lays out and paints every frame
+                  // (`scripts/check-motion-canon.mjs`).
+                  transform: `scaleX(${percent / 100})`,
+                  transition: "transform var(--duration-fast) var(--ease-standard)",
                 }}
               />
             </div>

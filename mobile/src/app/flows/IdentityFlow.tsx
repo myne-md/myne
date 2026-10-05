@@ -98,6 +98,10 @@ function MonoField({
         boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
       }}
     >
+      {/* A raw `<input>`: mobile has no real text-input primitive yet
+          (`components/inputs.tsx`'s `Field` is a presentational mock that
+          renders a div, not a field), so the real control lives here and is
+          recorded in `scripts/primitive-adoption.json` (myne-md/myne#788). */}
       <input
         value={value}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
@@ -133,6 +137,8 @@ function MonoField({
  *  wall and pushes everything below it off screen. */
 function MonoBox({ value, testId }: { value: string; testId: string }) {
   return (
+    // Read-only monospace display; same missing-primitive reason as `RawField`
+    // above. Recorded in `scripts/primitive-adoption.json`.
     <input
       readOnly
       value={value}
@@ -180,16 +186,17 @@ function AckRow({
         borderBottom: "1px solid var(--line-1)",
       }}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        full={false}
         onClick={onToggle}
         aria-pressed={checked}
         aria-labelledby={labelId}
         data-testid={testId}
-        style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flex: "none" }}
+        style={{ border: "none", background: "transparent", padding: 0, height: "auto", width: "auto", display: "flex", flex: "none" }}
       >
         <Checkbox checked={checked} />
-      </button>
+      </Button>
       <div
         id={labelId}
         onClick={onToggle}
