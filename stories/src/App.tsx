@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Input } from "@app/components/primitives/Input";
+import { Button } from "@app/components/primitives/Button";
 import { storiesByGroup, storyById, STORIES } from "./registry";
 import { resolveFixture } from "../fixtures";
 import { setStoryFixture } from "./host/internals";
@@ -32,26 +33,6 @@ const GROUP_TITLE_STYLE: CSSProperties = {
   letterSpacing: "var(--tracking-caps)",
   textTransform: "uppercase",
   color: "var(--fg-3)",
-};
-
-const ITEM_STYLE: CSSProperties = {
-  display: "block",
-  width: "100%",
-  textAlign: "start",
-  padding: "var(--space-1) var(--space-2)",
-  border: 0,
-  borderRadius: "var(--radius-1)",
-  background: "transparent",
-  color: "var(--fg-2)",
-  font: "inherit",
-  fontSize: "var(--text-sm)",
-  cursor: "pointer",
-};
-
-const ITEM_ACTIVE_STYLE: CSSProperties = {
-  ...ITEM_STYLE,
-  background: "var(--accent)",
-  color: "var(--accent-on)",
 };
 
 const STAGE_STYLE: CSSProperties = {
@@ -154,15 +135,16 @@ export function App() {
           <div key={group}>
             <div style={GROUP_TITLE_STYLE}>{group}</div>
             {stories.map((story) => (
-              <button
+              <Button
                 key={story.id}
                 type="button"
-                style={story.id === selected?.id ? ITEM_ACTIVE_STYLE : ITEM_STYLE}
+                variant={story.id === selected?.id ? "primary" : "ghost"}
+                style={{ width: "100%", justifyContent: "flex-start" }}
                 onClick={() => select(story.id)}
                 data-testid={`stories.item.${story.id}`}
               >
                 {story.surface} · {story.state}
-              </button>
+              </Button>
             ))}
           </div>
         ))}

@@ -13,6 +13,9 @@ import { Select } from "@app/components/primitives/Select";
 import { Switch } from "@app/components/primitives/Switch";
 import { Tooltip } from "@app/components/primitives/Tooltip";
 import { Spinner } from "@app/components/Spinner";
+import { CredentialField } from "@app/components/primitives/CredentialField";
+import { EmptyState } from "@app/components/primitives/EmptyState";
+import { Skeleton } from "@app/components/primitives/Skeleton";
 import type { StoryDescriptor } from "../types";
 
 const noop = () => {};
@@ -211,6 +214,56 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     render: () => (
       <Row>
         <Spinner />
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/credentialfield/default",
+    group: "primitives",
+    surface: "CredentialField",
+    state: "default",
+    render: () => (
+      <Row>
+        <div style={{ width: 280 }}>
+          <CredentialField
+            value=""
+            onChange={noop}
+            ariaLabel="Password"
+            busyLabel="Unlocking"
+            submitLabel="Unlock"
+          />
+        </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/emptystate/first-run",
+    group: "primitives",
+    surface: "EmptyState",
+    state: "first-run",
+    render: () => (
+      <Row>
+        <div style={{ width: 360 }}>
+          <EmptyState
+            variant="firstRun"
+            icon="file-text"
+            title="No notes yet"
+            body="Create your first note to get started."
+          />
+        </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/skeleton/default",
+    group: "primitives",
+    surface: "Skeleton",
+    state: "default",
+    render: () => (
+      <Row>
+        <div style={{ width: 280 }}>
+          <Skeleton lines={3} />
+        </div>
       </Row>
     ),
   },

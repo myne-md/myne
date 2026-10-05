@@ -14,6 +14,13 @@ import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 
 import { AboutPanel } from "@app/components/settings/AboutPanel";
+import { BarCustomizeSettings } from "@app/components/settings/BarCustomizeSettings";
+import { RecoveryDrillRow } from "@app/components/settings/RecoveryDrillRow";
+import {
+  CUSTOMIZE_LIST_STYLE,
+  CustomizeRow,
+  useDragReorder,
+} from "@app/components/settings/CustomizeList";
 import { AccountPanel } from "@app/components/settings/AccountPanel";
 import { AiOnboardingSurface } from "@app/components/settings/AiOnboardingSurface";
 import { AiPanel } from "@app/components/settings/AiPanel";
@@ -197,6 +204,37 @@ function Frame({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * `CustomizeList` is a toolkit (a row + a drag-reorder hook + its style), not a
+ * self-contained surface, so this wrapper is what a story can mount. It is the
+ * same shape `BarCustomizeSettings` and the ribbon panel compose.
+ */
+function CustomizeListDemo() {
+  const reorder = useDragReorder(["pin", "search", "settings"], noop);
+  const rows: { id: string; icon: "pin" | "search" | "settings"; label: string }[] = [
+    { id: "pin", icon: "pin", label: "Pinned" },
+    { id: "search", icon: "search", label: "Search" },
+    { id: "settings", icon: "settings", label: "Settings" },
+  ];
+  return (
+    <div style={CUSTOMIZE_LIST_STYLE}>
+      {rows.map((row, i) => (
+        <CustomizeRow
+          key={row.id}
+          id={row.id}
+          icon={row.icon}
+          label={row.label}
+          index={i}
+          total={rows.length}
+          reorder={reorder}
+          trailing={null}
+          testId={`stories.customize.${row.id}`}
+        />
+      ))}
     </div>
   );
 }
@@ -827,5 +865,28 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
         />
       </Frame>
     ),
+  },
+  {
+    id: "settings/barcustomizesettings/default",
+    group: "settings",
+    surface: "BarCustomizeSettings",
+    state: "default",
+    fixture: PREFS_FIXTURE,
+    render: () => <BarCustomizeSettings />,
+  },
+  {
+    id: "settings/recoverydrillrow/default",
+    group: "settings",
+    surface: "RecoveryDrillRow",
+    state: "default",
+    fixture: PREFS_FIXTURE,
+    render: () => <RecoveryDrillRow />,
+  },
+  {
+    id: "settings/customizelist/default",
+    group: "settings",
+    surface: "CustomizeList",
+    state: "default",
+    render: () => <CustomizeListDemo />,
   },
 ];

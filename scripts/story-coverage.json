@@ -1,5 +1,5 @@
 {
   "$comment": "Surfaces with no story yet (myne-md/myne#832). DEBT: this set may only SHRINK. Do not add an entry by hand; write the story. `node scripts/check-story-coverage.mjs --record` refuses to grow it.",
-  "floor": 157,
+  "floor": 167,
   "debt": []
 }
