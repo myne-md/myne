@@ -19,7 +19,8 @@ import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
-import { DeviceJoinQr } from "../sync/DeviceJoinQr";
+import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
+import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
@@ -51,6 +52,7 @@ import {
 } from "../../notes/conflictCopy";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
+import { Tooltip } from "../primitives/Tooltip";
 import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -121,21 +123,25 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
+  // The shared person-identity store: the roster's Lock/Forget and this panel's
+  // own unlock all write it, so it is the one "is the identity ready for this
+  // session" signal.
+  const { ready: identityReady, ownerCode: identityOwnerCode } = usePersonIdentityState();
   // The full device-local person status, not just `enrolled`: the Identity block
   // below shows the existing identity (its public code) while it is locked, which
-  // `enrolled` alone cannot answer (myne-md/myne#792 follow-up).
+  // `enrolled` alone cannot answer (myne-md/myne#792 follow-up). It is re-probed
+  // whenever the shared store changes, so a lock or forget taken in the member
+  // roster re-derives the block here instead of leaving a mount-time snapshot
+  // claiming the identity is still unlocked (myne-md/myne#831 review).
   const [person, setPerson] = useState<PersonStatusView | null>(null);
-  useEffect(() => {
-    let alive = true;
+  const probePerson = useCallback(() => {
     void personStatus()
-      .then((s) => {
-        if (alive) setPerson(s);
-      })
+      .then((s) => setPerson(s))
       .catch(() => {});
-    return () => {
-      alive = false;
-    };
   }, []);
+  useEffect(() => {
+    probePerson();
+  }, [probePerson, identityReady, identityOwnerCode]);
   // After the identity dialog recovers or creates an identity, the session now
   // holds it. Reflect that in the shared identity store (the roster's unlock gate
   // reads it, and without this it stayed on the phrase grid) and kick one cycle
@@ -154,10 +160,7 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   }, [syncNow]);
   // A device holds an identity if it enrolled a token OR sealed a keypair it can
   // still recover (#780): the latter means "you have an identity, recover it",
-  // not "add one". Merged with the shared identity store so an unlock done
-  // through the member roster below (which writes that store) reflects here
-  // without waiting for a re-probe (myne-md/myne#792 review).
-  const { ready: identityReady, ownerCode: identityOwnerCode } = usePersonIdentityState();
+  // not "add one".
   const hasIdentity =
     identityReady ||
     identityOwnerCode != null ||
@@ -201,15 +204,33 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   const [termsOpen, setTermsOpen] = useState(false);
   // The later-add identity door (myne-md/myne#768).
   const [identityOpen, setIdentityOpen] = useState(false);
+  // The inline session unlock of an existing identity (myne-md/myne#831): the
+  // member roster no longer carries a second phrase grid, so this is the one
+  // surface, and the status indicator opens it too.
+  const [identityUnlockOpen, setIdentityUnlockOpen] = useState(false);
+  // The device-join QR dialog (myne-md/myne#831): an icon in the Devices header
+  // rather than a full-width block.
+  const [qrOpen, setQrOpen] = useState(false);
   // The identity-code copy outcome, for the icon-chip + inline line
   // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
   const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
     "success" | "error" | null
   >(null);
+  // Any child ModalShell this panel mounts must stand the Settings shell's
+  // Escape/keys down while it is up (myne-md/myne#831 added the QR dialog;
+  // IdentitySetupDialog was the same latent gap). ModalShell calls
+  // `preventDefault` but does not stop propagation, so without this Escape
+  // closed the whole Settings modal as well as the child.
+  // The member roster owns child dialogs of its own (invite, remove) and reports
+  // them here rather than straight to the shell, so this panel stays the ONE
+  // writer of the shell's flag and last-writer-wins cannot clear it while a
+  // dialog is still up (myne-md/myne#831 review).
+  const [rosterDialogOpen, setRosterDialogOpen] = useState(false);
+  const childModalOpen = termsOpen || identityOpen || qrOpen || rosterDialogOpen;
   useEffect(() => {
-    onDialogOpenChange?.(termsOpen);
+    onDialogOpenChange?.(childModalOpen);
     return () => onDialogOpenChange?.(false);
-  }, [termsOpen, onDialogOpenChange]);
+  }, [childModalOpen, onDialogOpenChange]);
   // Still roster-derived, because it asks something status cannot: the QR
   // invite is only meaningful for a device the ACCOUNT lists as an approved
   // member, and only the roster knows that.
@@ -425,11 +446,19 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
               <p style={HELPER_STYLE}>{t("sync.panel.identity.helper")}</p>
               <Button
                 variant="secondary"
+                style={{ alignSelf: "flex-start" }}
                 onClick={() => setIdentityOpen(true)}
                 data-testid="sync.panel.add-identity"
               >
                 {t("sync.panel.identity.cta")}
               </Button>
+              {/* Derive the identity from an existing phrase without a server
+                  round trip; the dialog above can only recover with an
+                  endpoint, because it registers the person account. */}
+              <PersonIdentityUnlock
+                open={identityUnlockOpen}
+                onOpenChange={setIdentityUnlockOpen}
+              />
             </>
           ) : identityUnlocked ? (
             <p style={HELPER_STYLE} data-testid="sync.panel.identity-unlocked">
@@ -441,9 +470,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
                 {t("sync.panel.identity.lockedHelper")}
               </p>
               {/* Identity box with its actions inline, matching the
-                  sync-server row: the copy chip and the unlock button sit at
-                  the end of the box rather than on their own full-width row
-                  (myne-md/myne#818). */}
+                  sync-server row: the copy chip sits at the end of the box
+                  rather than on its own full-width row (myne-md/myne#818).
+                  The unlock is the inline phrase entry below, the ONE surface
+                  for it since the member roster's grid was removed
+                  (myne-md/myne#831). */}
               <div
                 style={{
                   display: "flex",
@@ -476,14 +507,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
                     testId="sync.panel.copy-identity"
                   />
                 ) : null}
-                <Button
-                  variant="secondary"
-                  onClick={() => setIdentityOpen(true)}
-                  data-testid="sync.panel.unlock-identity"
-                >
-                  {t("sync.status.unlockIdentityCta")}
-                </Button>
               </div>
+              <PersonIdentityUnlock
+                open={identityUnlockOpen}
+                onOpenChange={setIdentityUnlockOpen}
+              />
             </>
           )}
         </div>
@@ -498,7 +526,11 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
-        <SyncStatusIndicator onUnlockIdentity={() => setIdentityOpen(true)} />
+        <SyncStatusIndicator
+          onUnlockIdentity={
+            hasCapability("memberSharing") ? () => setIdentityUnlockOpen(true) : undefined
+          }
+        />
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
@@ -563,6 +595,8 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         onCreated={handleIdentityCreated}
       />
 
+      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
+
       {/* What that form is replaced BY for a device that is already waiting
           (MYND-635). Stating the situation rather than offering an action,
           because there is no action to take here: approval happens on another
@@ -585,7 +619,28 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
-        <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
+        {/* The device-join QR is an icon in this header rather than a
+            full-width block below (myne-md/myne#831). Only an already-enrolled
+            device can invite another by showing one. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
+          {enrolledHere ? (
+            <Tooltip label={t("sync.deviceJoinQr.title")}>
+              <IconButton
+                icon="plus"
+                label={t("sync.deviceJoinQr.title")}
+                onClick={() => setQrOpen(true)}
+                testId="sync.device-join-qr.open"
+              />
+            </Tooltip>
+          ) : null}
+        </div>
         <DeviceManagementPanel hook={devicesHook} />
       </div>
 
@@ -600,16 +655,9 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
       {hasCapability("memberSharing") ? (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.members" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>{t("sync.memberRoster.title")}</span>
-          <MemberRosterPanel onDialogOpenChange={onDialogOpenChange} />
+          <MemberRosterPanel onDialogOpenChange={setRosterDialogOpen} />
         </div>
       ) : null}
-
-      {/* An enrolled device can invite another by showing a QR (MYND-466). */}
-      {enrolledHere && (
-        <div style={BLOCK_STYLE}>
-          <DeviceJoinQr />
-        </div>
-      )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.conflicts" data-setting-row="true">
         <span style={SECTION_TITLE_STYLE}>

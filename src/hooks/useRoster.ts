@@ -2,15 +2,14 @@
 // The vault member roster (myne-md/myne#698, b2b-identity-substrate task 9).
 // Lists the members of the unlocked shared vault from the membership roster
 // extension, drives the invite flow, and drives member removal. The invite
-// path needs the person identity held backend-side (`personUnlock`), so the
-// hook never sends a private seed across IPC.
+// path needs the person identity held backend-side (unlocked in the Sync
+// panel's Identity block), so the hook never sends a private seed across IPC.
 import { useCallback, useEffect, useState } from "react";
 import {
   listRoster,
   listVaultInvites,
   personCreateInvite,
   personLock,
-  personUnlock,
   removeMember,
   type InviteCommandView,
   type RosterMemberView,
@@ -31,8 +30,8 @@ export interface RosterHook {
   loading: boolean;
   error: string | null;
   reload: () => void;
-  /** Person identity lifecycle: unlock from the phrase (once per process). */
-  unlockPerson: typeof personUnlock;
+  /** Person identity lifecycle: lock (the unlock lives in the Sync panel's
+   *  Identity block, myne-md/myne#831). */
   lockPerson: typeof personLock;
   inviting: boolean;
   lastInvite: InviteCommandView | null;
@@ -168,7 +167,6 @@ export function useRoster(personReady: boolean): RosterHook {
     loading,
     error,
     reload,
-    unlockPerson: personUnlock,
     lockPerson: personLock,
     inviting,
     lastInvite,

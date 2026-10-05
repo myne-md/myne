@@ -26,6 +26,10 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
 }));
 
 import { getToasts, resetToasts } from "../../src/components/toast/toastStore";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
 function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
@@ -36,10 +40,12 @@ function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
 beforeEach(() => {
   invokeMock.mockReset();
   writeTextMock.mockReset().mockResolvedValue(undefined);
+  resetPersonIdentityState();
   resetToasts();
 });
 afterEach(() => {
   cleanup();
+  resetPersonIdentityState();
   vi.clearAllMocks();
 });
 
@@ -64,10 +70,10 @@ describe("the Identity block, per device identity state", () => {
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
     const code = screen.getByTestId("sync.panel.identity-code") as HTMLInputElement;
     expect(code.value).toBe("MYNE-PERSON-1:deadbeef");
-    // The copy chip sits beside the code, and the unlock action is inline on the
-    // same row (myne-md/myne#818).
+    // The copy chip sits beside the code; the unlock is the inline phrase
+    // entry below the row (myne-md/myne#831).
     expect(screen.getByTestId("sync.panel.copy-identity")).toBeTruthy();
-    expect(screen.getByTestId("sync.panel.unlock-identity")).toBeTruthy();
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
     // The Add CTA is not shown; the identity already exists.
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
   });
@@ -84,7 +90,7 @@ describe("the Identity block, per device identity state", () => {
     });
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-unlocked")).toBeTruthy());
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
-    expect(screen.queryByTestId("sync.panel.unlock-identity")).toBeNull();
+    expect(screen.queryByTestId("sync.panel.identity-unlock")).toBeNull();
   });
 
   it("treats a sealed-but-unenrolled identity as 'recover', not 'add'", async () => {
@@ -142,5 +148,37 @@ describe("the Identity block, per device identity state", () => {
     });
     await waitFor(() => expect(getToasts().at(-1)?.variant).toBe("error"));
     expect(getToasts().at(-1)?.message).toBe("Couldn't copy the identity code");
+  });
+
+  it("re-derives the locked branch after the identity is locked from the roster", async () => {
+    // The roster's Lock identity clears the shared store; the block must
+    // re-probe rather than keep its mount-time snapshot claiming unlocked, or
+    // the only unlock surface is gone until Settings is reopened
+    // (myne-md/myne#831 review).
+    let unlocked = true;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_person_status") {
+        return {
+          enrolled: true,
+          identity_unlocked: unlocked,
+          person_id_hex: "11".repeat(16),
+          identity_code: "MYNE-PERSON-1:deadbeef",
+          sealed_keypair_present: true,
+        };
+      }
+      return syncPanelCommandRouter({ syncState: "idle" })(cmd);
+    });
+    // A held, unlocked identity implies the shared store is seeded.
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:deadbeef" });
+    renderSyncPanel();
+    await waitFor(() => expect(screen.getByTestId("sync.panel.identity-unlocked")).toBeTruthy());
+
+    unlocked = false;
+    await act(async () => {
+      setPersonIdentityState({ ready: false, ownerCode: null });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
   });
 });

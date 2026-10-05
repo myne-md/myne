@@ -9,7 +9,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { resetPersonIdentityState } from "../../src/components/sync/personIdentityState";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 let personReady = false;
@@ -33,31 +36,19 @@ vi.mock("../../src/hooks/useFocusTrap", () => ({
 }));
 
 import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
-import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
 
 const inviteCalls = () =>
   invokeMock.mock.calls.filter(([command]) => command === "plugin:sync|sync_list_vault_invites").length;
 const migrationCalls = () =>
   invokeMock.mock.calls.filter(([command]) => command === "plugin:sync|sync_start_b2b_migration").length;
 
-function fillPhrase(): void {
-  for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
-    fireEvent.change(
-      screen.getByTestId(
-        index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`,
-      ),
-      { target: { value: index === 0 ? "abandon" : "about" } },
-    );
-  }
-}
-
+/** The panel reads the shared identity store; the Sync panel's Identity block
+ *  is what actually unlocks it (myne-md/myne#831), so the fixture seeds the
+ *  store rather than driving a phrase grid this panel no longer owns. */
 async function unlockPerson(): Promise<void> {
-  await screen.findByTestId("member-roster.person-unlock");
-  // The phrase grid is collapsed by default; reveal it, then fill it.
-  fireEvent.click(screen.getByTestId("member-roster.person-unlock-open"));
-  fillPhrase();
+  personReady = true;
   await act(async () => {
-    fireEvent.click(screen.getByTestId("member-roster.person-unlock-button"));
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:owner" });
   });
   await screen.findByTestId("member-roster.person-ready");
 }
@@ -70,14 +61,6 @@ beforeEach(() => {
   invokeMock.mockImplementation(async (command: string) => {
     if (command === "plugin:sync|sync_list_roster") {
       return { members: [], authority: "owner", group_key_epoch: groupKeyEpoch };
-    }
-    if (command === "plugin:sync|sync_person_unlock") {
-      personReady = true;
-      return {
-        fingerprint_hex: "00".repeat(32),
-        person_id_hex: "11".repeat(16),
-        identity_code: "MYNE-PERSON-1:owner",
-      };
     }
     if (command === "plugin:sync|sync_person_lock") return undefined;
     if (command === "plugin:sync|sync_start_b2b_migration") return { group_key_epoch: 1, singletons_migrated: 0 };
@@ -143,7 +126,6 @@ describe("MemberRosterPanel invitation loading gate", () => {
     render(<MemberRosterPanel />);
 
     await screen.findByTestId("member-roster.person-ready");
-    expect(screen.queryByTestId("member-roster.phrase-input")).toBeNull();
     expect((screen.getByTestId("member-roster.owner-code") as HTMLInputElement).value).toBe(
       "MYNE-PERSON-1:owner",
     );

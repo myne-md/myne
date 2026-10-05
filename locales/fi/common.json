@@ -4013,7 +4013,6 @@
       "invitationPending": "Ei hyväksytty vielä",
       "invitationsFailed": "Kutsujasi ei voitu ladata.",
       "title": "Valtiointin jäsenet",
-      "personHint": "Avaa jäsenidentiteettisi palautusfraasilla.",
       "personUnlock": "Avaa jäsenidentiteetti",
       "personReady": "Jäsenidentiteetti avattu.",
       "ownerCodeHint": "Jaa tämä koodi henkilölle, jonka kutsut, jotta he voivat vahvistaa, että valtiointi on sinun. Se sisältää vain julkista tietoa.",

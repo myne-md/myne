@@ -4013,7 +4013,6 @@
       "invitationPending": "Nog niet geaccepteerd",
       "invitationsFailed": "Je uitnodigingen konden niet worden geladen.",
       "title": "Kuisleden",
-      "personHint": "Ontgrendel je lididentiteit met je herstelzin.",
       "personUnlock": "Lididentiteit ontgrendelen",
       "personReady": "Lididentiteit ontgrendeld.",
       "ownerCodeHint": "Deel deze code met de persoon die je uitnodigt zodat hij kan verifiëren dat de kluis van jou is. Hij bevat alleen publieke informatie.",
