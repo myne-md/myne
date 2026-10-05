@@ -44,6 +44,14 @@ pub enum QuickUnlockError {
     /// Biometric hardware / OS facility unavailable on this device.
     #[error("biometric hardware unavailable")]
     HardwareUnavailable,
+    /// The OS refused the biometric store with `errSecAuthFailed`, so a
+    /// biometric credential could not be created. Most often no biometric is
+    /// enrolled, but the status is broad, so the copy names the likely remedy
+    /// rather than asserting the cause. Distinct from
+    /// [`QuickUnlockError::HardwareUnavailable`] (this BUILD cannot use the
+    /// facility at all). myne-md/myne#830.
+    #[error("biometric authentication failed")]
+    BiometricAuthFailed,
     /// The PIN / biometric did not reproduce the wrap key — the blob did not
     /// decrypt. `remaining` attempts before the credential is wiped. Deliberately
     /// non-distinguishing (wrong PIN vs tampered blob).
@@ -78,6 +86,7 @@ impl From<ProviderError> for QuickUnlockError {
         match e {
             ProviderError::UserCancelled => QuickUnlockError::Cancelled,
             ProviderError::HardwareUnavailable => QuickUnlockError::HardwareUnavailable,
+            ProviderError::BiometricAuthFailed => QuickUnlockError::BiometricAuthFailed,
             ProviderError::CredentialMissing => QuickUnlockError::NotConfigured,
             ProviderError::Backend => QuickUnlockError::Backend,
         }

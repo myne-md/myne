@@ -5,10 +5,10 @@
 //
 // What this proves that the component test cannot: the block renders in the
 // REAL app in its empty state, and it flips to "unlocked" after the identity is
-// unlocked through the member roster BELOW it in the same panel. That flip is
-// the reason the block subscribes to the shared person-identity store rather
-// than a mount-time probe (myne-md/myne#792 review): the locked -> unlocked
-// transition has to be visible without reopening Settings.
+// unlocked through the block's own inline phrase entry. That flip is the reason
+// the block subscribes to the shared person-identity store rather than a
+// mount-time probe (myne-md/myne#792 review): the locked -> unlocked transition
+// has to be visible without reopening Settings.
 //
 // The block's LOCKED state (the held identity's public code plus an unlock
 // action, on an `NTV6` vault whose identity is not held this session) is covered
@@ -52,16 +52,19 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
         // empty state (before this change the whole block was absent).
         await app.session.byTestId("sync.panel.add-identity", { timeoutMs: 10_000 });
 
-         // Unlock the identity through the member roster below.
+         // Unlock the identity through the block's own inline phrase entry
+         // (moved here from the member roster, myne-md/myne#831).
          await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
-         // The recovery-phrase grid is collapsed by default (myne#796).
-         await (await app.session.byTestId("member-roster.person-unlock-open")).click();
+         // The recovery-phrase grid is collapsed by default.
+         await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
          for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
-            index === 0 ? "member-roster.phrase-input" : `member-roster.phrase-cell-${index + 1}`;
+            index === 0
+              ? "sync.panel.identity-unlock.phrase-input"
+              : `sync.panel.identity-unlock.phrase-cell-${index + 1}`;
           await (await app.session.byTestId(testId)).replaceText(word);
         }
-        await (await app.session.byTestId("member-roster.person-unlock-button")).click();
+        await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
         await app.session.byTestId("member-roster.person-ready");
 
         // The block reflects the unlock through the shared store, without a

@@ -41,6 +41,8 @@ import { AuthShell } from "@app/screens/AuthShell";
 import { ChoiceRow } from "@app/components/ChoiceList";
 import { PhraseGrid } from "@app/components/PhraseGrid";
 import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
+import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
+import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
 import { EnrollPhraseCredential } from "@app/components/sync/EnrollPhraseCredential";
@@ -1407,5 +1409,19 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "SecretDisplayCaveats",
     state: "default",
     render: () => <SecretDisplayCaveats testIdPrefix="stories.secret" />,
+  },
+  {
+    id: "components/devicejoinqrdialog/default",
+    group: "components",
+    surface: "DeviceJoinQrDialog",
+    state: "default",
+    render: () => <DeviceJoinQrDialog open onClose={noop} />,
+  },
+  {
+    id: "components/personidentityunlock/default",
+    group: "components",
+    surface: "PersonIdentityUnlock",
+    state: "default",
+    render: () => <PersonIdentityUnlock open onOpenChange={noop} />,
   },
 ];
