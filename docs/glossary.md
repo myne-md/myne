@@ -2593,6 +2593,18 @@ Stamped on `<field>/<entry>` in the [field clock](#field-clock) map for the thre
 
 Used in: `spec/sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; myne-md/myne#613
 
+### **recovery kit** &nbsp; 📦 *Product*
+
+The single saveable artifact handed over at vault creation, carrying both the 24-word [recovery phrase](#recovery-phrase) and the vault's [account number](#account_number) (myne-md/myne#468). Before this the phrase and the account number were separate steps; the kit presents them together as plain text to save or copy, and the user's one acknowledgement covers the whole sheet. The account number identifies the vault for a second device and is never stored or re-displayed on the device itself, so creation is the only point at which it can be captured. The phrase and the account number landing in one artifact is a deliberate concentration and the reason `threat-model.md` TB3 records it: each alone is insufficient, the pair is account takeover.
+
+Used in: `spec/recovery-flow.md` §2.2, `decisions/ui/0642`, `threat-model.md` TB3
+
+### **recovery drill** &nbsp; 📦 *Product*
+
+The read-only check that a saved recovery phrase still opens the vault that is open now (myne-md/myne#468). It derives `recovery_wrap_key` from the entered phrase, attempts the AEAD-open of `enc_root_key_recovery`, discards the derived key, and answers a boolean. It performs no slot transition and writes nothing, so it is not a recovery: a caller who is only checking is not forced through a password reset. It is unlock-gated and rides the shared `auth_permits` budget, which is what bounds it as a verification oracle, since a caller with an unlocked vault already holds the plaintext. On the web client it is the second place the phrase is entered, alongside a user-started recovery, which is why it amends A18 (`decisions/security/0645`).
+
+Used in: `spec/recovery-flow.md` §3.6, `decisions/security/0640`, `decisions/security/0645`, `threat-model.md` A18
+
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as Myne's secondary credential for vault unlock. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation** — that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
