@@ -11,6 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readTitleFromFmBody } from "../../src/dialect";
+import { extractWikilinks } from "../../src/dialect/visitors/wikilinks";
 import {
   buildWelcomeNoteMarkdown,
   WELCOME_NOTE_BODY_KEY,
@@ -62,7 +63,50 @@ describe("WELCOME_NOTE_MARKDOWN (MYND-118)", () => {
   });
 
   it("has no dead wikilink and no 'broken link' framing", () => {
-    expect(WELCOME_NOTE_MARKDOWN).not.toContain("[[");
+    // Asserted through the PARSER rather than as a string match on `[[`
+    // (myne-md/myne#468). The invariant is what this test's own name says: a lone
+    // Welcome note has no sibling to link to, so any wikilink in it resolves to
+    // nothing and renders with the §5.3 broken-link styling on a user's first
+    // screen.
+    //
+    // `not.toContain("[[")` was the proxy for that, and it is stricter than the
+    // rule: it also forbids TEACHING the syntax, which the note now does in a
+    // code span — and the parser does not see `[[` inside one, so there is no
+    // link to break. (Measured, not assumed: `extractWikilinks("Type `[[` …")`
+    // returns an empty list.) The desktop's example vault teaches it the same
+    // way, in `notes.example.links.body`.
+    expect(extractWikilinks(WELCOME_NOTE_MARKDOWN)).toEqual([]);
     expect(WELCOME_NOTE_MARKDOWN.toLowerCase()).not.toContain("broken");
+  });
+
+  it("the parser check is not a weaker check", () => {
+    // Non-vacuity for the assertion above, and the reason it is a separate test:
+    // `toEqual([])` passes on any input the parser refuses to read, so on its own
+    // it would also pass if `extractWikilinks` were broken or the note were empty.
+    // A REAL wikilink in the same note body must be found.
+    const withOne = WELCOME_NOTE_MARKDOWN.replace(
+      "To learn more",
+      "See [[Reading list]]. To learn more",
+    );
+    expect(extractWikilinks(withOne).map((w) => w.target)).toEqual(["Reading list"]);
+  });
+
+  it("teaches linking, and says what a backlink does", () => {
+    // The strongest thing Myne does that a plain text editor does not, and the
+    // note said nothing about it (myne-md/myne#468). The syntax is not
+    // translated; the sentences around it are.
+    expect(WELCOME_NOTE_MARKDOWN).toContain("`[[`");
+    expect(WELCOME_NOTE_MARKDOWN.toLowerCase()).toContain("backlink");
+  });
+
+  it("does not greet the reader", () => {
+    // `PRODUCT.md` refuses "Welcome back, friend!" copy by name, and this note
+    // closed on "We're glad you're here." — the same move one degree quieter.
+    // The register is "careful engineer to careful engineer": the note can say
+    // what the app does and where to read more, and has no business being pleased.
+    const lower = WELCOME_NOTE_MARKDOWN.toLowerCase();
+    for (const greeting of ["glad you", "we're excited", "thanks for", "enjoy!"]) {
+      expect(lower, `the note greets the reader: "${greeting}"`).not.toContain(greeting);
+    }
   });
 });

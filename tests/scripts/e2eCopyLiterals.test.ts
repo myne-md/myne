@@ -61,8 +61,18 @@ function literalIn(specPath: string, name: string): string {
 const PAIRS: ReadonlyArray<{ spec: string; name: string; key: string }> = [
   {
     spec: "e2e/clipboard-copy.e2e.ts",
-    name: "PHRASE_COPIED",
-    key: "vaultCreation.phrase.copied",
+    name: "KIT_COPIED",
+    key: "vaultCreation.kit.copied",
+  },
+  {
+    // Asserted by equality in the same scenario and with the same staleness
+    // failure, and it had no row until myne-md/myne#468 renamed it: the sweep
+    // below was scoped to `*_COPIED`, so the SAVE literal was hand-copied from
+    // the catalog and compared to it by nothing. Widening the scope is what
+    // found that, rather than anybody noticing.
+    spec: "e2e/clipboard-copy.e2e.ts",
+    name: "KIT_SAVED",
+    key: "vaultCreation.kit.savedToFile",
   },
   {
     spec: "e2e/clipboard-copy.e2e.ts",
@@ -89,20 +99,25 @@ describe("E2E copy literals track the catalog", () => {
     });
   }
 
-  it("covers every copy-outcome literal the spec declares", () => {
+  it("covers every copy- and save-outcome literal the spec declares", () => {
     // Non-vacuity: a new `const X_COPIED = "..."` added to the spec without a
     // row above would otherwise be unchecked, and this file would still pass
     // while the thing it exists to prevent came back.
     //
-    // Scoped to `*_COPIED` rather than every SCREAMING_CASE string const,
-    // because the spec also holds test INPUTS (a fixture password), and a
+    // Scoped to `*_COPIED` and `*_SAVED` rather than every SCREAMING_CASE string
+    // const, because the spec also holds test INPUTS (a fixture password), and a
     // sweep that demanded a catalog key for those would be a check nobody could
     // satisfy. The first version did exactly that and failed on `PASSWORD`,
     // which is how this scope got argued for rather than assumed.
+    //
+    // `_SAVED` joined in myne-md/myne#468. It belongs for the same reason
+    // `_COPIED` does — same scenario, same equality assertion, same timeout when
+    // it goes stale — and its absence was not a decision, it was the shape of
+    // the first version: only the copy half existed when this file was written.
     const src = readFileSync(join(ROOT, "e2e/clipboard-copy.e2e.ts"), "utf8");
-    const declared = [...src.matchAll(/const\s+([A-Z][A-Z0-9_]*_COPIED)\s*=\s*\n?\s*"/g)].map(
-      (m) => m[1],
-    );
+    const declared = [
+      ...src.matchAll(/const\s+([A-Z][A-Z0-9_]*_(?:COPIED|SAVED))\s*=\s*\n?\s*"/g),
+    ].map((m) => m[1]);
     expect(declared.length, "the sweep must find the literals it is scoped to").toBeGreaterThan(0);
     const covered = new Set(PAIRS.map((p) => p.name));
     expect(

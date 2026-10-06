@@ -37,7 +37,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewMenuItem,
+  clickNewItem,
   nameNewNote,
   createNote,
   dismissImporterOffer,
@@ -143,7 +143,7 @@ async function menuOffers(
  *  folder a value the driver types faithfully (a driver limitation, not a
  *  product one). */
 async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewMenuItem(s, "notes.new-folder");
+  await clickNewItem(s, "notes.new-folder");
   // `` is the W3C Enter code point — it commits the inline new-folder
   // input. Without it the input never materializes `notes.folder-row` and the
   // next line times out (the nc4 site in notes.e2e.ts carries the same key).

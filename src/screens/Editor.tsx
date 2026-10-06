@@ -24,6 +24,7 @@
 //   - Mockup (structural reference only, NOT copied):
 //     docs/design/ui_kits/desktop/Editor.jsx
 
+import { recordCommandRun } from "../lib/commandRecency";
 import {
   lazy,
   Suspense,
@@ -45,6 +46,7 @@ import {
   shouldMirrorSelection,
   shouldOpenIntoFocusedPane,
 } from "../notes/selectionBridges";
+import { openCommandForKind } from "../notes/tabKinds";
 import { CommandPalette } from "../components/CommandPalette";
 import { LeftRibbon } from "../notes/components/LeftRibbon";
 import { ribbonCommands } from "../notes/ribbonCommands";
@@ -102,7 +104,6 @@ import {
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
-import { TemplatesManager } from "../components/TemplatesManager";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
@@ -181,6 +182,7 @@ import {
 } from "../notes/components/NoteActionsMenu";
 import { dragEdgeX, insertionLineStyleX } from "../notes/components/reorderDnd";
 import {
+  BAR_ITEMS,
   RIGHT_CLUSTER_DEFAULT_ORDER,
   resolveBarOrder,
   reorderByDrop,
@@ -256,15 +258,14 @@ import {
   HAS_OVERLAY_WINDOW_CONTROLS,
   TITLE_BAR_CONTROL_HEIGHT,
   TITLE_BAR_CONTROL_TOP,
+  TITLE_BAR_RIGHT_EDGE,
   TRAFFIC_LIGHT_GAP,
   dragRegionProps,
 } from "./titlebar";
 import { useIsFullscreen } from "../hooks/useIsFullscreen";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
-import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
-import { CenterViewProvider, type CenterView } from "./centerView";
 import {
   WorkspaceProvider,
   panesNotSettledMessage,
@@ -357,18 +358,6 @@ function useVimMode(): string | null {
   }, []);
   return mode;
 }
-
-const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
-  { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
-  { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
-  { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
-  { id: "tags", labelKey: "editor.chrome.barItems.tags" },
-  { id: "views", labelKey: "editor.chrome.barItems.views" },
-  { id: "settings", labelKey: "editor.chrome.barItems.settings" },
-  { id: "lock", labelKey: "editor.chrome.barItems.lock" },
-  { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
-  { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
-];
 
 // There is deliberately NO left cluster and NO graph launcher here any more.
 // myne-md/myne#396 asked for a bottom-left launcher and this branch shipped one;
@@ -840,9 +829,13 @@ function EditorChrome({
   // Panel Settings should open on (myne-md/myne#699): the left ribbon's
   // "Customize ribbon…" asks for Appearance; every other entry point clears it.
   const [settingsPanel, setSettingsPanel] = useState<PanelId | null>(null);
+  // The setting to land ON, not merely the panel it lives in. A panel is nine
+  // blocks tall and "Customize ribbon…" used to drop the user at the top of it.
+  const [settingsAnchor, setSettingsAnchor] = useState<string | null>(null);
   const openSettings = useCallback(
-    (panel: PanelId | null = null) => {
+    (panel: PanelId | null = null, anchor: string | null = null) => {
       setSettingsPanel(panel);
+      setSettingsAnchor(anchor);
       setSettingsOpen(true);
     },
     [setSettingsOpen],
@@ -850,7 +843,8 @@ function EditorChrome({
   // The rail is a sibling subtree, so its right-click entry reaches Settings
   // through the service locator.
   useEffect(() => {
-    ribbonCommands.customizeRibbon = () => openSettings("appearance");
+    ribbonCommands.customizeRibbon = () =>
+      openSettings("appearance", "appearance.ribbon");
     return () => {
       ribbonCommands.customizeRibbon = undefined;
     };
@@ -994,7 +988,6 @@ function EditorChrome({
     [showExportToast, confirmAttachments, confirmPdfExclusions, confirmEgress],
   );
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
-  const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
   // Whole-vault markdown export modal (MYND-211 task 3) - same Editor-local
@@ -1120,7 +1113,6 @@ function EditorChrome({
   const onReadout = useCallback((r: PaneReadout) => setReadout(r), []);
   // MYND-170 (SYNC-9): which surface the center pane shows. The shell +
   // sidebars persist; only this region swaps.
-  const [centerView, setCenterView] = useState<CenterView>("editor");
 
   // Resizable/collapsible sidebar layout (MYND-137). Widths + collapse
   // flags are persisted to vault.prefs and clamped on load; `rowRef`
@@ -1233,7 +1225,6 @@ function EditorChrome({
   // controls that were not there and its caret floated a control's width off the
   // right edge (myne-md/myne#727).
   const topRightFloatsShown = topRightFloats({
-    centerView,
     focusedTabKind: ws.focusedLeaf.activeTab?.kind,
     pendingNewTabPaneId: ws.pendingNewTabPaneId,
     focusedPaneId: ws.focusedPaneId,
@@ -1335,14 +1326,10 @@ function EditorChrome({
   // mutually exclusive in the active highlight - opening one deactivates the
   // other. Skips the initial mount so a fresh editor doesn't redundantly
   // re-assert "editor" (it already starts there).
-  const selectionInitRef = useRef(true);
-  useEffect(() => {
-    if (selectionInitRef.current) {
-      selectionInitRef.current = false;
-      return;
-    }
-    setCenterView("editor");
-  }, [ctx.selectedId]);
+  // Selecting a note used to have to swap the center view back to the editor,
+  // because the attachment library replaced the whole pane tree. As a tab it
+  // does not: `ctx.open` puts the note in the focused pane, which IS the way
+  // back (myne-md/myne#773).
 
   // MYND-173: the generic file-card's "Reveal in library" action fires a window
   // event (the card lives in a CM6 widget, outside React). Open the attachments
@@ -1350,10 +1337,10 @@ function EditorChrome({
   // question) - this opens the library unfocused, which is the sanctioned
   // first-cut fallback.
   useEffect(() => {
-    const onReveal = () => setCenterView("attachments");
+    const onReveal = () => ws.openAttachments();
     window.addEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
     return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
-  }, []);
+  }, [ws]);
 
   // MYND-424: the background sync loop emits `sync://changed` after writing
   // pulled notes to disk. Reload the sidebar + the open note so incoming edits
@@ -2210,10 +2197,6 @@ function EditorChrome({
     deleteWorkspace(snapshot.activeId);
   }, [ws, deleteWorkspace]);
 
-  const centerViewValue = useMemo(
-    () => ({ view: centerView, setView: setCenterView }),
-    [centerView],
-  );
 
   // myne#681 task 2 (SYNC-11): terminal "deleted elsewhere" state for a detached
   // window whose note was deleted from another surface. Every hook above has run,
@@ -2256,7 +2239,6 @@ function EditorChrome({
   }
 
   return (
-    <CenterViewProvider value={centerViewValue}>
     <div
       data-focus-active={focusActive ? "true" : undefined}
       // focus-mode (MYND-348): dim / typewriter gates = focus active && the pref
@@ -2312,7 +2294,18 @@ function EditorChrome({
         {/* Left ribbon (myne-md/myne#699): a far-left icon column independent of
             the notes sidebar, so collapsing the tree does not hide it. Hidden in
             focus mode and under the width-forced collapse. */}
-        <LeftRibbon hidden={focusActive || detached || forced.forceLeftCollapsed} />
+        <LeftRibbon
+          hidden={focusActive || detached || forced.forceLeftCollapsed}
+          // Derived from the FOCUSED TAB, never from rail-local state
+          // (myne-md/myne#773). The rail had no active state at all before
+          // this, which is why pressing Attachments and pressing Graph left it
+          // looking identical — on the one column that is always visible.
+          currentCommandId={
+            ws.focusedLeaf.activeTab === null
+              ? undefined
+              : openCommandForKind(ws.focusedLeaf.activeTab.kind)
+          }
+        />
         <SidebarBootstrap />
         {/* Always mounted (even when collapsed) so the width collapse/expand
             animates instead of popping - SidebarPane drives the width 0↔open
@@ -2354,7 +2347,6 @@ function EditorChrome({
                 switching={switching}
               />
               <NotesSidebarList
-                onNewFromTemplate={() => setNewFromTemplateOpen(true)}
                 exportHooks={exportHooks}
               />
             </div>
@@ -2382,78 +2374,29 @@ function EditorChrome({
             flexDirection: "column",
           }}
         >
-        {centerView === "attachments" ? (
-          // Attachments is a full-center view with no tab strip; give it a
-          // matching drag-region clearance row so its toolbar clears the
-          // floated toggles + traffic lights.
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              // Allow this column to shrink below content height so the nested
-              // AttachmentsLibrary scroll area is bounded (flexbox min-height
-              // trap - the strip is fixed, the library fills + scrolls).
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              {...dragRegionProps()}
-              style={{
-                height: STRIP_HEIGHT,
-                flexShrink: 0,
-                background: "var(--paper-2)",
-                borderBottom: "1px solid var(--line-1)",
-                display: "flex",
-                alignItems: "center",
-                // Clear the floated left toggle + traffic lights when the left
-                // sidebar is collapsed (they float over this pane's top-left).
-                paddingInlineStart: leftCollapsed ? leftClearance : "var(--space-4)",
-                paddingInlineEnd: "var(--space-4)",
-              }}
-            >
-              {/* The Attachments title rides the top clearance/tab-strip row so
-                  it reads as the surface's header, with the row's border between
-                  it and the toolbar below. */}
-              <span
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 15,
-                  fontWeight: "var(--weight-semibold)",
-                  color: "var(--fg-1)",
-                }}
-              >
-                {t("attachments.library.title")}
-              </span>
-            </div>
-            <AttachmentsLibrary onClose={() => setCenterView("editor")} />
-          </div>
-        ) : (
-          <PaneTree
-            node={ws.root}
-            focusedPaneId={ws.focusedPaneId}
-            onReadout={onReadout}
-            leftInset={leftCollapsed ? leftClearance : 0}
-            // The clearance is reserved for the two controls that FLOAT in the
-            // top-right corner, so it is only owed when they are there. On a
-            // non-note tab (the graph, the task list, a saved view) neither is
-            // rendered, there is no note for either to act on, and reserving
-            // their room anyway left the tab strip's caret sitting a control's
-            // width off the right edge with empty space beside it
-            // (myne-md/myne#727). The strip's padding already transitions on the
-            // sidebar's own curve, so the caret slides rather than jumping when
-            // the focused tab changes kind.
-            rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
-          />
-        )}
+        <PaneTree
+          node={ws.root}
+          focusedPaneId={ws.focusedPaneId}
+          onReadout={onReadout}
+          leftInset={leftCollapsed ? leftClearance : 0}
+          // The clearance is reserved for the two controls that FLOAT in the
+          // top-right corner, so it is only owed when they are there. On a
+          // non-note tab (the graph, the task list, a saved view) neither is
+          // rendered, there is no note for either to act on, and reserving
+          // their room anyway left the tab strip's caret sitting a control's
+          // width off the right edge with empty space beside it
+          // (myne-md/myne#727). The strip's padding already transitions on the
+          // sidebar's own curve, so the caret slides rather than jumping when
+          // the focused tab changes kind.
+          rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
+        />
         </div>
-        {centerView !== "attachments" &&
-          // Same condition as the right toggle: a non-note tab has no note for
-          // the backlinks/outline sidebar to describe, so it is not shown - and
-          // the sidebar can never be left open with its toggle gone
-          // (myne-md/myne#656 review).
-          ws.focusedLeaf.activeTab?.kind === "note" && (
+        {/* A non-note tab has no note for the backlinks/outline sidebar to
+            describe, so it is not shown - and the sidebar can never be left
+            open with its toggle gone (myne-md/myne#656 review). The attachment
+            library used to need a second clause here; as a tab its kind is
+            simply not "note" (myne-md/myne#773). */}
+        {ws.focusedLeaf.activeTab?.kind === "note" && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
@@ -2466,7 +2409,12 @@ function EditorChrome({
             resizeLabel={t("editor.chrome.resizeBacklinksSidebar")}
           >
             <RightSidebar
-              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSettings={(panel, anchor) =>
+                openSettings(
+                  (panel as PanelId | undefined) ?? null,
+                  anchor ?? null,
+                )
+              }
               onShowToast={(message) => showToastMessage(message)}
             />
           </SidebarPane>
@@ -2643,6 +2591,7 @@ function EditorChrome({
         vaultId={vaultId}
         open={settingsOpen}
         initialPanel={settingsPanel ?? undefined}
+        initialAnchor={settingsAnchor ?? undefined}
         onClose={() => setSettingsOpen(false)}
         onShowToast={showToastMessage}
         onForceRelock={onForceRelock}
@@ -2674,7 +2623,11 @@ function EditorChrome({
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
-        onShowToast={showToastMessage}
+        onOpenDrill={() => {
+          setBackupExportOpen(false);
+          openSettings("privacy", "privacy.recovery-drill");
+        }}
+        vaultId={vaultId}
       />
       <VaultExportModal
         open={vaultExportOpen}
@@ -2693,15 +2646,12 @@ function EditorChrome({
           and wins. Deferring only delays - the request stays latched and the
           dialog opens as soon as the offer is dismissed. */}
       <ThemeInstallDialog deferred={offerOpen} />
-      <TemplatesManager
-        open={templatesOpen}
-        onClose={() => setTemplatesOpen(false)}
-        onOpenNote={(id) => {
-          void ctx.open(id).catch(() => {
-            /* selection failure surfaces via sidebar UX */
-          });
-        }}
-      />
+      {/* TemplatesManager is NOT mounted here. On this branch it is a TAB TYPE
+          rendered by `PaneView` (`isTemplates`), so the modal carve-out moved
+          with it; mounting it here too would render two managers over one
+          "Manage templates…" action. Develop's editor-mounted copy is dropped,
+          and its #824 fix (refresh a just-created template into the cache
+          BEFORE opening it) is ported into PaneView's mount instead. */}
       <SnapshotsPanel
         open={snapshotsOpen}
         onClose={() => setSnapshotsOpen(false)}
@@ -2717,7 +2667,7 @@ function EditorChrome({
       <AiHydrationProbe />
       {/* First-run AI onboarding (myne-md/myne#805): offered once per device,
           after the first successful unlock. Gated on `localAi` as a whole: a
-          host with no AI at all (web, per `decisions/ai/0627`) renders nothing,
+          host with no AI at all (web, per `decisions/ai/0628`) renders nothing,
           rather than an opt-in and a Chat card whose provider setup that host
           cannot open. Desktop offers the download cards; mobile mounts its own
           copy with `downloads={false}` (opt-in + Chat only). */}
@@ -2738,7 +2688,7 @@ function EditorChrome({
         onClose={() => setNewFromTemplateOpen(false)}
         onManageTemplates={() => {
           setNewFromTemplateOpen(false);
-          setTemplatesOpen(true);
+          ws.openTemplates();
         }}
         onBlankNote={() => {
           // Zero-templates degrade → the existing instant-blank path, unchanged.
@@ -2782,7 +2732,6 @@ function EditorChrome({
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onReopen={() => setPaletteOpen(true)}
-        centerView={centerView}
         setToast={setToast}
         onImportObsidian={() => {
           setPaletteOpen(false);
@@ -2806,7 +2755,7 @@ function EditorChrome({
         }}
         onOpenAttachments={() => {
           setPaletteOpen(false);
-          setCenterView("attachments");
+          ws.openAttachments();
         }}
         onOpenSettings={() => {
           setPaletteOpen(false);
@@ -2814,7 +2763,7 @@ function EditorChrome({
         }}
         onManageTemplates={() => {
           setPaletteOpen(false);
-          setTemplatesOpen(true);
+          ws.openTemplates();
         }}
         onNewNoteFromTemplate={() => {
           setPaletteOpen(false);
@@ -3041,7 +2990,6 @@ function EditorChrome({
           reports an NC05 note was reconciled by an automatic CRDT merge (#419). */}
       <RemoteMergeHint />
     </div>
-    </CenterViewProvider>
   );
 }
 
@@ -3086,8 +3034,9 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 // The left toggle x-offset + left clearance are computed PER-RENDER inside
 // EditorChrome (`leftToggleX` / `leftClearance`) because they depend on the live
 // fullscreen state (the traffic-light gap collapses in fullscreen).
-/** Right toggle's x offset from the right edge. */
-const RIGHT_TOGGLE_X = 8;
+/** Right toggle's x offset from the right edge — shared with the tab strip's
+ *  trailing inset, so the two end the row on one line. */
+const RIGHT_TOGGLE_X = TITLE_BAR_RIGHT_EDGE;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
@@ -3243,9 +3192,6 @@ type CommandPaletteHostProps = {
   /** Re-open the palette - used to pop back from a QuickPicker sub-flow on
    *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
   onReopen: () => void;
-  /** Which surface the center pane shows - the note-actions "…" menu hides on
-   *  the attachments view (it acts on the focused note, absent there). */
-  centerView: CenterView;
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
@@ -3592,13 +3538,26 @@ function CommandPaletteHost({
         paletteWs.detachNote(id);
       },
       onArchiveNote: () => {
-        if (ctx.selectedId !== null) void ctx.archiveWithRollback(ctx.selectedId).catch(() => {});
+        if (ctx.selectedId !== null) {
+          // Surfaced (not swallowed): `archiveNote` now flushes dirty panes
+          // first and REJECTS when one does not settle (myne-md/myne#819), so
+          // the palette action can now fail where it previously could not.
+          void ctx.archiveWithRollback(ctx.selectedId).catch(() => {
+            showAttachmentToast(t("notes.list.archiveSingleError"));
+          });
+        }
       },
       onRenameNote: () => {
         if (ctx.selectedId !== null) ctx.startRename(ctx.selectedId);
       },
       onTrashNote: () => {
-        if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
+        if (ctx.selectedId !== null) {
+          // Same as `onArchiveNote`: `trashNote`'s flush rejection must reach
+          // the user rather than being swallowed.
+          void ctx.trashWithRollback(ctx.selectedId).catch(() => {
+            showAttachmentToast(t("notes.list.trashSingleError"));
+          });
+        }
       },
       onEmptyTrash: (viaKey: boolean) => {
         // Permanent purge - request the count-aware confirm instead of firing
@@ -3690,6 +3649,12 @@ function CommandPaletteHost({
         })().catch(() => {});
       },
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
+      // The agent hub, on its vault-general view (myne-md/myne#771). Opening
+      // the tab is the workspace controller's job; the palette only asks.
+      onOpenAgentVault: () => paletteWs.openAgent(),
+      // The agent hub on the open note's Focus view. The note is read from the
+      // workspace (the focused pane's active tab), so it follows a split.
+      onOpenAgentNote: () => paletteWs.openAgentOnNote(paletteWs.focusedNoteId ?? undefined),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3-4): reveal the render target, grab the focused pane's live view
       // via the `getActiveEditorView` registry (the palette pattern), then drive
@@ -3771,6 +3736,13 @@ function CommandPaletteHost({
         });
       },
       onLock: onLockFlushed,
+      // The palette's own entry point (myne-md/myne#773). Both values are
+      // already props of this host — `onReopen` exists so a cancelled
+      // QuickPicker sub-flow pops back to the palette, and re-opening it from
+      // the rail is the same operation — so the action needed no new plumbing,
+      // only a name in the context.
+      onOpenPalette: onReopen,
+      paletteOpen: open,
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
@@ -3837,6 +3809,8 @@ function CommandPaletteHost({
       onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,
+      onReopen,
+      open,
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
@@ -3879,6 +3853,7 @@ function CommandPaletteHost({
     ribbonCommands.run = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
       if (action === undefined || action.visibility(commandCtx) !== "show") return;
+      recordCommandRun(id);
       // A rail click that fails must say so: the button already acted pressed.
       // `run` may be sync or async; normalizing lets one catch cover both.
       void Promise.resolve(action.run(commandCtx)).catch(() => {
@@ -4273,6 +4248,11 @@ function CommandPaletteHost({
             void ctx
               .emptyTrashWithSync(ids)
               .then((result) => {
+                // Close the tabs of the notes that WERE purged, so none stays
+                // editable after its blob is gone (myne-md/myne#819; the palette
+                // Empty-trash twin of TrashPanel's close-on-success). A failed
+                // purge rolled back and the note still exists, so its tab stays.
+                for (const id of result.purged) paletteWs.closeNoteEverywhere(id);
                 // Best-effort bulk purge - report a remaining count on partial
                 // failure (the palette has no status line, so toast it).
                 if (result.failed.length > 0) {
@@ -4612,11 +4592,15 @@ function RightSidebar({
   onOpenSettings,
   onShowToast,
 }: {
-  onOpenSettings?: () => void;
+  // Optionally on a panel and scrolled to a setting: the AI status chip names
+  // a fault and lands ON the control that clears it rather than at the top of
+  // a panel (myne-md/myne#771).
+  onOpenSettings?: (panel?: string, anchor?: string) => void;
   onShowToast?: (message: string) => void;
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const notes = useResolverNotes();
   const {
     prefs,
@@ -4900,6 +4884,10 @@ function RightSidebar({
             }}
             openNoteId={selectedId}
             folders={agentFolders}
+            // The panel-to-deep-surface exit (myne-md/myne#771): reveal the
+            // agent tab on the open note's Focus view. The workspace controller
+            // owns the reveal; without a note it lands on the Hub.
+            onFocusAgent={() => ws.openAgentOnNote(selectedId ?? undefined)}
             // An undo rewrites notes out-of-band of any pane's autosave, the
             // same shape a sync pull has, so it reuses the same blanket bump.
             // Each pane applies its own dirty guard, so this never clobbers
@@ -5548,6 +5536,30 @@ function BottomBar({
     rendered.push({ id, node });
   }
   const visibleIds = rendered.map((r) => r.id);
+
+  // The preview-companion toggle is pinned OUTSIDE the `BAR_ITEMS` vocabulary
+  // (see `barItemsOrder.ts`): it is contextual rather than configurable, and the
+  // bar is the only place it lives. So it counts toward the bar being occupied —
+  // dropping the bar while it is live would strand an affordance with nowhere
+  // else to go.
+  const companionPinned = showPreview && onTogglePreview !== undefined;
+
+  // NOTHING to show: no bar at all, rather than an empty 28px strip with a
+  // hairline under the editor (myne-md/myne#773). Two things about this are
+  // deliberate.
+  //
+  // It keys off what actually RENDERED, not off `hidden_bar_items.length === 9`.
+  // Several renderers already return `null` on a data condition — `vim-mode`
+  // when vim is off, `save-status` under `hideSaveStatus`, `view-mode` with no
+  // active note tab — so "the user hid everything" and "nothing here applies
+  // right now" arrive at the same place and should look the same.
+  //
+  // And the items are restorable from Settings -> Appearance, not only from this
+  // bar's own right-click menu. That is a precondition of this early return
+  // rather than a nicety: before it existed, the menu that un-hides an item WAS
+  // the bar, so hiding the ninth item would have deleted the only route back and
+  // made the setting unrecoverable from the UI that set it.
+  if (rendered.length === 0 && !companionPinned) return null;
 
   return (
     <div

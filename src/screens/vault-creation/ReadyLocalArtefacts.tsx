@@ -71,8 +71,15 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
       }
       // `vaultId` is always populated here (CreateVault passes the committed id
       // once commit succeeds); the null arm is type-level defense only —
-      // sole-vault targeting would misfire under multi-vault.
-      await exportBackup(destination, vaultId ?? undefined);
+      // sole-vault targeting would misfire under multi-vault. Refuse rather
+      // than invoke with a missing target: the command takes `vault_id` as a
+      // required string (myne-md/myne#250), so an undefined one is an
+      // argument deserialization failure, not a clean error.
+      if (vaultId == null) {
+        setBackupState("error");
+        return;
+      }
+      await exportBackup(destination, vaultId);
       setBackupState("done");
     } catch (e) {
       logErrorKind(e, "ready-step-backup-failed");
@@ -95,15 +102,7 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
     <>
       <Button
         variant="ghost"
-        icon="folder"
-        onClick={handleShowVaultFolder}
-        disabled={pending}
-        data-testid="create.ready-show-folder"
-      >
-        {t("vaultCreation.ready.showFolder")}
-      </Button>
-      <Button
-        variant="secondary"
+        icon="download"
         onClick={handleBackupNow}
         disabled={pending || backupState === "saving" || backupState === "done"}
         data-testid="create.ready-backup-now"
@@ -114,10 +113,24 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
             ? t("vaultCreation.ready.backedUp")
             : t("vaultCreation.ready.backUpNow")}
       </Button>
+      <Button
+        variant="ghost"
+        icon="folder"
+        onClick={handleShowVaultFolder}
+        disabled={pending}
+        data-testid="create.ready-show-folder"
+      >
+        {t("vaultCreation.ready.showFolder")}
+      </Button>
       {backupState === "error" && (
         <div
           data-testid="create.ready-backup-error"
-          style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", textAlign: "center" }}
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-2)",
+            textAlign: "center",
+          }}
         >
           {t("vaultCreation.ready.backupError")}
         </div>

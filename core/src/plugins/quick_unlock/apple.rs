@@ -36,7 +36,10 @@
 
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
-use super::provider::{ProviderError, ProviderSecret, QuickUnlockProvider, WRAP_KEY_LEN};
+use super::provider::{
+    store_error_from_osstatus, ProviderError, ProviderSecret, QuickUnlockProvider,
+    ERR_SEC_MISSING_ENTITLEMENT, WRAP_KEY_LEN,
+};
 use crate::vault_id::VaultId;
 use getrandom::getrandom;
 use protocol::quick_unlock_blob::{PROVIDER_KIND_BIOMETRIC, QUICK_UNLOCK_PIN_SALT_LEN};
@@ -262,25 +265,17 @@ fn wrap_key_from_item(bytes: &[u8]) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, Pro
     Ok(wrap_key)
 }
 
-/// `errSecUserCanceled` — the user dismissed the biometric prompt.
+/// `errSecUserCanceled`: the user dismissed the biometric prompt.
 const ERR_SEC_USER_CANCELED: i32 = -128;
-/// `errSecItemNotFound` — the Keychain item is absent (wiped / never set).
+/// `errSecItemNotFound`: the Keychain item is absent (wiped / never set).
 const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
-/// `errSecMissingEntitlement` — this PROCESS may not use the Keychain item,
-/// regardless of hardware. The dominant cause is an unsigned binary: a
-/// biometric-gated (`kSecAccessControlBiometryCurrentSet`) item requires the
-/// `keychain-access-groups` entitlement on a SIGNED build, and `tauri dev`
-/// runs unsigned. Distinguishing it from [`ProviderError::Backend`] is what
-/// lets the Unlock screen say "biometric unavailable in this build" and fall
-/// back to the password, instead of surfacing an opaque backend failure that
-/// reads as "Touch ID is broken" (MYND-628).
-const ERR_SEC_MISSING_ENTITLEMENT: i32 = -34018;
 
-/// Log a Keychain failure with its OSStatus code (safe to emit — an OS status
+/// Log a Keychain failure with its OSStatus code (safe to emit: an OS status
 /// code is not key material; the DENY-list covers keys/PINs/paths, not error
-/// codes). The code is the diagnostic the hardware review needs (e.g.
-/// `-34018` errSecMissingEntitlement → the dev build isn't signed with the
-/// keychain entitlement; `-25293` errSecAuthFailed → biometric mismatch).
+/// codes). The code is the diagnostic the hardware review needs, e.g.
+/// `-34018` `errSecMissingEntitlement` (the dev build is not signed with the
+/// keychain entitlement) or `-25293` `errSecAuthFailed` (a broad biometric
+/// failure: an empty enrolment set, a lockout, or denied access).
 fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
     tracing::warn!(
         stage = "quick_unlock_biometric",
@@ -290,20 +285,18 @@ fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
     );
 }
 
-/// Map a Keychain error from `create` (store). The dominant failure on an
-/// UNSIGNED build is `errSecMissingEntitlement`: a biometric-gated item needs the
-/// `keychain-access-groups` entitlement on a signed binary, which `tauri dev`
-/// (and an unsigned `tauri build`) lacks. Surfacing it as `HardwareUnavailable`
-/// rather than the opaque `Backend` is what lets Settings say "Touch ID isn't
-/// available in this build" and hide the affordance, instead of a generic
-/// "something went wrong" that reads as "Touch ID is broken" (#214). Anything
-/// else → `Backend`, with the OSStatus code logged for the hardware review.
+/// Map a Keychain error from `create` (store): log the OSStatus, then hand the
+/// code to the target-agnostic [`store_error_from_osstatus`] (which is what CI
+/// can actually exercise). The dominant failure on an UNSIGNED build is
+/// `errSecMissingEntitlement`, which becomes `HardwareUnavailable` so Settings
+/// can say "Touch ID isn't available in this build" (#214). `errSecAuthFailed`
+/// becomes `BiometricAuthFailed`: the OS refused the biometric store, often
+/// because no biometric is enrolled, so the UI offers enrolment as the remedy
+/// without asserting it is the only cause (myne-md/myne#830). Anything else is
+/// `Backend`, with the code logged for the hardware review.
 fn map_store_error(e: security_framework::base::Error) -> ProviderError {
     log_keychain_err("store", &e);
-    match e.code() {
-        ERR_SEC_MISSING_ENTITLEMENT => ProviderError::HardwareUnavailable,
-        _ => ProviderError::Backend,
-    }
+    store_error_from_osstatus(e.code())
 }
 
 /// Map a Keychain error (from `retrieve`) to the coarse provider error, logging
@@ -312,6 +305,12 @@ fn map_store_error(e: security_framework::base::Error) -> ProviderError {
 /// facility is unusable by this build (see [`ERR_SEC_MISSING_ENTITLEMENT`]);
 /// everything else → a backend failure surfaced (with the logged code) so the
 /// real cause is visible.
+///
+/// `errSecAuthFailed` (a biometric mismatch) intentionally stays `Backend` here:
+/// unlike the store path it signals a failed match on an item that already
+/// exists, so folding it to the password form would be wrong. The behavior is
+/// part of this module's pending hardware-verification checklist (see the
+/// module header), not a claim this code pins.
 fn map_keychain_error(e: security_framework::base::Error) -> ProviderError {
     log_keychain_err("retrieve", &e);
     match e.code() {
@@ -416,17 +415,15 @@ mod tests {
         }
     }
 
-    // The OSStatus constants are the contract with the OS, not our invention —
-    // a typo here would silently reroute a real failure into the wrong
-    // user-facing branch. Pin them against Apple's published values.
+    // The two RETRIEVE-path OSStatus constants are the contract with the OS, not
+    // our invention: a typo here would silently reroute a real failure into the
+    // wrong user-facing branch. Pin them against Apple's published values. (The
+    // store-path pair and its mapping are pinned in `provider.rs`, which a Linux
+    // CI run compiles.)
     #[test]
-    fn osstatus_constants_match_apple_values() {
+    fn retrieve_osstatus_constants_match_apple_values() {
         assert_eq!(ERR_SEC_USER_CANCELED, -128, "errSecUserCanceled");
         assert_eq!(ERR_SEC_ITEM_NOT_FOUND, -25300, "errSecItemNotFound");
-        assert_eq!(
-            ERR_SEC_MISSING_ENTITLEMENT, -34018,
-            "errSecMissingEntitlement"
-        );
     }
 
     #[test]

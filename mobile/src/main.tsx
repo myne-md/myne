@@ -20,6 +20,7 @@ import { initReminderTaps } from "./lib/reminderTap";
 // behind. FIRST, because the app-shell sheet below overrides two of its values
 // and both later sheets read the rest.
 import "@myne/client-core/tokens.css";
+import "@myne/client-core/components.css";
 import "./styles/tokens.css";
 // The shared ornament layer (myne#394) — same sheet the desktop client loads, so
 // a synced theme's ornament renders identically here. Draws nothing until a

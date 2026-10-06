@@ -19,6 +19,7 @@
 // point without the UI having to police it.
 
 import { patchArchivedField, patchTrashedField } from "../dialect";
+import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 
@@ -32,6 +33,11 @@ const decoder = new TextDecoder();
  * Rejects with whatever `noteRead` / `noteUpdate` propagate (IPC error shapes).
  */
 export async function archiveNote(noteId: string): Promise<void> {
+  // Persist any dirty pane FIRST (myne-md/myne#819). #825 closes the archived
+  // note's tabs on success, and a pane's autosave-on-unmount is itself a writer:
+  // without this flush it rewrites the buffer without the just-written
+  // `archived:` field and silently un-archives the note.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   // Clear trashed first (state-D no-op when absent), then set archived — the two
   // patchers touch independent lines, so composing them enforces archive ⊥ trash.
@@ -47,6 +53,9 @@ export async function archiveNote(noteId: string): Promise<void> {
  * Rejects with whatever `noteRead` / `noteUpdate` propagate.
  */
 export async function unarchiveNote(noteId: string): Promise<void> {
+  // Twin of `archiveNote`'s flush (myne-md/myne#819): the Archive panel's
+  // Restore re-enters the live tree, and a dirty pane must not race the write.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const restored = patchArchivedField(encoder.encode(current), null);
   await noteUpdate(noteId, decoder.decode(restored));

@@ -33,7 +33,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
@@ -80,18 +79,13 @@ import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
+import { removeModel, type DownloadArtifactId } from "../../lib/ai-model-download";
 import {
-  isChecksumMismatch,
-  downloadModel,
-  newDownloadId,
-  removeModel,
-  type DownloadArtifactId,
-} from "../../lib/ai-model-download";
+  cancelModelDownloadFor,
+  startModelDownload,
+  useModelDownload,
+} from "../../lib/ai-download-store";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
@@ -125,18 +119,6 @@ const LINK_STYLE: CSSProperties = {
   gap: "var(--space-1)",
   alignSelf: "flex-start",
   transition: "color var(--duration-fast) var(--ease-standard)",
-};
-
-/** Hover for an accent text link: shift to the hover-accent so the pointer-over
- *  reads even though the link is already underlined + accent-colored (a bg block
- *  would look wrong on inline link text). */
-const linkHover = {
-  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent-hover)";
-  },
-  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent)";
-  },
 };
 
 /**
@@ -290,7 +272,7 @@ function ModelRoleBlock(props: {
           type="button"
           data-testid={props.testIdRecommend}
           onClick={props.onOpenRecommend}
-          {...linkHover}
+          className="myne-text-link"
           style={LINK_STYLE}
         >
           {props.recommendName}
@@ -313,32 +295,15 @@ function ModelRoleBlock(props: {
         >
           {props.path ?? props.noneLabel}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           data-testid={props.testIdChoose}
           disabled={props.disabled}
           onClick={props.onChoose}
-          {...hoverSurface({
-            restBg: "var(--paper-2)",
-            hoverBg: "var(--paper-3)",
-            disabled: props.disabled,
-          })}
-          style={{
-            font: "inherit",
-            fontSize: "var(--text-sm)",
-            padding: "var(--space-1) var(--space-2)",
-            borderRadius: "var(--radius-1)",
-            border: "1px solid var(--line-1)",
-            background: "var(--paper-2)",
-            color: "var(--fg-1)",
-            cursor: props.disabled ? "default" : "pointer",
-            opacity: props.disabled ? 0.5 : 1,
-            whiteSpace: "nowrap",
-            transition: HOVER_TRANSITION,
-          }}
+          style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
         >
           {props.chooseLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -360,31 +325,54 @@ function DownloadedModelRow(props: {
   onShowToast?: (message: string) => void;
 }) {
   const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
+  // The download lives in the module-scope store, so it survives this row
+  // unmounting when the user switches Settings panels (myne-md/myne#814).
+  const download = useModelDownload(props.artifact);
   const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
-  const run = async () => {
-    setBusy(true);
-    setError(null);
-    const id = newDownloadId();
-    try {
-      await downloadModel(props.artifact, id);
-      props.onChanged();
-    } catch (err) {
-      // One cause, one message: the checksum branch is named in the inline
-      // error, so the toast carries the same copy rather than the generic one.
-      const message = isChecksumMismatch(err)
+  const downloading = download.status === "downloading";
+  const busy = downloading || removing;
+  const percent =
+    download.total > 0
+      ? Math.min(100, Math.round((download.downloaded / download.total) * 100))
+      : 0;
+
+  // Surface a terminal failure once: inline copy plus a toast, one cause to one
+  // message (the checksum branch names itself).
+  const announcedRef = useRef(false);
+  useEffect(() => {
+    if (download.status !== "failed") {
+      announcedRef.current = false;
+      return;
+    }
+    if (announcedRef.current) return;
+    announcedRef.current = true;
+    const message =
+      download.cause === "checksum"
         ? t("settings.ai.downloadFailedChecksum")
         : t("settings.ai.downloadFailed");
-      setError(message);
-      props.onShowToast?.(message);
-    } finally {
-      setBusy(false);
+    setError(message);
+    props.onShowToast?.(message);
+    // `props.onShowToast` and `t` are stable enough for this one-shot; the
+    // `announcedRef` guard makes a re-run idempotent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [download.status, download.cause]);
+
+  // A completed download (this mount or a background one) reloads the stored
+  // path so the row flips to "Installed".
+  const completedRef = useRef(false);
+  useEffect(() => {
+    if (download.status === "complete" && !completedRef.current) {
+      completedRef.current = true;
+      props.onChanged();
     }
-  };
+    if (download.status !== "complete") completedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [download.status]);
 
   const remove = async () => {
-    setBusy(true);
+    setRemoving(true);
     setError(null);
     try {
       await removeModel(props.role);
@@ -392,7 +380,7 @@ function DownloadedModelRow(props: {
     } catch {
       setError(t("settings.ai.downloadFailed"));
     } finally {
-      setBusy(false);
+      setRemoving(false);
     }
   };
 
@@ -403,43 +391,106 @@ function DownloadedModelRow(props: {
       helper={props.sizeText}
       testId={`ai.download-row-${props.artifact}`}
       error={error}
-      control={(helperId) => (
-        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-          <span
-            data-testid={`ai.download-state-${props.artifact}`}
+      control={(helperId) =>
+        downloading ? (
+          <div
             style={{
-              fontSize: "var(--text-sm)",
-              color: props.path ? "var(--accent)" : "var(--fg-3)",
-              fontFamily: "var(--font-mono)",
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "center",
             }}
-            aria-describedby={helperId}
           >
-            {props.path
-              ? t("settings.ai.downloadInstalled")
-              : t("settings.ai.downloadNotInstalled")}
-          </span>
-          <Button
-            variant="secondary"
-            disabled={!props.aiEnabled || busy}
-            onClick={() => void run()}
-            data-testid={`ai.download-button-${props.artifact}`}
-          >
-            {busy
-              ? t("settings.ai.downloading")
-              : t("settings.ai.downloadReinstall")}
-          </Button>
-          {props.path && (
+            <div
+              data-testid={`ai.download-progress-${props.artifact}`}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              style={{
+                width: 120,
+                height: 6,
+                background: "var(--paper-3)",
+                borderRadius: "var(--radius-2)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  background: "var(--accent)",
+                  transformOrigin: "left",
+                  // A determinate fill animated with `transform: scaleX`, not
+                  // `width`: scaling runs on the compositor, while a `width`
+                  // transition lays out and paints every frame
+                  // (`scripts/check-motion-canon.mjs`).
+                  transform: `scaleX(${percent / 100})`,
+                  transition: "transform var(--duration-fast) var(--ease-standard)",
+                }}
+              />
+            </div>
+            <span
+              data-testid={`ai.download-percent-${props.artifact}`}
+              aria-describedby={helperId}
+              style={{
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-2)",
+                fontFamily: "var(--font-mono)",
+                minWidth: "4ch",
+              }}
+            >
+              {t("settings.ai.downloadingPercent", { percent })}
+            </span>
             <Button
               variant="ghost"
-              disabled={!props.aiEnabled || busy}
-              onClick={() => void remove()}
-              data-testid={`ai.remove-button-${props.artifact}`}
+              onClick={() => cancelModelDownloadFor(props.artifact)}
+              data-testid={`ai.download-cancel-${props.artifact}`}
             >
-              {t("settings.ai.modelRemove")}
+              {t("settings.ai.downloadCancel")}
             </Button>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--space-2)",
+              alignItems: "center",
+            }}
+          >
+            <span
+              data-testid={`ai.download-state-${props.artifact}`}
+              style={{
+                fontSize: "var(--text-sm)",
+                color: props.path ? "var(--accent)" : "var(--fg-3)",
+                fontFamily: "var(--font-mono)",
+              }}
+              aria-describedby={helperId}
+            >
+              {props.path
+                ? t("settings.ai.downloadInstalled")
+                : t("settings.ai.downloadNotInstalled")}
+            </span>
+            <Button
+              variant="secondary"
+              disabled={!props.aiEnabled || busy}
+              onClick={() => void startModelDownload(props.artifact)}
+              data-testid={`ai.download-button-${props.artifact}`}
+            >
+              {t("settings.ai.downloadReinstall")}
+            </Button>
+            {props.path && (
+              <Button
+                variant="ghost"
+                disabled={!props.aiEnabled || busy}
+                onClick={() => void remove()}
+                data-testid={`ai.remove-button-${props.artifact}`}
+              >
+                {t("settings.ai.modelRemove")}
+              </Button>
+            )}
+          </div>
+        )
+      }
     />
   );
 }
@@ -943,6 +994,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         </p>
         <button
           type="button"
+          className="myne-text-link"
           data-testid="ai.trust-disclosure-toggle"
           aria-expanded={disclosureOpen}
           onClick={() => setDisclosureOpen((o) => !o)}
@@ -954,7 +1006,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             color: "var(--fg-2)",
             font: "inherit",
             fontSize: "var(--text-sm)",
-            textDecoration: "underline",
             cursor: "pointer",
           }}
         >
@@ -1152,7 +1203,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         />
       </div>
 
-      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0627`).
+      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0628`).
           The AI-shaped weights are no longer bundled: a user who skipped
           onboarding enables AI and fetches them here, and the same rows answer
           "is it installed" from the device-local model store. No file name and
@@ -1233,7 +1284,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             type="button"
             data-testid="ai.endpoint-runtime-link"
             onClick={openLocalRuntime}
-            {...linkHover}
+            className="myne-text-link"
             style={LINK_STYLE}
           >
             {LOCAL_RUNTIME.name}
@@ -1415,7 +1466,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-key-revoke"
                 disabled={!aiEnabled}
                 onClick={() => void revokeKey()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerKeyRevoke")}
@@ -1487,7 +1538,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-model-load"
                 disabled={!aiEnabled || !hasKey || modelsLoading}
                 onClick={() => void loadModels()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerModelLoad")}
@@ -1501,7 +1552,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                   type="button"
                   data-testid="ai.provider-model-show-all"
                   onClick={() => setShowAllModels((v) => !v)}
-                  {...linkHover}
+                  className="myne-text-link"
                   style={LINK_STYLE}
                 >
                   {showAllModels

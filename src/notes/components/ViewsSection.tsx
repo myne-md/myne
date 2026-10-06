@@ -27,13 +27,11 @@ import {
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../../components/primitives/hoverSurface";
+import { Button } from "../../components/primitives/Button";
+import { Input } from "../../components/primitives/Input";
+import { IconButton } from "../../components/primitives/IconButton";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import type { SavedView } from "../../lib/prefs";
-import { MIN_TARGET } from "../../components/primitives/targetSize";
 import {
   consumeRevealViews,
   useRevealViewsNonce,
@@ -43,20 +41,6 @@ import {
  *  the rail's own `data-command-id` contract (LeftRibbon), not by a testid, so
  *  it is a product attribute rather than a test hook. */
 const RIBBON_ANCHOR_SELECTOR = '[data-command-id="views.show"]';
-
-const ICON_BTN_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  ...MIN_TARGET,
-  padding: 0,
-  background: "transparent",
-  border: 0,
-  borderRadius: "var(--radius-1)",
-  color: "var(--fg-3)",
-  cursor: "pointer",
-  transition: HOVER_TRANSITION,
-};
 
 // Flyout — a body-level portal opening to the RIGHT of the row.
 const FLYOUT_STYLE: CSSProperties = {
@@ -184,7 +168,7 @@ function ViewRow({
         >
           <Icon name="layout-grid" size={14} />
         </span>
-        <input
+        <Input
           type="text"
           data-testid="views.rename-input"
           defaultValue={view.name}
@@ -202,8 +186,8 @@ function ViewRow({
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       role="menuitem"
       data-testid="views.row"
       data-view-id={view.id}
@@ -211,7 +195,6 @@ function ViewRow({
       title={label}
       onClick={() => onOpen(view.id)}
       onContextMenu={(e) => onContextMenu(e, view.id)}
-      {...hoverSurface()}
       style={ROW_BASE_STYLE}
     >
       <span
@@ -229,7 +212,7 @@ function ViewRow({
           <Icon name="check" size={14} />
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -463,7 +446,7 @@ export function ViewsSection({
           >
             <div style={SEARCH_ROW_STYLE}>
               <Icon name="search" size={14} />
-              <input
+              <Input
                 ref={searchRef}
                 type="text"
                 value={query}
@@ -476,11 +459,12 @@ export function ViewsSection({
                   if (e.key === "Escape") setOpen(false);
                 }}
               />
-              <button
-                type="button"
-                data-testid="views.new-button"
-                aria-label={t("notes.views.newView")}
-                title={t("notes.views.newView")}
+              <IconButton
+                icon="file-plus"
+                iconSize={14}
+                label={t("notes.views.newView")}
+                tooltip
+                testId="views.new-button"
                 onClick={() => {
                   // Creating opens the full filter-builder modal; close the
                   // flyout so it isn't left hanging behind (and its
@@ -488,11 +472,7 @@ export function ViewsSection({
                   setOpen(false);
                   onNewView();
                 }}
-                {...hoverSurface()}
-                style={ICON_BTN_STYLE}
-              >
-                <Icon name="file-plus" size={14} />
-              </button>
+              />
             </div>
             <div style={LIST_STYLE}>
               {filtered.length === 0 ? (

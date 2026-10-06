@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Streaming HTTPS GET for on-demand AI model downloads (myne-md/myne#805,
-//! `decisions/ai/0627`).
+//! `decisions/ai/0628`).
 //!
 //! This is the socket a model fetch leaves the device through. It exists as its
 //! own module, in `core::inference` rather than in the desktop plugin, for one

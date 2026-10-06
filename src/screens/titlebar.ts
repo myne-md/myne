@@ -60,6 +60,16 @@ export const TITLE_BAR_CONTROL_TOP = 6;
 export const TITLE_BAR_CONTROL_HEIGHT = 26;
 
 /**
+ * How far the right-most title-bar control sits in from the window's right
+ * edge. The floated right-sidebar toggle uses it, and so does the tab strip's
+ * own trailing inset, so whichever control ends the row — the toggle when the
+ * right sidebar is collapsed, the strip's tab-list caret when it is open — lands
+ * on the same line. The strip had no trailing inset at all, which put the caret
+ * flush against the edge whenever it was the last control (myne-md/myne#772).
+ */
+export const TITLE_BAR_RIGHT_EDGE = 8;
+
+/**
  * The window-drag attribute, as spreadable props.
  *
  * `data-tauri-drag-region` is intercepted by the Tauri host on every platform

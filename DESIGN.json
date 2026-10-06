@@ -13,85 +13,331 @@
         "role": "primary",
         "displayName": "Iron Blue",
         "canonical": "#2c4a7a",
-        "tonalRamp": ["#0e1828", "#15233a", "#1b2e4d", "#233b62", "#2c4a7a", "#5a76a3", "#8aa4d0", "#c0cee2"]
+        "tonalRamp": [
+          "#0e1828",
+          "#15233a",
+          "#1b2e4d",
+          "#233b62",
+          "#2c4a7a",
+          "#5a76a3",
+          "#8aa4d0",
+          "#c0cee2"
+        ]
       },
       "warm-paper": {
         "role": "neutral",
         "displayName": "Warm Paper",
         "canonical": "#fbfbfa",
-        "tonalRamp": ["#0b0b09", "#1a1a17", "#3a3934", "#6b6a64", "#a3a29c", "#c8c7c1", "#e3e2dd", "#f4f4f2", "#fbfbfa"]
+        "tonalRamp": [
+          "#0b0b09",
+          "#1a1a17",
+          "#3a3934",
+          "#6b6a64",
+          "#a3a29c",
+          "#c8c7c1",
+          "#e3e2dd",
+          "#f4f4f2",
+          "#fbfbfa"
+        ]
       },
       "ink-primary": {
         "role": "neutral",
         "displayName": "Warm-Black Ink",
         "canonical": "#1a1a17",
-        "tonalRamp": ["#0b0b09", "#1a1a17", "#3a3934", "#6b6a64", "#a3a29c", "#c8c7c1", "#e3e2dd", "#f4f4f2"]
+        "tonalRamp": [
+          "#0b0b09",
+          "#1a1a17",
+          "#3a3934",
+          "#6b6a64",
+          "#a3a29c",
+          "#c8c7c1",
+          "#e3e2dd",
+          "#f4f4f2"
+        ]
       },
       "brick-danger": {
         "role": "state-danger",
         "displayName": "Brick Red",
         "canonical": "#8a2a23",
-        "tonalRamp": ["#3a0f0c", "#591711", "#8a2a23", "#a44a44", "#bd6b66", "#d39994", "#e6c0bc", "#f5e7e5"]
+        "tonalRamp": [
+          "#3a0f0c",
+          "#591711",
+          "#8a2a23",
+          "#a44a44",
+          "#bd6b66",
+          "#d39994",
+          "#e6c0bc",
+          "#f5e7e5"
+        ]
       },
       "ochre-warning": {
         "role": "state-warning",
         "displayName": "Ochre",
         "canonical": "#8a6a1f",
-        "tonalRamp": ["#3a2c0c", "#5a4514", "#8a6a1f", "#a48648", "#bda36c", "#d3bf94", "#e6d5b8", "#f5efde"]
+        "tonalRamp": [
+          "#3a2c0c",
+          "#5a4514",
+          "#8a6a1f",
+          "#a48648",
+          "#bda36c",
+          "#d3bf94",
+          "#e6d5b8",
+          "#f5efde"
+        ]
       },
       "forest-success": {
         "role": "state-success",
         "displayName": "Forest Green",
         "canonical": "#2f6048",
-        "tonalRamp": ["#0f2419", "#1a3b29", "#2f6048", "#4d7e64", "#6e9a82", "#94b6a3", "#c0d2c5", "#e3eee8"]
+        "tonalRamp": [
+          "#0f2419",
+          "#1a3b29",
+          "#2f6048",
+          "#4d7e64",
+          "#6e9a82",
+          "#94b6a3",
+          "#c0d2c5",
+          "#e3eee8"
+        ]
       }
     },
     "categoricalPalette": {
       "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is client-core/src/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); docs/design/colors_and_type.css mirrors light + dark.",
       "colors": [
-        { "name": "group-olive", "displayName": "Olive", "light": "#5d7b32", "dark": "#cce3ab" },
-        { "name": "group-fern", "displayName": "Fern", "light": "#549f41", "dark": "#9cd98c" },
-        { "name": "group-teal", "displayName": "Teal", "light": "#32647b", "dark": "#abd1e3" },
-        { "name": "group-denim", "displayName": "Denim", "light": "#415c9f", "dark": "#8ca2d9" },
-        { "name": "group-indigo", "displayName": "Indigo", "light": "#3b327b", "dark": "#b1abe3" },
-        { "name": "group-violet", "displayName": "Violet", "light": "#72419f", "dark": "#b48cd9" },
-        { "name": "group-orchid", "displayName": "Orchid", "light": "#75327b", "dark": "#deabe3" },
-        { "name": "group-rose", "displayName": "Rose", "light": "#9f4182", "dark": "#d98cc1" }
+        {
+          "name": "group-olive",
+          "displayName": "Olive",
+          "light": "#5d7b32",
+          "dark": "#cce3ab"
+        },
+        {
+          "name": "group-fern",
+          "displayName": "Fern",
+          "light": "#549f41",
+          "dark": "#9cd98c"
+        },
+        {
+          "name": "group-teal",
+          "displayName": "Teal",
+          "light": "#32647b",
+          "dark": "#abd1e3"
+        },
+        {
+          "name": "group-denim",
+          "displayName": "Denim",
+          "light": "#415c9f",
+          "dark": "#8ca2d9"
+        },
+        {
+          "name": "group-indigo",
+          "displayName": "Indigo",
+          "light": "#3b327b",
+          "dark": "#b1abe3"
+        },
+        {
+          "name": "group-violet",
+          "displayName": "Violet",
+          "light": "#72419f",
+          "dark": "#b48cd9"
+        },
+        {
+          "name": "group-orchid",
+          "displayName": "Orchid",
+          "light": "#75327b",
+          "dark": "#deabe3"
+        },
+        {
+          "name": "group-rose",
+          "displayName": "Rose",
+          "light": "#9f4182",
+          "dark": "#d98cc1"
+        }
       ]
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Hero headlines on marketing-adjacent surfaces only." },
-      "headline": { "displayName": "Headline", "purpose": "Welcome screen sections, vault-creation step headings." },
-      "title": { "displayName": "Title", "purpose": "In-app page titles, modal headings." },
-      "body": { "displayName": "Body", "purpose": "Desktop client default at 14px. Sustained reading." },
-      "body-large": { "displayName": "Body Large", "purpose": "Onboarding copy and recovery-flow prose where the message must land carefully." },
-      "caption": { "displayName": "Caption", "purpose": "Captions, helper text, status text in ink-tertiary." },
-      "label": { "displayName": "Label / Eyebrow", "purpose": "The only uppercase role in the system. Used for eyebrow tags above primary blocks." },
-      "mono": { "displayName": "Mono", "purpose": "Code spans, fingerprints, file paths. Never used for prose." },
-      "mono-large": { "displayName": "Mono Large", "purpose": "Recovery-phrase word display." },
-      "account-number": { "displayName": "Account Number", "purpose": "Signature treatment for MY-XXXX-XXXX-XXXX-XXXX-XXXX — 27 characters, the MY- prefix plus five 4-char Crockford groups (docs/spec/account-number.md §2). Always non-breaking hyphens, user-select all, slashed zero on." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headlines on marketing-adjacent surfaces only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Welcome screen sections, vault-creation step headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "In-app page titles, modal headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Desktop client default at 14px. Sustained reading."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "Onboarding copy and recovery-flow prose where the message must land carefully."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Captions, helper text, status text in ink-tertiary."
+      },
+      "label": {
+        "displayName": "Label / Eyebrow",
+        "purpose": "The only uppercase role in the system. Used for eyebrow tags above primary blocks."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code spans, fingerprints, file paths. Never used for prose."
+      },
+      "mono-large": {
+        "displayName": "Mono Large",
+        "purpose": "Recovery-phrase word display."
+      },
+      "account-number": {
+        "displayName": "Account Number",
+        "purpose": "Signature treatment for MY-XXXX-XXXX-XXXX-XXXX-XXXX — 27 characters, the MY- prefix plus five 4-char Crockford groups (docs/spec/account-number.md §2). Always non-breaking hyphens, user-select all, slashed zero on."
+      }
     },
     "shadows": [
-      { "name": "shadow-1", "value": "0 1px 0 rgba(11,11,9,0.04), 0 1px 2px rgba(11,11,9,0.06)", "purpose": "Tooltips only." },
-      { "name": "shadow-2", "value": "0 2px 4px rgba(11,11,9,0.06), 0 4px 12px rgba(11,11,9,0.08)", "purpose": "Dropdown menus, toasts." },
-      { "name": "shadow-3", "value": "0 8px 16px rgba(11,11,9,0.08), 0 16px 40px rgba(11,11,9,0.12)", "purpose": "Command palette and modal dialogs only." },
-      { "name": "shadow-1-dark", "value": "0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5)", "purpose": "Tooltips, dark theme." },
-      { "name": "shadow-2-dark", "value": "0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5)", "purpose": "Dropdown menus and toasts, dark theme." },
-      { "name": "shadow-3-dark", "value": "0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6)", "purpose": "Command palette and modal dialogs, dark theme." }
+      {
+        "name": "shadow-1",
+        "value": "0 1px 0 rgba(11,11,9,0.04), 0 1px 2px rgba(11,11,9,0.06)",
+        "purpose": "Tooltips only."
+      },
+      {
+        "name": "shadow-2",
+        "value": "0 2px 4px rgba(11,11,9,0.06), 0 4px 12px rgba(11,11,9,0.08)",
+        "purpose": "Dropdown menus, toasts."
+      },
+      {
+        "name": "shadow-3",
+        "value": "0 8px 16px rgba(11,11,9,0.08), 0 16px 40px rgba(11,11,9,0.12)",
+        "purpose": "Command palette and modal dialogs only."
+      },
+      {
+        "name": "shadow-1-dark",
+        "value": "0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5)",
+        "purpose": "Tooltips, dark theme."
+      },
+      {
+        "name": "shadow-2-dark",
+        "value": "0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5)",
+        "purpose": "Dropdown menus and toasts, dark theme."
+      },
+      {
+        "name": "shadow-3-dark",
+        "value": "0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6)",
+        "purpose": "Command palette and modal dialogs, dark theme."
+      }
     ],
     "motion": [
-      { "name": "duration-fast", "value": "120ms", "purpose": "Hover and focus micro-transitions." },
-      { "name": "duration-base", "value": "180ms", "purpose": "UI transitions: panel open, palette show." },
-      { "name": "duration-slow", "value": "260ms", "purpose": "Modal enter and substantial state changes." },
-      { "name": "ease-standard", "value": "cubic-bezier(0.2, 0, 0, 1)", "purpose": "Entrances and standard transitions." },
-      { "name": "ease-out", "value": "cubic-bezier(0, 0, 0.2, 1)", "purpose": "Exits." }
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "Hover and focus micro-transitions."
+      },
+      {
+        "name": "duration-base",
+        "value": "180ms",
+        "purpose": "UI transitions: panel open, palette show."
+      },
+      {
+        "name": "duration-slow",
+        "value": "260ms",
+        "purpose": "Modal enter and substantial state changes."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Entrances and standard transitions."
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0, 0, 0.2, 1)",
+        "purpose": "Exits."
+      },
+      {
+        "name": "duration-instant",
+        "value": "80ms",
+        "purpose": "EXPRESSIVE tier. Press/pointer-down feedback. Anything slower reads as the control deciding whether to respond."
+      },
+      {
+        "name": "duration-slower",
+        "value": "380ms",
+        "purpose": "EXPRESSIVE tier. The one duration above the 300ms UI ceiling; legitimate only for a large surface or a shared-element travel. Named so a reviewer has to notice it."
+      },
+      {
+        "name": "ease-emphasized",
+        "value": "cubic-bezier(0.05, 0.7, 0.1, 1.0)",
+        "purpose": "EXPRESSIVE tier. Emphasized decelerate: leaves fast, settles slow. For an entrance that should land with weight."
+      },
+      {
+        "name": "ease-spring",
+        "value": "linear(...) sampled spring, falling back to ease-emphasized",
+        "purpose": "EXPRESSIVE tier. ~4% overshoot, settles by ~380ms. Declared as --ease-emphasized in :root and upgraded inside @supports (transition-timing-function: linear(0,1)), so a WebView without linear() degrades to a strong decelerate rather than to the CSS-initial ease (an ease-IN-out, the one curve an entrance may not use)."
+      },
+      {
+        "name": "stagger-step",
+        "value": "18ms",
+        "purpose": "EXPRESSIVE tier. Per-item delay in a cascade. Multiply by index, then clamp to --stagger-max."
+      },
+      {
+        "name": "stagger-max",
+        "value": "120ms",
+        "purpose": "EXPRESSIVE tier. HARD cap on total stagger, so a 40-row list cascades over 120ms rather than 720ms."
+      },
+      {
+        "name": "control-pad-y",
+        "value": "7px",
+        "purpose": "Control geometry: vertical padding of a text button."
+      },
+      {
+        "name": "control-pad-x",
+        "value": "14px",
+        "purpose": "Control geometry: horizontal padding of a text button."
+      },
+      {
+        "name": "control-gap",
+        "value": "6px",
+        "purpose": "Control geometry: gap between a button's glyph and its label."
+      },
+      {
+        "name": "field-pad-y",
+        "value": "8px",
+        "purpose": "Control geometry: vertical padding of a text field."
+      },
+      {
+        "name": "field-pad-x",
+        "value": "10px",
+        "purpose": "Control geometry: horizontal padding of a text field."
+      },
+      {
+        "name": "segment-pad-y",
+        "value": "6px",
+        "purpose": "Control geometry: vertical padding of a segmented-control segment."
+      },
+      {
+        "name": "segment-pad-x",
+        "value": "16px",
+        "purpose": "Control geometry: horizontal padding of a segmented-control segment."
+      }
     ],
     "focus": [
-      { "name": "ring", "value": "0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent)", "purpose": "Standard focus-visible ring: 2px iron-blue stroke with 1px paper offset. Always visible, never removed." },
-      { "name": "ring-inset", "value": "inset 0 0 0 2px var(--accent)", "purpose": "Inset variant for tight rows where an outer ring would clip." }
+      {
+        "name": "ring",
+        "value": "0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent)",
+        "purpose": "Standard focus-visible ring: 2px iron-blue stroke with 1px paper offset. Always visible, never removed."
+      },
+      {
+        "name": "ring-inset",
+        "value": "inset 0 0 0 2px var(--accent)",
+        "purpose": "Inset variant for tight rows where an outer ring would clip."
+      }
     ],
     "breakpoints": [
-      { "name": "desktop", "value": "1280px", "purpose": "Reference desktop viewport; the width every desktop screen is composed against." }
+      {
+        "name": "desktop",
+        "value": "1280px",
+        "purpose": "Reference desktop viewport; the width every desktop screen is composed against."
+      }
     ]
   },
   "components": [
@@ -164,15 +410,51 @@
       "Restrained motion: 120/180/260ms, exponential ease-out only, prefers-reduced-motion disables transitions globally."
     ],
     "rules": [
-      { "name": "The One Accent Rule", "body": "Iron-blue is the only chromatic color in any UI region except a state surface. Anywhere you reach for 'another color for visual interest', you are wrong; reach for typography, density, or whitespace instead.", "section": "colors" },
-      { "name": "The Anti-Privacy-Theme Rule", "body": "No lock icon, no shield icon, no green checkmark badge anywhere on the product surface. Encryption status is communicated typographically (a small caption 'Encrypted, synced 12s ago' in ink-tertiary), never with chrome.", "section": "colors" },
-      { "name": "The Warm-Black Rule", "body": "Use #1a1a17, never #000. Use #fbfbfa, never #fff. The 1% chroma toward warm shifts the surface from 'screen' to 'paper' and is the single most identity-defining choice in the system.", "section": "colors" },
-      { "name": "The Mono-for-Crypto Rule", "body": "Every value a human types or compares by eye, account numbers, recovery-phrase words, key fingerprints, hash prefixes, file paths, renders in JetBrains Mono with ss02 and zero on. Sans-serif is forbidden for these identifiers because the slashed zero is load-bearing for hand-typed Crockford-base32.", "section": "typography" },
-      { "name": "The Sentence-Case Rule", "body": "Buttons, headings, menu items, modal titles: sentence case. 'Save note', not 'Save Note'. Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri). Acronyms stay in caps (E2EE, AEAD, KDF, AAD).", "section": "typography" },
-      { "name": "The No-Hype-Words Rule", "body": "'Military-grade', 'bank-level', 'unbreakable', 'ultra-secure', 'next-gen': forbidden in every type role. The threat model speaks for the product; marketing language inserted into the type system would expose the system as advertising rather than tooling.", "section": "typography" },
-      { "name": "The Flat-Editor Rule", "body": "The editor surface and any pane inside the editor (sidebar, backlinks pane, status bar) carry no shadow. Adding a shadow to a pane is a category error; the editor is paper, and paper does not float over itself.", "section": "elevation" },
-      { "name": "The No-Glass Rule", "body": "No backdrop-filter, no filter: blur(), no vibrancy, no glassmorphism. Tauri 2 supports it on macOS; the system declines on purpose. The only translucent surface in the entire product is the modal scrim, and it has no blur.", "section": "elevation" },
-      { "name": "The No-Card-Stripe Rule", "body": "A card is never communicated by a colored left-border accent. Cards earn distinction from the --paper-2 fill and the --line-1 hairline only. If a card needs to communicate state, an eyebrow label inside does the work.", "section": "elevation" }
+      {
+        "name": "The One Accent Rule",
+        "body": "Iron-blue is the only chromatic color in any UI region except a state surface. Anywhere you reach for 'another color for visual interest', you are wrong; reach for typography, density, or whitespace instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Anti-Privacy-Theme Rule",
+        "body": "No lock icon, no shield icon, no green checkmark badge anywhere on the product surface. Encryption status is communicated typographically (a small caption 'Encrypted, synced 12s ago' in ink-tertiary), never with chrome.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm-Black Rule",
+        "body": "Use #1a1a17, never #000. Use #fbfbfa, never #fff. The 1% chroma toward warm shifts the surface from 'screen' to 'paper' and is the single most identity-defining choice in the system.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-for-Crypto Rule",
+        "body": "Every value a human types or compares by eye, account numbers, recovery-phrase words, key fingerprints, hash prefixes, file paths, renders in JetBrains Mono with ss02 and zero on. Sans-serif is forbidden for these identifiers because the slashed zero is load-bearing for hand-typed Crockford-base32.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence-Case Rule",
+        "body": "Buttons, headings, menu items, modal titles: sentence case. 'Save note', not 'Save Note'. Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri). Acronyms stay in caps (E2EE, AEAD, KDF, AAD).",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Hype-Words Rule",
+        "body": "'Military-grade', 'bank-level', 'unbreakable', 'ultra-secure', 'next-gen': forbidden in every type role. The threat model speaks for the product; marketing language inserted into the type system would expose the system as advertising rather than tooling.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-Editor Rule",
+        "body": "The editor surface and any pane inside the editor (sidebar, backlinks pane, status bar) carry no shadow. Adding a shadow to a pane is a category error; the editor is paper, and paper does not float over itself.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Glass Rule",
+        "body": "No backdrop-filter, no filter: blur(), no vibrancy, no glassmorphism. Tauri 2 supports it on macOS; the system declines on purpose. The only translucent surface in the entire product is the modal scrim, and it has no blur.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Card-Stripe Rule",
+        "body": "A card is never communicated by a colored left-border accent. Cards earn distinction from the --paper-2 fill and the --line-1 hairline only. If a card needs to communicate state, an eyebrow label inside does the work.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do treat docs/design/ as the canonical design source, and bind every component to the CSS variables in docs/design/colors_and_type.css rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong, and update docs/design/ in the same change when it is the canon that has fallen behind.",

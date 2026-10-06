@@ -11,8 +11,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ChangeEvent,
-  type ClipboardEvent,
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,16 +21,13 @@ import { writeText as clipboardWriteText } from "../../platform/clipboardManager
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
 import { Input } from "../primitives/Input";
 import { HELPER_STYLE, MULTILINE_STYLE } from "../settings/panel-styles";
 import { SettingsSection } from "../settings/SettingsSection";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
-import { buildPhraseCredential } from "./phrase-credential";
 import { toast } from "../toast/toastStore";
 import {
-  getPersonIdentityGeneration,
   setPersonIdentityState,
-  setPersonIdentityStateForGeneration,
   usePersonIdentityState,
 } from "./personIdentityState";
 
@@ -138,18 +133,9 @@ export function MemberRosterPanel({
     shared,
     removing,
     remove,
-    unlockPerson,
     lockPerson,
     reload,
   } = useRoster(personReady);
-  const [personError, setPersonError] = useState(false);
-  const [phraseCells, setPhraseCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
-  // The recovery-phrase grid is collapsed until the user chooses to enter it:
-  // the panel must not sit with an always-open phrase field, and the Sync
-  // panel's own Identity block is the other place a phrase is entered.
-  const [unlockOpen, setUnlockOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
   // vault (myne-md/myne#783). The migration is permanent, so it is an explicit
@@ -202,35 +188,6 @@ export function MemberRosterPanel({
     });
   };
 
-  const setPhraseCell = (index: number, value: string) => {
-    setPersonError(false);
-    const cleaned = value.replace(/\s+/g, "");
-    setPhraseCells((cells) => cells.map((cell, i) => (i === index ? cleaned : cell)));
-  };
-
-  const handlePhraseCellChange =
-    (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
-      setPhraseCell(index, event.target.value);
-    };
-
-  const handlePhraseCellPaste =
-    (index: number) => (event: ClipboardEvent<HTMLInputElement>) => {
-      const tokens = event.clipboardData
-        .getData("text")
-        .split(/\s+/)
-        .filter((token) => token.length > 0);
-      if (tokens.length < 2) return;
-      event.preventDefault();
-      setPersonError(false);
-      setPhraseCells((cells) => {
-        const next = [...cells];
-        for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-          next[index + i] = tokens[i];
-        }
-        return next;
-      });
-    };
-
   // removal confirm are the two child dialogs.
   const childDialogOpen = inviteOpen || removeTarget !== null;
   useEffect(() => {
@@ -265,7 +222,6 @@ export function MemberRosterPanel({
       onClick={async () => {
         await lockPerson();
         setCopyFeedback(null);
-        setUnlockOpen(false);
         setPersonIdentityState({ ready: false, ownerCode: null });
       }}
     >
@@ -275,98 +231,15 @@ export function MemberRosterPanel({
 
   return (
     <div data-testid="member-roster" style={ROOT_STYLE}>
-      {/* The inviting identity: the person this device invites as. One unlock
-          per process. Grouped under its own heading so it reads apart from the
-          member list and the invitations below. */}
+      {/* The inviting identity: the person this device invites as, shown once
+          it is unlocked (the Sync panel's Identity block is the one place it is
+          unlocked, myne-md/myne#831). Grouped under its own heading so it reads
+          apart from the member list and the invitations below. */}
+      {personReady ? (
       <SettingsSection
         title={t("sync.memberRoster.identityHeading")}
         testId="member-roster.identity-section"
       >
-      {!personReady ? (
-        <div data-testid="member-roster.person-unlock" style={SECTION_STYLE}>
-          <p style={STATUS_STYLE}>{t("sync.memberRoster.personHint")}</p>
-          {unlockOpen ? (
-            <>
-              {/* No `label` override: this panel's own sentence above is the
-                  explanation, and passing the same key here rendered it a SECOND
-                  time as the grid's field label (myne-md/myne#764). The
-                  primitive's default label ("Recovery phrase") plus its default
-                  hint carry the field itself. */}
-              <EnrollPhraseCredential
-                baseId="member-roster"
-                cells={phraseCells}
-                onCellChange={handlePhraseCellChange}
-                onCellPaste={handlePhraseCellPaste}
-                gridTestId="member-roster.phrase-grid"
-                cellTestId={(index) =>
-                  index === 0
-                    ? "member-roster.phrase-input"
-                    : `member-roster.phrase-cell-${index + 1}`
-                }
-              />
-
-              <Button
-                type="button"
-                variant="primary"
-                style={{ alignSelf: "flex-start" }}
-                data-testid="member-roster.person-unlock-button"
-                disabled={!phraseCells.every((cell) => cell.length > 0)}
-                onClick={async () => {
-                  const unlockGeneration = getPersonIdentityGeneration();
-                  try {
-                    const view = await unlockPerson(buildPhraseCredential(phraseCells));
-                    if (!setPersonIdentityStateForGeneration(unlockGeneration, {
-                      ready: true,
-                      ownerCode: view.identity_code,
-                    })) {
-                      return;
-                    }
-                    setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                    setPersonError(false);
-                    setUnlockOpen(false);
-                    setCopyFeedback(null);
-                  } catch {
-                    setPersonError(true);
-                  }
-                }}
-              >
-                {t("sync.memberRoster.personUnlock")}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                style={{ alignSelf: "flex-start" }}
-                data-testid="member-roster.person-unlock-cancel"
-                onClick={() => {
-                  setUnlockOpen(false);
-                  setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                  setPersonError(false);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-            </>
-          ) : (
-            <Button
-              type="button"
-              variant="secondary"
-              style={{ alignSelf: "flex-start" }}
-              data-testid="member-roster.person-unlock-open"
-              onClick={() => {
-                setUnlockOpen(true);
-                setPersonError(false);
-              }}
-            >
-              {t("sync.memberRoster.personUnlockOpen")}
-            </Button>
-          )}
-          {personError ? (
-            <p data-testid="member-roster.person-error" style={ERROR_STYLE}>
-              {t("sync.memberRoster.personError")}
-            </p>
-          ) : null}
-        </div>
-      ) : (
         <div data-testid="member-roster.person-ready" style={SECTION_STYLE}>
           <p style={STATUS_STYLE}>{t("sync.memberRoster.personReady")}</p>
           {/* The owner's own out-of-band identity code: share it with an invitee
@@ -506,8 +379,8 @@ export function MemberRosterPanel({
             </Button>
           )}
         </div>
-      )}
       </SettingsSection>
+      ) : null}
 
       {/* The members list and the invite action that adds to it. */}
       <SettingsSection
@@ -515,9 +388,14 @@ export function MemberRosterPanel({
         testId="member-roster.members-section"
       >
       {members.length === 0 ? (
-        <p data-testid="member-roster.empty" style={HELPER_STYLE}>
-          {t("sync.memberRoster.empty")}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="user"
+          size="sm"
+          title={t("sync.memberRoster.emptyTitle")}
+          body={t("sync.memberRoster.empty")}
+          testId="member-roster.empty"
+        />
       ) : (
         <>
           <ul data-testid="member-roster.list" style={LIST_STYLE}>

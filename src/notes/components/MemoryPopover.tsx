@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "../../components/primitives/Button";
 import {
   memoryDelete,
   memoryList,
@@ -19,13 +20,13 @@ import {
 
 const OVERLAY_STYLE: CSSProperties = {
   position: "absolute",
-  // The popover mounts at the BOTTOM of the tab column (after the composer),
-  // so opening downward (top: 100%) lands past the viewport edge and the
-  // Close row stops being hit-testable (myne-md/myne#697, mem1 0/12). Open
-  // upward from the anchor instead, capped against the viewport.
-  bottom: "100%",
+  // The popover is anchored to the memory button (a `position: relative`
+  // wrapper in the chat header), so it opens DOWNWARD from the header into the
+  // chat area. The old `bottom: 100%` opened upward, which worked only because
+  // the popover used to live near the composer at the bottom of the tab.
+  top: "100%",
   right: 0,
-  marginBottom: "var(--space-1)",
+  marginTop: "var(--space-1)",
   zIndex: 30,
   width: 300,
   // The right panel narrows below 300px on small viewports: without this cap
@@ -181,14 +182,14 @@ export function MemoryPopover(props: {
               <p data-testid="ai.memory-popover-load-failed" style={TEXT_STYLE}>
                 {t("editor.chrome.rightPanel.aiChat.memoryPopoverLoadFailed")}
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 data-testid="ai.memory-popover-retry"
                 style={SMALL_BUTTON_STYLE}
                 onClick={() => void reload()}
               >
                 {t("editor.chrome.rightPanel.aiChat.memoryPopoverRetry")}
-              </button>
+              </Button>
             </div>
           ) : rows === null ? null : rows.length === 0 ? (
             <p data-testid="ai.memory-popover-empty" style={TEXT_STYLE}>
@@ -204,8 +205,8 @@ export function MemoryPopover(props: {
                 ) : (
                   <p style={TEXT_STYLE}>{texts[row.id] ?? ""}</p>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   data-testid="ai.memory-popover-delete"
                   onClick={() => {
                     void memoryDelete(row.id)
@@ -224,28 +225,28 @@ export function MemoryPopover(props: {
                   style={SMALL_BUTTON_STYLE}
                 >
                   {t("editor.chrome.rightPanel.aiChat.memoryPopoverDelete")}
-                </button>
+                </Button>
               </div>
             ))
           )}
         </div>
         <div style={FOOTER_STYLE}>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             data-testid="ai.memory-popover-settings"
             onClick={props.onOpenSettings}
             style={SMALL_BUTTON_STYLE}
           >
             {t("editor.chrome.rightPanel.aiChat.memoryPopoverSettings")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             data-testid="ai.memory-popover-close"
             onClick={props.onClose}
             style={SMALL_BUTTON_STYLE}
           >
             {t("editor.chrome.rightPanel.aiChat.memoryPopoverClose")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

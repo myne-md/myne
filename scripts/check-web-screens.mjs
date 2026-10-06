@@ -102,6 +102,10 @@ const VERDICTS = {
     verdict: "adapted",
     note: "Ships whole; affordances the platform cannot honour are omitted through the capability descriptor rather than by a fork (task 27).",
   },
+  "AuthShell.tsx": {
+    verdict: "ported",
+    note: "The deboxed pre-unlock page shell (myne-md/myne#773) shared by the vault picker and the unlock screen. Layout, a wordmark and an actions slot — it holds no state, reads no prefs and makes no host call, which is deliberate rather than incidental: every screen that mounts it is pre-unlock, where nothing on screen may derive from vault content, and a shell with a data dependency would be the easiest place in the tree to break that unnoticed.",
+  },
   "Unlock.tsx": {
     verdict: "adapted",
     note: "Ships whole; the fail-closed CTA is the platform exit seam (task 95) and the restore door is capability-gated (task 70).",
@@ -130,7 +134,6 @@ const VERDICTS = {
   },
 
   // ── ported: nothing platform-specific ──────────────────────────────────
-  "centerView.tsx": { verdict: "ported", note: "Pure view-state union." },
   "editorLayout.tsx": { verdict: "ported", note: "Pure layout state + persistence through the shared prefs." },
   "layoutClamp.ts": { verdict: "ported", note: "Pure arithmetic." },
   "responsiveCollapse.ts": { verdict: "ported", note: "Pure width thresholds; a browser resizes the same way." },
@@ -142,17 +145,18 @@ const VERDICTS = {
   // roster's job is to notice a NEW file, and a prefix rule would swallow one —
   // which is exactly what happened to `ProvisioningStep.tsx`, added by that same
   // change and caught by this gate rather than by a reviewer.
-  "vault-creation/AccountStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/BriefingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ConfirmStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/EncryptingStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/index.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/PasswordStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
-  "vault-creation/PhraseStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/KitStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/NameStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ReadyStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/reducer.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/SessionLostStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/step-shell.tsx": { verdict: "ported", via: "CreateVault.tsx" },
+  "vault-creation/stepOrder.ts": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/ReadyLocalArtefacts.tsx": {
     verdict: "excluded",
     marker: "create.ready-backup-now",

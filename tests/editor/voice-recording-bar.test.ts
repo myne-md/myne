@@ -89,22 +89,38 @@ describe("mountRecordingBar", () => {
 
   it("setLevel paints the newest sample into the right-most meter bar", () => {
     const handle = mountRecordingBar({ onStop: () => {}, onCancel: () => {} });
-    handle.setLevel(1); // max input → tallest bar height (12 + sqrt(1)*88 = 100%)
+    handle.setLevel(1); // max input → full-scale bar (12 + sqrt(1)*88 = 100%)
     const bars = bar().querySelectorAll(".cm-voice-rec-bar");
     const last = bars[bars.length - 1] as HTMLElement;
-    expect(last.style.height).toBe("100%");
-    // The oldest bar (shifted in as 0) sits at the floor height (12%).
-    expect((bars[0] as HTMLElement).style.height).toBe("12%");
+    expect(last.style.transform).toBe("scaleY(1.0000)");
+    // The oldest bar (shifted in as 0) sits at the floor level (12%).
+    expect((bars[0] as HTMLElement).style.transform).toBe("scaleY(0.1200)");
     handle.teardown();
   });
 
   it("clamps out-of-range levels into [0, 1] before painting", () => {
     const handle = mountRecordingBar({ onStop: () => {}, onCancel: () => {} });
-    handle.setLevel(5); // clamps to 1 → 100%
+    handle.setLevel(5); // clamps to 1 → full scale
     const bars = bar().querySelectorAll(".cm-voice-rec-bar");
-    expect((bars[bars.length - 1] as HTMLElement).style.height).toBe("100%");
+    expect((bars[bars.length - 1] as HTMLElement).style.transform).toBe("scaleY(1.0000)");
     handle.setLevel(-3); // clamps to 0 → 12% floor
-    expect((bars[bars.length - 1] as HTMLElement).style.height).toBe("12%");
+    expect((bars[bars.length - 1] as HTMLElement).style.transform).toBe("scaleY(0.1200)");
+    handle.teardown();
+  });
+
+  // The meter is driven by `transform: scaleY()` rather than by `height`
+  // (myne-md/myne#773): `setLevel` runs at audio rate across every bar, and a
+  // height write lays out the whole row on each one. Pinned as a property of
+  // the component rather than left implicit in the two assertions above, so a
+  // revert to `height` fails HERE, with the reason attached, instead of failing
+  // as two puzzling string mismatches.
+  it("drives the meter with a compositor transform, never with height", () => {
+    const handle = mountRecordingBar({ onStop: () => {}, onCancel: () => {} });
+    handle.setLevel(0.5);
+    for (const b of bar().querySelectorAll(".cm-voice-rec-bar")) {
+      expect((b as HTMLElement).style.height).toBe("");
+      expect((b as HTMLElement).style.transform).toMatch(/^scaleY\(/);
+    }
     handle.teardown();
   });
 

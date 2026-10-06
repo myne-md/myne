@@ -1,5 +1,5 @@
 // Download / cancel bindings for the on-demand AI model artefacts
-// (myne-md/myne#805, `decisions/ai/0627`).
+// (myne-md/myne#805, `decisions/ai/0628`).
 //
 // The desktop command streams an artefact from `downloads.myne.md`, verifies
 // every file against a SHA-256 compiled into the client binary, and only then
@@ -73,11 +73,17 @@ export async function removeModel(role: string): Promise<void> {
 /**
  * Mint a per-download id. `crypto.randomUUID` is available in every WebView the
  * app ships; the fallback keeps an older engine from throwing on a UI action.
+ * The fallback uses `crypto.getRandomValues`, not `Math.random`: the id is the
+ * sole key for the staging directory, and a same-millisecond collision would
+ * let one fetch's `remove_dir_all` truncate another's verified files
+ * (myne-md/myne#826).
  */
 export function newDownloadId(): string {
   try {
     return crypto.randomUUID();
   } catch {
-    return `dl-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `dl-${Date.now()}-${hex}`;
   }
 }

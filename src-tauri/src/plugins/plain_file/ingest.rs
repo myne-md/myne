@@ -31,12 +31,9 @@ use super::commands::SharedRegistry;
 use super::gate::{gate_path_in, read_gate};
 use super::handles::PlainFileError;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager, Runtime};
-// `Url` is used only by `ingest_urls`, which is gated to the platforms that
-// deliver `RunEvent::Opened`. An ungated import would be unused (and a
-// `-D warnings` failure) on Linux, the same way the ungated fn was.
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 use tauri::Url;
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Frontend event carrying an `OpenedFile` payload.
 pub const OPENED_EVENT: &str = "plain-file:opened";
@@ -63,15 +60,9 @@ pub fn ingest_args<R: Runtime>(app: &AppHandle<R>, args: Vec<String>) {
 
 /// Ingest the first openable file from a URL list (macOS `RunEvent::Opened`).
 ///
-/// **Gated to the platforms that have the event.** `tauri::RunEvent::Opened`
-/// exists only for macOS/iOS/Android (`tauri-2.12.1/src/app.rs`), and the sole
-/// caller in `lib.rs` carries the same `cfg`. Without it here, a Linux build
-/// compiles this function, finds no caller, and fails
-/// `clippy -D warnings` with `function ingest_urls is never used` — which is
-/// exactly what it did, on the `tauri-compile` step, while the macOS run was
-/// green. The gate belongs on the definition for the same reason it is on the
-/// call: a function whose only possible caller does not exist on this target is
-/// not part of this target's build.
+/// Gated to the platforms that deliver `RunEvent::Opened`; on Linux the sole
+/// caller does not exist, so an ungated definition is dead code and fails
+/// clippy's `-D warnings` in CI.
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 pub fn ingest_urls<R: Runtime>(app: &AppHandle<R>, urls: Vec<Url>) {
     let paths: Vec<PathBuf> = urls

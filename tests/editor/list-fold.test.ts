@@ -19,7 +19,7 @@ import { EditorState } from "@codemirror/state";
 import { foldable } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { listFoldRange, listFoldService } from "../../src/editor/list-fold";
-import { assertParsedState } from "./_parse-budget";
+import { completeState } from "./_parse-budget";
 
 /** A markdown-parsed EditorState with the list-fold service mounted. The docs
  *  here are tiny, but the lezer parse is lazy — `syntaxTree` alone only reads
@@ -45,12 +45,12 @@ import { assertParsedState } from "./_parse-budget";
  *  and the result would be `null` — identical to a genuinely non-foldable item.
   *  If this test fails again, the message now distinguishes the two. */
 function parsed(doc: string): EditorState {
-  const s = EditorState.create({
-    doc,
-    extensions: [markdown({ base: markdownLanguage }), listFoldService()],
-  });
-  assertParsedState(s);
-  return s;
+  return completeState(
+    EditorState.create({
+      doc,
+      extensions: [markdown({ base: markdownLanguage }), listFoldService()],
+    }),
+  );
 }
 
 /** The list-fold range for the line CONTAINING byte offset `at`, or null. */

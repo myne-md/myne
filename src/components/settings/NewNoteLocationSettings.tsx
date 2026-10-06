@@ -23,6 +23,7 @@ import {
 import { normalizeFolderPath } from "../../dialect/folderPath";
 import {
   listFolderPaths,
+  resolveFolderOption,
   type FolderPathOption,
 } from "../../notes/listFolderPaths";
 
@@ -123,7 +124,11 @@ export function NewNoteLocationSettings() {
         (folderPaths.length > 0 ? (
           <SearchableSelect
             options={folderOptions}
-            selected={folder === "" ? [] : [folder]}
+            selected={
+              folder === ""
+                ? []
+                : [resolveFolderOption(folderOptions.map((o) => o.value), folder)]
+            }
             onChange={(next) => {
               const chosen = next[0];
               if (chosen === undefined) return;

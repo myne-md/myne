@@ -47,8 +47,10 @@ const webSeam = path.join(repoRoot, "web", "src", "platform");
 // accepts account number plus password, and every routine phrase prompt in a
 // browser is what trains a user that typing 24 words into a page is normal —
 // the mechanism behind `threat-model.md` A18. Keeping this one module out is
-// what leaves a rule a user can apply: this client asks for the phrase in
-// exactly one situation, a recovery they started themselves.
+// what leaves a rule a user can apply: this client asks for the phrase in only
+// one routine situation, a recovery they started themselves. The one other
+// entry point is the unlock-gated, read-only drill, which checks a phrase the
+// user already holds and never displays one.
 //
 // Substituted by the same resolver as the platform seam, keyed on the resolved
 // path so a relative specifier at any depth is caught.
@@ -237,6 +239,17 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "components",
     "sync",
     "MemberRosterPanel",
+  ),
+  // The person-identity session unlock, moved out of MemberRosterPanel
+  // (myne-md/myne#831). Same rule as above: the phrase prompt is substituted out
+  // of the served artefact rather than hidden by a runtime gate.
+  [path.join(repoRoot, "src", "components", "sync", "PersonIdentityUnlock")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "PersonIdentityUnlock",
   ),
   [path.join(repoRoot, "src", "components", "sync", "MemberVaultUnlockCard")]: path.join(
     repoRoot,

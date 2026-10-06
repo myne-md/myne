@@ -34,6 +34,7 @@ import {
   quickUnlockWithPin,
   type QuickUnlockMethod,
 } from "../lib/quick-unlock";
+import { CredentialField } from "./primitives/CredentialField";
 import { ctaStyle } from "./primitives/CenteredCard";
 import { Spinner } from "./Spinner";
 import { isQuickUnlockError } from "../types/quick-unlock-error";
@@ -58,22 +59,13 @@ interface QuickUnlockEntryProps {
   onUnavailable: () => void;
 }
 
+/** Laid out exactly as the password form is (Unlock's FORM_STYLE): swapping
+ *  PIN for password changes the field, never the screen's shape. */
 const WRAP_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "var(--space-2)",
+  gap: "var(--space-3)",
   marginTop: "var(--space-2)",
-};
-
-const INPUT_STYLE: CSSProperties = {
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-4)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  outline: "none",
 };
 
 const HINT_STYLE: CSSProperties = {
@@ -199,38 +191,38 @@ export function QuickUnlockEntry({
           </span>
         </button>
       ) : (
-        <form
-          onSubmit={attemptPin}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
-        >
-          <input
-            type="password"
-            inputMode="numeric"
-            placeholder={t("unlock.quickUnlock.pinPlaceholder")}
+        <form onSubmit={attemptPin}>
+          {/* The same deboxed row the password takes (myne-md/myne#773). The PIN
+              runs the vault's own Argon2id parameters, so it is the same
+              multi-second wait, and the field's sweeping rule carries it — which
+              is why the two surfaces must not diverge here: a user who swaps
+              between them with "Use password instead" would otherwise watch the
+              screen change shape for a choice that changes only the credential. */}
+          <CredentialField
             value={pin}
-            onChange={(e) => setPin(e.currentTarget.value)}
-            disabled={busy}
-            // MYND-558: the PIN is now the primary (and only) field on screen
-            // when it is offered, so it takes the caret the password input used
-            // to hold.
-            autoFocus
-            autoComplete="off"
-            aria-label={t("unlock.quickUnlock.pinAriaLabel")}
-            style={INPUT_STYLE}
-            data-testid="unlock.quick-pin-input"
+            onChange={setPin}
+            busy={busy}
+            ariaLabel={t("unlock.quickUnlock.pinAriaLabel")}
+            placeholder={t("unlock.quickUnlock.pinPlaceholder")}
+            submitLabel={t("unlock.quickUnlock.unlockWithPin")}
+            busyLabel={t("unlock.decrypting")}
+            testId="unlock.quick-pin-input"
+            submitTestId="unlock.quick-pin-submit"
+            reveal={{
+              show: t("unlock.quickUnlock.showPin"),
+              hide: t("unlock.quickUnlock.hidePin"),
+            }}
+            inputProps={{
+              type: "password",
+              inputMode: "numeric",
+              // MYND-558: the PIN is the primary (and only) field on screen when
+              // it is offered, so it takes the caret the password input used to
+              // hold.
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus: true,
+              autoComplete: "off",
+            }}
           />
-          <button
-            type="submit"
-            disabled={busy || pin.length === 0}
-            style={ctaStyle(busy || pin.length === 0)}
-            data-testid="unlock.quick-pin-submit"
-          >
-            {/* The PIN runs the vault's own Argon2id parameters, so this is the
-                same multi-second wait the password CTA shows a spinner for — a
-                button that just goes quiet reads as a hung app. */}
-            {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
-            <span>{busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithPin")}</span>
-          </button>
         </form>
       )}
       {note != null && (

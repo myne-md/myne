@@ -35,6 +35,7 @@ export {
   // Alignment arithmetic for the title-bar row, identical on every host.
   TITLE_BAR_CONTROL_TOP,
   TITLE_BAR_CONTROL_HEIGHT,
+  TITLE_BAR_RIGHT_EDGE,
 } from "../../../src/screens/titlebar";
 
 /** No window controls float over a page: the tab's chrome is above it. */

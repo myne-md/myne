@@ -4263,7 +4263,6 @@
       "invitationPending": "Zatím nepřijato",
       "invitationsFailed": "Vaše pozvánky se nepodařilo načíst.",
       "title": "Členi úložiště",
-      "personHint": "Odemkněte svou členskou identitu obnovovací frází.",
       "personUnlock": "Odemknout identitu člena",
       "personReady": "Identita člena odemčena.",
       "ownerCodeHint": "Sdílejte tento kód s tím, koho zvete, aby mohl ověřit, že úložiště je vaše. Obsahuje pouze veřejné informace.",

@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
-import { assertParsedState, PARSE_BUDGET_MS } from "./_parse-budget";
+import { assertParsedState, completeState, PARSE_BUDGET_MS } from "./_parse-budget";
 
 /** A document far past the parser's initial chunk, so the caller's tree is short. */
 function oversizedDoc(): string {
@@ -67,5 +67,26 @@ describe("assertParsedState", () => {
     // gets the same named error rather than a partial tree.
     const state = markdownState(oversizedDoc());
     expect(() => assertParsedState(state, 0)).toThrow(/myne#567/);
+  });
+});
+
+describe("completeState", () => {
+  it("returns a state whose tree covers a document the bare init left short", () => {
+    // This is the fixer the tripwire above cannot be: it advances the context
+    // AND rebuilds the field snapshot, so the caller reads a complete tree
+    // instead of a named failure. Precondition first, so this passes for the
+    // real reason rather than a fixture that was already complete.
+    const state = markdownState(oversizedDoc());
+    expect(syntaxTree(state).length).toBeLessThan(state.doc.length);
+
+    const complete = completeState(state);
+    expect(syntaxTree(complete).length).toBe(complete.doc.length);
+  });
+
+  it("leaves a complete tree alone and preserves selection and document", () => {
+    const state = markdownState("see [^1] here\n\n[^1]: note\n");
+    const complete = completeState(state);
+    expect(syntaxTree(complete).length).toBe(complete.doc.length);
+    expect(complete.doc.toString()).toBe(state.doc.toString());
   });
 });

@@ -35,9 +35,23 @@ const ACCOUNT_DISPLAY_RE = /^MY(-[0-9A-HJKMNP-TV-Z]{4}){5}$/;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Fill + submit the password step and wait for the phrase grid — i.e.
+/** The name typed on the flow's first step (myne-md/myne#468). Deliberately
+ *  not a plain ASCII word: the value is written as the vault's label through
+ *  `prefs|vault_set_label` after the auto-unlock, and it is the header of the
+ *  recovery kit and of the file the kit saves. */
+const VC_VAULT_NAME = "E2E Kasa";
+
+/** Step over the vault-name step, which is the flow's first screen since
+ *  myne-md/myne#468 (pre-KDF, so this spends no Argon2id). */
+async function nameVaultStep(session: Session, name = VC_VAULT_NAME): Promise<void> {
+  await (await session.byTestId("create.name-input", { timeoutMs: 15_000 })).sendKeys(name);
+  await (await session.byTestId("create.name-continue")).click();
+  await session.byTestId("create.password-input", { timeoutMs: 10_000 });
+}
+
+/** Fill + submit the password step and wait for the recovery kit — i.e.
  *  run ONE production-Argon2id `begin`. The session is live afterwards
- *  (phrase step mounted). */
+ *  (kit step mounted). */
 async function submitPasswordStep(session: Session, password: string): Promise<void> {
   await (await session.byTestId("create.password-input")).sendKeys(password);
   await (await session.byTestId("create.confirm-input")).sendKeys(password);
@@ -53,7 +67,11 @@ async function submitPasswordStep(session: Session, password: string): Promise<v
 /** Traverse the first-run safety briefing (MYND-114): tick all three
  *  acknowledgements and continue to the password step. Pre-KDF — the
  *  briefing sits ahead of `begin`, so this spends no Argon2id. Only the
- *  welcome (first-run) entry shows it; picker/switcher creates skip it. */
+ *  welcome (first-run) entry shows it; picker/switcher creates skip it.
+ *
+ *  Lands on the NAME step, which is what follows the briefing since
+ *  myne-md/myne#468, and walks it, so every caller reaches the password step
+ *  exactly as it did before. */
 async function acknowledgeBriefing(session: Session): Promise<void> {
   await session.byTestId("create.briefing", { timeoutMs: 15_000 });
   const cont = await session.byTestId("create.briefing-continue");
@@ -68,7 +86,7 @@ async function acknowledgeBriefing(session: Session): Promise<void> {
     timeoutMs: 10_000,
   });
   await cont.click();
-  await session.byTestId("create.password-input", { timeoutMs: 10_000 });
+  await nameVaultStep(session);
 }
 
 /** Scrape the 24 revealed phrase words in data-index order (single
@@ -140,6 +158,24 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       const grid = await app.session.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
       expect(await grid.attribute("data-revealed")).toBe("false");
 
+      // The kit shows the account number BESIDE the phrase, in the same sheet,
+      // which is the merge this flow gained (myne-md/myne#468). 27-char §3
+      // display form. Asserted here rather than one step later because there is
+      // no later step to assert it on.
+      await app.session.byTestId("create.kit-sheet", { timeoutMs: 10_000 });
+      const accountEl = await app.session.byTestId("create.account-number", {
+        timeoutMs: 10_000,
+      });
+      const account = (await accountEl.text()).trim();
+      expect(account).toHaveLength(27);
+      expect(ACCOUNT_DISPLAY_RE.test(account)).toBe(true);
+      // The vault's own name heads its kit, which is half of why the name step
+      // exists. Its other half — the label reaching `vault.prefs` — is asserted
+      // after the unlock, further down.
+      expect(await (await app.session.byTestId("create.kit-meta")).text()).toContain(
+        VC_VAULT_NAME,
+      );
+
       // Reveal + scrape the 24 words (the fixture's ONLY capture point —
       // the phrase is never re-displayed).
       await (await app.session.byTestId("create.phrase-reveal")).click();
@@ -158,23 +194,12 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
         label: "confirm continue enabled (4/4 match)",
         timeoutMs: 10_000,
       });
+      // This click COMMITS: the confirm step is the last one now
+      // (myne-md/myne#468 — the account number moved back into the recovery kit
+      // and its acknowledgement checkbox was deleted rather than moved, because
+      // `protocol.md` §7.1.3 says a bare checkbox is not evidence and the
+      // type-back this button is gated on already is).
       await confirmContinue.click();
-
-      // Account step: 27-char §3 display form; ack gates commit.
-      const accountEl = await app.session.byTestId("create.account-number", {
-        timeoutMs: 10_000,
-      });
-      const account = (await accountEl.text()).trim();
-      expect(account).toHaveLength(27);
-      expect(ACCOUNT_DISPLAY_RE.test(account)).toBe(true);
-      const commit = await app.session.byTestId("create.account-commit");
-      expect(await commit.enabled()).toBe(false);
-      await (await app.session.byTestId("create.account-ack")).click();
-      await app.session.waitUntil(() => commit.enabled(), {
-        label: "commit enabled after ack",
-        timeoutMs: 10_000,
-      });
-      await commit.click();
 
       // Ready step. Do NOT click "Show vault folder" (MYND-219 pending —
       // it still opens the legacy `vault/` path).
@@ -310,7 +335,7 @@ describeE2E("VC-2 confirm gating + VC-3 blur cover (MYND-124 task 2)", () => {
       const cellError = await app.session.waitForElement(
         testIdSelector("create.confirm-error", { "data-index": String(firstPos) }),
       );
-      expect(await cellError.text()).toBe(`Doesn't match word #${firstPos}.`);
+      expect(await cellError.text()).toBe(`Doesn't match word ${firstPos}.`);
       const confirmContinue = await app.session.byTestId("create.confirm-continue");
       expect(await confirmContinue.enabled()).toBe(false);
 
@@ -386,7 +411,7 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
     return scrapePhrase(session);
   }
 
-  it("Confirm↔Phrase and Account↔Confirm preserve state; ReadyStep is forward-only", async () => {
+  it("Confirm↔Kit preserves state; ReadyStep is forward-only", async () => {
     // Vault-count precondition: 0. One begin chains arms 1+2+3.
     await scenario("vc4-mid-flow-backs", {}, async (app) => {
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
@@ -424,8 +449,11 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
         words[positionsBefore[0] - 1],
       );
 
-      // Fill the rest → Account; Back to Confirm returns ALREADY-PASSED
-      // (Continue enabled without retyping — arm 2).
+      // Fill the rest. Arm 2 used to be Account→Confirm returning
+      // already-passed; there is no account step to come back FROM since
+      // myne-md/myne#468, so what replaces it is the second half of arm 1: a
+      // round trip to the kit and back must leave the challenge already passed,
+      // with Continue enabled and nothing retyped.
       for (const cell of cellsAfter.slice(1)) {
         const pos = Number(await cell.attribute("data-index"));
         await cell.sendKeys(words[pos - 1]);
@@ -435,26 +463,22 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
         label: "confirm continue enabled",
         timeoutMs: 10_000,
       });
-      await confirmContinue.click();
-      await app.session.byTestId("create.account-number", { timeoutMs: 10_000 });
-      await (await app.session.byTestId("create.account-back")).click();
+      await (await app.session.byTestId("create.confirm-back")).click();
+      await app.session.byTestId("create.phrase-grid", { timeoutMs: 10_000 });
+      await (await app.session.byTestId("create.phrase-continue")).click();
       const continueBack = await app.session.byTestId("create.confirm-continue", {
         timeoutMs: 10_000,
       });
-      expect(await continueBack.enabled()).toBe(true);
-
-      // Forward to Ready: no Back affordance anywhere (arm 3).
-      await continueBack.click();
-      await (await app.session.byTestId("create.account-ack")).click();
-      const commit = await app.session.byTestId("create.account-commit");
-      await app.session.waitUntil(() => commit.enabled(), {
-        label: "commit enabled",
+      await app.session.waitUntil(() => continueBack.enabled(), {
+        label: "confirm continue still enabled after a kit round trip",
         timeoutMs: 10_000,
       });
-      await commit.click();
+
+      // Forward to Ready: no Back affordance anywhere (arm 3). One click, because
+      // this control is the commit as well as the Continue.
+      await continueBack.click();
       await app.session.byTestId("create.ready-done", { timeoutMs: 60_000 });
       for (const backId of [
-        "create.account-back",
         "create.confirm-back",
         "create.phrase-back",
         "create.secondary",
@@ -522,8 +546,8 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
   });
 });
 
-/** Drive password → phrase → confirm → account → ReadyStep through the
- *  real UI (one production begin). Caller decides what to do at Ready. */
+/** Drive password → recovery kit → confirm (which commits) → ReadyStep through
+ *  the real UI (one production begin). Caller decides what to do at Ready. */
 async function createToReadyStep(session: Session, password: string): Promise<void> {
   await submitPasswordStep(session, password);
   await (await session.byTestId("create.phrase-reveal")).click();
@@ -537,10 +561,6 @@ async function createToReadyStep(session: Session, password: string): Promise<vo
     timeoutMs: 10_000,
   });
   await confirmContinue.click();
-  await (await session.byTestId("create.account-ack", { timeoutMs: 10_000 })).click();
-  const commit = await session.byTestId("create.account-commit");
-  await session.waitUntil(() => commit.enabled(), { label: "commit enabled", timeoutMs: 10_000 });
-  await commit.click();
   await session.byTestId("create.ready-done", { timeoutMs: 60_000 });
 }
 

@@ -1,3 +1,5 @@
+import type { IconName } from "../lib/icons";
+
 // Bottom-bar item display-order helpers (MYND bottom-bar reorder). Pure
 // functions that resolve the user's stored `bar_items_order` prefs sequence
 // against the canonical default and compute reorder results for the two
@@ -16,6 +18,49 @@
  * lands. Adding a new right-cluster item means appending its id here (a known
  * id absent from a user's stored order falls back to its position here).
  */
+/**
+ * The toggleable bottom-bar items: id plus the i18n key for its label.
+ *
+ * ONE roster, read by three surfaces now (myne-md/myne#773): the `BottomBar`
+ * gates each element's render on `!hiddenItems.includes(id)`, the bar's
+ * right-click menu maps over it to build its checkable items, and
+ * Settings -> Appearance's bar-customization block does the same. It used to be
+ * a `const` private to `Editor.tsx`, which was fine while the only two readers
+ * lived in that file and stops being fine the moment a third one exists
+ * anywhere else.
+ *
+ * Ids are a closed, non-secret UI vocabulary persisted in
+ * `vault.prefs.hidden_bar_items`. The ORDER here is menu order; display order
+ * is {@link RIGHT_CLUSTER_DEFAULT_ORDER} resolved against the user's stored
+ * sequence, which is a different question and deliberately a different list.
+ */
+export const BAR_ITEMS: ReadonlyArray<{
+  id: string;
+  labelKey: string;
+  /**
+   * The glyph Settings draws beside the label (myne-md/myne#773).
+   *
+   * The bar itself does NOT read this — several of its items render a word, a
+   * count or a live value rather than an icon, and that is right for a strip
+   * along the bottom of a window. The customization list is a different
+   * surface with a different job: it is a roster of nine names in a column,
+   * where a glyph is how a reader finds the row they came for. The left
+   * ribbon's list has carried one since it shipped, which is most of why the
+   * two lists did not look like the same idea.
+   */
+  icon: IconName;
+}> = [
+  { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus", icon: "circle-check" },
+  { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode", icon: "eye" },
+  { id: "workspace", labelKey: "editor.chrome.barItems.workspace", icon: "columns-2" },
+  { id: "tags", labelKey: "editor.chrome.barItems.tags", icon: "hash" },
+  { id: "views", labelKey: "editor.chrome.barItems.views", icon: "layout-grid" },
+  { id: "settings", labelKey: "editor.chrome.barItems.settings", icon: "settings" },
+  { id: "lock", labelKey: "editor.chrome.barItems.lock", icon: "lock" },
+  { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode", icon: "code" },
+  { id: "word-count", labelKey: "editor.chrome.barItems.wordCount", icon: "type" },
+];
+
 export const RIGHT_CLUSTER_DEFAULT_ORDER: readonly string[] = [
   "save-status",
   "workspace",

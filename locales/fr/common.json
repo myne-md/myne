@@ -4139,7 +4139,6 @@
       "invitationPending": "Pas encore acceptée",
       "invitationsFailed": "Impossible de charger vos invitations.",
       "title": "Membres du coffre",
-      "personHint": "Déverrouillez votre identité de membre avec votre phrase de récupération.",
       "personUnlock": "Déverrouiller l'identité de membre",
       "personReady": "Identité de membre déverrouillée.",
       "ownerCodeHint": "Partagez ce code à la personne que vous invitez pour qu'elle puisse vérifier que le coffre vous appartient. Il ne contient que des informations publiques.",

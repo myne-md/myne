@@ -1,54 +1,36 @@
-import { useState, type InputHTMLAttributes } from "react";
+// `<Input>` — the app's single-line text field.
+//
+// Appearance and every state live in `@myne/client-core`'s `components.css`
+// under `.myne-input` (myne-md/myne#773). The React `focused` state this file
+// used to carry existed only to fake `:focus` from an inline style, and it is
+// gone: the focus border and ring are now a `:focus` rule.
+//
+// `:focus` rather than `:focus-visible`, deliberately. A text field that has
+// been clicked into IS focused and must say so — the caret alone is too quiet
+// to locate a field in a dense form, and a pointer-initiated focus on a text
+// input is precisely the case `:focus-visible` excludes.
+//
+// A caller's `style` still wins, so the mono account-number fields and the
+// width-constrained ones keep their call-site layout unchanged.
+
+import { type InputHTMLAttributes, type Ref } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   mono?: boolean;
+  /** Forwarded to the underlying `<input>`, so a caller that focuses or selects
+   *  the field directly (the saved-views search) can keep using the primitive. */
+  ref?: Ref<HTMLInputElement>;
 }
 
-export function Input({
-  invalid,
-  mono,
-  style,
-  onFocus,
-  onBlur,
-  ...rest
-}: InputProps) {
-  const [focused, setFocused] = useState(false);
-
-  const borderColor = invalid
-    ? "var(--danger)"
-    : focused
-      ? "var(--accent)"
-      : "var(--line-2)";
-
+export function Input({ invalid, mono, className, ref, ...rest }: InputProps) {
   return (
     <input
+      ref={ref}
       {...rest}
-      onFocus={(e) => {
-        setFocused(true);
-        onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        setFocused(false);
-        onBlur?.(e);
-      }}
-      style={{
-        fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)",
-        fontSize: mono ? 14 : 13,
-        fontFeatureSettings: mono ? '"ss02","zero","calt"' : undefined,
-        letterSpacing: mono ? "0.04em" : undefined,
-        padding: "8px 10px",
-        background: "var(--bg-1)",
-        color: "var(--fg-1)",
-        border: `1px solid ${borderColor}`,
-        borderRadius: "var(--radius-1)",
-        outline: "none",
-        boxShadow: focused
-          ? "0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent)"
-          : "none",
-        width: "100%",
-        ...style,
-      }}
+      className={className === undefined ? "myne-input" : `myne-input ${className}`}
+      data-mono={mono === true ? "true" : undefined}
+      data-invalid={invalid === true ? "true" : undefined}
     />
   );
 }

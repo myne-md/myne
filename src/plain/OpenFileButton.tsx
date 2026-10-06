@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon } from "../components/primitives/Icon";
+import { IconButton } from "../components/primitives/IconButton";
 import { plainFileOpenDialog } from "../platform/plainFile";
 
 /** The Rust enum's internally-tagged variant name (`rename_all` on the enum). */
@@ -55,30 +55,17 @@ export function OpenFileButton() {
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="plain-file.open"
-        aria-label={t("plainFile.open")}
-        title={t("plainFile.open")}
-        disabled={busy}
-        onClick={() => void open()}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: "1px solid var(--line-1)",
-          borderRadius: "var(--radius-2)",
-          background: "var(--paper)",
-          color: "var(--fg-2)",
-          padding: "var(--space-1)",
-          cursor: "pointer",
-          flexShrink: 0,
-          marginLeft: "auto",
-          opacity: busy ? 0.6 : 1,
-        }}
-      >
-        <Icon name="folder" aria-hidden="true" />
-      </button>
+      <span style={{ marginLeft: "auto", display: "inline-flex", flexShrink: 0 }}>
+        <IconButton
+          icon="folder"
+          label={t("plainFile.open")}
+          tooltip
+          bordered
+          disabled={busy}
+          testId="plain-file.open"
+          onClick={() => void open()}
+        />
+      </span>
       {refusal !== null && (
         <span
           role="alert"

@@ -40,7 +40,7 @@ const CREDENTIAL_SURFACES: ReadonlyArray<[path: string, what: string]> = [
   ["src/components/QuickUnlockEntry.tsx", "the quick-unlock PIN"],
   ["src/screens/AccountNumberEntry.tsx", "the account number"],
   ["src/screens/vault-creation/PasswordStep.tsx", "the password being chosen"],
-  ["src/screens/vault-creation/PhraseStep.tsx", "the recovery phrase, revealed once"],
+  ["src/screens/vault-creation/KitStep.tsx", "the recovery kit: phrase + account number, shown once"],
   ["src/screens/vault-creation/ConfirmStep.tsx", "four words of the phrase, re-entered"],
   ["src/screens/vault-recover/PhraseEntryStep.tsx", "the 24-word recovery grid"],
   ["src/components/sync/EnrollPhraseCredential.tsx", "a phrase grid, device enrolment"],
@@ -87,15 +87,22 @@ describe("no credential field blocks paste", () => {
     // `userSelect` flips to `text` on reveal; before reveal it is `none`, and
     // that is correct: there is nothing to select behind the blur.
     //
-    // The reveal lives in the shared `SecretPhraseReveal` as of myne-md/myne#768,
-    // because the identity phrase and the vault phrase get the same protections.
-    // Both callers render the shared control, so the assertion reads the one
-    // implementation rather than a per-screen copy.
-    const src = code("src/components/SecretPhraseReveal.tsx");
-    expect(src).toMatch(/userSelect:\s*revealed\s*\?\s*"text"/);
-    // And a Copy control exists, so the mechanism does not depend on the user
-    // dragging a selection across 24 words.
-    expect(src).toContain('data-testid={`${testIdPrefix}-copy`}');
+    // The grid lives in the shared `PhraseGrid` as of myne-md/myne#468, split out
+    // of `SecretPhraseReveal` (myne-md/myne#768) so the recovery kit can show the
+    // phrase beside the account number and export both as one file. Every caller
+    // renders this one grid, so the assertion reads the single implementation
+    // rather than a per-screen copy.
+    const grid = code("src/components/PhraseGrid.tsx");
+    expect(grid).toMatch(/userSelect:\s*revealed\s*\?\s*"text"/);
+    // And a Copy control exists on each screen that shows it, so the mechanism
+    // does not depend on the user dragging a selection across 24 words. Two
+    // screens, two copy targets: the phrase alone, and the whole kit.
+    expect(code("src/components/SecretPhraseReveal.tsx")).toContain(
+      'data-testid={`${testIdPrefix}-copy`}',
+    );
+    expect(code("src/screens/vault-creation/KitStep.tsx")).toContain(
+      'data-testid="create.kit-copy"',
+    );
   });
 });
 

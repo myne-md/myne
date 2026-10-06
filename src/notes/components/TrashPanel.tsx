@@ -14,7 +14,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,12 +25,14 @@ import {
   type NoteId,
 } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
+import { Button } from "../../components/primitives/Button";
+import { IconButton } from "../../components/primitives/IconButton";
+import { useWorkspace } from "../workspaceContext";
 import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PanelEmptyState } from "./PanelEmptyState";
 import {
   AGE_STYLE,
   COUNT_STYLE,
-  HEADER_CLOSE_STYLE,
   HEADER_LEFT_STYLE,
   HEADER_RIGHT_STYLE,
   HEADER_STYLE,
@@ -39,27 +40,11 @@ import {
   LIST_STYLE,
   PANEL_STYLE,
   ROW_ACTIONS_STYLE,
-  ROW_BTN_STYLE,
-  ROW_ICON_BTN_STYLE,
   ROW_STYLE,
   ROW_TITLE_STYLE,
   STATUS_LINE_STYLE,
 } from "./notePanelStyles";
 import { formatRelativeTime } from "./relativeTime";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../../components/primitives/hoverSurface";
-
-// Trash-only "Empty trash" action, now in the header cluster (#226
-// follow-up: the footer row is gone, close is a header ✕). Danger-tinted so the
-// irreversible bulk purge is distinct from restore.
-const EMPTY_TRASH_BTN_STYLE: CSSProperties = {
-  ...ROW_BTN_STYLE,
-  color: "var(--danger)",
-  borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
-  transition: HOVER_TRANSITION,
-};
 
 /**
  * A staged purge, plus how it was asked for. `viaKey` is the activating event's
@@ -81,6 +66,7 @@ export type TrashPanelProps = {
 export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [status, setStatus] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -136,9 +122,16 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
     if (confirm.kind === "single") {
       const id = confirm.id;
       setConfirm(null);
-      await ctx.deleteWithRollback(id).catch(() => {
+      try {
+        await ctx.deleteWithRollback(id);
+        // Permanently deleting a note that is open must close its tabs, or the
+        // pane keeps showing an editable buffer for a note that no longer
+        // exists (myne-md/myne#819). Only on SUCCESS: a failed delete rolled
+        // back and the note still exists, so its tab must stay.
+        ws.closeNoteEverywhere(id);
+      } catch {
         setStatus(t("notes.trash.deleteError"));
-      });
+      }
       return;
     }
     // empty trash — best-effort bulk purge with a remaining count on failure.
@@ -149,12 +142,16 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
     setConfirm(null);
     const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
     const result = await ctx.emptyTrashWithSync(ids);
+    // Close the tabs of the notes that WERE purged, so none stays editable
+    // after its blob is gone (myne-md/myne#819). A failed purge rolled back and
+    // the note still exists, so its tab stays.
+    for (const id of result.purged) ws.closeNoteEverywhere(id);
     if (result.failed.length > 0) {
       setStatus(
         t("notes.trash.emptyPartialFailure", { count: result.failed.length }),
       );
     }
-  }, [confirm, ctx, t]);
+  }, [confirm, ctx, t, ws]);
 
   if (!open) return null;
 
@@ -189,13 +186,9 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
           </div>
           <div style={HEADER_RIGHT_STYLE}>
             {count > 0 && (
-              <button
-                type="button"
-                {...hoverSurface({
-                  restBg: "var(--paper-2)",
-                  hoverBg: "var(--paper-3)",
-                })}
-                style={EMPTY_TRASH_BTN_STYLE}
+              <Button
+                variant="ghost"
+                style={{ color: "var(--danger)" }}
                 data-testid="trash.empty"
                 onClick={(e) =>
                   setConfirm({
@@ -206,19 +199,15 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 }
               >
                 {t("notes.trash.empty")}
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              style={HEADER_CLOSE_STYLE}
-              data-panel-action="close"
-              data-testid="trash.close"
-              title={t("notes.trash.close")}
-              aria-label={t("notes.trash.close")}
+            <IconButton
+              icon="x"
+              label={t("notes.trash.close")}
+              tooltip
+              testId="trash.close"
               onClick={onClose}
-            >
-              <Icon name="x" size={16} />
-            </button>
+            />
           </div>
         </div>
         {status !== null && <div style={STATUS_LINE_STYLE}>{status}</div>}
@@ -248,25 +237,17 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     : ""}
                 </span>
                 <div style={ROW_ACTIONS_STYLE}>
-                  <button
-                    type="button"
-                    style={ROW_ICON_BTN_STYLE}
-                    data-panel-action="restore"
-                    data-testid="trash.restore"
-                    data-note-id={r.noteUuid}
-                    title={t("notes.trash.restore")}
-                    aria-label={t("notes.trash.restore")}
+                  <IconButton
+                    icon="rotate-ccw"
+                    label={t("notes.trash.restore")}
+                    tooltip
+                    testId="trash.restore"
                     onClick={() => restore(r.noteUuid)}
-                  >
-                    <Icon name="rotate-ccw" size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    style={ROW_ICON_BTN_STYLE}
-                    data-panel-action="delete"
+                  />
+                  <Button
+                    variant="ghost"
+                    style={{ color: "var(--danger)", padding: "var(--space-1)" }}
                     data-testid="trash.delete"
-                    data-note-id={r.noteUuid}
-                    title={t("notes.trash.delete")}
                     aria-label={t("notes.trash.delete")}
                     onClick={(e) =>
                       setConfirm({
@@ -278,7 +259,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     }
                   >
                     <Icon name="trash-2" size={16} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
