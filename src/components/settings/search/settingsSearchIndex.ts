@@ -636,6 +636,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.ribbonCustomize.helper",
     keywordsKey: "settings.search.keywords.ribbon",
   },
+  {
+    id: "appearance.bar",
+    panelId: "appearance",
+    testid: "settings.bar-customize",
+    titleKey: "settings.appearance.barCustomize.label",
+    descriptionKey: "settings.appearance.barCustomize.helper",
+    keywordsKey: "settings.search.keywords.bar",
+  },
 
   // ── Storage ────────────────────────────────────────────────────────────────
   {

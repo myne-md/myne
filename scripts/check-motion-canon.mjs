@@ -49,7 +49,18 @@ import { join, relative } from "node:path";
 
 import { presentSharedRoots } from "./lib/shared-roots.mjs";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+/**
+ * The tree to scan. Defaults to the repository; `MYNE_GUARD_ROOT` overrides it,
+ * which is the seam `tests/scripts/motionCanon.test.ts` points at a throwaway
+ * tree so a fixture is invisible to every other guard spec scanning the real
+ * roots in a parallel worker. A missing shared root under the override still
+ * fails by name (see `presentSharedRoots`), so the seam cannot silently narrow
+ * the walk.
+ */
+const ROOT =
+  process.env.MYNE_GUARD_ROOT !== undefined
+    ? `${process.env.MYNE_GUARD_ROOT}/`
+    : new URL("..", import.meta.url).pathname;
 
 /**
  * Animations permitted to run `infinite`, by keyframe name, each with the
@@ -324,6 +335,59 @@ function declValue(src, start) {
   return src.slice(i, end);
 }
 
+/**
+ * Tokens in an `animation` shorthand that are NOT the keyframe name: the
+ * iteration/timing/direction/fill/play-state keywords. Durations and
+ * `steps(…)`/`cubic-bezier(…)`/`var(…)` are stripped before splitting.
+ */
+const ANIM_KEYWORDS = new Set([
+  "infinite",
+  "linear",
+  "ease",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+  "step-start",
+  "step-end",
+  "normal",
+  "reverse",
+  "alternate",
+  "alternate-reverse",
+  "none",
+  "forwards",
+  "backwards",
+  "both",
+  "running",
+  "paused",
+  "initial",
+  "inherit",
+  "unset",
+  "revert",
+]);
+
+/**
+ * The keyframe names in one `animation` declaration, in any shorthand order.
+ *
+ * The first version of rule 2 matched the NAME POSITIONALLY (`animation:
+ * <ident> … infinite`), so a duration-first shorthand such as `animation: 1s
+ * infinite pulse`, which is exactly how a hand-written loop is usually spelled,
+ * was never flagged: the regex required a letter where `1s` sits. Injection is
+ * what found it. This strips every token that is not a custom-ident and returns
+ * what remains, so order stops mattering.
+ */
+function animationNames(decl) {
+  return decl.split(",").flatMap((part) =>
+    part
+      // Function-like tokens (steps(2, start), cubic-bezier(…), var(…)) are not
+      // names, and splitting them on punctuation would mint a fake one.
+      .replace(/[A-Za-z-]+\([^)]*\)/g, " ")
+      .replace(/\b\d+(?:\.\d+)?m?s\b/g, " ")
+      .split(/\s+/)
+      .map((t) => t.replace(/[^A-Za-z0-9_-]/g, ""))
+      .filter((t) => t.length > 0 && !/^\d/.test(t) && !ANIM_KEYWORDS.has(t)),
+  );
+}
+
 const findings = [];
 const seenInfinite = new Set();
 const usedDurationExempt = new Set();
@@ -363,29 +427,33 @@ for (const root of present) {
     }
 
     // -- Rule 2: infinite outside the allowlist -----------------------------
+    // Declaration-based rather than name-position-based, so the shorthand's
+    // token ORDER does not decide whether a loop is seen (see `animationNames`).
     const flaggedInfinite = new Set();
-    for (const m of src.matchAll(
-      /animation(?:-name)?\s*:\s*["'`]?\s*([A-Za-z_][\w-]*)[^;}\n]*?\binfinite\b/g,
-    )) {
-      const name = m[1];
-      seenInfinite.add(name);
-      if (!INFINITE_ALLOWLIST.has(name)) {
-        // Rule 3 skips this declaration: a non-allowlisted loop is already one
-        // finding, and reporting its period as a second "over the ceiling" sends
-        // the reader to fix a duration on an animation that should not exist.
-        flaggedInfinite.add(name);
-        findings.push({
-          rel,
-          rule: "infinite",
-          detail:
-            `\`${name}\` loops forever and is not on the allowlist in this guard. ` +
-            "PRODUCT.md principle 4 admits no pulsing state indicator, no marching ants " +
-            "and no looping decoration, in EITHER motion tier. If this reports work in " +
-            "flight it is indeterminate progress: add it to INFINITE_ALLOWLIST with the " +
-            "reason, and give the element `data-motion=\"essential\"` so reduced motion " +
-            "slows it rather than freezing it (MYND-630).",
-          line: lineOf(src, m.index),
-        });
+    for (const m of src.matchAll(/\banimation(?:-name)?\s*:/g)) {
+      const decl = declValue(src, m.index + m[0].length);
+      if (!/\binfinite\b/.test(decl)) continue;
+      for (const name of animationNames(decl)) {
+        seenInfinite.add(name);
+        if (!INFINITE_ALLOWLIST.has(name)) {
+          // Rule 3 skips this declaration: a non-allowlisted loop is already one
+          // finding, and reporting its period as a second "over the ceiling"
+          // sends the reader to fix a duration on an animation that should not
+          // exist.
+          flaggedInfinite.add(name);
+          findings.push({
+            rel,
+            rule: "infinite",
+            detail:
+              `\`${name}\` loops forever and is not on the allowlist in this guard. ` +
+              "PRODUCT.md principle 4 admits no pulsing state indicator, no marching ants " +
+              "and no looping decoration, in EITHER motion tier. If this reports work in " +
+              "flight it is indeterminate progress: add it to INFINITE_ALLOWLIST with the " +
+              "reason, and give the element `data-motion=\"essential\"` so reduced motion " +
+              "slows it rather than freezing it (MYND-630).",
+            line: lineOf(src, m.index),
+          });
+        }
       }
     }
 
