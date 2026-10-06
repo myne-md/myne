@@ -14,6 +14,7 @@
 
 import { invoke } from "../platform/core";
 import { patchDeletedField } from "../dialect";
+import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 
@@ -80,6 +81,12 @@ export async function deleteNoteRouted(
   noteId: string,
   forceTombstone?: boolean,
 ): Promise<void> {
+  // Persist any dirty pane FIRST (myne-md/myne#819): a pane still holding the
+  // pre-delete buffer would otherwise autosave the note straight back (the
+  // tombstone route writes `deleted:`; the hard route unlinks, and the stale
+  // save recreates the file). Same reason and same losing direction as
+  // `trashNote`'s flush.
+  await flushBeforeFrontmatterWrite();
   const tombstone = forceTombstone ?? (await isSyncConfigured());
   if (tombstone) {
     await tombstoneNote(noteId);

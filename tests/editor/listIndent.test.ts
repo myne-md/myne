@@ -13,7 +13,7 @@ import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { listAwareIndent, nextIndentColumn } from "../../editor/src/list-indent";
 import { indentUnit } from "@codemirror/language";
-import { assertParsedState } from "./_parse-budget";
+import { completeState } from "./_parse-budget";
 
 describe("nextIndentColumn", () => {
   it("defers to indentMore on a line that is not a list item", () => {
@@ -66,11 +66,12 @@ describe("nextIndentColumn", () => {
 
 describe("the indent the parser actually reads", () => {
   const nested = (doc: string): boolean => {
-    const state = EditorState.create({
-      doc,
-      extensions: [markdown({ base: markdownLanguage })],
-    });
-    assertParsedState(state);
+    const state = completeState(
+      EditorState.create({
+        doc,
+        extensions: [markdown({ base: markdownLanguage })],
+      }),
+    );
     let depth = 0;
     let maxListDepth = 0;
     syntaxTree(state).iterate({
@@ -89,11 +90,12 @@ describe("the indent the parser actually reads", () => {
   };
 
   const isTask = (doc: string): boolean => {
-    const state = EditorState.create({
-      doc,
-      extensions: [markdown({ base: markdownLanguage })],
-    });
-    assertParsedState(state);
+    const state = completeState(
+      EditorState.create({
+        doc,
+        extensions: [markdown({ base: markdownLanguage })],
+      }),
+    );
     let found = false;
     syntaxTree(state).iterate({
       enter: (node) => {
@@ -152,11 +154,12 @@ describe("listAwareIndent", () => {
   }
 
   const isTaskDoc = (doc: string): boolean => {
-    const st = EditorState.create({
-      doc,
-      extensions: [markdown({ base: markdownLanguage })],
-    });
-    assertParsedState(st);
+    const st = completeState(
+      EditorState.create({
+        doc,
+        extensions: [markdown({ base: markdownLanguage })],
+      }),
+    );
     let found = false;
     syntaxTree(st).iterate({
       enter: (n) => {

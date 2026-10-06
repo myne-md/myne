@@ -58,20 +58,25 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
+import { refreshThenOpen } from "../openFreshNote";
 import {
   itemKey,
   parseItemKey,
   type LeafPane,
   type SplitDirection,
 } from "../workspaceState";
+import { tabKindSpec } from "../tabKinds";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
+import { AttachmentsLibrary } from "../../components/attachments/AttachmentsLibrary";
+import { TemplatesManager } from "../../components/TemplatesManager";
 import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
 import { TasksPane } from "./TasksPane";
+import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
 import { useTagSuggestions } from "../useTagSuggestions";
 import { acceptTagIntoView } from "../ai/acceptTagIntoView";
@@ -332,6 +337,12 @@ export function PaneView({
   // A tasks-kind active tab renders the vault-wide task list (MYND-616) in place
   // of the note editor - the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
+  const isAttachments = leaf.activeTab?.kind === "attachments";
+  const isTemplates = leaf.activeTab?.kind === "templates";
+  // An agent-kind active tab renders the agent hub (myne-md/myne#771) in place of
+  // the note editor - the same first-class-tab pattern the graph and tasks tabs
+  // established, and what makes "open the agent" a reveal rather than a second tab.
+  const isAgent = leaf.activeTab?.kind === "agent";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). The hook re-evaluates on
   // every SYNC-5 index-change nonce - so a note created/renamed/loaded elsewhere
@@ -340,6 +351,15 @@ export function PaneView({
   // reference only when the set actually changed, so an unrelated bump no longer
   // reconfigures this pane's editor (myne#217).
   const notes = useLiveResolverNotes();
+  // Every folder that holds a note, for the agent tab's scope picker. Memoized
+  // because `notes` changes identity on every save and this sorts; the right
+  // panel's own copy gates on its tab being open for the same reason, and the
+  // gate here is the pane's kind, checked where it is used.
+  const agentFolders = useMemo(
+    () =>
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+    [notes],
+  );
   const indexNonce = useIndexNonce();
   // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
   // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
@@ -1581,6 +1601,75 @@ export function PaneView({
     if (isGraph) {
       return { fill: true, gutters: false, el: <GraphPane /> };
     }
+    // The attachment library (myne-md/myne#773). `fill` with no gutters, like
+    // the graph: the library owns its own padding and its grid has to reach the
+    // pane edge to fit a sensible number of thumbnails at a narrow split.
+    //
+    // It no longer renders its own title row. That row existed because the
+    // library replaced the whole pane tree, tab strip included, so it had to
+    // reproduce a header; as a tab, the tab strip already carries the paperclip
+    // and the word, and a second copy directly beneath it was the surface
+    // announcing itself twice.
+    if (isAttachments) {
+      return {
+        fill: true,
+        gutters: false,
+        // The flex COLUMN is load-bearing and its absence was a real bug: the
+        // library scrolled nowhere as a tab (reported on the running build).
+        //
+        // A filling body is wrapped in `<div style={{ height: "100%" }}>`, which
+        // is a BLOCK. The library is written as a flex child — its root is
+        // `flex: 1; minHeight: 0` and its scroller is `flex: 1; minHeight: 0;
+        // overflowY: auto` — so with no flex parent neither gets a bounded
+        // height, the root grows to content, and the scroller has nothing to
+        // scroll inside. `GraphPane` never exposed this because a canvas fills
+        // `height: 100%` on its own.
+        //
+        // Fixed here rather than by making the generic wrapper a flex column,
+        // which would change the height regime under the graph and the task
+        // list too — a wider blast radius than the bug warrants.
+        el: (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minHeight: 0,
+            }}
+          >
+            <AttachmentsLibrary />
+          </div>
+        ),
+      };
+    }
+    // The template library (myne-md/myne#779). Gutters STAY: unlike the graph
+    // and the attachment grid, this is a text list, and a text list 8px from
+    // the edge of a full-width pane is the compact this product says it is not.
+    if (isTemplates) {
+      return {
+        fill: true,
+        gutters: true,
+        el: (
+          <TemplatesManager
+            open
+            onClose={() => {}}
+            onOpenNote={(id) => {
+              // Opening a template REPLACES this tab with it, which is what
+              // "open" means in a pane. No separate close.
+              //
+              // Refresh it into the cache FIRST. A template created moments ago
+              // is not in `ctx.cache` yet, and the open bridge treats an id that
+              // is not live as a DELETED note and refuses to open it (myne#655) —
+              // which is why a freshly created template could not be opened for
+              // editing, and why it also slipped through the palette's
+              // `isTemplate` filter (myne-md/myne#820). The ordering lives in
+              // `refreshThenOpen` so a test can pin it (myne-md/myne#824).
+              void refreshThenOpen(ctx, id).catch(() => {});
+            }}
+          />
+        ),
+      };
+    }
     if (isTasks && leaf.activeTab !== null) {
       // The third member of #534's family, found while fixing the graph.
       // `TaskListPanel`'s root is written as a filling body (`height: 100%` over
@@ -1599,6 +1688,36 @@ export function PaneView({
         fill: true,
         gutters: true,
         el: <TasksPane paneId={leaf.id} item={leaf.activeTab} />,
+      };
+    }
+    if (isAgent && leaf.activeTab !== null) {
+      // The agent hub (myne-md/myne#771). It fills like the tasks pane and
+      // takes NO gutters.
+      //
+      // **The pane owns its own inset, and it cannot while this is true.** The
+      // gutter here is `0 24px`, which is the reading measure a flowing note
+      // wants and is far too much for a surface whose left column is a 248px
+      // rail: 48px of the pane's width goes to nothing, on the narrowest thing
+      // in the app. Worse, it is invisible from the pane's own stylesheet —
+      // two rounds of editing `.myne-agent`'s padding changed nothing on
+      // screen, because the value being looked at was never the one producing
+      // the gutter. So the inset lives in ONE place, `components.css`, where
+      // the rail's and the conversation's own paddings are, and the pane is
+      // handed the full width to spend.
+      //
+      // **`folders` is not optional here, whatever its type says.** It was
+      // omitted, so the agent tab's scope picker offered exactly one entry —
+      // "This note" — and in the agent tab there usually IS no open note: the
+      // tab is the focused pane. So the scope resolved to `null`, the host
+      // refuses a run without one, Send sat disabled, and the only alternative
+      // scope the picker exists to offer was not in it. A dead end reachable by
+      // opening the tab and typing.
+      return {
+        fill: true,
+        gutters: false,
+        el: (
+          <AgentPane paneId={leaf.id} item={leaf.activeTab} folders={agentFolders} />
+        ),
       };
     }
     if (loading) {
@@ -1878,9 +1997,11 @@ export function PaneView({
         titleOf={(key) => {
           const it = parseItemKey(key);
           if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;
-          // Graph tab: the whole-vault graph is a singleton with a fixed label.
-          if (it.kind === "graph") return t("notes.pane.graphTab");
-          if (it.kind === "tasks") return t("notes.pane.tasksTab");
+          // A singleton kind (the graph, the task list) carries a fixed label
+          // key in the tab-kind registry, so this arm covers every one of them
+          // and a new singleton needs no edit here (myne-md/myne#773).
+          const labelKey = tabKindSpec(it.kind).labelKey;
+          if (labelKey !== undefined) return t(labelKey);
           // View tab: label by the saved view's name (MYND-274), not its raw id.
           // A blank name shows "Untitled view" (the sidebar's label rule); an
           // unknown id (a stale tab for a deleted view) falls back to null.
@@ -1899,9 +2020,12 @@ export function PaneView({
         }}
         iconOf={(key) => {
           const it = parseItemKey(key);
-          if (it.kind === "view") return "layout-grid";
-          if (it.kind === "graph") return "share-2";
-          if (it.kind === "tasks") return "list-todo";
+          // Every non-note kind takes its glyph straight from the registry
+          // (myne-md/myne#773). `note` falls through, because a note's glyph
+          // depends on the NOTE (drawing, task, bookmark) rather than on its
+          // tab kind — which is exactly the distinction the registry's default
+          // cannot make and the lines below can.
+          if (it.kind !== "note") return tabKindSpec(it.kind).icon;
           // url-bookmark (SYNC-16): a note carrying an unmanaged `source:`
           // provenance key is a clipped link-only bookmark → bookmark glyph;
           // every ordinary note keeps the default `file-text`.

@@ -315,12 +315,15 @@ describeE2E("gt3 the graph canvas follows a pane resize (myne-md/myne#534)", () 
         await runPaletteAction(s, "graph.show-isolated", "isolated");
         const pane = await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
         const filter = await s.byTestId("editor.graph-filter", { timeoutMs: 15_000 });
-        // The control TELLS THE TRUTH about the view it is in: a `<select>`
-        // cannot display a value with no matching option, so the isolated
-        // option is rendered while it is the value.
-        expect(await filter.property<string>("value")).toBe("@isolated");
-        // The harness has no arbitrary-JS escape hatch on purpose, so the
-        // option's presence is read off the control's own text.
+        // The control TELLS THE TRUTH about the view it is in: the isolated
+        // option is rendered only while it IS the value, and the trigger shows
+        // that option's label.
+        //
+        // Read off the trigger's TEXT since myne-md/myne#772 made this the
+        // shared `<Select>`: it is a button, not a native select, so there is
+        // no `.value` property — and its absence is the improvement. A native
+        // select falls back to its first option when the value matches none,
+        // which is how this control could read "All" over a different picture.
         expect(await filter.property<string>("textContent")).toContain("Isolated");
         // And the picture really is the isolated set: every note in this vault
         // is an orphan, so the pane reports the whole set.

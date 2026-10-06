@@ -181,10 +181,17 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     expect(screen.queryByTestId("unlock.quick-unlock")).toBeNull();
   });
 
-  it("redeeming a PIN shows the same in-flight CTA the password path does", async () => {
+  it("redeeming a PIN reports the wait the same way the password path does", async () => {
     // The PIN runs the vault's own Argon2id parameters — the same multi-second
-    // wait the password CTA covers with a spinner. Hold the redeem open and pin
-    // that the button reports the work instead of going quiet.
+    // wait. Hold the redeem open and pin that the screen says so instead of
+    // going quiet.
+    //
+    // The report is the button: its LABEL changes to say what is happening and
+    // a spinner sits beside it, which is the same thing every other long
+    // action in the app does (myne-md/myne#773 put the auth screens on the
+    // app's own `<Input>` and `<Button>`). The label is load-bearing rather
+    // than decorative — it is the only channel a screen-reader user has on a
+    // screen whose normal case is several seconds of nothing happening.
     let releaseRedeem: () => void = () => {};
     invokeMock.mockImplementation((cmd) => {
       if (cmd === STATUS_CMD) {
@@ -205,8 +212,16 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     const submit = screen.getByTestId("unlock.quick-pin-submit");
     fireEvent.click(submit);
 
-    await waitFor(() => expect(submit.textContent).toBe("Decrypting…"));
+    // The wait in words, the same way the password path reports it: a status
+    // line under the field, and the button's name, now that the button is an
+    // arrow with no room for a label.
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Decrypting…"));
+    expect(submit.getAttribute("aria-label")).toBe("Decrypting…");
     expect((submit as HTMLButtonElement).disabled).toBe(true);
+    const row = submit.parentElement as HTMLElement;
+    // No motion exemption survives anywhere on the row: nothing here carries
+    // state through motion now, so one would be an exemption for nothing.
+    expect(row.getAttribute("data-motion")).toBe(null);
     // The field is locked too, so a second PIN cannot race the in-flight derive.
     expect((screen.getByTestId("unlock.quick-pin-input") as HTMLInputElement).disabled).toBe(
       true,

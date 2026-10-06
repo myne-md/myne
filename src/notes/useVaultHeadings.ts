@@ -32,6 +32,7 @@ import {
 } from "@myne/editor/host/notes/vaultHeadings";
 import { useIndexNonce } from "./indexNonce";
 import { useResolverNotes } from "./resolverNotes";
+import { rowsEqual } from "./rowsEqual";
 import { vaultHeadings } from "./vaultIndices";
 
 // The join moved to `@myne/editor/host/notes/vaultHeadings` (myne-md/myne#452)
@@ -65,7 +66,15 @@ export function useVaultHeadings(): readonly VaultHeading[] {
       } catch {
         return; // best-effort — leave the prior set
       }
-      if (!cancelled && seq === fetchSeq.current) setRows(fetched);
+      if (!cancelled && seq === fetchSeq.current) {
+        // Keep the PRIOR array identity when the heading set is unchanged
+        // (before this the fresh array churned `vaultHeadings` on every
+        // autosave, reconfiguring the editor's facet and re-rendering every
+        // consumer — the long-note save flicker).
+        setRows((prev) =>
+          rowsEqual(prev, fetched, ["noteId", "text", "level"]) ? prev : fetched,
+        );
+      }
     })();
     return () => {
       cancelled = true;

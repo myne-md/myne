@@ -1,6 +1,6 @@
-// Attachments library surface (MYND-170 / MYND-164) — a full-pane center-pane
-// view (SYNC-9: an in-editor view toggle; the shell + sidebars persist; NOT a
-// modal, NOT a new Stage). Browse / search / sort / filter the vault's
+// Attachments library surface (MYND-170 / MYND-164) — a full-pane TAB body
+// (SYNC-9 shipped it as an in-editor view toggle; myne-md/myne#773 made it a
+// tab. The shell + sidebars persist; NOT a modal, NOT a new Stage). Browse / search / sort / filter the vault's
 // attachments, preview thumbnails (hover-preview → shared lightbox), see
 // "used in N notes", and act via a per-item ⋮ menu: preview, rename, delete.
 //
@@ -8,9 +8,12 @@
 // insert-into-note action (there is no focused editor while it's open — the
 // `emitAttachmentEmbed` insert path stays available in the editor itself).
 //
-// Mounted by `Editor.tsx` when the center view is "attachments". Lives
-// inside `<SidebarStateProvider>` so it can read the note-title cache + the
-// `open` action (jump-to-note target).
+// Rendered by `PaneView` as the body of an `attachments` TAB (myne-md/myne#773).
+// It used to be a `CenterView` — a second, parallel center-pane swap that
+// replaced the whole pane tree — which is why the left ribbon could not know it
+// was open and why it could not sit beside a note in a split. Lives inside
+// `<SidebarStateProvider>` so it can read the note-title cache + the `open`
+// action (jump-to-note target).
 //
 // Design canon: monochrome + iron-blue accent, 1px hairlines, no card
 // shadows, Inter UI / JetBrains Mono for ids, sentence-case, no emoji.
@@ -56,6 +59,9 @@ import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
 import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
+import { Skeleton } from "../primitives/Skeleton";
+import { VISUALLY_HIDDEN as visuallyHidden } from "../primitives/visuallyHidden";
 import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -115,12 +121,15 @@ const TRANSCRIBE_TOAST_KEY: Readonly<
 interface AttachmentsLibraryProps {
   /**
    * Return to the editor view. The library is a SCREEN, not a modal — there
-   * is no × affordance; the user leaves by selecting a note in the sidebar
-   * (which resets the center view). This callback survives only for the
-   * jump-to-note path (clicking a "used in N notes" entry), which opens the
-   * note AND swaps the center pane back to the editor.
+   * is no × affordance; the user leaves by selecting another tab, or by
+   * jumping to a note from a "used in N notes" entry — which opens the note in
+   * this pane and therefore replaces this tab with it.
+   *
+   * There is no `onClose` any more (myne-md/myne#773). It existed because the
+   * library was a `CenterView` — a parallel center-pane swap outside the tab
+   * model — so jumping to a note had to ALSO tell the shell to swap back. As a
+   * tab, opening the note in the focused pane is the whole operation.
    */
-  onClose: () => void;
 }
 
 // ---- layout tokens --------------------------------------------------------
@@ -266,19 +275,6 @@ const GRID_STYLE: CSSProperties = {
   paddingTop: "var(--space-4)",
 };
 
-const CENTER_MESSAGE_STYLE: CSSProperties = {
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-3)",
-  color: "var(--fg-3)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  textAlign: "center",
-};
-
 // ---- main component -------------------------------------------------------
 
 // Transient bottom-center toast for the "nothing to clean" / scan-error
@@ -299,7 +295,7 @@ const CLEAN_NOTICE_STYLE: CSSProperties = {
   zIndex: 10,
 };
 
-export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
+export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // AI opt-in gate for the per-item Transcribe action (voice-to-text MYND-552,
@@ -650,10 +646,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   const handleJump = useCallback(
     (id: NoteId) => {
+      // Opening the note in the focused pane REPLACES this tab with it, which
+      // is what "jump to the note" means. No second call is needed.
       void ctx.open(id).catch(() => {});
-      onClose(); // jumping to a note returns to the editor view
     },
-    [ctx, onClose],
+    [ctx],
   );
 
   // ---- render ------------------------------------------------------------
@@ -892,19 +889,63 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           writer when it lands. */}
       <AttachmentSyncProgress hideWhenEmpty />
 
-      <div style={SCROLL_STYLE}>
+      <div
+        style={
+          // A flex column only while a zero state is showing, so it can FILL
+          // the tab rather than sit as a card at the top of it with the rest
+          // of the tab empty below.
+          isEmpty || isNoMatch
+            ? { ...SCROLL_STYLE, display: "flex", flexDirection: "column" }
+            : SCROLL_STYLE
+        }
+      >
         {isLoading ? (
-          <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.decrypting")}</div>
+          // The library's layout is KNOWN before its contents are — a grid of
+          // uniform tiles, or a list of uniform rows — so it draws itself and
+          // the attachments arrive into it (myne-md/myne#778). It used to show
+          // the word "Decrypting…" centred in an empty pane, which told the
+          // user the wait was happening and nothing about what was coming, then
+          // shoved the page around when it landed.
+          //
+          // The word stays, in a live region, because the skeleton is
+          // `aria-hidden` and a screen-reader user would otherwise be told
+          // nothing at all.
+          <div data-testid="attachments.loading">
+            <span style={visuallyHidden} role="status" aria-live="polite">
+              {t("attachments.library.decrypting")}
+            </span>
+            <div
+              style={
+                view === "grid"
+                  ? GRID_STYLE
+                  : { display: "flex", flexDirection: "column", gap: "var(--space-1)" }
+              }
+              aria-hidden="true"
+            >
+              {Array.from({ length: 8 }, (_, i) => (
+                <Skeleton
+                  key={i}
+                  style={
+                    view === "grid"
+                      ? { height: 132, borderRadius: "var(--radius-2)" }
+                      : { height: 44, borderRadius: "var(--radius-2)" }
+                  }
+                />
+              ))}
+            </div>
+          </div>
         ) : isEmpty ? (
-          <EmptyState
+          <LibraryEmpty
             mode="empty"
             loadError={loadError}
             importing={importing}
             onImport={() => void handleImport()}
+            onRetry={() => void refresh()}
           />
         ) : isNoMatch ? (
-          <EmptyState
+          <LibraryEmpty
             mode="no-results"
+            query={query}
             onClearSearch={() => {
               setQuery("");
               setTypeFilter("all");
@@ -1108,75 +1149,104 @@ function ToolbarActionButton({
 
 // ---- empty state ----------------------------------------------------------
 
-// Two distinct zero states share one centered layout:
-//   • "empty"      — the catalog itself is empty → paperclip + import CTA.
-//   • "no-results" — the catalog is non-empty but the active query / type filter
-//                    matches nothing → search icon + a "Clear search" reset.
-type EmptyStateProps =
+// THREE distinct zero states, on the shared `<EmptyState>` since
+// myne-md/myne#776:
+//
+//   • firstRun — the catalog itself is empty. Import is the way out.
+//   • filtered — the catalog has items but the query / type filter matches
+//                nothing. The query is ECHOED BACK and clearing it is the way
+//                out. This is the state that was a dead end everywhere else in
+//                the app: "no results" with no sight of what was searched and
+//                nothing to press.
+//   • error    — the catalog could not be read. Previously this shared the
+//                firstRun branch, so a failure to DECRYPT the catalog rendered
+//                as "No attachments yet" beside an Import button: the one
+//                sentence guaranteed to be wrong, offering the one action that
+//                cannot help.
+type LibraryEmptyProps =
   | {
       mode: "empty";
       loadError: boolean;
       importing: boolean;
       onImport: () => void;
+      onRetry: () => void;
     }
   | {
       mode: "no-results";
+      query: string;
       onClearSearch: () => void;
     };
 
-function EmptyState(props: EmptyStateProps) {
+function LibraryEmpty(props: LibraryEmptyProps) {
   const { t } = useTranslation();
 
   if (props.mode === "no-results") {
     return (
-      <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-results">
-        <Icon name="search" size={40} style={{ color: "var(--fg-3)" }} />
-        <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
-          {t("attachments.library.emptyNoResultsTitle")}
-        </div>
-        <button
-          type="button"
-          onClick={props.onClearSearch}
-          data-testid="attachments.empty-clear-search"
-          {...hoverSurface()}
-          style={{
-            background: "transparent",
-            border: 0,
-            padding: "var(--space-1) var(--space-2)",
-            borderRadius: "var(--radius-1)",
-            cursor: "pointer",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-            color: "var(--accent)",
-            transition: HOVER_TRANSITION,
-          }}
-        >
-          {t("attachments.library.emptyClearSearch")}
-        </button>
-      </div>
+      <EmptyState
+        variant="filtered"
+        icon="search"
+        title={t("attachments.library.emptyNoResultsTitle")}
+        body={
+          props.query.trim() === ""
+            ? t("attachments.library.emptyFilteredBody")
+            : t("attachments.library.emptyFilteredBodyQuery")
+        }
+        query={props.query.trim() === "" ? undefined : props.query}
+        testId="attachments.empty-no-results"
+        fill
+        action={
+          <Button
+            variant="secondary"
+            icon="x"
+            onClick={props.onClearSearch}
+            data-testid="attachments.empty-clear-search"
+          >
+            {t("attachments.library.emptyClearSearch")}
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (props.loadError) {
+    return (
+      <EmptyState
+        variant="error"
+        icon="circle-alert"
+        title={t("attachments.library.emptyLoadError")}
+        body={t("attachments.library.emptyLoadErrorBody")}
+        testId="attachments.empty-load-error"
+        fill
+        action={
+          <Button variant="secondary" icon="refresh-cw" onClick={props.onRetry}>
+            {t("attachments.library.emptyRetry")}
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <div style={CENTER_MESSAGE_STYLE} data-testid="attachments.empty-no-attachments">
-      <Icon name="paperclip" size={40} style={{ color: "var(--fg-3)" }} />
-      <div style={{ fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
-        {props.loadError
-          ? t("attachments.library.emptyLoadError")
-          : t("attachments.library.emptyNoAttachments")}
-      </div>
-      <div>{t("attachments.library.emptyImportHint")}</div>
-      <Button
-        variant="secondary"
-        icon="download"
-        onClick={props.onImport}
-        disabled={props.importing}
-      >
-        {props.importing
-          ? t("attachments.library.importing")
-          : t("attachments.library.importFile")}
-      </Button>
-    </div>
+    <EmptyState
+      variant="firstRun"
+      icon="paperclip"
+      title={t("attachments.library.emptyNoAttachments")}
+      body={t("attachments.library.emptyImportHint")}
+      testId="attachments.empty-no-attachments"
+        fill
+      action={
+        <Button
+          variant="primary"
+          icon="download"
+          onClick={props.onImport}
+          disabled={props.importing}
+        >
+          {props.importing
+            ? t("attachments.library.importing")
+            : t("attachments.library.importFile")}
+        </Button>
+      }
+    />
   );
 }
 

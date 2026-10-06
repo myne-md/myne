@@ -179,7 +179,7 @@ The system explicitly rejects the privacy-product visual canon. There is no lock
 - Inter Variable for UI sans, JetBrains Mono Variable for cryptographic identifiers (slashed zero on, `ss02 + zero + calt`).
 - 1px hairlines (`#e3e2dd`) for every divider; 2px borders are forbidden.
 - Flat at rest. Shadows live only on overlays (command palette, dropdowns, toasts, tooltips), never on the editor surface or on cards.
-- Restrained motion: 120/180/260ms, exponential ease-out only, `prefers-reduced-motion` disables transitions globally.
+- Two motion tiers (`design-notes/ui/0632`). **Restrained** is the default and covers hover/focus/press/disclosure/panel: 120/180/260ms, exponential ease-out only. **Expressive** is opt-in for rare moments (first arrival, shared-element travel, a held gesture): 80ms press feedback, a named 380ms ceiling-breaker, emphasized and spring curves, capped stagger. `prefers-reduced-motion` disables transitions globally in **both**. A keyboard-initiated or 100+/day action gets no motion in either tier, and there are no pulsing state indicators in either.
 
 ## 2. Colors: The Paper-and-Ink Palette
 
@@ -328,7 +328,7 @@ Used only when an inline progressive disclosure is genuinely impossible. Backgro
 - **Do** use the standard 2px iron-blue ring with a 1px paper offset for `:focus-visible` on every interactive element. The ring is always visible; never removed.
 - **Do** use sentence case everywhere. "Save note", not "Save Note". Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri).
 - **Do** communicate state with an icon plus a text label, never with color alone.
-- **Do** keep motion under 260ms with exponential ease-out cubic curves. Disable transitions globally under `prefers-reduced-motion`.
+- **Do** keep restrained-tier motion under 260ms with exponential ease-out cubic curves, and expressive-tier motion under 380ms (`--duration-slower`, and only for a large surface or a shared-element travel). Disable transitions globally under `prefers-reduced-motion`. **Never** `ease-in` on an entrance or exit — it delays the moment the user is watching.
 **Inline editor chips use pill radius.** The canon reserved pill radius for status pills and small radius for chips, but the one shipped editor chip (`#tag`) uses pill radius, and MYND-614 adds three more chips that sit in the same line of prose beside it. The canon is updated toward the shipped artifact rather than the other way round: on-screen consistency between two chips sharing a line of text is worth more than consistency with a document the code already diverged from, and the project's own workflow says the projection gets updated when the two disagree.
 
 Scope of the exception: **inline chips inside the editor** (`.cm-tag-chip`, `.cm-task-chip`). Chips elsewhere — the tag browser's rows, panel chips — keep the 3px small radius. The status-pill rule is untouched, and so is the prohibition on a green check.

@@ -68,7 +68,7 @@ async function insertInlineDrawing(s: Session): Promise<void> {
   // assertion once and at the last reload step once, which is the signature of
   // a race, not of a stale assertion.
   //
-  // Same shape as `clickNewMenuItem` (`e2e/AGENTS.md`) and the audio ⋮ menu:
+  // Same shape as `clickNewItem` (`e2e/AGENTS.md`) and the audio ⋮ menu:
   // when a trigger can miss, the fix is to re-fire it, not to wait longer.
   // Re-sending is safe precisely BECAUSE a missed burst mints nothing: the loop
   // only repeats while no embed exists, and the per-attempt settle below gives a

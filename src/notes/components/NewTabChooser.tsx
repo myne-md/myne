@@ -1,27 +1,45 @@
 // `<NewTabChooser>` — the empty-tab landing surface (MYND-166 behavioral
-// pass). Shown when a pane has no active tab, or when the user opens a new
-// tab via the strip's "+". Instead of the "+" force-creating a note, this
-// lets the user search/pick an existing note or create a fresh one — the
-// "empty state window" from the design decision.
+// pass; reshaped as a start page in myne-md/myne#772). Shown when a pane has no
+// active tab, or when the user opens a new tab via the strip's "+". Instead of
+// the "+" force-creating a note, this lets the user pick what the tab becomes.
 //
-// Presented as ONE clean card (search → recent list → action rows) rather than
-// loose floating controls, so the empty tab reads as a deliberate command
-// surface (à la a command palette) instead of a bare page.
+// Three layers, top to bottom:
 //
-// Notes come from the in-memory sidebar cache (already loaded for the
-// vault), filtered to live notes (no trash, no templates) and ranked by
-// recency, so picking is instant with no extra IPC.
+// 1. One search over notes AND commands, so "graph" finds the graph and
+//    "lecture" finds the lecture note. Enter opens the top row.
+// 2. The places row: the destinations a tab can hold (today's note, the agent,
+//    attachments, the graph, tasks) as fixed tiles. Fixed rather than learned,
+//    so a fresh vault's first new tab is already useful and the tiles never
+//    move under a person's hand.
+// 3. "Jump back in": notes and commands mixed by recency. Notes carry their own
+//    `updatedAt`; commands come from the session's recency store
+//    (`lib/commandRecency`), fed by the palette, the rail and key chords.
+//
+// Places and commands run through `ribbonCommands`, the same bridge the left
+// rail uses, so a tile click is the rail click it looks like: same visibility
+// rule, same failure toast. Opening an item into the focused pane consumes the
+// pending new tab (workspaceContext), so the chosen surface lands HERE.
+//
+// Notes come from the in-memory sidebar cache (already loaded for the vault),
+// filtered to live notes, so picking is instant with no extra IPC.
 
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { COMMAND_ACTIONS } from "../../commands";
+import type { CommandAction } from "../../commands/registry";
+import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import {
   hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useRecentCommandRuns } from "../../lib/commandRecency";
+import type { IconName } from "../../lib/icons";
 import { archivedFolderKeys } from "../archivedFolders";
+import { ribbonCommands } from "../ribbonCommands";
 import { liveCache, useSelectedNote, type NoteId } from "../sidebarState";
+import { formatRelativeTime, useTick } from "./relativeTime";
 
 type NewTabChooserProps = {
   /** Open an existing note into the new tab. */
@@ -36,8 +54,40 @@ type NewTabChooserProps = {
   onCancel: () => void;
 };
 
+/** The places row, in order. Each is a registry command id plus the short
+ *  noun its tile shows; a place whose command is hidden in the current state
+ *  (the agent without developer mode) drops out rather than rendering dead. */
+export const NEW_TAB_PLACES: readonly {
+  id: string;
+  icon: IconName;
+  labelKey: string;
+}[] = [
+  { id: "daily.open-today", icon: "calendar-days", labelKey: "notes.newTab.places.today" },
+  { id: "ai.open-agent-vault", icon: "message-square", labelKey: "notes.newTab.places.agent" },
+  { id: "attachments.open", icon: "paperclip", labelKey: "notes.newTab.places.attachments" },
+  { id: "graph.show", icon: "share-2", labelKey: "notes.newTab.places.graph" },
+  { id: "tasks.show", icon: "list-todo", labelKey: "notes.newTab.places.tasks" },
+];
+
+/** Commands that never belong in the recent list: the places already have a
+ *  tile, and opening the palette is not a destination. */
+const NOT_RECENT = new Set<string>([
+  ...NEW_TAB_PLACES.map((p) => p.id),
+  "palette.open",
+  "note.new",
+  "note.new-tab",
+]);
+
+const RECENT_LIMIT = 8;
+const SEARCH_NOTE_LIMIT = 50;
+const SEARCH_COMMAND_LIMIT = 6;
+
+type Row =
+  | { kind: "note"; key: string; id: NoteId; title: string | null; at: number }
+  | { kind: "command"; key: string; action: CommandAction; at: number };
+
 const WRAP: CSSProperties = {
-  maxWidth: 480,
+  maxWidth: 640,
   width: "100%",
   margin: "10vh auto 0",
   padding: "0 16px",
@@ -45,32 +95,26 @@ const WRAP: CSSProperties = {
   fontFamily: "var(--font-sans)",
 };
 
-// The card — one bordered, elevated surface the whole chooser lives inside.
-const CARD: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2)",
-  overflow: "hidden",
-};
-
-const SEARCH_ROW: CSSProperties = {
+const SEARCH_PILL: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
-  padding: "11px 14px",
-  borderBottom: "1px solid var(--line-1)",
+  height: 42,
+  padding: "0 14px",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--bg-2)",
   color: "var(--fg-3)",
+  transition: HOVER_TRANSITION,
 };
 
 const INPUT: CSSProperties = {
   flex: 1,
+  minWidth: 0,
   border: 0,
   outline: "none",
-  // Suppress the global `input:focus-visible` ring (tokens.css) — the field is
-  // the card's header, not a standalone control.
+  // Suppress the global `input:focus-visible` ring (tokens.css) — the pill
+  // draws the focus state itself, on its border.
   boxShadow: "none",
   background: "transparent",
   color: "var(--fg-1)",
@@ -78,9 +122,33 @@ const INPUT: CSSProperties = {
   fontSize: "var(--text-base)",
 };
 
-const SECTION_LABEL: CSSProperties = {
-  padding: "10px 14px 4px",
+const PLACES: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-4)",
+};
+
+const PLACE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "var(--space-3)",
+  padding: "12px 12px 10px",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--bg-2)",
+  color: "var(--fg-1)",
+  cursor: "pointer",
+  textAlign: "start",
   fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  transition: HOVER_TRANSITION,
+};
+
+const SECTION_LABEL: CSSProperties = {
+  margin: "var(--space-5) 0 var(--space-1)",
+  padding: "0 8px",
   fontSize: "var(--text-xs)",
   fontWeight: "var(--weight-semibold)",
   letterSpacing: "0.06em",
@@ -94,7 +162,6 @@ const LIST: CSSProperties = {
   gap: 1,
   maxHeight: "38vh",
   overflowY: "auto",
-  padding: "0 6px 6px",
 };
 
 const ROW: CSSProperties = {
@@ -102,7 +169,7 @@ const ROW: CSSProperties = {
   alignItems: "center",
   gap: "var(--space-2)",
   width: "100%",
-  padding: "8px 8px",
+  padding: "7px 8px",
   border: 0,
   borderRadius: "var(--radius-1)",
   background: "transparent",
@@ -112,42 +179,37 @@ const ROW: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
   transition: HOVER_TRANSITION,
+};
+
+const ROW_ICON: CSSProperties = { display: "flex", flexShrink: 0, color: "var(--fg-3)" };
+
+const ROW_META: CSSProperties = {
+  flexShrink: 0,
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
 };
 
 const EMPTY: CSSProperties = {
-  padding: "16px 14px",
+  padding: "12px 8px",
   color: "var(--fg-3)",
   fontSize: "var(--text-sm)",
-  textAlign: "center",
 };
 
-// The action rows at the card's foot — Create / New drawing, presented like
-// menu entries (icon + label) rather than floating buttons.
-const ACTIONS: CSSProperties = {
+const CREATE_ROW: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  borderTop: "1px solid var(--line-1)",
-  padding: 6,
-  gap: 1,
+  flexWrap: "wrap",
+  gap: "var(--space-1)",
+  marginTop: "var(--space-3)",
 };
 
-const ACTION_ROW: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  width: "100%",
-  padding: "9px 10px",
-  border: 0,
-  borderRadius: "var(--radius-1)",
-  background: "transparent",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  textAlign: "start",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)",
-  transition: HOVER_TRANSITION,
-};
+const isShown = (id: string): boolean => ribbonCommands.visibility?.(id) === "show";
+
+/** 0 = starts with the query, 1 = contains it, null = no match. */
+function matchTier(text: string, q: string): 0 | 1 | null {
+  const s = text.toLowerCase();
+  if (s.startsWith(q)) return 0;
+  return s.includes(q) ? 1 : null;
+}
 
 export function NewTabChooser({
   onPick,
@@ -159,9 +221,11 @@ export function NewTabChooser({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const { prefs } = usePrefs();
+  const commandRuns = useRecentCommandRuns();
+  // Re-render on the shared relative-time tick so "2 min ago" stays true.
+  useTick();
   const [query, setQuery] = useState("");
-  // Focus the whole search pill (not the bare input) — inline styles can't
-  // express `:focus-within`, so track it.
+  // Inline styles can't express `:focus-within`, so the pill tracks it.
   const [searchFocused, setSearchFocused] = useState(false);
 
   const archivedKeys = useMemo(
@@ -169,22 +233,77 @@ export function NewTabChooser({
     [prefs.archived_folders],
   );
 
-  const rows = useMemo(() => {
-    // `liveCache` is the canonical trash/template/archive visibility predicate
-    // (sidebarState) — reuse it (with the folder-archive keys) so this picker
-    // can't silently diverge.
-    const all = [...liveCache(ctx.cache, archivedKeys).values()];
-    const q = query.trim().toLowerCase();
-    const matched =
-      q === ""
-        ? all
-        : all.filter((r) => (r.title ?? "").toLowerCase().includes(q));
-    return matched
-      .sort(
+  // `liveCache` is the canonical trash/template/archive visibility predicate
+  // (sidebarState); reuse it so this picker can't silently diverge.
+  const notes = useMemo(
+    () =>
+      [...liveCache(ctx.cache, archivedKeys).values()].sort(
         (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
-      )
-      .slice(0, 100);
-  }, [ctx.cache, query, archivedKeys]);
+      ),
+    [ctx.cache, archivedKeys],
+  );
+
+  // Visibility is read at render: prefs changes (developer mode, AI) re-render
+  // this component through `usePrefs`, which is when the answer can change.
+  const places = NEW_TAB_PLACES.filter((p) => isShown(p.id));
+  const canTemplate = isShown("templates.new-note");
+
+  const q = query.trim().toLowerCase();
+  const rows = useMemo<Row[]>(() => {
+    const noteRow = (r: (typeof notes)[number]): Row => ({
+      kind: "note",
+      key: `n:${r.noteUuid}`,
+      id: r.noteUuid,
+      title: r.title,
+      at: r.updatedAt?.getTime() ?? 0,
+    });
+    const runAt = new Map(commandRuns.map((r) => [r.id, r.at]));
+
+    if (q === "") {
+      const recentCommands: Row[] = [];
+      for (const run of commandRuns) {
+        if (NOT_RECENT.has(run.id)) continue;
+        const action = COMMAND_ACTIONS.find((a) => a.id === run.id);
+        if (action === undefined || !isShown(action.id)) continue;
+        recentCommands.push({ kind: "command", key: `c:${action.id}`, action, at: run.at });
+      }
+      return [...notes.slice(0, RECENT_LIMIT).map(noteRow), ...recentCommands]
+        .sort((a, b) => b.at - a.at)
+        .slice(0, RECENT_LIMIT);
+    }
+
+    // Searching: prefix matches outrank substring matches, then recency. A
+    // command nobody has run yet sorts after every one that has, within its tier.
+    const scored: { row: Row; tier: 0 | 1 }[] = [];
+    let noteCount = 0;
+    for (const r of notes) {
+      if (noteCount >= SEARCH_NOTE_LIMIT) break;
+      const tier = matchTier(r.title ?? "", q);
+      if (tier === null) continue;
+      noteCount += 1;
+      scored.push({ row: noteRow(r), tier });
+    }
+    let commandCount = 0;
+    for (const action of COMMAND_ACTIONS) {
+      if (commandCount >= SEARCH_COMMAND_LIMIT) break;
+      if (action.id === "palette.open" || !isShown(action.id)) continue;
+      const tier = matchTier(action.label, q);
+      if (tier === null) continue;
+      commandCount += 1;
+      scored.push({
+        row: { kind: "command", key: `c:${action.id}`, action, at: runAt.get(action.id) ?? 0 },
+        tier,
+      });
+    }
+    return scored
+      .sort((a, b) => a.tier - b.tier || b.row.at - a.row.at)
+      .map((s) => s.row);
+    // `prefs` is a dependency for the visibility reads above.
+  }, [notes, commandRuns, q, prefs]);
+
+  const runCommand = (id: string) => ribbonCommands.run?.(id);
+  const openRow = (row: Row) =>
+    row.kind === "note" ? onPick(row.id) : runCommand(row.action.id);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (cancellable && e.key === "Escape") {
@@ -192,100 +311,142 @@ export function NewTabChooser({
       onCancel();
       return;
     }
-    // Enter opens the top result — the search doubles as go-to-file.
+    // Enter opens the top row — the search doubles as go-to-anything.
     if (e.key === "Enter" && rows.length > 0) {
       e.preventDefault();
-      onPick(rows[0]!.noteUuid);
+      openRow(rows[0]!);
     }
   };
 
+  const meta = (row: Row): string => {
+    const kind =
+      row.kind === "note" ? t("notes.newTab.kindNote") : t("notes.newTab.kindCommand");
+    const when = row.at > 0 ? formatRelativeTime(new Date(row.at)) : "";
+    return when === "" ? kind : `${kind} · ${when}`;
+  };
+
   return (
-    <div style={WRAP} onKeyDown={onKeyDown}>
-      <div style={CARD}>
-        <div
-          style={{
-            ...SEARCH_ROW,
-            ...(searchFocused ? { color: "var(--accent)" } : {}),
-          }}
-        >
-          <Icon name="search" size={15} />
-          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            placeholder={t("notes.newTab.searchPlaceholder")}
-            spellCheck={false}
-            autoComplete="off"
-            aria-label={t("notes.newTab.searchAriaLabel")}
-            style={INPUT}
-          />
-        </div>
+    <div style={WRAP} onKeyDown={onKeyDown} data-testid="notes.newTab">
+      <div
+        style={{
+          ...SEARCH_PILL,
+          ...(searchFocused ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}),
+        }}
+      >
+        <Icon name="search" size={15} />
+        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder={t("notes.newTab.searchPlaceholder")}
+          spellCheck={false}
+          autoComplete="off"
+          aria-label={t("notes.newTab.searchAriaLabel")}
+          data-testid="notes.newTab.search"
+          style={INPUT}
+        />
+      </div>
 
-        {rows.length > 0 && (
-          <div style={SECTION_LABEL}>{t("notes.newTab.recent")}</div>
-        )}
-        <div style={LIST}>
-          {rows.length === 0 ? (
-            <div style={EMPTY}>
-              {query.trim() === ""
-                ? t("notes.newTab.noNotesYet")
-                : t("notes.newTab.noNotesMatch")}
-            </div>
-          ) : (
-            rows.map((r) => (
-              <button
-                key={r.noteUuid}
-                type="button"
-                onClick={() => onPick(r.noteUuid)}
-                {...hoverSurface()}
-                style={ROW}
+      {q === "" && places.length > 0 && (
+        <div style={PLACES} role="group" aria-label={t("notes.newTab.placesLabel")}>
+          {places.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => runCommand(p.id)}
+              data-testid={`notes.newTab.place.${p.id}`}
+              {...hoverSurface()}
+              style={PLACE}
+            >
+              <span
+                style={{
+                  display: "flex",
+                  color: p.id === "daily.open-today" ? "var(--accent)" : "var(--fg-2)",
+                }}
               >
-                <Icon name="file-text" size={14} />
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontStyle: r.title === null ? "italic" : "normal",
-                    color: r.title === null ? "var(--fg-3)" : undefined,
-                  }}
-                >
-                  {r.title ?? t("notes.newTab.untitled")}
-                </span>
-              </button>
-            ))
-          )}
+                <Icon name={p.icon} size={18} />
+              </span>
+              <span>{t(p.labelKey)}</span>
+            </button>
+          ))}
         </div>
+      )}
 
-        <div style={ACTIONS}>
-          <button
-            type="button"
-            onClick={onCreate}
-            {...hoverSurface()}
-            style={ACTION_ROW}
+      <div style={SECTION_LABEL}>
+        {q === "" ? t("notes.newTab.recent") : t("notes.newTab.results")}
+      </div>
+      <div style={LIST}>
+        {rows.length === 0 ? (
+          <div style={EMPTY}>
+            {q === "" ? t("notes.newTab.noNotesYet") : t("notes.newTab.noMatch")}
+          </div>
+        ) : (
+          rows.map((row) => (
+            <button
+              key={row.key}
+              type="button"
+              onClick={() => openRow(row)}
+              data-testid={
+                row.kind === "note" ? "notes.newTab.note-row" : "notes.newTab.command-row"
+              }
+              {...hoverSurface()}
+              style={ROW}
+            >
+              <span style={ROW_ICON}>
+                <Icon
+                  name={
+                    row.kind === "note" ? "file-text" : (row.action.ribbon?.icon ?? "command")
+                  }
+                  size={14}
+                />
+              </span>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  ...(row.kind === "note" && row.title === null
+                    ? { fontStyle: "italic", color: "var(--fg-3)" }
+                    : null),
+                }}
+              >
+                {row.kind === "note"
+                  ? (row.title ?? t("notes.newTab.untitled"))
+                  : row.action.label}
+              </span>
+              <span style={ROW_META}>{meta(row)}</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      <div style={CREATE_ROW}>
+        <Button variant="ghost" icon="plus" onClick={onCreate} data-testid="notes.newTab.create-note">
+          {t("notes.newTab.createNote")}
+        </Button>
+        <Button
+          variant="ghost"
+          icon="pencil"
+          onClick={onCreateDrawing}
+          data-testid="notes.newTab.create-drawing"
+        >
+          {t("notes.newTab.createDrawing")}
+        </Button>
+        {canTemplate && (
+          <Button
+            variant="ghost"
+            icon="file-plus"
+            onClick={() => runCommand("templates.new-note")}
+            data-testid="notes.newTab.create-from-template"
           >
-            <span style={{ display: "flex", flexShrink: 0, color: "var(--accent)" }}>
-              <Icon name="plus" size={15} />
-            </span>
-            <span>{t("notes.newTab.createNote")}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onCreateDrawing}
-            data-testid="notes.newTab.create-drawing"
-            {...hoverSurface()}
-            style={ACTION_ROW}
-          >
-            <span style={{ display: "flex", flexShrink: 0, color: "var(--fg-3)" }}>
-              <Icon name="pencil" size={15} />
-            </span>
-            <span>{t("notes.newTab.createDrawing")}</span>
-          </button>
-        </div>
+            {t("notes.newTab.createFromTemplate")}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -35,7 +35,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::recover_with_phrase,
             commands::complete_recovery,
-            commands::resolve_vault_by_account_number
+            commands::resolve_vault_by_account_number,
+            commands::verify_recovery_phrase
         ])
         .build()
 }

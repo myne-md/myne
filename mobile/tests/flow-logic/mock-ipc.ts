@@ -501,6 +501,20 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // an UNMOCKED command to `[]`, so without a real handler + store a picker
     // test would pass against its own optimistic draft and prove nothing.
     let vaultIcon: string | null = (config.prefs?.icon as string | null | undefined) ?? null;
+    // Same shape as `vaultIcon`, for the label the vault-name step writes.
+    let vaultLabel: string | null = (config.prefs?.label as string | null | undefined) ?? null;
+    // Whether `plugin:vault-unlock|unlock` has succeeded in this session.
+    //
+    // Tracked ONLY so the prefs WRITE handlers can refuse before it, which the
+    // real backend does: every prefs write needs the active vault's `prefs_key`,
+    // so `vault_set_label` rejects with `SlotNotUnlocked` when no vault is open.
+    // Without this the mock accepted a label written at commit time — before any
+    // unlock — and a test asserting the write ORDER passed against a defect the
+    // device would reject. Found by injection: moving the call above the unlock
+    // left the scenario green. Reads are left ungated, because `freshDevice`
+    // scenarios read prefs before ever unlocking and gating them would rewrite
+    // half this file's fixtures to prove nothing.
+    let unlockedThisSession = false;
     // Vaults deleted during this session, by id. The delete escape routes by
     // re-probing rather than by navigating, so the roster is the only thing
     // that can carry the outcome — see the vault-delete handler.
@@ -628,6 +642,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|report_user_activity": () => null,
       "plugin:vault-unlock|unlock": () => {
         if (config.unlockError) throw config.unlockError;
+        unlockedThisSession = true;
         return null;
       },
       // ── Vault creation (5-step onboarding) ──
@@ -688,6 +703,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         timezone,
         item_order: itemOrder,
         icon: vaultIcon,
+        label: vaultLabel,
         ai_enabled: aiEnabled,
         ai_provider: aiProvider,
         ai_provider_consent: aiConsent,
@@ -993,6 +1009,45 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __customThemeWrites?: (string | null)[] };
         (w.__customThemeWrites ??= []).push(name);
         customTheme = name;
+        return null;
+      },
+      // The export-destination chokepoint (`plugin:export-dir|export_path`,
+      // myne-md/myne#517). Mocked rather than left to fall through, because the
+      // save seam builds its write path from this answer: without a handler the
+      // flow wrote to `undefined` and a scenario asserting on the path was
+      // asserting on the mock's silence. It returns the SHAPE the host returns —
+      // an absolute path, the directory's display name, the sanitized basename —
+      // and nothing about the backup exclusion, which is a device fact no browser
+      // tier can stand in for (`mobile/docs/dev/device-matrix.md` §8).
+      "plugin:export-dir|export_path": (args) => {
+        const name = String(args.filename ?? args.fallback ?? "export.txt");
+        return { path: `/flow/Documents/${name}`, dir: "Documents", name };
+      },
+      // The narrow save seam (`secret-export`). Records the CONTENTS, because
+      // what a once-only screen writes to disk is the whole claim of that screen
+      // and a handler returning `null` would let a save that wrote the wrong
+      // secret report success — which is exactly the shape of the recovery kit's
+      // risk (myne-md/myne#468: the kit holds the phrase AND the account number,
+      // and the step it replaced wrote only the phrase).
+      "plugin:secret-export|save_secret_text": (args) => {
+        const w = window as unknown as { __secretSaves?: { path: string; contents: string }[] };
+        (w.__secretSaves ??= []).push({
+          path: String(args.path ?? ""),
+          contents: String(args.contents ?? ""),
+        });
+        return null;
+      },
+      // The vault-LABEL setter (MYND-205; driven by the name step in
+      // myne-md/myne#468). Records the write AND mutates the store, like the icon
+      // setter below it and for the same reason: the flow writes the label after
+      // the auto-unlock, and a recording-only handler would let a test pass while
+      // the picker still rendered the neutral fallback.
+      "plugin:prefs|vault_set_label": (args) => {
+        if (!unlockedThisSession) throw { kind: "slot_not_unlocked" };
+        const label = (args.label ?? null) as string | null;
+        const w = window as unknown as { __vaultLabelWrites?: (string | null)[] };
+        (w.__vaultLabelWrites ??= []).push(label);
+        vaultLabel = label;
         return null;
       },
       // The vault-icon setter (vault-icons) — records the write AND mutates the

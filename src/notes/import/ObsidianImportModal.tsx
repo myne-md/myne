@@ -32,9 +32,10 @@ import { BODY_STYLE, FOOTER_STYLE } from "./modalChrome";
 import { runMyneVaultImport, type MyneImportExtras } from "./myneRun";
 import { createVaultOnlyPorts } from "./ports";
 import {
-  asVaultUnlockError,
   importSourceClose,
+  importSourceCloseBackup,
   importSourceOpen,
+  importSourceOpenBackup,
 } from "../../lib/import-source-vault";
 import { activeVaultId } from "../../lib/vault-list";
 import type { TFunction } from "i18next";
@@ -48,6 +49,8 @@ import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { Button } from "../../components/primitives/Button";
+import { Input } from "../../components/primitives/Input";
+import { IconButton } from "../../components/primitives/IconButton";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
 import { truncateMiddle } from "./truncateMiddle";
@@ -87,7 +90,7 @@ interface ObsidianImportModalProps {
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0, 0, 0, 0.4)",
+  background: "var(--scrim)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -278,10 +281,12 @@ export function ObsidianImportModal({
   const startMyneImport = useCallback(
     ({
       sourceVaultId,
+      backupPath,
       importLabel,
       credential,
     }: {
-      sourceVaultId: string;
+      sourceVaultId?: string;
+      backupPath?: string;
       importLabel: string;
       credential: { password: string } | { recoveryPhrase: string };
     }) => {
@@ -291,13 +296,16 @@ export function ObsidianImportModal({
       // Remember the non-secret cells BEFORE the unmount, so the retryable arm
       // below comes back to a filled form rather than an empty one.
       setSetupCells({
-        chosen: sourceVaultId,
+        chosen: sourceVaultId ?? backupPath ?? "",
         label: importLabel,
         kind: "password" in credential ? "password" : "phrase",
       });
       setProgress({ done: 0, total: 0 });
       setPhase("running");
       void (async () => {
+        // The source's close, set once the open succeeds. `null` while nothing
+        // is open, so the `finally` is a no-op on an early return.
+        let closeSource: (() => Promise<void>) | null = null;
         try {
           // The OPEN happens HERE, inside the same try/finally as the close.
           // It used to happen in the credential step, which left an
@@ -306,9 +314,23 @@ export function ObsidianImportModal({
           // root_key and items_key sat resident until the 30-minute TTL swept
           // them, and the import then ran headless behind a closed modal. One
           // owner for the whole slot lifetime makes that unrepresentable.
-          await importSourceOpen(sourceVaultId, credential);
+          //
+          // A `.myne-backup` source opens through `importSourceOpenBackup`,
+          // which stages the container and returns the minted source id
+          // (myne-md/myne#816); a local vault keeps the original path.
+          let openedId: string;
+          if (backupPath !== undefined) {
+            openedId = await importSourceOpenBackup(backupPath, credential);
+            closeSource = () => importSourceCloseBackup(openedId);
+          } else if (sourceVaultId !== undefined) {
+            await importSourceOpen(sourceVaultId, credential);
+            openedId = sourceVaultId;
+            closeSource = () => importSourceClose(sourceVaultId);
+          } else {
+            return;
+          }
           const out = await runMyneVaultImport(
-            sourceVaultId,
+            openedId,
             policy,
             createVaultOnlyPorts(),
             {
@@ -341,15 +363,28 @@ export function ObsidianImportModal({
           //
           // Everything else is a real import failure and keeps the terminal
           // phase, where that sentence is true.
-          const kind = asVaultUnlockError(err)?.kind;
+          // The backup-open error enum is snake_case (myne-md/myne#816); the
+          // local-vault `VaultUnlockError` is PascalCase. Both land here, so
+          // each credential-shaped case names both spellings.
+          // Read `kind` as an open string: this arm now sees BOTH the local
+          // `VaultUnlockError` (PascalCase) and the backup-open enum
+          // (snake_case), so a narrowed union would reject the backup spellings.
+          const kind = (err as { kind?: string } | null)?.kind;
           const retryable =
-            kind === "InvalidCredentialOrVault"
+            kind === "InvalidCredentialOrVault" ||
+            kind === "invalid_credential_or_vault"
               ? t("notes.import.myne.errors.credential")
-              : kind === "UnlockInProgress"
+              : kind === "UnlockInProgress" || kind === "unlock_in_progress"
                 ? t("notes.import.myne.errors.busy")
-                : kind === "VaultOpenAsImportSource"
+                : kind === "VaultOpenAsImportSource" ||
+                    kind === "vault_open_as_import_source"
                   ? t("notes.import.myne.errors.alreadyOpen")
-                  : null;
+                  : kind === "not_a_backup_file" ||
+                      kind === "damaged_backup" ||
+                      kind === "invalid_vault_meta" ||
+                      kind === "io"
+                    ? t("notes.import.myne.errors.backupInvalid")
+                    : null;
           if (retryable !== null) {
             setSetupError(retryable);
             setPhase("setup");
@@ -376,7 +411,7 @@ export function ObsidianImportModal({
           // loop here: a second attempt would fail for the same reason and the
           // real backstop is host-side.
           try {
-            await importSourceClose(sourceVaultId);
+            if (closeSource !== null) await closeSource();
           } catch {
             // Deliberately silent to the USER: they cannot act on it, and the
             // window is already bounded above. Not silent to the developer.
@@ -466,23 +501,13 @@ export function ObsidianImportModal({
             {title}
           </h2>
           {dismissable && (
-            <button
-              type="button"
-              aria-label={t("notes.import.modal.closeAriaLabel")}
+            <IconButton
+              icon="x"
+              label={t("notes.import.modal.closeAriaLabel")}
+              tooltip
+              testId="import.close"
               onClick={handleClose}
-              data-testid="import.close"
-              style={{
-                background: "none",
-                border: 0,
-                color: "var(--fg-3)",
-                cursor: "pointer",
-                padding: 6,
-                display: "inline-flex",
-                borderRadius: "var(--radius-1)",
-              }}
-            >
-              <Icon name="x" size={16} />
-            </button>
+            />
           )}
         </div>
 
@@ -497,13 +522,16 @@ export function ObsidianImportModal({
           />
         )}
 
-        {phase === "setup" && spec.pick === "vault" && (
-          // The Myne source picks a VAULT, not a path, so it gets its own setup
-          // step: a list of the user's other local vaults, a credential for the
-          // chosen one, and the import label. `SetupBody` below is built around
-          // a picked folder and has nothing to show here.
+        {phase === "setup" && source === "myne" && (
+          // The Myne source takes a `.myne-backup` and needs a credential for
+          // it, so it keeps its own setup step (myne-md/myne#816). `SetupBody`
+          // below is built around a plaintext picked folder and has nothing to
+          // show for an encrypted source.
           <MyneVaultSetup
             activeVaultId={activeVault}
+            backupMode
+            backupPath={folder?.root ?? undefined}
+            onChooseFile={() => void chooseFolder()}
             onReady={startMyneImport}
             onCancel={handleClose}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
@@ -513,7 +541,7 @@ export function ObsidianImportModal({
             initialKind={setupCells?.kind}
           />
         )}
-        {phase === "setup" && spec.pick !== "vault" && (
+        {phase === "setup" && source !== "myne" && (
           <SetupBody
             spec={spec}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
@@ -594,24 +622,21 @@ function SetupBody({
             {t(spec.labelKey)}
           </span>
           {onBack !== undefined && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={onBack}
               data-testid="import.change-source"
               style={{
                 marginInlineStart: "auto",
-                background: "none",
-                border: 0,
                 padding: 0,
+                height: "auto",
                 color: "var(--fg-3)",
-                fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-xs)",
-                cursor: "pointer",
                 textDecoration: "underline",
               }}
             >
               {t("notes.import.modal.changeSource")}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -742,8 +767,8 @@ function RadioRow({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       role="radio"
       aria-checked={checked}
       onClick={onSelect}
@@ -756,7 +781,6 @@ function RadioRow({
         border: `1px solid ${checked ? "var(--accent)" : "var(--line-1)"}`,
         borderRadius: "var(--radius-2)",
         padding: "var(--space-3)",
-        cursor: "pointer",
         fontFamily: "var(--font-sans)",
       }}
     >
@@ -791,7 +815,7 @@ function RadioRow({
         </span>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{hint}</span>
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -1408,7 +1432,7 @@ function AttentionRow({
         </div>
       ) : (
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
-          <input
+          <Input
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
@@ -1424,7 +1448,6 @@ function AttentionRow({
               color: "var(--fg-1)",
               border: "1px solid var(--line-2)",
               borderRadius: "var(--radius-1)",
-              outline: "none",
             }}
           />
           <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>

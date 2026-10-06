@@ -95,6 +95,8 @@ function find(id: string): CommandAction {
 describe("Command palette action registry", () => {
   it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198; graph.show-isolated myne-md/myne#727; tags.show MYND-46; tasks.show MYND-616; sidebar toggles MYND-166)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
+      "ai.open-agent-note",
+      "ai.open-agent-vault",
       "ai.open-chat",
       "ai.rewrite-selection",
       "ai.summarize-note",
@@ -155,6 +157,10 @@ describe("Command palette action registry", () => {
       "note.trash",
       "notes.random",
       "notes.toggle-archiving",
+      // myne-md/myne#773: the palette's own entry. It had none — `palette.toggle`
+      // was a keybinding only, and the left rail derives its roster from actions
+      // carrying a `ribbon` block, so the palette could not be pinned to it.
+      "palette.open",
       "pane.close",
       "pane.focus-next",
       "pane.focus-prev",

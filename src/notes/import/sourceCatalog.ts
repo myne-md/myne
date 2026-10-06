@@ -28,13 +28,11 @@ export type ImportSourceId =
 /**
  * How the user names the source.
  *
- * `"vault"` is not a file-dialog mode at all: the Myne source picks one of the
- * user's OTHER local vaults from the list the app already keeps, so there is no
- * path to browse to and no native dialog to open. Keeping it in this union
- * rather than adding a parallel flag is what makes the picker exhaustive over
- * the ways a source can be named.
+ * The Myne source used to be a `"vault"` mode (pick one of this device's other
+ * vaults from the list the app keeps); since myne-md/myne#816 it is a `"file"`
+ * mode that takes a `.myne-backup`, so the former variant is gone.
  */
-export type PickMode = "directory" | "file" | "vault";
+export type PickMode = "directory" | "file";
 
 export interface ImportSourceSpec {
   readonly id: ImportSourceId;
@@ -116,7 +114,11 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
   myne: {
     id: "myne",
     icon: "vault",
-    pick: "vault",
+    // A `.myne-backup` file, not a local vault (myne-md/myne#816). The card used
+    // to list this device's other vaults; it now takes an externally exported
+    // backup, which is the artifact a user actually moved between machines.
+    pick: "file",
+    filter: { name: "Myne backup", extensions: ["myne-backup"] },
     // Desktop only. A browser origin holds one container under a constant vault
     // id, so the source list would be permanently empty, and the `importer:`
     // plugin is `Class::Unsupported` there in any case. See the capability's own

@@ -51,7 +51,7 @@ import {
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
-import { panesNotSettledMessage } from "../workspaceContext";
+import { panesNotSettledMessage, useWorkspaceOptional } from "../workspaceContext";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -133,6 +133,19 @@ function findByFoldedKey(
 
 export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const { prefs } = usePrefs();
+  // Pane/tab close on a subtree trash or archive (myne-md/myne#819) — the same
+  // `closeNoteEverywhere` the single-note paths in NoteList call. OPTIONAL: a
+  // unit test injects only `ctx` and mounts no workspace, and its handlers own
+  // no panes, so `?.` is the honest read (the app's callers are always inside
+  // the provider).
+  const ws = useWorkspaceOptional();
+  const closeTabs = useCallback(
+    (ids: readonly string[]) => {
+      if (ws === null) return;
+      for (const id of ids) ws.closeNoteEverywhere(id);
+    },
+    [ws],
+  );
   const [deliberate, setDeliberate] = useState<string[]>([]);
   // A ref alongside the state, read by `addDeliberate` (myne-md/myne#613
   // pr-review). That path used to compute its `next` inside a `setDeliberate`
@@ -686,7 +699,11 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const performFolderDelete = useCallback(
     async (node: FolderNode, plan: FolderDeletePlan) => {
       if (plan.noteIds.length > 0) {
-        await ctx.bulkTrashWithSync(plan.noteIds);
+        const result = await ctx.bulkTrashWithSync(plan.noteIds);
+        // Close the trashed subtree's tabs (myne-md/myne#819): a stale
+        // still-editable buffer autosaved back would resurrect the note, and a
+        // hard-delete route would re-create an erased file. Only the successes.
+        closeTabs(result.trashed);
         // If the open/selected note just went to Trash, don't dwell on it.
         if (ctx.selectedId !== null && plan.noteIds.includes(ctx.selectedId)) {
           ctx.select(null);
@@ -712,7 +729,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // icon (MYND-184/185 durability).
       applyDecorationRemap((m) => pruneFolderPrefix(m, node.path));
     },
-    [ctx, archivedFolders, applyDecorationRemap],
+    [ctx, closeTabs, archivedFolders, applyDecorationRemap],
   );
 
   // ---- archive / restore folder (folder-archive) ---------------------------
@@ -727,12 +744,17 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       void mutateArchivedFolders(mutationFrom(archivedFolders, plan.nextArchived)).catch(() => {
         setArchivedFoldersState(prev); // disk write failed → revert optimistic UI
       });
+      // The folder leaves the live tree; close its notes' tabs so no hidden note
+      // stays open in a pane (myne-md/myne#819). Unlike subtree trash this writes
+      // no note frontmatter, so the hazard is a lingering hidden tab, not
+      // resurrection — hence close regardless of the optimistic prefs write.
+      closeTabs(plan.noteIds);
       // If the open/selected note just left the working set, don't dwell on it.
       if (ctx.selectedId !== null && plan.noteIds.includes(ctx.selectedId)) {
         ctx.select(null);
       }
     },
-    [ctx, archivedFolders],
+    [ctx, closeTabs, archivedFolders],
   );
 
   const archiveFolderAction = useCallback(
@@ -770,7 +792,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       if (key.length === 0) return;
       const ids = collectSubtreeNoteIdsFromCache(ctx.cache, key);
       if (ids.length > 0) {
-        await ctx.bulkTrashWithSync(ids);
+        const result = await ctx.bulkTrashWithSync(ids);
+        // Close the subtree's trashed tabs (myne-md/myne#819). Only the successes.
+        closeTabs(result.trashed);
         if (ctx.selectedId !== null && ids.includes(ctx.selectedId)) {
           ctx.select(null);
         }
@@ -795,7 +819,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       }
       applyDecorationRemap((m) => pruneFolderPrefix(m, path));
     },
-    [ctx, archivedFolders, deliberate, applyDecorationRemap],
+    [ctx, closeTabs, archivedFolders, deliberate, applyDecorationRemap],
   );
 
   const deleteFolderAction = useCallback(

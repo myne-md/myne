@@ -4,34 +4,31 @@
 // The canonical render target the AI capability siblings (note-summarization,
 // semantic-search-qa) mount their output into. Auto-tag used to render its
 // accept-chips here too; MYND-651 moved it to the inline suggestion band at the
-// frontmatter boundary, which is now the only tag surface. Task 3 shipped
-// the strip wiring + empty-state; task 5 adds the shared **"AI off / ready"
-// chrome** — the header status reflects the `ai_enabled` pref so a user who
-// switches to this tab with AI off sees why it's empty and where to turn it on.
-// Because AI now ships in the default build as a runtime beta opt-in (decisions.md
+// frontmatter boundary, which is now the only tag surface.
+//
+// **This file is now the FRAME and nothing else** (myne-md/myne#771 task 1). The
+// transcript, the composer, the live run strip and the conversation's own modals
+// live in `ConversationSurface`, shared with the agent tab's Hub and Focus views
+// so the two surfaces cannot drift. What stays here is the panel's furniture: the
+// heading, the history / memory / new-chat buttons, the status chip, the honesty
+// note and the persist warning.
+//
+// Because AI ships in the default build as a runtime beta opt-in (decisions.md
 // 2026-07-02), the status has THREE resting states: off (`ai_enabled` false),
-// no-model (enabled but no generation model side-loaded — every infer would fail
-// `NotReady`, so we point at Settings → Developer → AI), and ready. The "AI thinking…"
-// busy state is wired when a sibling drives a blocking inference call (SYNC-7).
+// no-model (enabled but no generation model side-loaded, so every infer would
+// fail `NotReady`, pointing at Settings → Developer → AI), and ready. The
+// "AI thinking…" busy state is the live run strip the surface renders.
 //
 // Inference is local by default and remote only where the user has named a
 // provider, consented and stored a key (#414/#415); the AI settings panel states
 // the bounded guarantee.
 //
-// **Layout: this component owns the tab body's whole height.** Header and
-// composer are fixed, only the transcript scrolls. That is what makes it read as
-// a chat rather than as a page with an input somewhere down it, and it is what
-// lets the composer stay where the user last left their hands.
-//
-// **One composer, two modes.** The agent's entry point is this composer's Edit
-// mode, not a second form beside it. `design-notes/ai/0515` already put the
-// entry point in chat; what shipped mounted `AgentComposer` as a sibling of this
-// component, so the tab offered two inputs and two Send buttons and said nothing
-// about which one to use. `ChatComposer` is now the single one; `AgentProgress`
-// and the run's outcome render as a turn in this transcript.
+// **Layout: this component owns the tab body's whole height.** Header is fixed,
+// and the surface below it sizes to the rest. That is what makes it read as a
+// chat rather than as a page with an input somewhere down it, and it is what lets
+// the composer stay where the user last left their hands.
 
-import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
-import { providerErrorKey } from "../../lib/engine-error";
+import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
@@ -40,36 +37,19 @@ import {
   useAiRetrievalState,
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
-import {
-  clearChat,
-  useChat,
-  type AgentTurnEnd,
-  type ChatTurn,
-} from "../ai/chatStore";
-import {
-  hydrateActiveConversation,
-  installChatPersistence,
-  isChatHydrateFailed,
-  isChatPersistLagging,
-  subscribeChatPersistHealth,
-} from "../ai/chatPersist";
-import { agentCancel, agentLastRun, agentUndo } from "../../lib/agent-run";
-import type { AgentUndoResult, Proposal } from "../../lib/agent-protocol";
+import { useChat } from "../ai/chatStore";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
-import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
-import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
-import { ModalShell } from "../../components/primitives/ModalShell";
+import { Tooltip } from "../../components/primitives/Tooltip";
+import { startNewConversation } from "../ai/startNewConversation";
 import { providerLabelOf } from "../../lib/ai-capability";
-import { CAPTION_STYLE, SECTION_HEADING_STYLE } from "./sharedStyles";
-import { ChatComposer } from "./ChatComposer";
+import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatHistoryModal } from "./ChatHistoryModal";
 import { MemoryPopover } from "./MemoryPopover";
-import { ProposalDiffModal } from "./ProposalDiffModal";
-import { clearAgent, useAgent } from "../agent/agentStore";
-import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
-import { RunCostLine } from "../agent/components/RunCostLine";
-import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
+import {
+  ConversationSurface,
+  type ConversationSurfaceStatus,
+} from "../ai/ConversationSurface";
 
 /** Why the chat surface is at rest, as a fixed identifier — never content
  *  (#191 task 3). `ready` covers both "working" and "still asking the host":
@@ -92,7 +72,7 @@ const NOT_ANSWERING: ReadonlySet<string> = new Set([
 ]);
 
 /** Total switches over the union rather than lookup tables, and the reason is
- *  `scripts/check-i18n.mjs`: it verifies **static quoted-key call sites**, so a
+ *  `scripts/check-i18n.mjs`: it verifies **static `t("…")` call sites**, so a
  *  key sitting in a `Record` is a key no guard checks and a typo in it renders
  *  the raw key at the user. Written this way the compiler catches a missing
  *  cause and the guard catches a missing translation. */
@@ -106,19 +86,6 @@ function chipKey(cause: Exclude<RestingCause, "ready">, t: TFn): string {
       return t("editor.chrome.rightPanel.aiChat.statusUnreachable");
     case "unavailable":
       return t("editor.chrome.rightPanel.aiChat.statusUnavailable");
-  }
-}
-
-function bodyKey(cause: Exclude<RestingCause, "ready">, t: TFn): string {
-  switch (cause) {
-    case "off":
-      return t("editor.chrome.rightPanel.aiChat.offHint");
-    case "no-provider":
-      return t("editor.chrome.rightPanel.aiChat.noModelHint");
-    case "unreachable":
-      return t("editor.chrome.rightPanel.aiChat.unreachableHint");
-    case "unavailable":
-      return t("editor.chrome.rightPanel.aiChat.unavailableHint");
   }
 }
 
@@ -142,427 +109,50 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
   rowGap: "var(--space-1)",
 };
 
-/** Icon-only header buttons (History, Memory, New chat). Text labels cost a
- *  third of a 280px sidebar; the meanings are stable enough for icons with
- *  the translated label kept as the accessible name + hover title. */
-const HEADER_ICON_BUTTON_STYLE: CSSProperties = {
-  padding: "var(--space-1)",
-  flexShrink: 0,
-};
 
 /** Optional handlers the Editor wires; absent in isolation (e.g. tests). */
 export interface AiChatTabProps {
   /** Explicit "Insert into note" action for a ready summary (task 5, SYNC-17).
    *  When absent, the insert affordance is not shown. */
   onInsert?: (text: string) => void;
-  /** The open note: the agent's default scope in the composer's Edit mode. */
+  /** The open note: the agent's default scope in the composer's scope picker. */
   openNoteId?: string | null;
   /** Folders the user can attach as an agent scope. */
   folders?: readonly string[];
   /** Called with the ids of notes an automatic apply wrote, so the open pane
-   *  re-reads them (myne-md/myne#551). The manual path reaches the same
-   *  callback through `AgentReviewTakeover`; this is the automatic one. */
+   *  re-reads them (myne-md/myne#551). */
   onNotesWritten?: (noteIds: readonly string[]) => void;
   /** Called after an agent-run undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
-  /** Open Settings (the memory popover's "Manage in Settings" link). Absent
-   *  in isolation (e.g. tests): the link then just closes the popover. */
-  onOpenSettings?: () => void;
+  /**
+   * Open Settings, optionally on a panel and scrolled to a setting.
+   *
+   * Used by the memory popover's "Manage in Settings" link (no arguments: the
+   * default landing is right for it) and by the status chip, which names a
+   * fault and needs to land ON the control that clears it rather than at the
+   * top of a panel. Absent in isolation (e.g. tests): the popover's link then
+   * just closes it, and the chip is not a button at all.
+   */
+  onOpenSettings?: (panel?: string, anchor?: string) => void;
   /** Toast sink for the memory popover's one-shot outcomes (delete saved /
    *  failed). Absent in isolation: the popover still deletes, it just
    *  reports nothing. */
   onShowToast?: (message: string) => void;
+  /** Move from the light panel to the agent tab, on the open note's Focus view
+   *  (myne-md/myne#771). The panel-to-deep-surface exit. Absent in isolation:
+   *  the button is not rendered. */
+  onFocusAgent?: () => void;
 }
-
-const TURN_TEXT_STYLE: CSSProperties = { fontSize: "var(--text-sm)", lineHeight: 1.5 };
-
-/** Stable empty list, so a caller that omits `folders` does not hand the
- *  composer a fresh array identity on every render. */
-const NO_FOLDERS: readonly string[] = [];
-
-
-/** The shared bubble every turn sits in. */
-const bubbleStyle = (isUser: boolean): CSSProperties => ({
-  alignSelf: isUser ? "flex-end" : "flex-start",
-  maxWidth: "92%",
-  background: isUser ? "var(--bg-2)" : "var(--paper-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  padding: "var(--space-1) var(--space-2)",
-});
-
-/** What a run that proposed nothing AND answered nothing says (myne-md/myne#574).
- *
- *  A total switch rather than a lookup table, for the reason the file's own note
- *  above gives: `scripts/check-i18n.mjs` verifies **static** quoted-key call
- *  sites, so a key assembled from a variable is a key it cannot see.
- *
- *  Two of the five ends mean the run never did its work — it went round in
- *  circles, or it ran out of steps — and those get a sentence that says so and
- *  suggests the retry. The rest kept the old line: a `finished` run with an
- *  empty proposal really did look and decide there was nothing to change, and a
- *  `cancelled` one stopped because the user said so. `awaitingScope` never
- *  reaches here, because `settleRunIntoChat` does not settle a turn on it. */
-function emptyRunLabel(end: AgentTurnEnd, t: TFn): string {
-  switch (end) {
-    case "stalled":
-    case "exhaustedIterations":
-      return t("editor.chrome.rightPanel.aiChat.agentTurn.noAnswer");
-    case "finished":
-    case "cancelled":
-    case "awaitingScope":
-      return t("agent.review.noChanges");
-  }
-}
-
-/** The speaker caption above a turn's body. */
-function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
-  return (
-    <div
-      style={{
-        fontSize: "var(--text-xs)",
-        fontWeight: "var(--weight-medium)",
-        color: "var(--fg-3)",
-      }}
-    >
-      {isUser
-        ? t("editor.chrome.rightPanel.aiChat.you")
-        : t("editor.chrome.rightPanel.aiChat.assistant")}
-    </div>
-  );
-}
-
-/** What an agent run looks like in the transcript, once it has stopped.
- *
- *  **The live strip is NOT here**, and that was a defect worth the extra
- *  component. Mounting `AgentProgress` inside the bubble put the scope-expansion
- *  dialog it carries inside the scrolling transcript, at 92% of a 280px sidebar,
- *  below whatever the reader had scrolled to. That dialog is the entire bound
- *  `design-notes/ai/0515` puts on model-originated scope growth, so a gate the
- *  user has to go looking for is weaker than the decision assumes. It also tied
- *  the strip's lifetime to a transcript turn, which "New chat" deletes, so
- *  clearing the transcript took the running scope total and the Stop control off
- *  screen while the host kept running.
- *
- *  What stays here is the run's OUTCOME, frozen onto the turn when it settled.
- *  That is what keeps a finished run readable after `clearAgent()`: closing the
- *  review screen drops the run, and without the freeze the turn would go blank
- *  for having done its work. */
-function AgentTurnView({
-  turn,
-  working,
-  t,
-  canRevert,
-  onOpenDiff,
-  onRequestRevert,
-  revertBusy,
-  undoReport,
-}: {
-  turn: ChatTurn;
-  /** Whether this turn's run is the one still working. See `working` below. */
-  working: boolean;
-  t: TFn;
-  /** True only when this turn's run is the host's current undoable record. */
-  canRevert: boolean;
-  onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
-  onRequestRevert: (runId: string) => void;
-  revertBusy: boolean;
-  /** The undo report, when it describes THIS turn's run. */
-  undoReport: AgentUndoResult | null;
-}) {
-  const s = turn.agentSummary;
-  const hasProposal =
-    s !== undefined &&
-    s.proposal !== undefined &&
-    (s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0);
-  return (
-    <div
-      data-testid="ai.turn"
-      data-role="assistant"
-      data-kind="agent"
-      data-streaming="false"
-      data-working={working ? "true" : "false"}
-      style={bubbleStyle(false)}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "var(--space-1)",
-        }}
-      >
-        <TurnSpeaker isUser={false} t={t} />
-        {/* Icons only once the run has settled with something to show: a live
-            working turn has no frozen proposal and no undoable record yet. */}
-        {s !== undefined && !working ? (
-          <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0 }}>
-            {hasProposal ? (
-              <IconButton
-                icon="columns-2"
-                label={t("editor.chrome.rightPanel.aiChat.viewDiff")}
-                testId="ai.turn-diff"
-                iconSize={14}
-                onClick={() => onOpenDiff(s.proposal!)}
-              />
-            ) : null}
-            {/* Only the host's current undoable run gets the revert affordance:
-                an older turn's run has been superseded and a second undo would
-                report `noSuchRun`. */}
-            {canRevert ? (
-              <IconButton
-                icon="rotate-ccw"
-                label={t("editor.chrome.rightPanel.aiChat.revertRun")}
-                testId="ai.turn-revert"
-                iconSize={14}
-                disabled={revertBusy}
-                onClick={() => onRequestRevert(s.runId)}
-              />
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      {/* **The first leg has nothing else to show.** `beginRun()` nulls the
-          view and only a settled step sets it, so until the host answers there
-          is no run id, no scope total and no strip: without this line the
-          bubble rendered the word "Assistant" and nothing else, for minutes,
-          as the only sign anything was happening. The running scope total
-          appears in the pinned strip the moment the host reports one. */}
-      {working && s === undefined && !turn.error ? (
-        <p
-          data-testid="ai.agent-working"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "var(--space-1) 0 0" }}
-        >
-          {t("agent.progress.working")}
-        </p>
-      ) : null}
-      {turn.error ? (
-        <p
-          role="alert"
-          data-testid="ai.turn-error"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "var(--space-1) 0 0" }}
-        >
-          {turn.text}
-        </p>
-      ) : null}
-      {/* **The model's own answer, above the counts** (myne-md/myne#568). In one
-          mode a question is a run like any other and `finish` is how it is
-          answered, so this is the reply the user asked for. It used to render
-          only inside the review dialog, which is how a question about a note
-          got answered inside a "Review changes" screen. Not `t()`-wrapped: it
-          is model output, not copy. */}
-      {s !== undefined && s.summary.trim().length > 0 ? (
-        <p
-          data-testid="ai.agent-answer"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", margin: "var(--space-1) 0 0" }}
-        >
-          {s.summary}
-        </p>
-      ) : null}
-      {s !== undefined ? (
-        <div
-          data-testid="ai.agent-summary"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", marginTop: "var(--space-1)" }}
-        >
-          <div>
-            {s.edits === 0 && s.newNotes === 0
-              ? // **Suppressed when the model answered.** "The agent proposed no
-                // changes" is the right line for an edit request that produced
-                // nothing, and exactly the wrong one under an answer the user
-                // asked for: it reads as a failure report on a reply that
-                // succeeded.
-                s.summary.trim().length > 0
-                ? null
-                : // **And the wrong one again when the run never got anywhere**
-                  // (myne-md/myne#574). A run that stalls or runs out of steps
-                  // proposed nothing AND answered nothing, so "the agent
-                  // proposed no changes" reports the less useful of the two
-                  // facts: it reads as a considered verdict on the note, when
-                  // what happened is that the run ended without doing its work.
-                  // The end line underneath says WHY; this says what the user
-                  // got, which is nothing, and what to do about it.
-                  emptyRunLabel(s.end, t)
-              : [
-                  s.edits > 0
-                    ? t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", {
-                        count: s.edits,
-                      })
-                    : null,
-                  s.newNotes > 0
-                    ? t("editor.chrome.rightPanel.aiChat.agentTurn.newNotes", {
-                        count: s.newNotes,
-                      })
-                    : null,
-                ]
-                  .filter((line) => line !== null)
-                  .join(" ")}
-          </div>
-          {/* The run's cost, in the same three figures the review screen
-              reports, from the same component: the wording is the remote arm's
-              compensating control, not a caption. */}
-          <RunCostLine
-            testId="ai.agent-run-cost"
-            iterations={s.iterations}
-            notesRead={s.notesRead}
-            charsOffDevice={s.charsOffDevice}
-            style={{ ...CAPTION_STYLE, display: "block" }}
-          />
-          {/* **The memory-write marker** (myne-md/myne#697): a run that
-              wrote memory says so on its turn, with the entry count. This is
-              the transparency half of the automatic-write model
-              (`decisions/ai/0590`): the user sees the change happened and
-              where to look (the memory list), rather than approving it first.
-              The count comes from the host (`memoryUpdated` on the run
-              result), never from a model claim, so a run cannot report a
-              write it did not make. */}
-          {(s.memoryUpdated ?? 0) > 0 ? (
-            <div data-testid="ai.agent-memory-updated" style={CAPTION_STYLE}>
-              {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
-                count: s.memoryUpdated ?? 0,
-              })}
-            </div>
-          ) : null}
-          {s.end !== "finished" ? (
-            <div data-testid="ai.agent-run-end" style={CAPTION_STYLE}>
-              {endStatusLabel(s.end, t)}
-            </div>
-          ) : null}
-          {/* The undo report, attached to the turn it describes. Matching on
-              `runId` rather than rendering a strip under the composer: the
-              report is a statement about THIS run's reversion. */}
-          {undoReport !== null ? (
-            <div data-testid="ai.undo-result" style={CAPTION_STYLE}>
-              {undoResultText(undoReport, t)}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** One transcript turn (user or assistant). Assistant turns render the streaming
- *  caret, the error state, and the citation chips. Design uses design-token CSS
- *  variables only (no hex), per `src/AGENTS.md`.
- *
- *  **Memoized, and the reason is the streaming path.** Each token arrives in its
- *  own task, so React does not batch them: one store dispatch, one tab render
- *  per token. `chatReducer`'s `replaceLast` keeps every earlier turn's identity,
- *  so without this the whole transcript reconciles at token rate and the cost
- *  grows with the length of the conversation. */
-const ChatTurnView = memo(function ChatTurnView({
-  turn,
-  onInsert,
-  t,
-}: {
-  turn: ChatTurn;
-  onInsert?: (text: string) => void;
-  t: TFn;
-}) {
-  const isUser = turn.role === "user";
-  return (
-    <div
-      data-testid="ai.turn"
-      data-role={turn.role}
-      // The turn's own kind, not the component's. This bubble also renders an
-      // agent run's TASK, which is `kind: "agent"`; hardcoding "text" here made
-      // the DOM contradict the store, and the exact regression this branch
-      // fixed (a task built as `text` and fed to the ask model as history)
-      // would have left every E2E assertion unchanged.
-      data-kind={turn.kind}
-      data-streaming={turn.streaming ? "true" : "false"}
-      style={bubbleStyle(isUser)}
-    >
-      <TurnSpeaker isUser={isUser} t={t} />
-      {/* The scope the message was sent under, on the user's own turn. A run
-          reads back as "I asked this, over that", which is the pairing the
-          approval gate is about. */}
-      {turn.scopeLabel !== undefined ? (
-        <div data-testid="ai.turn-scope" style={CAPTION_STYLE}>
-          {t("agent.composer.scopeLabel")}: {turn.scopeLabel}
-        </div>
-      ) : null}
-      <div
-        data-testid="ai.turn-text"
-        style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}
-      >
-        {turn.text}
-        {turn.streaming && (
-          <span data-testid="ai.turn-streaming" aria-hidden="true">
-            ▍
-          </span>
-        )}
-      </div>
-      {/* Empty finalized answer (the model produced nothing) renders a friendly
-          placeholder instead of a blank bubble.
-
-          Two routes reach it and they converge BEFORE the store, not here. A
-          local engine finalizes a turn with no text; a remote provider reports
-          the same outcome as the typed failure `empty_completion`
-          (myne-md/myne#466), because the transport has to distinguish it from a
-          policy refusal and from a reply shape Myne does not model. `ai-chat.ts`
-          finalizes that cause rather than failing it, so by the time a turn is
-          rendered `error` means what it says and this condition reads one
-          field. */}
-      {!isUser && !turn.streaming && turn.text.length === 0 && !turn.error && (
-        <p
-          data-testid="ai.no-answer"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", fontStyle: "italic", margin: 0 }}
-        >
-          {t("editor.chrome.rightPanel.aiChat.noAnswer")}
-        </p>
-      )}
-      {turn.error && (
-        <p
-          role="alert"
-          data-testid="ai.turn-error"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "var(--space-1) 0 0" }}
-        >
-          {/* Name the class and, through its own copy, the next action
-              (myne-md/myne#440). Falls back to the generic sentence only when
-              the failure carried no cause at all. */}
-          {turn.errorCause
-            ? t(providerErrorKey(turn.errorCause))
-            : t("editor.chrome.rightPanel.aiChat.errorTurn")}
-        </p>
-      )}
-      {/* Which backend produced this answer (#191 task 4, SYNC-13). Attached to
-          the TURN, so switching provider does not retroactively re-label the
-          answers that came before it — and only on a finalized turn, because a
-          streaming one has not been answered by anyone yet. A caption in the
-          same register as the citation chips beside it: no icon, no colour, no
-          badge, no dismissal. Persistent rather than interruptive, because a
-          dialog people see often is a dialog people stop reading. */}
-      {!turn.streaming && turn.answeredBy !== undefined && (
-        <div style={{ marginTop: "var(--space-1)" }}>
-          <AnsweredByIndicator answeredBy={turn.answeredBy} testId="ai.turn-answered-by" />
-        </div>
-      )}
-      {/* Per-turn "Insert into note" for a summary answer (task 10, SYNC-17). */}
-      {turn.insertable && onInsert && !turn.streaming && turn.text.length > 0 && (
-        <div style={{ marginTop: "var(--space-2)" }}>
-          <Button
-            type="button"
-            variant="secondary"
-            data-testid="ai.insert-turn"
-            onClick={() => onInsert(turn.text)}
-          >
-            {t("editor.chrome.rightPanel.aiChat.insert")}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-});
 
 export function AiChatTab({
   onOpenSettings,
   onInsert,
   openNoteId = null,
-  folders = NO_FOLDERS,
+  folders,
   onNotesWritten,
   onRunUndone,
   onShowToast,
+  onFocusAgent,
 }: AiChatTabProps = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
@@ -573,13 +163,10 @@ export function AiChatTab({
   // **Who is actually serving, asked of the HOST.** The chip and the honesty
   // note both name a backend, and naming one from `prefs.ai_provider` names
   // what the user INTENDED: `active()` falls back to the local arm on six other
-  // conditions (no model chosen, consent or key missing, a preferences snapshot
-  // from another vault), so a provider named and never finished reads as
-  // "answered by OpenRouter" while every request goes in-process. That is
-  // myne-md/myne#466's defect, and `AiPanel` already carries its fix. The NAME
-  // still comes from the preferences, because only they carry it; it is shown
-  // only for the class the host says is active, so the claim cannot outrun the
-  // fact.
+  // conditions, so a provider named and never finished reads as "answered by
+  // OpenRouter" while every request goes in-process. That is myne-md/myne#466's
+  // defect. The NAME still comes from the preferences, because only they carry
+  // it; it is shown only for the class the host says is active.
   const backendClass = useAiBackendClass(aiEnabled);
   const activeProviderName =
     backendClass === "remote" ? (providerLabelOf(prefs.ai_provider) ?? null) : null;
@@ -589,11 +176,6 @@ export function AiChatTab({
   // (SYNC-16), and the embedding model is not bundled. So a user with a working
   // provider and no local search model saw the provider's name — which reads as
   // ready — on a surface that refused every turn.
-  //
-  // This also replaces a `gettingReady` PROP that no caller ever passed: the
-  // "Preparing…" state was documented in the user guide and unreachable in
-  // production, because its default was `false` and nothing overrode it. It is
-  // derived here instead, from the same flag the host gates the turn on.
   const retrieval = useAiRetrievalState(aiEnabled);
   const noSearchModel =
     retrieval.embedding.kind === "unavailable" ||
@@ -602,11 +184,6 @@ export function AiChatTab({
     !noSearchModel &&
     retrieval.embedding.kind === "available" &&
     !retrieval.indexReady;
-  // …and one sentence per state (#191 task 3). The old copy said "No model
-  // selected. Choose one in Settings" for ALL of them, which is wrong in two:
-  // it tells a user whose runtime merely is not running to redo a setup they
-  // already did, and it offers a settings page to a build that has no local AI
-  // compiled in at all.
   const resting: RestingCause = !aiEnabled
     ? "off"
     : backend.kind === "absent"
@@ -615,113 +192,63 @@ export function AiChatTab({
         ? NOT_ANSWERING.has(backend.cause ?? "")
           ? "unreachable"
           : "no-provider"
-        : backend.kind === "checking"
-          ? "ready"
-          : "ready";
+        : "ready";
   const noModel = resting === "no-provider" || resting === "unreachable" || resting === "unavailable";
   const ready = aiEnabled && !noModel;
+
   const chat = useChat();
-  const scrollRef = useRef<HTMLDivElement>(null);
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
-  // only while open so every opening re-fetches the roster (including sync
-  // arrivals) rather than showing a stale list.
+  // only while open so every opening re-fetches the roster.
   const [historyOpen, setHistoryOpen] = useState(false);
-  // Memory popover (myne-md/myne#697): tab-local boolean like the history
-  // modal, mounted only while open so every opening re-fetches the roster.
+  // Memory popover (myne-md/myne#697): tab-local boolean like the history modal.
   const [memoryOpen, setMemoryOpen] = useState(false);
+  /**
+   * Whether the user has expanded the honesty note back open.
+   *
+   * Session state, not a pref: the note is clamped because a reader has just
+   * read it, and "just" resets when the panel is remounted. Persisting a
+   * dismissal would make the claim something a user turns off once, which is
+   * not what a threat-model-bounded sentence is for.
+   */
+  const [honestyOpen, setHonestyOpen] = useState(false);
+  /**
+   * Clamped exactly when there is a conversation AND the user has not opened it
+   * back up. An empty transcript is the moment the claim is being made, so it
+   * is never clamped there — which is also why no persisted dismissal exists.
+   */
+  const honestyClamped = chat.turns.length > 0 && !honestyOpen;
 
-  // ONE subscription to the run store, at the tab rather than one per agent
-  // turn: the transcript's turns render frozen counts, which need no live read.
-  const agent = useAgent();
-  // The last-run undo lives here rather than in a strip under the composer
-  // (myne-md/myne#741): one mount for the tab, with the offer and report
-  // matched onto turns by `runId`.
-  const undo = useUndoLastRun({
-    agentLastRun,
-    agentUndo,
-    ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
+  /**
+   * Whether the chip names something the user can act on, and the sentence
+   * saying how.
+   *
+   * A total switch rather than a lookup, for the reason every helper on this
+   * surface gives: `scripts/check-i18n.mjs` verifies STATIC `t("…")` call
+   * sites, so a key assembled from a variable is a key it cannot see. `off` is
+   * deliberately absent — AI being switched off is a state the user chose, and
+   * a chip offering to undo a deliberate choice is nagging.
+   */
+  const STATUS_HINT = noSearchModel
+    ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
+    : resting === "no-provider"
+      ? t("editor.chrome.rightPanel.aiChat.noModelHint")
+      : resting === "unreachable"
+        ? t("editor.chrome.rightPanel.aiChat.unreachableHint")
+        : "";
+  // `unavailable` is a build without local AI and `off` is the user's own
+  // switch: neither has a setting that would change it, so neither gets a
+  // click target. Offering one would be a control that goes somewhere and
+  // changes nothing.
+  const actionableStatus = STATUS_HINT !== "" && onOpenSettings !== undefined;
+  // The surface reports the frame facts the header dresses. Lifted rather than
+  // rendered in the surface, because the agent tab does not show either of them.
+  const [surfaceStatus, setSurfaceStatus] = useState<ConversationSurfaceStatus>({
+    persistLagging: false,
+    undoRunId: null,
+    undoHosted: false,
   });
-  const [diffProposal, setDiffProposal] = useState<Pick<
-    Proposal,
-    "edits" | "newNotes"
-  > | null>(null);
-  const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
-  // **A run, not merely a failure.** A start that never landed nulls the view,
-  // and its message lives on the turn itself; rendering the strip for it too
-  // printed the same sentence twice.
-  const runOpen = agent.view !== null;
-  // The newest agent turn, which is the only one a live run can belong to:
-  // `agentStore` holds exactly one.
-  let liveAgentTurnId: string | null = null;
-  for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
-    const turn = chat.turns[i]!;
-    if (turn.kind === "agent" && turn.role === "assistant") {
-      liveAgentTurnId = turn.id;
-      break;
-    }
-  }
-
-  // **The offer is bounded by the record's life, not by which surface is on
-  // screen.** `undo.run` outlives the review screen (`0518`) and New chat
-  // deliberately does not clear it (the comment on that button), so a record
-  // whose run has no turn in the open transcript, after New chat, or after
-  // switching to another conversation, still needs a reachable affordance. The
-  // turn icon is the primary one; this flag drives the fallback in the header.
-  const undoRunId = undo.run?.runId ?? null;
-  const undoHosted =
-    undoRunId !== null &&
-    chat.turns.some((turn) => turn.agentSummary?.runId === undoRunId);
-
-  // Follow the newest turn, but only when the reader is already at the bottom.
-  // Yanking the viewport away from someone who has scrolled up to read a cited
-  // answer is the one thing a transcript must not do.
-  //
-  // **Recorded on scroll, not measured in the effect**, because by the time the
-  // effect runs the DOM already carries the new turn: a reader who WAS at the
-  // bottom is suddenly a whole bubble away from it, so measuring there stops
-  // following on exactly the append the user is waiting to see. A streamed turn
-  // grows a few pixels at a time and would have kept following, which is what
-  // made the wrong version look right.
-  //
-  // Coalesced into a frame, because the trigger is per TOKEN and the reader
-  // cannot perceive more than one scroll per frame: at 40 tokens a second that
-  // is 40 layout touches doing the work of one.
-  const atBottomRef = useRef(true);
-  const frameRef = useRef(0);
-  const lastTurn = chat.turns[chat.turns.length - 1];
-  const turnCount = chat.turns.length;
-  const tailLength = lastTurn?.text.length ?? 0;
-  // Persist health (myne-md/myne#675 review): a failed persist retries and
-  // stashes for the unlock replay, and is no longer silent while it does.
-  // Subscribed, not polled: the flag changes at most once per failure or
-  // success.
-  const [persistLagging, setPersistLagging] = useState(isChatPersistLagging());
-  const [hydrateFailed, setHydrateFailedState] = useState(isChatHydrateFailed());
-  useEffect(
-    () =>
-      subscribeChatPersistHealth(() => {
-        setPersistLagging(isChatPersistLagging());
-        setHydrateFailedState(isChatHydrateFailed());
-      }),
-    [],
-  );
-  // Persistence wiring (myne-md/myne#675): install the store's settle listener
-  // once, then re-hydrate the last active conversation. Both are idempotent
-  // (the persister dedupes by payload; hydrate no-ops when bound or when the
-  // store is non-empty), so a strict-mode double-mount only double-fetches.
-  useEffect(() => {
-    installChatPersistence();
-    void hydrateActiveConversation();
-  }, []);
-  useEffect(() => {
-    if (!atBottomRef.current) return;
-    cancelAnimationFrame(frameRef.current);
-    frameRef.current = requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el !== null) el.scrollTop = el.scrollHeight;
-    });
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [turnCount, tailLength]);
+  // The header's fallback revert hands the run id down to the surface's confirm.
+  const [fallbackRevertRunId, setFallbackRevertRunId] = useState<string | null>(null);
 
   return (
     <div
@@ -739,83 +266,82 @@ export function AiChatTab({
           {t("editor.chrome.rightPanel.tabs.aiChat")}
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <Button
-            type="button"
-            variant="ghost"
+          <IconButton
             icon="clock"
-            aria-label={t("editor.chrome.rightPanel.aiChat.history")}
-            title={t("editor.chrome.rightPanel.aiChat.history")}
-            data-testid="ai.history-button"
+            label={t("editor.chrome.rightPanel.aiChat.history")}
+            tooltip
+            expanded={historyOpen}
+            testId="ai.history-button"
             onClick={() => setHistoryOpen(true)}
-            style={HEADER_ICON_BUTTON_STYLE}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            icon="bookmark"
-            aria-label={t("editor.chrome.rightPanel.aiChat.memory")}
-            title={t("editor.chrome.rightPanel.aiChat.memory")}
-            data-testid="ai.memory-button"
-            onClick={() => setMemoryOpen((open) => !open)}
-            style={HEADER_ICON_BUTTON_STYLE}
-          />
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <IconButton
+              icon="bookmark"
+              label={t("editor.chrome.rightPanel.aiChat.memory")}
+              tooltip
+              // A disclosure, so it says whether it is open. It is a toggle in
+              // behaviour and was silent about it: a screen-reader user pressed
+              // it twice and heard the same thing both times.
+              expanded={memoryOpen}
+              testId="ai.memory-button"
+              onClick={() => setMemoryOpen((open) => !open)}
+            />
+            {/* The popover and its button share ONE `position: relative`
+                container, so the popover's `bottom: 100%; right: 0` anchors to
+                the BUTTON rather than to wherever it sits in the flow. Before
+                this it rendered down by the composer (its old `{memoryOpen ? …}`
+                slot), so opening it from the header icon painted the card below
+                the header, half outside the panel and over the composer
+                (myne-md/myne#574). */}
+            {memoryOpen ? (
+              <MemoryPopover
+                onClose={() => setMemoryOpen(false)}
+                onOpenSettings={() => {
+                  setMemoryOpen(false);
+                  // The settings shell opens from the Editor, which passes the
+                  // opener down. Absent in isolation: the link then just closes.
+                  onOpenSettings?.();
+                }}
+                onShowToast={onShowToast ?? (() => {})}
+              />
+            ) : null}
+          </div>
+          {onFocusAgent !== undefined ? (
+            <IconButton
+              icon="maximize-2"
+              label={t("editor.chrome.rightPanel.aiChat.focusAgent")}
+              tooltip
+              testId="ai.focus-agent"
+              onClick={onFocusAgent}
+            />
+          ) : null}
           {chat.turns.length > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              data-testid="ai.new-chat"
-              style={HEADER_ICON_BUTTON_STYLE}
+            <IconButton
+              testId="ai.new-chat"
               icon="plus"
-              aria-label={t("editor.chrome.rightPanel.aiChat.newChat")}
-              title={t("editor.chrome.rightPanel.aiChat.newChat")}
-              onClick={() => {
-                // **Stop what it is clearing, host side, before clearing it.**
-                // Forgetting a run is not stopping one: an abandoned one still
-                // settles later through `settleRunIntoChat`, which repopulates
-                // the store and pops the review of a conversation the user just
-                // deleted. The streaming half of this used to stop an Ask
-                // generation too; Ask is gone (myne-md/myne#552) and the only
-                // thing left to stop is the run.
-                // A run's first leg USED to have no id to cancel with:
-                // `beginRun()` nulls `view` and only a settled step set it, so
-                // for the whole of `agentStart` the run was working and
-                // unaddressable (myne-md/myne#544). It is addressable now — the
-                // host sends the view through `agentStart`'s `onOpen` channel
-                // before it drives the loop — but the null check stays, because
-                // the window between `beginRun()` and that first message is
-                // real, and a start that failed outright never has a view at
-                // all. `clearAgent()` below does the half that is always
-                // available: it bumps the run epoch, so a reply is dropped
-                // instead of repopulating the store and opening a full-screen
-                // review of a conversation that no longer exists.
-                if (agent.view !== null) void agentCancel(agent.view.runId);
-                // The transcript and the open run together: the two halves of
-                // what this conversation produced. NOT `clearAgentForLock`. The
-                // undo offer describes notes already written to the vault, and
-                // starting a new conversation does not un-write them.
-                clearChat();
-                clearAgent();
-              }}
+              label={t("editor.chrome.rightPanel.aiChat.newChat")}
+              tooltip
+              // The whole sequence — cancel the run host-side, then clear the
+              // transcript and the store — lives in `startNewConversation`,
+              // because the agent hub needs the same act and its ordering is
+              // load-bearing. Two copies is how one of them loses the cancel.
+              onClick={startNewConversation}
             />
           ) : null}
           {/* The fallback revert offer (myne-md/myne#741). Shown only when the
               host holds an undoable record that no turn in the open transcript
-              can host, which is New chat and a switched conversation; the turn
-              icon is the primary surface. Without it the record's offer would be
-              live but unreachable, which is the narrowing this review found. */}
-          {undoRunId !== null && !undoHosted ? (
-            <Button
-              type="button"
-              variant="ghost"
-              data-testid="ai.revert-fallback"
-              style={HEADER_ICON_BUTTON_STYLE}
+              can host, which is New chat and a switched conversation. It hands
+              the run id to the surface, which owns the confirm. */}
+          {surfaceStatus.undoRunId !== null && !surfaceStatus.undoHosted ? (
+            <IconButton
+              testId="ai.revert-fallback"
               icon="rotate-ccw"
-              aria-label={t("editor.chrome.rightPanel.aiChat.revertRun")}
-              title={t("editor.chrome.rightPanel.aiChat.revertRun")}
-              onClick={() => setRevertConfirmRunId(undoRunId)}
+              label={t("editor.chrome.rightPanel.aiChat.revertRun")}
+              tooltip
+              onClick={() => setFallbackRevertRunId(surfaceStatus.undoRunId)}
             />
           ) : null}
-          {persistLagging ? (
+          {surfaceStatus.persistLagging ? (
             <span
               data-testid="ai.persist-warning"
               style={{
@@ -826,242 +352,148 @@ export function AiChatTab({
               {t("editor.chrome.rightPanel.aiChat.persistWarning")}
             </span>
           ) : null}
-          <span
-            data-testid="ai.chrome-status"
-            data-ai-enabled={aiEnabled ? "true" : "false"}
-            data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
-            data-ai-cause={resting}
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: "var(--weight-medium)",
-              color: aiEnabled && !noModel ? "var(--fg-2)" : "var(--fg-3)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-1)",
-              padding: "1px var(--space-1)",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              maxWidth: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {resting !== "ready"
-              ? chipKey(resting, t)
-              : noSearchModel
-                ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
-                : gettingReady
-                  ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                  : // At rest with a provider SERVING, the chip IS the attribution
-                    // (#191 task 4): "Ready" would be true and uninformative, and
-                    // the provider name is the one fact a user cannot get anywhere
-                    // else without opening Settings. A proper noun, not i18n'd.
-                    (activeProviderName ??
-                    t("editor.chrome.rightPanel.aiChat.statusReady"))}
-          </span>
+          {/* **The chip says what is wrong; this is where it says what to do**
+              (myne-md/myne#771).
+
+              It was a `<span>`: a passive label naming a fault with no route
+              out of it. Worse, the sentence that WAS written to give that
+              route — `noSearchModelHint`, "Asking searches your notes on this
+              device, and that needs a search model here… Choose one in
+              Settings → Developer → AI" — was rendered nowhere at all, in any
+              client. Somebody wrote it, 31 locales translated it, and it has
+              never been on a screen. `check-i18n.mjs` cannot see that: it
+              verifies a USED key exists, not that an existing key is used.
+
+              So the degraded chip is a button carrying that sentence as its
+              tooltip and opening Settings on the models block. The healthy
+              chip stays a `<span>`: naming the provider that is answering is a
+              statement, and a statement with a click target invites a press
+              that would do nothing useful. */}
+          {actionableStatus ? (
+            <Tooltip label={STATUS_HINT}>
+              <button
+                type="button"
+                data-testid="ai.chrome-status"
+                data-ai-enabled={aiEnabled ? "true" : "false"}
+                data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
+                data-ai-cause={resting}
+                data-actionable="true"
+                onClick={() => onOpenSettings?.("ai", "ai.models")}
+                className="myne-pill"
+                data-interactive="true"
+                data-tone={aiEnabled && !noModel ? "ready" : undefined}
+              >
+                {resting !== "ready"
+                  ? chipKey(resting, t)
+                  : noSearchModel
+                    ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
+                    : gettingReady
+                      ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+                      : (activeProviderName ??
+                        t("editor.chrome.rightPanel.aiChat.statusReady"))}
+              </button>
+            </Tooltip>
+          ) : (
+            <span
+              data-testid="ai.chrome-status"
+              data-ai-enabled={aiEnabled ? "true" : "false"}
+              data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
+              data-ai-cause={resting}
+              className="myne-pill"
+              data-tone={aiEnabled && !noModel ? "ready" : undefined}
+            >
+              {resting !== "ready"
+                ? chipKey(resting, t)
+                : noSearchModel
+                  ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
+                  : gettingReady
+                    ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+                    : (activeProviderName ??
+                      t("editor.chrome.rightPanel.aiChat.statusReady"))}
+            </span>
+          )}
         </div>
       </div>
       {/* Honest framing (task 13): rendered VERBATIM (load-bearing copy, never
           i18n'd) — a weak on-device model is fallible, so the user is told to
-          verify against the cited notes. Must not over-claim / imply isolation. */}
+          verify against the cited notes. Must not over-claim.
+
+          **It is clamped once there is a conversation, never hidden**
+          (myne-md/myne#771). At panel width the sentence is three lines, and it
+          sat above the transcript on every render: a permanent third of the
+          surface spent re-telling a reader something they were told when they
+          arrived. It stays FULLY EXPANDED while the transcript is empty, which
+          is the moment the claim is being made, and clamps to one line after
+          the first turn with a control that expands it again.
+
+          The text is in the DOM either way — clamped, not conditionally
+          rendered — so it is present to a screen reader, to a text search and
+          to `tests/components/AiChatTab.test.tsx`, which asserts the exact
+          wording. What is reduced is how much room a sentence the user has read
+          takes from the thing they came for. */}
       {ready && (
-        <p
-          data-testid="ai.honesty-note"
-          style={{ fontSize: "var(--text-xs)", lineHeight: 1.4, color: "var(--fg-3)", margin: 0 }}
-        >
-          {aiChatHonestyNote(activeProviderName)}
-        </p>
-      )}
-
-      {/* The unreadable conversation store (review I9): an empty transcript
-          must not read as "no conversations yet" when the roster refused to
-          open. Shown only while the tab is actually empty; a hydrate,
-          a replay, or an explicit open that succeeds clears the flag. */}
-      {hydrateFailed && chat.turns.length === 0 ? (
-        <p
-          data-testid="ai.hydrate-error"
-          style={{ fontSize: "var(--text-xs)", lineHeight: 1.4, color: "var(--danger)", margin: 0 }}
-        >
-          {t("editor.chrome.rightPanel.aiChat.historyError")}
-        </p>
-      ) : null}
-
-      {/* The one scrolling region. Everything above and below it stays put. */}
-      <div
-        ref={scrollRef}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        }}
-        style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
-      >
-        {chat.turns.length > 0 ? (
-          <div
-            data-testid="ai.transcript"
-            aria-live="polite"
-            aria-atomic="false"
-            style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
-          >
-            {/* The RUN renders as an agent turn; the task the user sent is an
-                ordinary bubble that happens to belong to the agent flow, so
-                the switch is on the role rather than on the kind. */}
-            {chat.turns.map((turn) =>
-              turn.kind === "agent" && turn.role === "assistant" ? (
-                <AgentTurnView
-                  key={turn.id}
-                  turn={turn}
-                  working={agent.running && turn.id === liveAgentTurnId}
-                  t={t}
-                  canRevert={
-                    undo.run !== null &&
-                    turn.agentSummary !== undefined &&
-                    turn.agentSummary.runId === undo.run.runId
-                  }
-                  onOpenDiff={setDiffProposal}
-                  onRequestRevert={setRevertConfirmRunId}
-                  revertBusy={undo.busy}
-                  undoReport={
-                    undo.report !== null &&
-                    turn.agentSummary !== undefined &&
-                    turn.agentSummary.runId === undo.reportRunId
-                      ? undo.report
-                      : null
-                  }
-                />
-              ) : (
-                <ChatTurnView
-                  key={turn.id}
-                  turn={turn}
-                  onInsert={onInsert}
-                  t={t}
-                />
-              ),
-            )}
-          </div>
-        ) : (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-1)" }}>
           <p
-            data-testid={noModel ? "ai.status-no-model" : undefined}
-            data-ai-cause={resting}
+            data-testid="ai.honesty-note"
+            data-clamped={honestyClamped ? "true" : undefined}
             style={{
-              fontSize: "var(--text-sm)",
-              lineHeight: 1.5,
+              fontSize: "var(--text-xs)",
+              lineHeight: 1.4,
               color: "var(--fg-3)",
               margin: 0,
+              flex: 1,
+              minWidth: 0,
+              ...(honestyClamped
+                ? {
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical" as const,
+                    WebkitLineClamp: 1,
+                    overflow: "hidden",
+                  }
+                : {}),
             }}
           >
-            {resting !== "ready"
-              ? bodyKey(resting, t)
-              : noSearchModel
-                ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
-                : gettingReady
-                  ? t("editor.chrome.rightPanel.aiChat.gettingReadyHint")
-                  : t("editor.chrome.rightPanel.aiChat.empty")}
+            {aiChatHonestyNote(activeProviderName)}
           </p>
-        )}
-      </div>
-
-      {/* The live run: its status, its running scope total, its Stop, and the
-          scope-expansion dialog it carries. OUTSIDE the scrolling region and
-          tied to the run rather than to a transcript turn, deliberately. The
-          scope total is one of the four bounds `docs/threat-model.md` §7 names
-          in place of the superseded no-tool-calling claim, and the dialog is the
-          whole of what `design-notes/ai/0515` puts between the model and a
-          wider scope. Neither may scroll out of the way, and neither may be
-          unmounted by clearing the transcript. */}
-      {runOpen ? <AgentProgress /> : null}
-
-      {/* Shown whenever AI is on, and NOT gated on a side-loaded model, so it is
-          reachable in the stub E2E build and in a no-model state (where a send
-          surfaces the honest error turn). */}
-      {aiEnabled && (
-        <ChatComposer
-          openNoteId={openNoteId}
-          folders={folders}
-          onNotesWritten={onNotesWritten}
-        />
+          {chat.turns.length > 0 ? (
+            <IconButton
+              icon={honestyOpen ? "chevron-up" : "chevron-down"}
+              label={t(
+                honestyOpen
+                  ? "editor.chrome.rightPanel.aiChat.honestyCollapse"
+                  : "editor.chrome.rightPanel.aiChat.honestyExpand",
+              )}
+              tooltip
+              iconSize={12}
+              expanded={honestyOpen}
+              testId="ai.honesty-toggle"
+              onClick={() => setHonestyOpen((open) => !open)}
+            />
+          ) : null}
+        </div>
       )}
+
+      {/* The conversation itself, shared with the agent tab. Gated on
+          `ai_enabled` so the composer is reachable in the stub E2E build and in
+          a no-model state, where a send surfaces the honest error turn. */}
+      {aiEnabled ? (
+        <ConversationSurface
+          testId="ai.chat-panel-surface"
+          {...(onInsert === undefined ? {} : { onInsert })}
+          openNoteId={openNoteId}
+          {...(folders === undefined ? {} : { folders })}
+          {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
+          {...(onRunUndone === undefined ? {} : { onRunUndone })}
+          onStatusChange={setSurfaceStatus}
+          confirmRevertRunId={fallbackRevertRunId}
+          onConfirmRevertConsumed={() => setFallbackRevertRunId(null)}
+          restingCause={resting}
+          degraded={noModel}
+        />
+      ) : null}
+
       {historyOpen ? (
         <ChatHistoryModal open onClose={() => setHistoryOpen(false)} />
-      ) : null}
-      {memoryOpen ? (
-        <MemoryPopover
-          onClose={() => setMemoryOpen(false)}
-          onOpenSettings={() => {
-            setMemoryOpen(false);
-            // The settings shell opens from the Editor, which passes the
-            // opener down. Absent in isolation: the link then just closes.
-            onOpenSettings?.();
-          }}
-          onShowToast={onShowToast ?? (() => {})}
-        />
-      ) : null}
-      {diffProposal !== null ? (
-        <ProposalDiffModal
-          open
-          onClose={() => setDiffProposal(null)}
-          proposal={diffProposal}
-        />
-      ) : null}
-      {/* Revert is a write, so it confirms first. The sentence states the one
-          asymmetry the offer always carries: edits go back, creates stay. */}
-      {revertConfirmRunId !== null ? (
-        <ModalShell
-          open
-          onClose={() => setRevertConfirmRunId(null)}
-          title={t("editor.chrome.rightPanel.aiChat.revertConfirmTitle")}
-          labelId="ai-revert-confirm-title"
-          width={420}
-          closeLabel={t("common.close")}
-          testId="ai.revert-confirm"
-        >
-          <div
-            style={{
-              padding: "var(--space-4) var(--space-5)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-3)",
-            }}
-          >
-            <p style={{ ...TURN_TEXT_STYLE, color: "var(--fg-2)", margin: 0 }}>
-              {t("editor.chrome.rightPanel.aiChat.revertConfirmBody")}
-            </p>
-            {/* The session-scoped disclosure `0561` requires, carried forward
-                into the confirm rather than dropped with the strip: the offer
-                is lost on lock or close, and the version history is the durable
-                path. Stated at the moment of the write, which is where it
-                matters. */}
-            <p style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: 0 }}>
-              {t("agent.undo.sessionOnly")}
-            </p>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "var(--space-2)",
-              }}
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                data-testid="ai.revert-cancel"
-                onClick={() => setRevertConfirmRunId(null)}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={undo.busy || undo.run?.runId !== revertConfirmRunId}
-                data-testid="ai.revert-confirm-undo"
-                onClick={() => {
-                  setRevertConfirmRunId(null);
-                  void undo.undo();
-                }}
-              >
-                {t("agent.undo.action")}
-              </Button>
-            </div>
-          </div>
-        </ModalShell>
       ) : null}
     </div>
   );

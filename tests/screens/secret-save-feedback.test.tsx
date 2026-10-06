@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 //
-// "Save as file" reports which way it went, on both screens that show a
+// "Save as file" reports which way it went, on both surfaces that show a
 // credential once (myne-md/myne#522).
+//
+// The pair changed shape in myne-md/myne#468 and the reason is worth keeping: it
+// used to be the vault-creation phrase step and its account-number step, which
+// merged into ONE recovery-kit step. So the second surface here is now the shared
+// `SecretPhraseReveal`, driven directly — that is the OTHER save row in the tree
+// (the identity phrase's, `decisions/protocol/0604`), and the two rows are
+// separate implementations because the kit exports two secrets as one file while
+// the reveal exports one. Two implementations is exactly why both are driven.
 //
 // Two properties, and the second is the one the issue is about:
 //
@@ -34,8 +42,8 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { AccountStep } from "../../src/screens/vault-creation/AccountStep";
-import { PhraseStep } from "../../src/screens/vault-creation/PhraseStep";
+import { KitStep } from "../../src/screens/vault-creation/KitStep";
+import { SecretPhraseReveal } from "../../src/components/SecretPhraseReveal";
 
 const PHRASE = Array.from({ length: 24 }, (_, i) => `word${i + 1}`);
 
@@ -48,38 +56,45 @@ afterEach(() => {
   cleanup();
 });
 
-/** The two screens, each with the testid of the status line it renders. */
+/** The two surfaces, each with the testid of the status line it renders. */
 const SCREENS = [
   {
-    name: "account step",
-    statusId: "create.account-action-status",
-    saveLabel: "Save as file",
-    saved: "Saved. It is a plain text file, so keep it somewhere only you can read.",
-    saveFailed: "Couldn't save the file. Copy the number instead, or write it down.",
-    copyFailed: 'Couldn\'t copy. Use "Save as file" instead.',
+    name: "recovery kit step",
+    statusId: "create.kit-action-status",
+    saveLabel: "Save recovery kit",
+    saved:
+      "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read.",
+    saveFailed: "Couldn't save the file. Copy the kit instead, or write both parts down.",
+    copyFailed: 'Couldn\'t copy. Use \u201cSave recovery kit\u201d instead.',
     render: () =>
       render(
-        <AccountStep
+        <KitStep
+          phrase={PHRASE}
           accountNumber="MY-4K7P-9QRS-2TVW-XYZ0-1234"
-          acknowledged={false}
-          committing={false}
-          error={null}
-          inviteCode=""
-          onInviteCodeChange={() => {}}
-          showInviteCode={false}
+          vaultName="Research"
+          revealed={true}
           dispatch={() => {}}
         />,
       ),
   },
   {
-    name: "phrase step",
-    statusId: "create.phrase-action-status",
+    name: "shared phrase reveal",
+    statusId: "identity-setup.phrase-action-status",
     saveLabel: "Save as file",
     saved: "Saved. It is a plain text file, so keep it somewhere only you can read.",
     saveFailed: "Couldn't save the file. Copy the words instead, or write them down.",
     copyFailed: 'Couldn\'t copy. Use "Save as file" instead.',
     render: () =>
-      render(<PhraseStep phrase={PHRASE} revealed={true} dispatch={() => {}} />),
+      render(
+        <SecretPhraseReveal
+          phrase={PHRASE}
+          revealed={true}
+          onReveal={() => {}}
+          onHide={() => {}}
+          testIdPrefix="identity-setup.phrase"
+          saveFilename="myne-identity-phrase.txt"
+        />,
+      ),
   },
 ] as const;
 

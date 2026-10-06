@@ -1259,6 +1259,7 @@ mod tests {
             title: title.to_string(),
             updated_at,
             version,
+            note_id: None,
         }
     }
 
@@ -1274,6 +1275,7 @@ mod tests {
             title: String::new(),
             updated_at,
             version,
+            note_id: None,
         }
     }
 

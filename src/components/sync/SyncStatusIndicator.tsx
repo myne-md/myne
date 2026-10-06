@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Button } from "../primitives/Button";
 
 const ROOT_STYLE: CSSProperties = {
   display: "flex",
@@ -92,8 +93,8 @@ function present(status: SyncStatus | null): Presentation {
       // A shared (`NTV6`) vault refuses to sync until the person identity is
       // unlocked for this session. Separate copy because the
       // fix is a specific user action, and "Sync error" would send them looking
-      // at the network instead. The unlock control lives in this same Sync panel
-      // (the member roster's identity step).
+      // at the network instead. The unlock control is the inline phrase entry in
+      // this same Sync panel's Identity block (myne-md/myne#831).
       if (status.detail === "identity_locked") {
         return {
           dotColor: "var(--warning)",
@@ -131,8 +132,9 @@ function present(status: SyncStatus | null): Presentation {
 export interface SyncStatusIndicatorProps {
   /**
    * Offered only while sync is parked on a locked person identity (`NTV6`, the
-   * `identity_locked` detail): opens the identity setup/recover dialog. Optional
-   * so an isolated render (a component test) still shows just the label.
+   * `identity_locked` detail): opens the Sync panel's inline person-identity
+   * phrase entry (myne-md/myne#831). Optional so an isolated render (a component
+   * test) still shows just the label.
    */
   onUnlockIdentity?: () => void;
 }
@@ -162,18 +164,14 @@ export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorPro
         {label}
       </span>
       {identityLocked && onUnlockIdentity && (
-        <button
+        <Button
           type="button"
-          style={BUTTON_STYLE}
-          {...hoverSurface({
-            restBg: "var(--bg-2)",
-            hoverBg: "var(--paper-3)",
-          })}
+          variant="secondary"
           onClick={onUnlockIdentity}
           data-testid="sync.unlock-identity"
         >
           {t("sync.status.unlockIdentityCta")}
-        </button>
+        </Button>
       )}
       {!hideSyncNow && (
         <button

@@ -316,23 +316,10 @@ pub fn validate_member_path(path: &str) -> Result<(), BackupContainerError> {
     Ok(())
 }
 
-/// Strict lowercase-hyphenated UUID check (36 chars, hyphens at 8/13/18/23,
-/// lowercase hex elsewhere) — the on-disk filename form for notes and
-/// snapshots. Deliberately stricter than `uuid::Uuid::parse_str` (which
-/// tolerates uppercase/braced forms that never appear on disk) and
-/// deliberately NOT `NoteId::parse` (v7-strict — §9.11.3's grammar carries
-/// no version constraint; reusing the v7 validator would silently shrink
-/// backup membership).
-fn is_disk_uuid(s: &str) -> bool {
-    let b = s.as_bytes();
-    if b.len() != 36 {
-        return false;
-    }
-    b.iter().enumerate().all(|(i, &c)| match i {
-        8 | 13 | 18 | 23 => c == b'-',
-        _ => c.is_ascii_digit() || (b'a'..=b'f').contains(&c),
-    })
-}
+// The UUID-shape check lives in the ungated `crate::disk_uuid` module so the
+// import reader (which compiles for wasm32) can share it; re-exported here so
+// the container allowlist keeps one definition, two callers (myne-md/myne#827).
+pub use crate::disk_uuid::is_disk_uuid;
 
 fn is_lower_hex(s: &str) -> bool {
     !s.is_empty()

@@ -4140,7 +4140,6 @@
       "invitationsFailed": "Impossibile caricare i tuoi inviti.",
       "title": "Membri del caveau",
       "personUnlock": "Sblocca identità membro",
-      "personHint": "Sblocca la tua identità membro con la tua frase di recupero.",
       "personReady": "Identità membro sbloccata.",
       "ownerCodeHint": "Condividi questo codice con la persona che inviti così può verificare che il caveau sia tuo. Contiene solo informazioni pubbliche.",
       "personLock": "Blocca identità membro",

@@ -21,6 +21,7 @@ import {
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { Input } from "../primitives/Input";
+import { Button } from "../primitives/Button";
 import { Segmented } from "../primitives/Segmented";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
@@ -34,7 +35,6 @@ import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import { has } from "../../platform/capabilities";
 import { EnrollPhraseCredential } from "./EnrollPhraseCredential";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -71,22 +71,6 @@ const NOTICE: CSSProperties = {
   color: "var(--fg-2)",
   margin: 0,
 };
-
-function submitStyle(disabled: boolean): CSSProperties {
-  return {
-    alignSelf: "flex-start",
-    background: disabled ? "var(--bg-3)" : "var(--accent)",
-    color: disabled ? "var(--fg-3)" : "var(--accent-on)",
-    border: disabled ? "1px solid var(--line-1)" : "none",
-    borderRadius: "var(--radius-2)",
-    padding: "8px 18px",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--text-sm)",
-    fontWeight: "var(--weight-medium)",
-    cursor: disabled ? "not-allowed" : "pointer",
-    transition: HOVER_TRANSITION,
-  };
-}
 
 const MODE_VALUES = ["password", "recovery"] as const;
 
@@ -333,20 +317,15 @@ export function EnrollDeviceForm() {
         </p>
       )}
 
-      <button
-        type="button"
+      <Button
+        variant="primary"
         onClick={handleSubmit}
         disabled={!canSubmit}
-        style={submitStyle(!canSubmit)}
-        {...hoverSurface({
-          restBg: "var(--accent)",
-          hoverBg: "var(--accent-hover)",
-          disabled: !canSubmit,
-        })}
+        style={{ alignSelf: "flex-start" }}
         data-testid="sync.enroll.submit"
       >
         {busy ? t("sync.enroll.connecting") : t("sync.enroll.submit")}
-      </button>
+      </Button>
     </div>
   );
 }

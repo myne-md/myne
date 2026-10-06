@@ -7,7 +7,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { refreshTorState } from "../../hooks/useTorState";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Button } from "../primitives/Button";
+import { Input } from "../primitives/Input";
 import { Icon } from "../primitives/Icon";
 
 /**
@@ -32,28 +33,9 @@ const ROW: CSSProperties = {
   alignItems: "center",
 };
 
-const INPUT: CSSProperties = {
+const FIELD_FILL: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-sm)",
-  background: "var(--paper)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--font-sans)",
-};
-
-const BTN: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-sm)",
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-1)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  transition: HOVER_TRANSITION,
 };
 
 const HELP: CSSProperties = {
@@ -76,16 +58,6 @@ const NOTE_BLOCK: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   lineHeight: "var(--leading-normal)",
-};
-
-// The "Connected" resting state of the connect button: muted, non-accent, and
-// clearly inert (E4c) — the input matches the endpoint already in use.
-const BTN_CONNECTED: CSSProperties = {
-  ...BTN,
-  background: "var(--bg-2)",
-  color: "var(--fg-3)",
-  border: "1px solid var(--line-1)",
-  cursor: "default",
 };
 
 export function EndpointConfig({
@@ -125,6 +97,10 @@ export function EndpointConfig({
   const [inviteCode, setInviteCode] = useState("");
   // `null` means loopback HTTP, never an unverified remote TLS session.
   const [pinSource, setPinSource] = useState<PinSource>(null);
+  // On the LOCKED hosted door the address is read-only, so editing it can never
+  // fire the address `onChange` that re-reveals the invite field. This flag is
+  // the manual escape hatch for that door (myne-md/myne#822).
+  const [revealCode, setRevealCode] = useState(false);
 
   useEffect(() => {
     // `cert_pin_hex` is on the wire and is always `null` since 0620. It is not
@@ -173,6 +149,7 @@ export function EndpointConfig({
     })
       .then((r) => {
         setConnectedUrl(trimmed);
+        setRevealCode(false);
         onConnected?.();
         setPinSource(r.pin_source);
         // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
@@ -207,6 +184,11 @@ export function EndpointConfig({
     connectedUrl !== null &&
     trimmedUrl.length > 0 &&
     trimmedUrl === connectedUrl;
+  // The invite field shows while unconnected, OR when the user asked to
+  // re-enter it on the locked hosted door (myne-md/myne#822). On that door the
+  // address is read-only and the code is the ONLY thing that can be wrong, so
+  // without this a wrong/rotated code is uncorrectable.
+  const showInviteField = !isConnectedUnedited || revealCode;
 
   return (
     <div
@@ -236,7 +218,7 @@ export function EndpointConfig({
         </div>
       )}
       <div style={ROW}>
-        <input
+        <Input
           value={url}
           readOnly={lockedUrl}
           onChange={(e) => {
@@ -250,61 +232,80 @@ export function EndpointConfig({
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          style={lockedUrl ? { ...INPUT, color: "var(--fg-3)" } : INPUT}
+          style={lockedUrl ? { ...FIELD_FILL, color: "var(--fg-3)" } : FIELD_FILL}
           data-testid="sync.endpoint-input"
         />
-        {isConnectedUnedited ? (
-          <button
-            type="button"
-            disabled
-            style={BTN_CONNECTED}
+        {isConnectedUnedited && !revealCode ? (
+          <Button variant="secondary" disabled data-testid="sync.endpoint-connect">
+            {t("sync.endpoint.connected")}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={connect}
+            disabled={busy}
             data-testid="sync.endpoint-connect"
           >
-            {t("sync.endpoint.connected")}
-          </button>
-        ) : (
-            <button
-              type="button"
-              onClick={connect}
-              disabled={busy}
-              style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
-              {...hoverSurface({
-                restBg: "var(--accent)",
-                hoverBg: "var(--accent-hover)",
-                disabled: busy,
-              })}
-              data-testid="sync.endpoint-connect"
-            >
-              {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-            </button>
-          )}
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </Button>
+        )}
       </div>
       {/* The invite code for a gated server (myne-md/myne#800). Optional: an
           open server ignores it, and a self-host operator never sets one. It
           sits under the address because it is part of "which server, and what
-          does it ask for", not a separate setting. */}
-      <label
-        style={{ ...HELP, marginTop: "var(--space-1)" }}
-        htmlFor="sync-endpoint-invite"
-      >
-        {t("sync.endpoint.inviteLabel")}
-      </label>
-      <div style={ROW}>
-        <input
-          id="sync-endpoint-invite"
-          value={inviteCode}
-          onChange={(e) => {
-            setInviteCode(e.target.value);
-            onEdit?.();
-          }}
-          placeholder={t("sync.endpoint.invitePlaceholder")}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-          style={INPUT}
-          data-testid="sync.endpoint-invite-input"
-        />
-      </div>
+          does it ask for", not a separate setting.
+
+          Hidden once the server is connected (myne-md/myne#815): the code is
+          only for admission, so asking for it again on an already-connected
+          endpoint reads as if it were still required. The value stays hydrated
+          from `sync_get_endpoint`, and on the self-hosted door editing the
+          address clears it and re-reveals the field (a code issued for the old
+          server must not go to the new one). On the LOCKED hosted door the
+          address is read-only, so that path cannot fire; there the "Change
+          invite code" control below re-reveals the field instead
+          (myne-md/myne#822). It is NOT true that the code is still sent on a
+          reconnect: every reconnect requires an address change (or a deliberate
+          re-entry here), and both re-send whatever is in the field. */}
+      {showInviteField && (
+        <>
+          <label
+            style={{ ...HELP, marginTop: "var(--space-1)" }}
+            htmlFor="sync-endpoint-invite"
+          >
+            {t("sync.endpoint.inviteLabel")}
+          </label>
+          <div style={ROW}>
+            <Input
+              id="sync-endpoint-invite"
+              value={inviteCode}
+              onChange={(e) => {
+                setInviteCode(e.target.value);
+                onEdit?.();
+              }}
+              placeholder={t("sync.endpoint.invitePlaceholder")}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoComplete="off"
+              style={FIELD_FILL}
+              data-testid="sync.endpoint-invite-input"
+            />
+          </div>
+        </>
+      )}
+      {/* The locked hosted door has no way to re-reveal the invite field by
+          editing the read-only address, so it gets an explicit control
+          (myne-md/myne#822). Hidden on the self-hosted door, where editing the
+          address already re-reveals the field. */}
+      {lockedUrl && isConnectedUnedited && !revealCode && (
+        <Button
+          variant="ghost"
+          onClick={() => setRevealCode(true)}
+          style={{ alignSelf: "flex-start" }}
+          data-testid="sync.endpoint-change-invite"
+        >
+          {t("sync.endpoint.changeInviteCode")}
+        </Button>
+      )}
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">
         {t("sync.endpoint.tlsHelp")}

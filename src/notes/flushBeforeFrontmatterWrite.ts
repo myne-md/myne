@@ -46,30 +46,31 @@
 
 // # Which writers call this, and which deliberately do not
 //
-// Callers today: `setNoteCover.ts`, and both converts in `templates.ts`.
-// `folderActions.ts` and `renameInbound.ts` call `renameFlushHooks()
-// .flushOpenPanes()` directly, because they flush once for a BATCH rather than
-// per note.
+// Callers today: `setNoteCover.ts`, both converts in `templates.ts`, the
+// trash/restore/delete writers `trashNote.ts` + `deleteNote.ts`
+// (myne-md/myne#819), and the archive pair `archiveNote`/`unarchiveNote`
+// (myne-md/myne#825's tab-close-on-archive made their losing direction a
+// silent un-archive). `folderActions.ts` and `renameInbound.ts` call
+// `renameFlushHooks().flushOpenPanes()` directly, because they flush once for a
+// BATCH rather than per note.
 //
-// Seven more writers have the identical read-patch-write shape against disk and
-// do NOT flush: `archiveNote`, `trashNote` (and their restore twins),
-// `moveNote`, `folderNote`, `renameNote`, `completeNote` and
-// `lib/writing-assistant.ts`. Every one of them is reachable from the sidebar
-// context menu or the palette while the same note is open and dirty, so the
-// race is not hypothetical there either, and on `trashNote` the losing direction
-// is worse than a reverted field: a pane still holding the pre-trash buffer
-// autosaves `trashed:` back off and the note returns from the trash.
+// The FIVE that remain and do NOT flush are the read-patch-write writers whose
+// losing direction was accepted as out of scope: `moveNote`, `folderNote`,
+// `renameNote`, `completeNote` and `lib/writing-assistant.ts`. Every one of them
+// is reachable from the sidebar context menu or the palette while the same note
+// is open and dirty, so the race is not hypothetical there either. They are not
+// simply wired up here, because doing so is a BEHAVIOUR change per writer rather
+// than a missing line: this function REJECTS on an unsettled pane, and a caller
+// that inherits that rejection turns the action into one that can fail while a
+// save is failing somewhere else. Each needs its own answer.
 //
-// They are not simply wired up here, because doing so is a BEHAVIOUR change per
-// writer rather than a missing line. This function REJECTS on an unsettled
-// pane, and a caller that inherits that rejection turns "Move to trash" into an
-// action that can fail while a save is failing somewhere else. Whether that is
-// right depends on the writer: for a cover it plainly is, since the alternative
-// is losing the field silently; for a trash it is a question about what the
-// user asked for. Each needs its own answer, and answering seven of them by
-// adding one line each is how a silent revert becomes a visible failure nobody
-// designed. Recorded here rather than left implicit, so the next reader finds
-// the roster instead of concluding the class is closed.
+// `trashNote`/`restoreNote`/`deleteNoteRouted` were the two whose answer was
+// never in doubt and are now wired here. Their losing direction is not a
+// reverted field but a resurrected note: a pane still holding the pre-trash (or
+// pre-delete) buffer autosaves `trashed:`/`deleted:` back off, the note returns
+// from the trash, and it stays editable (myne-md/myne#819). Recorded here
+// rather than left implicit, so the next reader finds the roster instead of
+// concluding the class is closed.
 
 import { renameFlushHooks } from "./renameFlushHook";
 

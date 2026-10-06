@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import { SidebarSearchRow } from "./SidebarSearchRow";
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
@@ -62,9 +63,11 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
+import { Button } from "../../components/primitives/Button";
+import { EmptyState as ZeroState } from "../../components/primitives/EmptyState";
+import { tabKindSpec } from "../tabKinds";
 import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
-import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { ViewSettings, type ViewDisplayPatch } from "./ViewSettings";
@@ -93,12 +96,6 @@ import {
   useFolderManagement,
   type FolderManagement,
 } from "./useFolderManagement";
-import { Icon } from "../../components/primitives/Icon";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../../components/primitives/hoverSurface";
-import { useCenterView } from "../../screens/centerView";
 import { regionOf } from "../../lib/regions";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
@@ -542,130 +539,75 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
 
 // The header's single "+" button and its dropdown (New note / New note from
 // template / New folder) — replaces the former three-button cluster.
-const NEW_MENU_STYLE: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 4px)",
-  insetInlineEnd: 0,
-  minWidth: 210,
-  zIndex: 40,
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2)",
-  padding: "var(--space-1)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 1,
-};
-
-const NEW_MENU_ITEM_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  padding: "8px 10px",
-  border: 0,
-  borderRadius: "var(--radius-1)",
-  background: "transparent",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  textAlign: "start",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  transition: HOVER_TRANSITION,
-};
-
-function NotesActionsMenu({
+/**
+ * The sidebar's three create actions, as explicit icon buttons.
+ *
+ * They were folded behind a single `+` dropdown in #230, and #282 then added a
+ * fourth row to it. The dropdown was the wrong trade on this surface: the three
+ * things a person creates in a notes app are a note, a folder and a drawing,
+ * and putting all three one click plus one read behind a `+` taxes the common
+ * case to tidy a row that had room for them.
+ *
+ * "New note from template" does NOT get a button — four icons is a toolbar, and
+ * it is the rarest of the four by a distance. It stays on the command palette
+ * as `templates.new-note`, which is reachable from the search row immediately
+ * to the left of these.
+ *
+ * Order is drawing, folder, note: the most-used sits nearest the tree it acts
+ * on, and the pointer travels least for the thing it does most.
+ */
+function NotesActionsBar({
   onNewFolder,
   onCreate,
-  onNewFromTemplate,
   onNewDrawing,
 }: {
   onNewFolder: () => void;
   onCreate: () => void;
-  onNewFromTemplate?: () => void;
   onNewDrawing: () => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: globalThis.MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const id = window.setTimeout(
-      () => document.addEventListener("mousedown", onDown),
-      0,
-    );
-    document.addEventListener("keydown", onKey);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-  const item = (
-    label: string,
-    testId: string,
-    icon: IconName,
-    onClick: () => void,
-  ) => (
-    <button
-      type="button"
-      role="menuitem"
-      data-testid={testId}
-      {...hoverSurface()}
-      style={NEW_MENU_ITEM_STYLE}
-      onClick={() => {
-        setOpen(false);
-        onClick();
-      }}
-    >
-      <Icon name={icon} size={14} style={{ color: "var(--fg-3)" }} />
-      {label}
-    </button>
-  );
   return (
-    <div ref={ref} style={{ position: "relative", display: "flex" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
       <IconButton
-        icon="plus"
-        label={t("notes.list.newItem")}
-        testId="notes.new-menu"
-        onClick={() => setOpen((v) => !v)}
+        icon="image-plus"
+        iconSize={15}
+        label={t("notes.list.newDrawingMenu")}
+        testId="notes.new-drawing"
+        tooltip
+        onClick={onNewDrawing}
       />
-      {open && (
-        <div role="menu" data-testid="notes.new-menu-dropdown" style={NEW_MENU_STYLE}>
-          {item(t("notes.list.newNote"), "notes.create", "file-plus", onCreate)}
-          {onNewFromTemplate &&
-            item(
-              t("notes.list.newNoteFromTemplate"),
-              "notes.new-from-template",
-              "file-text",
-              onNewFromTemplate,
-            )}
-          {/* myne#282: drawings were creatable from three OTHER menus but not
-              this one — and since #230 moved the create actions behind the `+`,
-              this is the discoverable entry point, so a note kind absent from it
-              is effectively hidden. Sits before New folder because it is a note
-              kind, not a container. */}
-          {item(t("notes.list.newDrawingMenu"), "notes.new-drawing", "image", onNewDrawing)}
-          {item(t("notes.list.newFolder"), "notes.new-folder", "folder-plus", onNewFolder)}
-        </div>
-      )}
+      <IconButton
+        icon="folder-plus"
+        iconSize={15}
+        label={t("notes.list.newFolder")}
+        testId="notes.new-folder"
+        tooltip
+        onClick={onNewFolder}
+      />
+      <IconButton
+        icon="file-plus"
+        iconSize={15}
+        label={t("notes.list.newNote")}
+        testId="notes.create"
+        tooltip
+        onClick={onCreate}
+      />
     </div>
   );
 }
 
 /** Leading group: the collapse chevron + the "Notes" eyebrow, kept together
  *  so the header stays a clean two-group `space-between` row (MYND-137). */
+/** The header's leading half: the search row, which takes everything the
+ *  create buttons do not. `HEADER_ROW_STYLE` is `space-between`, so without
+ *  the grow this box sized to its content and the gap between the two halves
+ *  was dead space rather than the search field. */
 const HEADER_LEAD_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
+  flex: 1,
+  minWidth: 0,
 };
 
 /** "Favorites" eyebrow row — pinned above the "Notes" header (MYND-183). Same
@@ -694,24 +636,6 @@ const EMPTY_WRAPPER_STYLE: CSSProperties = {
   textAlign: "center",
   gap: 14,
   minWidth: 0,
-};
-
-const EMPTY_COPY_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-};
-
-const EMPTY_CTA_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)",
-  color: "var(--accent-on)",
-  background: "var(--accent)",
-  border: 0,
-  padding: "10px 14px",
-  borderRadius: "var(--radius-2)",
-  cursor: "pointer",
 };
 
 const SIDEBAR_OUTER_STYLE: CSSProperties = {
@@ -832,7 +756,7 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
 };
 
-/** Optional props. `onNewFromTemplate` wires the new-note caret that opens
+/** Optional props.
  *  the template flow (MYND-190); omitted → the caret is not rendered.
  *
  *  The sidebar collapse toggle moved to a floated `TitleBarToggle` in the
@@ -840,7 +764,6 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
  *  `SidebarVaultSwitcher` header above this list (MYND-166); neither is
  *  hosted here. */
 interface NoteListProps {
-  onNewFromTemplate?: () => void;
   /** UI hooks for the per-note export flow (MYND-116) — the Editor's
    *  structured toast sink + the pre-flight "Include N attachments"
    *  modal hook. Optional so isolated NoteList renders stay inert. */
@@ -856,19 +779,15 @@ type BuilderState =
 
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
-export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
+export function NoteList({ exportHooks }: NoteListProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
-  // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
-  // pane to the editor — covers the Enter-on-already-selected edge the
-  // `selectedId` effect can't see. No-op outside the Editor provider.
-  const { setView } = useCenterView();
+  // Opening a note used to also have to swap the center view back to the
+  // editor. As a tab it does not: `ctx.open` puts the note in the focused pane,
+  // which replaces whatever tab was there (myne-md/myne#773).
   const openNote = useCallback(
-    (id: NoteId): Promise<unknown> => {
-      setView("editor");
-      return ctx.open(id);
-    },
-    [ctx, setView],
+    (id: NoteId): Promise<unknown> => ctx.open(id),
+    [ctx],
   );
   // Folder-management state + handlers (deliberate_folders set, context menu,
   // create / rename / delete / drag-drop). Owns the deliberate set.
@@ -1412,7 +1331,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         <EmptyState
           onCreate={handleCreate}
           fm={fm}
-          onNewFromTemplate={onNewFromTemplate}
         />
       ) : (
         <PopulatedList
@@ -1427,7 +1345,6 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           onRevealFolder={revealFolder}
           onCreate={handleCreate}
           fm={fm}
-          onNewFromTemplate={onNewFromTemplate}
           exportHooks={exportHooks}
           showTimestamps={viewsPrefs.show_note_timestamps}
         />
@@ -1501,25 +1418,28 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
 function EmptyState({
   onCreate,
   fm,
-  onNewFromTemplate,
 }: {
   onCreate: () => void;
   fm: FolderManagement;
-  onNewFromTemplate?: () => void;
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
+        {/* The `NOTES` heading that used to sit here is gone (myne-md/myne#773).
+            It labelled a region that can only ever contain notes, directly
+            under the vault picker that already says where you are — a row of
+            chrome carrying no information, on the surface with the least room
+            to spare. The space now holds the app's only clickable route into
+            the command palette. */}
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
+          <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <NotesActionsMenu
+          <NotesActionsBar
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
-            onNewFromTemplate={onNewFromTemplate}
             onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>
@@ -1531,11 +1451,25 @@ function EmptyState({
           onCancel={fm.cancelNewFolder}
         />
       )}
+      {/* The first thing a new user sees in this app. It used to be the string
+          "No notes yet." above a button — true, and saying nothing about what
+          the surface is for. It is also the one zero state in the sidebar that
+          is a DESTINATION rather than a transient, which is why it carries the
+          brand field and the filtered states below do not. */}
       <div style={EMPTY_WRAPPER_STYLE}>
-        <div style={EMPTY_COPY_STYLE}>{t("notes.list.emptyState")}</div>
-        <button type="button" onClick={onCreate} style={EMPTY_CTA_STYLE}>
-          {t("notes.list.createFirstNote")}
-        </button>
+        <ZeroState
+          variant="firstRun"
+          icon="file-text"
+          title={t("notes.list.emptyState")}
+          body={t("notes.list.emptyBody")}
+          size="sm"
+          testId="notes.empty-state"
+          action={
+            <Button variant="primary" icon="file-plus" onClick={onCreate}>
+              {t("notes.list.createFirstNote")}
+            </Button>
+          }
+        />
       </div>
     </div>
   );
@@ -1641,7 +1575,6 @@ function PopulatedList({
   onRevealFolder,
   onCreate,
   fm,
-  onNewFromTemplate,
   exportHooks,
   showTimestamps,
 }: {
@@ -1671,7 +1604,6 @@ function PopulatedList({
   onRevealFolder: (path: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
-  onNewFromTemplate?: () => void;
   exportHooks?: NoteExportUiHooks;
   /** Sidebar per-note timestamp visibility (sidebar-note-timestamps), read from
    *  `PrefsView.show_note_timestamps` in the parent. Threaded into every
@@ -1762,22 +1694,19 @@ function PopulatedList({
   const folderNotesEnabled = rowPrefs.folder_notes_enabled;
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
   // returns the center pane to the editor. The `selectedId`-keyed effect in
-  // Editor.tsx covers note-to-note switches; this explicit reset also handles
-  // re-clicking the ALREADY-selected note while the Attachments view is open
-  // (no `selectedId` change → that effect wouldn't fire). No-op fallback
-  // outside the Editor provider, so isolated NoteList renders stay inert.
-  const { view, setView } = useCenterView();
   const ws = useWorkspace();
   // Open a note from the sidebar into the workspace (MYND-166). Modifiers /
   // context-menu choose the target: Alt → split to the side; Cmd/Ctrl or
-  // middle → new tab; plain → reuse the focused tab. `setView("editor")` also
-  // covers the re-click-the-already-selected-note-while-Attachments-open edge
-  // the `selectedId` effect can't see (no `selectedId` change → no fire). The
-  // editor mirrors the focused pane's active note back into `selectedId` for
-  // row highlight (Editor.tsx bridge B). No-op fallback outside the providers.
+  // middle → new tab; plain → reuse the focused tab. The editor mirrors the
+  // focused pane's active note back into `selectedId` for row highlight
+  // (Editor.tsx bridge B). No-op fallback outside the providers.
+  //
+  // The `setView("editor")` that used to open this function is gone with the
+  // center-view mechanism (myne-md/myne#773): opening a note in the focused
+  // pane IS the way back from any non-note tab, including the re-click-the-
+  // already-selected-note edge the `selectedId` effect could never see.
   const openNote = useCallback(
     (id: NoteId, opts?: { newTab?: boolean; toSide?: boolean }) => {
-      setView("editor");
       // Plain click → open in the focused pane's CURRENT active tab (reuse);
       // Cmd/Ctrl-click (or middle) → a new tab; Alt-click → split to the
       // side. Re-opening an already-open note reveals it (duplicate-forbid).
@@ -1785,15 +1714,24 @@ function PopulatedList({
       else if (opts?.newTab) ws.openNewTabInFocused(id);
       else ws.openInFocused(id);
     },
-    [ws, setView],
+    [ws],
   );
-  // SYNC-9 exclusive active-state (MYND-164 Fix 1): while the Attachments view
-  // owns the center pane, NO sidebar note row renders its selected highlight —
-  // the Attachments footer entry is the sole active surface. The selection is
-  // preserved in `ctx.selectedId` (so returning to the editor restores it); it
-  // just isn't *shown* as active here. Exactly one of {a note, Attachments} is
-  // highlighted at any time.
-  const noteHighlightActive = view !== "attachments";
+  // Exclusive active-state (MYND-164 Fix 1, generalised by myne-md/myne#773):
+  // a sidebar note row renders its selected highlight only while the focused
+  // tab IS a note. The selection stays in `ctx.selectedId`, so returning to the
+  // note restores it; it just is not SHOWN as active meanwhile.
+  //
+  // The old rule asked whether the attachment library owned the center pane,
+  // which was the only non-note surface that could — so it was correct for the
+  // library and WRONG for the graph and the task list, which could both be
+  // focused while a note row still claimed to be active.
+  //
+  // Asked of the registry rather than compared to the literal `"note"`: the
+  // top-right floats ask the identical question one file over, and a literal in
+  // each is how the two drifted in the first place.
+  const activeKind = ws.focusedLeaf.activeTab?.kind;
+  const noteHighlightActive =
+    activeKind !== undefined && tabKindSpec(activeKind).showsFocusedNote;
 
   const onTreeKeyDown = useMemo(
     () =>
@@ -2185,12 +2123,17 @@ function PopulatedList({
     const id = undoToast;
     setUndoToast(null);
     void ctx.restoreWithRollback(id).catch((err) => {
+      // `restoreNote` now flushes dirty panes first and rejects when one does
+      // not settle (myne-md/myne#819). That rejection is user-reachable, so it
+      // gets the same non-blocking message the trash path shows rather than a
+      // DEV-only log.
+      setTrashError(t("notes.trash.restoreError"));
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.warn("[NoteList] restore (undo) failed:", err);
       }
     });
-  }, [undoToast, ctx]);
+  }, [undoToast, ctx, t]);
 
   // ---- folder notes (MYND-370) -------------------------------------------
   // Create a new index note for `folderPath`, settle it into the cache (so the
@@ -2306,7 +2249,11 @@ function PopulatedList({
       ? (navIds.find((nid) => !victims.has(nid)) ?? null)
       : null;
     try {
-      await ctx.bulkTrashWithSync(ids);
+      const result = await ctx.bulkTrashWithSync(ids);
+      // Close every trashed note's tabs (myne-md/myne#819): the single-note path
+      // above does, and a stale still-editable buffer autosaved back would
+      // resurrect the note. Only the ones that actually trashed.
+      for (const id of result.trashed) ws.closeNoteEverywhere(id);
       setBulkUndo(ids);
       if (openIsVictim) {
         if (survivor !== null) {
@@ -2325,7 +2272,7 @@ function PopulatedList({
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds, t]);
+  }, [ctx, navIds, t, ws]);
 
   // Bulk archive (MYND-331 / MYND-367): archive the whole multi-selection
   // (recoverable from the Archive section), then collapse the set. If the OPEN
@@ -2341,7 +2288,11 @@ function PopulatedList({
       ? (navIds.find((nid) => !victims.has(nid)) ?? null)
       : null;
     try {
-      await ctx.bulkArchiveWithSync(ids);
+      const result = await ctx.bulkArchiveWithSync(ids);
+      // Same as the single-note archive path (myne-md/myne#819): archiving takes
+      // the notes out of the live tree, so close their tabs — a stale buffer
+      // autosaved back would drop `archived:`. Only the ones that archived.
+      for (const id of result.archived) ws.closeNoteEverywhere(id);
       if (openIsVictim) {
         if (survivor !== null) {
           void ctx.open(survivor).catch(() => {
@@ -2359,17 +2310,24 @@ function PopulatedList({
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds, t]);
+  }, [ctx, navIds, t, ws]);
 
   // "Undo" on the bulk-trash toast → restore every just-trashed note.
   const handleUndoBulk = useCallback(() => {
     const ids = bulkUndo;
     setBulkUndo(null);
     if (ids === null) return;
-    void Promise.allSettled(
-      ids.map((id) => ctx.restoreWithRollback(id)),
-    ).catch(() => {});
-  }, [bulkUndo, ctx]);
+    // `allSettled` never rejects, so a `.catch` here was dead code and every
+    // per-note failure was dropped. Each `restoreNote` now flushes first and can
+    // reject (myne-md/myne#819); inspect the results and report any failure.
+    void Promise.allSettled(ids.map((id) => ctx.restoreWithRollback(id))).then(
+      (results) => {
+        if (results.some((r) => r.status === "rejected")) {
+          setTrashError(t("notes.trash.restoreError"));
+        }
+      },
+    );
+  }, [bulkUndo, ctx, t]);
 
   // Bulk "Move N notes to…" submenu: Vault root + every folder (depth-indented).
   // Folder path is the item id → addressable by `data-item-id` in E2E.
@@ -2884,14 +2842,19 @@ function PopulatedList({
         </div>
       )}
       <div style={HEADER_ROW_STYLE}>
+        {/* The `NOTES` heading that used to sit here is gone (myne-md/myne#773).
+            It labelled a region that can only ever contain notes, directly
+            under the vault picker that already says where you are — a row of
+            chrome carrying no information, on the surface with the least room
+            to spare. The space now holds the app's only clickable route into
+            the command palette. */}
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
+          <SidebarSearchRow />
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <NotesActionsMenu
+          <NotesActionsBar
             onNewFolder={() => fm.startNewFolder("")}
             onCreate={onCreate}
-            onNewFromTemplate={onNewFromTemplate}
             onNewDrawing={() => void ctx.createDrawingAndStartRename().catch(() => {})}
           />
         </div>

@@ -17,29 +17,19 @@
 // is `load-bearing-copy.ts`, rendered VERBATIM and never translated
 // (`src/AGENTS.md`). Design: tokens only, no literals (`check-token-adoption`).
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
+import type { DownloadArtifactId } from "../../lib/ai-model-download";
 import {
-  isChecksumMismatch,
-  downloadModel,
-  cancelModelDownload,
-  newDownloadId,
-  type DownloadArtifactId,
-} from "../../lib/ai-model-download";
+  cancelModelDownloadFor,
+  startModelDownload,
+  useModelDownload,
+} from "../../lib/ai-download-store";
 import { AI_TRUST_INVARIANT } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
-
-/** How a download card is progressing. `idle` is the offered state; the rest
- *  are the states the task's acceptance criteria name. */
-type DownloadState =
-  | { kind: "idle" }
-  | { kind: "downloading"; id: string }
-  | { kind: "complete" }
-  | { kind: "failed"; cause: "checksum" | "generic" }
-  | { kind: "cancelled" };
 
 const CARD_STYLE: CSSProperties = {
   display: "flex",
@@ -80,93 +70,51 @@ function DownloadCard(props: {
   disabled: boolean;
 }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<DownloadState>({ kind: "idle" });
-  // The id of the in-flight download, so unmount can cancel it. A ref (not the
-  // state) because the cleanup reads the LATEST id, not the one captured at the
-  // render the effect ran on.
-  const activeId = useRef<string | null>(null);
-
-  useEffect(
-    () => () => {
-      // The surface was dismissed mid-download (Skip/Done/Esc/backdrop): the
-      // host fetch keeps running otherwise, and the card that would show its
-      // progress is gone. Best-effort cancel, so a model the user never saw
-      // finish is not silently registered.
-      if (activeId.current) void cancelModelDownload(activeId.current);
-    },
-    [],
-  );
-
-  const start = useCallback(async () => {
-    const id = newDownloadId();
-    activeId.current = id;
-    setState({ kind: "downloading", id });
-    try {
-      await downloadModel(props.artifact, id);
-      activeId.current = null;
-      setState({ kind: "complete" });
-    } catch (err) {
-      // A cancel surfaces as a rejection too; distinguish it from a genuine
-      // failure by the state `stop` already set, not by the error shape (the
-      // error is opaque by design). `isChecksumMismatch` selects the copy that
-      // names the compiled-in-digest refusal specifically.
-      activeId.current = null;
-      setState((prev) =>
-        prev.kind === "cancelled"
-          ? prev
-          : { kind: "failed", cause: isChecksumMismatch(err) ? "checksum" : "generic" },
-      );
-    }
-  }, [props.artifact]);
-
-  const stop = useCallback(async () => {
-    if (state.kind !== "downloading") return;
-    // Set the terminal state BEFORE the IPC rejects, so `start`'s catch does not
-    // relabel a user cancel as a failure.
-    setState({ kind: "cancelled" });
-    activeId.current = null;
-    try {
-      await cancelModelDownload(state.id);
-    } catch {
-      /* best-effort: the fetch has already been marked cancelled locally */
-    }
-  }, [state]);
+  // Shared with the Settings row, so dismissing this surface no longer cancels
+  // the fetch: the store owns it and the Settings panel shows its progress
+  // (myne-md/myne#814).
+  const download = useModelDownload(props.artifact);
+  const downloading = download.status === "downloading";
+  const percent =
+    download.total > 0
+      ? Math.min(100, Math.round((download.downloaded / download.total) * 100))
+      : 0;
 
   return (
     <div style={CARD_STYLE} data-testid={`aiOnboarding.card.${props.artifact}`}>
       <h3 style={CARD_TITLE_STYLE}>{props.title}</h3>
       <p style={CARD_BODY_STYLE}>{props.body}</p>
       <div style={CARD_FOOTER_STYLE}>
-        {(state.kind === "idle" || state.kind === "cancelled") && (
+        {(download.status === "idle" || download.status === "cancelled") && (
           <Button
             variant="primary"
             disabled={props.disabled}
-            onClick={() => void start()}
+            onClick={() => void startModelDownload(props.artifact)}
             data-testid={`aiOnboarding.download.${props.artifact}`}
           >
-            {state.kind === "cancelled"
+            {download.status === "cancelled"
               ? t("aiOnboarding.retry")
               : t("aiOnboarding.download")}
           </Button>
         )}
-        {state.kind === "downloading" && (
+        {downloading && (
           <>
             <span
               data-testid={`aiOnboarding.downloading.${props.artifact}`}
               style={CARD_BODY_STYLE}
             >
-              {t("aiOnboarding.downloading")}
+              {t("settings.ai.downloadingPercent", { percent })}
             </span>
             <Button
               variant="ghost"
-              onClick={() => void stop()}
+              onClick={() => cancelModelDownloadFor(props.artifact)}
               data-testid={`aiOnboarding.cancel.${props.artifact}`}
             >
               {t("aiOnboarding.cancel")}
             </Button>
           </>
         )}
-        {state.kind === "complete" && (
+        {download.status === "complete" && (
           <span
             data-testid={`aiOnboarding.complete.${props.artifact}`}
             style={{ ...CARD_BODY_STYLE, color: "var(--accent)" }}
@@ -174,20 +122,20 @@ function DownloadCard(props: {
             {t("aiOnboarding.complete")}
           </span>
         )}
-        {state.kind === "failed" && (
+        {download.status === "failed" && (
           <>
             <span
               data-testid={`aiOnboarding.failed.${props.artifact}`}
               role="alert"
               style={{ ...CARD_BODY_STYLE, color: "var(--danger)" }}
             >
-              {state.cause === "checksum"
+              {download.cause === "checksum"
                 ? t("settings.ai.downloadFailedChecksum")
                 : t("settings.ai.downloadFailed")}
             </span>
             <Button
               variant="secondary"
-              onClick={() => void start()}
+              onClick={() => void startModelDownload(props.artifact)}
               data-testid={`aiOnboarding.retry.${props.artifact}`}
             >
               {t("aiOnboarding.retry")}

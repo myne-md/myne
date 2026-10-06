@@ -91,6 +91,41 @@ export function coerceScalar(value: unknown): ScalarProperty {
 }
 
 /**
+ * Coerce one property's RAW SOURCE TEXT — the characters after `key:` on a
+ * frontmatter line — by resolving it as a YAML scalar first.
+ *
+ * Every other entry point here takes an already-resolved value, because the
+ * index parses the whole mapping before it types anything. The Properties
+ * widget does not: it walks lines and holds the raw text, so it needs the
+ * resolution step, and putting it HERE rather than in the widget is what keeps
+ * the widget from knowing about `CORE_SCHEMA` and thereby acquiring a second
+ * opinion about what `2026-01-02` is (myne-md/myne#777).
+ *
+ * CORE_SCHEMA for the reason the module header gives: the project default
+ * resolves ISO dates to `Date` objects, and the Myne recognizer wants the
+ * verbatim string so a quoted and an unquoted date type identically.
+ *
+ * Unparseable text is a `string`, never a throw. A malformed line is a line the
+ * user is still typing, and the widget must keep showing it as a text field
+ * rather than swallowing what they wrote.
+ */
+export function coerceSourceScalar(raw: string): ScalarProperty {
+  let resolved: unknown;
+  try {
+    resolved = loadYaml(raw, { schema: CORE_SCHEMA });
+  } catch {
+    return { type: "string", value: raw };
+  }
+  // `loadYaml("")` is `undefined`, which `coerceScalar` maps to an empty
+  // string — correct, and worth stating because an empty property is common.
+  const coerced = coerceScalar(resolved);
+  // The widget writes `value` back into the document, so it must round-trip the
+  // SOURCE rather than a canonicalisation of it. Typing `1.50` must not rewrite
+  // the file to `1.5` merely because the row rendered.
+  return { type: coerced.type, value: raw };
+}
+
+/**
  * Coerce one YAML-resolved value: a sequence → `list` (each element coerced as
  * a scalar, heterogeneous allowed; empty sequence → empty list), anything else
  * → a scalar via [`coerceScalar`].

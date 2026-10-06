@@ -21,6 +21,10 @@
 pub mod atomic_write;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod backup_container;
+// Ungated on purpose: the pure UUID-shape check is shared with the import
+// reader, which compiles for wasm32. Its `backup_container` twin is native-only
+// because that module reads `std::fs`; the shared function does not.
+pub mod disk_uuid;
 pub mod embed_span;
 pub mod export_error;
 pub mod export_naming;

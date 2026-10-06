@@ -4013,7 +4013,6 @@
       "invitationPending": "Ikke godtatt ennå",
       "invitationsFailed": "Kunne ikke laste invitasjonene dine.",
       "title": "Vault-medlemmer",
-      "personHint": "Lås opp medlemsidentiteten din med gjenopprettingsfrasen.",
       "personUnlock": "Lås opp medlemsidentitet",
       "personReady": "Medlemsidentitet låst opp.",
       "ownerCodeHint": "Del denne koden med personen du inviterer, så de kan verifisere at vaulten er din. Den inneholder bare offentlig informasjon.",

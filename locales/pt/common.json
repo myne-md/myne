@@ -4139,7 +4139,6 @@
       "invitationPending": "Ainda não aceite",
       "invitationsFailed": "Não foi possível carregar os seus convites.",
       "title": "Membros do cofre",
-      "personHint": "Desbloqueie a sua identidade de membro com a sua frase de recuperação.",
       "personUnlock": "Desbloquear identidade de membro",
       "personReady": "Identidade de membro desbloqueada.",
       "ownerCodeHint": "Partilhe este código com a pessoa que convida para poder verificar que o cofre é seu. Contém apenas informação pública.",

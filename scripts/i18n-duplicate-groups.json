@@ -18,14 +18,6 @@
     "reason": "Same step title on account entry and recover; one step, two flows."
   },
   {
-    "value": "No attachments match your search.",
-    "keys": [
-      "attachments.library.emptyNoResultsTitle",
-      "attachments.library.noMatch"
-    ],
-    "reason": "Same empty-search string as the library title and empty state on one screen; shared copy, accepted."
-  },
-  {
     "value": "Transcription failed. Please try again.",
     "keys": [
       "attachments.library.transcribeFailed",
@@ -349,17 +341,9 @@
       "sync.join.title",
       "vaultPicker.joinDevice",
       "vaultSwitcher.joinDevice",
-      "welcome.joinCta"
+      "welcome.joinTitle"
     ],
     "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
-  },
-  {
-    "value": "Couldn't reach that server. Check the address and try again.",
-    "keys": [
-      "identityFlow.serverUnreachable",
-      "sync.settings.connectError"
-    ],
-    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
   },
   {
     "value": "Double-check this number. It doesn't look right.",
@@ -368,63 +352,6 @@
       "sync.settings.accountNumberHint"
     ],
     "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
-  },
-  {
-    "value": "Forget this identity on this device",
-    "keys": [
-      "identityFlow.home.forget",
-      "identityHome.forgetCta",
-      "sync.memberRoster.identityForgetCta"
-    ],
-    "reason": "Deliberate verbatim sharing: the identity home and the member-roster panel both need the SAME short label for the same destructive action, and one wording keeps the three surfaces(both, and mobile) from drifting. Rewording per surface would invent a difference the user does not have."
-  },
-  {
-    "value": "I understand this identity will be removed from this device.",
-    "keys": [
-      "identityHome.forgetCheckbox",
-      "sync.memberRoster.identityForgetCheckbox"
-    ],
-    "reason": "Deliberate verbatim sharing: the acknowledgement checkbox gates the same destructive action on the identity home and the member-roster panel, so the sentence a user must understand is one sentence. Two wordings would mean one surface under-warns relative to the other."
-  },
-  {
-    "value": "Could not forget the identity. Try again.",
-    "keys": [
-      "identityHome.forgetError",
-      "sync.memberRoster.identityForgetError"
-    ],
-    "reason": "Deliberate verbatim sharing of a non-distinguishing failure line for the same action on two surfaces; a per-surface rewrite would vary a string whose whole point is to say one thing."
-  },
-  {
-    "value": "Couldn't copy. Use \"Save as file\" instead.",
-    "keys": [
-      "vaultCreation.account.copyFailed",
-      "vaultCreation.phrase.copyFailed"
-    ],
-    "reason": "Same copy-failed notice on the account-number and phrase steps; one event, one string."
-  },
-  {
-    "value": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-    "keys": [
-      "vaultCreation.account.downloadStarted",
-      "vaultCreation.phrase.downloadStarted"
-    ],
-    "reason": "Same download-arrived notice on the account-number and phrase steps of vault creation; one event, one string."
-  },
-  {
-    "value": "Saved. It is a plain text file, so keep it somewhere only you can read.",
-    "keys": [
-      "vaultCreation.account.savedToFile",
-      "vaultCreation.phrase.savedToFile"
-    ],
-    "reason": "Same save-to-file confirmation on the account-number and phrase steps; one event, one string."
-  },
-  {
-    "value": "Before you create your vault",
-    "keys": [
-      "vaultCreation.briefing.eyebrow",
-      "vaultCreation.briefing.heading"
-    ],
-    "reason": "Briefing eyebrow repeats the briefing heading on one screen; same-screen duplication, accepted as designed."
   },
   {
     "value": "If this takes longer than 30 seconds, close the window and try again.",
@@ -473,5 +400,38 @@
       "vaultPicker.accountUnreadable"
     ],
     "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
+  },
+  {
+    "value": "Couldn't reach that server. Check the address and try again.",
+    "keys": [
+      "identityFlow.serverUnreachable",
+      "sync.settings.connectError"
+    ],
+    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
+  },
+  {
+    "value": "Forget this identity on this device",
+    "keys": [
+      "identityFlow.home.forget",
+      "identityHome.forgetCta",
+      "sync.memberRoster.identityForgetCta"
+    ],
+    "reason": "Deliberate verbatim sharing: the identity home and the member-roster panel both need the SAME short label for the same destructive action, and one wording keeps the three surfaces(both, and mobile) from drifting. Rewording per surface would invent a difference the user does not have."
+  },
+  {
+    "value": "I understand this identity will be removed from this device.",
+    "keys": [
+      "identityHome.forgetCheckbox",
+      "sync.memberRoster.identityForgetCheckbox"
+    ],
+    "reason": "Deliberate verbatim sharing: the acknowledgement checkbox gates the same destructive action on the identity home and the member-roster panel, so the sentence a user must understand is one sentence. Two wordings would mean one surface under-warns relative to the other."
+  },
+  {
+    "value": "Could not forget the identity. Try again.",
+    "keys": [
+      "identityHome.forgetError",
+      "sync.memberRoster.identityForgetError"
+    ],
+    "reason": "Deliberate verbatim sharing of a non-distinguishing failure line for the same action on two surfaces; a per-surface rewrite would vary a string whose whole point is to say one thing."
   }
 ]

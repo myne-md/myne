@@ -53,7 +53,7 @@ const V = {
   ],
   "src/components/settings/AiOnboardingSurface.tsx": [
     "adapted",
-    "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0627). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
+    "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0628). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
   ],
   "src/components/settings/MemorySection.tsx": [
     "adapted",
@@ -147,9 +147,21 @@ const V = {
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
   ],
+  "src/components/settings/RecoveryDrillRow.tsx": [
+    "ported",
+    "The recovery drill (myne-md/myne#468), and it renders unchanged on web because the web client HAS phrase recovery: `plugin:vault-recover|verify_recovery_phrase` is on the wasm dispatcher's DISPATCHED roster beside `recover_with_phrase`, so the row works rather than sitting there reporting an error. No capability gate for the same reason, and no `developer_mode` gate because a first-time user is exactly who it is for.",
+  ],
   "src/components/settings/ReminderSettings.tsx": [
     "adapted",
     "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
+  ],
+  "src/components/settings/BarCustomizeSettings.tsx": [
+    "ported",
+    "Prefs-backed (myne-md/myne#773), the visibility half of the bottom-bar vocabulary. The bar renders from the same shared src/ tree on web and each item carries its own data guard, so hiding one behaves identically here. It is also the reason the bar is allowed to disappear at all: the bar's own right-click menu is the only other place visibility can be changed, so on every client this block is the route back.",
+  ],
+  "src/components/settings/CustomizeList.tsx": [
+    "ported",
+    "The row shared by the two customize rosters (myne-md/myne#773) — a grip, an icon, a label and a caller-supplied trailing control, plus the drag and Alt+Arrow bookkeeping. Pure DOM and React state, no host call and no capability of its own, so it carries whatever the two blocks that use it already carry. HTML5 drag-and-drop is the one host-ish thing in it and it is a browser API, which is where the desktop already gets it from.",
   ],
   "src/components/settings/RibbonCustomizeSettings.tsx": [
     "ported",
@@ -202,7 +214,12 @@ const V = {
     "typed-unsupported",
     "Thin bindings over the `local-inference` download/`cancel` commands, which the whole plugin classifies `Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. Rendered only where `has(\"localAi\")` is true, which web is not, so nothing on web reaches these calls; the module is reachable and its backend answers a typed refusal, which is the `typed-unsupported` verdict.",
   ],
+  "src/lib/ai-download-store.ts": [
+    "typed-unsupported",
+    "Module-scope state over the `local-inference` download/cancel commands and their progress event (myne-md/myne#814). Same verdict and reason as `ai-model-download.ts`, which it wraps: the plugin is `Class::Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. No AI surface renders on web (`localAi` is absent), so nothing reaches it; `typed-unsupported` rather than `excluded` because its backend answers a typed refusal rather than the code being absent.",
+  ],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
     "The pop-out spawn binding (myne#173). The `detached-window` plugin is `Class::Unsupported` in web/wasm/src/capability.rs (a browser page cannot open an OS window), so its one command answers the typed unsupported refusal; the affordance is also gated off, since `detachedWindows` is absent on web.",
@@ -253,6 +270,11 @@ const V = {
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",
+  ],
+  "src/lib/backup-drill-line.ts": [
+    "excluded",
+    "The post-backup drill line's one-time dismissal store (myne-md/myne#468). Its only importer is `BackupExportModal`, which web substitutes, so it leaves the bundle with it.",
+    "myne.backup.drill-line-seen",
   ],
   "src/lib/backup-schedule.ts": [
     "excluded",
@@ -378,6 +400,10 @@ const V = {
     "ported",
     "The copy-policy chokepoint (myne-md/myne#390). Runs on web as written because it holds no transport: the platform write, the clear and the error sink are all injected, and the module imports nothing at all. On web the injected write IS `web/src/platform/clipboardManager.ts`, so the same code makes the same decision about what the user is told and only the byte-mover underneath it differs. The `os-managed` clear arm is mobile-only and simply has no web caller; the `host` arm's clear is the web dispatcher's refusal, exactly as `secret-export.ts` below describes.",
   ],
+  "src/lib/recovery-kit.ts": [
+    "ported",
+    "A pure function from strings to one string: the recovery kit's file contents. No host call, no filesystem, no clipboard — the writing is `secret-export.ts` below, which is where the web adaptation lives. So the browser produces byte-identical kit text to the desktop, which is the point: a kit saved on one client has to be readable by the recovery flow on another.",
+  ],
   "src/lib/secret-export.ts": [
     "adapted",
     "Both halves adapt rather than one shipping and one being substituted, and the note that said otherwise was falsified on three clauses at once by `decisions.md` 2026-08-15 (entry 0514). Save-as-file takes the browser-download arm where `nativeSaveAs` is absent; the clipboard copy takes the `none` clear strategy where `clipboardAutoClear` is absent, so it writes and reports and schedules nothing. Its secret callers are the two creation steps, which are no longer substituted: creation ships on web.",
@@ -430,6 +456,10 @@ const V = {
     "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
+  "src/lib/vaultDisplayName.ts": [
+    "ported",
+    "Pure naming: a vault's label, or the neutral `Vault N` fallback derived from `stableVaultNumber`. No IPC, no host. It runs as written on web, where the one constant vault per origin means the fallback is always `Vault 1` — correct rather than degraded, since there is no list to rank it against.",
+  ],
   "src/lib/viewsEnabled.ts": ["ported", "Device-local Views feature toggle helper (localStorage); runs as written."],
   "src/lib/vault-recover.ts": [
     "ported",

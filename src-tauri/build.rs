@@ -59,10 +59,14 @@ fn main() {
             // `commands.allow` entry in
             // `permissions/vault-recover/default.toml` is a
             // security regression.
+            // myne-md/myne#468 adds `verify_recovery_phrase` (the recovery
+            // DRILL — derive, attempt the unwrap, discard, return a bool; no
+            // slot transition, no write, unlock-gated).
             tauri_build::InlinedPlugin::new().commands(&[
                 "recover_with_phrase",
                 "complete_recovery",
                 "resolve_vault_by_account_number",
+                "verify_recovery_phrase",
             ]),
         )
         .plugin(
@@ -391,6 +395,11 @@ fn main() {
                 "import_source_read_note",
                 "import_source_reseal_attachment",
                 "import_source_merge_dictionary",
+                // Open a `.myne-backup` container as an import source
+                // (myne-md/myne#816): the same namespace and the same
+                // read-only source slot as the local-vault commands above.
+                "import_source_open_backup",
+                "import_source_close_backup",
             ]),
         )
         .plugin(

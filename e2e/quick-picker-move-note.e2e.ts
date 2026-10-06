@@ -31,7 +31,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewMenuItem,
+  clickNewItem,
   createNote,
   dismissImporterOffer,
   runPaletteAction,
@@ -75,7 +75,7 @@ describeE2E("qp1 palette move-note QuickPicker: Esc pops back, Enter moves (pale
         // nc4/ms1 site carries the same key) — this also registers the
         // canonical "Arsiv/" entry in deliberate_folders, which is what the
         // picker lists for an empty folder.
-        await clickNewMenuItem(s, "notes.new-folder");
+        await clickNewItem(s, "notes.new-folder");
         await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         await s.byTestId("notes.folder-row");
 

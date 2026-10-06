@@ -125,7 +125,7 @@ async function embedAudioAndReopen(s: Session, id: string): Promise<void> {
  * on a cold app, and it polls with a re-open for exactly that reason. tr1 and
  * tr3 clicked once and then waited the full 45 s budget on a row that was never
  * going to appear, with nothing to re-click. That is the same shape
- * `e2e/AGENTS.md` records for `clickNewMenuItem`: the victim looks like a broken
+ * `e2e/AGENTS.md` records for `clickNewItem`: the victim looks like a broken
  * feature, and the fix is to re-fire the trigger rather than to wait longer. */
 async function openAudioMenuItem(s: Session, testId: string): Promise<void> {
   const row = await s.waitUntil(

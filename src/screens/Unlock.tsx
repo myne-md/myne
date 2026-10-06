@@ -63,6 +63,7 @@
 import { invoke } from "../platform/core";
 import {
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -83,13 +84,19 @@ import {
   ctaHover,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
-import { Spinner } from "../components/Spinner";
+import { AuthHeading, AuthShell } from "./AuthShell";
+import { MyneMark } from "../components/primitives/MyneMark";
+import { Button } from "../components/primitives/Button";
+import { Icon } from "../components/primitives/Icon";
+import { CredentialField } from "../components/primitives/CredentialField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
 import { listVaults, soleVaultId } from "../lib/vault-list";
+import { vaultDisplayNameById } from "../lib/vaultDisplayName";
+import type { VaultSummary } from "../types/vault-summary";
 import { memberVaultStatus } from "../lib/personAccount";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
@@ -355,22 +362,14 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
   }
 }
 
+/** The password form: the field and its arrow, then the error under them.
+ *  No surrounding card: the field is the one thing on screen to do, and a box
+ *  around a single row only drew a second outline around the first. */
 const FORM_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
   marginTop: "var(--space-2)",
-};
-
-const INPUT_STYLE: CSSProperties = {
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-4)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  outline: "none",
 };
 
 // Info-style banner used for `recovery-in-progress` mode — distinct
@@ -392,49 +391,68 @@ const INFO_BANNER_STYLE: CSSProperties = {
 // the full Button danger variant (which would compete visually with
 // the primary Unlock CTA).
 const DELETE_VAULT_LINK_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
   background: "transparent",
   border: 0,
   padding: 0,
-  marginTop: "var(--space-1)",
-  alignSelf: "center",
   fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  // Small and regular-weight: a last resort behind a confirmation, so it is
+  // findable without competing with Unlock. The trash glyph and the colour
+  // carry "destructive" together, never the colour alone.
+  fontSize: "var(--text-xs)",
   color: "var(--danger)",
   cursor: "pointer",
   textAlign: "center",
 };
 
-// Neutral ghost back link to the vault picker. Placed at the top of the
-// card, left-aligned with a leading chevron — a navigational affordance
-// distinct from the accent recovery link and the danger delete link below
-// the form, so it doesn't compete with the primary Unlock CTA.
-const BACK_LINK_STYLE: CSSProperties = {
-  background: "transparent",
-  border: 0,
-  padding: 0,
-  alignSelf: "flex-start",
+
+/**
+ * The secondary actions under the field, one per line (myne-md/myne#773,
+ * #772).
+ *
+ * They were three centred links at near-identical weight, then one wrapping
+ * row, where two sentences side by side read as a single run of link text with
+ * no seam between them. One per line keeps them apart; each carries the
+ * `myne-text-link` underline on hover so it reads as a link when the pointer
+ * arrives. Deleting the vault is not among them: it sits below the rule.
+ */
+const ALT_ROW_STYLE: CSSProperties = {
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  gap: "var(--space-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--fg-2)",
-  cursor: "pointer",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-2)",
 };
+
 
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
   padding: 0,
-  marginTop: "var(--space-2)",
-  alignSelf: "center",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
   color: "var(--accent)",
   cursor: "pointer",
+};
+
+/**
+ * The last-resort zone, below a hairline.
+ *
+ * Deleting the vault is not a third way to open it, and a red link sitting an
+ * equal gap under two blue ones said that it was. The rule is the whole
+ * device: it separates a destructive act from the alternatives above it
+ * without shouting, and it is a `--line-1` hairline because that is the only
+ * way a surface earns division here.
+ */
+const DANGER_ZONE_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  marginTop: "var(--space-2)",
+  paddingTop: "var(--space-4)",
+  borderTop: "1px solid var(--line-1)",
 };
 
 export function Unlock({
@@ -472,21 +490,46 @@ export function Unlock({
   // auto-lock reaches the vault selector too, not only a picker-reached unlock.
   // Probed on mount (fresh after any lock; the picker is a meaningful
   // destination only with another vault to switch to).
-  const [otherVaultsExist, setOtherVaultsExist] = useState(false);
+  const [vaults, setVaults] = useState<readonly VaultSummary[]>([]);
   useEffect(() => {
     let cancelled = false;
     void listVaults().then(
       (res) => {
-        if (!cancelled) setOtherVaultsExist("ok" in res && res.ok.length >= 2);
+        if (!cancelled) setVaults("ok" in res ? res.ok : []);
       },
       () => {
-        if (!cancelled) setOtherVaultsExist(false);
+        if (!cancelled) setVaults([]);
       },
     );
     return () => {
       cancelled = true;
     };
   }, []);
+  const otherVaultsExist = vaults.length >= 2;
+
+  /**
+   * The name of the vault being opened, or `null`.
+   *
+   * **The heading names it rather than asking for "your vault".** You arrive
+   * here from a list of named vaults and the screen forgot which one you
+   * picked — the one question it exists to ask was the only thing on it that
+   * did not say what it was about.
+   *
+   * `null` is a real state and not a defensive branch: the sole-vault path
+   * reaches this screen with no `vaultId` at all, and a list that failed to
+   * load is empty. Both keep the generic title, because a screen that invents
+   * a number is worse than one that does not name the vault.
+   *
+   * Most users will read the FALLBACK ("Vault 4") rather than a stored name:
+   * `VaultSummary.label` is null for a vault this session has not unlocked,
+   * and null again when "hide vault names" is on. That is the correct
+   * outcome in both cases and needs no branch here — the option erases the
+   * name at the source rather than leaving it for a surface to filter.
+   */
+  const vaultName = useMemo(
+    () => vaultDisplayNameById(vaultId, vaults, t),
+    [vaultId, vaults, t],
+  );
 
   // A B2B member vault has no password: it is opened from the member's recovery
   // phrase (myne-md/myne#711 task 25). Probed once; when true the password form
@@ -741,28 +784,51 @@ export function Unlock({
   }
 
   return (
-    <CenteredCard>
-      {/* Back to the vault picker — shown whenever ≥2 vaults exist (App always
-          wires `onBack`), so a manual lock / auto-lock can reach the vault
-          selector too, not just a picker-reached unlock. Suppressed during
-          `decrypting` so an in-flight unlock isn't abandoned mid-IPC. */}
-      {onBack && otherVaultsExist && !decrypting && (
-        <button
-          type="button"
-          onClick={onBack}
-          style={BACK_LINK_STYLE}
-          data-testid="unlock.back-to-picker"
-        >
-          <span aria-hidden="true">←</span>
-          <span>{t("unlock.backToPicker")}</span>
-        </button>
-      )}
+    <AuthShell
+      testId="unlock.root"
+      // A short, fixed form: the upper third rather than dead centre. Unlike
+      // the picker there is no list here, so nothing on this screen can grow
+      // to fill a centred region.
+      align="upper"
+      // The mark is centred above the question instead (the Welcome screen's
+      // shape), so the corner copy would draw the brand twice.
+      brand={false}
+      // The way back to the vault picker, in the top-left corner where a back
+      // control is looked for, now that the corner holds no brand. Shown
+      // whenever ≥2 vaults exist (App always wires `onBack`), and withdrawn
+      // during `decrypting` so an in-flight unlock is never abandoned mid-IPC.
+      leading={
+        onBack && otherVaultsExist && !decrypting ? (
+          <Button
+            type="button"
+            variant="ghost"
+            icon="arrow-left"
+            onClick={onBack}
+            data-testid="unlock.back-to-picker"
+          >
+            {t("unlock.backToPicker")}
+          </Button>
+        ) : undefined
+      }
+      // Arriving here is going FORWARD from the picker. The back link below
+      // sends the user the other way, and the picker states its own direction.
+      enter="forward"
+    >
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <MyneMark size={56} />
+      </div>
       {/* Method-aware subtitle: the PIN / Touch ID surface must not tell the user
           to "enter your password" (MYND — the primary surface is not a password
           when quick-unlock owns the screen). */}
-      <p style={CARD_BODY_STYLE}>
+      <AuthHeading
+        centered
+        title={
+          vaultName === null
+            ? t("unlock.title")
+            : t("unlock.titleNamed", { vault: vaultName })
+        }
+      >
         {t(
           surface === "quick"
             ? quickMethod === "biometric"
@@ -770,7 +836,7 @@ export function Unlock({
               : "unlock.subtitlePin"
             : "unlock.subtitle",
         )}
-      </p>
+      </AuthHeading>
       {/* Quick-unlock (PIN / Touch ID) — the primary surface when the probe
           above says it is redeemable and the user hasn't opted out (MYND-329,
           MYND-558). The password escape hatch sits one click below it:
@@ -785,14 +851,6 @@ export function Unlock({
             onUnlocked={onUnlocked}
             onUnavailable={() => setQuickMethod(null)}
           />
-          <button
-            type="button"
-            onClick={() => setPasswordRevealed(true)}
-            style={RECOVER_LINK_STYLE}
-            data-testid="unlock.use-password-link"
-          >
-            {t("unlock.usePasswordInstead")}
-          </button>
         </>
       )}
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
@@ -807,71 +865,95 @@ export function Unlock({
           data-testid="unlock.form"
           data-vault-id={vaultId}
         >
-          <input
-            type="password"
-            placeholder={t("unlock.passwordPlaceholder")}
+          <CredentialField
             value={password}
-            onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
-            disabled={decrypting}
-            autoFocus
-            autoComplete="current-password"
-            style={INPUT_STYLE}
-            aria-label={t("unlock.passwordLabel")}
-            aria-invalid={error != null ? true : undefined}
-            data-testid="unlock.password-input"
+            onChange={(value) => dispatch({ type: "set-password", value })}
+            busy={decrypting}
+            invalid={error != null}
+            ariaLabel={t("unlock.passwordLabel")}
+            placeholder={t("unlock.passwordPlaceholder")}
+            submitLabel={t("unlock.submit")}
+            busyLabel={t("unlock.decrypting")}
+            testId="unlock.password-input"
+            submitTestId="unlock.submit"
+            reveal={{ show: t("password.input.show"), hide: t("password.input.hide") }}
+            inputProps={{
+              type: "password",
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus: true,
+              autoComplete: "current-password",
+            }}
+            footer={
+              error != null ? (
+                <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
+              ) : undefined
+            }
           />
-          {error != null && (
-            <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
-          )}
-          <button
-            type="submit"
-            disabled={submitDisabled}
-            style={ctaStyle(submitDisabled)}
-            {...ctaHover(submitDisabled)}
-            data-testid="unlock.submit"
-          >
-            {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-            <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
-          </button>
-          {/* Way back to the quick surface the user traded away — rendered only
-              when quick-unlock is still redeemable, so an exhausted or
-              unconfigured credential is never re-offered. */}
-          {quickMethod != null && !decrypting && (
-            <button
-              type="button"
-              onClick={() => setPasswordRevealed(false)}
-              style={RECOVER_LINK_STYLE}
-              data-testid="unlock.use-quick-unlock-link"
-            >
-              {quickMethod === "biometric"
-                ? t("unlock.useBiometricInstead", {
-                    biometric: t("settings.quickUnlock.methodTouchId"),
-                  })
-                : t("unlock.unlockWithPinInstead")}
-            </button>
-          )}
-          {!decrypting && (
-            <button
-              type="button"
-              onClick={onStartRecovery}
-              style={RECOVER_LINK_STYLE}
-              data-testid="unlock.recovery-link"
-            >
-              {t("unlock.recoveryLink")}
-            </button>
-          )}
-          {!decrypting && (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "request-delete-vault" })}
-              style={DELETE_VAULT_LINK_STYLE}
-              data-testid="unlock.delete-link"
-            >
-              {t("unlock.deleteLink")}
-            </button>
-          )}
         </form>
       )}
-    </CenteredCard>
+      {/* The alternatives to the credential on screen, on one row, under
+          either surface: the PIN / Touch ID screen and the password screen are
+          the same screen with a different field, so they share this row and the
+          delete zone below it. Swapping between them changes only the field.
+          The way back to the quick surface is offered only while quick-unlock is
+          still redeemable, so an exhausted credential is never re-offered. */}
+      {surface !== "pending" && !decrypting && (
+        <div style={ALT_ROW_STYLE} data-testid="unlock.alt-row">
+          {surface === "quick" ? (
+            <button
+              type="button"
+              onClick={() => setPasswordRevealed(true)}
+              style={RECOVER_LINK_STYLE}
+              className="myne-text-link"
+              data-testid="unlock.use-password-link"
+            >
+              {t("unlock.usePasswordInstead")}
+            </button>
+          ) : (
+            quickMethod != null && (
+              <button
+                type="button"
+                onClick={() => setPasswordRevealed(false)}
+                style={RECOVER_LINK_STYLE}
+                className="myne-text-link"
+                data-testid="unlock.use-quick-unlock-link"
+              >
+                {quickMethod === "biometric"
+                  ? t("unlock.useBiometricInstead", {
+                      biometric: t("settings.quickUnlock.methodTouchId"),
+                    })
+                  : t("unlock.unlockWithPinInstead")}
+              </button>
+            )
+          )}
+          <button
+            type="button"
+            onClick={onStartRecovery}
+            style={RECOVER_LINK_STYLE}
+            className="myne-text-link"
+            data-testid="unlock.recovery-link"
+          >
+            {t("unlock.recoveryLink")}
+          </button>
+        </div>
+      )}
+      {/* Below the rule: destroying the vault is not a third way to open it.
+          The `trash-2` glyph is the canon's own requirement rather than
+          decoration — `PRODUCT.md` says colour is never the sole channel. */}
+      {surface !== "pending" && !decrypting && (
+        <div style={DANGER_ZONE_STYLE}>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "request-delete-vault" })}
+            style={DELETE_VAULT_LINK_STYLE}
+            className="myne-text-link"
+            data-testid="unlock.delete-link"
+          >
+            <Icon name="trash-2" size={14} />
+            {t("unlock.deleteLink")}
+          </button>
+        </div>
+      )}
+    </AuthShell>
   );
 }
