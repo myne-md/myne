@@ -22,26 +22,26 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { assertParsedState } from "./_parse-budget";
+import { completeState } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { trimRowNewline } from "@myne/editor/task-selection";
 
 const DOC = "- [x] milk\nplain prose\n- [ ] \nlast\n";
 
 function stateFor(doc = DOC): EditorState {
-  const state = EditorState.create({
-    doc,
-    extensions: [markdown({ base: markdownLanguage })],
-  });
-  // Parse the WHOLE document before asserting, and the reason is a flake this
-  // file produced on its second full-suite run. `syntaxTree(state)` returns
-  // whatever the incremental parser finished inside its own time budget, which
-  // on a fresh state under a loaded machine can stop short: `listMarkerEnd`
-  // then finds no `TaskMarker` on the row and `trimRowNewline` correctly
-  // declines, so the test fails on a real answer to a half-parsed document.
-  // Passing alone and failing in the suite is the signature.
-  assertParsedState(state);
-  return state;
+  // `completeState` forces the WHOLE document into the tree the caller reads,
+  // and the reason is a flake this file produced on its second full-suite run.
+  // A bare state's initial parse is time-budgeted, so under a loaded CI machine
+  // it can stop short even at this size: `listMarkerEnd` then finds no
+  // `TaskMarker` on the row and `trimRowNewline` correctly declines, so the test
+  // fails on a real answer to a half-parsed document. Passing alone and failing
+  // in the suite is the signature.
+  return completeState(
+    EditorState.create({
+      doc,
+      extensions: [markdown({ base: markdownLanguage })],
+    }),
+  );
 }
 
 /** The shape the filter hands `trimRowNewline`, built from two offsets. */

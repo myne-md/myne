@@ -83,6 +83,33 @@ export function assertParsedState(state: EditorState, budgetMs = PARSE_BUDGET_MS
   }
 }
 
+/**
+ * Force the field tree to cover the whole document and return the state.
+ *
+ * `assertParsedState` above is the TRIPWIRE: it reports a short tree. This is
+ * the FIXER for a BARE state, where there is no view to dispatch through. The
+ * initial parse a bare state gets is time-budgeted (`LanguageState.init`, 20 ms
+ * up to 3000 chars), so under machine load even a 35-character document can come
+ * back short, and a caller that only asserts then reads a partial tree. CI
+ * caught exactly that on `taskRowSelection.test.ts` and `footnote.test.ts`.
+ *
+ * `ensureSyntaxTree` advances the parse CONTEXT; a no-op transaction then
+ * rebuilds the language field from that context, which is the snapshot
+ * `syntaxTree()` returns. The refreshed state is what the caller must use, hence
+ * the return value. Throws (via `assertParsedState`) if the tree still does not
+ * cover the document, so a genuinely unparseable input stays a named failure.
+ */
+export function completeState(
+  state: EditorState,
+  budgetMs = PARSE_BUDGET_MS,
+): EditorState {
+  const upto = state.doc.length;
+  ensureSyntaxTree(state, upto, budgetMs);
+  const refreshed = state.update({}).state;
+  assertParsedState(refreshed, budgetMs);
+  return refreshed;
+}
+
 function incompleteParseError(upto: number, budgetMs: number): Error {
   return new Error(
     `editor test: the syntax parse did not reach ${upto} within ` +
