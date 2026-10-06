@@ -25,7 +25,7 @@ import {
   unknownExtensionMessage,
 } from "./lib/scanned-assets.mjs";
 import { join } from "node:path";
-import { VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
+import { WEB_VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
 
 const DIST = process.argv[2] ?? "web/dist";
 
@@ -40,10 +40,11 @@ const DIST = process.argv[2] ?? "web/dist";
 // configured sync origin, so the browser blocks the request before it is made.
 // That is the guarantee. This list exists so that the *next* one gets read by a
 // person rather than shipped silently.
-// The origins, with a reason each, in ONE place shared with
-// `check-stories-bundle.mjs` (myne-md/myne#832) so the two lists cannot drift.
-// `KNOWN` stays the local name the loops below read.
-export const KNOWN = VENDORED_ORIGINS;
+// The origins a WEB bundle can carry, with a reason each, from the shared
+// `lib/vendored-origins.mjs` (myne-md/myne#832) — scoped to the web bundle
+// rather than the union, so an origin only the catalogue or a desktop artefact
+// carries is not pre-approved here. `KNOWN` stays the local name the loops read.
+export const KNOWN = WEB_VENDORED_ORIGINS;
 
 if (!existsSync(DIST)) {
   console.error(`web third-party check: no bundle at ${DIST} — run \`pnpm web:build\` first.`);

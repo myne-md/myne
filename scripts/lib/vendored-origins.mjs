@@ -1,7 +1,7 @@
 // Third-party origins that appear in a built client because a VENDORED library
-// carries them as string constants, each with the reason. Shared by
-// `check-web-third-party.mjs` and `check-stories-bundle.mjs` so the two lists
-// cannot drift.
+// carries them as string constants, each with the reason. This is the UNION
+// across the clients, and the two guards below do NOT both read it whole: see
+// `WEB_VENDORED_ORIGINS` for why.
 //
 // Every entry here is inert at runtime: a documentation link, an XML namespace
 // URI, an embed allowlist the app never surfaces, or a placeholder in example
@@ -68,3 +68,25 @@ export const VENDORED_ORIGINS = new Map([
   ["https://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
   ["https://raw.githubusercontent.com", "vendored doc links"],
 ]);
+
+/**
+ * The origins the WEB bundle can legitimately carry, which is what
+ * `check-web-third-party.mjs` reads.
+ *
+ * Reading the union whole was a regression: an origin only the story catalogue
+ * or a desktop-only artefact carries was then "recorded" for the web bundle, so
+ * the next genuinely new web origin matching one of them would ship with no
+ * human reading it — the exact review that guard exists to force. The web set is
+ * the union minus the origins that cannot reach the served bundle: the SIL OFL
+ * font licence text lives in `public/fonts/LICENSE.txt`, and the web scan does
+ * not read `.txt` (the catalogue's does). A superset is safe here in one
+ * direction only: an origin the web bundle DOES carry and this set omits would
+ * fail the guard's unknown-origin arm, so membership is checked in a test.
+ */
+const WEB_EXCLUDED = new Set(["http://scripts.sil.org", "https://scripts.sil.org"]);
+export const WEB_VENDORED_ORIGINS = new Map(
+  [...VENDORED_ORIGINS].filter(([origin]) => !WEB_EXCLUDED.has(origin)),
+);
+
+/** The origins the story catalogue can legitimately carry; it reads the union. */
+export const STORIES_VENDORED_ORIGINS = VENDORED_ORIGINS;

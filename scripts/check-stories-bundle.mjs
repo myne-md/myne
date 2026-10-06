@@ -23,15 +23,17 @@ import {
   partitionAssets,
   unknownExtensionMessage,
 } from "./lib/scanned-assets.mjs";
-import { VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
+import { STORIES_VENDORED_ORIGINS } from "./lib/vendored-origins.mjs";
 
 // ── pinned origins ───────────────────────────────────────────────────────────
 //
 // The catalogue now mounts real screens, so it pulls in the same vendored
-// libraries the web bundle does (Excalidraw, Mermaid, pdf.js). The origin list
-// is shared with `check-web-third-party.mjs` through `lib/vendored-origins.mjs`
-// so the two cannot drift.
-export const KNOWN_ORIGINS = VENDORED_ORIGINS;
+// libraries the web bundle does (Excalidraw, Mermaid, pdf.js), AND it scans the
+// font licence text the web scan ignores. It reads the shared union from
+// `lib/vendored-origins.mjs`; the web guard reads the narrower
+// `WEB_VENDORED_ORIGINS` from the same file, so the reasons have one home and
+// only the membership differs.
+export const KNOWN_ORIGINS = STORIES_VENDORED_ORIGINS;
 
 // ── the BIP-39 word list ─────────────────────────────────────────────────────
 //
