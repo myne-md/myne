@@ -48,6 +48,15 @@ describe("check-stories-bundle.findBundleProblems", () => {
     expect(problems.some((p) => p.includes("BIP-39"))).toBe(true);
   });
 
+  it("names a SPACE-JOINED word list, which the quoted-marker check misses", () => {
+    // One string, so `"abandon"` never appears with its closing quote. The
+    // sequence check is what catches this shape.
+    const problems = findBundleProblems({
+      files: files('"abandon ability able about above absent"'),
+    });
+    expect(problems.some((p) => p.includes("BIP-39"))).toBe(true);
+  });
+
   it("names an unrecorded account-shaped string", () => {
     const problems = findBundleProblems({ files: files('"MY-1234-5678-9JKM-NPQR-STVW"') });
     expect(problems.some((p) => p.includes("account-number-shaped"))).toBe(true);
