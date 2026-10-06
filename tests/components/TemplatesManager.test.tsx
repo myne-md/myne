@@ -7,8 +7,9 @@
 // `Editor.tsx` refreshes into the cache before opening — the other half of the
 // #820 fix, covered by the open-bridge code it calls).
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
 const listTemplates = vi.hoisted(() => vi.fn());
 const createTemplate = vi.hoisted(() => vi.fn());
@@ -26,6 +27,38 @@ vi.mock("../../src/notes", () => ({
 }));
 
 import { TemplatesManager } from "../../src/components/TemplatesManager";
+import {
+  WorkspaceProvider,
+  useWorkspace,
+  type WorkspaceApi,
+} from "../../src/notes/workspaceContext";
+
+/** Renders `ui` inside a real `WorkspaceProvider` and hands back a live handle
+ *  to the workspace API so a test can open a note and read the tab strips. */
+function renderWithWorkspace(ui: ReactNode): { current: WorkspaceApi | null } {
+  const api: { current: WorkspaceApi | null } = { current: null };
+  function Probe() {
+    api.current = useWorkspace();
+    return null;
+  }
+  render(
+    <WorkspaceProvider>
+      <Probe />
+      {ui}
+    </WorkspaceProvider>,
+  );
+  return api;
+}
+
+/** Every note id still present in any pane's tab strip. */
+function openNoteIds(
+  leaves: Array<{ tabs: Array<{ kind: string; id: string }> }>,
+): string[] {
+  return leaves
+    .flatMap((l) => l.tabs)
+    .filter((t) => t.kind === "note")
+    .map((t) => t.id);
+}
 
 beforeEach(() => {
   listTemplates.mockReset().mockResolvedValue([]);
@@ -107,5 +140,48 @@ describe("TemplatesManager create flow", () => {
     fireEvent.click(await screen.findByTestId("templates.new-create"));
     expect(await screen.findByTestId("templates.error")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+// Deleting a template soft-trashes an ordinary note, and a template can be open
+// in a pane (the row-open button). The delete must close that pane's tab, or the
+// resident buffer's next autosave writes the pre-trash body back and returns the
+// note from the trash (myne-md/myne#819). These drive the SURFACE, not
+// `closeNoteEverywhere` directly, so removing the call reddens.
+describe("TemplatesManager delete closes the note's pane tab", () => {
+  it("closes the tab after a successful delete", async () => {
+    listTemplates.mockResolvedValue([
+      { noteUuid: "tpl-1", title: "Meeting", folder: null },
+    ]);
+    deleteTemplate.mockResolvedValue(undefined);
+    const api = renderWithWorkspace(
+      <TemplatesManager open onClose={() => {}} onOpenNote={() => {}} />,
+    );
+    act(() => api.current!.openInFocused("tpl-1"));
+    expect(openNoteIds(api.current!.leaves)).toContain("tpl-1");
+
+    fireEvent.click(await screen.findByTestId("templates.row-delete"));
+    await waitFor(() => expect(deleteTemplate).toHaveBeenCalledWith("tpl-1"));
+    await waitFor(() =>
+      expect(openNoteIds(api.current!.leaves)).not.toContain("tpl-1"),
+    );
+  });
+
+  it("keeps the tab when the delete fails (nothing was trashed)", async () => {
+    listTemplates.mockResolvedValue([
+      { noteUuid: "tpl-2", title: "Meeting", folder: null },
+    ]);
+    deleteTemplate.mockRejectedValue(new Error("boom"));
+    const api = renderWithWorkspace(
+      <TemplatesManager open onClose={() => {}} onOpenNote={() => {}} />,
+    );
+    act(() => api.current!.openInFocused("tpl-2"));
+
+    fireEvent.click(await screen.findByTestId("templates.row-delete"));
+    await waitFor(() => expect(deleteTemplate).toHaveBeenCalledWith("tpl-2"));
+    // Give the rejected promise a beat to settle before asserting it stayed.
+    await waitFor(() =>
+      expect(openNoteIds(api.current!.leaves)).toContain("tpl-2"),
+    );
   });
 });
