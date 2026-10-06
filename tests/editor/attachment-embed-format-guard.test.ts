@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState, type Transaction } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { assertParsedState } from "./_parse-budget";
+import { completeState } from "./_parse-budget";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { rangeOverlapsAttachmentEmbed } from "../../src/editor/decorations/attachment-embed";
 import { toggleWrap } from "../../src/editor/wrap-toggle";
@@ -17,14 +17,14 @@ import { toggleWrap } from "../../src/editor/wrap-toggle";
 const ID = "a".repeat(64);
 
 function stateWith(doc: string, anchor: number, head: number): EditorState {
-  const state = EditorState.create({
-    doc,
-    selection: EditorSelection.single(anchor, head),
-    extensions: [markdown({ base: markdownLanguage, extensions: [Wikilink] })],
-  });
   // Force a complete parse so syntaxTree() sees the Wikilink node.
-  assertParsedState(state);
-  return state;
+  return completeState(
+    EditorState.create({
+      doc,
+      selection: EditorSelection.single(anchor, head),
+      extensions: [markdown({ base: markdownLanguage, extensions: [Wikilink] })],
+    }),
+  );
 }
 
 /** Run a StateCommand against `state`, capturing any dispatched transaction. */
