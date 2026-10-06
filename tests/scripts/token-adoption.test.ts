@@ -58,6 +58,26 @@ describe("check-token-adoption", () => {
     expect(out).toContain("probe.tsx");
   });
 
+  it("counts a numeric colour function, which the hex pattern cannot see", () => {
+    // The blind spot this widening closes: `rgba()`/`hsl()` are as unthemable as
+    // a hex literal, and the branch's translucent backdrops shipped uncounted.
+    const dir = withFile(
+      'const s = { background: "rgba(0,0,0,0.32)", border: "1px solid hsl(240 100% 50%)" };\n',
+    );
+    const { out } = run(["--scan", dir]);
+    expect(out).toContain("hardcoded visual values grew");
+    expect(out).toContain("probe.tsx");
+  });
+
+  it("does not count a colour function whose colour is a token", () => {
+    // `var(...)` is stripped to TOKEN before counting, so no numeric argument
+    // remains and the call is not a literal.
+    const dir = withFile('const s = { color: "rgb(var(--accent-rgb))" };\n');
+    const { code, out } = run(["--scan", dir]);
+    expect(out).toContain("token-adoption: ok");
+    expect(code).toBe(0);
+  });
+
   it("does not count a var() fallback, a comment, or a token reference", () => {
     // The three measurement corrections this guard needed, pinned so they cannot
     // regress: a fallback is already themable, an issue ref is not a colour, and
