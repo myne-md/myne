@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Button } from "../primitives/Button";
 
 const ROOT_STYLE: CSSProperties = {
   display: "flex",
@@ -163,18 +164,14 @@ export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorPro
         {label}
       </span>
       {identityLocked && onUnlockIdentity && (
-        <button
+        <Button
           type="button"
-          style={BUTTON_STYLE}
-          {...hoverSurface({
-            restBg: "var(--bg-2)",
-            hoverBg: "var(--paper-3)",
-          })}
+          variant="secondary"
           onClick={onUnlockIdentity}
           data-testid="sync.unlock-identity"
         >
           {t("sync.status.unlockIdentityCta")}
-        </button>
+        </Button>
       )}
       {!hideSyncNow && (
         <button

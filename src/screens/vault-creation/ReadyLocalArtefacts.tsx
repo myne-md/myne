@@ -102,15 +102,7 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
     <>
       <Button
         variant="ghost"
-        icon="folder"
-        onClick={handleShowVaultFolder}
-        disabled={pending}
-        data-testid="create.ready-show-folder"
-      >
-        {t("vaultCreation.ready.showFolder")}
-      </Button>
-      <Button
-        variant="secondary"
+        icon="download"
         onClick={handleBackupNow}
         disabled={pending || backupState === "saving" || backupState === "done"}
         data-testid="create.ready-backup-now"
@@ -121,10 +113,24 @@ export function ReadyLocalArtefacts({ pending, vaultId }: ReadyLocalArtefactsPro
             ? t("vaultCreation.ready.backedUp")
             : t("vaultCreation.ready.backUpNow")}
       </Button>
+      <Button
+        variant="ghost"
+        icon="folder"
+        onClick={handleShowVaultFolder}
+        disabled={pending}
+        data-testid="create.ready-show-folder"
+      >
+        {t("vaultCreation.ready.showFolder")}
+      </Button>
       {backupState === "error" && (
         <div
           data-testid="create.ready-backup-error"
-          style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", textAlign: "center" }}
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-2)",
+            textAlign: "center",
+          }}
         >
           {t("vaultCreation.ready.backupError")}
         </div>

@@ -119,8 +119,10 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // typing 24 words into a browser is normal. That training is the entire
   // mechanism behind `threat-model.md` A18, and keeping this absent is what
   // leaves a rule a user can actually apply: this client asks for the phrase in
-  // exactly ONE situation, a recovery they started themselves. Never to add a
-  // device, never to sign in.
+  // only one ROUTINE situation, a recovery they started themselves. The one
+  // other entry point is the unlock-gated, read-only drill, which checks a
+  // phrase the user already holds and never displays one
+  // (`decisions/security/0645`). Never to add a device, never to sign in.
   //
   // Enforced structurally rather than by this flag alone: the credential grid is
   // substituted out of the bundle (`web/vite.config.ts`) and its absence from

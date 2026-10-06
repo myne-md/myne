@@ -5,7 +5,7 @@
 // are not pinned yet). The list below shows only the PINNED commands,
 // reorderable by drag, each with an × to remove. No checkboxes, no arrows.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS } from "../../commands";
 import { Button } from "../primitives/Button";
@@ -17,52 +17,14 @@ import { ERROR_STYLE } from "./panel-styles";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { prefsRead, setRibbonItems, setRibbonVisible } from "../../lib/prefs";
 import { resolveRibbonItems, ribbonEligibleIds } from "../../notes/ribbonItems";
-import { reorderByDrop, moveBarItem } from "../../notes/barItemsOrder";
+import { CUSTOMIZE_LIST_STYLE, CustomizeRow, useDragReorder } from "./CustomizeList";
+import { EmptyState } from "../primitives/EmptyState";
 
 const SECTION_STYLE: CSSProperties = {
   position: "relative",
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
-};
-const LIST_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-1)",
-};
-const ROW_STYLE: CSSProperties = {
-  position: "relative",
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-1) var(--space-2)",
-  borderRadius: "var(--radius-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-};
-/** Straight accent drop line, not a rounded inset shadow. */
-const DROP_STYLE: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  height: 2,
-  background: "var(--accent)",
-  pointerEvents: "none",
-};
-const GRIP_STYLE: CSSProperties = {
-  cursor: "grab",
-  color: "var(--fg-3)",
-  lineHeight: 1,
-  userSelect: "none",
-  fontSize: "var(--text-sm)",
-};
-const LABEL_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  flex: 1,
-  minWidth: 0,
 };
 const ICON_BUTTON_STYLE: CSSProperties = {
   display: "inline-flex",
@@ -128,8 +90,6 @@ export function RibbonCustomizeSettings() {
   const [orderLoaded, setOrderLoaded] = useState(false);
   const [visible, setVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -151,6 +111,26 @@ export function RibbonCustomizeSettings() {
     };
   }, [eligible]);
 
+  /**
+   * Set when the picker closes by a route that owes focus back to the Add
+   * button (Escape). Consumed by the effect below AFTER the close has
+   * rendered, which is the part that cannot be done from the key handler.
+   */
+  const [restoreFocus, setRestoreFocus] = useState(false);
+
+  useEffect(() => {
+    if (!restoreFocus || pickerOpen) return;
+    setRestoreFocus(false);
+    // The Add button is a shared primitive with no ref forwarding; reach it by
+    // its testid, which doubles as the stable selector. By now the picker is
+    // gone and this node is the one that will survive.
+    sectionRef.current
+      ?.querySelector<HTMLButtonElement>(
+        '[data-testid="settings.ribbon-customize.add"]',
+      )
+      ?.focus();
+  }, [restoreFocus, pickerOpen]);
+
   // Click-away closes the dropdown. Escape closes it too and returns focus
   // to the Add button that opened it, so keyboard users are not dropped.
   useEffect(() => {
@@ -162,14 +142,20 @@ export function RibbonCustomizeSettings() {
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        // Close, and ASK for focus back — do not take it here. Focusing
+        // synchronously inside this handler races the re-render that
+        // `setPickerOpen(false)` schedules: React tears the picker down
+        // afterwards, and if reconciliation replaces the Add button's DOM node
+        // the focus we just set goes with it and the keyboard user lands on
+        // `<body>` with the panel behind them (myne-md/myne#775).
+        //
+        // It failed roughly one run in six under a loaded parallel suite, which
+        // is exactly what a scheduling race looks like from the outside — and
+        // on a slow machine it is not a test artefact, it is a keyboard user
+        // being dropped. The effect below restores focus once the close has
+        // actually rendered.
+        setRestoreFocus(true);
         setPickerOpen(false);
-        // The Add button is a shared primitive with no ref forwarding; reach
-        // it by its testid, which doubles as the stable selector.
-        sectionRef.current
-          ?.querySelector<HTMLButtonElement>(
-            '[data-testid="settings.ribbon-customize.add"]',
-          )
-          ?.focus();
       }
     }
     document.addEventListener("mousedown", onDown);
@@ -198,28 +184,6 @@ export function RibbonCustomizeSettings() {
   function remove(id: string) {
     persistOrder(order.filter((x) => x !== id));
   }
-  function onDragOver(e: DragEvent, id: string) {
-    if (dragId === null || dragId === id) return;
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropAt({ id, edge: e.clientY < rect.top + rect.height / 2 ? "before" : "after" });
-  }
-  function onDrop(id: string) {
-    if (dragId !== null && dragId !== id && dropAt !== null) {
-      persistOrder(reorderByDrop(order, dragId, dropAt.id, dropAt.edge));
-    }
-    setDragId(null);
-    setDropAt(null);
-  }
-
-  function onRowKeyDown(e: React.KeyboardEvent, id: string) {
-    // Keyboard reorder fallback, the rail's own Alt+Arrow contract
-    // (LeftRibbon.tsx): the roster lists the whole order, so the full order
-    // is both sequences moveBarItem takes.
-    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-    e.preventDefault();
-    persistOrder(moveBarItem(order, order, id, e.key === "ArrowUp" ? -1 : 1));
-  }
 
   function persistVisible(next: boolean) {
     setVisible(next);
@@ -231,6 +195,7 @@ export function RibbonCustomizeSettings() {
       });
   }
 
+  const reorder = useDragReorder(order, persistOrder);
   const pinned = new Set(order);
   const q = query.trim().toLowerCase();
   const choices = eligible.filter((id) => {
@@ -304,58 +269,49 @@ export function RibbonCustomizeSettings() {
           </div>
         )}
       </div>
-      <div style={LIST_STYLE} role="list" data-testid="settings.ribbon-customize.list">
+      <div
+        style={CUSTOMIZE_LIST_STYLE}
+        role="list"
+        data-testid="settings.ribbon-customize.list"
+      >
         {orderLoaded && order.length === 0 && (
-          <p style={EMPTY_STYLE}>{t("settings.ribbonCustomize.empty")}</p>
+          <EmptyState
+            variant="firstRun"
+            icon="pin"
+            size="sm"
+            field={false}
+            title={t("settings.ribbonCustomize.emptyTitle")}
+            body={t("settings.ribbonCustomize.empty")}
+            testId="settings.ribbon-customize.empty"
+          />
         )}
         {order.map((id, index) => {
           const action = byId.get(id);
           if (action === undefined) return null;
-          const dropEdge = dropAt?.id === id ? dropAt.edge : null;
           return (
-            <div
+            <CustomizeRow
               key={id}
-              style={{ ...ROW_STYLE, opacity: dragId === id ? 0.4 : 1 }}
-              draggable
-              tabIndex={0}
-              role="listitem"
-              aria-label={t("settings.ribbonCustomize.position", {
-                name: action.label,
-                index: index + 1,
-                total: order.length,
-              })}
-              onKeyDown={(e) => onRowKeyDown(e, id)}
-              onDragStart={() => setDragId(id)}
-              onDragEnd={() => {
-                setDragId(null);
-                setDropAt(null);
-              }}
-              onDragOver={(e) => onDragOver(e, id)}
-              onDrop={() => onDrop(id)}
-              data-testid="settings.ribbon-customize.row"
-              data-item-id={id}
-            >
-              {dropEdge === "before" && <span aria-hidden style={{ ...DROP_STYLE, top: -1 }} />}
-              {dropEdge === "after" && <span aria-hidden style={{ ...DROP_STYLE, bottom: -1 }} />}
-              <span style={GRIP_STYLE} aria-hidden="true">
-                ⠿
-              </span>
-              <span style={LABEL_STYLE}>
-                <Icon name={action.ribbon!.icon} size={16} />
-                {action.label}
-              </span>
-              <button
-                type="button"
-                aria-label={t("settings.ribbonCustomize.remove", { name: action.label })}
-                onClick={() => remove(id)}
-                {...hoverSurface()}
-                style={ICON_BUTTON_STYLE}
-                data-testid="settings.ribbon-customize.remove"
-                data-item-id={id}
-              >
-                <Icon name="x" size={16} />
-              </button>
-            </div>
+              id={id}
+              icon={action.ribbon!.icon}
+              label={action.label}
+              index={index}
+              total={order.length}
+              reorder={reorder}
+              testId="settings.ribbon-customize.row"
+              trailing={
+                <button
+                  type="button"
+                  aria-label={t("settings.ribbonCustomize.remove", { name: action.label })}
+                  onClick={() => remove(id)}
+                  {...hoverSurface()}
+                  style={ICON_BUTTON_STYLE}
+                  data-testid="settings.ribbon-customize.remove"
+                  data-item-id={id}
+                >
+                  <Icon name="x" size={16} />
+                </button>
+              }
+            />
           );
         })}
       </div>

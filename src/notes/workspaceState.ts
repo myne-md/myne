@@ -42,6 +42,28 @@ import {
   type TaskView,
 } from "./taskView";
 import type { DetachedEntry } from "./detachedRestore";
+import {
+  AGENT_TAB_ID,
+  ATTACHMENTS_TAB_ID,
+  GRAPH_TAB_ID,
+  TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
+  TAB_KIND_TAGS,
+  canonicalTabId,
+} from "./tabKinds";
+
+// The singleton sentinels are DECLARED in the tab-kind registry (myne-md/myne#773)
+// and re-exported here, where every caller already imported them from. See the
+// registry's own note: declaring them here made the two modules circular, and at
+// init time every `singletonId` was `undefined`, so no persisted singleton id was
+// ever normalized to its sentinel.
+export {
+  AGENT_TAB_ID,
+  ATTACHMENTS_TAB_ID,
+  GRAPH_TAB_ID,
+  TASKS_TAB_ID,
+  TEMPLATES_TAB_ID,
+} from "./tabKinds";
 
 /** Opaque identifier for a pane (leaf or split node). */
 export type PaneId = string;
@@ -52,13 +74,12 @@ export type ViewId = string;
 
 /** The whole-vault graph is a singleton tab: there is exactly one graph per
  *  workspace, so its id is a fixed sentinel (the global duplicate-forbid
- *  invariant then makes "open graph" idempotent - a reveal, never a 2nd tab). */
-export const GRAPH_TAB_ID = "graph";
+ *  invariant then makes "open graph" idempotent - a reveal, never a 2nd tab).
+ *  Declared in the tab-kind registry; see the re-export note above. */
 
-/** The vault-wide task list is a singleton tab too, for the same reason the
- *  graph is: there is exactly one per workspace, so a fixed sentinel id makes
- *  "open tasks" idempotent - a reveal, never a second tab (MYND-616). */
-export const TASKS_TAB_ID = "tasks";
+/** The attachment library and the template library are singletons too, and
+ *  they are declared in the tab-kind registry with the rest; see the re-export
+ *  note above for why every one of them lives there. */
 
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
@@ -98,13 +119,70 @@ export type WorkspaceItem =
    * on its defaults stays byte-identical to a pre-feature descriptor. The
    * descriptor is opaque to the storage codec - no format change.
    */
+  /**
+   * The attachment library (myne-md/myne#773). A singleton like the graph and
+   * the task list, and carrying no per-tab state of its own: its sort, filter
+   * and search are session state inside the component, which is the same
+   * decision the graph made.
+   */
+  | {
+      kind: "attachments";
+      id: typeof ATTACHMENTS_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+    }
+  /** The note-template library (myne-md/myne#779). */
+  | {
+      kind: "templates";
+      id: typeof TEMPLATES_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+    }
   | {
       kind: "tasks";
       id: typeof TASKS_TAB_ID;
       pinned?: boolean;
       viewMode?: ViewMode;
       taskView?: PersistedTaskView;
+    }
+  /**
+   * The agent (myne-md/myne#771). A singleton like the graph and the task list.
+   * `agentView` is **per-tab session state** in the same sense `taskView` is:
+   * which conversation the tab is showing is where you are, not a preference.
+   *
+   * **Omit-when-default**, so a tab on a fresh conversation is byte-identical
+   * to a descriptor from before this kind existed. The descriptor is opaque to
+   * the storage codec.
+   */
+  | {
+      kind: "agent";
+      id: typeof AGENT_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+      agentView?: PersistedAgentView;
     };
+
+/**
+ * The persisted delta of the agent tab's state (myne-md/myne#771).
+ *
+ * **There is no view discriminator any more.** It carried `"hub" | "focus"`,
+ * because the tab was a conversation LIST you navigated out of into a single
+ * conversation. It is one screen now — the history rail beside the open
+ * conversation, the shape every chat application has — so the only thing worth
+ * persisting is which conversation is open, and the two-view state was a mode
+ * where the user only ever wanted a selection (`design-notes/ai/0637`).
+ *
+ * Absent means a fresh conversation with nothing selected, which is the
+ * omit-when-default value. A stored descriptor from the two-view shape still
+ * reads correctly: its `noteId` and `conversationId` mean here what they meant
+ * there, and the dropped `view` key is simply ignored.
+ */
+export type PersistedAgentView = {
+  /** The conversation the tab is showing, when one is open. */
+  conversationId?: string;
+  /** The note that conversation is anchored to, when it has one. */
+  noteId?: string;
+};
 
 /**
  * The persisted delta of a `TaskView`. Every key is omit-when-default, so the
@@ -163,15 +241,41 @@ export function tasksItem(): WorkspaceItem {
   return { kind: "tasks", id: TASKS_TAB_ID };
 }
 
+/** The attachment-library tab item (singleton - see [`ATTACHMENTS_TAB_ID`]). */
+export function attachmentsItem(): WorkspaceItem {
+  return { kind: "attachments", id: ATTACHMENTS_TAB_ID };
+}
+
+/** The template-library tab item (singleton - see [`TEMPLATES_TAB_ID`]). */
+export function templatesItem(): WorkspaceItem {
+  return { kind: "templates", id: TEMPLATES_TAB_ID };
+}
+
+/** The agent hub tab item (singleton - see [`AGENT_TAB_ID`]). */
+export function agentItem(): WorkspaceItem {
+  return { kind: "agent", id: AGENT_TAB_ID };
+}
+
 /** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`
  *  handle back to an item. An unrecognized prefix is treated as a note id (the
  *  legacy/default kind), so a bare or note-prefixed handle always yields a note
  *  item. */
 export function parseItemKey(key: string): WorkspaceItem {
-  if (key.startsWith("view:")) return { kind: "view", id: key.slice(5) };
-  if (key.startsWith("graph:")) return { kind: "graph", id: GRAPH_TAB_ID };
-  if (key.startsWith("tasks:")) return { kind: "tasks", id: TASKS_TAB_ID };
-  if (key.startsWith("note:")) return { kind: "note", id: key.slice(5) };
+  // Derived from the tab-kind registry (myne-md/myne#773) rather than an arm
+  // per kind. A singleton normalizes to its sentinel whatever the key carried,
+  // which is what keeps "graph:anything" resolving to the one graph tab.
+  const colon = key.indexOf(":");
+  if (colon > 0) {
+    const tag = key.slice(0, colon) as WorkspaceItem["kind"];
+    if ((TAB_KIND_TAGS as readonly string[]).includes(tag)) {
+      return {
+        kind: tag,
+        id: canonicalTabId(tag, key.slice(colon + 1)),
+      } as WorkspaceItem;
+    }
+  }
+  // An unrecognized prefix — or a bare id — is the legacy/default `note` kind,
+  // so a pre-prefix handle still opens the note it names.
   return { kind: "note", id: key };
 }
 
@@ -787,6 +891,66 @@ export function resolveTaskView(p: PersistedTaskView | undefined): TaskView {
 export function taskViewOf(item: WorkspaceItem): TaskView {
   if (item.kind !== "tasks") return DEFAULT_TASK_VIEW;
   return resolveTaskView(item.taskView);
+}
+
+/**
+ * The agent tab's state as a live value (myne-md/myne#771). Absent means a
+ * fresh conversation, so the fallback is the empty object rather than an error.
+ */
+export function agentViewOf(item: WorkspaceItem): PersistedAgentView {
+  if (item.kind !== "agent") return {};
+  return item.agentView ?? {};
+}
+
+/**
+ * Set the agent tab's state, omit-when-default (myne-md/myne#771): a tab with
+ * no conversation selected DROPS the key, so an untouched agent tab serializes
+ * byte-identical to a descriptor from before the kind existed. `undefined`
+ * returned from the to-persisted helper is what triggers the drop.
+ */
+export function setAgentViewState(
+  state: WorkspaceState,
+  paneId: PaneId,
+  view: PersistedAgentView,
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (t.kind !== "agent") return t;
+    const rest: Record<string, unknown> = { ...t };
+    delete rest.agentView;
+    const v = agentViewToPersisted(view);
+    if (v !== undefined) rest.agentView = v;
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) => ({
+      ...leaf,
+      tabs: leaf.tabs.map(apply),
+      activeTab: leaf.activeTab === null ? null : apply(leaf.activeTab),
+    })),
+  };
+}
+
+/**
+ * The persisted delta of the agent tab's state, or `undefined` when there is
+ * nothing to persist.
+ *
+ * The two keys are INDEPENDENT, which is the change the one-screen shape makes:
+ * a conversation can be vault-general (an id with no note), and a fresh
+ * conversation can be about the note the user had open (a note with no id yet,
+ * so a reload lands on the same subject rather than on nothing). The old shape
+ * dropped both unless a note was present, because a view called Focus with no
+ * note was incoherent — a sentence about a mode that no longer exists.
+ */
+export function agentViewToPersisted(
+  view: PersistedAgentView,
+): PersistedAgentView | undefined {
+  const v: PersistedAgentView = {};
+  if (view.conversationId !== undefined && view.conversationId !== "") {
+    v.conversationId = view.conversationId;
+  }
+  if (view.noteId !== undefined && view.noteId !== "") v.noteId = view.noteId;
+  return Object.keys(v).length === 0 ? undefined : v;
 }
 
 /**

@@ -21,7 +21,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon } from "../primitives/Icon";
+import { IconButton } from "../primitives/IconButton";
 import { mapImportedFile } from "../../notes/import/mapping";
 import { noteCreate } from "../../notes/createNote";
 import { requestNoteOpen } from "../../notes/pendingNoteOpen";
@@ -68,29 +68,15 @@ export function ImportPlainFileButton({ handle }: ImportPlainFileButtonProps) {
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="plain-file.import"
-        aria-label={t("plainFile.import")}
-        title={t("plainFile.import")}
+      <IconButton
+        icon="copy"
+        label={t("plainFile.import")}
+        tooltip
+        bordered
         disabled={busy}
+        testId="plain-file.import"
         onClick={() => void importFile()}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: "1px solid var(--line-1)",
-          borderRadius: "var(--radius-2)",
-          background: "var(--paper)",
-          color: "var(--fg-2)",
-          padding: "var(--space-1)",
-          cursor: "pointer",
-          flexShrink: 0,
-          opacity: busy ? 0.6 : 1,
-        }}
-      >
-        <Icon name="copy" aria-hidden="true" />
-      </button>
+      />
       {message !== null && (
         <span
           role="alert"

@@ -31,9 +31,9 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { placeMenu, type MenuPlacement } from "./menuPlacement";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 import type { SelectOption } from "./Select";
@@ -77,89 +77,6 @@ interface SearchableSelectProps<T extends string> {
   testId?: string;
 }
 
-const TRIGGER_STYLE: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-1)",
-  minHeight: 30,
-  maxWidth: 320,
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "0 var(--space-2)",
-  cursor: "pointer",
-  textAlign: "start",
-  transition: "border-color var(--duration-fast) var(--ease-standard)",
-};
-
-const MENU_STYLE: CSSProperties = {
-  position: "fixed",
-  // Above the modal layer (ModalShell / SettingsModal sit at z-index 1000) —
-  // these controls live inside the Settings modal, so the portaled menu must
-  // clear that overlay rather than render behind it.
-  zIndex: 1100,
-  minWidth: 220,
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
-  paddingBottom: "var(--space-1)",
-  display: "flex",
-  flexDirection: "column",
-  maxHeight: 320,
-};
-
-const SEARCH_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-3)",
-  borderBottom: "1px solid var(--line-1)",
-  color: "var(--fg-3)",
-};
-
-const SEARCH_INPUT_STYLE: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  border: 0,
-  outline: "none",
-  background: "transparent",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-};
-
-const LIST_STYLE: CSSProperties = {
-  overflowY: "auto",
-  padding: "var(--space-1) 0",
-};
-
-const OPTION_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  textAlign: "start",
-  padding: "var(--space-2) var(--space-3)",
-  background: "transparent",
-  border: 0,
-  cursor: "pointer",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-  whiteSpace: "nowrap",
-};
-
-const EMPTY_STYLE: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-};
-
 export function SearchableSelect<T extends string>({
   options,
   selected,
@@ -184,11 +101,9 @@ export function SearchableSelect<T extends string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [coords, setCoords] = useState<{
-    top: number;
-    right: number;
-    minWidth: number;
-  } | null>(null);
+  const [coords, setCoords] = useState<
+    (MenuPlacement & { right: number; minWidth: number }) | null
+  >(null);
 
   const selectedSet = useMemo(() => new Set<T>(selected), [selected]);
 
@@ -266,9 +181,12 @@ export function SearchableSelect<T extends string>({
     [multiple, options, selectedSet, onChange, close],
   );
 
-  // Anchor the menu below the trigger, RIGHT-aligned to it (opens leftward) so it
-  // never spills past the right edge — the trigger usually sits on the right of a
-  // settings row / modal, where a left-aligned menu leaked off-screen.
+  // Anchor the menu to the trigger, RIGHT-aligned to it (opens leftward) so it
+  // never spills past the right edge — the trigger usually sits on the right of
+  // a settings row / modal, where a left-aligned menu leaked off-screen. The
+  // vertical half is `placeMenu`'s, shared with `<Select>`: this one is taller
+  // (320px against 280) so it runs out of room below sooner, and the AI
+  // composer's scope picker sits a few pixels above the status bar.
   useLayoutEffect(() => {
     if (!open) return;
     const el = triggerRef.current;
@@ -276,7 +194,13 @@ export function SearchableSelect<T extends string>({
     const r = el.getBoundingClientRect();
     const minWidth = Math.max(220, r.width);
     const right = Math.max(8, window.innerWidth - r.right);
-    setCoords({ top: r.bottom + 4, right, minWidth });
+    // 320 is this variant's `max-height` in `components.css` (taller than the
+    // plain one, because it carries a pinned search row above its list).
+    setCoords({
+      ...placeMenu(r, window.innerHeight, { cap: 320 }),
+      right,
+      minWidth,
+    });
   }, [open]);
 
   // Outside-click closes; scroll/resize close (a fixed menu would drift).
@@ -366,30 +290,16 @@ export function SearchableSelect<T extends string>({
         aria-label={ariaLabel}
         disabled={disabled}
         data-testid={testId}
-        style={{
-          ...TRIGGER_STYLE,
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.5 : 1,
-        }}
+        className="myne-select-trigger"
+        // The wrapping variant: this trigger renders the SELECTED CHIPS, which
+        // may run onto a second line, so it grows down from a minimum instead
+        // of sitting at the fixed height a single-value Select uses.
+        data-wrap="true"
         onClick={(e) => {
           e.stopPropagation();
           if (open) close();
           else openMenu();
         }}
-        onMouseEnter={
-          disabled
-            ? undefined
-            : (e) => {
-                e.currentTarget.style.borderColor = "var(--line-3)";
-              }
-        }
-        onMouseLeave={
-          disabled
-            ? undefined
-            : (e) => {
-                e.currentTarget.style.borderColor = "var(--line-2)";
-              }
-        }
         onKeyDown={onTriggerKeyDown}
       >
         <span
@@ -418,15 +328,23 @@ export function SearchableSelect<T extends string>({
             // focus back the moment it lands — leaving the box untypable.
             // This marks the surface as belonging to its opener.
             data-focus-trap-portal=""
+            className="myne-select-menu"
+            data-searchable="true"
+            data-side={coords.side}
+            // The MEASURED anchor only; everything else is in `components.css`.
+            // The height is measured too: the room on the chosen side is the
+            // value and the stylesheet's `max-height` is the cap, or flipping
+            // would move the overflow to the other edge rather than remove it.
             style={{
-              ...MENU_STYLE,
-              top: coords.top,
+              ...(coords.top === undefined ? {} : { top: coords.top }),
+              ...(coords.bottom === undefined ? {} : { bottom: coords.bottom }),
+              maxHeight: coords.maxHeight,
               right: coords.right,
               minWidth: coords.minWidth,
               maxWidth: "min(360px, calc(100vw - 16px))",
             }}
           >
-            <div style={SEARCH_ROW_STYLE}>
+            <div className="myne-select-search-row">
               <Icon name="search" size={14} />
               <input
                 ref={searchRef}
@@ -435,7 +353,7 @@ export function SearchableSelect<T extends string>({
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
                 data-testid={searchTestId}
-                style={SEARCH_INPUT_STYLE}
+                className="myne-select-search-input"
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onSearchKeyDown}
                 onClick={(e) => e.stopPropagation()}
@@ -445,10 +363,10 @@ export function SearchableSelect<T extends string>({
               role="listbox"
               aria-multiselectable={multiple ? "true" : undefined}
               aria-label={ariaLabel}
-              style={LIST_STYLE}
+              className="myne-select-list"
             >
               {filtered.length === 0 ? (
-                <p style={EMPTY_STYLE}>{emptyText}</p>
+                <p className="myne-select-empty">{emptyText}</p>
               ) : (
                 filtered.map((opt, index) => {
                   const isSelected = selectedSet.has(opt.value);
@@ -461,28 +379,23 @@ export function SearchableSelect<T extends string>({
                       aria-selected={isSelected}
                       data-testid={optionTestId}
                       data-value={opt.value}
+                      className="myne-select-option"
+                      // `data-active` is SELECTION (the app-wide E2E contract);
+                      // `data-highlighted` is the keyboard cursor. They are two
+                      // different things in a multi-select and painting them
+                      // with one attribute would light every selected row.
                       data-active={isSelected}
-                      style={{
-                        ...OPTION_STYLE,
-                        background: active ? "var(--bg-3)" : "transparent",
-                      }}
+                      data-highlighted={active ? "true" : "false"}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={(e) => {
                         e.stopPropagation();
                         choose(opt.value);
                       }}
                     >
-                      <span
-                        style={{
-                          width: 16,
-                          display: "inline-flex",
-                          flexShrink: 0,
-                          color: "var(--accent)",
-                        }}
-                      >
+                      <span className="myne-select-option__check">
                         {isSelected && <Icon name="check" size={14} />}
                       </span>
-                      <span style={{ flex: 1, minWidth: 0 }}>{opt.label}</span>
+                      <span className="myne-select-option__label">{opt.label}</span>
                     </button>
                   );
                 })

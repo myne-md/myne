@@ -117,7 +117,11 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
       levels.push(clamped);
       for (let i = 0; i < bars.length; i++) {
         const h = 12 + Math.sqrt(levels[i]) * 88;
-        bars[i].style.height = `${h}%`;
+        // `scaleY` of a full-height box, NOT `height` (myne-md/myne#773). The
+        // geometry is identical because the meter centres its children, but this
+        // loop runs at audio rate over every bar and a height write lays out the
+        // whole row each time; a transform write does not.
+        bars[i].style.transform = `scaleY(${(h / 100).toFixed(4)})`;
       }
     },
     setBusy(): void {

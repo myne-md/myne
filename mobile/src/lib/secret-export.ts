@@ -22,9 +22,10 @@ import { copySecret, type CancelClear, type Feedback } from "@myne/clipboard";
  * It wrote through `@tauri-apps/plugin-clipboard-manager`, whose plugin was
  * registered nowhere on mobile: no Cargo dependency, no `.plugin()` call, no
  * capability grant. Every call was dispatched to a plugin that does not exist
- * and rejected at runtime, so the account-number Copy reported
- * `vaultCreation.account.copyFailed` on every tap, on every device, for as long
- * as it shipped. What kept that from being a silent lie is that
+ * and rejected at runtime, so the account-number Copy reported its copy-failed
+ * string on every tap, on every device, for as long as it shipped. (That key was
+ * `vaultCreation.account.copyFailed`; it retired with the account step when the
+ * recovery kit merged the two in myne-md/myne#468.) What kept that from being a silent lie is that
  * myne-md/myne-mobile#51 had already made the caller check the write, which is
  * also why myne-md/myne#390 held this up as the shape for desktop to adopt: the
  * shape was right and the wiring underneath it was never done.

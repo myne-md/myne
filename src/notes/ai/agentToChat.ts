@@ -58,6 +58,7 @@ import {
   settleStep,
 } from "../agent/agentStore";
 import { visibleHistory } from "./chatHistory";
+import { setPendingAnchorNoteId } from "./chatStore";
 import { failAgentTurn, getChat, sendAgentTurn, settleAgentTurn } from "./chatStore";
 
 /** The already-localized strings the run's turns render.
@@ -162,6 +163,11 @@ export async function startAgentRun(
   /** Called with the ids of notes an automatic apply wrote, so the open pane
    *  re-reads them. Absent when the caller has nothing to tell. */
   onNotesWritten?: (noteIds: readonly string[]) => void,
+  /** The note to ANCHOR the conversation to, when the run is about one note
+   *  (myne-md/myne#771). The anchor is written at conversation-create time, so
+   *  it must be set before the first persist; a vault-general run passes
+   *  `null`. */
+  anchorNoteId?: string | null,
 ): Promise<void> {
   // **Captured BEFORE the turn is appended**, which is the ordering that makes
   // this the conversation so far rather than the conversation including the
@@ -169,6 +175,10 @@ export async function startAgentRun(
   // agent turn; seeding after it would send the task twice, once as history and
   // once as the task itself, and seed an empty assistant turn with it.
   const history = visibleHistory(getChat().turns);
+  // Anchor the conversation to the note this run is about, if any, BEFORE the
+  // turn is appended: the first persist creates the conversation and reads the
+  // pending anchor (myne-md/myne#771).
+  setPendingAnchorNoteId(anchorNoteId ?? null);
   sendAgentTurn(task, copy.scopeLabel);
   beginRun();
   // Captured BEFORE the await, so a vault lock during the call invalidates what

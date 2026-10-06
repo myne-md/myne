@@ -16,6 +16,7 @@
 // most-specific-wins precedence. It binds only over a closed entry list — there
 // is no runtime chord→callback registration (no plugin surface).
 
+import { recordCommandRun } from "../lib/commandRecency";
 import { eventToChord, normalizeChord, isMacPlatform, type ChordEvent } from "./chord";
 import {
   isBindingActive,
@@ -93,6 +94,9 @@ export function dispatchKeybind(
 ): boolean {
   const entry = resolveKeybind(event, phase, ctx, entries, keymap, mac);
   if (!entry) return false;
+  // A chord is the third way a command runs (after the palette and the rail),
+  // and the one power users lean on, so it counts toward recency too.
+  recordCommandRun(entry.id);
   entry.run();
   return true;
 }

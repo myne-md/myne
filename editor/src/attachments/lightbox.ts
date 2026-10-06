@@ -191,6 +191,21 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     backdrop.appendChild(surface);
     pdfSurface = surface;
   } else {
+    // The picture's frame. It is a real element rather than padding on the
+    // backdrop because `mountZoom` fits to `stage.clientWidth/clientHeight`,
+    // and `clientWidth` includes padding — so the backdrop's gutter was
+    // invisible to the fit and the image ran under the × and the zoom bar.
+    // `styles.ts` carries the inset and the max width.
+    const stage = document.createElement("div");
+    stage.className = "cm-attach-lightbox-stage";
+    // A click on the mat around the picture still dismisses, as it did when
+    // the mat was the backdrop itself. `openModal` fires only for a click
+    // whose target IS the backdrop, and this element now covers most of it.
+    stage.addEventListener("click", (e) => {
+      if (e.target === stage) dismissAttachmentLightbox();
+    });
+    backdrop.appendChild(stage);
+
     const img = document.createElement("img");
     img.className = "cm-attach-lightbox-img";
     img.setAttribute("data-testid", "attachment-lightbox.image");
@@ -198,7 +213,7 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     img.src = opts.url;
     img.alt = opts.alt;
     img.draggable = false; // we own drag → pan; suppress the native image drag
-    backdrop.appendChild(img);
+    stage.appendChild(img);
 
     // Zoom/pan controls (ED-08 design: − / percentage / +), floating bottom-
     // centre. Wheel / pinch / double-tap / keyboard are wired by the controller
@@ -214,7 +229,7 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
       onReset: () => zoomRef?.reset(),
     });
     const zoom = mountZoom({
-      stage: backdrop,
+      stage,
       element: img,
       onPercent: controls.setPercent,
       rest: "contain",

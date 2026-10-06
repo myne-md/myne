@@ -65,6 +65,28 @@ describe("frontmatter widget: presence", () => {
     expect(titleInput(m).value).toBe("Hi");
   });
 
+  it("keeps the note title out of the key/value block", () => {
+    // The frontmatter block was drawn as one bordered table for a round
+    // (myne-md/myne#773) and the border is withdrawn: at the head of every
+    // note with frontmatter it competed with the prose it introduces, which
+    // is the thing a reader is there for.
+    //
+    // What the border was holding together is still true and still worth a
+    // test, which is why this is narrowed rather than deleted: the note title
+    // is the NOTE's, not a row of its frontmatter, so it must not be inside
+    // the properties list however that list is drawn next.
+    m = mount("---\ntitle: Hi\nstatus: draft\n---\nbody\n");
+    const list = m.host.querySelector(".cm-fm-properties-list");
+    expect(list, "no properties list").not.toBeNull();
+    expect(
+      list!.querySelector(".cm-fm-properties-name"),
+      "the note title belongs to the note, not to its frontmatter rows",
+    ).toBeNull();
+    // And it is on screen — outside the list, not absent, which is the other
+    // way this assertion can be satisfied by a defect.
+    expect(titleInput(m).value).toBe("Hi");
+  });
+
   it("a doc with no frontmatter renders no widget", () => {
     m = mount("just body text\nno yaml here\n");
     expect(widget(m)).toBeNull();

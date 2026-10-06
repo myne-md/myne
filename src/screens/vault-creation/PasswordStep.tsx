@@ -1,4 +1,4 @@
-// Step 1 of 4 — master password.
+// Step 2 of 4 — master password.
 //
 // Implements design session 2026-04-28-vault-creation-frontend.md:
 //   - Q2 state machine (PasswordStep is a leaf component; password lives
@@ -7,7 +7,8 @@
 //     orchestrator captures the value via a ref for the begin invocation).
 //   - Q7 error UX (inline error banner for recoverable BEGIN_ERR variants
 //     via <ErrorBanner role="alert">).
-//   - Q10 step indicator ("STEP 1 OF 4 — MASTER PASSWORD" eyebrow).
+//   - Q10 step indicator, now composed from `stepOrder.ts` rather than being
+//     one translated string per step (myne-md/myne#468 — see that file for why).
 //
 // Body (password + confirm fields, zxcvbn meter, suggest helper, min-
 // strength gating, submit button) is delegated to the shared
@@ -26,11 +27,16 @@ import { useTranslation } from "react-i18next";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { PasswordCreateForm } from "../../components/PasswordCreateForm";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
-import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
+import { StepCounter, StepHeading, StepLayout } from "./step-shell";
 import type { ErrorState } from "./reducer";
 
 interface PasswordStepProps {
   error: ErrorState | null;
+  /**
+   * One step BACK, to the vault-name step — not out of the flow. Something
+   * precedes the password now, so this control returns to it with the typed name
+   * intact (`PASSWORD_BACK`), where before it exited creation entirely.
+   */
   onBack: () => void;
   onSubmit: (password: string) => void;
 }
@@ -39,7 +45,10 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
   const { t } = useTranslation();
   return (
     <StepLayout>
-      <StepEyebrow icon="lock">{t("vaultCreation.password.eyebrow")}</StepEyebrow>
+      <StepCounter
+        step="password"
+        label={t("vaultCreation.password.eyebrowLabel")}
+      />
       <StepHeading>{t("vaultCreation.password.heading")}</StepHeading>
 
       <PasswordCreateForm
@@ -56,20 +65,20 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
             <ErrorBanner error={error} />
           ) : undefined
         }
+        fieldsCard
         helperCopy={
+          // Quiet text rather than a boxed alert: the briefing already asked the
+          // user to acknowledge this, so here it is a reminder, not a warning.
+          // The sentence itself is load-bearing and stays verbatim.
           <div
             style={{
-              padding: "var(--space-3)",
-              background: "var(--paper-2)",
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
               fontSize: "var(--text-sm)",
               lineHeight: 1.6,
               color: "var(--fg-2)",
             }}
           >
             {t("vaultCreation.password.helperLead")}{" "}
-            <strong style={{ color: "var(--fg-1)" }}>
+            <strong style={{ color: "var(--fg-1)", fontWeight: "var(--weight-medium)" }}>
               {LOST_BOTH_SECRETS_SENTENCE}
             </strong>
           </div>

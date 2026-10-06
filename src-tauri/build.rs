@@ -59,10 +59,14 @@ fn main() {
             // `commands.allow` entry in
             // `permissions/vault-recover/default.toml` is a
             // security regression.
+            // myne-md/myne#468 adds `verify_recovery_phrase` (the recovery
+            // DRILL — derive, attempt the unwrap, discard, return a bool; no
+            // slot transition, no write, unlock-gated).
             tauri_build::InlinedPlugin::new().commands(&[
                 "recover_with_phrase",
                 "complete_recovery",
                 "resolve_vault_by_account_number",
+                "verify_recovery_phrase",
             ]),
         )
         .plugin(

@@ -45,6 +45,7 @@ import {
 import { applyTheme } from "../../lib/theme";
 import { applyAccent, readAccent, writeAccent } from "../../lib/accentColor";
 import { CustomThemesSection } from "./CustomThemesSection";
+import { BarCustomizeSettings } from "./BarCustomizeSettings";
 import { RibbonCustomizeSettings } from "./RibbonCustomizeSettings";
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
@@ -703,6 +704,7 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
       />
 
       <RibbonCustomizeSettings />
+      <BarCustomizeSettings />
     </div>
   );
 }

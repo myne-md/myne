@@ -19,7 +19,7 @@
 // asserted together rather than one per test.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const listVaults = vi.fn();
 
@@ -30,7 +30,7 @@ vi.mock("../../src/lib/vault-list", async () => {
   return { ...actual, listVaults: (...a: unknown[]) => listVaults(...a) };
 });
 
-import { VaultPicker } from "../../src/screens/VaultPicker";
+import { VaultPicker, VISIBLE_VAULT_ROWS } from "../../src/screens/VaultPicker";
 import type { VaultSummary } from "../../src/types/vault-summary";
 
 afterEach(() => {
@@ -73,26 +73,102 @@ describe("VaultPicker at a vault count that overflows the window", () => {
     });
   });
 
-  it("bounds the card and makes the LIST the only scroller", async () => {
+  it("bounds the centre column and makes the LIST the only scroller", async () => {
+    // The screen is deboxed since myne-md/myne#773, so the bounded box is the
+    // shell's centre column rather than a card — but the invariant is the one
+    // that mattered before and the reason is unchanged: the vault count is
+    // unbounded, nothing in the chain above scrolls, and a column that grows to
+    // fit takes its overflow off the bottom of the window with it.
     const root = await renderPicker();
-    const card = root.firstElementChild as HTMLElement;
-    expect(card.style.maxHeight).toBe("100%");
+    const view = root.querySelector(".myne-auth-view") as HTMLElement;
+    expect(view, "the shell's centre column is gone").not.toBeNull();
+    expect(view.style.maxHeight).toBe("100%");
     // `min-height: auto` on a flex item refuses to shrink below its content, so
     // without this the maxHeight above has nothing to act on.
-    expect(card.style.minHeight).toBe("0px");
+    expect(view.style.minHeight).toBe("0px");
 
     const list = screen.getAllByTestId("picker.vault-row")[0]!.parentElement!;
     expect(list.style.overflowY).toBe("auto");
     expect(list.style.minHeight).toBe("0px");
+    // And it scrolls past four rows even in a tall window, rather than only
+    // once the window runs out: the cap is four rows and three gaps.
+    expect(list.style.maxHeight).toBe(
+      `calc(${VISIBLE_VAULT_ROWS} * 60px + ${VISIBLE_VAULT_ROWS - 1} * var(--space-2))`,
+    );
+    expect(VISIBLE_VAULT_ROWS).toBe(4);
   });
 
   it("keeps the heading and the three actions out of the shrink", async () => {
     // If the chrome shrank too, a tall list would compress the heading and the
-    // footer instead of scrolling, so the same rows are lost in a different way.
+    // actions instead of scrolling, so the same rows are lost in a different
+    // way. The three actions sit as one labelled row directly UNDER the list
+    // (they were icon-only in the shell's top bar for a round); the row is held
+    // out of the shrink, so at any vault count the list scrolls and the row
+    // stays on screen beneath it.
     await renderPicker();
     for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
-      expect(screen.getByTestId(testId).style.flexShrink).toBe("0");
+      expect(screen.getByTestId(testId), `${testId} is gone`).toBeTruthy();
     }
-    expect(screen.getByRole("heading").style.flexShrink).toBe("0");
+    const actions = screen.getByTestId("picker.actions");
+    for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
+      expect(actions.contains(screen.getByTestId(testId)), `${testId} left the row`).toBe(true);
+    }
+    expect(actions.style.flexShrink, "the actions row must not compress").toBe("0");
+    // Under the list, not above it: the row follows the scrolling list in
+    // document order, so it reads as "or add another".
+    const firstRow = screen.getAllByTestId("picker.vault-row")[0]!;
+    expect(
+      firstRow.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the actions row must come after the vault list",
+    ).toBeTruthy();
+    // The heading's GROUP, not the `<h1>`. The title and its subtitle are one
+    // block now (they were two siblings a section-gap apart), so the group is
+    // the flex item the column sizes — `flex-shrink` on a child of it means
+    // nothing, which is the same trap the Tooltip wrapper sprang one screen
+    // over. The `<h1>` is asserted to be inside it, or "the group does not
+    // shrink" would be true of a group that no longer holds the heading.
+    const heading = screen.getByRole("heading");
+    const group = heading.parentElement as HTMLElement;
+    expect(group.style.flexDirection, "the heading is not in a group").toBe("column");
+    expect(group.style.flexShrink).toBe("0");
+    // And the pair really is tighter than the section gap it used to sit in.
+    const subline = group.querySelector("p");
+    expect(subline, "the subtitle left the group").not.toBeNull();
+    expect(group.style.gap).toBe("var(--space-1)");
+  });
+});
+
+describe("the row under the pointer wears the accent", () => {
+  it("rings the hovered row in the accent, not a second grey", async () => {
+    // The neutral `--line-1` → `--line-2` step it replaced was a change nobody
+    // could see: two adjacent greys, on a 60px row, behind a fill that was also
+    // changing. On this screen the row is the only thing to press.
+    await renderPicker();
+    const row = screen.getAllByTestId("picker.vault-row")[0]!;
+    expect(row.style.border).toContain("var(--line-1)");
+
+    fireEvent.mouseEnter(row);
+    expect(row.style.border, "hover must reach for the accent").toContain(
+      "var(--accent)",
+    );
+    expect(row.style.background).toContain("var(--accent-soft)");
+
+    fireEvent.mouseLeave(row);
+    expect(row.style.border).toContain("var(--line-1)");
+  });
+
+  it("does not change the row's geometry on hover", () => {
+    // A box-shadow ring would change the row's optical size, and a 60px row in
+    // a scrolling list would appear to breathe as the pointer ran down it. The
+    // colour changes; the geometry does not.
+    return renderPicker().then(() => {
+      const row = screen.getAllByTestId("picker.vault-row")[0]!;
+      const before = { h: row.style.height, p: row.style.padding, r: row.style.borderRadius };
+      fireEvent.mouseEnter(row);
+      expect(row.style.height).toBe(before.h);
+      expect(row.style.padding).toBe(before.p);
+      expect(row.style.borderRadius).toBe(before.r);
+      expect(row.style.boxShadow, "a ring would resize the row").toBe("");
+    });
   });
 });

@@ -143,6 +143,18 @@ export type VaultRecoveryError =
    */
   | { kind: "VaultRecoveryRequiresActiveSession" }
   /**
+   * `verify_recovery_phrase` (the recovery drill, myne-md/myne#468) was invoked
+   * with no vault unlocked.
+   *
+   * The drill needs no key material; the gate is what BOUNDS its verification
+   * oracle — a caller who has an unlocked vault already has the plaintext, so a
+   * yes/no about the phrase tells them nothing they do not have.
+   *
+   * Not expected in normal use: the drill lives in Settings, which is
+   * unreachable while locked. If it surfaces, a router bug.
+   */
+  | { kind: "SlotNotUnlocked" }
+  /**
    * `tokio::task::spawn_blocking` join handle returned an error
    * (panic in the blocking task, runtime shutdown). User-facing
    * CTA is "try again", recoverable banner, not a credential error.

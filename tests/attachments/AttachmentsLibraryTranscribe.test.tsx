@@ -70,7 +70,7 @@ const IMAGE: CatalogEntry = {
 function renderLibrary() {
   return render(
     <SidebarStateProvider>
-      <AttachmentsLibrary onClose={() => {}} />
+      <AttachmentsLibrary />
     </SidebarStateProvider>,
   );
 }

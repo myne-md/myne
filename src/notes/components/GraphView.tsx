@@ -44,8 +44,14 @@ import { useWorkspace } from "../workspaceContext";
 import { GraphSettingsPanel } from "./GraphSettingsPanel";
 import { GraphList } from "./GraphList";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
-import { Icon } from "../../components/primitives/Icon";
-import type { IconName } from "../../lib/icons";
+import { Segmented } from "../../components/primitives/Segmented";
+import { Select } from "../../components/primitives/Select";
+// The cluster's icon controls are the SHARED primitive now (myne-md/myne#774).
+// This file carried a local `IconButton` because the primitive had no bordered
+// variant — a floating control needs its own edge to be findable against
+// whatever is behind it — so the variant moved to the primitive instead. Its
+// `title` becomes a `<Tooltip>` in the same move (myne-md/myne#775).
+import { IconButton as ClusterButton } from "../../components/primitives/IconButton";
 
 // Lazy-loaded so the d3-force + canvas-renderer chunk stays OUT of the initial
 // bundle (vision.md "separate, lazy-loaded"; SYNC-8 TB9 posture). The app's
@@ -143,6 +149,26 @@ export function GraphPane() {
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [buildNonce, setBuildNonce] = useState(0);
   const [buildTrigger, setBuildTrigger] = useState(0);
+  /**
+   * Whether the last build produced nodes but NO links — the signature of a
+   * build that ran before the vault index was ready.
+   *
+   * The nodes come from the sidebar's note cache and the links come from the
+   * vault INDEX, and those are populated by different paths. On unlock,
+   * `vaultIndices.ts` sweeps every stale note (`for (const id of stale) await
+   * reindexNote(id)`), so on a cold start the index fills in PROGRESSIVELY. A
+   * graph tab restored into that window builds against a half-empty index and
+   * gets every note and none of its connections — which is what a user sees as
+   * "the graph loaded as a field of grey dots with no edges".
+   *
+   * It then stayed that way. The build effect deliberately does not depend on
+   * the note cache (SYNC-14: an ordinary edit must not re-scatter a laid-out
+   * graph), so nothing rebuilt; `stale` only lit the Refresh button and waited
+   * to be pressed.
+   */
+  const prematureRef = useRef(false);
+  /** Whether the one automatic recovery below has already been spent. */
+  const autoRebuiltRef = useRef(false);
   const [overlay, setOverlay] = useState<GraphOverlay>({
     model: null,
     colors: NO_NODE_COLORS,
@@ -216,6 +242,9 @@ export function GraphPane() {
           });
       const [, m] = await Promise.all([hydrate, build()]);
       if (cancelled) return;
+      // A build that came back with NODES but no EDGES, in a view that should
+      // have some, was almost certainly premature — see `prematureRef`.
+      prematureRef.current = m.nodes.length > 0 && m.edges.length === 0;
       setBuildNonce(getIndexNonce());
       setModel(m);
       setLayoutNonce((n) => n + 1); // one bump per (re)build — the flashbang probe
@@ -352,6 +381,21 @@ export function GraphPane() {
   // SYNC-14: stale when the index changed since the layout was built. The
   // expensive re-layout is gated to an explicit refresh, never the nonce.
   const stale = indexNonce !== buildNonce;
+
+  // Recover from a premature build, ONCE per mount.
+  //
+  // Deliberately not a general "rebuild when the index changes": that is
+  // exactly what SYNC-14 refused, and for a good reason — a graph that
+  // re-scatters itself every time you edit a note is worse than a stale one.
+  // This fires only in the state where the picture is unambiguously wrong
+  // (nodes, zero links) and only once, so a vault that genuinely has no links
+  // costs a single extra build and then stops. Everything else still waits for
+  // an explicit Refresh.
+  useEffect(() => {
+    if (!stale || !prematureRef.current || autoRebuiltRef.current) return;
+    autoRebuiltRef.current = true;
+    setBuildTrigger((n) => n + 1);
+  }, [stale]);
 
   // --- Bootstrapping the first model (myne-md/myne#727) ------------------
   // Reported twice as "the graph pane opens and never loads": the first time as
@@ -627,7 +671,10 @@ export function GraphPane() {
             All and the chip is gone (myne-md/myne#727). It sits leftmost
             because it is the outermost decision: what the picture is OF, before
             how it is drawn. */}
-        <select
+        <Select
+          testId="editor.graph-filter"
+          aria-label={t("notes.graph.filterSelectAriaLabel")}
+          style={{ maxWidth: 190 }}
           value={
             filter.kind === "tag"
               ? `tag:${filter.key}`
@@ -637,8 +684,38 @@ export function GraphPane() {
                   ? ORPHANS_FILTER_VALUE
                   : ""
           }
-          onChange={(e) => {
-            const value = e.target.value;
+          options={[
+            { value: "", label: t("notes.graph.filterAll") },
+            // The isolated view has no permanent entry: task 14 moved it to the
+            // palette, and the header is not where a once-in-a-while view
+            // lives. It is rendered ONLY while it IS the current value, so the
+            // control tells the truth about what is on screen without becoming
+            // a way to enter the view. (The native `<select>` this replaced had
+            // to do the same for a harder reason: it cannot display a value
+            // with no matching option and silently falls back to the first,
+            // which left it reading "All" over a different picture.)
+            ...(filter.kind === "orphans"
+              ? [
+                  {
+                    value: ORPHANS_FILTER_VALUE,
+                    label: t("notes.graph.filterIsolated"),
+                  },
+                ]
+              : []),
+            ...(ctx.selectedId !== null
+              ? [
+                  {
+                    value: LOCAL_FILTER_VALUE,
+                    label: t("notes.graph.filterAroundNote"),
+                  },
+                ]
+              : []),
+            ...tags.map((tag) => ({
+              value: `tag:${tag.key}`,
+              label: `#${tag.display} (${tag.subtreeCount})`,
+            })),
+          ]}
+          onChange={(value) => {
             if (value === "") setFilter({ kind: "all" });
             else if (value === LOCAL_FILTER_VALUE) {
               if (ctx.selectedId !== null) {
@@ -646,43 +723,7 @@ export function GraphPane() {
               }
             } else setFilter({ kind: "tag", key: value.slice("tag:".length) });
           }}
-          aria-label={t("notes.graph.filterSelectAriaLabel")}
-          data-testid="editor.graph-filter"
-          style={{
-            fontSize: 12,
-            maxWidth: 190,
-            padding: "3px 6px",
-            background: "var(--bg-1)",
-            color: "var(--fg-2)",
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-2)",
-          }}
-        >
-          <option value="">{t("notes.graph.filterAll")}</option>
-          {/* The isolated view has no entry here, because task 14 moved it to
-              the palette and the header is not where a once-in-a-while view
-              lives. But a `<select>` cannot display a value with no matching
-              option, it silently falls back to the first one, so opening that
-              view from the palette would leave this control reading "All" while
-              the picture showed something else. The option is rendered ONLY
-              while it is the current value: the control tells the truth, and it
-              still cannot be used to ENTER the view. */}
-          {filter.kind === "orphans" && (
-            <option value={ORPHANS_FILTER_VALUE}>
-              {t("notes.graph.filterIsolated")}
-            </option>
-          )}
-          {ctx.selectedId !== null && (
-            <option value={LOCAL_FILTER_VALUE}>
-              {t("notes.graph.filterAroundNote")}
-            </option>
-          )}
-          {tags.map((tag) => (
-            <option key={tag.key} value={`tag:${tag.key}`}>
-              {`#${tag.display} (${tag.subtreeCount})`}
-            </option>
-          ))}
-        </select>
+        />
         {filter.kind === "local" && (
           <button
             type="button"
@@ -720,43 +761,41 @@ export function GraphPane() {
                 gap: "var(--space-1)",
               }}
             >
-            {/* The picture and the list are two renderings of ONE model, so this
-                is a reading mode rather than a filter: it narrows nothing.
-                NOT the repo's `<Segmented>`, and the reason is a measured
-                defect rather than a preference: `Segmented` paints its
-                selection as an absolutely-positioned thumb sized from
-                `offsetWidth`, and inside a graph pane that mounts BEFORE its
-                tab is visible that measurement is 0. The selected label then
-                takes `--accent-on` (`#0b0b09` in the dark themes) with no thumb
-                behind it, so the ACTIVE half renders invisible, which is exactly
-                what it did. Painting the accent directly has no measurement in
-                it and cannot fail that way. */}
-            <div
-              role="group"
-              aria-label={t("notes.graph.viewToggleAriaLabel")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                border: "1px solid var(--line-1)",
-                borderRadius: "var(--radius-2)",
-                overflow: "hidden",
-              }}
-            >
-              <ViewHalf
-                testId="editor.graph-view-graph"
-                icon="share-2"
-                label={t("notes.graph.viewGraph")}
-                active={!asList}
-                onClick={() => setAsList(false)}
-              />
-              <ViewHalf
-                testId="editor.graph-view-list"
-                icon="list"
-                label={t("notes.graph.viewList")}
-                active={asList}
-                onClick={() => setAsList(true)}
-              />
-            </div>
+            {/* The picture and the list are two renderings of ONE model, so
+                this is a reading mode rather than a filter: it narrows nothing.
+
+                This used to be a hand-rolled fork of `<Segmented>` and is not
+                any more (myne-md/myne#773). The fork cited a measured defect —
+                `Segmented` sized its thumb from `offsetWidth`, which is 0 in a
+                graph pane that mounts before its tab is visible, so the active
+                half painted `--accent-on` over no thumb and rendered invisible
+                — and that defect was fixed at the primitive in
+                myne-md/myne#727, with a `ResizeObserver` that re-measures when
+                the box changes. The fork outlived its reason and became the
+                thing that looked off-system.
+
+                Its other, unstated reason was DENSITY: this cluster floats on
+                the picture and cannot take a settings-row control. That is now
+                `size="sm"` on the primitive, because a primitive nobody can
+                make dense is a primitive people keep re-implementing.
+
+                The testids are unchanged: `<Segmented>` derives
+                `${testId}-${value}`, so `editor.graph-view` + values
+                `graph`/`list` reproduce `editor.graph-view-graph` and
+                `editor.graph-view-list` exactly. The semantics DID change, for
+                the better: two mutually-exclusive reading modes are a
+                radiogroup (`role="radio"` + `aria-checked`), not two
+                independent toggles (`aria-pressed`). */}
+            <Segmented
+              testId="editor.graph-view"
+              ariaLabel={t("notes.graph.viewToggleAriaLabel")}
+              value={asList ? "list" : "graph"}
+              onChange={(v) => setAsList(v === "list")}
+              options={[
+                { value: "graph", label: t("notes.graph.viewGraph"), icon: "share-2" },
+                { value: "list", label: t("notes.graph.viewList"), icon: "list" },
+              ]}
+            />
             {/* ALWAYS rendered, and that is the fix for a dead end rather than a
             cosmetic choice. It used to appear only while the index was stale,
             so on a vault whose index had not changed there was NO way to re-run
@@ -769,7 +808,9 @@ export function GraphPane() {
             Icon-only since the cluster has to stay narrow enough to sit on the
             picture: the tooltip carries the word, and the glyph is the circular
             arrow that means "again". */}
-        <IconButton
+        <ClusterButton
+          bordered
+          tooltip
           testId="editor.graph-relayout"
           icon="refresh-cw"
           label={stale ? t("notes.graph.refreshTitle") : t("notes.graph.relayoutTitle")}
@@ -783,7 +824,9 @@ export function GraphPane() {
             floats over the canvas, that half is load-bearing, because a panel
             that took width from the canvas would resize it and re-run the
             layout. */}
-        <IconButton
+        <ClusterButton
+          bordered
+          tooltip
           testId="editor.graph-settings-gear"
           icon="settings"
           label={t("notes.graph.settings.openTitle")}
@@ -828,111 +871,3 @@ export function GraphPane() {
 /** The floating cluster's controls are ONE control vocabulary, so they are one
  *  style object: a chip, a switch half and an icon button differ only in what
  *  they act on, and a second copy of these properties is how they drift apart. */
-const CONTROL_BASE_STYLE = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-1)",
-  fontSize: 12,
-  padding: "3px 8px",
-  border: 0,
-  background: "transparent",
-  cursor: "pointer",
-  color: "var(--fg-3)",
-} as const;
-
-/**
- * One half of the picture-versus-list switch.
- *
- * The accent is painted DIRECTLY on the active half rather than as a sliding
- * thumb behind it, and that is a bug fix rather than a style choice: the repo's
- * `<Segmented>` sizes its thumb from `offsetWidth`, and a graph pane that mounts
- * before its tab is visible measures 0, so the selected label took
- * `--accent-on` with nothing behind it and the active half rendered invisible
- * (myne-md/myne#727). Nothing here is measured, so nothing here can fail that
- * way.
- */
-function ViewHalf({
-  testId,
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  testId: string;
-  icon: IconName;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-pressed={active}
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--space-1)",
-        fontSize: "var(--text-xs)",
-        padding: "5px var(--space-2)",
-        border: 0,
-        cursor: "pointer",
-        background: active ? "var(--accent)" : "transparent",
-        color: active ? "var(--accent-on)" : "var(--fg-2)",
-      }}
-    >
-      <Icon name={icon} size={12} />
-      {label}
-    </button>
-  );
-}
-
-/** An icon-only control in the cluster. The word lives in the tooltip and the
- *  accessible name, because the cluster has to stay narrow enough to float on
- *  the picture. */
-function IconButton({
-  testId,
-  icon,
-  label,
-  onClick,
-  active,
-  expanded,
-}: {
-  testId: string;
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  expanded?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-label={label}
-      title={label}
-      aria-expanded={expanded}
-      onClick={onClick}
-      aria-pressed={active}
-      style={{
-        ...CONTROL_BASE_STYLE,
-        width: 28,
-        height: 28,
-        padding: 0,
-        // Its OWN border, now that the group's surrounding box is gone: three
-        // separately-bounded controls read as three controls, where one box
-        // around them read as a single surface with buttons in it
-        // (myne-md/myne#727).
-        border: "1px solid var(--line-1)",
-        borderRadius: "var(--radius-2)",
-        background: active ? "var(--paper-3)" : "var(--bg-1)",
-        color: active ? "var(--fg-1)" : "var(--fg-2)",
-      }}
-    >
-      <Icon name={icon} size={14} />
-    </button>
-  );
-}
