@@ -28,7 +28,16 @@ const [ID_A, ID_B] = ribbonEligibleIds();
 async function renderWithRail(items: string[]) {
   prefsRead.mockResolvedValue({ ribbon_items: items, ribbon_visible: true });
   render(<RibbonCustomizeSettings />);
-  await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+  // Wait for the loaded roster, not merely for `prefsRead` to have been
+  // CALLED: the call happens during the mount effect, while the rows only
+  // exist after its promise resolves. Asserting the call alone queries the
+  // empty pre-load DOM and races the microtask flush, which passed locally
+  // and failed under CI load (myne-md/myne#465).
+  await waitFor(() =>
+    expect(
+      screen.queryAllByTestId("settings.ribbon-customize.row"),
+    ).toHaveLength(items.length),
+  );
   return screen.getAllByTestId("settings.ribbon-customize.row");
 }
 

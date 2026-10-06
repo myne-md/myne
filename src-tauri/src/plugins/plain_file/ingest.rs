@@ -31,7 +31,9 @@ use super::commands::SharedRegistry;
 use super::gate::{gate_path_in, read_gate};
 use super::handles::PlainFileError;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager, Runtime, Url};
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+use tauri::Url;
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Frontend event carrying an `OpenedFile` payload.
 pub const OPENED_EVENT: &str = "plain-file:opened";
@@ -57,6 +59,11 @@ pub fn ingest_args<R: Runtime>(app: &AppHandle<R>, args: Vec<String>) {
 }
 
 /// Ingest the first openable file from a URL list (macOS `RunEvent::Opened`).
+///
+/// Gated to the platforms that deliver `RunEvent::Opened`; on Linux the sole
+/// caller does not exist, so an ungated definition is dead code and fails
+/// clippy's `-D warnings` in CI.
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 pub fn ingest_urls<R: Runtime>(app: &AppHandle<R>, urls: Vec<Url>) {
     let paths: Vec<PathBuf> = urls
         .iter()

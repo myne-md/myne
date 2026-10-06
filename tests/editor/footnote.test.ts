@@ -14,6 +14,7 @@ import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Footnote } from "../../src/dialect/lezer/footnote";
 import { footnoteDecorations } from "../../src/editor/decorations/footnote";
+import { assertParsed } from "./_parse-budget";
 
 type Mounted = { view: EditorView; host: HTMLElement };
 
@@ -33,6 +34,12 @@ function mount(doc: string, selectionPos?: number): Mounted {
     parent: host,
   });
   view.requestMeasure();
+  // Force a COMPLETE parse before the test reads any decoration. A fresh
+  // view's tree is time-budgeted, so under a loaded CI machine it can stop
+  // short of a trailing `[^1]:` definition, which makes a resolved reference
+  // render as an orphan. `forceParsing` dispatches, so the decorations rebuild
+  // against the full tree.
+  assertParsed(view);
   return { view, host };
 }
 
