@@ -497,6 +497,11 @@ mod tests {
         // conversation does not resurrect on the new device
         // (`sync-protocol.md` enrollment seed).
         let pt_tombstoned: &[u8] = br#"{"0184a2b3c4d5e6f708192a3b4c5d6e7f":{"created_at":1725417600000,"title":"Help me with taxes","updated_at":1725417600000,"version":3},"2184a2b3c4d5e6f708192a3b4c5d6e7f0":{"created_at":1725417500000,"deleted_at":1725417800000,"title":"Old draft","updated_at":1725417800000,"version":5}}"#;
+        // A roster carrying the note anchor added by myne-md/myne#771. Pins the
+        // lexicographic position of `note_id`, which sorts between `deleted_at`
+        // and `title`; an implementation emitting sorted keys must match these
+        // bytes.
+        let pt_noteid: &[u8] = br#"{"0184a2b3c4d5e6f708192a3b4c5d6e7f":{"created_at":1725417600000,"note_id":"9f2ab3c4d5e6f708192a3b4c5d6e7f0","title":"Anchored to a note","updated_at":1725417600000,"version":1}}"#;
 
         let blob_empty =
             encode_chats_catalog_blob_raw(&catalog_key, &account_hash, pt_empty, &nonce)
@@ -507,12 +512,16 @@ mod tests {
         let blob_tombstoned =
             encode_chats_catalog_blob_raw(&catalog_key, &account_hash, pt_tombstoned, &nonce)
                 .expect("encode tombstoned");
+        let blob_noteid =
+            encode_chats_catalog_blob_raw(&catalog_key, &account_hash, pt_noteid, &nonce)
+                .expect("encode note-anchored");
 
         // Round-trip sanity on every sealed plaintext.
         for (blob, pt) in [
             (&blob_empty, pt_empty),
             (&blob_populated, pt_populated),
             (&blob_tombstoned, pt_tombstoned),
+            (&blob_noteid, pt_noteid),
         ] {
             let dec = decode_chats_catalog_blob(&catalog_key, &account_hash, blob)
                 .expect("decode round-trip");
@@ -575,7 +584,7 @@ mod tests {
         d.push_str("  \"schema\": \"chats-catalog\",\n");
         d.push_str("  \"protocol_version\": \"v0.1\",\n");
         d.push_str("  \"spec_section\": \"protocol.md §9.23 + §5.2 + §3.4\",\n");
-        d.push_str("  \"description\": \"Pins protocol::encode_chats_catalog_blob_raw + decode_chats_catalog_blob (MYM1) + aad_chats_catalog. Inner plaintext is the client layer's canonical roster JSON: object mapping conversation-id hex -> {created_at,deleted_at?,title,updated_at,version?} with id keys sorted and per-entry keys alphabetical (version 0 omitted, deleted_at tombstones only); empty roster = {}. KEK = DeriveSubkey(root,'chats-catalog-key'). Reference impl: protocol/src/chats_catalog_blob.rs.\",\n");
+        d.push_str("  \"description\": \"Pins protocol::encode_chats_catalog_blob_raw + decode_chats_catalog_blob (MYM1) + aad_chats_catalog. Inner plaintext is the client layer's canonical roster JSON: object mapping conversation-id hex -> {created_at,deleted_at?,note_id?,title,updated_at,version?} with id keys sorted and per-entry keys alphabetical (version 0 omitted, deleted_at tombstones only, note_id on note-anchored rows only); empty roster = {}. KEK = DeriveSubkey(root,'chats-catalog-key'). Reference impl: protocol/src/chats_catalog_blob.rs.\",\n");
         d.push_str("  \"cases\": [\n");
         let mut first = true;
         let mut case = |id: &str, desc: &str, kind: &str, body: &str| {
@@ -634,6 +643,21 @@ mod tests {
                 hex(&nonce),
                 hex(catalog_key.as_slice()),
                 hex(&blob_tombstoned),
+            ),
+        );
+        // encrypt note-anchored (myne-md/myne#771)
+        case(
+            "chats-catalog/v0.1/encrypt-note-anchored",
+            "One conversation carrying note_id (myne-md/myne#771); pins its lexicographic position between deleted_at and title (created_at<note_id<title<updated_at<version).",
+            "encrypt",
+            &alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n      \"input_catalog_nonce_hex\": \"{}\",\n      \"informational_catalog_key_hex\": \"{}\",\n      \"expected_catalog_blob_hex\": \"{}\"\n",
+                hex(&root_key),
+                hex(&account_hash),
+                hex(pt_noteid),
+                hex(&nonce),
+                hex(catalog_key.as_slice()),
+                hex(&blob_noteid),
             ),
         );
         // decrypt_ok
