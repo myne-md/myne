@@ -182,6 +182,12 @@ export function mountMeetingBar(opts: MeetingBarOptions): MeetingBarHandle {
     setLevel(level: number): void {
       const clamped = Math.min(1, Math.max(0, level));
       if (clamped > maxLevel) maxLevel = clamped;
+      // The warning means "no input has been seen". Real input makes that
+      // false, so the first above-floor level clears it. Without this it
+      // latched: a quiet start (or the tap's aggregate-device build delaying
+      // the first level past the grace window) kept "No audio detected" on a
+      // session whose microphone was working the whole time.
+      if (clamped >= SILENCE_LEVEL) micWarning.hidden = true;
       levels.shift();
       levels.push(clamped);
       for (let i = 0; i < bars.length; i++) {

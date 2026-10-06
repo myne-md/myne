@@ -71,6 +71,26 @@ describe("mountMeetingBar", () => {
     bar.teardown();
   });
 
+  it("clears the microphone warning once the meter sees real input", () => {
+    vi.useFakeTimers();
+    try {
+      const bar = mountMeetingBar({ onStop: () => {}, onCancel: () => {} });
+      const warning = tid("meeting.mic-warning") as HTMLElement;
+      // A quiet start past the grace window raises the warning...
+      vi.advanceTimersByTime(3000);
+      expect(warning.hidden).toBe(false);
+      // ...and the first above-floor level clears it, because the microphone
+      // is demonstrably working. Without the clear the warning latched for the
+      // rest of the session (the tap's aggregate-device build can start the
+      // level stream after the grace window elapses).
+      bar.setLevel(0.5);
+      expect(warning.hidden).toBe(true);
+      bar.teardown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows the system-audio warning only when told to", () => {
     const bar = mountMeetingBar({ onStop: () => {}, onCancel: () => {} });
     const warning = tid("meeting.tap-warning") as HTMLElement;
