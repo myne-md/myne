@@ -43,6 +43,13 @@ export const KNOWN_ORIGINS = VENDORED_ORIGINS;
 // forms so `zoom` cannot match `zoo`.
 export const WORDLIST_MARKERS = ["abandon", "walnut", "zebra", "cactus", "zoo"];
 
+// A SPACE-JOINED list is one string (`"abandon ability able about …"`), so it
+// carries the markers but not their QUOTED forms and the per-word check above
+// misses it. The list's opening three words, in order, are the tell; matching
+// them across whitespace and separators catches a joined list, a JSON array
+// flattened to one line, and a newline-broken dump alike.
+export const WORDLIST_SEQUENCE = /\babandon\b[\s,"'`]+ability\b[\s,"'`]+able\b/;
+
 // ── account-number shapes ────────────────────────────────────────────────────
 //
 // A `MY-XXXX-XXXX-XXXX-XXXX-XXXX` shaped string. This list requires REVIEW, not
@@ -94,6 +101,7 @@ export function classifyText(text) {
       wordlist.push(marker);
     }
   }
+  if (WORDLIST_SEQUENCE.test(text)) wordlist.push("abandon ability able (joined list)");
 
   const accounts = new Set();
   for (const m of text.matchAll(new RegExp(ACCOUNT_SHAPE.source, "g"))) accounts.add(m[0]);
