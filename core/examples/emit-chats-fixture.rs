@@ -122,6 +122,7 @@ fn main() {
                 title: CONV_TITLE.to_string(),
                 updated_at: CREATED_AT,
                 version: 1,
+                note_id: None,
             },
         );
         let roster_bytes = serde_json::to_vec(&roster).expect("roster serializes");

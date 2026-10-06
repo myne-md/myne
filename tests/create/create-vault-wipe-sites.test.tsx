@@ -57,6 +57,7 @@ import { mapAppErrorToUserMessage } from "../../src/lib/vault-creation-errors";
 const PASSWORD = "Tk9#mQ4!wX7&zR2p-cmp";
 const PHRASE = Array.from({ length: 24 }, (_, i) => `word${i + 1}`);
 const TOKEN = "11111111-2222-4333-8444-555555555555";
+const VAULT_NAME = "Research";
 const NEW_VAULT_ID = "00000000-0000-7000-8000-0000000000aa";
 
 function beginResult() {
@@ -93,7 +94,22 @@ function renderCreateVault(overrides?: {
   );
 }
 
+/**
+ * Step over the vault-name step, which is the flow's first screen since
+ * myne-md/myne#468. A name is typed rather than skipped: the value rides in
+ * reducer state all the way to the auto-unlock, so a test that left it empty
+ * would exercise the one branch where nothing is applied.
+ */
+async function submitName(): Promise<void> {
+  fireEvent.change(await screen.findByTestId("create.name-input"), {
+    target: { value: VAULT_NAME },
+  });
+  fireEvent.click(screen.getByTestId("create.name-continue"));
+  await screen.findByTestId("create.password-input");
+}
+
 async function submitPassword(): Promise<void> {
+  await submitName();
   fireEvent.change(screen.getByTestId("create.password-input"), {
     target: { value: PASSWORD },
   });
@@ -105,7 +121,7 @@ async function submitPassword(): Promise<void> {
   fireEvent.click(submit);
 }
 
-/** Drive begin → phrase → confirm → account → ReadyStep. */
+/** Drive begin → recovery kit → confirm (which commits) → ReadyStep. */
 async function driveToReady(): Promise<void> {
   await submitPassword();
   await screen.findByTestId("create.phrase-grid");
@@ -117,13 +133,13 @@ async function driveToReady(): Promise<void> {
     const pos = Number(cell.getAttribute("data-index"));
     fireEvent.change(cell, { target: { value: PHRASE[pos - 1] } });
   }
+  // The challenge's Continue IS the commit now: the account number moved into
+  // the kit step and its acknowledgement checkbox was deleted rather than moved,
+  // because `protocol.md` §7.1.3 says a checkbox is not evidence and the
+  // type-back this button is gated on already is.
   const cont = screen.getByTestId("create.confirm-continue") as HTMLButtonElement;
   await waitFor(() => expect(cont.disabled).toBe(false));
   fireEvent.click(cont);
-  fireEvent.click(await screen.findByTestId("create.account-ack"));
-  const commit = screen.getByTestId("create.account-commit") as HTMLButtonElement;
-  await waitFor(() => expect(commit.disabled).toBe(false));
-  fireEvent.click(commit);
   await screen.findByTestId("create.ready-done");
 }
 

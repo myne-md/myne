@@ -28,6 +28,7 @@ import { RootErrorBoundary } from "../../src/components/RootErrorBoundary";
 // sheet this client also compiles, because both that sheet and the ornament one
 // read the values it supplies.
 import "@myne/client-core/tokens.css";
+import "@myne/client-core/components.css";
 import "../../src/styles/tokens.css";
 // The ornament layer (myne#394). The web client shares `src/lib/theme.ts`, so it
 // already reflects every `data-o-*` selection onto the root — without this import

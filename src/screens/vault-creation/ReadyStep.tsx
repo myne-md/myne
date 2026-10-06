@@ -47,8 +47,19 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
   const { t } = useTranslation();
   return (
     <StepLayout align="center">
-      <div style={{ color: "var(--success)" }}>
-        <Icon name="circle-check" size={36} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 56,
+          height: 56,
+          borderRadius: "var(--radius-pill)",
+          color: "var(--success)",
+          background: "color-mix(in srgb, var(--success) 14%, transparent)",
+        }}
+      >
+        <Icon name="check" size={28} />
       </div>
 
       <StepHeading centered>{t("vaultCreation.ready.heading")}</StepHeading>
@@ -59,22 +70,34 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           lineHeight: 1.6,
           color: "var(--fg-2)",
           textAlign: "center",
-          maxWidth: 360,
+          maxWidth: 380,
         }}
       >
         {t("vaultCreation.ready.body")}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+      {/* One way forward, and it is the obvious one. The two local artefacts
+          (a backup file, the folder on disk) are real but optional, so they sit
+          under it as quiet actions rather than beside it as equals. */}
+      <Button
+        variant="primary"
+        onClick={onDone}
+        disabled={pending}
+        data-testid="create.ready-done"
+        style={{ minWidth: 220, justifyContent: "center", marginTop: "var(--space-2)" }}
+      >
+        {pending ? t("vaultCreation.ready.decrypting") : t("vaultCreation.ready.done")}
+      </Button>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "var(--space-1)",
+        }}
+      >
         <ReadyLocalArtefacts pending={pending} vaultId={vaultId} />
-        <Button
-          variant="primary"
-          onClick={onDone}
-          disabled={pending}
-          data-testid="create.ready-done"
-        >
-          {pending ? t("vaultCreation.ready.decrypting") : t("vaultCreation.ready.done")}
-        </Button>
       </div>
     </StepLayout>
   );

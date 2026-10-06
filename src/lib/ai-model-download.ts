@@ -1,5 +1,5 @@
 // Download / cancel bindings for the on-demand AI model artefacts
-// (myne-md/myne#805, `decisions/ai/0627`).
+// (myne-md/myne#805, `decisions/ai/0628`).
 //
 // The desktop command streams an artefact from `downloads.myne.md`, verifies
 // every file against a SHA-256 compiled into the client binary, and only then

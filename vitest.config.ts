@@ -50,6 +50,21 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     environment: "node",
     globals: false,
+    // The story catalogue's render checks live under `tests/stories/` and are
+    // owned by `vitest.stories.config.ts` (myne-md/myne#832): they need the
+    // fake-IPC story host installed before any app module body runs and a jsdom
+    // environment, neither of which belongs in this suite's setup. Excluded
+    // here explicitly rather than left to fall through `include` above, so the
+    // two lanes cannot both claim the same specs. The defaults are restated
+    // because setting `exclude` replaces them.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/cypress/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
+      "tests/stories/**",
+    ],
     // Initialise the shared i18n instance so components calling
     // `useTranslation()` render with real source strings (see the file).
     setupFiles: [

@@ -117,6 +117,13 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
       // when slot is already Unlocked. Fail-closed surfaces the
       // regression.
       return { kind: "fail-closed", reason: "invalid-state" };
+    case "SlotNotUnlocked":
+      // The drill's variant (myne-md/myne#468), which is the exact OPPOSITE
+      // precondition to this screen's: the drill needs an open vault, phrase
+      // recovery needs a closed one. Unreachable here, and mapped rather than
+      // ignored because the exhaustiveness check is what keeps that claim
+      // honest. Same bug-canary treatment as the line above it.
+      return { kind: "fail-closed", reason: "invalid-state" };
     case "RecoveryAlreadyInProgress":
       // Q4 silent recovery: slot is actually Recovering already; jump
       // to password-reset.

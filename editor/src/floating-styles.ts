@@ -517,6 +517,39 @@ const CSS = `
   color: var(--fg-3);
   font-size: 0.929em;
 }
+/* The type glyphs are a different SHAPE from the old uniform triple-bar, so
+   they need their own optical sizing rather than inheriting one tuned for it.
+   The date and checkbox marks in particular sit low and read small at the key
+   font size (myne-md/myne#777). */
+.cm-fm-properties-icon[data-property-type="date"],
+.cm-fm-properties-icon[data-property-type="checkbox"] {
+  font-size: 1.05em;
+}
+.cm-fm-properties-icon[data-property-type="number"] {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+
+/* A date or number input is a NATIVE control, and the browser draws its own
+   chrome inside: a calendar button, a spinner. They inherit the row's
+   transparent background and hover, but their indicator is a foreground colour
+   the theme has to supply or it stays the UA default black on a dark panel. */
+.cm-fm-properties-value[data-property-type="date"],
+.cm-fm-properties-value[data-property-type="number"] {
+  color-scheme: light dark;
+}
+.cm-fm-properties-value[data-property-type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The checkbox row: a real control rather than the word true in a text box. */
+.cm-fm-properties-checkbox {
+  justify-self: start;
+  margin: 0 6px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .cm-fm-properties-key {
   width: 100%;
   min-width: 0;

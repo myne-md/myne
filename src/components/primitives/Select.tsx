@@ -8,6 +8,13 @@
 // approach as the attachments ⋮ menu + UsedInNotesPopover — so it escapes the
 // top bar's wrap container and the surface scroll clipping.
 //
+// Appearance lives in `@myne/client-core`'s `components.css` under
+// `.myne-select-*` (myne-md/myne#773), shared with `SearchableSelect` — the two
+// had independent copies of the same trigger, menu box and option row, which is
+// how they drifted into different hover behaviour for the same visual control.
+// What stays here is the part a stylesheet cannot do: the portal's measured
+// anchor rect, and the active-descendant index the arrow keys move.
+//
 // Keyboard: open on Enter / Space / ↓; ↑/↓ move the active option; Enter
 // selects; Esc closes. Closes on outside-click, on an ANCESTOR/window scroll,
 // and on resize (a fixed menu would desync from the trigger) — but never on the
@@ -23,6 +30,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { placeMenu, type MenuPlacement } from "./menuPlacement";
 import { Icon } from "./Icon";
 
 export interface SelectOption<T extends string> {
@@ -68,56 +76,6 @@ interface SelectProps<T extends string> {
   testId?: string;
 }
 
-const TRIGGER_STYLE: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-1)",
-  height: 30,
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "0 var(--space-2)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  transition: "border-color var(--duration-fast) var(--ease-standard)",
-};
-
-const MENU_STYLE: CSSProperties = {
-  position: "fixed",
-  // Above modal surfaces (ModalShell / SettingsModal use z-index 1000): a Select
-  // opened INSIDE the Settings modal must render its menu over the modal, not
-  // behind it — at z-index 60 the options were covered by the modal backdrop and
-  // could not be clicked (the menu is a body-level fixed portal).
-  zIndex: 1100,
-  minWidth: 160,
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
-  padding: "var(--space-1) 0",
-  maxHeight: 280,
-  overflowY: "auto",
-};
-
-const OPTION_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  width: "100%",
-  textAlign: "start",
-  padding: "var(--space-2) var(--space-3)",
-  background: "transparent",
-  border: 0,
-  cursor: "pointer",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-  whiteSpace: "nowrap",
-};
-
 export function Select<T extends string>({
   value,
   options,
@@ -131,11 +89,9 @@ export function Select<T extends string>({
   const [activeIndex, setActiveIndex] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{
-    top: number;
-    left: number;
-    minWidth: number;
-  } | null>(null);
+  const [coords, setCoords] = useState<
+    (MenuPlacement & { left: number; minWidth: number }) | null
+  >(null);
 
   const selectedIndex = options.findIndex((o) => o.value === value);
   const current = selectedIndex >= 0 ? options[selectedIndex] : options[0];
@@ -169,7 +125,12 @@ export function Select<T extends string>({
     [options, onChange],
   );
 
-  // Anchor the menu below the trigger, left-aligned, at least as wide as it.
+  // Anchor the menu to the trigger, left-aligned, at least as wide as it —
+  // and on whichever side there is room for it. `placeMenu` owns the vertical
+  // half: this control sits near the bottom of the window often enough
+  // (the AI composer's two dropdowns are a few pixels above the status bar)
+  // that "always downward" put most of the menu past the fold, with no scroll
+  // to reach it because a fixed portal does not extend the page.
   useLayoutEffect(() => {
     if (!open) return;
     const el = triggerRef.current;
@@ -177,7 +138,14 @@ export function Select<T extends string>({
     const r = el.getBoundingClientRect();
     const minWidth = Math.max(160, r.width);
     const left = Math.min(r.left, window.innerWidth - minWidth - 8);
-    setCoords({ top: r.bottom + 4, left: Math.max(8, left), minWidth });
+    setCoords({
+      // 280 is this variant's `max-height` in `components.css`. Passed rather
+      // than read: an inline `max-height` overrides the sheet, so the number
+      // has to be known here or the menu grows to whatever room exists.
+      ...placeMenu(r, window.innerHeight, { cap: 280 }),
+      left: Math.max(8, left),
+      minWidth,
+    });
   }, [open]);
 
   // Outside-click / Esc handled at the trigger; scroll/resize close the menu
@@ -269,25 +237,17 @@ export function Select<T extends string>({
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         data-testid={testId}
+        className="myne-select-trigger"
         // The SELECTED value, on the trigger, so a test can read the current
         // choice without opening the menu and without depending on the label's
         // locale. `Segmented` published this on the active segment; a row that
         // converts here needs somewhere to keep asserting from (#769).
         data-value={current?.value}
-        style={{ ...TRIGGER_STYLE, ...style }}
+        style={style}
         onClick={(e) => {
           e.stopPropagation();
           if (open) close();
           else openMenu();
-        }}
-        // Hover affordance for the bordered trigger: deepen the border so the
-        // dropdown reads as interactive on pointer-over (an input-like control
-        // shows its hover on the border, not a fill).
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = "var(--line-3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = "var(--line-2)";
         }}
         onKeyDown={onTriggerKeyDown}
       >
@@ -301,9 +261,20 @@ export function Select<T extends string>({
             ref={menuRef}
             role="listbox"
             aria-label={ariaLabel}
+            className="myne-select-menu"
+            // Which way it opened, for a scenario and for anyone reading the
+            // DOM: the coordinates alone do not say, since `top` and `bottom`
+            // are both plausible numbers.
+            data-side={coords.side}
+            // The measured values, and only those: the menu is a fixed portal
+            // anchored to the trigger's rect, which no stylesheet knows. The
+            // height is measured too — the stylesheet's `max-height` is the
+            // cap, and the room on the chosen side is the value, or flipping
+            // would only move the overflow to the other edge.
             style={{
-              ...MENU_STYLE,
-              top: coords.top,
+              ...(coords.top === undefined ? {} : { top: coords.top }),
+              ...(coords.bottom === undefined ? {} : { bottom: coords.bottom }),
+              maxHeight: coords.maxHeight,
               left: coords.left,
               minWidth: coords.minWidth,
             }}
@@ -319,27 +290,23 @@ export function Select<T extends string>({
                   aria-selected={selected}
                   data-testid={testId ? `${testId}-option` : undefined}
                   data-value={opt.value}
-                  style={{
-                    ...OPTION_STYLE,
-                    background: active ? "var(--bg-3)" : "transparent",
-                  }}
+                  className="myne-select-option"
+                  // The ACTIVE DESCENDANT, not a hover: arrow keys move it, and
+                  // the pointer syncs it below so the keyboard and the mouse
+                  // share one highlight rather than lighting two rows. NOT
+                  // `data-active`, which is the app-wide E2E contract for "the
+                  // selected one".
+                  data-highlighted={active ? "true" : "false"}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={(e) => {
                     e.stopPropagation();
                     choose(index);
                   }}
                 >
-                  <span
-                    style={{
-                      width: 16,
-                      display: "inline-flex",
-                      flexShrink: 0,
-                      color: "var(--accent)",
-                    }}
-                  >
+                  <span className="myne-select-option__check">
                     {selected && <Icon name="check" size={14} />}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>{opt.label}</span>
+                  <span className="myne-select-option__label">{opt.label}</span>
                 </button>
               );
             })}

@@ -126,26 +126,64 @@ const CSS = `
 }
 
 /* Click-to-preview lightbox (dogfooding fix #3). Centered, size-capped image
-   shown directly on a dimmed backdrop — no white frame/padding/box. Mounts to
+   shown directly on an OPAQUE backdrop — no white frame/padding/box. Mounts to
    document.body so it escapes the CM theme scope. Esc / backdrop-click / the
    top-right × button close it (wired in lightbox.ts). */
 .cm-attach-lightbox-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  /* Fully opaque, not a 72% scrim. A scrim leaves the app legible underneath,
+     so a screenshot — which is most of what gets previewed — was read against
+     a tab strip and a sidebar showing through it, and the eye kept resolving
+     the wrong layer. A preview is a surface you look AT, and the thing behind
+     it is not context, it is noise. */
+  /* A literal, and NOT var(--scrim): that token is the translucent modal
+     scrim by definition, and it is theme-tinted (rgba(11, 11, 9, .4) in the
+     light theme). A picture mat must not tint the picture — a warm-grey wash
+     over a screenshot shifts every colour in it — and it must be the same
+     black in every theme, so this is one of the few values that is correctly
+     not a token. Recorded in scripts/token-adoption.json for that reason. */
+  background: var(--mat-black);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-5, 24px);
   z-index: 1300;
   cursor: zoom-out;
-  /* The image (image mode) is absolutely positioned + transformed; clip it to
-     the viewport so a zoomed image never overflows the page (MYND-594). */
+  overflow: hidden;
+}
+/* The image's frame, and the reason the padding above was never doing anything.
+
+   The image is position: absolute, so its containing block is the backdrop's
+   PADDING box — and mountZoom fits it to stage.clientWidth/clientHeight,
+   which INCLUDES padding. Both measurements therefore ignored the gutter, and
+   a landscape screenshot fitted edge to edge: under the × and Export buttons
+   at the top (top: max(56px, …), 32px tall) and under the zoom bar at the
+   bottom. The chrome sat on the picture instead of around it.
+
+   So the stage is its own element and the gutter is its INSET rather than
+   anyone's padding: clientHeight then measures the box we actually want the
+   image inside, and the fit falls out of it. The top and bottom are unequal on
+   purpose — they clear different chrome. */
+.cm-attach-lightbox-stage {
+  position: absolute;
+  /* Clears the × / Export row (top: 56px + 32px tall) with room to breathe. */
+  top: 96px;
+  /* Clears the zoom bar (bottom: 20px, ~42px tall). */
+  bottom: 72px;
+  left: 0;
+  right: 0;
+  /* The max width. margin-inline: auto centres an absolutely positioned box
+     whose left and right are both 0 and whose width is definite. */
+  width: min(calc(100% - 2 * var(--space-5, 24px)), 1600px);
+  margin-inline: auto;
+  /* The image is transform-driven; clip a zoomed one to the frame rather than
+     to the viewport, so it stays inside the picture area (MYND-594). */
   overflow: hidden;
 }
 .cm-attach-lightbox-img {
-  /* The image sits directly on the dimmed backdrop — no white frame, padding,
-     or background box. Absolutely positioned + transform-driven so it can be
+  /* The image sits directly on the backdrop — no white frame, padding, or
+     background box. Absolutely positioned + transform-driven so it can be
      zoomed/panned (MYND-594); the controller sets translate/scale + cursor. */
   position: absolute;
   top: 0;
@@ -466,19 +504,23 @@ const CSS = `
   color: var(--fg-1, #1a1a17);
   z-index: 1250;
 }
+/* A STATIC red dot. It used to pulse (cm-voice-rec-pulse, 1.2s ease-in-out
+   infinite), which PRODUCT.md principle 4 forbids in both motion tiers and
+   which scripts/check-motion-canon.mjs now fails on
+   (docs/decisions/ui/0632).
+
+   Removing it costs nothing, and that is the point: the recording bar already
+   carries .cm-voice-rec-time, a monospace elapsed timer ticking once a
+   second. That timer is the liveness signal, it is INFORMATION rather than
+   decoration, and it is the "state is communicated by typography" clause
+   working exactly as written. The dot says "recording"; the number says "and
+   still going". A second, wordless restatement of the first in fading opacity
+   was never adding a third thing. */
 .cm-voice-rec-dot {
   width: 10px;
   height: 10px;
   border-radius: var(--radius-pill);
   background-color: var(--danger, #b3261e);
-  animation: cm-voice-rec-pulse 1.2s ease-in-out infinite;
-}
-@keyframes cm-voice-rec-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cm-voice-rec-dot { animation: none; }
 }
 .cm-voice-rec-time {
   font-family: var(--font-mono);
@@ -492,14 +534,25 @@ const CSS = `
   gap: 2px;
   height: 18px;
 }
-/* Each bar's height is set live in JS (a rolling waveform of recent input),
-   so the meter reads as voice waves, not a left-to-right fill. */
+/* Each bar's level is set live in JS (a rolling waveform of recent input), so
+   the meter reads as voice waves rather than a left-to-right fill.
+
+   It is driven by transform: scaleY() rather than by height
+   (myne-md/myne#773). The two are geometrically IDENTICAL here — the meter is
+   align-items: center, so a full-height box scaled from its centre occupies
+   exactly the band a centred short box did — but they cost very differently:
+   setLevel runs at audio rate over every bar in the meter, and a height
+   change lays out and paints the whole row on each one, where a transform is
+   composited. This is the single hottest animation in the editor and it was the
+   only one animating a layout property. */
 .cm-voice-rec-bar {
   width: 3px;
-  height: 12%;
+  height: 100%;
+  transform-origin: center;
+  transform: scaleY(0.12);
   border-radius: var(--radius-pill);
   background-color: var(--accent, #2c4a7a);
-  transition: height 90ms ease-out;
+  transition: transform 90ms var(--ease-out);
 }
 .cm-voice-rec-warning {
   font-size: 12px;
@@ -535,15 +588,27 @@ const CSS = `
 /* Transcription busy meter (voice-to-text MYND-552). The @keyframes lives here
    in the global sheet (the CM theme's StyleModule doesn't emit @keyframes); the
    bar's static box + colour come from the scoped theme. */
+/* This one STAYS looping, and the distinction from the dot above is the whole
+   of docs/decisions/ui/0632: a transcription busy meter reports that work is
+   in flight, which is information the user asked for, so it is an indeterminate
+   progress indicator rather than decoration.
+
+   Two things about it did change. It animated height, which lays out and
+   paints on every frame; transform: scaleY() is the compositor-only
+   equivalent and transform-origin: bottom keeps it growing from the baseline
+   the way the height version did. And its reduced-motion arm stopped it dead,
+   which is the failure MYND-630 records for the spinner — a frozen progress
+   indicator reads as hung, not as calm, at the one moment the user most needs
+   to know the app is alive. It now takes the same data-motion="essential"
+   opt-in, which the global rule in each client's shell sheet slows to half
+   speed rather than freezing. */
 @keyframes cm-attachment-transcript-pulse {
-  0%, 100% { height: 30%; opacity: 0.4; }
-  50% { height: 100%; opacity: 1; }
+  0%, 100% { transform: scaleY(0.3); opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 1; }
 }
 .cm-attachment-audio-transcript-bar {
+  transform-origin: bottom;
   animation: cm-attachment-transcript-pulse 1s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .cm-attachment-audio-transcript-bar { animation: none; }
 }
 `;
 

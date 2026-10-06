@@ -49,6 +49,8 @@ import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { Button } from "../../components/primitives/Button";
+import { Input } from "../../components/primitives/Input";
+import { IconButton } from "../../components/primitives/IconButton";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
 import { truncateMiddle } from "./truncateMiddle";
@@ -88,7 +90,7 @@ interface ObsidianImportModalProps {
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0, 0, 0, 0.4)",
+  background: "var(--scrim)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -499,23 +501,13 @@ export function ObsidianImportModal({
             {title}
           </h2>
           {dismissable && (
-            <button
-              type="button"
-              aria-label={t("notes.import.modal.closeAriaLabel")}
+            <IconButton
+              icon="x"
+              label={t("notes.import.modal.closeAriaLabel")}
+              tooltip
+              testId="import.close"
               onClick={handleClose}
-              data-testid="import.close"
-              style={{
-                background: "none",
-                border: 0,
-                color: "var(--fg-3)",
-                cursor: "pointer",
-                padding: 6,
-                display: "inline-flex",
-                borderRadius: "var(--radius-1)",
-              }}
-            >
-              <Icon name="x" size={16} />
-            </button>
+            />
           )}
         </div>
 
@@ -630,24 +622,21 @@ function SetupBody({
             {t(spec.labelKey)}
           </span>
           {onBack !== undefined && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={onBack}
               data-testid="import.change-source"
               style={{
                 marginInlineStart: "auto",
-                background: "none",
-                border: 0,
                 padding: 0,
+                height: "auto",
                 color: "var(--fg-3)",
-                fontFamily: "var(--font-sans)",
                 fontSize: "var(--text-xs)",
-                cursor: "pointer",
                 textDecoration: "underline",
               }}
             >
               {t("notes.import.modal.changeSource")}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -778,8 +767,8 @@ function RadioRow({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       role="radio"
       aria-checked={checked}
       onClick={onSelect}
@@ -792,7 +781,6 @@ function RadioRow({
         border: `1px solid ${checked ? "var(--accent)" : "var(--line-1)"}`,
         borderRadius: "var(--radius-2)",
         padding: "var(--space-3)",
-        cursor: "pointer",
         fontFamily: "var(--font-sans)",
       }}
     >
@@ -827,7 +815,7 @@ function RadioRow({
         </span>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{hint}</span>
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -1444,7 +1432,7 @@ function AttentionRow({
         </div>
       ) : (
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
-          <input
+          <Input
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
@@ -1460,7 +1448,6 @@ function AttentionRow({
               color: "var(--fg-1)",
               border: "1px solid var(--line-2)",
               borderRadius: "var(--radius-1)",
-              outline: "none",
             }}
           />
           <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>

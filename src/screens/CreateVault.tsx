@@ -10,8 +10,8 @@
 //     (Argon2id × 2 inside spawn_blocking on the Rust side).
 //   - Q7 error routing: AppError → mapAppErrorToUserMessage → BEGIN_ERR
 //     (inline banner) or SESSION_LOST (dedicated screen).
-//   - Q8.2 onCloseRequested prompt for sensitive steps (phrase / confirm /
-//     account); membership decided via isSensitiveStep() in reducer.ts.
+//   - Q8.2 onCloseRequested prompt for sensitive steps (kit / confirm);
+//     membership decided via isSensitiveStep() in reducer.ts.
 //   - Q8.3 useRef + empty-deps cleanup pattern (cancel(token) only on
 //     real unmount; React 18 StrictMode dev double-invoke is a no-op
 //     because the ref only carries a token after BEGIN_OK).
@@ -36,17 +36,18 @@ import {
   type Step,
 } from "./vault-creation";
 import { BriefingStep } from "./vault-creation/BriefingStep";
+import { NameStep } from "./vault-creation/NameStep";
 import { PasswordStep } from "./vault-creation/PasswordStep";
 import { EncryptingStep } from "./vault-creation/EncryptingStep";
-import { PhraseStep } from "./vault-creation/PhraseStep";
+import { KitStep } from "./vault-creation/KitStep";
 import { ConfirmStep } from "./vault-creation/ConfirmStep";
-import { AccountStep } from "./vault-creation/AccountStep";
 import { ReadyStep } from "./vault-creation/ReadyStep";
 import { SessionLostStep } from "./vault-creation/SessionLostStep";
 import { ProvisioningStep } from "./vault-creation/ProvisioningStep";
 import { mapAppErrorToUserMessage } from "../lib/vault-creation-errors";
 import { isAppError, logErrorKind } from "../lib/vault-creation-logging";
 import { seedExampleVault } from "../notes/exampleVault";
+import { setVaultLabel } from "../lib/prefs";
 import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
@@ -122,10 +123,15 @@ export function CreateVault({
     makeInitialState,
   );
   const [autoUnlocking, setAutoUnlocking] = useState(false);
-  // The shared invite code for a gated sync server (myne-md/myne#800). Empty for
-  // an open server. Kept out of the reducer's secret material: it is an
-  // operator-supplied door word, not a vault secret.
-  const [inviteCode, setInviteCode] = useState("");
+  // The shared invite code for a gated sync server (myne-md/myne#800).
+  //
+  // The field that collected it lived on the account step, which this branch
+  // folded into `KitStep`. The provisioning leg runs immediately after `begin`
+  // (before `kit`), so a field on any later step could never reach
+  // `sync_set_endpoint`; the code is entered on the sync-connection surface
+  // instead (`IdentitySetupDialog` → `EndpointConfig`). Kept as an empty
+  // literal rather than deleted so the provisioning call below keeps its shape.
+  const inviteCode = "";
 
   const sessionTokenRef = useRef<string | null>(null);
   // The id of the vault `commit` just wrote to (`vaults/<id>/`), captured from
@@ -153,6 +159,7 @@ export function CreateVault({
       "across", "act", "action", "actor", "actress", "actual",
     ];
     const MOCK_ACCOUNT = "MY-4K7P-N3RM-9QXC-VBHT-2";
+    const MOCK_VAULT_NAME = "Personal";
     const MOCK_TOKEN = "test-session-token-uuid";
     const MOCK_SESSION_LOST = {
       title: "Session expired",
@@ -170,37 +177,32 @@ export function CreateVault({
     // The first-run briefing is the initial step when `withBriefing` (the
     // welcome entry); capturing it needs no dispatch. Every other target
     // sits past the briefing gate, so step over it first (idempotent from
-    // `password` when there is no briefing). `password` itself needs no
-    // further dispatch — the ladder below matches nothing and the effect
-    // ends on the password step.
+    // `name` when there is no briefing). `name` itself needs no further
+    // dispatch — the ladder below matches nothing and the effect ends there.
     if (target === "briefing") return;
     dispatch({ type: "BRIEFING_ACKED" });
+    if (target === "name") return;
+    // Every target past the name step walks through it, with a name, so the
+    // captured kit screen shows the header a real run would show.
+    dispatch({ type: "NAME_CHANGED", value: MOCK_VAULT_NAME });
+    dispatch({ type: "NAME_SUBMITTED" });
     if (target === "encrypting") {
       dispatch({ type: "BEGIN_REQUESTED" });
-    } else if (target === "phrase") {
+    } else if (target === "kit") {
       beginOk();
     } else if (target === "confirm") {
       beginOk();
       dispatch({ type: "PHRASE_REVEALED" });
       dispatch({ type: "PHRASE_ACKED" });
-    } else if (target === "account") {
-      beginOk();
-      dispatch({ type: "PHRASE_REVEALED" });
-      dispatch({ type: "PHRASE_ACKED" });
-      dispatch({ type: "PHRASE_CONFIRMED" });
     } else if (target === "committing") {
       beginOk();
       dispatch({ type: "PHRASE_REVEALED" });
       dispatch({ type: "PHRASE_ACKED" });
-      dispatch({ type: "PHRASE_CONFIRMED" });
-      dispatch({ type: "ACCOUNT_ACK_TOGGLED", checked: true });
       dispatch({ type: "COMMIT_REQUESTED" });
     } else if (target === "ready") {
       beginOk();
       dispatch({ type: "PHRASE_REVEALED" });
       dispatch({ type: "PHRASE_ACKED" });
-      dispatch({ type: "PHRASE_CONFIRMED" });
-      dispatch({ type: "ACCOUNT_ACK_TOGGLED", checked: true });
       dispatch({ type: "COMMIT_REQUESTED" });
       dispatch({ type: "COMMIT_OK" });
     } else if (target === "session-lost") {
@@ -284,6 +286,30 @@ export function CreateVault({
     dispatch({ type: "BEGIN_REQUESTED" });
   };
 
+  /**
+   * Apply the name from the `name` step as the new vault's label.
+   *
+   * It has to happen HERE, after the chained `vault_unlock`, and not at commit
+   * time: `prefs|vault_set_label` writes into `vault.prefs` under the active
+   * vault's `prefs_key`, so it is unlock-gated and there is no unlocked slot
+   * until the line above it resolves. Empty means the user left the step blank,
+   * which is allowed — the picker's neutral fallback is the right answer then,
+   * and writing `null` would be indistinguishable from it while costing a write.
+   *
+   * Best-effort, like `seedExampleVault` beside it and for the same reason: the
+   * vault exists and is open, so a failed rename must not bounce a successfully
+   * unlocked user back to the manual-unlock fallback. The name is one Settings
+   * field away; the vault is not.
+   */
+  const applyVaultLabel = async (name: string) => {
+    if (name.length === 0) return;
+    try {
+      await setVaultLabel(name);
+    } catch (e) {
+      logErrorKind(e, "vault-label-failed");
+    }
+  };
+
   const handlePhraseBack = () => {
     if (CAN_CREATE) {
       const token = sessionTokenRef.current;
@@ -332,6 +358,7 @@ export function CreateVault({
       // Welcome note. Best-effort: seedExampleVault never throws, so a failure
       // here can't bounce a successfully-unlocked user back to the manual-unlock
       // fallback.
+      await applyVaultLabel(state.vaultName);
       await seedExampleVault();
       onAutoUnlockSuccess(committedVaultIdRef.current);
     } catch (e) {
@@ -550,25 +577,36 @@ export function CreateVault({
           onContinue={() => dispatch({ type: "BRIEFING_ACKED" })}
         />
       );
+    case "name":
+      return (
+        <NameStep
+          value={state.vaultName}
+          onChange={(value) => dispatch({ type: "NAME_CHANGED", value })}
+          onSubmit={() => dispatch({ type: "NAME_SUBMITTED" })}
+          onBack={onBack}
+        />
+      );
     case "password":
       return (
         <PasswordStep
           error={state.error}
-          onBack={onBack}
+          onBack={() => dispatch({ type: "PASSWORD_BACK" })}
           onSubmit={handlePasswordSubmit}
         />
       );
     case "encrypting":
       return <EncryptingStep />;
     // Deliberately NOT next to `committing`: that label shares a fall-through
-    // with `account`, so a case inserted between them silently steals the
-    // account step's return. This one stands alone.
+    // with `confirm`, so a case inserted between them silently steals the
+    // confirm step's return. This one stands alone.
     case "provisioning":
       return <ProvisioningStep />;
-    case "phrase":
+    case "kit":
       return (
-        <PhraseStep
+        <KitStep
           phrase={state.phrase ?? []}
+          accountNumber={state.accountNumber ?? ""}
+          vaultName={state.vaultName}
           revealed={state.phraseRevealed}
           dispatch={dispatch}
           // Omitted where provisioning ran, so the Back control is not drawn.
@@ -591,25 +629,14 @@ export function CreateVault({
         />
       );
     case "confirm":
+    case "committing":
       return (
         <ConfirmStep
           phrase={state.phrase ?? []}
           positions={state.confirmPositions ?? [1, 1, 1, 1]}
           inputs={state.confirmInputs}
-          dispatch={dispatch}
-        />
-      );
-    case "account":
-    case "committing":
-      return (
-        <AccountStep
-          accountNumber={state.accountNumber ?? ""}
-          acknowledged={state.accountAcknowledged}
           committing={state.step === "committing"}
           error={state.error}
-          inviteCode={inviteCode}
-          onInviteCodeChange={setInviteCode}
-          showInviteCode={REQUIRES_PROVISIONING}
           dispatch={dispatch}
         />
       );

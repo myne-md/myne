@@ -19,9 +19,10 @@
 // plugin behind it was registered NOWHERE: no Cargo dependency, no `.plugin()`
 // call in the mobile builder, no capability grant. Every call through it was an
 // `invoke` against a plugin that does not exist, so it rejected at runtime. The
-// account-number Copy on the vault-creation screen therefore reported
-// `vaultCreation.account.copyFailed` on every tap, on every device, since it
-// shipped, and the only reason that was honest rather than a silent lie is that
+// account-number Copy on the vault-creation screen therefore reported its
+// copy-failed string on every tap, on every device, since it shipped (the key was
+// `vaultCreation.account.copyFailed`, retired with that step when the recovery kit
+// merged the two in myne-md/myne#468), and the only reason that was honest rather than a silent lie is that
 // myne-md/myne-mobile#51 had already made it check the write.
 //
 // The JS dependency is gone from `mobile/package.json` in the same change. The

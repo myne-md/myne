@@ -1,6 +1,7 @@
 //! Vault-recover Tauri plugin.
 //!
-//! Owns `vault_recover_with_phrase` and `vault_complete_recovery`.
+//! Owns `vault_recover_with_phrase`, `vault_complete_recovery` and
+//! `vault_verify_recovery_phrase` (the read-only recovery drill).
 //! Sibling to `vault_unlock` rather than a submodule — plugin
 //! boundary mirrors the user-facing flow boundary (unlock vs
 //! recover). Both plugins share `VaultRuntimeState`, registered at
@@ -17,6 +18,10 @@
 // paths keep resolving. The `init()` wiring stays desktop-side.
 pub use myne_core::plugins::vault_recover::{account_number_select, commands};
 
+/// The four-site ACL parity check (myne-md/myne#468). Test-only.
+#[cfg(test)]
+mod acl_parity;
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
@@ -30,7 +35,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::recover_with_phrase,
             commands::complete_recovery,
-            commands::resolve_vault_by_account_number
+            commands::resolve_vault_by_account_number,
+            commands::verify_recovery_phrase
         ])
         .build()
 }

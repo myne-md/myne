@@ -11,16 +11,16 @@ import { invoke } from "../platform/core";
 import { decodeGraphSettings, encodeGraphSettings } from "../notes/graphSettings";
 import { decodeTaskDisplay, encodeTaskDisplay } from "../notes/taskDisplay";
 import type { DetachedEntry } from "../notes/detachedRestore";
+import { canonicalTabId } from "../notes/tabKinds";
 import {
   collectLeaves,
   findLeaf,
-  GRAPH_TAB_ID,
-  TASKS_TAB_ID,
   itemKey,
   sameItem,
   wrapAsSingleSlot,
   type LeafPane,
   type NamedWorkspaces,
+  type PersistedAgentView,
   type PersistedTaskView,
   type ViewMode,
   type WorkspaceItem,
@@ -401,6 +401,38 @@ function parseTaskView(o: Record<string, unknown>): { taskView?: PersistedTaskVi
   return Object.keys(v).length > 0 ? { taskView: v } : {};
 }
 
+/**
+ * The persisted agent-tab view, defensively (myne-md/myne#771).
+ *
+ * Field-by-field, omit-when-default: a malformed or unknown value degrades to
+ * the Hub rather than rejecting the whole workspace blob and losing every open
+ * tab. A `focus` with no note id is incoherent (Focus needs a note), so it
+ * degrades to the Hub.
+ */
+function parseAgentView(o: Record<string, unknown>): { agentView?: PersistedAgentView } {
+  const raw =
+    typeof o.agentView === "object" && o.agentView !== null
+      ? (o.agentView as Record<string, unknown>)
+      : {};
+  const noteId = typeof raw.noteId === "string" && raw.noteId !== "" ? raw.noteId : undefined;
+  const conversationId =
+    typeof raw.conversationId === "string" && raw.conversationId !== ""
+      ? raw.conversationId
+      : undefined;
+
+  // The two keys are read INDEPENDENTLY, and `raw.view` is deliberately not
+  // consulted: the agent tab was a Hub-or-Focus mode and is one screen now
+  // (`docs/decisions/ai/0637`), so a descriptor written by the two-view build
+  // still resolves — its `noteId` and `conversationId` mean here exactly what
+  // they meant there, and the dropped discriminator is ignored rather than
+  // rejected. A reader that required `view === "focus"` would silently discard
+  // the conversation a user had open across the change.
+  const v: PersistedAgentView = {};
+  if (conversationId !== undefined) v.conversationId = conversationId;
+  if (noteId !== undefined) v.noteId = noteId;
+  return Object.keys(v).length === 0 ? {} : { agentView: v };
+}
+
 function parseItem(t: unknown): ParsedItem {
   if (typeof t === "string") return { item: { kind: "note", id: t } };
   if (typeof t !== "object" || t === null) return "invalid";
@@ -428,21 +460,65 @@ function parseItem(t: unknown): ParsedItem {
   // The whole-vault graph (MYND-198) is a singleton tab; its id is the fixed
   // sentinel, so any persisted id normalizes to a canonical graph item.
   if (o.kind === "graph") {
-    return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned, ...viewMode } };
+    // `canonicalTabId` rather than the sentinel inline (myne-md/myne#773): the
+    // tab-kind registry owns which kinds are singletons and what their one id
+    // is, so this reader cannot drift from the strip that renders them.
+    return {
+      item: { kind: "graph", id: canonicalTabId("graph", o.id), ...pinned, ...viewMode },
+    };
   }
   // The vault-wide task list (MYND-616) - a singleton like the graph, plus two
   // pieces of per-tab session state. Both are read-when-present and
   // **degrade to the default rather than erroring**: an unknown filter name from
   // a future build, or junk in `taskScope`, must not reject the whole workspace
   // blob and lose every open tab.
+  // The attachment library (myne-md/myne#773) — a singleton with no per-tab
+  // state, so it parses exactly like the graph.
+  if (o.kind === "attachments") {
+    return {
+      item: {
+        kind: "attachments",
+        id: canonicalTabId("attachments", o.id),
+        ...pinned,
+        ...viewMode,
+      },
+    };
+  }
+  // The template library (myne-md/myne#779) — a singleton with no per-tab
+  // state, so it parses exactly like the graph and the attachment library.
+  if (o.kind === "templates") {
+    return {
+      item: {
+        kind: "templates",
+        id: canonicalTabId("templates", o.id),
+        ...pinned,
+        ...viewMode,
+      },
+    };
+  }
   if (o.kind === "tasks") {
     return {
       item: {
         kind: "tasks",
-        id: TASKS_TAB_ID,
+        id: canonicalTabId("tasks", o.id),
         ...pinned,
         ...viewMode,
         ...parseTaskView(o),
+      },
+    };
+  }
+  // The agent hub (myne-md/myne#771) - a singleton like the graph and the task
+  // list, plus its per-tab view. Read-when-present and **degrade to the Hub**
+  // rather than erroring: an unknown view name from a future build must not
+  // reject the whole workspace blob and lose every open tab.
+  if (o.kind === "agent") {
+    return {
+      item: {
+        kind: "agent",
+        id: canonicalTabId("agent", o.id),
+        ...pinned,
+        ...viewMode,
+        ...parseAgentView(o),
       },
     };
   }

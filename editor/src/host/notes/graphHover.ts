@@ -76,3 +76,33 @@ export function highlightAlpha(
 ): number {
   return hover === null || lit ? 1 : HOVER_DIM_ALPHA;
 }
+
+/**
+ * Resting alpha for an EDGE with nothing hovered.
+ *
+ * Edges were drawn fully opaque, which makes a dense hub read as a solid fan of
+ * lines with dots on the ends — the connections out-weigh the notes, and the
+ * notes are the content. Pulling them back lets the nodes sit in front of their
+ * own structure without losing it.
+ */
+export const EDGE_REST_ALPHA = 0.5;
+
+/**
+ * Alpha for an edge that IS lit during a hover.
+ *
+ * Still clearly the brightest thing on screen — it is answering "which
+ * connections are this note's" — but not a hard accent line, which at full
+ * opacity across a hundred-edge hub reads as a starburst rather than a
+ * highlight.
+ */
+export const EDGE_LIT_ALPHA = 0.8;
+
+/**
+ * The alpha to draw an EDGE at. Separate from {@link highlightAlpha} because
+ * edges and nodes want different weights: dimming a node hides content, while
+ * dimming an edge reveals it.
+ */
+export function edgeAlpha(hover: HoverHighlight | null, lit: boolean): number {
+  if (hover === null) return EDGE_REST_ALPHA;
+  return lit ? EDGE_LIT_ALPHA : HOVER_DIM_ALPHA;
+}

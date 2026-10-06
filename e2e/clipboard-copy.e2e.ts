@@ -49,26 +49,26 @@ const PASSWORD = "correct horse battery staple 42";
  * catalog and not here fails this scenario, which is the correct outcome for a
  * string the user reads on the screen where the phrase is shown once.
  */
-const PHRASE_COPIED =
-  "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.";
+const KIT_COPIED =
+  "The kit is on your clipboard. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.";
 
 /** The SAVE success string on the desktop's dialog arm (myne-md/myne#522).
  *
- *  Duplicated for the same reason as `PHRASE_COPIED`, and asserted by EQUALITY
+ *  Duplicated for the same reason as `KIT_COPIED`, and asserted by EQUALITY
  *  for one more: this screen has two affordances sharing one status line, and
  *  the defect being pinned is a save rendering the COPY sentence. "Something
  *  appeared" passes that; the wrong sentence does not. */
-const PHRASE_SAVED =
-  "Saved. It is a plain text file, so keep it somewhere only you can read.";
+const KIT_SAVED =
+  "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read.";
 
-describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#390)", () => {
+describeE2E("cb1 the recovery kit reports its copy, and says which outcome (myne#390)", () => {
   it("says nothing before the copy, and the SUCCESS string after it", async () => {
     await scenario("cb1-phrase-copy-reports-outcome", {}, async (app) => {
       const s = app.session;
 
-      // Straight to the create flow's account step. The briefing + password +
-      // phrase + confirm steps are exercised by `vault-creation.e2e.ts`; this
-      // scenario reuses the same route rather than re-asserting it.
+      // Straight to the create flow's recovery-kit step. The briefing, name,
+      // password and confirm steps are exercised by `vault-creation.e2e.ts`;
+      // this scenario reuses the same route rather than re-asserting it.
       await (await s.byTestId("welcome.create-cta", { timeoutMs: 30_000 })).click();
 
       await s.byTestId("create.briefing", { timeoutMs: 15_000 });
@@ -86,7 +86,17 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       });
       await cont.click();
 
-      await (await s.byTestId("create.password-input")).sendKeys(PASSWORD);
+      // The vault-name step (myne-md/myne#468) sits between the briefing and the
+      // password. Named rather than skipped, because the name is the kit sheet's
+      // header and part of the file the save half below writes.
+      await (await s.byTestId("create.name-input", { timeoutMs: 10_000 })).sendKeys(
+        "E2E Kasa",
+      );
+      await (await s.byTestId("create.name-continue")).click();
+
+      await (await s.byTestId("create.password-input", { timeoutMs: 10_000 })).sendKeys(
+        PASSWORD,
+      );
       await (await s.byTestId("create.confirm-input")).sendKeys(PASSWORD);
       const submit = await s.byTestId("create.submit");
       await s.waitUntil(() => submit.enabled(), {
@@ -95,9 +105,9 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       });
       await submit.click();
 
-      // Phrase step. Reveal, copy, and assert the confirmation APPEARS, this
-      // surface reported nothing at all before myne#390, on the one screen where
-      // the phrase is shown once.
+      // Recovery-kit step. Reveal, copy, and assert the confirmation APPEARS:
+      // this surface reported nothing at all before myne#390, on the one screen
+      // where the phrase is shown once.
       await s.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
       await (await s.byTestId("create.phrase-reveal")).click();
 
@@ -105,7 +115,7 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // live region that is only inserted once there is something to say cannot
       // announce it, because a screen reader watches a region it already knows
       // about. This is the half that is easy to get wrong and impossible to see.
-      const status = await s.byTestId("create.phrase-action-status", {
+      const status = await s.byTestId("create.kit-action-status", {
         timeoutMs: 10_000,
       });
       expect((await status.text()).trim()).toBe("");
@@ -113,7 +123,7 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // Press Copy. Before myne#390 this screen changed NOTHING on either
       // outcome, which is the defect: a failed copy looked exactly like a
       // successful one on the screen where the phrase is shown once.
-      await (await s.byTestId("create.phrase-copy")).click();
+      await (await s.byTestId("create.kit-copy")).click();
 
       // Asserted by EQUALITY against the success string, not by "something
       // appeared". An earlier version of this checked only that the region was
@@ -123,8 +133,8 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // every device, for as long as it shipped) would have passed it unchanged.
       // Distinguishing the two outcomes IS the feature.
       await s.waitUntil(
-        async () => ((await status.text()).trim() === PHRASE_COPIED ? true : null),
-        { label: "phrase copy reports SUCCESS, not merely an outcome", timeoutMs: 10_000 },
+        async () => ((await status.text()).trim() === KIT_COPIED ? true : null),
+        { label: "kit copy reports SUCCESS, not merely an outcome", timeoutMs: 10_000 },
       );
 
       // ---- the SAVE half (myne-md/myne#522) --------------------------------
@@ -144,9 +154,9 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // Outside the vault tree: `secret-export|save_secret_text` re-validates
       // its destination and REFUSES the app-data / vault directory, which is the
       // narrow-seam guard this scenario must not fight.
-      const saveDir = path.join(app.dataHome, "phrase-saves");
+      const saveDir = path.join(app.dataHome, "kit-saves");
       fs.mkdirSync(saveDir, { recursive: true });
-      const savePath = path.join(saveDir, "e2e-phrase.txt");
+      const savePath = path.join(saveDir, "e2e-kit.txt");
       const patched = await s.execute<boolean>(
         "if (window.__e2eDialogPatched !== true) {" +
           "  const saveUrl = window.__TAURI_INTERNALS__.convertFileSrc('plugin:dialog|save', 'ipc');" +
@@ -172,25 +182,40 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       );
       expect(patched).toBe(true);
 
-      await (await s.byTestId("create.phrase-save")).click();
+      await (await s.byTestId("create.kit-save")).click();
 
       // The SAVE sentence, by equality. The regression this pins is one status
       // line serving two affordances: before #522 the line either said nothing
       // at all, or (once it spoke) said the copy sentence for a save.
       await s.waitUntil(
-        async () => ((await status.text()).trim() === PHRASE_SAVED ? true : null),
+        async () => ((await status.text()).trim() === KIT_SAVED ? true : null),
         {
-          label: "phrase save reports the SAVE sentence, not the copy one",
+          label: "kit save reports the SAVE sentence, not the copy one",
           timeoutMs: 15_000,
         },
       );
 
       // The sentence AND the file. Asserting only the sentence would pass a
       // build that announces success unconditionally, which is exactly the
-      // defect this same issue fixed on the web arm. Length only, never the
-      // contents: SYNC-13 forbids a failure diff that could print the phrase.
+      // defect this same issue fixed on the web arm.
+      //
+      // BOTH secrets, because the kit replaced two steps that saved two files
+      // (myne-md/myne#468) and a save path still writing only the phrase would
+      // report exactly this same success sentence. Shape only, never the
+      // contents: SYNC-13 forbids a failure diff that could print the phrase, so
+      // every assertion below is on a BOOLEAN.
       expect(fs.existsSync(savePath)).toBe(true);
-      expect(fs.readFileSync(savePath, "utf8").trim().split(/\s+/).length).toBe(24);
+      const kit: string = fs.readFileSync(savePath, "utf8");
+      const lines: string[] = kit.split("\n").map((l: string) => l.trim());
+      expect(
+        lines.some((l: string) => l.split(/\s+/).length === 24),
+        "no 24-word line in the saved kit",
+      ).toBe(true);
+      expect(
+        lines.some((l: string) => /^MY(-[0-9A-HJKMNP-TV-Z]{4}){5}$/.test(l)),
+        "no account number in the saved kit",
+      ).toBe(true);
+      expect(kit.includes("E2E Kasa"), "the kit does not name its vault").toBe(true);
     });
   });
 });

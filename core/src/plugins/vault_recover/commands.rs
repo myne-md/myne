@@ -9,6 +9,9 @@
 //!   `Slot::Recovering` → `Slot::Unlocked` by rewriting `vault.meta`
 //!   under a new master password (recovery-side bytes preserved per
 //!   `recovery-flow.md` §4.4; atomic write per §4.2).
+//! - [`verify_recovery_phrase`] — the recovery DRILL (myne-md/myne#468):
+//!   the same derive-and-unwrap, on an ALREADY-UNLOCKED vault, with the
+//!   result thrown away and a `bool` returned. Touches no slot.
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 
@@ -993,6 +996,210 @@ pub(crate) fn derive_root_key_from_phrase(
     )
 }
 
+/// The recovery DRILL: does this phrase still open this vault?
+///
+/// The whole point of a drill (myne-md/myne#468) is that the user finds out
+/// while they can still do something about it. `recovery-flow.md` §2.4 is a
+/// no-re-display commitment and `protocol.md` §7 gives the phrase no rotation,
+/// so a phrase mis-copied at creation is discovered on the day it is needed —
+/// which is the day the password is already gone. A user who has the phrase in
+/// front of them and an OPEN vault can check it, find it wrong, and export
+/// everything. The same user a year later has nothing.
+///
+/// **Read-only, and that is the difference from [`recover_with_phrase`].** This
+/// derives `recovery_wrap_key`, attempts the AEAD-open of
+/// `enc_root_key_recovery`, drops whatever it gets, and answers `true`/`false`.
+/// It does not populate `Slot::Recovering`, does not touch the unlocked slot,
+/// and writes nothing. The slot is byte-identical before and after, on both the
+/// correct-phrase and the wrong-phrase path — which is the property
+/// `verify_recovery_phrase_leaves_the_slot_untouched` exists to pin, because a
+/// drill that moved the slot to `Recovering` would demand a password reset from
+/// a user who was only checking.
+///
+/// **Unlock-gated.** Not for key material — it needs none — but because that is
+/// what bounds the oracle below. An attacker at a locked app cannot reach this
+/// command at all; one at an unlocked app already has the plaintext, so the
+/// phrase tells them nothing they do not have. The gate is therefore not
+/// defence in depth, it is the reason the oracle is acceptable.
+///
+/// **It IS an oracle, and here is the accounting.** A caller learns, per
+/// attempt, whether one 256-bit-entropy phrase is the right one
+/// (`protocol.md` §7). Brute force is out of reach by an enormous margin, so
+/// the rate limit is not what stops an attacker guessing — it stops local
+/// malware from using this command as a fast, silent confirmation channel for a
+/// phrase it found somewhere on the machine. Attempts therefore ride the
+/// EXISTING `auth_permits` budget rather than a new one, which is deliberate:
+/// that budget already serialises unlock, recovery and password-change, so a
+/// drill cannot run concurrently with any of them and a caller cannot use the
+/// drill to keep the real auth path busy. `decisions.md` carries the entry.
+///
+/// **Failure is one answer, not three.** A wrong phrase, ANOTHER vault's
+/// phrase, and structurally invalid input all return `false`. That falls out of
+/// the crypto rather than being imposed: the AEAD tag on THIS vault's recovery
+/// section is what is being checked, so another vault's phrase fails it exactly
+/// as a wrong one does. The UI must not narrow it either — see the Settings
+/// surface's copy.
+pub async fn verify_recovery_phrase_from_host(
+    phrase: String,
+    state: &VaultRuntimeState,
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, VaultRecoveryError> {
+    // The vault must be OPEN, and its id is also what resolves the path — so the
+    // drill cannot be pointed at a vault the caller does not currently have open.
+    // The gate is re-checked inside `_with_path`, which is where the tests drive
+    // it; this arm exists so no path is built for a vault that is not there.
+    let Some(target) = state.active_vault_id().await else {
+        tracing::error!(
+            stage = "slot_peek",
+            error_kind = "SlotNotUnlocked",
+            "recovery drill rejected: no vault is unlocked"
+        );
+        return Err(VaultRecoveryError::SlotNotUnlocked);
+    };
+    let vault_path = vault_meta_path(host, Some(target))?;
+    verify_recovery_phrase_with_path(phrase, &vault_path, state, io).await
+}
+
+/// Testable core of [`verify_recovery_phrase_from_host`]: everything but the
+/// app-data path resolution, so a test can point it at a scratch `vault.meta`.
+pub(crate) async fn verify_recovery_phrase_with_path(
+    phrase: String,
+    vault_path: &Path,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, VaultRecoveryError> {
+    // Wrap immediately so any early-return path (SlotNotUnlocked,
+    // RecoveryInProgress, IO failure, parse failure) drops the wrapper and
+    // zeroes the bytes. The twin `recover_with_phrase_with_path` does the same;
+    // a plain `String` would drop the credential without wiping it.
+    let phrase = Zeroizing::new(phrase);
+
+    // (1) The unlock gate, asserted HERE rather than only at the caller: this is
+    //     the function the tests drive, and a gate that lives one frame up is a
+    //     gate a future caller can skip.
+    if state.active_vault_id().await.is_none() {
+        tracing::error!(
+            stage = "slot_peek",
+            error_kind = "SlotNotUnlocked",
+            "recovery drill rejected: no vault is unlocked"
+        );
+        return Err(VaultRecoveryError::SlotNotUnlocked);
+    }
+
+    // (2) The shared auth budget, held across the KDF. See the oracle note above
+    //     for why this is the existing budget and not one of its own. RAII, so
+    //     every return path below releases it.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::error!(
+                stage = "permit_acquire",
+                error_kind = "RecoveryInProgress",
+                "recovery drill rejected: another auth op in flight"
+            );
+            return Err(VaultRecoveryError::RecoveryInProgress);
+        }
+    };
+
+    let bytes = match io.read(vault_path).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => {
+            tracing::error!(
+                stage = "read_meta",
+                error_kind = "VaultNotFound",
+                "vault.meta does not exist for the unlocked vault"
+            );
+            return Err(VaultRecoveryError::VaultNotFound);
+        }
+        Err(other) => {
+            tracing::error!(
+                stage = "read_meta",
+                error_kind = "IoError",
+                io_failure_kind = ?other,
+                "vault.meta read failed"
+            );
+            return Err(VaultRecoveryError::IoError {
+                io_error_kind: other,
+            });
+        }
+    };
+
+    // (3) Derive and attempt the unwrap off the runtime worker — Argon2id at
+    //     production parameters is the whole cost of this command.
+    let join_outcome = crate::task::run_blocking(move || -> Result<bool, VaultRecoveryError> {
+        let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
+        let meta = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
+            tracing::error!(
+                stage = "parse_meta",
+                error_kind = "InvalidVaultMeta",
+                protocol_error_kind = protocol_error_kind(&e),
+                "vault.meta parse rejected"
+            );
+            VaultRecoveryError::InvalidVaultMeta
+        })?;
+
+        // `derive_root_key_from_phrase` is shared with the real recovery path,
+        // which is the point: a drill that answered `true` through code the
+        // recovery flow does not use would be testing a second implementation.
+        //
+        // The two outcomes are mapped rather than propagated.
+        // `InvalidCredentialOrVault` is §3.4's non-distinguishing tag — wrong
+        // phrase OR a tampered recovery section — and for a drill both mean the
+        // same thing to the user: this phrase will not open this vault. Every
+        // other variant is structural and stays an error, because "your phrase
+        // is wrong" would be a false statement about a corrupt `vault.meta`.
+        match derive_root_key_from_phrase(version, &phrase, &meta) {
+            // Dropped immediately, and `Zeroizing` wipes it. The drill has no
+            // use for the key; its whole output is the fact that it existed.
+            Ok(root_key) => {
+                drop(root_key);
+                Ok(true)
+            }
+            Err(VaultRecoveryError::InvalidCredentialOrVault) => Ok(false),
+            Err(other) => Err(other),
+        }
+    })
+    .await;
+
+    match join_outcome {
+        Ok(Ok(verified)) => {
+            // Coarse only: whether a drill ran and how long it took. NOT the
+            // outcome — a log line saying "the phrase matched" is a statement
+            // about a credential, and the ALLOW-list in `src-tauri/AGENTS.md`
+            // does not carry one.
+            tracing::info!(stage = "drill_complete", "recovery drill finished");
+            Ok(verified)
+        }
+        Ok(Err(inner)) => Err(inner),
+        Err(_) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "blocking task join failed"
+            );
+            Err(VaultRecoveryError::JoinFailure)
+        }
+    }
+}
+
+/// IPC wrapper for [`verify_recovery_phrase_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn verify_recovery_phrase<R: Runtime>(
+    phrase: String,
+    state: State<'_, VaultRuntimeState>,
+    app: AppHandle<R>,
+) -> Result<bool, VaultRecoveryError> {
+    verify_recovery_phrase_from_host(
+        phrase,
+        state.inner(),
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
 /// Error mapping for the recovery-wrap pipeline (KDF + root_key
 /// AEAD-open). `AeadFailure` is the §3.4 non-distinguishing tag
 /// (`InvalidCredentialOrVault`); everything else is structural and
@@ -1143,6 +1350,238 @@ mod tests {
                     assert_eq!(*root_key, original_root_key);
                 }
                 _ => panic!("expected Slot::Recovering after recover_with_phrase success"),
+            }
+        });
+    }
+
+    // ── The recovery DRILL (myne-md/myne#468) ───────────────────────────────
+    //
+    // Four properties, and the third is the one that separates this command from
+    // `recover_with_phrase`: the slot must be byte-identical afterwards, on BOTH
+    // outcomes. A drill that moved the slot to `Recovering` would demand a
+    // password reset from a user who was only checking their phrase.
+
+    /// An unlocked slot for `id`, with the key bytes the caller names, so a test
+    /// can compare the slot's contents before and after rather than only its kind.
+    async fn unlock_fixture(state: &VaultRuntimeState, id: crate::vault_id::VaultId) {
+        state
+            .set_unlocked(id, fixture_unlocked_with_keys(0xA1, 0xB2, 0xC3))
+            .await;
+    }
+
+    #[test]
+    fn verify_recovery_phrase_accepts_the_real_phrase() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _root, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_fixture(&state, test_vault_id()).await;
+
+            let verified = verify_recovery_phrase_with_path(
+                phrase,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("drill should complete");
+            assert!(verified, "the vault's own phrase was rejected");
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_rejects_a_wrong_phrase_without_erroring() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _root, _phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_fixture(&state, test_vault_id()).await;
+
+            // A DIFFERENT vault's real phrase, not gibberish. That is the case the
+            // UI's non-distinguishing failure copy exists for, and it must read as
+            // `false` rather than as an error: it is a perfectly well-formed
+            // BIP-39 phrase that simply does not open this vault.
+            let (_other_bytes, _other_root, other_phrase) = seed_vault_meta("pw2");
+
+            let verified = verify_recovery_phrase_with_path(
+                other_phrase,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("a wrong phrase is an ANSWER, not an error");
+            assert!(!verified, "another vault's phrase was accepted");
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_leaves_the_slot_untouched() {
+        // THE point of this command. Asserted on both outcomes and on the slot's
+        // CONTENTS rather than its kind: a `SlotKind::Unlocked` comparison would
+        // pass on a slot whose keys had been replaced.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _root, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+            let (_b, _r, wrong_phrase) = seed_vault_meta("pw2");
+
+            for (label, candidate) in [("correct", phrase), ("wrong", wrong_phrase)] {
+                let state = VaultRuntimeState::default();
+                unlock_fixture(&state, test_vault_id()).await;
+
+                let before = state
+                    .peek_unlocked_root_key_clone()
+                    .await
+                    .expect("fixture slot is unlocked");
+
+                verify_recovery_phrase_with_path(
+                    candidate,
+                    scratch.path(),
+                    &state,
+                    &crate::vault_io::StdVaultIo,
+                )
+                .await
+                .unwrap_or_else(|e| panic!("{label} phrase: drill errored: {e}"));
+
+                assert_eq!(
+                    state.slot_kind(test_vault_id()).await,
+                    SlotKind::Unlocked,
+                    "{label} phrase: the slot left Unlocked"
+                );
+                let after = state
+                    .peek_unlocked_root_key_clone()
+                    .await
+                    .unwrap_or_else(|| panic!("{label} phrase: the slot was emptied"));
+                assert_eq!(*before, *after, "{label} phrase: the slot's root_key moved");
+                // And no Recovering entry was created anywhere, which is the
+                // specific transition `recover_with_phrase` performs and this
+                // command must not.
+                assert!(
+                    state.recovering_vault_id().await.is_none(),
+                    "{label} phrase: the drill started a recovery"
+                );
+            }
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_refuses_while_another_auth_op_holds_the_budget() {
+        // The drill rides the EXISTING `auth_permits` budget, so it cannot run
+        // beside an unlock, a recovery or a password change — and cannot be used
+        // to keep that budget busy either, since it takes the same one.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _root, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_fixture(&state, test_vault_id()).await;
+
+            let held = state
+                .auth_permits()
+                .try_acquire()
+                .expect("the budget starts free");
+
+            let err = verify_recovery_phrase_with_path(
+                phrase.clone(),
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect_err("the drill ran while the auth budget was held");
+            assert!(matches!(err, VaultRecoveryError::RecoveryInProgress));
+
+            // Non-vacuity: released, the very same call succeeds. Without this the
+            // test would also pass against a command that always refused.
+            drop(held);
+            assert!(verify_recovery_phrase_with_path(
+                phrase,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("drill after release"));
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_refuses_when_no_vault_is_unlocked() {
+        // The gate that bounds the oracle. An empty slot map, so the phrase is
+        // never derived at all — which is also why this test is fast.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _root, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            let err = verify_recovery_phrase_with_path(
+                phrase,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect_err("the drill ran with no vault unlocked");
+            assert!(matches!(err, VaultRecoveryError::SlotNotUnlocked));
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_does_not_answer_false_for_a_corrupt_vault_meta() {
+        // "Your phrase is wrong" is a false statement about a `vault.meta` that
+        // cannot be read, and it is the wrong thing to tell a user who would then
+        // go looking for a phrase that is fine. Structural failures stay errors;
+        // only §3.4's non-distinguishing tag becomes `false`.
+        //
+        // TWO corruptions, and the second is the one that matters. The first
+        // breaks the MAGIC, which `parse_vault_meta_any` rejects with `?` before
+        // the phrase is ever derived — so on its own this test passed even with
+        // every structural error rewritten to `Ok(false)`, because it never
+        // reached the arm that decides. Found by injection, which is the only way
+        // it could have been.
+        //
+        // The second puts `m_kib` below `MIN_KDF_M_KIB` (offset 22 is the 11-byte
+        // KDF block, `m_kib` at 23..27 big-endian, `protocol.md` §4.3). That
+        // parses fine and fails inside `derive_root_key_from_phrase`, which is
+        // exactly the `Err(other) => Err(other)` arm under test.
+        rt().block_on(async {
+            for (label, corrupt) in [("bad magic", 0usize), ("kdf m_kib below range", 23usize)] {
+                let scratch = scratch_vault();
+                let (mut meta_bytes, _root, phrase) = seed_vault_meta("pw");
+                if corrupt == 0 {
+                    meta_bytes[0] ^= 0xFF;
+                } else {
+                    meta_bytes[23..27].copy_from_slice(&0u32.to_be_bytes());
+                }
+                scratch.write_meta(&meta_bytes);
+
+                let state = VaultRuntimeState::default();
+                unlock_fixture(&state, test_vault_id()).await;
+
+                let err = verify_recovery_phrase_with_path(
+                    phrase,
+                    scratch.path(),
+                    &state,
+                    &crate::vault_io::StdVaultIo,
+                )
+                .await
+                .expect_err(match label {
+                    "bad magic" => {
+                        "a vault.meta with a broken magic was reported as a wrong phrase"
+                    }
+                    _ => "a vault.meta with out-of-range KDF params was reported as a wrong phrase",
+                });
+                assert!(
+                    matches!(err, VaultRecoveryError::InvalidVaultMeta),
+                    "{label}: expected InvalidVaultMeta, got {err:?}"
+                );
             }
         });
     }

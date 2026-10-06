@@ -147,6 +147,23 @@ const GUARDED = [
       `\nto web/wasm/src/capability.rs (dispatched / absent-on-web / port owed) in` +
       `\nthe same change, which \`check-web-command-coverage.mjs\` requires.`,
   },
+  // The story catalogue (myne-md/myne#832) gets `seam: null`, the strictest
+  // form, and that is its architecture rather than a coincidence: it is not a
+  // Tauri host at all. `stories/src/host/internals.ts` installs a fake
+  // `window.__TAURI_INTERNALS__` so the DESKTOP seam (`src/platform/*`) runs
+  // unmodified, which means the catalogue itself must reach no `@tauri-apps/*`
+  // module. Anything it needs from a host, it gets by mounting a real `src/`
+  // component that goes through the seam.
+  {
+    root: "stories/src",
+    seam: null,
+    advice:
+      `Nothing under stories/src may import @tauri-apps/*. The story catalogue is` +
+      `\nnot a Tauri host: it installs a fake window.__TAURI_INTERNALS__ so the` +
+      `\ndesktop seam (src/platform/*) runs against canned fixture data. Mount a real` +
+      `\nsrc/ component instead of reaching a host directly:` +
+      `\n\n    import { Button } from "@app/components/primitives/Button";`,
+  },
 ];
 
 // ── the roster, versus `scripts/lib/shared-roots.mjs` ───────────────────────
@@ -237,6 +254,11 @@ const TAURI_GLOBAL = /__TAURI[A-Z0-9_]*__/;
 const TAURI_GLOBAL_EXEMPT = new Set([
   join("src", "lib", "app-window.ts"),
   join("mobile", "src", "lib", "app-window.ts"),
+  // The story host (myne-md/myne#832). It WRITES the global rather than probing
+  // it, which is the point: it is the fake host the catalogue mounts the real
+  // seam against. One file per tree may name the global, the same boundary the
+  // two probes above hold.
+  join("stories", "src", "host", "internals.ts"),
 ]);
 
 // `withFileTypes` rather than a `statSync` per entry: the roster grew to eight

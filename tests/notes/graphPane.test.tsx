@@ -321,14 +321,32 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     );
 
     // Apply the tag filter: the tag view is notes-only BY DESIGN, so no hubs.
-    const select = screen.getByTestId("editor.graph-filter");
-    fireEvent.change(select, { target: { value: "tag:work" } });
+    //
+    // Driven as the shared `<Select>` rather than a native one since
+    // myne-md/myne#772: the trigger is a `role="combobox"` button and the
+    // options live in a portal that only exists while it is open. The native
+    // element was also the reason this control ignored the design system's
+    // padding — it could not take it.
+    const openFilter = (): void => {
+      fireEvent.click(screen.getByTestId("editor.graph-filter"));
+    };
+    const pickFilter = (value: string): void => {
+      openFilter();
+      const option = document
+        .querySelectorAll(`[data-testid="editor.graph-filter-option"]`);
+      const match = Array.from(option).find(
+        (el) => el.getAttribute("data-value") === value,
+      );
+      expect(match, `no filter option for ${value}`).toBeTruthy();
+      fireEvent.click(match as Element);
+    };
+    pickFilter("tag:work");
     await waitFor(() =>
       expect(pane.getAttribute("data-tag-node-count")).toBe("0"),
     );
 
     // …and back to All. The hubs have to come back.
-    fireEvent.change(select, { target: { value: "" } });
+    pickFilter("");
     await waitFor(() =>
       expect(pane.getAttribute("data-tag-node-count")).toBe("1"),
     );
@@ -339,13 +357,18 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     // thing; the chip is gone and the dropdown opens on All.
     render(<GraphPane />);
     await settledPane();
-    const select = screen.getByTestId("editor.graph-filter");
-    const options = Array.from(select.querySelectorAll("option")).map((o) =>
-      o.getAttribute("value"),
-    );
-    expect(options[0]).toBe("");
-    // `value` is a DOM property on a select, not an attribute.
-    expect((select as HTMLSelectElement).value).toBe("");
+    const trigger = screen.getByTestId("editor.graph-filter");
+    // The trigger shows the CURRENT option's label, which is how the shared
+    // Select reports its value — there is no `.value` property to read, and
+    // that is the point: a native select silently falls back to its first
+    // option when the value matches none, which is exactly the lie this
+    // control used to be able to tell.
+    expect(trigger.textContent).toContain("All");
+    fireEvent.click(trigger);
+    const values = Array.from(
+      document.querySelectorAll('[data-testid="editor.graph-filter-option"]'),
+    ).map((o) => o.getAttribute("data-value"));
+    expect(values[0]).toBe("");
   });
 
   it("puts the controls on their own line in LIST mode, so nothing overlaps the rows", async () => {
@@ -402,20 +425,36 @@ describe("GraphPane mounts (myne-md/myne#727)", () => {
     expect(Object.is(canvasModels.at(-1), before)).toBe(true);
   });
 
-  it("paints the ACTIVE half of the view switch instead of a measured thumb", async () => {
-    // `Segmented`'s thumb is sized from `offsetWidth`, which is 0 in a pane that
-    // mounts before its tab is visible; the selected label then takes
-    // `--accent-on` with nothing behind it and the active half renders
-    // invisible. The cluster paints the accent directly instead, so this asserts
-    // a real background on the active half and none on the other.
+  it("uses the SHARED segmented control, with radiogroup semantics", async () => {
+    // This was a hand-rolled fork (`ViewHalf`) until myne-md/myne#773. The fork
+    // existed because `Segmented` sized its thumb from `offsetWidth`, which is 0
+    // in a pane that mounts before its tab is visible, so the selected label
+    // took `--accent-on` over nothing and the active half rendered invisible
+    // (myne-md/myne#727). Two things closed that: #727 added the
+    // `ResizeObserver` that re-measures when the box appears, and #773 gave the
+    // active segment its OWN accent fill beneath the thumb, so a zero-width
+    // thumb costs a transition rather than legibility.
+    //
+    // That fill is a stylesheet rule and jsdom does not apply it, so the visual
+    // half is asserted in `tests/styles/segmentedSelection.test.ts` against the
+    // sheet itself. What is observable HERE is the semantics, and they improved
+    // in the move: two mutually-exclusive reading modes are a radiogroup, not
+    // two independent toggles.
     render(<GraphPane />);
     await settledPane();
     const graphHalf = screen.getByTestId("editor.graph-view-graph");
     const listHalf = screen.getByTestId("editor.graph-view-list");
-    expect(graphHalf.style.background).toContain("var(--accent)");
-    expect(graphHalf.style.color).toContain("var(--accent-on)");
-    expect(listHalf.style.background).not.toContain("var(--accent)");
-    expect(graphHalf.getAttribute("aria-pressed")).toBe("true");
+    expect(graphHalf.getAttribute("role")).toBe("radio");
+    expect(graphHalf.getAttribute("aria-checked")).toBe("true");
+    expect(listHalf.getAttribute("aria-checked")).toBe("false");
+    expect(graphHalf.className).toContain("myne-segmented__segment");
+    // `aria-pressed` is the toggle-button attribute the fork used. Its absence
+    // is the assertion: carrying both would announce the control twice.
+    expect(graphHalf.getAttribute("aria-pressed")).toBeNull();
+    expect(
+      graphHalf.closest('[role="radiogroup"]'),
+      "the segments must sit inside a radiogroup for the roles to mean anything",
+    ).not.toBeNull();
   });
 
   it("queries only the AUTHORED rule's tag once a rule exists", async () => {

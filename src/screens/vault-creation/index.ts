@@ -1,7 +1,7 @@
 // Barrel re-exports for the vault-creation orchestrator surface.
-// Step components (PasswordStep, EncryptingStep, PhraseStep,
-// ConfirmStep, AccountStep, ReadyStep, SessionLostStep) land in
-// later tasks and will be re-exported here.
+// The step components are imported directly by `<CreateVault>`; what this
+// barrel carries is the reducer surface plus the step roster the eyebrows
+// number themselves from.
 
 export {
   vaultCreationReducer,
@@ -16,3 +16,9 @@ export type {
   Action,
   ErrorState,
 } from "./reducer";
+export {
+  NUMBERED_STEPS,
+  stepPosition,
+  isNumberedStep,
+} from "./stepOrder";
+export type { NumberedStep } from "./stepOrder";

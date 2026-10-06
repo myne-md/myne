@@ -64,6 +64,11 @@ describe("IdentitySetupDialog", () => {
     const onCreated = vi.fn();
     render(<IdentitySetupDialog open onClose={() => {}} onCreated={onCreated} />);
 
+    // The recovery grid sits behind its own door, so a first identity is not
+    // met by twenty-four empty fields.
+    expect(screen.queryByTestId("identity-setup.phrase-grid")).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-setup.recover-open"));
+
     const recoverCta = (await screen.findByTestId(
       "identity-setup.recover-cta",
     )) as HTMLButtonElement;
@@ -103,7 +108,9 @@ describe("IdentitySetupDialog", () => {
     expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
     fireEvent.click(screen.getByTestId("first-run-server.back"));
     fireEvent.click(screen.getByTestId("first-run-server.back"));
-    expect(screen.getByTestId("identity-setup.recover-cta")).toBeTruthy();
+    // Back on the identity form: its recover door is the choice row's button
+    // (the 24-word grid opens behind it, #772), not the grid's own submit.
+    expect(screen.getByTestId("identity-setup.recover-open")).toBeTruthy();
   });
 
   it("keeps a pin failure distinct and provides recovery from the identity form", async () => {

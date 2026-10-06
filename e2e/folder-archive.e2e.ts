@@ -19,7 +19,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewMenuItem,
+  clickNewItem,
   clickRibbonUntilVisible,
   createNote,
   dismissImporterOffer,
@@ -47,7 +47,7 @@ async function contextMenuPick(
  *  never materializes (the `createFolder` helper in folder-notes.e2e.ts carries
  *  the same commit key). */
 async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewMenuItem(s, "notes.new-folder");
+  await clickNewItem(s, "notes.new-folder");
   await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}`);
   await s.byTestId("notes.folder-row");
 }

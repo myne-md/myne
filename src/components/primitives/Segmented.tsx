@@ -9,6 +9,13 @@
 // `useLayoutEffect`) so it glides between options; reduced-motion zeroes the
 // transition globally (tokens.css).
 //
+// Appearance lives in `@myne/client-core`'s `components.css` under
+// `.myne-segmented` (myne-md/myne#773). What stays here is the part a
+// stylesheet cannot do: MEASURING the active segment's box so the thumb knows
+// where to travel. The hover rule moved to `[aria-checked="false"]:hover`, so
+// the painted "not selected" and the announced "not selected" are now the same
+// attribute rather than two things a call site keeps in step.
+//
 // testids: the root carries `testId`; each segment carries `${testId}-${value}`
 // plus `data-value` + `data-active` for E2E targeting and assertions.
 
@@ -18,10 +25,8 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 import { Icon } from "./Icon";
-import { hoverSurface } from "./hoverSurface";
 import type { IconName } from "../../lib/icons";
 
 export interface SegmentedOption {
@@ -52,65 +57,13 @@ interface SegmentedProps {
   optionAriaLabel?: (option: SegmentedOption) => string;
   /** Root `data-testid`; segments derive `${testId}-${option.value}`. */
   testId?: string;
+  /**
+   * Density. `"md"` (default) is the settings-row size; `"sm"` is for a control
+   * floating on content, where the cluster has to stay narrow enough not to
+   * cover what it sits on.
+   */
+  size?: "sm" | "md";
 }
-
-const SEGMENTED_STYLE: CSSProperties = {
-  position: "relative",
-  display: "inline-flex",
-  flexDirection: "row",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  overflow: "hidden",
-  alignSelf: "flex-start",
-};
-
-// Single sliding fill behind the segments; labels + dividers sit above it.
-const THUMB_STYLE: CSSProperties = {
-  position: "absolute",
-  top: 0,
-  bottom: 0,
-  left: 0,
-  // Selected segment reads as accent (the sliding fill behind the active label).
-  background: "var(--accent)",
-  zIndex: 0,
-  pointerEvents: "none",
-  transition:
-    "transform var(--duration-base) var(--ease-standard), width var(--duration-base) var(--ease-standard)",
-};
-
-const SEGMENT_STYLE: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "var(--space-1)",
-  border: 0,
-  background: "transparent",
-  padding: "6px 16px",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--fg-2)",
-  cursor: "pointer",
-  minWidth: 72,
-  transition:
-    "color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard)",
-};
-
-const SEGMENT_SELECTED_STYLE: CSSProperties = {
-  ...SEGMENT_STYLE,
-  // On the accent thumb, the label switches to the on-accent ink for contrast.
-  color: "var(--accent-on)",
-};
-
-const DIVIDER_STYLE: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  width: 1,
-  background: "var(--line-2)",
-  alignSelf: "stretch",
-};
 
 export function Segmented({
   options,
@@ -120,6 +73,7 @@ export function Segmented({
   ariaDescribedBy,
   optionAriaLabel,
   testId,
+  size = "md",
 }: SegmentedProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const segmentRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -175,23 +129,31 @@ export function Segmented({
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
       data-testid={testId}
-      style={SEGMENTED_STYLE}
+      data-size={size}
+      className="myne-segmented"
     >
       <span
         aria-hidden="true"
-        style={{ ...THUMB_STYLE, width: thumb.width, transform: `translateX(${thumb.left}px)` }}
+        className="myne-segmented__thumb"
+        // The two measured values, and only those: a stylesheet cannot know how
+        // wide the active segment is. Everything else about this element —
+        // fill, stacking, the travel transition — is in `components.css`.
+        style={{ width: thumb.width, transform: `translateX(${thumb.left}px)` }}
       />
       {options.map((o, idx) => {
         const selected = o.value === value;
         return (
           <Fragment key={o.value}>
-            {idx > 0 && <span aria-hidden="true" style={DIVIDER_STYLE} />}
+            {idx > 0 && (
+              <span aria-hidden="true" className="myne-segmented__divider" />
+            )}
             <button
               ref={(el) => {
                 segmentRefs.current[idx] = el;
               }}
               type="button"
               role="radio"
+              className="myne-segmented__segment"
               aria-checked={selected}
               aria-label={optionAriaLabel ? optionAriaLabel(o) : o.label}
               data-testid={testId ? `${testId}-${o.value}` : undefined}
@@ -200,10 +162,6 @@ export function Segmented({
               onClick={() => {
                 if (!selected) onChange(o.value);
               }}
-              // Only unselected segments take a hover fill — the selected one
-              // already carries the sliding thumb behind it.
-              {...(selected ? {} : hoverSurface())}
-              style={selected ? SEGMENT_SELECTED_STYLE : SEGMENT_STYLE}
             >
               {o.icon !== undefined && <Icon name={o.icon} size={12} />}
               {o.label}

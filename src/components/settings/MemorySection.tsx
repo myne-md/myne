@@ -29,6 +29,7 @@ import {
   type MemoryListRow,
   type PersonalityDirective,
 } from "../../lib/memory";
+import { EmptyState } from "../primitives/EmptyState";
 import { ControlBlock } from "./ControlBlock";
 import {
   BLOCK_STYLE,
@@ -322,9 +323,14 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
           </button>
         </div>
       ) : rows === null ? null : rows.length === 0 ? (
-        <p data-testid="settings.memory.empty" style={HELPER_STYLE}>
-          {t("settings.memory.empty")}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="book-open"
+          size="sm"
+          title={t("settings.memory.emptyTitle")}
+          body={t("settings.memory.empty")}
+          testId="settings.memory.empty"
+        />
       ) : (
         <ul style={LIST_STYLE} data-testid="settings.memory.list">
           {rows.map((row) => (

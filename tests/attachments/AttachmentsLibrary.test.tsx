@@ -47,7 +47,7 @@ const ENTRY: CatalogEntry = {
 function renderLibrary() {
   return render(
     <SidebarStateProvider>
-      <AttachmentsLibrary onClose={() => {}} />
+      <AttachmentsLibrary />
     </SidebarStateProvider>,
   );
 }

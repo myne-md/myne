@@ -18,6 +18,7 @@ import { installGlobalFailureHandlers } from "./lib/global-failure";
 // consumed by all three clients. FIRST, because the app-shell sheet below and
 // the ornament sheet after it both read the values it supplies.
 import "@myne/client-core/tokens.css";
+import "@myne/client-core/components.css";
 import "./styles/tokens.css";
 // The ornament layer (myne#394). After the token sheet, because every rule in it
 // reads tokens the theme supplies. Drawing nothing until a component declares a
