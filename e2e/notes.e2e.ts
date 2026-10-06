@@ -32,6 +32,7 @@ import {
   editorText,
   nameNewNote,
   reopenNoteAfterReload,
+  runPaletteAction,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -414,6 +415,64 @@ describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
         await (await s.byTestId("notes.folder-row")).click(); // collapse
         await s.waitForGone(testIdSelector("notes.row"));
         expect((await s.byTestIdAll("notes.folder-row")).length).toBe(1);
+      },
+    );
+  });
+});
+
+describeE2E("nc6 deleting a PINNED open note closes its tab (myne-md/myne#819)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("palette Move-to-trash closes the pinned tab; the note stays trashed after reload", async () => {
+    let password = "";
+    await scenario(
+      "nc6-delete-pinned-open-note",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Sabitlenmiş Not");
+
+        // The created note is open in the focused pane's tab. Read its id from
+        // the tab handle, then PIN it: a pinned tab was close-protected, which
+        // is exactly why a deleted pinned note used to stay open and editable
+        // (the `closeTab` pin guard `closeNoteEverywhere` inherited).
+        const tab = await s.byTestId("editor.tab");
+        const tabId = (await tab.attribute("data-tab-id")) ?? "";
+        expect(tabId.startsWith("note:")).toBe(true);
+        const noteId = tabId.slice("note:".length);
+        await contextMenuPick(s, tab, "tab.pin");
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("editor.tab")).attribute("data-pinned")) === "true"
+              ? true
+              : null,
+          { label: "the note's tab reports data-pinned=true" },
+        );
+
+        // Delete through the COMMAND PALETTE ("Move to trash") — the surface the
+        // #825 fix left open (it closed tabs from the sidebar context menu and
+        // the Trash panel, but not from the palette / editor "..." menu).
+        await runPaletteAction(s, "note.trash", "trash");
+
+        // The tab MUST be gone, pinned or not.
+        await s.waitForGone(
+          testIdSelector("editor.tab", { "data-tab-id": `note:${noteId}` }),
+        );
+        expect((await s.byTestIdAll("notes.row")).length).toBe(0);
+
+        // And the note is really trashed, not resurrected: it is restorable
+        // from the Trash panel, and it stays out of the live tree after a
+        // reload (a resurrected note would be back as a live row).
+        await clickRibbonUntilVisible(s, "trash.open", "trash.panel");
+        await s.byTestId("trash.panel");
+        expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
+        await (await s.byTestId("trash.close")).click();
+        await s.waitForGone(testIdSelector("trash.panel"));
+
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+        expect((await s.byTestIdAll("notes.row")).length).toBe(0);
       },
     );
   });

@@ -3586,25 +3586,45 @@ function CommandPaletteHost({
         paletteWs.detachNote(id);
       },
       onArchiveNote: () => {
-        if (ctx.selectedId !== null) {
+        const id = ctx.selectedId;
+        if (id !== null) {
           // Surfaced (not swallowed): `archiveNote` now flushes dirty panes
           // first and REJECTS when one does not settle (myne-md/myne#819), so
           // the palette action can now fail where it previously could not.
-          void ctx.archiveWithRollback(ctx.selectedId).catch(() => {
-            showAttachmentToast(t("notes.list.archiveSingleError"));
-          });
+          void ctx
+            .archiveWithRollback(id)
+            .then(() => {
+              // Archiving takes the note out of the live tree: close its tabs
+              // in every pane, or the pane keeps a resident, editable buffer
+              // whose next autosave drops `archived:` back off (myne-md/myne#819).
+              // The palette + the editor "..." menu are the two surfaces that
+              // reach this handler; both previously left the tab open.
+              paletteWs.closeNoteEverywhere(id);
+            })
+            .catch(() => {
+              showAttachmentToast(t("notes.list.archiveSingleError"));
+            });
         }
       },
       onRenameNote: () => {
         if (ctx.selectedId !== null) ctx.startRename(ctx.selectedId);
       },
       onTrashNote: () => {
-        if (ctx.selectedId !== null) {
+        const id = ctx.selectedId;
+        if (id !== null) {
           // Same as `onArchiveNote`: `trashNote`'s flush rejection must reach
           // the user rather than being swallowed.
-          void ctx.trashWithRollback(ctx.selectedId).catch(() => {
-            showAttachmentToast(t("notes.list.trashSingleError"));
-          });
+          void ctx
+            .trashWithRollback(id)
+            .then(() => {
+              // Trashing also removes the note from the live tree, so close its
+              // tabs - a stale buffer autosaved back would resurrect it
+              // (myne-md/myne#819).
+              paletteWs.closeNoteEverywhere(id);
+            })
+            .catch(() => {
+              showAttachmentToast(t("notes.list.trashSingleError"));
+            });
         }
       },
       onEmptyTrash: (viaKey: boolean) => {
