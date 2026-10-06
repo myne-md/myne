@@ -3764,6 +3764,7 @@
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "recoveryDrill": "recovery phrase check verify drill test 24 words seed backup lost password",
         "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
+        "bar": "bottom bar status bar indicators customize reorder hide show toolbar",
         "ribbon": "left ribbon rail pin pins command commands customize reorder unpin toolbar shortcuts",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "screenCaptureOverride": "screen capture override allow disable magnifier remote desktop accessibility unlock screen black",
@@ -4627,7 +4628,7 @@
       "continue": "Continue",
       "eyebrowLabel": "Name your vault",
       "heading": "What should we call this vault?",
-      "helper": "The name is stored encrypted with the vault, so only you can read it. You can change it later, or hide vault names entirely, in Settings.",
+      "helper": "The name is stored encrypted with the vault. On this device it is shown on the startup vault picker before you unlock, so anyone who can see that screen can read it; hide vault names in Settings to turn that off. You can change it later.",
       "intro": "You will see this name on the lock screen and in your vault list.",
       "placeholder": "Personal"
     },

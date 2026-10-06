@@ -1069,6 +1069,12 @@ pub(crate) async fn verify_recovery_phrase_with_path(
     state: &VaultRuntimeState,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<bool, VaultRecoveryError> {
+    // Wrap immediately so any early-return path (SlotNotUnlocked,
+    // RecoveryInProgress, IO failure, parse failure) drops the wrapper and
+    // zeroes the bytes. The twin `recover_with_phrase_with_path` does the same;
+    // a plain `String` would drop the credential without wiping it.
+    let phrase = Zeroizing::new(phrase);
+
     // (1) The unlock gate, asserted HERE rather than only at the caller: this is
     //     the function the tests drive, and a gate that lives one frame up is a
     //     gate a future caller can skip.

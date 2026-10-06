@@ -57,12 +57,6 @@ pub struct ConversationEntry {
     /// syncs (remove-wins over a concurrent append, the § 11.4 rule).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<u64>,
-    pub title: String,
-    pub updated_at: u64,
-    /// Causal merge counter, the sync race key (§ 11.4 discipline:
-    /// `max(observed) + 1` on any mutation of this key; absent ≡ 0).
-    #[serde(default, skip_serializing_if = "is_zero_u64")]
-    pub version: u64,
     /// The note this conversation is anchored to, when it is (myne-md/myne#771).
     /// A **field on the existing row, not a new blob family**: the roster already
     /// syncs Class-1, so the Hub can list and link every note-anchored
@@ -72,14 +66,20 @@ pub struct ConversationEntry {
     /// **Additive and backward-compatible**: the field is `Option` with
     /// `skip_serializing_if`, so a conversation written before this existed
     /// reads back with `None`, and a reader that does not know the field keeps
-    /// the row it already understood. The canonical-JSON key order is
-    /// alphabetical (§ 9.23), so `note_id` sorts between `deleted_at` and
-    /// `title`; serde emits struct fields in declaration order, and
-    /// `serde_json`'s default map is a `BTreeMap`-ordered pass only when the
-    /// `preserve_order` feature is off, which is the case here, so the emitted
-    /// key order stays canonical whatever this declaration order is.
+    /// the row it already understood. It is declared HERE, between `deleted_at`
+    /// and `title`, because the canonical-JSON key order is lexicographic
+    /// (§ 9.23): a derived `serde` struct emits its fields in **declaration
+    /// order**, so the declaration order is the emitted order and nothing
+    /// re-sorts it. An independent implementation emitting sorted keys must
+    /// therefore produce the same bytes, which is what the `MYM1` vectors pin.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note_id: Option<String>,
+    pub title: String,
+    pub updated_at: u64,
+    /// Causal merge counter, the sync race key (§ 11.4 discipline:
+    /// `max(observed) + 1` on any mutation of this key; absent ≡ 0).
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub version: u64,
 }
 
 fn is_zero_u64(v: &u64) -> bool {
