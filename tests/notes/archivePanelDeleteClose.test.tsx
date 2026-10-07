@@ -89,6 +89,17 @@ describe("ArchivePanel delete-to-trash closes the note's tab", () => {
       />,
     );
     act(() => api.current!.openInFocused("arch-1"));
+    // PIN the tab. The defect this guards is that a PINNED tab survived its
+    // note's trash; an unpinned tab was already closed before the fix, so an
+    // unpinned fixture passes on the pre-fix tree and guards nothing.
+    act(() =>
+      api.current!.setItemPinned(
+        api.current!.focusedPaneId,
+        { kind: "note", id: "arch-1" },
+        true,
+      ),
+    );
+    expect(api.current!.leaves[0]?.tabs[0]?.pinned).toBe(true);
     expect(openNoteIds(api.current!.leaves)).toContain("arch-1");
 
     fireEvent.click(await screen.findByTestId("archive.delete"));
@@ -110,6 +121,13 @@ describe("ArchivePanel delete-to-trash closes the note's tab", () => {
       />,
     );
     act(() => api.current!.openInFocused("arch-1"));
+    act(() =>
+      api.current!.setItemPinned(
+        api.current!.focusedPaneId,
+        { kind: "note", id: "arch-1" },
+        true,
+      ),
+    );
 
     fireEvent.click(await screen.findByTestId("archive.delete"));
     await waitFor(() => expect(trashWithRollback).toHaveBeenCalledWith("arch-1"));
