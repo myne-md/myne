@@ -96,6 +96,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_ai_provider_consent,
             commands::set_ai_provider_key,
             commands::set_ai_provider_model,
+            commands::set_meeting_ai_prompt,
             commands::ai_provider_has_key,
             commands::set_reminders_enabled,
             commands::set_reminder_horizon_days,

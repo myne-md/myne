@@ -2399,6 +2399,7 @@ export const ROSTER = Object.freeze([
       "src/lib/meeting-notes.ts",
       "src/notes/meetingSession.ts",
       "src/notes/meetingNote.ts",
+      "src/components/meeting/",
       "editor/src/attachments/meetingBar.ts",
       "src-tauri/src/tray.rs",
       "src-tauri/src/plugins/attachments/meeting/",
@@ -2407,7 +2408,7 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/plugins/attachments/voice/tap.rs",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
-    automatedBy: ["e2e/meeting-notes.e2e.ts"],
+    automatedBy: ["e2e/meeting-notes.e2e.ts", "e2e/meeting-ai.e2e.ts"],
     manual: [
       {
         see: "On a macOS 14.2 or later release build, join a call with another participant and start a meeting session. Confirm the system-audio permission prompt appears the first time, and that with it granted the other participant's words appear in the session's transcript blocks AND in the note the session writes, with the audio players at the top of that note playing both sides back.",
@@ -2436,6 +2437,13 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos"],
         estimateMin: 10,
         tier: "core",
+      },
+      {
+        see: "With a real text model installed, run a meeting session, take the AI offer, and generate the sections. Confirm the summary, action items, decisions and open questions read as a faithful, usable draft against the transcript (a perceptual judgement of a small model's output, not a mechanical check), that the sections land beneath the transcript without altering it, and that the offer, picker and preview render legibly on macOS and Windows.",
+        whyNotAutomated: "A real model's output quality is a human reading judgement that no stub can stand in for, and the macOS and Windows renderings of the dialog have no driver lane (the container runs WebKitGTK on Linux).",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
       },
     ],
     exemptionReason: "",

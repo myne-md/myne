@@ -48,6 +48,7 @@ permissions = [
   "allow-set-ai-provider-consent",
   "allow-set-ai-provider-key",
   "allow-set-ai-provider-model",
+  "allow-set-meeting-ai-prompt",
   "allow-ai-provider-has-key",
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
@@ -589,6 +590,11 @@ commands.allow = ["set_ai_provider_key"]
 identifier = "allow-set-ai-provider-model"
 description = "Allow invoking prefs:set_ai_provider_model (Slot::Unlocked-gated setter for WHICH model at the named remote AI provider answers, myne#415, ledger SYNC-24). An Option<String>; None clears it and an all-whitespace value is treated as a clear rather than stored as a blank that would fail every request. Deliberately NOT validated against a compiled-in list, unlike its three siblings: the valid set is whatever the provider published a moment ago, which is the whole content of SYNC-24 (Myne ships no per-provider model default; the user picks from the list the provider itself reports). A pinned allowlist would re-introduce the rot that resolution rejected and would buy nothing, because this value selects among a provider's own catalogue and cannot name a DESTINATION — the destination is a compiled-in host constant no pref can redirect. What is bounded instead is the length (200 bytes), so a compromised WebView cannot use the blob as storage. Classified Shared / scalar last-write-wins (sync-protocol.md 10.2), travelling with the selection it qualifies: a device that inherited the provider but not the model would be configured with nothing to ask. Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["set_ai_provider_model"]
+
+[[permission]]
+identifier = "allow-set-meeting-ai-prompt"
+description = "Allow invoking prefs:set_meeting_ai_prompt (Slot::Unlocked-gated setter for the meeting AI prompt, meeting-ai). An Option<String>; None or an all-whitespace value clears it, restoring the built-in default instruction, and a value longer than 4000 bytes is refused so a compromised WebView cannot use the blob as storage. Classified Shared / scalar last-write-wins (sync-protocol.md 10.2), so the instruction reaches the account's other devices. The value is user text and is never logged (DENY list, src-tauri/AGENTS.md). Atomic-writes vault.prefs with no native side-effect. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_meeting_ai_prompt"]
 
 [[permission]]
 identifier = "allow-ai-provider-has-key"
