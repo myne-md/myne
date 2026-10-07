@@ -1076,6 +1076,32 @@
       }
     },
     "meeting": {
+      "ai": {
+        "cancelled": "Stopped. Nothing was added to the note.",
+        "close": "Close",
+        "discard": "Discard",
+        "failed": "The AI pass failed. The transcript is unchanged.",
+        "generate": "Generate",
+        "insert": "Insert into note",
+        "notice": "AI-generated from the transcript above. It can be wrong; the transcript is the record.",
+        "noAttribution": "The transcript does not say who spoke, so action items have no owners.",
+        "noModel": "No AI model is installed for generating text. The meeting summary needs one; download it in Settings, AI.",
+        "offer": "Meeting saved. Summarize it with AI?",
+        "offerAction": "Summarize",
+        "openSettings": "Open AI settings",
+        "pickIntro": "Choose what to generate from the transcript.",
+        "progress": "Part {{done}} of {{total}}",
+        "reviewIntro": "Review before inserting. The transcript stays as it is.",
+        "running": "Generating…",
+        "section": {
+          "actionItems": "Action items",
+          "decisions": "Decisions",
+          "openQuestions": "Open questions",
+          "summary": "Summary"
+        },
+        "stop": "Stop",
+        "title": "Meeting AI"
+      },
       "barAria": "Meeting session",
       "cancel": "Cancel",
       "chunksMissing": "Part of the meeting did not transfer, so the note has a gap. The audio that arrived is still there.",
@@ -3323,6 +3349,9 @@
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
+      "meetingPromptHelper": "The instruction the meeting AI pass uses to turn a transcript into sections. Leave it empty for the built-in default. It replaces the default output format, so if you set it, ask for the sections you want yourself.",
+      "meetingPromptLabel": "Meeting summary prompt",
+      "meetingPromptReset": "Reset to default",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
@@ -3739,6 +3768,7 @@
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
+        "aiMeetingPrompt": "meeting summary prompt instruction custom transcript action items decisions",
         "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
         "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",

@@ -442,6 +442,29 @@ export const TEARDOWN_CALLS = [
     },
   },
   {
+    call: "clearMeetingAiOffer",
+    declaredIn: "src/components/meeting/meetingAiStore.ts",
+    holds:
+      "the meeting-AI offer: the note id and the full meeting transcript (other people's speech, AS1-class) a session published so the dialog could read it. A lock or a vault switch with the offer live leaves it resident, and the next Editor mount re-renders the dialog from the same module value against the previous vault's note id, which is the myne-md/myne#529 shape one surface over.",
+    // Asserted through the meeting-session teardown, which both desktop leaving
+    // paths already call: the offer is part of that session's RAM, so it clears
+    // in the same function that clears the clip transcripts and the bar.
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    via: {
+      "desktop-lock": { fn: "teardownMeetingSessionForLock", file: "src/notes/meetingSession.ts" },
+      "desktop-switch": { fn: "teardownMeetingSessionForLock", file: "src/notes/meetingSession.ts" },
+    },
+    skips: {
+      "desktop-create": SKIP_CREATE,
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+      "mobile-lock":
+        "the meeting AI dialog is desktop-only; the store lives under `src/components/meeting/`, which the mobile client does not compile, so there is nothing on the mobile path to clear.",
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would discard the offer for a session the user is still in.",
+    },
+  },
+  {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",

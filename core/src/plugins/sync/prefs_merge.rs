@@ -695,6 +695,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         daily_template: lww!("daily_template", daily_template),
         icon: lww!("icon", icon),
         label: lww!("label", label),
+        // meeting-ai: Shared/ScalarLww. The custom meeting-AI instruction is
+        // vault content the user wants on every device, and last-writer-wins is
+        // right for a single text value.
+        meeting_ai_prompt: lww!("meeting_ai_prompt", meeting_ai_prompt),
         new_note_location: lww!("new_note_location", new_note_location),
         new_note_location_folder: lww!("new_note_location_folder", new_note_location_folder),
         // ---- shared: set-union with per-entry removal clocks (myne#613) ------

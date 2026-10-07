@@ -1842,6 +1842,18 @@ The device-local `vault.member-key` file that lets a B2B member re-unlock a shar
 
 Used in: `docs/decisions/protocol/0606-member-vault-key-store.md`; `docs/spec/protocol.md` §5.2; `myne-md/myne#711`.
 
+### **meeting AI sections** &nbsp; 📦 *Product*
+
+The opt-in, machine-generated block a meeting note can gain beneath its verbatim transcript: a summary, action items, decisions and open questions, produced on demand by an on-device (or user-consented remote) AI pass and appended as ordinary markdown under a machine-generated notice distinct from the transcript's own. The block is wrapped in two HTML comment markers, so a regenerate replaces exactly that region and never touches the transcript or user text. It never replaces the transcript (`decisions/ai/0648`, which amends `docs/decisions/storage/0646`).
+
+Used in: `decisions/ai/0648`; `docs/decisions/storage/0646`; `docs/threat-model.md` TB13
+
+### **meeting AI prompt** &nbsp; 📦 *Product*
+
+The optional `vault.prefs` field (`meeting_ai_prompt`, `protocol.md` §9.5.2, Shared / scalar-LWW) that replaces the meeting AI pass's reduce instruction verbatim when set. It scopes to the meeting AI feature only, not the other AI surfaces; empty or absent means the built-in default instruction. Classified shared so it reaches the account's other devices.
+
+Used in: `protocol.md` §9.5.2; `sync-protocol.md` §10.2; `decisions/ai/0648`
+
 ### **membership roster extension** &nbsp; 📦 *Product*
 
 The `vault.meta` membership field's third shape: NTV5 `reserved` byte

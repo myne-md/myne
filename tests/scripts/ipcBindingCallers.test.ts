@@ -369,7 +369,10 @@ function healthyFiles(): Record<string, string> {
   await invoke("plugin:vault-unlock|vault_delete");
 }
 `,
-    "src/notes/meetingSession.ts": `export function teardownMeetingSessionForLock(): void {}\n`,
+    "src/notes/meetingSession.ts": `export function teardownMeetingSessionForLock(): void {
+  clearMeetingAiOffer();
+}\n`,
+    "src/components/meeting/meetingAiStore.ts": `export function clearMeetingAiOffer(): void {}\n`,
     "src/notes/scrollMemory.ts": `export function resetScrollMemory(): void {}\n`,
     "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
     "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,

@@ -104,6 +104,7 @@ import {
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
+import { MeetingAiDialog } from "../components/meeting/MeetingAiDialog";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
@@ -2633,6 +2634,15 @@ function EditorChrome({
         open={vaultExportOpen}
         onClose={() => setVaultExportOpen(false)}
         folders={vaultExportFolders}
+      />
+      {/* Meeting AI: the opt-in pass, self-driving from the offer store, so it
+          needs no state from Editor and renders nothing until an offer exists. */}
+      <MeetingAiDialog
+        onOpenAiSettings={() => openSettings("ai")}
+        settle={{
+          reloadOpenNote: () => ctx.reloadOpenNote(),
+          refreshOne: (id) => ctx.refreshOne(id),
+        }}
       />
       {/* MYND-567: the `myne://theme/install` confirmation gate. Self-driving -
           it drains the deep-link latch on mount and listens for warm arrivals,

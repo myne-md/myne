@@ -350,6 +350,7 @@ const V = {
     "Pure URL construction for the published legal documents (myne-ops#15) — no host call, no IPC, no platform branch. The only input is the i18next language tag, which both clients have. Opening the URL is the seam's job (`openUrl`), and that is already substituted.",
   ],
   "src/lib/load-bearing-copy.ts": ["ported", "Re-exports `@myne/copy`; the literals are identical across clients by construction."],
+  "src/lib/meeting-ai.ts": ["typed-unsupported", "Wraps the `local-inference` plugin's `infer_batch` and `chat_stop`; the whole `local-inference` plugin is `Class::Unsupported` on web (web/wasm/src/capability.rs), so on web the dispatcher answers a typed refusal. The meeting AI surface is desktop-only and is not mounted on web."],
   "src/lib/note-export-errors.ts": ["ported", "Error copy; the export destinations differ, the taxonomy does not."],
   "src/lib/noteImageCard.ts": ["ported", "Pure markdown/DOM shaping."],
   "src/lib/noteImageExport.ts": ["adapted", "Rendering is portable; delivery goes through the download seam."],

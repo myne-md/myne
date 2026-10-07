@@ -31,6 +31,7 @@ import type { ImportedAttachment } from "@myne/editor";
 import i18n from "../i18n";
 import { prefsRead } from "../lib/prefs";
 import { toast } from "../components/toast/toastStore";
+import { clearMeetingAiOffer, offerMeetingAi } from "../components/meeting/meetingAiStore";
 import { createNoteFromBody } from "./newNoteFromTemplate";
 import { buildMeetingNote, meetingNoteHasContent } from "./meetingNote";
 import {
@@ -256,6 +257,12 @@ export async function cancelMeetingSession(): Promise<void> {
  */
 export function teardownMeetingSessionForLock(): void {
   transcripts.clear();
+  // The AI offer holds the note id and the full transcript (other people's
+  // speech, AS1-class) so the dialog can read it. It must not outlive the
+  // unlocked session: a lock or a vault switch with the offer live would leave
+  // it resident, and the next Editor mount would re-render the dialog from the
+  // same module value against the previous vault's note id.
+  clearMeetingAiOffer();
   teardown();
 }
 
@@ -318,6 +325,28 @@ async function writeMeetingNote(
     } catch {
       /* the note is on disk; the next sidebar refresh will show it */
     }
+  }
+  // Offer the AI pass, once, and only when the on-device AI beta is on. The
+  // offer is a toast; taking it opens the dialog through the offer store (the
+  // session module is not React). Gates beyond `ai_enabled` (an AI-excluded
+  // folder, a missing generation model) are the dialog's concern.
+  const prefs = await prefsRead().catch(() => null);
+  // Offered only when the on-device AI beta is on. The meeting note is created
+  // at the vault root (`createNoteFromBody(body, name, null)`), and the
+  // `ai_excluded_folders` set holds non-empty folder paths, so a root note is
+  // never excluded: there is no folder gate to apply here. A future change that
+  // files the meeting note in a folder owes the `isNoteAiExcluded` check against
+  // the folder it actually lands in.
+  if (prefs?.ai_enabled === true) {
+    toast({
+      message: i18n.t("editor.meeting.ai.offer"),
+      variant: "info",
+      action: {
+        label: i18n.t("editor.meeting.ai.offerAction"),
+        onAction: () => offerMeetingAi(id, transcript),
+      },
+      testId: "meeting.ai-offer",
+    });
   }
 }
 

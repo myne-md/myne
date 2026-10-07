@@ -358,7 +358,17 @@
     "the base plus both deltas: 11174 + 126 + 130 = 11430. Written out because a",
     "merge that silently kept one side would look like the ratchet holding while",
     "half the roster went unaccounted, which is the failure a ceiling exists to",
-    "make loud."
+    "make loud.",
+    "",
+    "CEILING RAISED 11430 -> 11450 by meeting-ai, in the sanctioned direction: a",
+    "NEW surface that genuinely needs a human. What added the minutes, named so",
+    "the raise is an argument: the meeting AI output quality (a perceptual",
+    "judgement of a small model's summary, action items, decisions and open",
+    "questions against the transcript) and the macOS/Windows rendering of the",
+    "offer, the section picker and the preview, 10 minutes on each of two desktop",
+    "clients (+20). The desktop E2E lane runs WebKitGTK on Linux against a stub",
+    "model, so neither the real output nor those two renderings is observable in",
+    "any lane. The item is standard tier, so gatedMinutes is unchanged."
   ],
   "$comment2": [
     "CEILING RAISED 9822 -> 9846 by myne-md/myne#456, in the sanctioned direction.",
@@ -685,7 +695,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11430,
+  "totalMinutesCeiling": 11450,
   "gatedMinutes": 3837,
   "$comment6": [
     "CEILING RAISED 11096 -> 11120 by myne-md/myne#788, in the sanctioned",
