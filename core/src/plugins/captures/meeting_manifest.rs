@@ -80,6 +80,15 @@ pub struct MeetingSession {
     pub started_at: u64,
     /// The session's sealed chunks, ascending by `chunk_index`.
     pub chunks: Vec<MeetingChunk>,
+    /// The vault note this session already drained into, once one exists
+    /// (myne-md/myne#812 review). Recorded so a later drain that resolves a
+    /// previously-retryable chunk APPENDS to that note rather than creating a
+    /// second one — one import hiccup must not fragment a meeting into two
+    /// disconnected notes. `None` until the first successful note creation.
+    /// `#[serde(default)]` so a record written before this field existed still
+    /// parses.
+    #[serde(default)]
+    pub note_id: Option<String>,
 }
 
 /// Is `s` a safe manifest-stem session id? Non-empty, at most
@@ -153,6 +162,7 @@ pub fn append_chunk(
             session_id: session_id.to_string(),
             started_at,
             chunks: Vec::new(),
+            note_id: None,
         },
     };
     if session.chunks.iter().any(|c| c.chunk_index == chunk_index) {
@@ -168,6 +178,25 @@ pub fn append_chunk(
     let encoded = serde_json::to_vec(&session).map_err(|_| CaptureError::Backend)?;
     crate::atomic_write::atomic_write_private(&path, &encoded, true).map_err(io)?;
     Ok(true)
+}
+
+/// Record the vault note a session drained into, so a later re-drain appends to
+/// it instead of creating a second note (myne-md/myne#812 review). A no-op when
+/// the session record is already gone (fully acked) — there is nothing to append
+/// to, and the caller is mid-ack anyway.
+pub fn set_note_id(
+    manifest_dir: &Path,
+    session_id: &str,
+    note_id: &str,
+) -> Result<(), CaptureError> {
+    let path = manifest_path(manifest_dir, session_id)?;
+    let Some(mut session) = read_session(manifest_dir, session_id)? else {
+        return Ok(());
+    };
+    session.note_id = Some(note_id.to_string());
+    let encoded = serde_json::to_vec(&session).map_err(|_| CaptureError::Backend)?;
+    crate::atomic_write::atomic_write_private(&path, &encoded, true).map_err(io)?;
+    Ok(())
 }
 
 /// List every readable session record. Best-effort: a file whose name is not a
@@ -256,6 +285,45 @@ mod tests {
         assert_eq!(s.chunks[0].entry_id, entry(0), "the original entry is kept");
         // The original start time is not overwritten by a later append either.
         assert_eq!(s.started_at, 10);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn note_id_is_recorded_and_survives_a_reload() {
+        let dir = tmp();
+        append_chunk(&dir, "sess-a", 1, 0, &entry(0)).unwrap();
+        assert!(
+            read_session(&dir, "sess-a")
+                .unwrap()
+                .unwrap()
+                .note_id
+                .is_none(),
+            "no note id before the note exists"
+        );
+
+        set_note_id(&dir, "sess-a", "n1").unwrap();
+        assert_eq!(
+            read_session(&dir, "sess-a")
+                .unwrap()
+                .unwrap()
+                .note_id
+                .as_deref(),
+            Some("n1"),
+            "note id recorded"
+        );
+        // A later chunk append does not clear it.
+        append_chunk(&dir, "sess-a", 1, 1, &entry(1)).unwrap();
+        assert_eq!(
+            read_session(&dir, "sess-a")
+                .unwrap()
+                .unwrap()
+                .note_id
+                .as_deref(),
+            Some("n1"),
+            "note id survives a chunk append"
+        );
+        // A no-op on an absent session (already acked).
+        set_note_id(&dir, "sess-gone", "n2").unwrap();
         let _ = std::fs::remove_dir_all(&dir);
     }
 

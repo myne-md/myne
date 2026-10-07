@@ -28,6 +28,13 @@ import WatchConnectivity
 /// transfer until a watch restart (the same hazard
 /// [`WatchConnectivityClient`] guards its captures against).
 ///
+/// The `inFlight` map is RAM-only, so a chunk whose transfer completes **after a
+/// watch-app relaunch** is not deleted by `didFinish` — the mapping was lost with
+/// the process. That file lingers in `tmp` (OS-Data-Protection-only, like the
+/// dictated-capture outbox) until `tmp` reclamation, which is the accepted
+/// window rather than a leak of anything that is not already on the watch in
+/// plaintext. `MeetingRecorder`'s `workDir` doc says the same thing.
+///
 /// The watch holds **NO vault key and runs NO crypto**: this type moves file
 /// bytes over the OS-encrypted WatchConnectivity transport and nothing else. The
 /// phone seals each chunk on arrival.
@@ -101,6 +108,8 @@ final class MeetingTransfer: NSObject {
     /// `WCSessionDelegate.session(_:didFinish fileTransfer:)` — routed here by
     /// [`WatchConnectivityClient`], the watch app's one delegate owner. Deletes
     /// the local chunk ONLY on success; on failure the file stays for a retry.
+    /// A transfer with no `inFlight` entry (it completed after a relaunch lost
+    /// the map) is left to `tmp` reclamation — see the type doc.
     func didFinish(fileTransfer: WCSessionFileTransfer, error: Error?) {
         lock.lock()
         let fileURL = inFlight.removeValue(forKey: ObjectIdentifier(fileTransfer))

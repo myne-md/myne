@@ -177,7 +177,9 @@ fn main() {
                     // reachable through two of the three and absent from this list
                     // is the drift `check-mobile-plugin-acl.mjs` exists to refuse.
                     "seal_meeting_chunk",
+                    "seal_meeting_inbox",
                     "drain_pending_meetings",
+                    "set_meeting_session_note",
                     "ack_meeting_session",
                 ]),
             )

@@ -137,7 +137,12 @@ public final class WCMeetingReceiver: Plugin {
             // Dropping it without deleting leaves the OS to reclaim its inbox.
             return
         }
-        guard let moved = Self.moveIntoInbox(parsed.sourceURL) else {
+        guard let moved = Self.moveIntoInbox(
+            parsed.sourceURL,
+            sessionID: parsed.sessionID,
+            chunkIndex: parsed.chunkIndex,
+            startedAt: parsed.startedAt
+        ) else {
             // The move failed (no inbox dir, or the source vanished between the
             // delegate firing and this call). Nothing app-owned exists to seal,
             // so there is nothing to queue; `transferFile` re-delivers.
@@ -197,13 +202,29 @@ public final class WCMeetingReceiver: Plugin {
         return (url, sessionID, chunkIndex, startedAt)
     }
 
-    /// Move the delivered file into the app-owned inbox, synchronously. Returns
-    /// the durable URL, or `nil` on any failure. `moveItem` (not `copyItem`): the
-    /// delivered file is consumed here, so a copy would leave a second plaintext
-    /// file for the OS to reclaim on its own schedule.
-    private static func moveIntoInbox(_ source: URL) -> URL? {
+    /// Move the delivered file into the app-owned inbox, synchronously, naming it
+    /// with the delivery's metadata. Returns the durable URL, or `nil` on any
+    /// failure. `moveItem` (not `copyItem`): the delivered file is consumed here,
+    /// so a copy would leave a second plaintext file for the OS to reclaim on its
+    /// own schedule.
+    ///
+    /// The name is `<session-id>.<chunk-index>.<started-at>.<uuid>`. Embedding the
+    /// metadata is what makes the inbox re-scannable: the WatchConnectivity
+    /// metadata is consumed the moment this delegate returns, so a seal that
+    /// fails or never runs would otherwise leave a chunk with no way to recover
+    /// its grouping. A session id is ASCII alphanumerics plus `-`/`_` and can
+    /// never contain a `.`, so the fields split unambiguously; the Rust
+    /// `seal_meeting_inbox` scan parses this exact shape
+    /// (`core/src/plugins/captures/commands.rs::parse_meeting_inbox_name`).
+    private static func moveIntoInbox(
+        _ source: URL,
+        sessionID: String,
+        chunkIndex: UInt32,
+        startedAt: UInt64
+    ) -> URL? {
         guard let dir = inboxDir() else { return nil }
-        let dest = dir.appendingPathComponent(UUID().uuidString)
+        let name = "\(sessionID).\(chunkIndex).\(startedAt).\(UUID().uuidString)"
+        let dest = dir.appendingPathComponent(name)
         do {
             try FileManager.default.moveItem(at: source, to: dest)
             return dest

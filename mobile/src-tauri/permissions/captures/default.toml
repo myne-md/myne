@@ -23,7 +23,9 @@ permissions = [
     "allow-take-pending",
     "allow-ack",
     "allow-seal-meeting-chunk",
+    "allow-seal-meeting-inbox",
     "allow-drain-pending-meetings",
+    "allow-set-meeting-session-note",
     "allow-ack-meeting-session",
 ]
 
@@ -48,9 +50,19 @@ description = "Allow invoking captures:seal_meeting_chunk (seal one arrived watc
 commands.allow = ["seal_meeting_chunk"]
 
 [[permission]]
+identifier = "allow-seal-meeting-inbox"
+description = "Allow invoking captures:seal_meeting_inbox (seal every watch meeting-audio chunk left in the app-owned inbox, recovering each delivery's grouping from its filename; the retry half of the on-arrival seal, runs while locked)."
+commands.allow = ["seal_meeting_inbox"]
+
+[[permission]]
 identifier = "allow-drain-pending-meetings"
 description = "Allow invoking captures:drain_pending_meetings (decrypt each sealed watch meeting-audio chunk and import it into the vault library as an attachment; requires the unlocked vault)."
 commands.allow = ["drain_pending_meetings"]
+
+[[permission]]
+identifier = "allow-set-meeting-session-note"
+description = "Allow invoking captures:set_meeting_session_note (record the vault note a drained meeting session produced, so a re-drain appends to it instead of creating a second note)."
+commands.allow = ["set_meeting_session_note"]
 
 [[permission]]
 identifier = "allow-ack-meeting-session"

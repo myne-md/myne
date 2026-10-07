@@ -71,6 +71,48 @@ export function buildMeetingNote(
 }
 
 /**
+ * Append one more chunk (clip + transcript) to a note already built by
+ * {@link buildMeetingNote}, for the re-drain of a session whose chunk arrived
+ * late (myne-md/myne#812 review). The new clip's embed is inserted at the end of
+ * the existing embed block (immediately before the transcript heading), and its
+ * transcript text is appended to the transcript, so the note stays "one note"
+ * with the clips still in capture order.
+ *
+ * Idempotent on the clip's attachment id: a chunk whose embed is already present
+ * is left untouched, so an at-least-once re-drain cannot duplicate an embed. (The
+ * transcript text is not de-duplicated — the same rare duplicate the
+ * at-least-once contract already accepts.)
+ */
+export function appendMeetingChunk(
+  body: string,
+  clip: MeetingClipRef,
+  transcript: string,
+  copy: MeetingNoteCopy,
+): string {
+  const embed = `![[att:${clip.attachmentId}]]`;
+  if (body.includes(embed)) return body;
+
+  const text = transcript.trim();
+  const heading = `## ${copy.transcriptHeading}`;
+  const lines = body.split("\n");
+  const headingIdx = lines.findIndex((line) => line.trim() === heading);
+
+  if (headingIdx === -1) {
+    // No transcript section yet: add the embed, then a fresh section.
+    const withEmbed = body.trim().length > 0 ? `${body.trimEnd()}\n\n${embed}` : embed;
+    if (text.length === 0) return withEmbed;
+    return `${withEmbed}\n\n${heading}\n\n_${copy.machineNotice}_\n\n${text}`;
+  }
+
+  // Insert the embed at the end of the embed block (just before the heading) and
+  // append the new transcript text at the very end.
+  const before = lines.slice(0, headingIdx).join("\n").trimEnd();
+  const after = lines.slice(headingIdx).join("\n");
+  const withEmbed = before.length > 0 ? `${before}\n\n${embed}\n\n${after}` : `${embed}\n\n${after}`;
+  return text.length === 0 ? withEmbed : `${withEmbed.trimEnd()}\n\n${text}`;
+}
+
+/**
  * Whether a note body built by {@link buildMeetingNote} carries anything worth
  * opening. A session that captured nothing at all is a failed session, and the
  * caller says so rather than opening an empty note.

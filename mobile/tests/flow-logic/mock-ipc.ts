@@ -146,6 +146,11 @@ export interface MockConfig {
     started_at: number;
     chunks: Array<{ chunk_index: number; attachment_id: string }>;
     missing_chunk_indices?: number[];
+    retryable_chunk_indices?: number[];
+    /** A note a previous drain already wrote for this session (myne-md/myne#812
+     *  review): a re-drain APPENDS to it instead of creating a second note.
+     *  `set_meeting_session_note` records one too, and that takes precedence. */
+    note_id?: string | null;
   }>;
   /** Reject the first N `captures|ack_meeting_session` calls (myne-md/myne#812).
    *  Drives the crash-after-note-before-ack path: the note is created, the ack
@@ -1485,9 +1490,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // acks reject, driving that crash-after-note-before-ack path.
       "plugin:captures|meeting_pending_sessions": () => config.pendingMeetings ?? [],
       "plugin:captures|drain_pending_meetings": () => {
-        const w = window as unknown as { __meetingAcked?: string[] };
+        const w = window as unknown as {
+          __meetingAcked?: string[];
+          __meetingNoteIds?: Record<string, string>;
+        };
         const acked = new Set(w.__meetingAcked ?? []);
-        return (config.pendingMeetings ?? []).filter((s) => !acked.has(s.session_id));
+        const noteIds = w.__meetingNoteIds ?? {};
+        return (config.pendingMeetings ?? [])
+          .filter((s) => !acked.has(s.session_id))
+          .map((s) => ({ ...s, note_id: noteIds[s.session_id] ?? s.note_id ?? null }));
+      },
+      // The retry half of the on-arrival seal (myne-md/myne#812 review): records
+      // the call so a spec can assert boot / unlock re-scans the inbox.
+      "plugin:captures|seal_meeting_inbox": () => {
+        const w = window as unknown as { __sealMeetingInboxCalls?: number };
+        w.__sealMeetingInboxCalls = (w.__sealMeetingInboxCalls ?? 0) + 1;
+        return 0;
+      },
+      // Record the note a session drained into, mirroring the real manifest
+      // write, so a re-drain returns it and APPENDS (myne-md/myne#812 review).
+      "plugin:captures|set_meeting_session_note": (args) => {
+        const w = window as unknown as { __meetingNoteIds?: Record<string, string> };
+        (w.__meetingNoteIds ??= {})[String(args.sessionId ?? "")] = String(args.noteId ?? "");
+        return null;
       },
       "plugin:captures|ack_meeting_session": (args) => {
         const w = window as unknown as {

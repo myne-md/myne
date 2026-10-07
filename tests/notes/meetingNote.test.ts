@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendMeetingChunk,
   buildMeetingNote,
   meetingNoteHasContent,
   type MeetingNoteCopy,
@@ -76,6 +77,40 @@ describe("buildMeetingNote", () => {
     // differs and the note is meant to be readable as markdown.
     const body = buildMeetingNote([clip("aa"), clip("bb")], "", COPY);
     expect(body).toBe("![[att:aa]]\n\n![[att:bb]]");
+  });
+});
+
+describe("appendMeetingChunk", () => {
+  it("inserts the new embed after the existing ones and appends the text", () => {
+    const first = buildMeetingNote([clip("aa")], "first words", COPY);
+    const body = appendMeetingChunk(first, clip("bb"), "second words", COPY);
+    const embeds = body.match(/!\[\[att:[a-f0-9]+\]\]/g) ?? [];
+    expect(embeds).toEqual(["![[att:aa]]", "![[att:bb]]"]);
+    const headingAt = body.indexOf(COPY.transcriptHeading);
+    expect(body.lastIndexOf("![[att:")).toBeLessThan(headingAt);
+    expect(body.indexOf("first words")).toBeLessThan(body.indexOf("second words"));
+  });
+
+  it("is idempotent on the attachment id", () => {
+    const first = buildMeetingNote([clip("aa")], "words", COPY);
+    expect(appendMeetingChunk(first, clip("aa"), "words", COPY)).toBe(first);
+  });
+
+  it("adds a transcript section when the note had none", () => {
+    const first = buildMeetingNote([clip("aa")], "", COPY);
+    const body = appendMeetingChunk(first, clip("bb"), "late words", COPY);
+    expect(body).toContain("![[att:aa]]");
+    expect(body).toContain("![[att:bb]]");
+    expect(body).toContain(COPY.transcriptHeading);
+    expect(body).toContain("late words");
+  });
+
+  it("adds the embed without a transcript section when the new chunk has no text", () => {
+    const first = buildMeetingNote([clip("aa")], "words", COPY);
+    const body = appendMeetingChunk(first, clip("bb"), "  ", COPY);
+    expect(body).toContain("![[att:bb]]");
+    expect(body).toContain("words");
+    expect(body.match(/## /g)?.length).toBe(1);
   });
 });
 

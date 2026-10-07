@@ -35,6 +35,21 @@ async function readMeetingAcks(page: Page): Promise<string[]> {
   );
 }
 
+/** The meeting-note bodies the drain UPDATED (the append path), filtered the
+ *  same way as {@link meetingNotes}. */
+async function meetingNoteUpdates(page: Page): Promise<string[]> {
+  const all = await page.evaluate(
+    () => (window as unknown as { __noteUpdates?: string[] }).__noteUpdates ?? [],
+  );
+  return all.filter((t) => t.includes("## Transcript"));
+}
+
+async function readSealInboxCalls(page: Page): Promise<number> {
+  return page.evaluate(
+    () => (window as unknown as { __sealMeetingInboxCalls?: number }).__sealMeetingInboxCalls ?? 0,
+  );
+}
+
 const A = "a".repeat(64);
 const B = "b".repeat(64);
 const C = "c".repeat(64);
@@ -133,12 +148,17 @@ test.describe("Apple Watch pending-meeting drain", () => {
     await expect(page.getByTestId("toast.host")).toContainText("gap");
   });
 
-  test("a crash after note-create and before ack re-drains into a duplicate", async ({ page }) => {
+  test("a crash after note-create and before ack re-drains by APPENDING, not duplicating", async ({
+    page,
+  }) => {
     await installMockIpc(page, {
       pendingMeetings: [threeChunkSession()],
       // The first ack rejects: the note is written, the ack fails, and the
       // session stays in the manifest.
       meetingAckFailures: 1,
+      // Persist the note body so the re-drain can READ the existing note and
+      // append to it.
+      statefulNoteWrites: true,
     });
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
@@ -147,12 +167,60 @@ test.describe("Apple Watch pending-meeting drain", () => {
     await expect.poll(() => meetingNotes(page)).toHaveLength(1);
     await expect.poll(() => readMeetingAcks(page)).toEqual(["sess-a"]);
 
-    // A second drain (foreground) sees the un-acked session again and writes a
-    // duplicate note rather than nothing — the at-least-once contract.
+    // A second drain (foreground) sees the un-acked session again. The note id
+    // was recorded before the failed ack, so the re-drain APPENDS to that note
+    // instead of creating a second, fragmenting one (myne-md/myne#812 review).
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect.poll(() => meetingNotes(page)).toHaveLength(2);
-    // …and the second attempt acks, clearing the session.
     await expect.poll(() => readMeetingAcks(page)).toEqual(["sess-a", "sess-a"]);
+    expect(await meetingNotes(page)).toHaveLength(1); // still exactly ONE note
+  });
+
+  test("a late chunk re-drains into the session's existing note, not a second one", async ({
+    page,
+  }) => {
+    // The exact fragmentation case: a first drain wrote the note from chunk 0,
+    // chunk 1 failed transiently and resolves on a later unlock. The session
+    // carries the note id it already produced, so the late chunk is APPENDED.
+    const existing = `![[att:${A}]]\n\n${HEADER}first words`;
+    await installMockIpc(page, {
+      pendingMeetings: [
+        {
+          session_id: "sess-late",
+          started_at: 1_700_000_000_000,
+          chunks: [{ chunk_index: 1, attachment_id: B }],
+          missing_chunk_indices: [],
+          retryable_chunk_indices: [],
+          note_id: "existing-note",
+        },
+      ],
+      noteBodies: { "existing-note": existing },
+      statefulNoteWrites: true,
+    });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+
+    // No NEW note was created; the existing one was updated.
+    await expect.poll(() => readMeetingAcks(page)).toEqual(["sess-late"]);
+    expect(await meetingNotes(page)).toHaveLength(0);
+    const updated = await meetingNoteUpdates(page);
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toContain(`![[att:${A}]]`); // kept the existing embed
+    expect(updated[0]).toContain(`![[att:${B}]]`); // added the late chunk's embed
+    expect(updated[0]).toContain("the quick brown fox"); // the late transcript
+    // The embed is in the embed block, above the transcript heading.
+    expect(updated[0].lastIndexOf("![[att:")).toBeLessThan(
+      updated[0].indexOf("## Transcript"),
+    );
+  });
+
+  test("unlock re-scans the meeting inbox (the retry half of the seal)", async ({ page }) => {
+    // A chunk whose on-arrival seal failed stays in the app-owned inbox under its
+    // metadata-bearing name; the drain re-scans it on unlock (myne-md/myne#812
+    // review). The boot path also calls it; here we only assert it runs.
+    await installMockIpc(page, { pendingMeetings: [] });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+    await expect.poll(() => readSealInboxCalls(page)).toBeGreaterThan(0);
   });
 
   test("a retryable chunk is not acked away (no permanent audio loss)", async ({ page }) => {
