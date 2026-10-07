@@ -31,6 +31,11 @@ const isMediaTarget = (target: string): boolean => {
 
 setEditorHost({
   t: (key, opts) => i18n.t(key, opts ?? {}),
+  // Meeting sessions (myne-md/myne#789). A no-op rather than an absent member:
+  // `src/AGENTS.md` records that a test asserting an optional seam member is
+  // ABSENT is vacuous unless the shared stub provides it, and the `/meeting`
+  // trigger's positive path needs the member to exist.
+  meetingSession: () => {},
   notes: { tagTree: async () => [], isMediaTarget },
   // The clipboard write the code-block copy button goes through
   // (myne-md/myne#390). Delegates to the WebView API so a test that wants to

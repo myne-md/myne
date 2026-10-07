@@ -24,5 +24,25 @@
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>md.myne.mobile</string>
+	<!-- The watch microphone is held open by MeetingRecorder (myne-md/myne#812).
+	     CaptureView's dictation uses the system text input's mic instead, which
+	     the OS owns — this key exists for the meeting recorder. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Myne records meeting audio to send to your paired iPhone, where it is encrypted before anything is stored.</string>
+	<!-- `myne-watch://meeting` opens the app straight onto the recorder — the
+	     complication's meeting entry point. `myne-watch:` is deliberately
+	     distinct from the phone's `myne:` scheme so the two never resolve to
+	     each other. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>md.myne.mobile.watchkitapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>myne-watch</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

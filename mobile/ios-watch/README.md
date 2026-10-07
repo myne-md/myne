@@ -1,24 +1,29 @@
-# `ios-watch/` — Myne Apple Watch companion (voice quick-capture)
+# `ios-watch/` — Myne Apple Watch companion (voice quick-capture + meeting recording)
 
 > Native SwiftUI watchOS app + complication + the iPhone-side WatchConnectivity
 > receiver. Committed here, **outside** the git-ignored `src-tauri/gen/apple/`
 > tree, so the sources survive `tauri ios init` (same discipline as
 > `ios-widgets/`). Spec: `docs/spec/protocol.md` §9.18. Scope decision:
-> main-repo `design-notes.md` 2026-07-12.
+> main-repo `design-notes.md` 2026-07-12. Meeting lane: myne-md/myne#812.
 
 ## What this is (and is not)
 
-**One feature: voice → on-watch dictation → plain text → a new vault note.** The
-watch app holds **no vault key and runs no crypto** — it dictates text and ships
-it to the paired iPhone over WatchConnectivity. The phone seals it into a
-device-local encrypted `MYK1` queue (`myne_core::plugins::captures`) and, on the
-next unlock, drains it into the vault as an ordinary note (the audited
-`plugin:notes|note_create` path). The watch is **outside the plaintext trust
-boundary**, exactly like the home-screen widget.
+**Two features, one trust boundary.** (1) **Voice quick-capture**: dictate text
+through the system input and ship it to the paired iPhone, where it becomes a new
+vault note. (2) **Meeting recording** (myne-md/myne#812): hold the watch
+microphone open for a meeting, spool it into numbered audio chunks, and ship each
+chunk to the phone, which seals it on arrival. Either way the watch app holds **no
+vault key and runs no crypto** — the phone seals everything into device-local
+encrypted queues (`MYK1` for captures, the share-import wrap key for meeting
+chunks) and, on the next unlock, drains them into the vault as ordinary notes
+(the audited `plugin:notes|note_create` path). The watch is **outside the
+plaintext trust boundary**, exactly like the home-screen widget.
 
-Deliberately **out of scope (V1):** reading / editing existing notes on the
-watch, search, audio-file capture, a Siri App Intent, and any vault key material
-on the watch.
+Deliberately **out of scope:** reading / editing existing notes on the watch,
+search, and any vault key material on the watch. The meeting recorder is
+deliberately **foreground-only** — no `HKWorkoutSession`, no background recording,
+and the screen stays on for the meeting's duration (see `MeetingRecorder.swift`
+for the trade).
 
 ## Tree
 
@@ -26,15 +31,25 @@ on the watch.
 ios-watch/
 ├── Shared/MyneWatchTheme.swift        ← Myne tokens + the "M" mark (both watch targets)
 ├── MyneWatch/                          ← the watchOS app (target: MyneWatch)
-│   ├── MyneWatchApp.swift              ← @main, activates WCSession
+│   ├── MyneWatchApp.swift              ← @main, activates WCSession, TabView of the
+│   │                                      two surfaces + the `myne-watch://meeting` route
 │   ├── CaptureView.swift               ← dictation UI + Send + "Sent" confirmation
-│   ├── WatchConnectivityClient.swift   ← WCSession.transferUserInfo(text) → phone
-│   └── Info.plist                      ← WKApplication + WKCompanionAppBundleIdentifier
+│   ├── MeetingRecorder.swift           ← mic → 15 s audio chunks + live elapsed (#812)
+│   ├── MeetingTransfer.swift           ← WCSession.transferFile per chunk + delete-on-complete (#812)
+│   ├── MeetingView.swift               ← recorder UI: start / live state / stop / discard (#812)
+│   ├── WatchConnectivityClient.swift   ← WCSession.transferUserInfo(text) → phone; owns the
+│   │                                      ONE delegate, incl. the meeting lane's
+│   │                                      `didFinish fileTransfer:` forward
+│   └── Info.plist                      ← WKApplication + WKCompanionAppBundleIdentifier +
+│                                          NSMicrophoneUsageDescription + the myne-watch: scheme
 ├── MyneWatchComplications/             ← watchOS WidgetKit complication (launcher)
 │   ├── MyneWatchComplications.swift
 │   └── Info.plist
 └── Receiver/                           ← iPhone-side (compiled INTO the iOS app)
-    ├── WCCaptureReceiver.swift         ← WCSessionDelegate → stages plaintext
+    ├── WCCaptureReceiver.swift         ← the ONE WCSessionDelegate: stages dictated
+    │                                      text; forwards file deliveries to the meeting handler
+    ├── WCMeetingReceiver.swift         ← meeting audio chunks (myne-md/myne#812): seals on
+    │                                      arrival, never stages plaintext
     └── WCCaptureReceiverBootstrap.m    ← ObjC +load launch-hook (no AppDelegate)
 ```
 
@@ -42,6 +57,20 @@ Data flow: `CaptureView → WatchConnectivityClient.transferUserInfo` → (WC tr
 → `WCCaptureReceiver.didReceiveUserInfo` writes `<app_data_dir>/pending-captures/
 staging/<uuid>` → Rust `captures|seal_staged` → `<…>/sealed/<capture-id>` (`MYK1`)
 → on unlock, JS `drainPendingCaptures` → `note_create` + `captures|ack`.
+
+Watch meeting flow (myne-md/myne#812): `MeetingView → MeetingRecorder` writes a
+**15 s chunk** to `tmp`, `MeetingTransfer.transferFile(_:metadata:)` ships it with
+`session_id` / `chunk_index` (from 0) / `started_at`, and the local chunk is
+deleted the moment `didFinish fileTransfer:` reports success. On the phone
+`WCCaptureReceiver.session(_:didReceive:)` forwards the delivery to
+`WCMeetingReceiver`, which dispatches a `myne-meeting-chunk` event into the
+WebView; `mobile/src/lib/captures.ts` seals it on arrival via
+`captures|seal_meeting_chunk` (device-key based — runs while the vault is LOCKED)
+into `<…>/pending-captures/meetings/entries/`, recording it in the per-session
+manifest. **No plaintext audio is staged by our code** — the WatchConnectivity
+inbox file is handed straight to the seal, which deletes it. On unlock,
+`drainPendingMeetings` imports each chunk into the vault, transcribes it, builds
+the note with the shared `buildMeetingNote`, creates it, then acks the session.
 
 ## Wiring into the Tauri iOS project (committed spec + ios-postinit.sh)
 
@@ -101,8 +130,11 @@ The committed spec declares:
   the same split the iOS archive already lives with. Build locally with
   `pnpm tauri ios build` (which drives xcodegen + xcodebuild) on a Mac.
 - Dictation uses the **system text input's mic** (tap the field → dictate), so
-  there is **no `SFSpeechRecognizer` and no microphone / speech entitlement** on
-  either target (the OS owns the mic).
+  there is **no `SFSpeechRecognizer` and no speech entitlement** on either target.
+  The meeting recorder is the first surface to hold the watch mic directly, so
+  `MyneWatch/Info.plist` now carries `NSMicrophoneUsageDescription` (the literal
+  plist, not `INFOPLIST_KEY_*` build settings — this target already uses a
+  committed plist file, copied into `gen/` by `ios-postinit.sh`).
 
 ## Pre-device static verification (done) + on-device checklist
 
@@ -111,8 +143,10 @@ real SDKs — `xcodebuild -target MyneWatch -sdk watchosNN` (watch app + complic
 BUILD SUCCEEDED, `swiftc -typecheck -sdk iphoneos` on the receiver + `clang
 -fsyntax-only` on the `+load` bootstrap are clean, and `xcodegen generate` emits all
 4 targets with the Embed-Watch-Content / Embed-Foundation-Extensions phases. The
-runtime assumptions a compiler can't see were verified against authoritative sources
-and two were fixed before device test:
+meeting recorder + transfer (`MeetingRecorder.swift`, `MeetingTransfer.swift`,
+`MeetingView.swift`) were added to the same `swiftc -typecheck -sdk watchos`
+invocation and compile clean. The runtime assumptions a compiler can't see were
+verified against authoritative sources and two were fixed before device test:
 
 - **Staging-dir path parity — RESOLVED (was a 100% break).** Tauri v2's iOS
   `app_data_dir()` = `dirs::data_dir()/<bundle id>` (verified in tauri 2.11.2
@@ -139,3 +173,47 @@ MYND-467):**
    while the phone vault is locked → the note appears after unlocking the phone; the
    `captures/sealed/` queue drains; the device wrap key is created without a
    biometric prompt.
+4. **Watch meeting capture end-to-end (myne-md/myne#812).** Start a recording on
+   the wrist, let it run long enough to produce several chunks, stop it, and
+   confirm the note arrives on the phone after unlock with the audio embeds and the
+   transcript. Cover: the phone staying LOCKED through the whole meeting (the seal
+   is device-key based); a watch that loses contact mid-meeting and reconnects
+   (the not-yet-transferred chunk stays on the watch); and a `seal_meeting_chunk`
+   that runs on a cold background launch (the receiver queues the delivery until
+   the WebView exists — see `WCMeetingReceiver`). The phone-side flow logic is
+   covered by `tests/flow-logic/captures/meeting-drain.flow.ts`; this row is the
+   device half.
+5. **`transferFile` is device-only too.** The watchOS **simulator does not support
+   `transferFile`** (the same limitation row 2 records for `transferUserInfo`), so
+   neither the chunk delivery nor the `didFinish fileTransfer:` delete-on-complete
+   can be exercised without a paired physical Watch. Confirm on device that a
+   chunk file actually disappears from the watch's `tmp` once its transfer reports
+   complete (`MeetingTransfer.didFinish`), and that a transfer attempted while out
+   of range leaves the file in place.
+6. **Microphone permission prompt.** The first `MeetingView` start must raise the
+   watchOS mic prompt from `NSMicrophoneUsageDescription`; confirm the wording
+   reads honestly and that denying it surfaces the view's error line rather than a
+   silent dead "Recording" state.
+7. **Foreground-only behaviour is the documented trade.** With a recording running,
+   drop the wrist and confirm what the app actually does (watchOS dims and suspends
+   a non-workout app; there is deliberately no `HKWorkoutSession` and no
+   background mode). The recorded expectation is: the session stops, the elapsed
+   counter freezes, and every chunk already transferred is safe on the phone. The
+   screen stays on only while the app is foregrounded.
+8. **Chunk boundaries and ordering under a real meeting.** Record past at least
+   three 15 s boundaries and confirm the phone-side note carries every chunk in
+   order with none missing or duplicated (this is the same claim as row 4, scoped
+   to the watch's chunk duration).
+9. **Discard a mistaken start.** Tap Discard on a just-started recording and
+   confirm no session and no chunk reaches the phone (the local chunk files are
+   removed and the session id is cleared).
+10. **Complication meeting entry point.** Add the rectangular complication and
+    confirm its recorder glyph opens the app straight on `MeetingView`
+    (`myne-watch://meeting`), while the complication body still launches to the
+    `CaptureView` dictation surface.
+11. **Page swipe vs. scroll (the one layout risk).** Both surfaces put a
+    `ScrollView` inside a `.verticalPage` `TabView`, so a vertical swipe is
+    claimed by both the page turn and the scroll. Confirm on device that the
+    capture surface still scrolls and still reaches the meeting page, and that
+    `CaptureView`'s one-tap dictation is unchanged. If the two fight, the fix is
+    a non-vertical TabView style rather than editing `CaptureView`.

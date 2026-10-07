@@ -241,6 +241,15 @@ export interface PrefsView {
    */
   last_backup_at: number | null;
   /**
+   * **Meeting AI prompt** (meeting-ai): the user's replacement for the meeting
+   * AI pass's reduce instruction. `null` (or an empty string) means the built-in
+   * default instruction is used; a non-empty value is used verbatim and replaces
+   * the default section machinery. It scopes to the meeting AI feature only.
+   * Serialized from Rust `Option<String>`; omitted from the encrypted blob when
+   * `null`. Non-load-bearing. Write via {@link setMeetingAiPrompt}.
+   */
+  meeting_ai_prompt: string | null;
+  /**
    * New-note default-location MODE (MYND-462, "Files" settings panel) —
    * {@link NewNoteLocation}: `"root"` (vault root), `"current"` (the active
    * note's folder), or `"specific"` (the folder named by
@@ -1159,6 +1168,17 @@ export async function setAiProviderKey(key: string | null): Promise<void> {
  */
 export async function setAiProviderModel(model: string | null): Promise<void> {
   await writePref("plugin:prefs|set_ai_provider_model", { model });
+}
+
+/**
+ * Replace the meeting AI prompt, or pass `null` to restore the built-in default
+ * (meeting-ai). An all-whitespace value is treated as a clear host-side, and a
+ * value longer than 4000 bytes is refused. The value is user text stored in the
+ * encrypted `vault.prefs`; being Shared / scalar last-write-wins it reaches the
+ * account's other devices.
+ */
+export async function setMeetingAiPrompt(prompt: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_meeting_ai_prompt", { prompt });
 }
 
 /**

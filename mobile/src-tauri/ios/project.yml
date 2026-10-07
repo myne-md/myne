@@ -57,8 +57,13 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
-      # The Apple Watch companion's iPhone-side receiver (§9.18): the
-      # WatchConnectivity delegate + the +load bootstrap, compiled INTO the app.
+      # The Apple Watch companion's iPhone-side receiver (§9.18 + myne-md/myne#812):
+      # the WatchConnectivity delegate + the +load bootstrap, compiled INTO the
+      # app. The directory carries BOTH lanes: `WCCaptureReceiver.swift` (the one
+      # delegate owner — dictated captures + the meeting `didReceive file:`
+      # forwarder), `WCMeetingReceiver.swift` (the meeting chunk handler), and
+      # `WCCaptureReceiverBootstrap.m`. Listing the DIRECTORY means a new sibling
+      # source is picked up with no second edit here.
       - path: ../../../ios-watch/Receiver
     info:
       path: myne-mobile_iOS/Info.plist

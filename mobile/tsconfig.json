@@ -53,7 +53,12 @@
       "@myne/undo-last-run": ["../src/notes/agent/useUndoLastRun.ts"],
       "@myne/engine-error": ["../src/lib/engine-error.ts"],
       "@myne/decorations": ["../src/notes/decorations.ts"],
-      "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"]
+      "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"],
+      // The shared meeting-note body builder (myne-md/myne#798). Pure — no
+      // imports at all — so a watch meeting drained on mobile produces the SAME
+      // note shape the desktop meeting session produces. A hand-copy is how the
+      // two clients would silently disagree about the embed/transcript layout.
+      "@myne/meeting-note": ["../src/notes/meetingNote.ts"]
     }
   },
   "include": ["src"]

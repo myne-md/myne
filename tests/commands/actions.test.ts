@@ -136,6 +136,7 @@ describe("Command palette action registry", () => {
       "folder.new",
       "graph.show",
       "graph.show-isolated",
+      "meeting.summarize",
       "nav.back",
       "nav.forward",
       "note.archive",

@@ -33,6 +33,7 @@ import {
   mutateCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
   setChatHistoryBudget as persistChatHistoryBudget,
+  setMeetingAiPrompt as persistMeetingAiPrompt,
   setDeveloperMode as persistDeveloperMode,
   setDateFormat,
   setTimeFormat,
@@ -145,6 +146,7 @@ const DEFAULT_PREFS: PrefsView = {
   label: null,
   icon: null,
   last_backup_at: null,
+  meeting_ai_prompt: null,
   new_note_location: null,
   new_note_location_folder: null,
   startup_open: null,
@@ -188,6 +190,8 @@ interface UsePrefsResult {
   /** `null` clears the override. The stored value may be lower than the one
    *  passed: the host clamps it, and this hook re-reads to show what stuck. */
   setChatHistoryBudget: (budget: number | null) => Promise<void>;
+  /** Set the custom meeting-AI prompt, or `null` to restore the default. */
+  setMeetingAiPrompt: (prompt: string | null) => Promise<void>;
   /**
    * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
    * Optimistic; same converge-on-error pattern. The socket itself follows
@@ -442,6 +446,26 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed. Keep the optimistic value; the backend
           // tracing logged the original failure. User can retry.
         }
+      }
+    },
+    [onError],
+  );
+
+  // The meeting AI prompt (meeting-ai). Optimistic-then-converge, like the
+  // other setters; a blank value is a clear host-side and the length is bounded
+  // there, so no clamp re-read is needed.
+  const setMeetingAiPromptPref = useCallback(
+    async (prompt: string | null) => {
+      setPrefs((p) => ({ ...p, meeting_ai_prompt: prompt }));
+      try {
+        await persistMeetingAiPrompt(prompt);
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed. Keep the optimistic value.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],
@@ -831,6 +855,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
     setChatHistoryBudget: setChatHistoryBudgetPref,
+    setMeetingAiPrompt: setMeetingAiPromptPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
     setReminderHorizon,

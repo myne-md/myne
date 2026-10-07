@@ -801,6 +801,16 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     testid: "ai.history-budget-input",
   },
   {
+    id: "ai.meeting-prompt",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.meetingPromptLabel",
+    descriptionKey: "settings.ai.meetingPromptHelper",
+    keywordsKey: "settings.search.keywords.aiMeetingPrompt",
+    testid: "ai.meeting-prompt-input",
+  },
+  {
     id: "ai.models",
     capability: "localAi",
     developerGated: true,

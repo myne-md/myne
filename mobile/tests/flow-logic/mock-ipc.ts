@@ -136,6 +136,26 @@ export interface MockConfig {
   /** Canned pending watch captures returned ONCE by `captures|take_pending`
    *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
   pendingCaptures?: Array<{ id: string; text: string }>;
+  /** Canned drained watch meeting sessions (myne-md/myne#812). `drain_pending_meetings`
+   *  returns these ONCE (then empty, mirroring a real drain+ack clearing the
+   *  manifest); `ack_meeting_session` records the acked session ids. Each chunk
+   *  is transcribed through `transcribe`, so one session → one note whose body is
+   *  the three embeds + the transcript. */
+  pendingMeetings?: Array<{
+    session_id: string;
+    started_at: number;
+    chunks: Array<{ chunk_index: number; attachment_id: string }>;
+    missing_chunk_indices?: number[];
+    retryable_chunk_indices?: number[];
+    /** A note a previous drain already wrote for this session (myne-md/myne#812
+     *  review): a re-drain APPENDS to it instead of creating a second note.
+     *  `set_meeting_session_note` records one too, and that takes precedence. */
+    note_id?: string | null;
+  }>;
+  /** Reject the first N `captures|ack_meeting_session` calls (myne-md/myne#812).
+   *  Drives the crash-after-note-before-ack path: the note is created, the ack
+   *  fails, and the next drain re-returns the session — the rare duplicate. */
+  meetingAckFailures?: number;
   /** Canned imported shares returned ONCE by
    *  `share-import|drain_pending_shares` (§9.20 OS share-sheet drain). The
    *  host-side drain does decrypt→import→ack, so the mock just returns the
@@ -306,6 +326,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     } catch {
       /* storage disabled — the app offers onboarding, which is its own case */
     }
+    // A per-session ack-failure budget for the watch meeting drain (myne-md/myne#812):
+    // seeded from config so the first N `ack_meeting_session` calls reject,
+    // driving the crash-after-note-before-ack re-drain.
+    (window as unknown as { __meetingAckFailures?: number }).__meetingAckFailures =
+      config.meetingAckFailures ?? 0;
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
       // myne#177: the real host always sends this (serde emits a BTreeMap as
@@ -1424,6 +1449,26 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;
         return 0;
       },
+      // The watch meeting-chunk seal (myne-md/myne#812): records each delivery
+      // the `myne-meeting-chunk` event carried, so a spec can assert the native
+      // dispatch reaches the command with its manifest fields intact.
+      "plugin:captures|seal_meeting_chunk": (args) => {
+        const w = window as unknown as {
+          __meetingChunkSeals?: Array<{
+            sessionId: string;
+            chunkIndex: number;
+            startedAt: number;
+            path: string;
+          }>;
+        };
+        (w.__meetingChunkSeals ??= []).push({
+          sessionId: String(args.sessionId ?? ""),
+          chunkIndex: Number(args.chunkIndex ?? 0),
+          startedAt: Number(args.startedAt ?? 0),
+          path: String(args.path ?? ""),
+        });
+        return null;
+      },
       "plugin:captures|take_pending": () => {
         const w = window as unknown as { __pendingTaken?: boolean };
         if (w.__pendingTaken) return [];
@@ -1433,6 +1478,79 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:captures|ack": (args) => {
         const w = window as unknown as { __captureAcks?: string[] };
         (w.__captureAcks ??= []).push(String(args.id ?? ""));
+        return null;
+      },
+      // ── Watch meeting-capture surface (myne-md/myne#812) ──
+      // STATEFUL, like the real at-least-once queue: `drain_pending_meetings`
+      // returns every seeded session that has NOT been acked yet, and
+      // `ack_meeting_session` removes one. So a drain that creates a note but
+      // whose ack fails returns the same session on the next drain — the rare
+      // duplicate the at-least-once discipline accepts — which a "returned once"
+      // mock could not express at all. `meetingAckFailures` makes the first N
+      // acks reject, driving that crash-after-note-before-ack path.
+      "plugin:captures|meeting_pending_sessions": () => config.pendingMeetings ?? [],
+      "plugin:captures|drain_pending_meetings": () => {
+        const w = window as unknown as {
+          __meetingAcked?: string[];
+          __meetingNoteIds?: Record<string, string>;
+        };
+        const acked = new Set(w.__meetingAcked ?? []);
+        const noteIds = w.__meetingNoteIds ?? {};
+        return (config.pendingMeetings ?? [])
+          .filter((s) => !acked.has(s.session_id))
+          .map((s) => ({ ...s, note_id: noteIds[s.session_id] ?? s.note_id ?? null }));
+      },
+      // The retry half of the on-arrival seal (myne-md/myne#812 review): records
+      // the call so a spec can assert boot / unlock re-scans the inbox.
+      "plugin:captures|seal_meeting_inbox": () => {
+        const w = window as unknown as { __sealMeetingInboxCalls?: number };
+        w.__sealMeetingInboxCalls = (w.__sealMeetingInboxCalls ?? 0) + 1;
+        return 0;
+      },
+      // Record the note a session drained into, mirroring the real manifest
+      // write, so a re-drain returns it and APPENDS (myne-md/myne#812 review).
+      "plugin:captures|set_meeting_session_note": (args) => {
+        const w = window as unknown as { __meetingNoteIds?: Record<string, string> };
+        (w.__meetingNoteIds ??= {})[String(args.sessionId ?? "")] = String(args.noteId ?? "");
+        return null;
+      },
+      "plugin:captures|ack_meeting_session": (args) => {
+        const w = window as unknown as {
+          __meetingAcks?: string[];
+          __meetingAcked?: string[];
+          __meetingAckFailures?: number;
+          __meetingResolved?: Record<string, number[]>;
+        };
+        const id = String(args.sessionId ?? "");
+        const resolved = Array.isArray(args.resolvedChunkIndices)
+          ? (args.resolvedChunkIndices as number[])
+          : [];
+        (w.__meetingAcks ??= []).push(id);
+        const failed = w.__meetingAckFailures ?? 0;
+        if (failed > 0) {
+          w.__meetingAckFailures = failed - 1;
+          throw { kind: "Backend" };
+        }
+        // Record the RESOLVED indices too, so a test can assert the H3 contract:
+        // a retryable chunk is not in the list and its session is not fully
+        // acked away. `__meetingAcked` means "every chunk resolved" (the record
+        // is gone), matching the Rust `ack_meeting_session_in_dirs` behaviour
+        // where the manifest row survives while any entry is still on disk.
+        (w.__meetingResolved ??= {})[id] = resolved;
+        const session = (config.pendingMeetings ?? []).find((s) => s.session_id === id);
+        // "Fully resolved" means every chunk that could be accounted for is in
+        // the ack: the imported/missing ones AND the retryable ones. A retryable
+        // chunk is NOT resolved (its entry stays for the next unlock), so the
+        // session is not fully acked while one exists — the H3 contract.
+        const retryable = session?.retryable_chunk_indices ?? [];
+        const allResolved =
+          !session ||
+          (session.chunks.every((c) => resolved.includes(c.chunk_index)) &&
+            session.missing_chunk_indices.every((i) => resolved.includes(i)) &&
+            retryable.every((i) => resolved.includes(i)));
+        if (allResolved) {
+          (w.__meetingAcked ??= []).push(id);
+        }
         return null;
       },
       // ── Share-import surface (§9.20 OS share-sheet drain) ──

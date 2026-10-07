@@ -104,6 +104,9 @@ import {
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
+import { MeetingAiDialog } from "../components/meeting/MeetingAiDialog";
+import { offerMeetingAi } from "../components/meeting/meetingAiStore";
+import { extractMeetingTranscript } from "../notes/ai/meetingTranscript";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
@@ -230,6 +233,7 @@ import {
 } from "../notes/sidebarState";
 import { settleFrontmatterWrite as settleFrontmatterWriteFor } from "../notes/settleFrontmatterWrite";
 import { sidebarCommands } from "../notes/sidebarCommands";
+import { setMeetingSidebarSurface } from "../notes/meetingSession";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "../platform/webviewWindow";
 import { listen } from "../platform/event";
@@ -781,6 +785,22 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+
+  // The meeting-session controller needs the sidebar surface (`refreshOne` +
+  // `open`) at STOP, to register and open the note the session created. The
+  // `EditorHost` seam only carries the `EditorView`, so the surface is bound
+  // here — the one place `useSelectedNote()` is in scope — and the `/meeting`
+  // slash command reads the binding at dispatch. Same shape `voiceRecord` uses:
+  // the trigger lives in the shared package, the flow stays desktop-side.
+  useEffect(() => {
+    setMeetingSidebarSurface({
+      refreshOne: (id) => ctx.refreshOne(id as NoteId),
+      open: (id) => ctx.open(id as NoteId),
+    });
+    return () => {
+      setMeetingSidebarSurface(null);
+    };
+  }, [ctx]);
   // First-run AI onboarding (myne-md/myne#805): offered once per DEVICE, after
   // the first successful unlock, gated on a localStorage flag so it covers every
   // entry path (create/restore/recover/join). Skippable; the app works without
@@ -2617,6 +2637,15 @@ function EditorChrome({
         onClose={() => setVaultExportOpen(false)}
         folders={vaultExportFolders}
       />
+      {/* Meeting AI: the opt-in pass, self-driving from the offer store, so it
+          needs no state from Editor and renders nothing until an offer exists. */}
+      <MeetingAiDialog
+        onOpenAiSettings={() => openSettings("ai")}
+        settle={{
+          reloadOpenNote: () => ctx.reloadOpenNote(),
+          refreshOne: (id) => ctx.refreshOne(id),
+        }}
+      />
       {/* MYND-567: the `myne://theme/install` confirmation gate. Self-driving -
           it drains the deep-link latch on mount and listens for warm arrivals,
           so it needs no state from Editor. Mounted HERE (and only here) because
@@ -3660,6 +3689,22 @@ function CommandPaletteHost({
           budget: SUMMARIZE_BUDGET_CHARS,
           infer: aiInfer,
         });
+      },
+      // Re-run the meeting AI pass on the open note (meeting-ai). The pass is
+      // offered once after a meeting stops; this is the way back to it, for a
+      // note the user dismissed the offer on or wants to regenerate. The
+      // transcript is recovered from the note's own body and the same dialog
+      // opens, so the write path and the gates are unchanged.
+      onSummarizeMeeting: () => {
+        const view = getActiveEditorView();
+        if (view === null || ctx.selectedId === null) return;
+        const cached = ctx.cache.get(ctx.selectedId);
+        if (cached === undefined) return;
+        // SYNC-14 fail-closed, same as onSummarizeNote.
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        const transcript = extractMeetingTranscript(view.state.doc.toString());
+        if (transcript.length === 0) return;
+        offerMeetingAi(ctx.selectedId, transcript);
       },
       // Rewrite the current selection (writing-assistant `/yeniden-yaz` as a
       // palette action): resolve the selection span via the tested `computeRewrite`

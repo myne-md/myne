@@ -43,6 +43,7 @@ import {
   resetPreviewCache,
   resetTranscripts,
 } from "../editor/attachments/session-caches";
+import { teardownMeetingSessionForLock } from "../notes/meetingSession";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
 import { lockVault } from "./vault-unlock";
@@ -154,6 +155,11 @@ export async function leaveActiveVault(deps: {
   // an unmount.
   resetPreviewCache();
   resetTranscripts();
+  // The meeting session (myne-md/myne#789): the same class as resetTranscripts
+  // above. Its transcript map holds third-party speech and its bar is
+  // body-mounted, so a vault change that skipped this left the previous vault's
+  // meeting text resident and visible over the next vault's editor.
+  teardownMeetingSessionForLock();
   // And the remembered mermaid diagram zoom (myne-md/myne#708): keyed by a hash
   // of the diagram source, so it enumerates this vault's diagrams and would
   // otherwise restore the PREVIOUS vault's scale onto one here.

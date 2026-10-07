@@ -86,6 +86,7 @@ import {
   startModelDownload,
   useModelDownload,
 } from "../../lib/ai-download-store";
+import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
@@ -497,8 +498,21 @@ function DownloadedModelRow(props: {
 
 export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
-  const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled, setChatHistoryBudget } =
-    usePrefs(onShowToast);
+  const {
+    prefs,
+    setAiEnabled,
+    setAiExcludedFolders,
+    setAutoTagEnabled,
+    setChatHistoryBudget,
+    setMeetingAiPrompt,
+  } = usePrefs(onShowToast);
+  // Local draft for the meeting-AI prompt textarea: it writes on blur rather
+  // than on every keystroke, and resyncs when the stored value changes (a sync
+  // from another device, or the Reset control).
+  const [meetingPromptDraft, setMeetingPromptDraft] = useState("");
+  useEffect(() => {
+    setMeetingPromptDraft(prefs.meeting_ai_prompt ?? "");
+  }, [prefs.meeting_ai_prompt]);
 
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
@@ -1140,6 +1154,42 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             style={{ width: "8ch" }}
           />
         )}
+      />
+
+      {/* Meeting AI prompt (meeting-ai): the user's replacement for the meeting
+          AI pass's reduce instruction. Empty means the built-in default. */}
+      <ControlBlock
+        label={t("settings.ai.meetingPromptLabel")}
+        helper={t("settings.ai.meetingPromptHelper")}
+        testId="ai.meeting-prompt"
+        anchorId="ai.meeting-prompt"
+        control={
+          <>
+            <textarea
+              value={meetingPromptDraft}
+              onChange={(e) => setMeetingPromptDraft(e.target.value)}
+              onBlur={() => {
+                const trimmed = meetingPromptDraft.trim();
+                void setMeetingAiPrompt(trimmed === "" ? null : meetingPromptDraft);
+              }}
+              disabled={!aiEnabled}
+              aria-label={t("settings.ai.meetingPromptLabel")}
+              data-testid="ai.meeting-prompt-input"
+              rows={4}
+            />
+            <Button
+              variant="secondary"
+              disabled={!aiEnabled}
+              onClick={() => {
+                setMeetingPromptDraft("");
+                void setMeetingAiPrompt(null);
+              }}
+              data-testid="ai.meeting-prompt-reset"
+            >
+              {t("settings.ai.meetingPromptReset")}
+            </Button>
+          </>
+        }
       />
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
