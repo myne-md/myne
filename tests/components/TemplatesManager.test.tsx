@@ -158,6 +158,17 @@ describe("TemplatesManager delete closes the note's pane tab", () => {
       <TemplatesManager open onClose={() => {}} onOpenNote={() => {}} />,
     );
     act(() => api.current!.openInFocused("tpl-1"));
+    // PIN the tab. The defect this guards is that a PINNED tab survived its
+    // note's trash; an unpinned tab was already closed before the fix, so an
+    // unpinned fixture passes on the pre-fix tree and guards nothing.
+    act(() =>
+      api.current!.setItemPinned(
+        api.current!.focusedPaneId,
+        { kind: "note", id: "tpl-1" },
+        true,
+      ),
+    );
+    expect(api.current!.leaves[0]?.tabs[0]?.pinned).toBe(true);
     expect(openNoteIds(api.current!.leaves)).toContain("tpl-1");
 
     fireEvent.click(await screen.findByTestId("templates.row-delete"));
@@ -176,6 +187,13 @@ describe("TemplatesManager delete closes the note's pane tab", () => {
       <TemplatesManager open onClose={() => {}} onOpenNote={() => {}} />,
     );
     act(() => api.current!.openInFocused("tpl-2"));
+    act(() =>
+      api.current!.setItemPinned(
+        api.current!.focusedPaneId,
+        { kind: "note", id: "tpl-2" },
+        true,
+      ),
+    );
 
     fireEvent.click(await screen.findByTestId("templates.row-delete"));
     await waitFor(() => expect(deleteTemplate).toHaveBeenCalledWith("tpl-2"));
