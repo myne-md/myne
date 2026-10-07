@@ -1060,6 +1060,30 @@ const aiSummarizeNoteAction: CommandAction = {
   },
 };
 
+// Re-run the meeting AI pass on the open note (meeting-ai). The pass is offered
+// once after a meeting stops, and this is the way back to it: a note whose offer
+// was dismissed, or one the user wants to regenerate. Same gate as
+// `ai.summarize-note` (editor + selected note + developer mode), because the
+// meeting feature itself is developer-gated.
+const meetingSummarizeAction: CommandAction = {
+  id: "meeting.summarize",
+  get label() {
+    return i18n.t("commands.actions.meetingSummarize.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onSummarizeMeeting();
+  },
+};
+
 // There is no `ai.suggest-tags` action. Auto-tag ran as an explicit palette
 // action while its output rendered in the AI Chat tab; MYND-651 made suggestion
 // always-on in the inline band, so a "suggest tags" command would be a second
@@ -1723,6 +1747,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   aiOpenAgentVaultAction,
   aiOpenAgentNoteAction,
   aiSummarizeNoteAction,
+  meetingSummarizeAction,
   aiRewriteSelectionAction,
 ]);
 

@@ -105,6 +105,8 @@ import {
 } from "../components/primitives/hoverSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
 import { MeetingAiDialog } from "../components/meeting/MeetingAiDialog";
+import { offerMeetingAi } from "../components/meeting/meetingAiStore";
+import { extractMeetingTranscript } from "../notes/ai/meetingTranscript";
 import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
@@ -3687,6 +3689,22 @@ function CommandPaletteHost({
           budget: SUMMARIZE_BUDGET_CHARS,
           infer: aiInfer,
         });
+      },
+      // Re-run the meeting AI pass on the open note (meeting-ai). The pass is
+      // offered once after a meeting stops; this is the way back to it, for a
+      // note the user dismissed the offer on or wants to regenerate. The
+      // transcript is recovered from the note's own body and the same dialog
+      // opens, so the write path and the gates are unchanged.
+      onSummarizeMeeting: () => {
+        const view = getActiveEditorView();
+        if (view === null || ctx.selectedId === null) return;
+        const cached = ctx.cache.get(ctx.selectedId);
+        if (cached === undefined) return;
+        // SYNC-14 fail-closed, same as onSummarizeNote.
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        const transcript = extractMeetingTranscript(view.state.doc.toString());
+        if (transcript.length === 0) return;
+        offerMeetingAi(ctx.selectedId, transcript);
       },
       // Rewrite the current selection (writing-assistant `/yeniden-yaz` as a
       // palette action): resolve the selection span via the tested `computeRewrite`

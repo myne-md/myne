@@ -111,6 +111,9 @@ function MeetingAiDialogInner({
   const [progress, setProgress] = useState<[number, number]>([0, 0]);
   const [noModel, setNoModel] = useState(false);
   const runRef = useRef<MeetingRun | null>(null);
+  // Set by Stop/close and checked after the async prefs read, so a Stop pressed
+  // before the run is created (the `prefsRead` await window) is not lost.
+  const stoppedRef = useRef(false);
 
   // The generation model is the AI output's prerequisite (the meeting feature's
   // Whisper model is a DIFFERENT role). Checked once on mount, and only at the
@@ -132,18 +135,26 @@ function MeetingAiDialogInner({
   }, []);
 
   const close = useCallback((): void => {
+    stoppedRef.current = true;
     runRef.current?.stop();
     clearMeetingAiOffer();
   }, []);
 
   const generate = useCallback((): void => {
     void (async () => {
+      stoppedRef.current = false;
       const chosen = MEETING_SECTION_IDS.filter((id) => selected[id]);
       setPhase("running");
       setProgress([0, 0]);
       // The custom prompt, read at run start: a blank or absent value uses the
       // built-in default instruction.
       const prefs = await prefsRead().catch(() => null);
+      // A Stop pressed during the prefs read must not be lost: without this the
+      // run started anyway and the UI flipped back to the review phase.
+      if (stoppedRef.current) {
+        setPhase("cancelled");
+        return;
+      }
       const run = startMeetingAi({
         transcript,
         sections: chosen,
@@ -266,6 +277,7 @@ function MeetingAiDialogInner({
               variant="secondary"
               data-testid="meeting.ai.stop"
               onClick={() => {
+                stoppedRef.current = true;
                 runRef.current?.stop();
                 setPhase("cancelled");
               }}
