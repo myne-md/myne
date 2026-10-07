@@ -42,6 +42,7 @@ import {
   deleteSlot as deleteSlotOp,
   dropItemOnPane as dropItemOnPaneOp,
   emptyWorkspace,
+  forceCloseTab as forceCloseTabOp,
   focusedLeaf,
   graphItem,
   tasksItem,
@@ -569,13 +570,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // fold (closeTabOp only removes a tab, never renumbers panes); a pane without
   // the tab is a no-op, and the last-tab-of-the-only-leaf case leaves that pane
   // tabless (the empty-editor shell) per the workspace invariant - never a crash.
+  //
+  // Deliberately uses the UNGUARDED close (myne-md/myne#819): a PINNED tab must
+  // not survive its note's deletion. `closeTab`'s pin guard exists to protect a
+  // tab from an accidental close gesture; a deleted note is not that, and a
+  // surviving pinned tab keeps a resident, editable autosave buffer that writes
+  // the note back on the next keystroke.
   const closeNoteEverywhere = useCallback(
     (id: NoteId) => {
       setPending(null);
       setState((s) => {
         const leafIds = collectLeaves(s.root).map((l) => l.id);
         return leafIds.reduce(
-          (acc, paneId) => closeTabOp(acc, paneId, noteItem(id)),
+          (acc, paneId) => forceCloseTabOp(acc, paneId, noteItem(id)),
           s,
         );
       });
