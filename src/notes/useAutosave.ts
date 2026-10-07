@@ -57,7 +57,7 @@ export type UseAutosaveReturn = {
   /** Re-fire the last save with the current body. Used by the Retry button. */
   retry: () => void;
   /** Flush any pending save synchronously (awaitable). No-op when clean. */
-  flushIfDirty: () => Promise<void>;
+  flushIfDirty: (opts?: { forceBaseGuard?: boolean }) => Promise<void>;
   /** Best-effort save of the buffer for whatever note the hook currently holds
    *  — for a caller that is about to stop being that note's editor (myne#288).
    *  Hashless, and it touches no hook state, because the caller is about to
@@ -227,6 +227,14 @@ export function useAutosave(
   /** Saved body that produced the current `saved` status — lets us tell
    *  if a fresh edit happened during in-flight (latest-wins). */
   const savedBodyRef = useRef<string | null>(null);
+  /** One-shot override of the §11.3 guard gate: `flushIfDirty({ forceBaseGuard: true })`
+   *  sets it so the NEXT save declares `savedBodyRef` as its expected base even when
+   *  `guardEnabled` is false. Used by the detached-window `notes://deleted` handler
+   *  (myne-md/myne#839 follow-up): a cross-window trash/archive write HAS changed disk,
+   *  so a mismatch there is never the spurious local conflict the sync gate exists to
+   *  avoid, and a hashless last-write-wins flush would write the stale pre-removal
+   *  buffer back over the just-set `trashed:`/`archived:` field and resurrect the note. */
+  const forceGuardRef = useRef<boolean>(false);
   /** Latest `onBaseMismatch` handler — read through a ref at fire time so
    *  `fireSave`'s identity doesn't churn with per-render callbacks (the
    *  `autosaveRef` pattern PaneView already uses in the other direction). */
@@ -380,7 +388,7 @@ export function useAutosave(
         // hiccup — autosave must never break on the guard's plumbing;
         // an omitted hash just means legacy last-write-wins for this fire.
         let expectedBaseHashHex: string | undefined;
-        if (guardEnabled && savedBodyRef.current !== null) {
+        if ((guardEnabled || forceGuardRef.current) && savedBodyRef.current !== null) {
           try {
             expectedBaseHashHex = await sha256Hex(savedBodyRef.current);
           } catch {
@@ -598,19 +606,30 @@ export function useAutosave(
     [clearTimers],
   );
 
-  const flushIfDirty = useCallback(async (): Promise<void> => {
-    if (!dirtyRef.current && inFlightRef.current === null) return;
-    if (inFlightRef.current !== null) {
-      await inFlightRef.current;
-      // If a follow-up save was queued (latest-wins), it will have
-      // re-armed in-flight; await again.
-      if (inFlightRef.current !== null) {
-        await inFlightRef.current;
+  const flushIfDirty = useCallback(
+    async (opts?: { forceBaseGuard?: boolean }): Promise<void> => {
+      // One-shot: set before firing, cleared once this flush's chain settles. A
+      // concurrent timer save is the only way the override could leak, and it
+      // self-corrects on the next fire.
+      if (opts?.forceBaseGuard) forceGuardRef.current = true;
+      try {
+        if (!dirtyRef.current && inFlightRef.current === null) return;
+        if (inFlightRef.current !== null) {
+          await inFlightRef.current;
+          // If a follow-up save was queued (latest-wins), it will have
+          // re-armed in-flight; await again.
+          if (inFlightRef.current !== null) {
+            await inFlightRef.current;
+          }
+          return;
+        }
+        await fireSave();
+      } finally {
+        if (opts?.forceBaseGuard) forceGuardRef.current = false;
       }
-      return;
-    }
-    await fireSave();
-  }, [fireSave]);
+    },
+    [fireSave],
+  );
 
   const retry = useCallback(() => {
     if (inFlightRef.current !== null) return;

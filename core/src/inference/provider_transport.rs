@@ -219,6 +219,82 @@ impl ProviderHost {
     }
 }
 
+/// The one place this module opens a socket, and therefore the one place the
+/// Tor routing gate has to be consulted.
+///
+/// Mirrors `model_download::open_socket_via` (myne-md/myne#805) so the two AI
+/// egress transports obey the same rule: with Tor mode on, only a `Ready` proxy
+/// yields a route and everything else refuses WITHOUT opening a socket. There is
+/// no direct-connect fallback, because falling back would leak the device's real
+/// source IP at exactly the moment the user believes they are protected. Before
+/// this (myne-md/myne#607) the provider chat/list arm dialed directly and ignored
+/// the setting the rest of the app honours, so sync went through Tor while
+/// provider traffic told the provider (and the local network) where the device
+/// was.
+///
+/// Free rather than a `ProviderTransport` method so the routing decision is
+/// unit-testable against a controlled gate and a loopback host. That is the same
+/// seam `model_download.rs` exposes, and the reason its two Tor tests can exist.
+/// It is module-private and its sole PRODUCTION caller passes `self.host.host()`,
+/// a compiled-in [`ProviderHost`]; the only other callers are the two tests
+/// below. The `&str` parameter is what makes those tests possible, so the older
+/// claim that the direct dial is reachable only through a `ProviderHost` no
+/// longer holds of the helper itself, and the AI egress record says so.
+fn open_socket_via(
+    proxy: &crate::plugins::sync::proxy::ProxyGate,
+    host: &str,
+    port: u16,
+) -> Result<TcpStream, ProviderTransportError> {
+    use crate::plugins::sync::proxy::Route;
+    use crate::plugins::sync::socks5::{connect_via_socks5, Socks5Error};
+
+    match proxy.route() {
+        Ok(Route::Direct) => {
+            // The direct arm resolves the name here, because the connecting
+            // helper takes a resolved address. The `Socks5` arm below must NOT:
+            // it hands the name to the proxy, which resolves it inside the
+            // circuit rather than on this device.
+            let addr = (host, port)
+                .to_socket_addrs()
+                .map_err(|_| ProviderTransportError::Unreachable)?
+                .next()
+                .ok_or(ProviderTransportError::Unreachable)?;
+            TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT).map_err(|e| match e.kind() {
+                std::io::ErrorKind::ConnectionRefused => ProviderTransportError::Refused,
+                std::io::ErrorKind::TimedOut => ProviderTransportError::Timeout,
+                _ => ProviderTransportError::Unreachable,
+            })
+        }
+        Ok(Route::Socks5 { socks_port }) => {
+            // The SOCKS5 error's two families are kept distinct rather than
+            // collapsed, matching what each means: `ProxyUnreachable` is the
+            // loopback proxy not answering (our side, so `Unreachable`), while
+            // `Refused(_)` is the proxy reporting the TARGET refused the connect
+            // (so `Refused`). Returning `Refused` for a dead sidecar, as an
+            // earlier revision of this arm did, reported a provider refusal that
+            // never happened.
+            connect_via_socks5(socks_port, host, port).map_err(|e| match e {
+                Socks5Error::ProxyUnreachable => ProviderTransportError::Unreachable,
+                Socks5Error::Refused(_) => ProviderTransportError::Refused,
+                _ => ProviderTransportError::Unreachable,
+            })
+        }
+        Err(denied) => {
+            // The bare denial reason only: never the host, the port or the proxy
+            // port (`src-tauri/AGENTS.md` secret-handling discipline, because the
+            // provider hostname is the thing Tor mode keeps off this device's
+            // resolver). A closed enum, like the connect-failed tag.
+            tracing::warn!(
+                target: "myne::ai",
+                event = "provider_tor_fail_closed",
+                reason = ?denied,
+                "Tor routing is on and the proxy is not ready; refusing to reach the provider"
+            );
+            Err(ProviderTransportError::Unreachable)
+        }
+    }
+}
+
 /// An HTTPS request path to one [`ProviderHost`].
 pub struct ProviderTransport {
     host: ProviderHost,
@@ -291,17 +367,7 @@ impl ProviderTransport {
             .map_err(|_| ProviderTransportError::Unreachable)?;
         let conn = ClientConnection::new(self.config.clone(), name)
             .map_err(|_| ProviderTransportError::TlsNotTrusted)?;
-        let addr = (self.host.host(), 443u16)
-            .to_socket_addrs()
-            .map_err(|_| ProviderTransportError::Unreachable)?
-            .next()
-            .ok_or(ProviderTransportError::Unreachable)?;
-        let sock =
-            TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT).map_err(|e| match e.kind() {
-                std::io::ErrorKind::ConnectionRefused => ProviderTransportError::Refused,
-                std::io::ErrorKind::TimedOut => ProviderTransportError::Timeout,
-                _ => ProviderTransportError::Unreachable,
-            })?;
+        let sock = self.open_socket()?;
         // A SHORT socket deadline so a wait is interruptible; the wrapper
         // turns repeated short waits into one long wait that observes
         // cancellation between them. Set on the raw socket, UNDER rustls, so a
@@ -310,6 +376,16 @@ impl ProviderTransport {
         let _ = sock.set_write_timeout(Some(POLL_INTERVAL));
         let guarded = CancellableStream::new(sock, Arc::clone(&self.cancelled), IDLE_TIMEOUT);
         Ok(StreamOwned::new(conn, guarded))
+    }
+
+    /// Open the provider socket, obeying the Tor routing gate. Delegates the
+    /// decision to [`open_socket_via`], which carries the rationale.
+    fn open_socket(&self) -> Result<TcpStream, ProviderTransportError> {
+        open_socket_via(
+            &crate::plugins::sync::proxy::installed_for(self.host.host()),
+            self.host.host(),
+            443,
+        )
     }
 
     /// One request/response round trip. `bearer` is the provider API key and is
@@ -792,5 +868,92 @@ mod tests {
                  module is that a verification failure has no fallback"
             );
         }
+    }
+
+    /// With Tor mode on and the proxy not `Ready`, opening the provider socket
+    /// fails AND dials nothing, the fail-closed half of myne-md/myne#607.
+    #[test]
+    fn tor_on_with_no_ready_proxy_fails_closed_and_dials_nothing() {
+        use crate::plugins::sync::proxy::{ProxyGate, TorProxyState};
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind probe");
+        let port = listener.local_addr().expect("addr").port();
+        let accepts = Arc::new(AtomicUsize::new(0));
+        let counter = accepts.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                if stream.is_err() {
+                    return;
+                }
+                counter.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+
+        // Tor mode on, sidecar still bootstrapping. The host is loopback only
+        // so the probe is reachable and the control arm below can prove the
+        // probe can SEE a connection; the gate is injected, so the loopback
+        // exemption in `installed_for` is bypassed and the injected gate is
+        // obeyed.
+        let gate = ProxyGate::new();
+        gate.set_enabled(true);
+        gate.set_state(TorProxyState::Starting);
+        assert_eq!(
+            open_socket_via(&gate, "127.0.0.1", port).map(|_| ()),
+            Err(ProviderTransportError::Unreachable),
+            "Tor on with a non-ready proxy must refuse"
+        );
+        std::thread::sleep(Duration::from_millis(150));
+        assert_eq!(
+            accepts.load(Ordering::SeqCst),
+            0,
+            "fail-closed means ZERO direct connections to the provider"
+        );
+
+        // Control: with a direct gate the probe DOES see a connection, or the
+        // zero above would be compatible with a probe that can never see one.
+        assert!(
+            open_socket_via(&ProxyGate::new(), "127.0.0.1", port).is_ok(),
+            "the control arm must be able to reach the probe"
+        );
+        std::thread::sleep(Duration::from_millis(150));
+        assert!(
+            accepts.load(Ordering::SeqCst) >= 1,
+            "the probe must be able to observe a direct connection, or the zero proves nothing"
+        );
+    }
+
+    /// With the proxy `Ready`, the provider socket is tunnelled and the target
+    /// reaches the proxy as a **hostname** (remote DNS), never a locally
+    /// resolved address, the positive half of myne-md/myne#607.
+    #[test]
+    fn a_tor_ready_gate_routes_the_provider_socket_through_the_proxy() {
+        use crate::plugins::sync::proxy::{ProxyGate, TorProxyState};
+        use crate::plugins::sync::socks5::fake::{Behavior, FakeSocks5, SeenTarget};
+        use std::net::TcpListener;
+
+        let target = TcpListener::bind("127.0.0.1:0").expect("bind target");
+        let target_port = target.local_addr().expect("addr").port();
+        let proxy = FakeSocks5::spawn(1, Behavior::Splice(target_port));
+
+        let gate = ProxyGate::new();
+        gate.set_enabled(true);
+        gate.set_state(TorProxyState::Ready {
+            socks_port: proxy.port,
+        });
+        let stream = open_socket_via(&gate, "openrouter.ai", 443)
+            .expect("a ready proxy yields a tunnelled socket");
+        drop(stream);
+
+        assert_eq!(
+            proxy.seen(),
+            vec![SeenTarget {
+                atyp: 0x03,
+                host: "openrouter.ai".to_string(),
+                port: 443,
+            }],
+            "the provider request must travel as a hostname CONNECT through the sidecar"
+        );
     }
 }
