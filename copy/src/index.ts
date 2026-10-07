@@ -372,16 +372,20 @@ export const CONSENT_DEVICE_SCOPE =
 /** HOW IT TRAVELS. Added by myne-md/myne#456, and it is stated nowhere else.
  *
  *  Myne can route its SYNC traffic through Tor on a desktop where the user has
- *  turned that on. The AI provider arm is not routed: `provider_transport.rs`
- *  opens a direct connection on every client, so the provider learns the
- *  device's IP address and the local network learns which provider is in use.
+ *  turned that on. myne-md/myne#607 extended that to the AI provider arm on
+ *  desktop: `provider_transport.rs` dials directly by default and through the
+ *  same Tor SOCKS5 proxy when the option is on, so the provider learns only the
+ *  exit node in that case. Mobile never installs the sidecar, so its provider
+ *  traffic stays direct.
  *
  *  Worth a clause of its own because the rest of this screen is about WHAT
  *  leaves and TO WHOM, and a reader who has seen the Tor option elsewhere in the
- *  product would reasonably assume it applies here. Routing it is
- *  myne-md/myne#607; until then, this is the honest sentence. */
+ *  product would reasonably assume it applies here. myne-md/myne#607 made that
+ *  assumption true on desktop: the Tor routing option now covers this request
+ *  too. The sentence below states the default AND the Tor case, and that mobile
+ *  has no Tor routing yet, so it stays accurate on both clients. */
 export const CONSENT_DIRECT_CONNECTION =
-  "The connection is direct. The provider sees this device's IP address, and your network can see which provider you use.";
+  "The connection is direct by default: the provider sees this device's IP address, and your network can see which provider you use. If you turn on Tor routing on desktop, this request goes through the same Tor proxy as sync, so the provider sees the exit node rather than this device. Mobile has no Tor routing yet, so it always connects directly.";
 
 /** WHAT NEW READS NEVER TOUCH. Added by myne-md/myne#675, and it is the one clause
  *  about the content control rather than the disclosure: folders on the

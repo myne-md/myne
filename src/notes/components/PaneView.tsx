@@ -1378,10 +1378,13 @@ export function PaneView({
   // caller's, so it is refused `BaseMismatch` and mints a keep-both conflict
   // copy for a note no remote writer ever touched.
   const saveInFlight = autosave.saveInFlight;
-  const flushAndReport = useCallback(async () => {
-    await flushIfDirty();
-    return !lastSaveFailed() && !saveInFlight();
-  }, [flushIfDirty, lastSaveFailed, saveInFlight]);
+  const flushAndReport = useCallback(
+    async (opts?: { forceBaseGuard?: boolean }) => {
+      await flushIfDirty(opts);
+      return !lastSaveFailed() && !saveInFlight();
+    },
+    [flushIfDirty, lastSaveFailed, saveInFlight],
+  );
   useEffect(() => {
     registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);

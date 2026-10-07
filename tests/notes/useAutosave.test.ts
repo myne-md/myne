@@ -80,6 +80,39 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(result.current.status).toMatchObject({ status: "saved" });
   });
 
+  it("forceBaseGuard declares a base even when the sync guard is disabled", async () => {
+    // `guardEnabled` (6th arg) false is the no-sync install. A normal flush is
+    // hashless (undefined base), so a cross-window removal landing under the
+    // editor is clobbered by last-write-wins; a forced flush must declare
+    // `savedBodyRef` so the write is refused and preserved as a conflict copy
+    // instead of resurrecting the removed note (myne-md/myne#839 follow-up).
+    const forced = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const forcedHook = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, forced, undefined, undefined, false),
+      { initialProps: { body: "v0" } },
+    );
+    forcedHook.rerender({ body: "v1" });
+    await act(async () => {
+      await forcedHook.result.current.flushIfDirty({ forceBaseGuard: true });
+    });
+    expect(forced).toHaveBeenCalledWith("note-1", "v1", "h:v0");
+
+    // Control: the same no-sync hook with no override stays hashless, which is
+    // exactly the path the override exists to bypass.
+    const plain = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const plainHook = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-2", body, plain, undefined, undefined, false),
+      { initialProps: { body: "w0" } },
+    );
+    plainHook.rerender({ body: "w1" });
+    await act(async () => {
+      await plainHook.result.current.flushIfDirty();
+    });
+    expect(plain).toHaveBeenCalledWith("note-2", "w1", undefined);
+  });
+
   it("γ2 max timer fires when continuous typing keeps resetting γ1", async () => {
     const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
     const { result, rerender } = renderHook(

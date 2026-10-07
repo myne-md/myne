@@ -1555,20 +1555,29 @@ function EditorChrome({
   const unmarkDetached = ws.unmarkDetached;
 
   // myne#681 task 2 (SYNC-11): a detached (pop-out) window reacts to its note
-  // being deleted from ANOTHER surface. Change and rename already reload through
-  // the `sync://changed` listener below (a rename keeps the note id); a DELETE
-  // instead shows the terminal "deleted elsewhere" state, after flushing so an
-  // unsaved edit survives as a conflict copy rather than being yanked away
-  // mid-sentence. Main-window instances never subscribe (`detachedNoteId` is
-  // null there), so a sidebar delete of a non-popped-out note follows its normal
-  // path. The event is the backend `NOTES_DELETED_EVENT` (`note_delete_from_host`).
+  // leaving the live tree from ANOTHER surface. Change and rename already reload
+  // through the `sync://changed` listener below (a rename keeps the note id); a
+  // delete (or a soft-trash / archive, which myne-md/myne#839 routes through the
+  // same event) instead shows the terminal "removed elsewhere" state, after
+  // flushing so an unsaved edit survives as a conflict copy rather than being
+  // yanked away mid-sentence. Main-window instances never subscribe
+  // (`detachedNoteId` is null there), so a sidebar removal of a non-popped-out
+  // note follows its normal path. The event is the backend `NOTES_DELETED_EVENT`,
+  // emitted from `note_update_from_host` for the soft paths and from
+  // `note_delete_from_host` (via `DesktopHooks`) for the hard one.
   useEffect(() => {
     if (detachedNoteId == null) return;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void listen<string>("notes://deleted", (e) => {
       if (e.payload !== detachedNoteId) return;
-      void flushAll().finally(() => setDeletedElsewhere(true));
+      // `forceBaseGuard`: the removal that fired this event IS a cross-window
+      // write, so the flush must declare its expected base even on a no-sync
+      // install. Without it the flush is hashless last-write-wins and writes
+      // the stale pre-removal buffer back over the just-set `trashed:` /
+      // `archived:` / `deleted:` field, resurrecting the note (myne-md/myne#839;
+      // the finding that the emit alone did not close the no-sync case).
+      void flushAll({ forceBaseGuard: true }).finally(() => setDeletedElsewhere(true));
     }).then((h) => {
       if (cancelled) h();
       else unlisten = h;
