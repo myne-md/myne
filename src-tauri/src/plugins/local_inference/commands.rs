@@ -110,6 +110,57 @@ pub async fn infer(
     .await
 }
 
+/// One-shot completion over an ORDERED BATCH of prompts, with progress and a
+/// user-reachable Stop (meeting-ai task 2).
+///
+/// The meeting AI pass is a map-reduce: it summarizes several transcript chunks
+/// and then reduces their summaries into the output sections. [`infer`] is
+/// lock-only cancellable, so a pass over a long meeting could not be stopped by
+/// the user; this command registers `StopAndLock` (like [`transcribe`]) so the
+/// existing `chat_stop` reaches it, and emits the completed-prompt count on
+/// `on_progress` so the UI can show a progress signal. Prompts run in order,
+/// each bounded by `max_new_tokens` exactly as [`infer`] is.
+///
+/// A stop between prompts, or a stop the engine observes mid-generation, ends
+/// the batch and returns the prompts that DID complete; the caller decides
+/// whether a short result is a cancellation. Nothing here writes a note, so a
+/// stopped batch cannot lose data.
+#[tauri::command]
+pub async fn infer_batch(
+    prompts: Vec<String>,
+    max_new_tokens: Option<usize>,
+    on_progress: Channel<u32>,
+    state: State<'_, LocalInferenceState>,
+    vault_state: State<'_, VaultRuntimeState>,
+    cancel_state: State<'_, CancelRegistry>,
+    priority: State<'_, ComputePriority>,
+) -> Result<Vec<String>, EngineError> {
+    // User-initiated compute: a background auto-tag pass yields to this, the
+    // same registration `infer` makes.
+    let _interactive = priority.interactive();
+    // Same vault authorization refresh as `infer` (myne-md/myne#437): the batch
+    // carries note text, so it resolves against the CURRENTLY unlocked vault.
+    if vault_state.active_vault_id().await.is_none() {
+        return Err(EngineError::VaultLocked);
+    }
+    state.refresh().await;
+    // `StopAndLock`: a batch's Stop rides `chat_stop` (there is no second stop
+    // command), so it is one of the surfaces a composer Stop may reach. The
+    // vault-lock teardown also reaches it, which is what keeps a locked vault's
+    // transcript from being summarized behind the lock.
+    let cancel_guard = cancel_state.begin(CancelReach::StopAndLock);
+    infer_batch_with_engine(
+        state.engine_for(INFER_CLASS)?,
+        prompts,
+        max_new_tokens,
+        cancel_guard.request_cancel(),
+        |done, _total| {
+            let _ = on_progress.send(done);
+        },
+    )
+    .await
+}
+
 /// One-shot completion for an **ambient** surface — today, inline ghost text.
 ///
 /// Byte-identical to [`infer`] in contract (prompt in, text out, the same
@@ -1250,6 +1301,53 @@ pub(crate) async fn infer_with_engine(
     unwrap_join(joined, EngineError::InferenceFailed, "infer")
 }
 
+/// Testable core of [`infer_batch`]: run the prompts in order, checking the
+/// shared cancel flag between them and handing it to each engine call, and
+/// reporting the completed count after each. A cancelled batch returns the
+/// prompts that completed rather than an error, so a user stop is distinguishable
+/// from a failure; any other engine error propagates.
+pub(crate) async fn infer_batch_with_engine(
+    engine: Arc<dyn Engine>,
+    prompts: Vec<String>,
+    max_new_tokens: Option<usize>,
+    cancel: RequestCancel,
+    mut on_progress: impl FnMut(u32, u32),
+) -> Result<Vec<String>, EngineError> {
+    let total = prompts.len() as u32;
+    // Wrap EVERY prompt before the loop, so the ones a stop leaves unprocessed
+    // are zeroized when the iterator drops rather than merely deallocated. The
+    // per-iteration wrap below covered only the in-flight prompt; the `break`
+    // paths dropped the rest as ordinary `String`s.
+    let prompts: Vec<Zeroizing<String>> = prompts.into_iter().map(Zeroizing::new).collect();
+    let mut out = Vec::with_capacity(prompts.len());
+    for (index, prompt) in prompts.into_iter().enumerate() {
+        if cancel.as_fn()() {
+            break;
+        }
+        let cancel_fn = cancel.as_fn().clone();
+        let engine_for_call = Arc::clone(&engine);
+        let joined = tokio::task::spawn_blocking(move || {
+            engine_for_call.infer_cancellable(&prompt, max_new_tokens, &cancel_fn)
+        })
+        .await;
+        match unwrap_join(joined, EngineError::InferenceFailed, "infer_batch") {
+            Ok(text) => {
+                out.push(text);
+                on_progress(index as u32 + 1, total);
+            }
+            Err(e) => {
+                // A stop the engine observed mid-generation is not a failure:
+                // return what completed. Any other error is.
+                if cancel.as_fn()() {
+                    break;
+                }
+                return Err(e);
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Testable core of [`embed`].
 pub(crate) async fn embed_with_engine(
     engine: Arc<dyn Engine>,
@@ -1405,6 +1503,71 @@ mod tests {
     }
 
     #[test]
+    fn infer_batch_runs_prompts_in_order_and_reports_progress() {
+        let engine: Arc<dyn Engine> = Arc::new(StubEngine);
+        let mut progress = Vec::new();
+        let out = rt()
+            .block_on(infer_batch_with_engine(
+                engine,
+                vec!["one".to_string(), "two".to_string(), "three".to_string()],
+                None,
+                uncancelled(),
+                |done, total| progress.push((done, total)),
+            ))
+            .expect("stub never fails");
+        assert_eq!(out.len(), 3);
+        assert!(out[0].contains("one"));
+        assert!(out[2].contains("three"));
+        assert_eq!(progress, vec![(1, 3), (2, 3), (3, 3)]);
+    }
+
+    #[test]
+    fn infer_batch_stops_when_the_token_is_already_cancelled() {
+        let reg: &'static CancelRegistry = Box::leak(Box::new(CancelRegistry::default()));
+        let guard = Box::leak(Box::new(reg.begin(CancelReach::LockOnly)));
+        guard.token().cancel();
+        let engine: Arc<dyn Engine> = Arc::new(StubEngine);
+        let out = rt()
+            .block_on(infer_batch_with_engine(
+                engine,
+                vec!["a".to_string(), "b".to_string()],
+                None,
+                guard.request_cancel(),
+                |_, _| {},
+            ))
+            .expect("a stop is not an error");
+        assert!(out.is_empty(), "an already-cancelled batch runs nothing");
+    }
+
+    /// Fails every call, to prove a real engine error is NOT swallowed as a
+    /// cancellation.
+    struct FailingEngine;
+
+    impl Engine for FailingEngine {
+        fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
+            Err(EngineError::NoModel)
+        }
+        fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
+            unreachable!("infer routing only")
+        }
+    }
+
+    #[test]
+    fn infer_batch_propagates_a_non_cancel_engine_error() {
+        let engine: Arc<dyn Engine> = Arc::new(FailingEngine);
+        let err = rt()
+            .block_on(infer_batch_with_engine(
+                engine,
+                vec!["a".to_string()],
+                None,
+                uncancelled(),
+                |_, _| {},
+            ))
+            .expect_err("NoModel must propagate rather than read as a stop");
+        assert_eq!(err, EngineError::NoModel);
+    }
+
+    #[test]
     fn embed_command_core_round_trips_text_to_vector() {
         let engine: Arc<dyn Engine> = Arc::new(StubEngine);
         let v = rt()
@@ -1470,9 +1633,9 @@ mod tests {
         // and `contains` would not see it.
         assert_eq!(
             production.matches(".begin(CancelReach::").count(),
-            3,
-            "expected exactly three registered surfaces — infer, infer_ambient, \
-             transcribe. A new prompt-bearing command owes a \
+            4,
+            "expected exactly four registered surfaces: infer, infer_ambient, \
+             infer_batch, transcribe. A new prompt-bearing command owes a \
              registration; a vanished one is a request the lock cannot abort"
         );
     }

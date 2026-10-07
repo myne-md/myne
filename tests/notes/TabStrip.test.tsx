@@ -96,3 +96,107 @@ describe("<TabStrip>", () => {
     ).toBeTruthy();
   });
 });
+
+describe("the active tab breaks the strip's bottom rule", () => {
+  // Obsidian's look, and the reason is legibility rather than taste: an
+  // unbroken rule under the active tab draws a closed box around it, and a
+  // closed box says "this is a chip", not "this is the thing you are looking
+  // at". The gap — the tab's own fill repainting that one pixel, with its side
+  // hairlines running down into it — is what joins the tab to the note body.
+  //
+  // This file's own source comment used to assert the opposite ("the line does
+  // NOT break under it") while calling that the Obsidian style, which is how a
+  // deliberate-looking choice survives: it was written down.
+
+  function tabAt(index: number): HTMLElement {
+    return screen.getAllByRole("tab")[index] as HTMLElement;
+  }
+
+  it("hangs the active tab over the rule and repaints it in the tab's fill", () => {
+    setup(); // active is "B", index 1
+    const active = tabAt(1);
+    // A HEIGHT, not a negative margin: under the app's global border-box, a
+    // -1px margin on a flex item with an explicit height moves nothing, and
+    // the tab's own bottom border sat one pixel above the rule.
+    expect(active.style.height, "the tab must reach down over the rule").toBe(
+      "calc(100% + 1px)",
+    );
+    expect(
+      active.style.borderBottom,
+      "and repaint that pixel in its own fill, or the rule shows through",
+    ).toContain("var(--bg-1)");
+    expect(
+      active.style.background,
+      "the fill it repaints with must be the fill it has",
+    ).toContain("var(--bg-1)");
+  });
+
+  it("does the same for the pending new-tab chip, which is the selected tab then", () => {
+    // The chip is its own component, so the fix above skipped it and the rule
+    // kept running under "New tab" (myne-md/myne#772).
+    setup({ pendingNewTab: true });
+    const chip = screen
+      .getAllByRole("tab")
+      .find((el) => el.getAttribute("title") === "notes.tabStrip.newTab" || /New tab/.test(el.textContent ?? ""))!;
+    expect(chip.style.height).toBe("calc(100% + 1px)");
+    expect(chip.style.borderBottom).toContain("var(--bg-1)");
+    expect(chip.style.background).toContain("var(--bg-1)");
+  });
+
+  it("is not clipped by the scrolling row that holds it", () => {
+    // The overhang above was asserted and the rule still showed on screen. The
+    // row the tabs scroll in is `overflow-x: auto`, which forces `overflow-y`
+    // to clip too, so the hanging pixel was cut at the row's padding edge. The
+    // row therefore carries one pixel of padding below the tabs (inside its
+    // clip) and the equal negative margin, which keeps the strip's height.
+    setup();
+    const row = tabAt(1).parentElement as HTMLElement;
+    expect(row.style.overflowY, "not the row this test is about").toBe("hidden");
+    // The two values are the `--hairline` token (myne-md/myne#773 moved the
+    // literal into the shared sheet). Asserted on the inline style text: jsdom's
+    // CSSOM does not resolve `var()` for a longhand, so `row.style.paddingBottom`
+    // is not readable here.
+    const inline = row.getAttribute("style") ?? "";
+    expect(inline, "the overhang is clipped by the row").toContain("padding-bottom: var(--hairline)");
+    expect(inline, "and the strip grew a pixel").toContain("margin-bottom: calc(var(--hairline) * -1)");
+  });
+
+  it("leaves every inactive tab's stretch of the rule intact", () => {
+    // An inactive tab is transparent: a filled bottom border there would punch
+    // a hole in the rule under a tab that is not open, which is the same defect
+    // pointing the other way.
+    setup();
+    for (const i of [0, 2]) {
+      expect(tabAt(i).style.height, `tab ${i} overhangs the rule`).toBe("100%");
+      expect(tabAt(i).style.borderBottom, `tab ${i} paints over the rule`).toBe("");
+    }
+  });
+
+  it("still draws the rule for the strip to break", () => {
+    // A gap in a rule that does not exist is just a tab floating on a surface.
+    setup();
+    expect(
+      (screen.getByTestId("editor.tab-strip") as HTMLElement).style.borderBottom,
+    ).toContain("var(--line-1)");
+  });
+});
+
+describe("the strip never ends flush against the window edge", () => {
+  // With the right sidebar open nothing floats over the strip's right end, so
+  // `insetRight` is 0 and the tab-list caret was the last control on the row —
+  // pressed against the edge while the right-sidebar toggle, in the other
+  // layout, sits TITLE_BAR_RIGHT_EDGE in. The two now end the row on one line.
+  it("takes the title bar's edge offset when nothing floats beside it", async () => {
+    const { TITLE_BAR_RIGHT_EDGE } = await import("../../src/screens/titlebar");
+    setup({ insetRight: 0 });
+    const strip = screen.getByTestId("editor.tab-strip");
+    expect(strip.style.paddingInlineEnd).toBe(`${TITLE_BAR_RIGHT_EDGE}px`);
+  });
+
+  it("keeps the larger clearance when the floated controls need it", () => {
+    // That clearance already contains the edge offset; adding it again would
+    // leave a gap between the caret and the floated `…`.
+    setup({ insetRight: 76 });
+    expect(screen.getByTestId("editor.tab-strip").style.paddingInlineEnd).toBe("76px");
+  });
+});

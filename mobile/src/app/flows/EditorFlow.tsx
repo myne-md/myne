@@ -43,7 +43,12 @@ import { activeVaultId, listVaults, orderByLastUnlock } from "../../lib/vault-li
 import { HAS_TAURI } from "../../lib/app-window";
 import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
-import { drainPendingCaptures, sealStagedCaptures } from "../../lib/captures";
+import {
+  drainPendingCaptures,
+  sealMeetingInbox,
+  sealStagedCaptures,
+} from "../../lib/captures";
+import { drainPendingMeetings } from "../../lib/meetingDrain";
 import { drainPendingShares } from "../../lib/shareImport";
 import { ShareImportToast } from "./ShareImportToast";
 import { ioBanner } from "../../lib/io-banner";
@@ -1941,12 +1946,22 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         // notes (both no-op when empty / the host is absent).
         await sealStagedCaptures();
         const created = await drainPendingCaptures();
+        // Retry any meeting-audio chunk still sitting in the app-owned inbox
+        // (a seal that failed before the first post-boot unlock, or a process
+        // death between the native move and the seal). Device-key based, so it
+        // runs here on unlock; idempotent, and a no-op when the inbox is empty.
+        await sealMeetingInbox();
+        // The watch MEETING lane (myne-md/myne#812): decrypt + import each
+        // pending session's sealed audio chunks into the vault library, then
+        // write one meeting note per session (audio embeds + transcript). Its
+        // own self-serialising guard, and it also no-ops when empty.
+        const meetings = await drainPendingMeetings();
         // `refreshAll`, not `loadEntries`: the latter READS the vault and throws
         // the result away - the drained captures never reached the list, and the
         // cost was a second full decrypt of every note on every foreground.
-        // The drain reports a count, not ids, so this is a legitimate whole-vault
+        // The drains report counts, not ids, so this is a legitimate whole-vault
         // reload - and it only runs when something was actually created.
-        if (created > 0) await refreshAll();
+        if (created > 0 || meetings > 0) await refreshAll();
       })();
     };
     runDrain(); // on mount - every unlock path lands here

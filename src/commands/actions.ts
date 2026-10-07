@@ -671,6 +671,38 @@ const lockVaultAction: CommandAction = {
   },
 };
 
+/**
+ * Open the command palette — from the palette's own rail entry (myne-md/myne#773).
+ *
+ * The palette had no clickable entry point at all before this: `palette.toggle`
+ * lived only in `bindableCatalog.ts` as a keybinding, and the left rail's
+ * roster is derived from `COMMAND_ACTIONS` entries carrying a `ribbon` block,
+ * so it was not absent from the default rail — it could not be pinned to it.
+ *
+ * `visibility` is the interesting half. The action hides while the palette is
+ * open, because a palette row that opens the palette is a no-op that reads as a
+ * broken command, and the rule at the top of this file is that the palette
+ * never exposes an action unavailable in the current state. The RAIL is not
+ * affected: the rail renders a pinned id whatever the palette is doing, and
+ * pressing it while the palette is up re-focuses rather than toggling shut,
+ * which is what a search affordance should do when you press it twice.
+ */
+const openPaletteAction: CommandAction = {
+  id: "palette.open",
+  ribbon: { icon: "search" },
+  get label() {
+    return i18n.t("commands.actions.openPalette.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && !ctx.paletteOpen ? "show" : "hidden",
+  run: (ctx) => {
+    ctx.onOpenPalette();
+  },
+};
+
 const openSettingsAction: CommandAction = {
   id: "app.open-settings",
   ribbon: { icon: "settings" },
@@ -952,6 +984,57 @@ const aiOpenChatAction: CommandAction = {
   },
 };
 
+// Open the agent tab on its vault-general Hub (myne-md/myne#771). The pair of
+// agent entries exists so "work on my vault" and "work on this note" are two
+// deliberate choices; the scope word in each label carries the difference, which
+// is what makes them distinguishable BEFORE either is invoked.
+const aiOpenAgentVaultAction: CommandAction = {
+  id: "ai.open-agent-vault",
+  get label() {
+    return i18n.t("commands.actions.aiOpenAgentVault.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  // The ONE pinnable agent item (myne-md/myne#771). It opens the agent tab on
+  // whatever view it was last left on: the reveal keeps an open tab's
+  // `agentView`, so a tab left in Focus comes back in Focus and a fresh one is
+  // born on the Hub. That is the "last-used view" behaviour without a second
+  // preference to keep in step.
+  ribbon: { icon: "message-square" },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onOpenAgentVault();
+  },
+};
+
+// Open the agent tab on its Focus view for the open note (myne-md/myne#771).
+// Needs a note, like the summarize/rewrite actions; without one the handler
+// lands on the Hub rather than a Focus with nothing behind it.
+const aiOpenAgentNoteAction: CommandAction = {
+  id: "ai.open-agent-note",
+  get label() {
+    return i18n.t("commands.actions.aiOpenAgentNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onOpenAgentNote();
+  },
+};
+
 // Summarize the open note / selection (note-summarization MYND-409). Per-note
 // AI action: needs a selected note (the exportNote pattern) AND ai_enabled AND
 // developer_mode. In the editor with a note, mode on, but AI off → disabled
@@ -974,6 +1057,30 @@ const aiSummarizeNoteAction: CommandAction = {
         : "disabled",
   run: (ctx) => {
     ctx.onSummarizeNote();
+  },
+};
+
+// Re-run the meeting AI pass on the open note (meeting-ai). The pass is offered
+// once after a meeting stops, and this is the way back to it: a note whose offer
+// was dismissed, or one the user wants to regenerate. Same gate as
+// `ai.summarize-note` (editor + selected note + developer mode), because the
+// meeting feature itself is developer-gated.
+const meetingSummarizeAction: CommandAction = {
+  id: "meeting.summarize",
+  get label() {
+    return i18n.t("commands.actions.meetingSummarize.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onSummarizeMeeting();
   },
 };
 
@@ -1483,6 +1590,8 @@ const deleteWorkspaceAction: CommandAction = {
 const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Object.freeze({
   "ai.toggle-enabled": "localAi",
   "ai.open-chat": "localAi",
+  "ai.open-agent-vault": "localAi",
+  "ai.open-agent-note": "localAi",
   "ai.summarize-note": "localAi",
   "ai.rewrite-selection": "localAi",
   "app.toggle-screen-capture": "screenCaptureProtection",
@@ -1537,6 +1646,7 @@ const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Obj
 
 const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
+  openPaletteAction,
   openSettingsAction,
   toggleLeftSidebarAction,
   toggleRightSidebarAction,
@@ -1634,7 +1744,10 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   restoreBackupAction,
   revealVaultFolderAction,
   aiOpenChatAction,
+  aiOpenAgentVaultAction,
+  aiOpenAgentNoteAction,
   aiSummarizeNoteAction,
+  meetingSummarizeAction,
   aiRewriteSelectionAction,
 ]);
 

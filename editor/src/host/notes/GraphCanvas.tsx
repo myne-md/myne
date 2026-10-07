@@ -54,6 +54,7 @@ import {
 } from "./graphPointerPolicy";
 import {
   buildHoverHighlight,
+  edgeAlpha,
   edgeIsLit,
   highlightAlpha,
   nodeIsLit,
@@ -761,7 +762,9 @@ export default function GraphCanvas({
         // neutral edge colour, so the highlight reads as "these are THIS note's
         // connections" instead of as "these lines are brighter".
         ctx.strokeStyle = hover !== null && lit ? colAccent : colEdge;
-        ctx.globalAlpha = highlightAlpha(hover, lit) * reveal;
+        // `edgeAlpha`, not `highlightAlpha`: edges and nodes want different
+        // weights. Dimming a node hides content; dimming an edge reveals it.
+        ctx.globalAlpha = edgeAlpha(hover, lit) * reveal;
         ctx.beginPath();
         for (const l of linksRef.current) {
           if (!isEdgeVisible(l.source, l.target, bounds)) continue;
@@ -1027,6 +1030,7 @@ export default function GraphCanvas({
       // otherwise leave a node held in the simulation forever.
       if (draggingId !== null) {
         layout?.release(draggingId);
+        layout?.dragWarm(false);
         draggingId = null;
       }
       // A press means the user is acting rather than reading, so the hover
@@ -1103,10 +1107,17 @@ export default function GraphCanvas({
           // every move is what keeps it hot for the whole gesture; the tick
           // budget restarts with each one, and it starts counting down again
           // the moment the pointer stops.
-          draggingId = dragNode.id;
           const live = ensureLiveLayout();
+          // Enter the warm state ONCE, on the frame the press becomes a drag.
+          // It used to call `reheat()` on every move instead: an impulse train
+          // that spiked alpha and reset the tick budget sixty times a second,
+          // so the neighbours advanced in pulses and the graph lurched after
+          // the pointer rather than following it.
+          if (draggingId !== dragNode.id) {
+            draggingId = dragNode.id;
+            live?.dragWarm(true);
+          }
           live?.hold(dragNode.id, dragNode.x, dragNode.y);
-          live?.reheat();
         }
       }
       schedule();
@@ -1159,6 +1170,7 @@ export default function GraphCanvas({
         // are persisted by the run's own settle callback, so nothing is written
         // from here.
         layout?.release(intent.id);
+        layout?.dragWarm(false);
         draggingId = null;
       }
       mode = "none";
@@ -1238,6 +1250,7 @@ export default function GraphCanvas({
         // in the simulation for the rest of the session.
         if (draggingId !== null) {
           layout?.release(draggingId);
+          layout?.dragWarm(false);
           draggingId = null;
         }
       }

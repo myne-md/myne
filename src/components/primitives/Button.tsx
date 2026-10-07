@@ -1,7 +1,23 @@
+// `<Button>` — the app's text button, in four variants.
+//
+// Appearance and every interactive state live in `@myne/client-core`'s
+// `components.css` under `.myne-btn` (myne-md/myne#773). This file is the
+// semantic shell: it picks a variant, renders an optional leading glyph, and
+// forwards everything else to the `<button>`.
+//
+// It used to track `hover` and `press` in React state and rebuild an inline
+// style object per render, because an inline style cannot express `:hover` or
+// `:active`. Two things were wrong with that beyond the duplication. A
+// `mousedown`-driven press never fired for a keyboard user (`:active` does, on
+// Space and Enter), and the press feedback had been wired for the primary
+// variant only, so the other three answered a click with nothing until the
+// handler returned. Both are fixed by the move rather than by this file.
+//
+// A caller's `style` still wins on specificity — deliberately, so layout stays
+// at the call site and migrating a call site is never all-or-nothing.
+
 import {
-  useState,
   type ButtonHTMLAttributes,
-  type CSSProperties,
   type ReactNode,
   type Ref,
 } from "react";
@@ -18,99 +34,18 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: Ref<HTMLButtonElement>;
 }
 
-const baseStyle: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)",
-  padding: "7px 14px",
-  borderRadius: "var(--radius-2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  transition:
-    "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
-  outline: "none",
-  border: "1px solid transparent",
-  lineHeight: 1.2,
-};
-
-const variantStyles: Record<ButtonVariant, CSSProperties> = {
-  primary: {
-    background: "var(--accent)",
-    color: "var(--accent-on)",
-    borderColor: "var(--accent)",
-  },
-  secondary: {
-    background: "var(--bg-1)",
-    color: "var(--fg-1)",
-    borderColor: "var(--line-2)",
-  },
-  ghost: {
-    background: "transparent",
-    color: "var(--fg-2)",
-  },
-  danger: {
-    // `--danger-solid` (a clear red fill), NOT the text-tuned `--danger` which
-    // washes out to salmon as a button background on a dark theme.
-    background: "var(--danger-solid)",
-    color: "#fff",
-    borderColor: "var(--danger-solid)",
-  },
-};
-
 export function Button({
   variant = "secondary",
   icon,
   children,
-  style,
-  disabled,
-  onMouseEnter,
-  onMouseLeave,
-  onMouseDown,
-  onMouseUp,
+  className,
   ...rest
 }: ButtonProps) {
-  const [hover, setHover] = useState(false);
-  const [press, setPress] = useState(false);
-
-  const merged: CSSProperties = { ...baseStyle, ...variantStyles[variant] };
-  if (disabled) {
-    merged.cursor = "not-allowed";
-    merged.opacity = 0.6;
-  } else {
-    if (hover && variant === "primary") merged.background = "var(--accent-hover)";
-    if (hover && (variant === "secondary" || variant === "ghost"))
-      // `--bg-3` (the hover ramp), not `--paper-2` — the latter is imperceptible
-      // on a near-black surface, so ghost/secondary buttons read as inert.
-      merged.background = "var(--bg-3)";
-    if (hover && variant === "danger")
-      merged.background = "color-mix(in srgb, var(--danger-solid), black 14%)";
-    if (press && variant === "primary") merged.background = "var(--accent-press)";
-  }
-
   return (
     <button
       {...rest}
-      disabled={disabled}
-      style={{ ...merged, ...style }}
-      onMouseEnter={(e) => {
-        setHover(true);
-        onMouseEnter?.(e);
-      }}
-      onMouseLeave={(e) => {
-        setHover(false);
-        setPress(false);
-        onMouseLeave?.(e);
-      }}
-      onMouseDown={(e) => {
-        setPress(true);
-        onMouseDown?.(e);
-      }}
-      onMouseUp={(e) => {
-        setPress(false);
-        onMouseUp?.(e);
-      }}
+      data-variant={variant}
+      className={className === undefined ? "myne-btn" : `myne-btn ${className}`}
     >
       {icon && <Icon name={icon} size={14} />}
       {children}

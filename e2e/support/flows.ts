@@ -288,7 +288,7 @@ export async function openPalette(session: Session): Promise<void> {
  * That helper re-fires the chord until the input exists, because a wait with
  * nothing to re-fire is a wait that can never recover. What followed was one
  * `sendKeys` and one `waitForElement`, which has exactly the failure
- * `e2e/AGENTS.md` records for `clickNewMenuItem`: the whole budget spent on a
+ * `e2e/AGENTS.md` records for `clickNewItem`: the whole budget spent on a
  * row that a re-fire would have produced in a second.
  *
  * Two things can go wrong after the palette is up, and neither gets better with
@@ -1005,7 +1005,7 @@ export async function clickBySelector(
     },
     // 45 s, and the number needs its argument because `e2e/AGENTS.md` records a
     // budget rise that fixed nothing: raising `DEFAULT_TIMEOUT_MS` 20 s -> 45 s
-    // for the `clickNewMenuItem` flake only made each occurrence twice as
+    // for the `clickNewItem` flake only made each occurrence twice as
     // expensive, because that wait was STUCK with nothing to re-fire. This one
     // re-locates and re-clicks every poll, so the extra budget buys retries
     // rather than idling. Measured: `sync-replication` passes isolated and timed
@@ -1263,51 +1263,23 @@ export async function clickRibbonUntilVisible(
  *  applied here. Each attempt gets its own SHORT window before being judged to
  *  have missed, because re-clicking a menu that did open would toggle it shut
  *  and turn one flake into an oscillation. */
-export async function clickNewMenuItem(session: Session, testId: string): Promise<void> {
-  if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) {
-    await session.waitUntil(
-      async () => {
-        if ((await session.byTestIdAll("notes.new-menu-dropdown")).length > 0) return true;
-        const trigger = await session.byTestIdAll("notes.new-menu");
-        // Sidebar not mounted yet — let the outer budget keep polling rather
-        // than throwing on a `+` that simply has not rendered.
-        if (trigger.length === 0) return null;
-        await trigger[0].click();
-        for (let i = 0; i < 20; i++) {
-          if ((await session.byTestIdAll("notes.new-menu-dropdown")).length > 0) return true;
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        return null;
-      },
-      { label: "new-menu dropdown open" },
-    );
-  }
-  // The ITEM click needs the same re-click the trigger got, and for the same
-  // reason — but it cannot simply be repeated: every item in this menu COMMITS
-  // (creates a note, opens the new-folder input), so a blind second click on a
-  // first click that actually landed would create two.
-  //
-  // The menu's own render gives the invariant that makes the retry safe.
-  // `NoteList.tsx`'s `item()` runs `setOpen(false)` BEFORE the action, for all
-  // four items, so:
-  //   - the click landed  -> the dropdown is gone, and there is nothing to retry
-  //   - the click missed  -> the dropdown is still up, and nothing was committed
-  // Re-clicking only while the dropdown is still present is therefore exactly
-  // the "the click provably did nothing" case, and cannot double-commit.
-  await session.waitUntil(
-    async () => {
-      if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) return true;
-      const [item] = await session.byTestIdAll(testId);
-      if (!item) return null;
-      await item.click();
-      for (let i = 0; i < 20; i++) {
-        if ((await session.byTestIdAll("notes.new-menu-dropdown")).length === 0) return true;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      return null;
-    },
-    { label: `new-menu item [${testId}] committed (dropdown closed)` },
-  );
+/**
+ * Click one of the sidebar's create actions.
+ *
+ * It used to open a `+` dropdown first and retry the item click — the dropdown
+ * closed BEFORE each action ran, which made a retry provably safe. myne#7xx
+ * replaced that dropdown with three direct icon buttons (new drawing, new
+ * folder, new note), so there is no menu, no open step, and no retry window:
+ * a click either lands or the element was not there.
+ *
+ * Kept as a named helper rather than inlined at 13 call sites, because the
+ * create actions are exactly the kind of control that moves — they have been
+ * loose buttons, then a menu, and now buttons again — and one helper is the
+ * thing that made the LAST move a one-file change.
+ */
+export async function clickNewItem(session: Session, testId: string): Promise<void> {
+  const el = await session.byTestId(testId, { timeoutMs: 10_000 });
+  await el.click();
 }
 
 // ── sidebar note rows ────────────────────────────────────────────────────────
@@ -1602,7 +1574,7 @@ export async function nameNewNote(session: Session, title: string): Promise<void
  * tab-strip assertion counts one tab and reads like a product bug.
  */
 export async function createNote(session: Session, title: string): Promise<void> {
-  await clickNewMenuItem(session, "notes.create");
+  await clickNewItem(session, "notes.create");
   await nameNewNote(session, title);
   // Best-effort: let the name reach the SIDEBAR before returning. The title is
   // committed by the frontmatter-title input and reaches the row's cache through

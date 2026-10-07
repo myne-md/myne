@@ -197,6 +197,60 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "ai.agent-hub",
+    title: "Agent hub and focus (the deep agent tab)",
+    paths: [
+      "src/notes/agent/AgentPane.tsx",
+      "src/notes/agent/AgentHubList.tsx",
+      "src/notes/agent/AgentConversationView.tsx",
+      "src/notes/ai/ConversationSurface.tsx",
+      "src/notes/tabKinds.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: [
+      "e2e/agent-hub.e2e.ts",
+      "e2e/a11y-axe-surfaces.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "Start an agent run with the hub tab open and WATCH the run indicator for a full minute. It must move continuously without drawing the eye away from the text you are reading: if you find yourself looking at it rather than at the conversation, it is too strong. Switch to another application and back, and confirm it is still there and still moving rather than having vanished or restarted. Then turn on the OS reduce-motion setting and confirm it holds still while the word beside it still says the run is working — a stopped mark with no word beside it reads as a crash, which is the failure this item exists to catch.",
+        whyNotAutomated: "Whether a moving mark is calm or distracting is a judgement about a person's attention over a minute of reading, and there is no assertion for it — the unit tests pin that the animation exists, is bounded, pauses and stops, which is the mechanism rather than the effect. The reduce-motion half needs the OS setting, and no lane in this tree renders a page under one: tests/a11y runs in jsdom, which computes no layout and honours no media query, and the E2E container has no accessibility settings to change.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        see: "With Windows high-contrast mode on, open the agent tab and confirm three things are visible: the run indicator (it must be a shape rather than an empty gap), the hub row you are on, and the anchor chip on an anchored conversation. Then tab through the hub with the keyboard only and confirm the focus ring lands somewhere visible on every stop, including the rename and delete controls inside a row.",
+        whyNotAutomated: "forced-colors strips every background and box-shadow, and no gate in this tree has ever rendered a page under it: the axe scenario runs in a Linux container against WebKitGTK, which does not implement the Windows high-contrast mapping at all. The stylesheet carries forced-colors arms and the unit tests assert they are PRESENT, which says nothing about what the platform then paints.",
+        clients: ["desktop-windows"],
+        estimateMin: 8,
+        tier: "core",
+      },
+      {
+        see: "With a screen reader running (VoiceOver on macOS, NVDA on Windows), open the agent hub and rename a conversation, then delete one. Confirm you HEAR what happened both times without moving focus to find out. Open a conversation into focus and confirm the reader announces arriving somewhere new rather than going silent, then use the back control and confirm the same. Finally confirm the run indicator is never announced — it is decoration, and the word beside it is what carries the meaning.",
+        whyNotAutomated: "A live region's whole job is what a screen reader decides to announce, and that is a property of the reader and the platform accessibility API, not of the DOM. jsdom exposes no accessibility tree and axe checks that a region EXISTS and is well-formed; whether VoiceOver actually speaks it — and whether it speaks it twice — is observable only with a reader running on the real platform.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "Make the agent tab narrow — split the pane until it is under about half the window — and confirm the layout answers. The history rail and the conversation must not both be squeezed into unusable columns: one of them gives way, a control appears to switch between them, and the history is still REACHABLE rather than gone. Widen it again and confirm both come back with no reflow of the header. Do the same by resizing the WINDOW rather than the pane, and confirm the answer is the same — the threshold is the pane's width, not the window's.",
+        whyNotAutomated: "The switch is a CSS container query on the pane, and jsdom implements neither container queries nor layout, so no unit test can reach the narrow arm at all: it can assert the attribute the rule keys off and nothing about what the rule then does. The E2E container runs one fixed window size, and the failure being looked for is a layout that is technically present and practically unusable, which is a judgement about whether two columns can be read rather than whether they exist.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        see: "Open the agent tab beside a note (split the pane), start a run, and type in the note while the run works. Confirm typing stays responsive and the caret never jumps. Then switch the tab between hub and focus several times while the run is going and confirm the run keeps running rather than restarting, the indicator keeps moving, and the conversation does not lose its scroll position.",
+        whyNotAutomated: "Input latency under a working run is a felt property, measured in whether a person notices a hitch between keystroke and glyph. Every E2E scenario drives the agent against StubEngine, which returns a fixed script instantly and so never occupies the thread the way a real run does.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 8,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "ai.chat",
     title: "AI chat panel",
     paths: [
@@ -521,14 +575,26 @@ export const ROSTER = Object.freeze([
       "editor/src/accessible-name.ts",
       "editor/src/fold-announce.ts",
       "docs/dev/accessibility-checklist.md",
+      // The forced-colors repair (myne-md/myne#775). Two sheets, because each
+      // client owns its own copy of the focus rule being repaired.
+      "src/styles/tokens.css",
+      "mobile/src/styles/tokens.css",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
       // The parts that CAN be measured. Everything below is what is left.
       "e2e/a11y-keyboard.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
+      "e2e/a11y-axe-surfaces.e2e.ts",
     ],
     manual: [
+      {
+        see: "Turn Windows high contrast on (Settings > Accessibility > Contrast themes, or Left Alt + Left Shift + Print Screen) and tab through the editor, the left ribbon, the tab strip, Settings and the command palette. Confirm EVERY focused control shows a visible outline in the theme's own highlight colour, with a gap between the outline and the control's edge. Then check the toggled controls specifically: an on/off switch in Settings, the selected half of the graph's Graph/List switch, and the ribbon entry for the surface you are on must each look different from their unselected neighbours rather than identical. Finally confirm no text has become invisible and every control still has a visible boundary.",
+        whyNotAutomated: "Forced-colors mode is a Windows compositor feature. The desktop E2E lane is a Linux container running WebKitGTK and the web lane is Chromium on the same runner, so no harness in this repository can enter the mode at all; jsdom has no rendering and therefore no `forced-colors` media query to match. `tests/a11y/forcedColors.test.ts` asserts the repair is present in both stylesheets, which catches its deletion, and cannot observe whether the operating system then paints it.",
+        clients: ["desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
       {
         see: "The mobile screen-reader and external-keyboard pass: run every row of mobile/docs/dev/device-matrix.md section 12 under VoiceOver on iOS (12.1 to 12.6, 12.8 to 12.11) and write the result into that table with the device model, OS build and screen-reader version. The rows cover whether each tappable row is announced as a BUTTON named by its own text, whether the folder chevron's state is spoken (it is a CSS rotation, so state is the only cue), whether Space activates without scrolling the list, and whether the palette scrim is silent rather than an unnamed full-screen button.",
         whyNotAutomated: "Neither CI lane builds for iOS: the desktop suite is a Linux container against WebKitGTK and the web lane is Chromium, so no harness in this repository launches an iOS runtime at all, and VoiceOver's spoken output is not exposed to WebDriver on any platform. `mobile/tests/a11y-tappable.test.tsx` holds the markup in both directions and markup is not the question here.",
@@ -946,7 +1012,13 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/attachments-library.e2e.ts",
+      // myne-md/myne#773: the library is a TAB, and the left ribbon marks it
+      // current. Both were impossible while it was a CenterView.
+      "e2e/attachments-tab.e2e.ts",
       "e2e/attachment-cleanup.e2e.ts",
       "e2e/attachment-zoom.e2e.ts",
       // myne-md/myne#604: an embed alone on its line draws as a block and
@@ -2321,6 +2393,62 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "meeting.notes",
+    title: "Meeting notes from live audio",
+    paths: [
+      "src/lib/meeting-notes.ts",
+      "src/notes/meetingSession.ts",
+      "src/notes/meetingNote.ts",
+      "src/components/meeting/",
+      "editor/src/attachments/meetingBar.ts",
+      "src-tauri/src/tray.rs",
+      "src-tauri/src/plugins/attachments/meeting/",
+      "src-tauri/src/plugins/attachments/voice/mix.rs",
+      "src-tauri/src/plugins/attachments/voice/silence.rs",
+      "src-tauri/src/plugins/attachments/voice/tap.rs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/meeting-notes.e2e.ts", "e2e/meeting-ai.e2e.ts"],
+    manual: [
+      {
+        see: "On a macOS 14.2 or later release build, join a call with another participant and start a meeting session. Confirm the system-audio permission prompt appears the first time, and that with it granted the other participant's words appear in the session's transcript blocks AND in the note the session writes, with the audio players at the top of that note playing both sides back.",
+        whyNotAutomated: "The tap needs a live CoreAudio process tap, a real audio device and a TCC grant. The desktop suite runs in a Linux container against WebKitGTK, where none of the three exists and the module does not compile.",
+        clients: ["desktop-macos"],
+        estimateMin: 20,
+        tier: "core",
+      },
+      {
+        see: "Revoke the system-audio permission in System Settings, Privacy & Security, Screen & System Audio Recording, then start a session while speaking yourself. Confirm the session warns that the other participants are not coming through, and that the warning arrives while you are still in the meeting rather than only when it ends.",
+        whyNotAutomated: "A denied tap delivers zeroed buffers rather than an error and there is no public preflight API, so the failure is only reachable by actually being denied the permission on macOS. Nothing in the process can distinguish a denied tap from a silent room, which is why the check is a human reading the warning.",
+        clients: ["desktop-macos"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "Run a session long enough to cross a clip boundary (about twelve minutes at 48 kHz), then stop. Confirm the note opens with one player per clip in capture order, that the transcript below is the concatenation in that same order with no duplicated or missing seam, and that the machine-transcript notice is present above it.",
+        whyNotAutomated: "Crossing the boundary needs twelve real minutes of audio; the E2E fixture session runs for seconds and never reaches it.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 20,
+        tier: "standard",
+      },
+      {
+        see: "Start a session, then lock the vault. Confirm the microphone and the system tap both stop, the menubar indicator disappears, and no further audio is captured; then unlock and confirm a fresh session starts cleanly with no leftover indicator.",
+        whyNotAutomated: "Whether a microphone and a CoreAudio tap were actually released is an OS-level audio-session observation; the suite can only assert that the process did not crash.",
+        clients: ["desktop-macos"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "With a real text model installed, run a meeting session, take the AI offer, and generate the sections. Confirm the summary, action items, decisions and open questions read as a faithful, usable draft against the transcript (a perceptual judgement of a small model's output, not a mechanical check), that the sections land beneath the transcript without altering it, and that the offer, picker and preview render legibly on macOS and Windows.",
+        whyNotAutomated: "A real model's output quality is a human reading judgement that no stub can stand in for, and the macOS and Windows renderings of the dialog have no driver lane (the container runs WebKitGTK on Linux).",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "editor.transcription",
     title: "Audio transcription (desktop)",
     paths: [
@@ -2872,6 +3000,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/graph-tab.e2e.ts",
       "e2e/graph-settings.e2e.ts",
       "e2e/graph-color-groups.e2e.ts",
@@ -3694,6 +3825,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/archive.e2e.ts",
       "e2e/folder-archive.e2e.ts",
     ],
@@ -3815,6 +3949,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/notes.e2e.ts",
       "e2e/palette-empty-trash.e2e.ts",
       "e2e/folder-archive.e2e.ts",
@@ -3916,6 +4053,8 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
       "e2e/a11y-axe.e2e.ts",
+      // myne-md/myne#775: the axe gate reaches this surface now.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/keyboard-nav-onboarding.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
     ],
@@ -5247,6 +5386,8 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/settings/AppearancePanel.tsx",
       "src/components/settings/RibbonCustomizeSettings.tsx",
+      "src/components/settings/BarCustomizeSettings.tsx",
+      "src/components/settings/CustomizeList.tsx",
       "src/lib/theme.ts",
       "src/styles/tokens.css",
       "mobile/src/lib/themes.ts",
@@ -5262,6 +5403,7 @@ export const ROSTER = Object.freeze([
       "e2e/ornament.e2e.ts",
       "e2e/graph-settings.e2e.ts",
       "e2e/left-ribbon.e2e.ts",
+      "e2e/bottom-bar-empty.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
     ],
     manual: [
@@ -5807,6 +5949,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/sync-join-recovery.e2e.ts",
       "e2e/device-names.e2e.ts",
       "e2e/sync-replication.e2e.ts",
       "e2e/beta-terms-consent.e2e.ts",
@@ -5946,6 +6089,9 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      // myne-md/myne#775: the axe gate reaches this surface now — it was
+      // outside the original six-screen denominator.
+      "e2e/a11y-axe-surfaces.e2e.ts",
       "e2e/task-panel.e2e.ts",
       "e2e/task-chips.e2e.ts",
       "e2e/task-recurrence.e2e.ts",
@@ -6111,12 +6257,12 @@ export const ROSTER = Object.freeze([
     id: "vault.creation",
     title: "Vault creation, the recovery phrase and its artefacts",
     paths: [
-      "src/screens/vault-creation/AccountStep.tsx",
       "src/screens/vault-creation/BriefingStep.tsx",
       "src/screens/vault-creation/ConfirmStep.tsx",
       "src/screens/vault-creation/EncryptingStep.tsx",
+      "src/screens/vault-creation/KitStep.tsx",
+      "src/screens/vault-creation/NameStep.tsx",
       "src/screens/vault-creation/PasswordStep.tsx",
-      "src/screens/vault-creation/PhraseStep.tsx",
       "src/screens/vault-creation/ProvisioningStep.tsx",
       "src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "src/screens/vault-creation/ReadyStep.tsx",
@@ -6124,9 +6270,7 @@ export const ROSTER = Object.freeze([
       "src/screens/vault-creation/index.ts",
       "src/screens/vault-creation/reducer.ts",
       "src/screens/vault-creation/step-shell.tsx",
-      "src/screens/vault-creation/PhraseStep.tsx",
-      "src/screens/vault-creation/ConfirmStep.tsx",
-      "src/screens/vault-creation/ReadyLocalArtefacts.tsx",
+      "src/screens/vault-creation/stepOrder.ts",
       "src/screens/CreateVault.tsx",
       "src/lib/vault-creation-errors.ts",
       "src/lib/vault-creation-logging.ts",
@@ -6135,6 +6279,7 @@ export const ROSTER = Object.freeze([
       "src/components/PasswordStrength.tsx",
       "src/lib/password-generator.ts",
       "src/lib/secret-export.ts",
+      "src/lib/recovery-kit.ts",
       "src/lib/bip39-normalize.ts",
       "src/lib/clipboard.ts",
       "src/components/ActionStatus.tsx",
@@ -6163,11 +6308,18 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On the recovery-phrase step press Save as file (recovery kit) and complete the real OS save dialog, writing the file to the Desktop. Open it in a text editor and confirm all 24 words are present in order. Then press Save as file again and cancel from within the dialog, and confirm no file was created and the flow stayed on the phrase step. On web, confirm the file arrives in the browser's Downloads with the suggested name.",
+        see: "On the recovery-kit step press Save recovery kit and complete the real OS save dialog, writing the file to the Desktop. Open it in a text editor and confirm it holds BOTH secrets: all 24 words present in order on one line, and the account number, each under its own heading, with the vault's name and the date at the top. Then press Save recovery kit again and cancel from within the dialog, and confirm no file was created and the flow stayed on the kit step. On web, confirm the file arrives in the browser's Downloads with the suggested name.",
         whyNotAutomated: "The GTK/AppKit save chooser is a native out-of-process widget; WebKitWebDriver drives the WebView only, so where the file lands, cancel-from-inside and a sandbox denial are all inside a window no scenario can reach, and losing this file silently is losing the only copy of a credential that cannot be rotated.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
         estimateMin: 5,
         tier: "core",
+      },
+      {
+        see: "On the recovery-kit step, in ONE shipped language other than English with long compound words (German is the intended case), resize the window from its widest down to its smallest usable height and read the sheet at each size. Four pass conditions, each a FAIL to fix: (a) the sheet still reads as one document rather than two stacked cards, meaning the two hairline rules and the single border survive and the phrase grid does not appear to float outside the sheet; (b) all 24 words stay legible in their four columns without a word being clipped or the grid scrolling sideways; (c) a long vault name in the header truncates with an ellipsis and does NOT push the date off the row or wrap the header into two lines; (d) at the smallest height the step scrolls rather than losing either the heading or the Save control. Repeat step (c) with a vault named by pasting 200 characters.",
+        whyNotAutomated: "Whether a bordered box with two hairline rules still reads as ONE document is a perceptual judgement with no machine representation, and it is the entire argument for merging the phrase and account steps into a sheet rather than warning the user in a box that both secrets are in one file. The measurable half is covered: the E2E suite renders this step at one fixed window size against WebKitGTK in a Linux container, and a screenshot diff would answer whether pixels changed, not whether the result is readable.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 7,
+        tier: "standard",
       },
       {
         see: "With Universal Clipboard enabled between a Mac and a signed-in iPhone/iPad, copy the phrase on the Mac and paste on the phone, then confirm whether the 24 words arrive there. Separately, on Windows press Win+V after copying and confirm whether the phrase appears in clipboard history. Record the answer either way; the release note must match what you saw.",
@@ -6436,6 +6588,12 @@ export const ROSTER = Object.freeze([
       "src/screens/VaultRecover.tsx",
       "src/lib/vault-recover.ts",
       "src/lib/bip39-normalize.ts",
+      // The Settings-side phrase CHECK (myne-md/myne#468): same crypto, same
+      // non-distinguishing failure, opposite precondition — it runs on an
+      // unlocked vault. Claimed by this entry rather than by a new one because
+      // what a human verifies about it is the same keyboard hazard the item
+      // below already describes.
+      "src/components/settings/RecoveryDrillRow.tsx",
       "src-tauri/src/plugins/vault_recover/",
       "core/src/plugins/vault_recover/",
     ],
@@ -6443,12 +6601,13 @@ export const ROSTER = Object.freeze([
     automatedBy: [
       "e2e/vault-recovery.e2e.ts",
       "e2e/recovery-drill.e2e.ts",
+      "e2e/recovery-phrase-check.e2e.ts",
       "e2e/keyboard-nav-onboarding.e2e.ts",
       "e2e/change-password.e2e.ts",
     ],
     manual: [
       {
-        see: "With the OS set to a non-English keyboard and macOS \"Correct spelling automatically\" plus \"Use smart quotes\" left ON, type a real 24-word phrase into the grid one cell at a time. Confirm no word is silently rewritten or capitalised by the OS, and that Submit reaches the password-reset step rather than reporting a wrong phrase.",
+        see: "With the OS set to a non-English keyboard and macOS \"Correct spelling automatically\" plus \"Use smart quotes\" left ON, type a real 24-word phrase into the grid one cell at a time. Confirm no word is silently rewritten or capitalised by the OS, and that Submit reaches the password-reset step rather than reporting a wrong phrase. Then repeat the same typing into Settings, Privacy, \"Check your recovery phrase\" on an unlocked vault, and confirm it reports the phrase as VALID: that field takes the whole phrase as one string rather than 24 cells, so a smart-quote or an autocorrected word lands differently there, and a false negative from the CHECK is worse than one from recovery — it tells a user with a good phrase that their backup is broken.",
         whyNotAutomated: "Every keystroke in the suite arrives through the W3C Actions API, which bypasses the OS keyboard layout and produces no OS autocorrect or text-substitution event; a phrase mangled by the OS is byte-identically indistinguishable from a wrong phrase by design, so the failure surfaces only as a user permanently locked out.",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 8,
@@ -6469,6 +6628,7 @@ export const ROSTER = Object.freeze([
     title: "Unlock screen",
     paths: [
       "src/screens/Unlock.tsx",
+      "src/screens/AuthShell.tsx",
       "src/lib/vault-unlock.ts",
       "src/lib/vault-status.ts",
       "src/components/SuspicionBanner.tsx",
@@ -6637,6 +6797,36 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "watch.meeting-capture",
+    title: "Apple Watch meeting capture: mic → transferFile → phone seal → unlock-drain note",
+    paths: [
+      "mobile/ios-watch/MyneWatch/",
+      "mobile/ios-watch/Receiver/WCMeetingReceiver.swift",
+      "mobile/src/lib/meetingDrain.ts",
+      "mobile/src-tauri/src/plugins/captures/mod.rs",
+      "core/src/plugins/captures/meeting_manifest.rs",
+    ],
+    clients: ["ios"],
+    automatedBy: [],
+    manual: [
+      {
+        see: "With a paired Apple Watch and the iPhone LOCKED, start a meeting recording on the watch, speak for about 30 seconds and stop. The bright recording state and live elapsed counter must show on the wrist, the phone must never need unlocking for the audio to arrive, and after you unlock the phone and open Myne exactly ONE note must appear with the audio embeds in chunk order and the on-device transcript beneath them.",
+        whyNotAutomated: "The hop is WatchConnectivity transferFile from a separate watchOS app to the iPhone receiver; the watchOS simulator does not support transferFile and no automated tier in this repo crosses that transport or drives the watch microphone, so the wrist capture and the delivery can only be observed on a paired physical Watch.",
+        clients: ["ios"],
+        estimateMin: 15,
+        tier: "core",
+      },
+      {
+        see: "Record a meeting long enough to cross a chunk boundary (at least three chunks) with the phone locked, then unlock and confirm the note carries every chunk in order with none missing and none duplicated. Then repeat with a mid-session Bluetooth disconnect: move the watch out of range for a minute, keep recording, return, and stop. The not-yet-transferred chunks must stay on the watch until contact returns, and no chunk may double-count.",
+        whyNotAutomated: "Chunk boundaries over a real recording, the OS's own transfer scheduling across a Bluetooth link, and a physical out-of-range disconnect are between two devices the OS decides; no runner produces a multi-chunk WatchConnectivity session or drops a real radio link mid-transfer.",
+        clients: ["ios"],
+        estimateMin: 15,
+        tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "web.attachments.blob-url-rendering",
     title: "Attachments painting from worker-minted blob URLs, and dying on lock",
     paths: [
@@ -6703,8 +6893,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "web/src/platform/clipboardManager.ts",
       "scripts/check-clipboard-feedback.mjs",
-      "src/screens/vault-creation/PhraseStep.tsx",
-      "src/screens/vault-creation/AccountStep.tsx",
+      "src/screens/vault-creation/KitStep.tsx",
       "src/lib/clipboard.ts",
     ],
     clients: ["web"],
@@ -6930,7 +7119,7 @@ export const ROSTER = Object.freeze([
       "web/src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "scripts/check-web-no-phrase.mjs",
       "e2e-web/create-account.e2e.ts",
-      "src/screens/vault-creation/PhraseStep.tsx",
+      "src/screens/vault-creation/KitStep.tsx",
       "src/screens/vault-recover/PhraseEntryStep.tsx",
     ],
     clients: ["web"],

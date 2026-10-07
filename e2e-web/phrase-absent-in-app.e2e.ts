@@ -52,7 +52,7 @@ import { openFixtureVault, openSettingsTab } from "./support/fixture-session";
  * make the check unusable.
  */
 const PHRASE_SURFACES = [
-  "create.phrase-grid", // vault creation, PhraseStep
+  "create.phrase-grid", // vault creation, the recovery kit's phrase grid
   "create.phrase-word",
   "recover.phrase-cell", // recovery, PhraseEntryStep
   "sync.enroll.phrase-cell", // device enrolment by phrase

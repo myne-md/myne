@@ -56,12 +56,31 @@ export type CommandContext = {
    */
   onOpenAiChat: () => void;
   /**
+   * Reveal the agent tab, on its vault-general Hub view (myne-md/myne#771).
+   * The scope word in the label is what makes it distinguishable from the
+   * note-scoped sibling before the user invokes either.
+   */
+  onOpenAgentVault: () => void;
+  /**
+   * Reveal the agent tab, on its Focus view for the OPEN note (myne-md/myne#771).
+   * A call with no open note lands on the Hub, which the handler decides.
+   */
+  onOpenAgentNote: () => void;
+  /**
    * Summarize the open note / selection (note-summarization MYND-409). Runs the
    * local `Engine.infer` on a RAM-assembled prompt and renders ephemerally in
    * the AI Chat tab; blocked for a note in an `ai_excluded_folders` folder
    * (SYNC-14). Gated by the action on `editor + selectedNote + aiEnabled`.
    */
   onSummarizeNote: () => void;
+  /**
+   * Re-run the meeting AI pass on the OPEN note (meeting-ai). The pass is
+   * offered once after a meeting stops; this is the way back to it, for a note
+   * the user dismissed the offer on or wants to regenerate. Reads the note's
+   * transcript out of its body and opens the same dialog. Gated by the action on
+   * `editor + selectedNote + aiEnabled + developer_mode`.
+   */
+  onSummarizeMeeting: () => void;
   /**
    * Rewrite the current editor selection in place (writing-assistant MYND-410
    * `/yeniden-yaz` as a palette action — a slash trigger has no selection). Runs
@@ -70,6 +89,27 @@ export type CommandContext = {
    * selectedNote + aiEnabled`.
    */
   onRewriteSelection: () => void;
+  /**
+   * Open the command palette itself (myne-md/myne#773).
+   *
+   * Until this landed the palette had NO clickable entry point anywhere in the
+   * app. `palette.toggle` existed only in `bindableCatalog.ts` as a keybinding
+   * (`Mod-K` / `Mod-P`), and `ribbonEligibleIds()` derives the rail's roster
+   * from actions in `COMMAND_ACTIONS` that declare a `ribbon` block — so the
+   * palette was not missing from the default rail, it was structurally
+   * impossible to pin to it. A user who did not already know the chord could
+   * not reach the palette, which also made every palette-only action
+   * undiscoverable.
+   */
+  onOpenPalette: () => void;
+  /**
+   * Whether the palette is currently open. Read by `palette.open`'s own
+   * `visibility` so the action hides itself while the palette is showing: a row
+   * that reopens the surface you are already looking at is a no-op that makes
+   * the palette look broken, and `actions.ts` states the standing rule that the
+   * palette never exposes an action unavailable in the current state.
+   */
+  paletteOpen: boolean;
   /** Invoke the lock-vault flow (mirrors BottomBar Lock button). */
   onLock: () => Promise<void>;
   /** Open the Settings modal (mirrors gear button). */
@@ -281,6 +321,10 @@ export type CommandAction = {
  * there; the resolver lives in `src/notes/ribbonItems.ts`.
  */
 export const RIBBON_DEFAULT_IDS: readonly string[] = [
+  // The palette's own entry, first on the rail (myne-md/myne#773). It is the
+  // way IN to every other command, so a rail that pins ten actions and not the
+  // one that finds the other two hundred has the ordering backwards.
+  "palette.open",
   "note.new",
   "daily.open-today",
   "periodic.open-this-week",

@@ -157,6 +157,51 @@ a:focus-visible,
   border-radius: var(--radius-2);
 }
 
+/* -- Forced colours (Windows high contrast) ---------------------------------
+   THE FOCUS RING ABOVE DISAPPEARS ENTIRELY under `forced-colors: active`, and
+   that is not a degradation — it is a total loss of keyboard focus indication
+   for every control in the app, affecting exactly the users who most need it.
+
+   The mechanism: the rule above is `outline: none` plus `box-shadow:
+   var(--ring)`, and forced-colors mode STRIPS `box-shadow` while leaving
+   `outline: none` standing. So the app removes the platform's own indicator and
+   then has its replacement removed from under it. Nothing reports this —
+   `tests/a11y/` runs in jsdom and the E2E lane runs in a Linux container, so no
+   gate in this tree has ever rendered a forced-colors page (myne-md/myne#775).
+
+   The desktop sheet carries the same repair with the full reasoning.
+   The repair is a real `outline`, which forced-colors preserves and repaints in
+   the user's own chosen colour. `Highlight` is the system keyword for exactly
+   this; the offset keeps it clear of the control's own edge, which forced
+   colours also repaint.
+
+   WCAG 2.2 AA 2.4.7 (Focus Visible) and 1.4.11 (Non-text Contrast). */
+@media (forced-colors: active) {
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  a:focus-visible,
+  [tabindex]:focus-visible,
+  .vc-step-heading:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* A toggled control communicates its state with a background fill, and
+     forced colours replace every background with the system canvas — so an
+     on/off switch, a selected segment and a current ribbon entry all become
+     identical. `forced-color-adjust: none` is the sanctioned opt-out for a
+     control whose colour IS its meaning, and it is scoped to exactly those. */
+  .myne-switch[aria-checked="true"],
+  .myne-segmented__segment[aria-checked="true"],
+  .myne-segmented__thumb {
+    forced-color-adjust: none;
+  }
+}
+
+
 /* Step headings receive programmatic focus on mount (orchestrator focus
    management). They are visually unchanged; the ring is the only signal. */
 .vc-step-heading:focus {

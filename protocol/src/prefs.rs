@@ -1269,6 +1269,21 @@ pub struct PrefsView {
     #[serde(default)]
     pub last_backup_at: Option<u64>,
 
+    /// **Meeting AI prompt** (meeting-ai): the user's replacement for the
+    /// meeting AI pass's reduce instruction. `None` or empty means the built-in
+    /// default instruction (which carries the section headings and the language
+    /// line); a non-empty value is used verbatim and replaces that machinery.
+    /// It scopes to the meeting AI feature only, not the other AI surfaces.
+    /// Omitted entirely from the canonical JSON when `None`, so a vault that
+    /// never set it is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected; additive field on `MYP1`). **Non-load-bearing**
+    /// (a tampered / replayed value changes only what the user's own model is
+    /// asked to produce), no protective-envelope clamp. Canonical key
+    /// `meeting_ai_prompt` sorts after `last_backup_at` (`l` < `m`), before
+    /// `new_note_location` (`m` < `n`).
+    #[serde(default)]
+    pub meeting_ai_prompt: Option<alloc::string::String>,
+
     /// Default location for newly-created notes (MYND-462, "Files" settings
     /// panel) — the MODE: `root` (vault root), `current` (the active note's
     /// folder), or `specific` (the folder named by
@@ -1556,6 +1571,7 @@ impl Default for PrefsView {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -2309,6 +2325,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // vault.prefs (preserves existing KAT vectors). Trailing comma like
     // last_backup_at (screen_capture_protection is mandatory and canonically
     // later).
+    // meeting_ai_prompt (canonical key 'm', after last_backup_at [l < m], before
+    // new_note_location [m < n], meeting-ai). The user's replacement for the
+    // meeting AI reduce instruction; omitted entirely when None so a vault that
+    // never set it is byte-identical to a pre-feature vault.prefs.
+    if let Some(ref v) = prefs.meeting_ai_prompt {
+        out.extend_from_slice(b"\"meeting_ai_prompt\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+
     if let Some(ref v) = prefs.new_note_location {
         out.extend_from_slice(b"\"new_note_location\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -3250,6 +3276,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
     // canonically later, so a comma always follows a well-formed value).
     let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
+    // meeting_ai_prompt (key 'm', after last_backup_at [l < m], before
+    // new_note_location [m < n], meeting-ai). Parsed from the same monotonic
+    // cursor so a later field's key marker is never matched inside the prompt
+    // text.
+    let meeting_ai_prompt =
+        parse_optional_string_field(rest, &mut cursor, b"\"meeting_ai_prompt\":")?;
     // new_note_location + new_note_location_folder (keys 'n' — after
     // last_backup_at [l < n], before paired_extensions [n < p], MYND-462). Parsed
     // from the same monotonic cursor so a later field's key marker is never
@@ -3446,6 +3478,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         theme,
         label,
         last_backup_at,
+        meeting_ai_prompt,
         new_note_location,
         new_note_location_folder,
         startup_open,
@@ -4558,6 +4591,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -4642,6 +4676,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -5140,6 +5175,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
@@ -5226,6 +5262,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
@@ -5662,6 +5699,7 @@ mod tests {
         // sort after spell_languages, before theme (after screen_capture_protection).
         let prefs = PrefsView {
             last_backup_at: Some(42),
+            meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("current")),
             new_note_location_folder: Some(alloc::string::String::from("Notes/")),
             spell_languages: alloc::vec![alloc::string::String::from("en-US")],
@@ -6912,6 +6950,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
+            meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
             right_panel_active_tab: None,
@@ -6932,9 +6971,39 @@ mod tests {
     }
 
     #[test]
+    fn encode_places_meeting_ai_prompt_between_last_backup_at_and_new_note_location() {
+        // Canonical key order (meeting-ai): last_backup_at (l) <
+        // meeting_ai_prompt (m) < new_note_location (n).
+        let view = PrefsView {
+            last_backup_at: Some(1765000000),
+            meeting_ai_prompt: Some(alloc::string::String::from("Summarize tersely.")),
+            new_note_location: Some(alloc::string::String::from("specific")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&view);
+        let text = core::str::from_utf8(&encoded).expect("utf8");
+        let pos = |needle: &str| text.find(needle).expect("marker present");
+        assert!(pos("\"last_backup_at\"") < pos("\"meeting_ai_prompt\""));
+        assert!(pos("\"meeting_ai_prompt\"") < pos("\"new_note_location\""));
+        let back = canonical_json_decode(&encoded).expect("decodes");
+        assert_eq!(
+            back.meeting_ai_prompt.as_deref(),
+            Some("Summarize tersely.")
+        );
+    }
+
+    #[test]
+    fn meeting_ai_prompt_is_omitted_when_unset() {
+        let encoded = canonical_json_encode(&PrefsView::default());
+        let text = core::str::from_utf8(&encoded).expect("utf8");
+        assert!(!text.contains("meeting_ai_prompt"), "got: {text}");
+    }
+
+    #[test]
     fn last_backup_at_round_trips_through_decode() {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
+            meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
             right_panel_active_tab: None,
@@ -6959,6 +7028,7 @@ mod tests {
         // survive (no silent truncation).
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
+            meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
             right_panel_active_tab: None,
@@ -7096,6 +7166,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -7719,6 +7790,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -7810,6 +7882,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -7899,6 +7972,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -7987,6 +8061,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8138,6 +8213,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8257,6 +8333,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8355,6 +8432,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8527,6 +8605,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8633,6 +8712,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -8981,6 +9061,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9069,6 +9150,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9159,6 +9241,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9317,6 +9400,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9452,6 +9536,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9777,6 +9862,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -9869,6 +9955,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
@@ -10223,6 +10310,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
@@ -10308,6 +10396,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
@@ -10458,6 +10547,7 @@ mod tests {
             editor_vim_mode: Some(true),
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765432100),
+            meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("specific")),
             new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
             paired_extensions: Vec::new(),
@@ -11801,6 +11891,7 @@ mod tests {
         let prefs = PrefsView {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
+            meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
             right_panel_active_tab: None,
@@ -12851,6 +12942,137 @@ mod tests {
         .expect("write vault-prefs chat-history-budget vectors dump");
     }
 
+    /// Generator for the **meeting AI prompt** `vault-prefs` cases (meeting-ai).
+    ///
+    /// `cargo test -p protocol --lib emit_meeting_ai_prompt_prefs_vectors -- --ignored`
+    ///
+    /// A new shipped v0.1.x `PrefsView` field owes an `encrypt-*` /
+    /// `decrypt_ok-*` pair plus its schema property (`protocol/AGENTS.md`
+    /// "Adding a `PrefsView` field is four edits": the fifth edit is the
+    /// `vault-prefs` vector family, and "Prefs are not a vector surface" is the
+    /// wrong intuition). The load-bearing half here is the canonical SLOT:
+    /// `last_backup_at` (l) < `meeting_ai_prompt` (m) < `new_note_location` (n),
+    /// which sits in the region the decoder scans forward through, so an older
+    /// client steps over the unknown key and reads the following fields
+    /// correctly. Unset is OMITTED ENTIRELY rather than encoded as an empty
+    /// string, so a vault that never set it stays byte-identical to its
+    /// pre-feature self.
+    #[test]
+    #[ignore]
+    fn emit_meeting_ai_prompt_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_maip: [u8; AEAD_NONCE_LEN] = [0xE0; AEAD_NONCE_LEN];
+        let prefs_maip = PrefsView {
+            last_backup_at: Some(1765432100),
+            meeting_ai_prompt: Some(String::from("Summarize tersely, decisions first.")),
+            new_note_location: Some(String::from("specific")),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_maip);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"last_backup_at":1765432100,"meeting_ai_prompt":"Summarize tersely, decisions first.","new_note_location":"specific","screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin last_backup_at (l) < meeting_ai_prompt (m) < new_note_location (n)",
+        );
+        let blob_maip =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_maip, &nonce_maip)
+                .expect("encode meeting-ai-prompt");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_maip).expect("decode");
+        assert_eq!(
+            decoded, prefs_maip,
+            "meeting-ai-prompt blob must round-trip exactly"
+        );
+
+        // Omit-when-unset: the same neighbours with the field back to `None`
+        // must carry no `meeting_ai_prompt` key at all.
+        let prefs_unset = PrefsView {
+            meeting_ai_prompt: None,
+            ..prefs_maip.clone()
+        };
+        let canonical_unset = canonical_json_encode(&prefs_unset);
+        assert_eq!(
+            canonical_unset.as_slice(),
+            br#"{"last_backup_at":1765432100,"new_note_location":"specific","screen_capture_protection":true}"#.as_slice(),
+            "an unset meeting_ai_prompt must be omitted entirely",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-meeting-ai-prompt
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-meeting-ai-prompt\",\n");
+        dump.push_str("      \"description\": \"The meeting AI prompt (meeting-ai). An optional free-text string, NFC-normalized, pinned between both canonical neighbours: last_backup_at (l) < meeting_ai_prompt (m) < new_note_location (n). That slot is the load-bearing half: it sits in the region a decoder scans forward through, so an older client steps over the unknown key and reads the following fields correctly. Unset is OMITTED ENTIRELY rather than encoded as an empty string, so a vault that never set it stays byte-identical to its pre-feature self. Same vault-A inputs as the sibling cases; prefs_nonce=0xE0x24. Generated by emit_meeting_ai_prompt_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_maip)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_maip)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-meeting-ai-prompt
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-meeting-ai-prompt\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-meeting-ai-prompt: the blob decodes back to a PrefsView carrying meeting_ai_prompt between last_backup_at and new_note_location under the same root_key + account_number_hash. A decoder that does not know the field tolerates it per the 9.5.2 forward-compat rule and treats the prompt as ABSENT rather than as an empty string; absent means the built-in default instruction applies, which is a different state from 'a blank custom prompt'.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_maip)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"last_backup_at\": 1765432100,\n");
+        dump.push_str("        \"meeting_ai_prompt\": \"Summarize tersely, decisions first.\",\n");
+        dump.push_str("        \"new_note_location\": \"specific\"\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_meeting_ai_prompt_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs meeting-ai-prompt vectors dump");
+    }
+
     /// Generator for the **set-entry removal clock** `vault-prefs` cases
     /// (myne-md/myne#613).
     ///
@@ -13747,6 +13969,7 @@ mod tests {
         // paired_extensions sorts after last_backup_at and before saved_views.
         let original = PrefsView {
             last_backup_at: Some(1_700_000_000),
+            meeting_ai_prompt: None,
             paired_extensions: alloc::vec![sample_paired("e", "t", false)],
             saved_views: alloc::vec![sample_view("v1", "A")],
             ..PrefsView::default()

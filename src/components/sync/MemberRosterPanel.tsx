@@ -21,6 +21,7 @@ import { writeText as clipboardWriteText } from "../../platform/clipboardManager
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
 import { Input } from "../primitives/Input";
 import { HELPER_STYLE, MULTILINE_STYLE } from "../settings/panel-styles";
 import { SettingsSection } from "../settings/SettingsSection";
@@ -387,9 +388,14 @@ export function MemberRosterPanel({
         testId="member-roster.members-section"
       >
       {members.length === 0 ? (
-        <p data-testid="member-roster.empty" style={HELPER_STYLE}>
-          {t("sync.memberRoster.empty")}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="user"
+          size="sm"
+          title={t("sync.memberRoster.emptyTitle")}
+          body={t("sync.memberRoster.empty")}
+          testId="member-roster.empty"
+        />
       ) : (
         <>
           <ul data-testid="member-roster.list" style={LIST_STYLE}>

@@ -569,6 +569,25 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # The pointer-target floor (myne#775, WCAG 2.2 AA SC 2.5.8). axe covers
+      # this rule only where a scenario renders the surface; this reads every
+      # declaration, including on screens no scenario opens.
+      - node scripts/check-target-size.mjs
+      # Primitive adoption (myne#774): a ratchet on hand-rolled interactive
+      # elements. Nothing else reports one — it compiles, renders, and passes
+      # every test, and a reviewer sees one file at a time.
+      - node scripts/check-primitive-adoption.mjs
+      # The tooltip convention (myne#775): a ratchet on native `title=` over
+      # interactive elements — the native tooltip waits ~1s, ignores the theme
+      # and never shows on keyboard focus — plus a hard failure for an icon-only
+      # control with no accessible name (WCAG 2.2 AA 4.1.2).
+      - node scripts/check-tooltip-convention.mjs
+      # The motion canon (myne#772, design-notes/ui/0632): no `ease-in` on a
+      # UI entrance, no `infinite` outside a named+reasoned allowlist, no raw
+      # duration past the 300ms ceiling, no transition on a layout-triggering
+      # property without a recorded reason. Every one of those is invisible to
+      # `tsc`, to eslint and to every test here.
+      - node scripts/check-motion-canon.mjs
       # Token PARITY (myne#478), the opposite question from the ratchet above:
       # does a token anybody names actually exist, and does one name have two
       # independent declarations? Neither half fails to compile and the wrong
@@ -664,6 +683,14 @@ steps:
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
       # Node-builtins only (no extra deps); folded here since node is set up.
       - node scripts/check-i18n.mjs
+      # Story-catalogue coverage ratchet (myne-md/myne#832): a new component or
+      # screen may not land without a story. Nothing else notices a missing
+      # story: it breaks no build, fails no type and renders nothing.
+      - node scripts/check-story-coverage.mjs
+      # Story-catalogue isolation (myne-md/myne#832): no app build config or
+      # Tauri bundle manifest may reference `stories/`, so "deployable" cannot
+      # quietly become "shipped to users".
+      - node scripts/check-stories-isolation.mjs
 
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
@@ -693,6 +720,36 @@ steps:
       # (`tests/platform/seam-contract.ts`), parameterised over a transport. The
       # two subject files supply the transports; neither restates an assertion.
       - pnpm test:seam:desktop
+      # Story catalogue render checks (myne-md/myne#832): every registered story
+      # must mount with no thrown/console error (smoke, BLOCKING) and its
+      # normalised DOM hash is compared against the committed baseline (drift,
+      # WARNING ONLY). A separate config because it needs the fake-IPC story host
+      # installed before any app module body runs. Runs here rather than in
+      # `pnpm-build`: it needs the DOM and the `@myne/*` source resolution that
+      # only a Vite pass provides, which is exactly why these checks are Vitest
+      # specs rather than standalone guards.
+      - pnpm stories:test
+
+  # ─── Story catalogue build + bundle guard ────────────────────
+  # The catalogue's own Vite target is built here so the bundle can be ASKED
+  # questions (a served page's contents are a property of the artefact, not of
+  # the source). The build-free coverage and isolation guards run in `pnpm-build`
+  # above; this step is the build-dependent half.
+  stories-build:
+    image: node:25
+    when: *code-paths
+    # After vitest to keep the pnpm-install steps serial (same reasoning as every
+    # other node step in this chain).
+    depends_on: [vitest]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm stories:build
+      # myne-md/myne#832: the served bundle carries no unrecorded third-party
+      # origin, no BIP-39 word list (so no phrase can be shown or typed) and no
+      # account-number-shaped string outside a recorded placeholder. A missing
+      # dist is a failure, not a skip.
+      - node scripts/check-stories-bundle.mjs
 
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.
@@ -701,8 +758,10 @@ steps:
     image: *ci_image
     when: *code-paths
     # depends_on vitest (not pnpm-build) to keep the pnpm-install steps serial —
-    # see the vitest step comment.
-    depends_on: [cargo-clippy, vitest]
+    # see the vitest step comment. `stories-build` is named alongside `vitest`
+    # for the same reason: it also runs `pnpm install`, so it must finish before
+    # this step starts rather than racing it.
+    depends_on: [cargo-clippy, vitest, stories-build]
     environment:
       # Woodpecker sets CI=woodpecker, but the Tauri CLI's `--ci` flag is
       # env-bound and only accepts true/false → normalize it, otherwise
@@ -1557,6 +1616,11 @@ steps:
       - name: pnpm-build
         optional: true
       - name: vitest
+        optional: true
+      # The story catalogue's build + bundle guard (myne-md/myne#832). A gate
+      # nobody is told about is a gate that goes red unnoticed, so it gets its
+      # own slot beside the lane that runs it.
+      - name: stories-build
         optional: true
       - name: tauri-compile
         optional: true

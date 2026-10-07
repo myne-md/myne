@@ -1,0 +1,1373 @@
+/* =========================================================================
+   Myne -- shared component layer (myne-md/myne#773, epic #772)
+
+   The sibling of `tokens.css`: that file declares the VALUES every client
+   renders from, this one declares the interactive PRIMITIVES every client
+   renders. All three clients import both, in that order.
+
+   ── Why this file exists ────────────────────────────────────────────────
+   The app styled its primitives through inline `style` objects plus React
+   `useState` for hover and press. An inline style cannot express `:hover`,
+   `:active`, `:focus-visible` or a media query, so three costs compounded:
+
+     1. Every variant was re-derived by hand at each call site, which is how
+        95 files came to render a raw `<button>` against 58 importing the
+        primitive.
+     2. State motion had nowhere to live -- there was no class change to
+        transition on.
+     3. `src/styles/tokens.css` grew a row of `[data-testid="…"]:focus-visible`
+        escape hatches, several carrying a comment that says in so many words
+        "inline styles can't reach :focus-visible".
+
+   `hoverSurface.ts` states the counter-argument and it was correct at the
+   time: an inline `background` outranks a stylesheet `:hover`, so a class
+   would silently lose to the element's own resting fill. That argument holds
+   only while the resting fill IS inline. Moving it here is what dissolves it,
+   and it is why the primitives must migrate WHOLE rather than gaining a class
+   alongside their inline styles. `hoverSurface` stays for the call sites that
+   are not primitives; it is not deprecated by this file.
+
+   ── Why plain CSS with stable names, and not CSS modules ────────────────
+   Two shipped, security-gated features read these selectors by name:
+   `@myne/ornaments` (the stylesheet a custom theme's ornament selections
+   resolve against) and the custom-theme layer validated by the
+   `theme-validator` crate -- security-load-bearing, because the WebView CSP
+   carries `style-src 'unsafe-inline'`, so a theme value that reaches the DOM
+   executes. A hashed class name would put every component here permanently
+   out of reach of both. CSS modules also buy nothing we need: this file is
+   one authored sheet with a `myne-` prefix, not a collision surface.
+
+   ── Conventions ─────────────────────────────────────────────────────────
+   * Block:        `.myne-<component>`
+   * Element:      `.myne-<component>__<part>`
+   * Variant:      `[data-variant="…"]`, `[data-size="…"]`
+   * State:        native pseudos first (`:hover`, `:active`, `:focus-visible`,
+                   `:disabled`), ARIA second (`[aria-checked="true"]`), and a
+                   `data-` flag only where neither can express it.
+   * Layout stays at the CALL SITE. This file owns appearance and state; it
+     never sets `margin`, `width` or `flex` on a block, so a caller's inline
+     layout keeps working and `check-token-adoption.mjs` keeps counting the
+     thing it is meant to count.
+
+   Specificity is deliberately flat -- single class, one attribute. A caller's
+   inline `style` still wins, which is the escape hatch that makes migrating
+   call sites incremental rather than all-or-nothing.
+   ========================================================================= */
+
+
+/* =========================================================================
+   Button
+   ========================================================================= */
+
+.myne-btn {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border: 1px solid transparent;
+  border-radius: var(--radius-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--control-gap);
+  cursor: pointer;
+  outline: none;
+  /* `background` and `border-color` only. Never `all`: a transition on `all`
+     also animates `box-shadow`, which would make the focus ring fade IN on
+     keyboard focus -- the one piece of feedback that must be instant. */
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.myne-btn[data-variant="primary"] {
+  background: var(--accent);
+  color: var(--accent-on);
+  border-color: var(--accent);
+}
+
+.myne-btn[data-variant="secondary"] {
+  background: var(--bg-1);
+  color: var(--fg-1);
+  border-color: var(--line-2);
+}
+
+.myne-btn[data-variant="ghost"] {
+  background: transparent;
+  color: var(--fg-2);
+}
+
+/* `--danger-solid` (a clear red fill), NOT the text-tuned `--danger`, which
+   washes out to salmon as a button background on a dark theme. */
+.myne-btn[data-variant="danger"] {
+  background: var(--danger-solid);
+  color: var(--danger-on);
+  border-color: var(--danger-solid);
+}
+
+/* -- Hover ----------------------------------------------------------------
+   `:enabled` on every state rule, so a disabled control never lights up. The
+   previous React implementation got this right by branching in JS; here the
+   pseudo-class carries it and cannot be forgotten at a call site. */
+
+.myne-btn[data-variant="primary"]:enabled:hover { background: var(--accent-hover); }
+
+/* `--bg-3` (the hover ramp), not `--paper-2` -- the latter is imperceptible on
+   a near-black surface, so ghost/secondary buttons read as inert. */
+.myne-btn[data-variant="secondary"]:enabled:hover,
+.myne-btn[data-variant="ghost"]:enabled:hover { background: var(--bg-3); }
+
+.myne-btn[data-variant="danger"]:enabled:hover {
+  background: color-mix(in srgb, var(--danger-solid), black 14%);
+}
+
+/* -- Press ----------------------------------------------------------------
+   NEW, and deliberate (epic #772 / `apple-design`): feedback belongs on
+   pointer-DOWN, not on release. The React version tracked a `press` state and
+   then used it for the primary variant only, so three of the four variants
+   gave no press feedback at all and every one of them gave none to a keyboard
+   user -- `:active` fires on Space/Enter, a `mousedown` handler does not.
+
+   `--duration-instant`, because a press that takes 120ms to register reads as
+   the control deciding whether to respond. */
+.myne-btn:enabled:active {
+  transition-duration: var(--duration-instant);
+}
+.myne-btn[data-variant="primary"]:enabled:active { background: var(--accent-press); }
+.myne-btn[data-variant="secondary"]:enabled:active,
+.myne-btn[data-variant="ghost"]:enabled:active {
+  background: color-mix(in srgb, var(--bg-3), var(--fg-1) 8%);
+}
+.myne-btn[data-variant="danger"]:enabled:active {
+  background: color-mix(in srgb, var(--danger-solid), black 24%);
+}
+
+.myne-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The focus ring is the global `button:focus-visible` rule in each client's
+   shell sheet; it resolves to `--radius-2`, which is this button's own radius,
+   so nothing is restated here. Components whose radius DIFFERS do restate it
+   -- see `.myne-switch` below. */
+
+
+/* =========================================================================
+   IconButton
+   ========================================================================= */
+
+.myne-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--fg-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-1);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+/* `:focus-visible` joins `:hover` here, and that is an accessibility fix
+   rather than a port. The React version deepened the background from an
+   `onMouseEnter` handler, so a keyboard user tabbing onto an icon-only control
+   got the focus ring and no surface change -- on a rail of identical glyphs,
+   the ring alone is a weak "you are here". */
+.myne-icon-btn:enabled:hover,
+.myne-icon-btn:enabled:focus-visible { background: var(--paper-3); }
+
+.myne-icon-btn:enabled:active {
+  background: color-mix(in srgb, var(--paper-3), var(--fg-1) 8%);
+  transition-duration: var(--duration-instant);
+}
+
+.myne-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Bordered variant: an icon control that FLOATS on content rather than sitting
+   in chrome, so it needs its own edge to be findable against whatever is
+   behind it. The graph pane's overlay cluster is the first, and it had forked
+   the primitive to get exactly this (myne-md/myne#774).
+
+   Three separately-bounded controls read as three controls, where one box drawn
+   around them read as a single surface with buttons in it (myne-md/myne#727) —
+   which is why the border is per control and not on the group. */
+.myne-icon-btn[data-bordered="true"] {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  color: var(--fg-2);
+  /* A bordered control needs breathing room INSIDE its border or the glyph
+     reads as jammed against it. The borderless variant does not: its hit area
+     is the whole square and there is no edge for the glyph to crowd. */
+  padding: var(--icon-btn-pad);
+}
+.myne-icon-btn[data-bordered="true"]:enabled:hover,
+.myne-icon-btn[data-bordered="true"]:enabled:focus-visible {
+  background: var(--paper-3);
+  border-color: var(--line-2);
+}
+
+/* Toggled ON. Keyed off `aria-pressed` so the painted state and the announced
+   state are the same attribute and cannot drift. */
+.myne-icon-btn[aria-pressed="true"] {
+  background: var(--paper-3);
+  color: var(--fg-1);
+}
+
+
+/* =========================================================================
+   Segmented
+   ========================================================================= */
+
+.myne-segmented {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-2);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+/* The sliding selection fill. `left`/`width` are still measured in JS and
+   handed over as inline values -- see the component's `ResizeObserver`, whose
+   absence rendered the active segment invisible in a pane that mounted hidden
+   (myne-md/myne#727). What moved here is only the appearance and the
+   transition; the measurement is not something a stylesheet can do. */
+.myne-segmented__thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--accent);
+  z-index: 0;
+  pointer-events: none;
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    width var(--duration-base) var(--ease-standard);
+}
+
+.myne-segmented__segment {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 0;
+  background: transparent;
+  padding: var(--segment-pad-y) var(--segment-pad-x);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--fg-2);
+  cursor: pointer;
+  min-width: 72px;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+/* Only UNSELECTED segments take a hover fill -- the selected one already
+   carries the thumb behind it. Keyed off `aria-checked`, which the component
+   must set anyway for the radiogroup semantics, so the visual state and the
+   announced state cannot drift apart. */
+.myne-segmented__segment[aria-checked="false"]:hover { background: var(--bg-3); }
+
+/* The active segment paints its OWN accent fill, underneath the sliding thumb.
+   Belt and braces, and the braces are the point (myne-md/myne#727,
+   myne-md/myne#773). The thumb is sized in JS from `offsetWidth`; a pane that
+   mounts before its tab is visible measures 0, and although a `ResizeObserver`
+   now re-measures when the box appears, any window in which the thumb is
+   zero-wide is a window in which this label sits at `--accent-on` (#0b0b09 in
+   the dark themes) on the panel background — invisible, with no error anywhere.
+   That is precisely the bug that made the graph pane fork this component.
+
+   With the fill here, the thumb is a GLIDE rather than the only thing painting
+   the selection: it slides over an already-correct segment. A measurement
+   failure can now cost a transition, never legibility. */
+.myne-segmented__segment[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+/* Dense variant, for a control that has to float ON content rather than sit in
+   a settings row — the graph pane's overlay cluster is the first. It exists
+   because that cluster had FORKED the whole component to get this size
+   (myne-md/myne#727 fixed the measurement bug the fork also cited; the density
+   was the part with no answer). A primitive that cannot be dense is a primitive
+   people will keep re-implementing. */
+.myne-segmented[data-size="sm"] .myne-segmented__segment {
+  padding: var(--segment-pad-y-sm) var(--space-2);
+  font-size: var(--text-xs);
+  min-width: 0;
+}
+
+.myne-segmented__divider {
+  position: relative;
+  z-index: 1;
+  width: 1px;
+  background: var(--line-2);
+  align-self: stretch;
+}
+
+
+/* =========================================================================
+   Switch
+   ========================================================================= */
+
+.myne-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--paper-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-3);
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* The global `button:focus-visible` rule sets `border-radius: var(--radius-2)`
+   (6px) on every button. This control is `--radius-3` (10px), so a keyboard
+   user watched the pill visibly SQUARE OFF the moment it took focus. Restating
+   the radius under the same pseudo-class is the fix, and it is a bug the
+   inline-style era could not have fixed from the component at all. */
+.myne-switch:focus-visible { border-radius: var(--radius-3); }
+
+.myne-switch[aria-checked="true"] {
+  background: var(--accent);
+  border-color: var(--accent-press);
+}
+
+/* A bordered control reads its hover on the border, not on a fill. */
+.myne-switch[aria-disabled="false"]:hover { border-color: var(--line-3); }
+.myne-switch[aria-checked="true"][aria-disabled="false"]:hover { border-color: var(--accent); }
+
+.myne-switch[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Constant 18px footprint (16px content + 1px border, which stays present and
+   turns transparent when on) travelling by `transform` rather than `left`, so
+   the slide is a compositor transform with no layout thrash and no size morph
+   mid-travel. Track inner width (34) minus knob footprint (18) = 16px travel. */
+.myne-switch__knob {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line-3);
+  border-radius: 50%;
+  transform: translateX(0);
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.myne-switch[aria-checked="true"] .myne-switch__knob {
+  transform: translateX(16px);
+  background: var(--accent-on);
+  border-color: transparent;
+}
+
+
+/* =========================================================================
+   Input
+   ========================================================================= */
+
+.myne-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: var(--field-pad-y) var(--field-pad-x);
+  background: var(--bg-1);
+  color: var(--fg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-1);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* JetBrains Mono with `ss02`/`zero`/`calt`: the features that disambiguate
+   0/O and 1/lI/! for a hand-typed Crockford-base32 account number. */
+.myne-input[data-mono="true"] {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-feature-settings: "ss02", "zero", "calt";
+  letter-spacing: 0.04em;
+}
+
+/* `:focus`, not `:focus-visible`. A text field that has been clicked into IS
+   focused and must say so -- the caret alone is too quiet to locate a field in
+   a dense form, and this is exactly the case `:focus-visible` deliberately
+   excludes. The ring value is the `--ring` token, restated at `--radius-1` to
+   match this control's corners. */
+.myne-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.myne-input[data-invalid="true"] { border-color: var(--danger); }
+.myne-input[data-invalid="true"]:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 4px var(--danger);
+}
+
+.myne-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+
+/* =========================================================================
+   Select / SearchableSelect — trigger, menu, option
+   ========================================================================= */
+
+/* Both dropdowns share this vocabulary deliberately. They are NOT identical —
+   `SearchableSelect` wraps selected chips onto more than one line, bounds its
+   width, and hangs a search row off the top of its menu — so the differences
+   are variants below rather than a pretence that one size fits both.
+
+   What they had before was two independent copies of the trigger, the menu box
+   and the option row, differing in ways nobody had decided: the same visual
+   control drifted into different hover behaviour, and `Select` was missing the
+   scroll-inside-the-menu fix `SearchableSelect` already had, which made a long
+   Select list literally un-scrollable (the wheel dismissed the menu it was
+   trying to move). A shared vocabulary with declared variants is what stops
+   that recurring. */
+
+.myne-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 30px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--fg-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-2);
+  /* `--control-pad-x`, the BUTTON's horizontal padding, not `--space-2`. The
+     two sat beside each other in the graph toolbar at 14px and 8px and the
+     dropdown read as cramped next to its neighbours — the same control
+     vocabulary at two different densities, which is the thing the shared layer
+     exists to stop. Height already matched; only the inset was off. */
+  padding: 0 var(--control-pad-x);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* An input-like control shows its hover on the BORDER, not on a fill — the same
+   rule the Switch follows. `:focus-visible` is not listed: the global focus ring
+   already marks this control, and doubling it with a border change reads as two
+   different states. */
+.myne-select-trigger:enabled:hover { border-color: var(--line-3); }
+
+/* Open is a state worth painting: the trigger stays visually attached to the
+   menu hanging off it. Keyed off `aria-expanded`, which the component must set
+   anyway, so the paint cannot drift from what is announced. */
+.myne-select-trigger[aria-expanded="true"] { border-color: var(--accent); }
+
+.myne-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The multi-select variant: its content is a row of selected chips that may
+   wrap, so it grows DOWN from a minimum rather than sitting at a fixed height,
+   and it is width-bounded so a vault with many selections cannot push the
+   settings row off its column. */
+.myne-select-trigger[data-wrap="true"] {
+  height: auto;
+  min-height: 30px;
+  max-width: 320px;
+  white-space: normal;
+  text-align: start;
+}
+
+.myne-select-menu {
+  position: fixed;
+  /* Above modal surfaces (`ModalShell` / `SettingsModal` sit at 1000): a Select
+     opened INSIDE a modal must render over it, not behind. At the old z-index 60
+     the options were covered by the backdrop and could not be clicked. */
+  z-index: 1100;
+  min-width: 160px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-1) 0;
+  /* The menu's resting height. The component writes an inline `max-height`
+     from `placeMenu`, which OVERRIDES this rather than deferring to it — so the
+     number is passed to that helper as its `cap` and the smaller of the two
+     wins. Changing it here without changing the argument there makes this
+     declaration dead, which `tests/styles/componentLayer.test.ts` checks. */
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* The searchable variant: a column with a pinned search row above a scrolling
+   list, so the list scrolls and the search field does not. */
+.myne-select-menu[data-searchable="true"] {
+  min-width: 220px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 var(--space-1) 0;
+  overflow-y: hidden;
+}
+
+.myne-select-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-1);
+  color: var(--fg-3);
+}
+
+/* Borderless by design: the ROW is the field, and the row's bottom hairline is
+   its boundary. The global `input:focus-visible` ring is suppressed for the
+   same reason — the menu only opens focused on this input, so a ring around it
+   marks a state the user is never not in. */
+.myne-select-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-1);
+}
+.myne-select-search-input:focus,
+.myne-select-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.myne-select-list {
+  overflow-y: auto;
+  padding: var(--space-1) 0;
+}
+
+.myne-select-empty {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-3);
+}
+
+.myne-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: start;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-1);
+  white-space: nowrap;
+}
+
+/* `[data-highlighted]`, not `:hover`, and the distinction is load-bearing. The
+   highlighted row is the ACTIVE DESCENDANT: arrow keys move it, and the
+   component syncs it on pointer-over so the keyboard and the mouse share one
+   highlight instead of showing two. A `:hover` rule would light a second row
+   whenever the pointer happened to rest over the list during keyboard
+   navigation — the classic two-highlights bug.
+
+   And `data-highlighted` rather than `data-active`, which would have been the
+   obvious name: `data-active` is already an app-wide E2E contract meaning "this
+   is the SELECTED one" — tabs, theme rows, colour-group rows and
+   `SearchableSelect`'s own options all publish it that way. Reusing it here
+   would have painted every selected row as the keyboard cursor, in a
+   multi-select, while every one of those scenarios kept passing. */
+.myne-select-option[data-highlighted="true"] { background: var(--bg-3); }
+
+/* The fixed-width check column, so labels align whether or not a row is the
+   selected one. */
+.myne-select-option__check {
+  width: 16px;
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.myne-select-option__label {
+  flex: 1;
+  min-width: 0;
+}
+
+
+/* =========================================================================
+   ModalShell
+   ========================================================================= */
+
+.myne-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  /* `--scrim`, not a literal. The canon specifies a theme-dependent scrim
+     (`DESIGN.md`, the No-Glass Rule) and eight files had hand-written one fixed
+     `rgba(0, 0, 0, 0.4)` instead — pure black on light where the canon asks for
+     ink, and 0.4 on dark where it asks for 0.6, so a modal over a near-black
+     page was barely separated from it. */
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: settings-backdrop-in var(--duration-fast) var(--ease-standard);
+}
+
+.myne-modal-card {
+  max-width: calc(100vw - var(--space-7));
+  max-height: calc(100vh - var(--space-7));
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-3);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  color: var(--fg-1);
+  overflow: hidden;
+  animation: settings-modal-in var(--duration-base) var(--ease-standard);
+}
+
+.myne-modal-header {
+  height: 56px;
+  padding: 0 var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-1);
+  flex: 0 0 auto;
+}
+
+.myne-modal-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-1);
+  margin: 0;
+}
+
+.myne-modal-close {
+  background: none;
+  border: 0;
+  color: var(--fg-3);
+  cursor: pointer;
+  padding: var(--icon-btn-pad);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-1);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+/* The close button had NO hover state at all before myne-md/myne#773 — every
+   modal in the app answered a pointer over its × with nothing. It is the one
+   control on the surface whose whole job is to be found in a hurry. */
+.myne-modal-close:hover,
+.myne-modal-close:focus-visible {
+  background: var(--bg-3);
+  color: var(--fg-1);
+}
+
+.myne-modal-close:active {
+  background: color-mix(in srgb, var(--bg-3), var(--fg-1) 8%);
+  transition-duration: var(--duration-instant);
+}
+
+.myne-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+
+/* =========================================================================
+   ThemeChiplet
+   ========================================================================= */
+
+/* The 5-swatch palette preview. The swatch COLOURS stay inline — they are the
+   component's data, arriving from a theme and filtered through
+   `displaySafeColor` before they reach the DOM — but the chiplet's own chrome
+   is chrome and belongs here. */
+.myne-chiplet {
+  display: flex;
+  width: 40px;
+  height: 28px;
+  border-radius: var(--radius-1);
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  flex: 0 0 auto;
+}
+
+.myne-chiplet__swatch { flex: 1; }
+
+
+/* =========================================================================
+   Pill — the small text chip (myne-md/myne#771)
+   ========================================================================= */
+
+/* A word or two in a bordered capsule: the AI panel's status chip, the agent
+   hub's note anchor. It is NOT `.myne-chiplet` one block up, which is a 40x28
+   THEME SWATCH with `overflow: hidden` — and this class exists because that
+   mistake was made: the anchor chip was given `.myne-chiplet` on the reasoning
+   that an app with one chip design should have one chip class, which was the
+   right instinct pointed at the wrong class. A text label in a fixed 40px box
+   with hidden overflow is a label nobody can read.
+   `tests/styles/componentLayer.test.ts` holds the two apart.
+
+   `[data-interactive]` is the button arm. Most pills are statements and a
+   statement with a hover state invites a press that does nothing; the ones
+   that lead somewhere say so. */
+.myne-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  flex-shrink: 0;
+  /* No vertical padding: the pill's height is its line box, which is what
+     keeps it the same height as the text beside it in a header row. The
+     inline padding is a token; a `1px` block padding would be a literal
+     nothing in the scale corresponds to, and the ratchet is right to refuse
+     one. */
+  padding: 0 var(--space-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-relaxed);
+  /* One line, ellipsized. A pill that wraps is a pill that changes its row's
+     height, and these sit in header rows beside controls that must not move. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.myne-pill[data-tone="ready"] { color: var(--fg-2); }
+
+.myne-pill[data-interactive="true"] {
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.myne-pill[data-interactive="true"]:enabled:hover {
+  background: var(--bg-3);
+  border-color: var(--line-2);
+}
+.myne-pill[data-interactive="true"]:enabled:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.myne-pill[data-interactive="true"]:disabled { cursor: default; }
+
+
+/* =========================================================================
+   ScrollArea
+   ========================================================================= */
+
+/* The native bar is hidden on the scroller and the indicator is a real element,
+   because a `var()` inside `::-webkit-scrollbar-thumb` does NOT resolve against
+   the scrolled element's cascade: it takes the ROOT's base value, which in this
+   app is the light theme's `--line-2` — so a panel drew a pale bar down a dark
+   surface while every other scroller looked right (myne-md/myne#727). The rule
+   was correct and the resolution was not, and no rewrite of the rule fixes
+   that. Styling a real element is what makes the tokens resolve the way every
+   other rule in the app does. */
+.myne-scrollarea {
+  scrollbar-width: none;
+}
+.myne-scrollarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.myne-scrollarea-thumb {
+  position: absolute;
+  inset-inline-end: 3px;
+  width: 6px;
+  border-radius: var(--radius-2);
+  background: var(--line-3);
+  opacity: 0;
+  /* Opacity only — the thumb's height and offset are written as inline
+     measured values every frame while scrolling, and transitioning those would
+     make the indicator lag the content it is reporting on. */
+  transition: opacity var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  touch-action: none;
+}
+
+/* Revealed on pointer-over OR focus-within, both resolved by the component:
+   a keyboard user tabbing into a panel has no pointer to reveal it with, and
+   the bar is how they learn there is more below. */
+.myne-scrollarea-thumb[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.myne-scrollarea-thumb:hover {
+  background: var(--fg-3);
+}
+
+
+/* =========================================================================
+   EmptyState
+   ========================================================================= */
+
+/* One component for every zero state in the app (myne-md/myne#776). Three
+   different situations rendered identically before it, and the middle one was a
+   dead end: an empty vault, a panel FILTERED to nothing, and a load error all
+   showed the same bare sentence — so a user who had filtered a list to zero saw
+   exactly what a user with no notes saw, with nothing to press.
+
+   It is one component at three sizes rather than three components, because a
+   sidebar section, a right-rail tab and a full pane want the same words with
+   different amounts of room. `data-size` is set by the caller. */
+
+/* Entrance, and the only NEW motion this epic added rather than fixed.
+   It passes the frequency gate that rejects most candidates: an empty state is
+   rare by construction — you see it when something is empty — and it is a
+   destination rather than a transient, so it is worth arriving rather than
+   appearing. `--ease-emphasized` leaves fast and settles slow, which is what
+   makes a surface land with weight instead of merely fading up.
+
+   The global `prefers-reduced-motion` rule zeroes the duration, so this needs
+   no arm of its own. The rise is 8px, small enough that nothing reads as
+   sliding: the eye registers arrival, not travel. */
+@keyframes myne-empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.myne-empty {
+  /* The wash's colour — see `.myne-empty__wash`. The accent by default; the
+     error variant overrides it. */
+  --myne-empty-wash: var(--accent);
+  animation: myne-empty-in var(--duration-base) var(--ease-emphasized);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-3);
+  overflow: hidden;
+  /* A whisper of surface, so the box reads as a considered area rather than a
+     hole. The accent wash sits behind the content, inside the same rounded box. */
+  background: var(--paper-2);
+  color: var(--fg-2);
+  font-family: var(--font-sans);
+}
+
+/* The wash: a soft, blurred accent gradient behind the content
+   (`design-notes/ui/0633`). It replaced the animated `01` binary field, which
+   read as developer / privacy iconography on surfaces a general user meets
+   every day.
+
+   Static on purpose. There is no animation here, so no motion-canon exemption,
+   no rAF loop, no pause logic and nothing to cost battery while it sits on
+   screen. Two off-centre radial glows, blurred, then masked so they fade to
+   nothing before reaching any edge of the box.
+
+   The colour is `--myne-empty-wash`, which defaults to `--accent`, so every
+   palette — custom themes included — tints it with its own accent, and the
+   error variant overrides it with `--danger` rather than needing a second
+   rule set. The percentages are low enough that body text over the brightest
+   point keeps its contrast on both ramps: the wash sits UNDER `--paper-2`'s
+   ink, never over it. */
+.myne-empty__wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      38% 44% at 34% 36%,
+      color-mix(in srgb, var(--myne-empty-wash) 24%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      36% 40% at 68% 62%,
+      color-mix(in srgb, var(--myne-empty-wash) 16%, transparent),
+      transparent 72%
+    );
+  filter: blur(32px);
+  /* The fade to the edges. A radial mask sized to the box (`closest-side`)
+     takes the wash to fully transparent AT every edge, so a filled state — which
+     has no border to hide a cut — dissolves into the surrounding surface
+     instead of meeting the pane edge as a hard line. Masking happens after the
+     blur in the rendering order, so the blur cannot bleed it back out. */
+  -webkit-mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
+  mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
+}
+
+/* Forced colours strip backgrounds anyway; hiding the element keeps a blurred
+   layer from compositing for nothing. The words carry everything. */
+@media (forced-colors: active) {
+  .myne-empty__wash {
+    display: none;
+  }
+}
+
+.myne-empty__body {
+  animation: myne-empty-in var(--duration-base) var(--ease-emphasized) var(--stagger-step)
+    both;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 46ch;
+}
+
+/* The rounded glyph tile. Not a colour badge: the canon bans the
+   lock/shield/green-check cliché, and this is a neutral surface with the
+   accent reserved for the action below. */
+.myne-empty__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-3);
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  color: var(--fg-2);
+  flex: none;
+}
+
+.myne-empty__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-1);
+}
+
+.myne-empty__body-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--fg-2);
+}
+
+/* The echoed query in a filtered-empty state. Monospace and isolated: it is
+   user text quoted back, and a right-to-left note title must not reorder the
+   sentence around it. */
+.myne-empty__query {
+  font-family: var(--font-mono);
+  color: var(--fg-1);
+  unicode-bidi: isolate;
+}
+
+.myne-empty__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* -- Sizes ---------------------------------------------------------------
+   `md` is the default (a right-rail tab, a settings block). `sm` is a sidebar
+   section, where the box is ~220px wide and the glyph plus a headline is all
+   that fits. `lg` is a full centre pane. */
+
+.myne-empty[data-size="sm"] {
+  padding: var(--space-4) var(--space-3);
+  gap: var(--space-2);
+  border-radius: var(--radius-2);
+}
+.myne-empty[data-size="sm"] .myne-empty__glyph { width: 32px; height: 32px; }
+.myne-empty[data-size="sm"] .myne-empty__title { font-size: var(--text-sm); }
+.myne-empty[data-size="sm"] .myne-empty__body-text { font-size: var(--text-xs); }
+
+/* -- Fill ----------------------------------------------------------------
+   A zero state that IS the surface, rather than a card sitting on one.
+
+   The Archive and Trash panels are the case that named it: a 560×78vh modal
+   with a bordered ~200px card pinned to the top of it and empty space below,
+   so the box the user is looking at and the box the state is drawn in are two
+   different rectangles. Filling means the modal body is the state — one
+   border (the modal's own), one background, and the `01` field spanning the
+   whole area instead of a strip.
+
+   It drops the border and the fill rather than keeping them and stretching:
+   a stretched card inside a modal is two nested rounded rectangles with the
+   same corner radius and nothing between them, which reads as a rendering
+   mistake. */
+.myne-empty[data-fill="true"] {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.myne-empty[data-size="lg"] { padding: var(--space-8) var(--space-5); }
+.myne-empty[data-size="lg"] .myne-empty__glyph { width: 56px; height: 56px; }
+.myne-empty[data-size="lg"] .myne-empty__title { font-size: var(--text-xl); }
+
+/* -- Variants ------------------------------------------------------------
+   Only `error` paints differently. The rest differ in WORDS and in which
+   action they offer, which is the whole point: the three states were visually
+   identical before and that is precisely what made the filtered one a dead
+   end. Giving them four fills would have been solving the wrong half. */
+
+.myne-empty[data-variant="error"] {
+  --myne-empty-wash: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
+}
+.myne-empty[data-variant="error"] .myne-empty__glyph {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
+}
+
+
+/* =========================================================================
+   Skeleton
+   ========================================================================= */
+
+/* The loading convention, stated once (myne-md/myne#778, epic #772 lane 7d).
+   Three cases, three answers, and the rule is about WHAT IS KNOWN rather than
+   about taste:
+
+     under ~200ms  -> nothing at all. A spinner that flashes for three frames
+                      reads as a glitch, and the pause it replaced read as
+                      nothing. Showing it makes the app feel slower, not more
+                      responsive.
+     known layout  -> a skeleton. The shape of the answer is already known, so
+                      draw it: the content arrives INTO its own outline instead
+                      of pushing the page around when it lands.
+     unknown/blocking -> the spinner or a progress bar. `<Spinner>` carries
+                      `data-motion="essential"` semantics (MYND-630) precisely
+                      because a frozen progress indicator reads as hung.
+
+   The shimmer is a LOOP, and it is admitted under the same clause as the other
+   two indeterminate indicators: it reports that work is in flight, and it stops
+   when the work does because the element is replaced by the content. It carries
+   `data-motion="essential"` so reduced motion slows it rather than freezing a
+   grey box the user cannot interpret. */
+
+@keyframes myne-skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.myne-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: var(--radius-1);
+  /* Content-shaped by default: a line of text. Callers size it. */
+  height: 1em;
+}
+
+/* The sweep is a pseudo-element translating across a clipped box — `transform`
+   only, so it composites — rather than an animated background-position, which
+   repaints the whole box every frame. */
+.myne-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--fg-3) 12%, transparent),
+    transparent
+  );
+  animation: myne-skeleton-sweep 1.4s var(--ease-standard) infinite;
+}
+
+/* A block of lines, the common case: the last one short, because a paragraph's
+   last line is. Without it a skeleton reads as a table rather than as text. */
+.myne-skeleton[data-lines] {
+  height: auto;
+}
+.myne-skeleton__line {
+  height: 1em;
+  margin-bottom: var(--space-2);
+  background: var(--bg-3);
+  border-radius: var(--radius-1);
+}
+.myne-skeleton__line:last-child {
+  width: 62%;
+  margin-bottom: 0;
+}
+
+
+/* =========================================================================
+   Drop indicator
+   ========================================================================= */
+
+/* One vocabulary for "the dragged thing lands HERE" (myne-md/myne#778).
+   Three reorder surfaces had grown three treatments — the left ribbon, the
+   ribbon roster in Settings, and the toolbar roster beside it — so the same
+   gesture answered differently depending on which list you were in.
+
+   TWO variants, because one of those differences was a decision rather than
+   drift, and flattening it would have reintroduced a rendering bug:
+
+     line   an absolutely-positioned bar between rows. The default, and the
+            clearer signal: it sits in the gap and points at a position.
+     inset  an inset box-shadow plus a soft fill on the row itself. For a list
+            whose rows are rounded and dark, where a positioned bar cannot be
+            drawn without a border — and WKWebView renders a 2px transparent
+            border on a rounded dark row as a visible light line (recorded in
+            `ToolbarCustomizeSettings.tsx` from a QA screenshot). An inset
+            shadow adds nothing to the box, so rows never reflow when it
+            appears.
+
+   Both are `--accent`, both are 2px, and neither animates: a drop indicator is
+   feedback about where the pointer IS, and motion on it would lag the thing it
+   is reporting. */
+
+.myne-drop-line {
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-1);
+  pointer-events: none;
+  z-index: 1;
+}
+.myne-drop-line[data-edge="before"] { top: -1px; }
+.myne-drop-line[data-edge="after"] { bottom: -1px; }
+
+/* The vertical twin, for a row of horizontally-arranged items (a tab strip). */
+.myne-drop-line[data-axis="inline"] {
+  inset-inline: auto;
+  inset-block: 0;
+  width: 2px;
+  height: auto;
+}
+
+.myne-drop-row[data-edge="before"] {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+.myne-drop-row[data-edge="after"] {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Under forced colours the accent becomes the system canvas and the indicator
+   disappears — on feedback whose entire job is to be seen mid-gesture. */
+@media (forced-colors: active) {
+  .myne-drop-line,
+  .myne-drop-row[data-edge] {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}
+
+
+/* =========================================================================
+   Inline submit field — the deboxed credential row (myne-md/myne#773)
+   ========================================================================= */
+
+/* The picker and the unlock screen were each a bordered card floating in the
+   middle of an empty window, which put a frame around the one thing on screen
+   and left the app's own name inside it. Deboxed: the window IS the surface,
+   the wordmark sits top-left where an app's name sits, the actions sit
+   top-right, and the middle holds only what the user came to do. */
+
+@keyframes myne-auth-enter-forward {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes myne-auth-enter-back {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.myne-auth-view[data-enter="forward"] {
+  animation: myne-auth-enter-forward var(--duration-base) var(--ease-emphasized);
+}
+
+.myne-auth-view[data-enter="back"] {
+  animation: myne-auth-enter-back var(--duration-base) var(--ease-emphasized);
+}
+
+
+/* =========================================================================
+   Agent run orb — the named run indicator (myne-md/myne#771 task 12)
+   ========================================================================= */
+
+.myne-agent {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: var(--space-2);
+  /* Asymmetric, and the asymmetry runs the opposite way to the one this
+     replaced.
+
+     It was `--space-4` vertically against `--space-1` horizontally, which put
+     a band of empty pane above the rail four times the gutter beside it — a
+     band that existed to clear a heading. Equal on all four sides was the
+     next attempt and it went too far the other way: at `--space-1` the
+     content sat against the pane's top edge with no breathing room at all.
+
+     Both of those were measured against the wrong thing. `PaneView` was
+     wrapping the agent tab in its reading gutter, `0 24px`, so the side inset
+     on screen was 24px whatever this rule said and neither edit moved it. The
+     gutter is gone (`PaneView`'s agent branch takes `gutters: false`) and this
+     is now the only inset the pane has, which is what makes a value here worth
+     arguing about.
+
+     Equal on all four sides, at the smallest step that still reads as an
+     inset. The pane is the narrowest surface in the app — 248px of rail plus
+     whatever the conversation gets — so side room is width taken from two
+     columns that need it, and the rail's rows and the conversation's bubbles
+     carry their own padding inside this. */
+  padding: var(--space-3);
+  box-sizing: border-box;
+}
+
+/* The pane's top row holds ONE thing now: the narrow arm's rail toggle.
+
+   The heading went first ("Agent" under a tab that says Agent), then the run
+   indicator, which moved to the word it modifies — the transcript's own
+   "Working" line — and to the tab. So at wide widths this row has nothing in
+   it at all, and an empty flex item still takes the parent's `gap`: a
+   reserved band of blank pane whose height is explained by nothing on screen.
+   Hidden here, restored in the narrow arm below.
+
+   It cannot be decided in the component: whether the toggle counts is a
+   container-width question, and React does not know the container's width.
+   That is also what makes this simpler than it was — the row's visibility
+   used to depend on a live run as well, which is a second, unrelated reason
+   for the pane to shift under the user mid-run. */
+.myne-agent__header { display: none; }
+
+.myne-agent__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-3);
+  /* Or a long conversation's own width floors the whole row and the rail
+     stops shrinking with the pane. A flex item's automatic minimum is
+     `min-content`, which for a transcript is whatever its longest unbreakable
+     token happens to be. */
+  min-width: 0;
+}
+
+.myne-agent__rail {
+  flex: none;
+  width: 248px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* A hairline rather than a fill: the rail and the conversation are one
+     surface with a division in it, not two cards side by side. The padding
+     before the divider is half the gap after it, because the pane's own inline
+     inset is `--space-1` and the rail's outer edge is therefore nearly flush:
+     an equal margin either side of the rule would leave the rail's content
+     squeezed between two gutters of very different weight. */
+  border-inline-end: 1px solid var(--line-1);
+  padding-inline-end: var(--space-2);
+}
+
+.myne-agent__main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The rail toggle exists only in the narrow arm, where the two columns cannot
+   both be on screen. Hidden rather than absent at wide widths so the header's
+   layout does not shift when a pane is dragged across the threshold. */
+.myne-agent__rail-toggle { display: none; }
+
+/* ── Narrow: one column at a time ────────────────────────────────────────
+   248px of rail plus a conversation is about 560px of pane. Below that the
+   two columns would each be too narrow to use, so the rail becomes a view you
+   switch TO — the old two-view behaviour, kept as the responsive fallback it
+   should always have been rather than as the primary model.
+
+   Hiding the rail outright was the other option and it is the wrong one: the
+   history would be unreachable at that width, which is worse than a round
+   trip. */
+@container (max-width: 559px) {
+  .myne-agent__rail-toggle { display: inline-flex; }
+
+  /* The toggle is real at this width, so the row that holds it is too. */
+  .myne-agent__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .myne-agent__rail {
+    width: auto;
+    flex: 1;
+    border-inline-end: none;
+    padding-inline-end: 0;
+  }
+
+  .myne-agent[data-rail="closed"] .myne-agent__rail { display: none; }
+  .myne-agent[data-rail="open"] .myne-agent__main { display: none; }
+}
+
+/* -- Text links -------------------------------------------------------------
+   A button that reads as a link (the unlock screen's "Use password instead",
+   "Forgot your password?", "Delete vault") has no fill to change on hover, so
+   colour alone said nothing when the pointer arrived. The underline is the
+   hover state, and keyboard focus gets the same one. */
+.myne-text-link:hover:not(:disabled),
+.myne-text-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -136,6 +136,26 @@ export interface MockConfig {
   /** Canned pending watch captures returned ONCE by `captures|take_pending`
    *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
   pendingCaptures?: Array<{ id: string; text: string }>;
+  /** Canned drained watch meeting sessions (myne-md/myne#812). `drain_pending_meetings`
+   *  returns these ONCE (then empty, mirroring a real drain+ack clearing the
+   *  manifest); `ack_meeting_session` records the acked session ids. Each chunk
+   *  is transcribed through `transcribe`, so one session → one note whose body is
+   *  the three embeds + the transcript. */
+  pendingMeetings?: Array<{
+    session_id: string;
+    started_at: number;
+    chunks: Array<{ chunk_index: number; attachment_id: string }>;
+    missing_chunk_indices?: number[];
+    retryable_chunk_indices?: number[];
+    /** A note a previous drain already wrote for this session (myne-md/myne#812
+     *  review): a re-drain APPENDS to it instead of creating a second note.
+     *  `set_meeting_session_note` records one too, and that takes precedence. */
+    note_id?: string | null;
+  }>;
+  /** Reject the first N `captures|ack_meeting_session` calls (myne-md/myne#812).
+   *  Drives the crash-after-note-before-ack path: the note is created, the ack
+   *  fails, and the next drain re-returns the session — the rare duplicate. */
+  meetingAckFailures?: number;
   /** Canned imported shares returned ONCE by
    *  `share-import|drain_pending_shares` (§9.20 OS share-sheet drain). The
    *  host-side drain does decrypt→import→ack, so the mock just returns the
@@ -306,6 +326,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     } catch {
       /* storage disabled — the app offers onboarding, which is its own case */
     }
+    // A per-session ack-failure budget for the watch meeting drain (myne-md/myne#812):
+    // seeded from config so the first N `ack_meeting_session` calls reject,
+    // driving the crash-after-note-before-ack re-drain.
+    (window as unknown as { __meetingAckFailures?: number }).__meetingAckFailures =
+      config.meetingAckFailures ?? 0;
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
       // myne#177: the real host always sends this (serde emits a BTreeMap as
@@ -481,6 +506,20 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // an UNMOCKED command to `[]`, so without a real handler + store a picker
     // test would pass against its own optimistic draft and prove nothing.
     let vaultIcon: string | null = (config.prefs?.icon as string | null | undefined) ?? null;
+    // Same shape as `vaultIcon`, for the label the vault-name step writes.
+    let vaultLabel: string | null = (config.prefs?.label as string | null | undefined) ?? null;
+    // Whether `plugin:vault-unlock|unlock` has succeeded in this session.
+    //
+    // Tracked ONLY so the prefs WRITE handlers can refuse before it, which the
+    // real backend does: every prefs write needs the active vault's `prefs_key`,
+    // so `vault_set_label` rejects with `SlotNotUnlocked` when no vault is open.
+    // Without this the mock accepted a label written at commit time — before any
+    // unlock — and a test asserting the write ORDER passed against a defect the
+    // device would reject. Found by injection: moving the call above the unlock
+    // left the scenario green. Reads are left ungated, because `freshDevice`
+    // scenarios read prefs before ever unlocking and gating them would rewrite
+    // half this file's fixtures to prove nothing.
+    let unlockedThisSession = false;
     // Vaults deleted during this session, by id. The delete escape routes by
     // re-probing rather than by navigating, so the roster is the only thing
     // that can carry the outcome — see the vault-delete handler.
@@ -608,6 +647,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|report_user_activity": () => null,
       "plugin:vault-unlock|unlock": () => {
         if (config.unlockError) throw config.unlockError;
+        unlockedThisSession = true;
         return null;
       },
       // ── Vault creation (5-step onboarding) ──
@@ -668,6 +708,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         timezone,
         item_order: itemOrder,
         icon: vaultIcon,
+        label: vaultLabel,
         ai_enabled: aiEnabled,
         ai_provider: aiProvider,
         ai_provider_consent: aiConsent,
@@ -973,6 +1014,45 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __customThemeWrites?: (string | null)[] };
         (w.__customThemeWrites ??= []).push(name);
         customTheme = name;
+        return null;
+      },
+      // The export-destination chokepoint (`plugin:export-dir|export_path`,
+      // myne-md/myne#517). Mocked rather than left to fall through, because the
+      // save seam builds its write path from this answer: without a handler the
+      // flow wrote to `undefined` and a scenario asserting on the path was
+      // asserting on the mock's silence. It returns the SHAPE the host returns —
+      // an absolute path, the directory's display name, the sanitized basename —
+      // and nothing about the backup exclusion, which is a device fact no browser
+      // tier can stand in for (`mobile/docs/dev/device-matrix.md` §8).
+      "plugin:export-dir|export_path": (args) => {
+        const name = String(args.filename ?? args.fallback ?? "export.txt");
+        return { path: `/flow/Documents/${name}`, dir: "Documents", name };
+      },
+      // The narrow save seam (`secret-export`). Records the CONTENTS, because
+      // what a once-only screen writes to disk is the whole claim of that screen
+      // and a handler returning `null` would let a save that wrote the wrong
+      // secret report success — which is exactly the shape of the recovery kit's
+      // risk (myne-md/myne#468: the kit holds the phrase AND the account number,
+      // and the step it replaced wrote only the phrase).
+      "plugin:secret-export|save_secret_text": (args) => {
+        const w = window as unknown as { __secretSaves?: { path: string; contents: string }[] };
+        (w.__secretSaves ??= []).push({
+          path: String(args.path ?? ""),
+          contents: String(args.contents ?? ""),
+        });
+        return null;
+      },
+      // The vault-LABEL setter (MYND-205; driven by the name step in
+      // myne-md/myne#468). Records the write AND mutates the store, like the icon
+      // setter below it and for the same reason: the flow writes the label after
+      // the auto-unlock, and a recording-only handler would let a test pass while
+      // the picker still rendered the neutral fallback.
+      "plugin:prefs|vault_set_label": (args) => {
+        if (!unlockedThisSession) throw { kind: "slot_not_unlocked" };
+        const label = (args.label ?? null) as string | null;
+        const w = window as unknown as { __vaultLabelWrites?: (string | null)[] };
+        (w.__vaultLabelWrites ??= []).push(label);
+        vaultLabel = label;
         return null;
       },
       // The vault-icon setter (vault-icons) — records the write AND mutates the
@@ -1369,6 +1449,26 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;
         return 0;
       },
+      // The watch meeting-chunk seal (myne-md/myne#812): records each delivery
+      // the `myne-meeting-chunk` event carried, so a spec can assert the native
+      // dispatch reaches the command with its manifest fields intact.
+      "plugin:captures|seal_meeting_chunk": (args) => {
+        const w = window as unknown as {
+          __meetingChunkSeals?: Array<{
+            sessionId: string;
+            chunkIndex: number;
+            startedAt: number;
+            path: string;
+          }>;
+        };
+        (w.__meetingChunkSeals ??= []).push({
+          sessionId: String(args.sessionId ?? ""),
+          chunkIndex: Number(args.chunkIndex ?? 0),
+          startedAt: Number(args.startedAt ?? 0),
+          path: String(args.path ?? ""),
+        });
+        return null;
+      },
       "plugin:captures|take_pending": () => {
         const w = window as unknown as { __pendingTaken?: boolean };
         if (w.__pendingTaken) return [];
@@ -1378,6 +1478,79 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:captures|ack": (args) => {
         const w = window as unknown as { __captureAcks?: string[] };
         (w.__captureAcks ??= []).push(String(args.id ?? ""));
+        return null;
+      },
+      // ── Watch meeting-capture surface (myne-md/myne#812) ──
+      // STATEFUL, like the real at-least-once queue: `drain_pending_meetings`
+      // returns every seeded session that has NOT been acked yet, and
+      // `ack_meeting_session` removes one. So a drain that creates a note but
+      // whose ack fails returns the same session on the next drain — the rare
+      // duplicate the at-least-once discipline accepts — which a "returned once"
+      // mock could not express at all. `meetingAckFailures` makes the first N
+      // acks reject, driving that crash-after-note-before-ack path.
+      "plugin:captures|meeting_pending_sessions": () => config.pendingMeetings ?? [],
+      "plugin:captures|drain_pending_meetings": () => {
+        const w = window as unknown as {
+          __meetingAcked?: string[];
+          __meetingNoteIds?: Record<string, string>;
+        };
+        const acked = new Set(w.__meetingAcked ?? []);
+        const noteIds = w.__meetingNoteIds ?? {};
+        return (config.pendingMeetings ?? [])
+          .filter((s) => !acked.has(s.session_id))
+          .map((s) => ({ ...s, note_id: noteIds[s.session_id] ?? s.note_id ?? null }));
+      },
+      // The retry half of the on-arrival seal (myne-md/myne#812 review): records
+      // the call so a spec can assert boot / unlock re-scans the inbox.
+      "plugin:captures|seal_meeting_inbox": () => {
+        const w = window as unknown as { __sealMeetingInboxCalls?: number };
+        w.__sealMeetingInboxCalls = (w.__sealMeetingInboxCalls ?? 0) + 1;
+        return 0;
+      },
+      // Record the note a session drained into, mirroring the real manifest
+      // write, so a re-drain returns it and APPENDS (myne-md/myne#812 review).
+      "plugin:captures|set_meeting_session_note": (args) => {
+        const w = window as unknown as { __meetingNoteIds?: Record<string, string> };
+        (w.__meetingNoteIds ??= {})[String(args.sessionId ?? "")] = String(args.noteId ?? "");
+        return null;
+      },
+      "plugin:captures|ack_meeting_session": (args) => {
+        const w = window as unknown as {
+          __meetingAcks?: string[];
+          __meetingAcked?: string[];
+          __meetingAckFailures?: number;
+          __meetingResolved?: Record<string, number[]>;
+        };
+        const id = String(args.sessionId ?? "");
+        const resolved = Array.isArray(args.resolvedChunkIndices)
+          ? (args.resolvedChunkIndices as number[])
+          : [];
+        (w.__meetingAcks ??= []).push(id);
+        const failed = w.__meetingAckFailures ?? 0;
+        if (failed > 0) {
+          w.__meetingAckFailures = failed - 1;
+          throw { kind: "Backend" };
+        }
+        // Record the RESOLVED indices too, so a test can assert the H3 contract:
+        // a retryable chunk is not in the list and its session is not fully
+        // acked away. `__meetingAcked` means "every chunk resolved" (the record
+        // is gone), matching the Rust `ack_meeting_session_in_dirs` behaviour
+        // where the manifest row survives while any entry is still on disk.
+        (w.__meetingResolved ??= {})[id] = resolved;
+        const session = (config.pendingMeetings ?? []).find((s) => s.session_id === id);
+        // "Fully resolved" means every chunk that could be accounted for is in
+        // the ack: the imported/missing ones AND the retryable ones. A retryable
+        // chunk is NOT resolved (its entry stays for the next unlock), so the
+        // session is not fully acked while one exists — the H3 contract.
+        const retryable = session?.retryable_chunk_indices ?? [];
+        const allResolved =
+          !session ||
+          (session.chunks.every((c) => resolved.includes(c.chunk_index)) &&
+            session.missing_chunk_indices.every((i) => resolved.includes(i)) &&
+            retryable.every((i) => resolved.includes(i)));
+        if (allResolved) {
+          (w.__meetingAcked ??= []).push(id);
+        }
         return null;
       },
       // ── Share-import surface (§9.20 OS share-sheet drain) ──

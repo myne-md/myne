@@ -33,7 +33,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
@@ -80,10 +79,6 @@ import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
-import {
-  hoverSurface,
-  HOVER_TRANSITION,
-} from "../primitives/hoverSurface";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
 import { removeModel, type DownloadArtifactId } from "../../lib/ai-model-download";
 import {
@@ -91,6 +86,7 @@ import {
   startModelDownload,
   useModelDownload,
 } from "../../lib/ai-download-store";
+import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
@@ -124,18 +120,6 @@ const LINK_STYLE: CSSProperties = {
   gap: "var(--space-1)",
   alignSelf: "flex-start",
   transition: "color var(--duration-fast) var(--ease-standard)",
-};
-
-/** Hover for an accent text link: shift to the hover-accent so the pointer-over
- *  reads even though the link is already underlined + accent-colored (a bg block
- *  would look wrong on inline link text). */
-const linkHover = {
-  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent-hover)";
-  },
-  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.color = "var(--accent)";
-  },
 };
 
 /**
@@ -289,7 +273,7 @@ function ModelRoleBlock(props: {
           type="button"
           data-testid={props.testIdRecommend}
           onClick={props.onOpenRecommend}
-          {...linkHover}
+          className="myne-text-link"
           style={LINK_STYLE}
         >
           {props.recommendName}
@@ -312,32 +296,15 @@ function ModelRoleBlock(props: {
         >
           {props.path ?? props.noneLabel}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           data-testid={props.testIdChoose}
           disabled={props.disabled}
           onClick={props.onChoose}
-          {...hoverSurface({
-            restBg: "var(--paper-2)",
-            hoverBg: "var(--paper-3)",
-            disabled: props.disabled,
-          })}
-          style={{
-            font: "inherit",
-            fontSize: "var(--text-sm)",
-            padding: "var(--space-1) var(--space-2)",
-            borderRadius: "var(--radius-1)",
-            border: "1px solid var(--line-1)",
-            background: "var(--paper-2)",
-            color: "var(--fg-1)",
-            cursor: props.disabled ? "default" : "pointer",
-            opacity: props.disabled ? 0.5 : 1,
-            whiteSpace: "nowrap",
-            transition: HOVER_TRANSITION,
-          }}
+          style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
         >
           {props.chooseLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -450,10 +417,16 @@ function DownloadedModelRow(props: {
             >
               <div
                 style={{
-                  width: `${percent}%`,
+                  width: "100%",
                   height: "100%",
                   background: "var(--accent)",
-                  transition: "width var(--duration-fast) var(--ease-standard)",
+                  transformOrigin: "left",
+                  // A determinate fill animated with `transform: scaleX`, not
+                  // `width`: scaling runs on the compositor, while a `width`
+                  // transition lays out and paints every frame
+                  // (`scripts/check-motion-canon.mjs`).
+                  transform: `scaleX(${percent / 100})`,
+                  transition: "transform var(--duration-fast) var(--ease-standard)",
                 }}
               />
             </div>
@@ -525,8 +498,21 @@ function DownloadedModelRow(props: {
 
 export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
-  const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled, setChatHistoryBudget } =
-    usePrefs(onShowToast);
+  const {
+    prefs,
+    setAiEnabled,
+    setAiExcludedFolders,
+    setAutoTagEnabled,
+    setChatHistoryBudget,
+    setMeetingAiPrompt,
+  } = usePrefs(onShowToast);
+  // Local draft for the meeting-AI prompt textarea: it writes on blur rather
+  // than on every keystroke, and resyncs when the stored value changes (a sync
+  // from another device, or the Reset control).
+  const [meetingPromptDraft, setMeetingPromptDraft] = useState("");
+  useEffect(() => {
+    setMeetingPromptDraft(prefs.meeting_ai_prompt ?? "");
+  }, [prefs.meeting_ai_prompt]);
 
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
@@ -1022,6 +1008,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         </p>
         <button
           type="button"
+          className="myne-text-link"
           data-testid="ai.trust-disclosure-toggle"
           aria-expanded={disclosureOpen}
           onClick={() => setDisclosureOpen((o) => !o)}
@@ -1033,7 +1020,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             color: "var(--fg-2)",
             font: "inherit",
             fontSize: "var(--text-sm)",
-            textDecoration: "underline",
             cursor: "pointer",
           }}
         >
@@ -1170,6 +1156,42 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         )}
       />
 
+      {/* Meeting AI prompt (meeting-ai): the user's replacement for the meeting
+          AI pass's reduce instruction. Empty means the built-in default. */}
+      <ControlBlock
+        label={t("settings.ai.meetingPromptLabel")}
+        helper={t("settings.ai.meetingPromptHelper")}
+        testId="ai.meeting-prompt"
+        anchorId="ai.meeting-prompt"
+        control={
+          <>
+            <textarea
+              value={meetingPromptDraft}
+              onChange={(e) => setMeetingPromptDraft(e.target.value)}
+              onBlur={() => {
+                const trimmed = meetingPromptDraft.trim();
+                void setMeetingAiPrompt(trimmed === "" ? null : meetingPromptDraft);
+              }}
+              disabled={!aiEnabled}
+              aria-label={t("settings.ai.meetingPromptLabel")}
+              data-testid="ai.meeting-prompt-input"
+              rows={4}
+            />
+            <Button
+              variant="secondary"
+              disabled={!aiEnabled}
+              onClick={() => {
+                setMeetingPromptDraft("");
+                void setMeetingAiPrompt(null);
+              }}
+              data-testid="ai.meeting-prompt-reset"
+            >
+              {t("settings.ai.meetingPromptReset")}
+            </Button>
+          </>
+        }
+      />
+
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded
           files. Three roles: text (GGUF) + search/embedding (safetensors) +
@@ -1231,7 +1253,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         />
       </div>
 
-      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0627`).
+      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0628`).
           The AI-shaped weights are no longer bundled: a user who skipped
           onboarding enables AI and fetches them here, and the same rows answer
           "is it installed" from the device-local model store. No file name and
@@ -1312,7 +1334,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             type="button"
             data-testid="ai.endpoint-runtime-link"
             onClick={openLocalRuntime}
-            {...linkHover}
+            className="myne-text-link"
             style={LINK_STYLE}
           >
             {LOCAL_RUNTIME.name}
@@ -1494,7 +1516,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-key-revoke"
                 disabled={!aiEnabled}
                 onClick={() => void revokeKey()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerKeyRevoke")}
@@ -1566,7 +1588,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 data-testid="ai.provider-model-load"
                 disabled={!aiEnabled || !hasKey || modelsLoading}
                 onClick={() => void loadModels()}
-                {...linkHover}
+                className="myne-text-link"
                 style={LINK_STYLE}
               >
                 {t("settings.ai.providerModelLoad")}
@@ -1580,7 +1602,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                   type="button"
                   data-testid="ai.provider-model-show-all"
                   onClick={() => setShowAllModels((v) => !v)}
-                  {...linkHover}
+                  className="myne-text-link"
                   style={LINK_STYLE}
                 >
                   {showAllModels

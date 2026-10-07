@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
+import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "../ChoiceList";
 import { EndpointConfig } from "./EndpointConfig";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
@@ -131,24 +132,45 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
           </div>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={openHosted}
-          data-testid="first-run-server.myne-sync"
-        >
-          {t("firstRun.server.myneSync")}
-        </Button>
-        <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--fg-3)" }}>
-          {t("firstRun.server.myneSyncHint")}
-        </div>
+        {/* Two doors on one card, each saying where it leads: the hint under
+            Myne Sync is the honest pin statement (TOFU), so it has to be read
+            before the button, not after it.
 
-        <Button
-          variant="secondary"
-          onClick={() => setMode("self-hosted")}
-          data-testid="first-run-server.self-hosted"
-        >
-          {t("firstRun.server.selfHosted")}
-        </Button>
+            The hosted door routes through `EndpointConfig` (`openHosted`)
+            rather than a one-tap connect, because the hosted server is gated
+            (`MYNE_INVITE_CODE`, myne-md/myne#800) and its connection needs the
+            invite-code field that form already carries. */}
+        <ChoiceCard>
+          <ChoiceRow
+            title={t("firstRun.server.myneSyncTitle")}
+            body={t("firstRun.server.myneSyncHint")}
+            action={
+              <Button
+                variant="primary"
+                onClick={openHosted}
+                data-testid="first-run-server.myne-sync"
+                style={CHOICE_ACTION_STYLE}
+              >
+                {t("firstRun.server.connectAction")}
+              </Button>
+            }
+          />
+          <ChoiceRow
+            title={t("firstRun.server.selfHostedTitle")}
+            body={t("firstRun.server.selfHostedHint")}
+            action={
+              <Button
+                variant="secondary"
+                onClick={() => setMode("self-hosted")}
+                data-testid="first-run-server.self-hosted"
+                style={CHOICE_ACTION_STYLE}
+              >
+                {t("firstRun.server.setUpAction")}
+              </Button>
+            }
+            last
+          />
+        </ChoiceCard>
 
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
           <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">

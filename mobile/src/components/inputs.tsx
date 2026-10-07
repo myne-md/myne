@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
@@ -177,7 +177,18 @@ export function RecoveryGrid({
   blurred?: boolean;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}>
+    // `dir="ltr"`, and it is a correctness fix rather than typography
+    // (myne-md/myne#468). The ORDER of the words is part of the secret,
+    // `recovery-flow.md` §2.4 commits to never showing them again, and BIP-39's
+    // checksum does not catch a permutation — so under an RTL locale a grid laid
+    // out in the locale's direction hands the user a transcription whose
+    // wrongness is undiscoverable until the phrase fails to open the vault. The
+    // surrounding page stays in the locale's own direction.
+    <div
+      dir="ltr"
+      data-testid="recovery-grid"
+      style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}
+    >
       {words.map((w, i) => (
         <div
           key={i}
@@ -457,5 +468,93 @@ export function Segmented({
         </div>
       ))}
     </div>
+  );
+}
+
+// ── Real text fields ─────────────────────────────────────────────────────────
+// Distinct from the presentational `Field` above (a gallery mock that renders a
+// div): these are the real `<input>`s a wired flow binds. They live here so the
+// flow does not hand-roll a field, and so the regex-ratchet counts them once,
+// in `PRIMITIVE_DIRS` (myne-md/myne#788).
+export function MonoField({
+  value,
+  onChange,
+  placeholder,
+  testId,
+  inputMode,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  testId: string;
+  inputMode?: "url";
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: 52,
+        border: `1.5px solid ${focused ? "var(--accent)" : "var(--line-2)"}`,
+        borderRadius: "var(--radius-2)",
+        background: "var(--bg-1)",
+        padding: "0 14px",
+        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
+      }}
+    >
+      <input
+        value={value}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoComplete="off"
+        data-testid={testId}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          padding: 0,
+          fontFamily: "var(--font-mono)",
+          fontSize: "var(--text-md)",
+          letterSpacing: "var(--tracking-wide)",
+          color: "var(--fg-1)",
+        }}
+      />
+    </div>
+  );
+}
+
+/** A read-only monospace value in a field (the identity code on the home step).
+ *  The code is a few kilobytes of hex (`MYNE-PERSON-1:` + the public halves), so
+ *  it renders in a single-line read-only input that scrolls, exactly as the
+ *  desktop `IdentityHome` shows it. A wrapping box turns it into an unreadable
+ *  wall and pushes everything below it off screen. */
+export function MonoBox({ value, testId }: { value: string; testId: string }) {
+  return (
+    <input
+      readOnly
+      value={value}
+      data-testid={testId}
+      aria-label={testId}
+      style={{
+        display: "block",
+        width: "100%",
+        height: 52,
+        border: "1.5px solid var(--line-2)",
+        borderRadius: "var(--radius-2)",
+        background: "var(--bg-1)",
+        padding: "0 14px",
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--text-xs)",
+        color: "var(--fg-2)",
+      }}
+    />
   );
 }

@@ -331,6 +331,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("keymap", PrefClass::DeviceLocal),
     ("label", PrefClass::Shared(SharedDiscipline::ScalarLww)),
     ("last_backup_at", PrefClass::DeviceLocal),
+    // Shared / ScalarLww (meeting-ai). The user's custom meeting-AI instruction
+    // is vault content they want on every device, so it travels; last-writer-wins
+    // is the right merge for a single text value.
+    (
+        "meeting_ai_prompt",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     (
         "new_note_location",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
@@ -507,6 +514,7 @@ mod tests {
             keymap: _,
             label: _,
             last_backup_at: _,
+            meeting_ai_prompt: _,
             new_note_location: _,
             new_note_location_folder: _,
             paired_extensions: _,
@@ -589,6 +597,7 @@ mod tests {
             "keymap",
             "label",
             "last_backup_at",
+            "meeting_ai_prompt",
             "new_note_location",
             "new_note_location_folder",
             "paired_extensions",

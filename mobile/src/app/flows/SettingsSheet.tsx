@@ -14,7 +14,7 @@ import {
   SyncMembersPanel,
 } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
-import { HideVaultNamesBlock } from "../../components";
+import { HideVaultNamesBlock, RecoveryDrillBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
 import { MemorySection } from "./MemorySection";
 import { applyTheme } from "../../formfactor/theme";
@@ -2104,6 +2104,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
         ) : (
           <button
             onClick={goBack}
+            // Icon-only: the chevron is the whole control, so without this it
+            // is announced as "button" and nothing else — on the only way back
+            // out of a settings sub-panel (myne-md/myne#775). WCAG 2.2 AA
+            // 4.1.2, which `PRODUCT.md` commits to.
+            aria-label={t("common.back")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2475,6 +2480,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 row, not a subtitle. See the block for why they are not behind
                 a chevron. */}
             <HideVaultNamesBlock />
+            {/* The recovery drill (myne-md/myne#468). Beside the lock timers and
+                the hide-names switch rather than under Account, because what it
+                protects is the ability to get back IN — the same family as its
+                neighbours — and because Account is where the vault's name and
+                number live, where a phrase field would read as one more
+                identifier to manage. The desktop twin sits in the same place for
+                the same reason. */}
+            <RecoveryDrillBlock />
             <SegmentBlock
               label={t("settings.privacy.autoLockAfter")}
               options={[60, 300, 900, 1800, 3600]}

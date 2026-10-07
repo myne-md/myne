@@ -3,19 +3,30 @@
 # as an `InlinedPlugin`. Referenced by `capabilities/default.json` as
 # `captures:default`.
 #
-# The three commands are device-key based (no vault key); `seal_staged` runs
+# The queue commands are device-key based (no vault key); `seal_staged` runs
 # while the vault is locked, `take_pending` + `ack` drain the queue into notes on
 # unlock. Off Apple targets the device key is unavailable and the commands no-op.
+# The watch meeting lane (myne-md/myne#812) splits the same way:
+# `seal_meeting_chunk` is device-key based and runs while LOCKED (it seals an
+# arrived audio chunk under the device-local key and records it in the
+# pending-meeting manifest), while `drain_pending_meetings` and
+# `ack_meeting_session` need the UNLOCKED vault (they import the chunks into the
+# vault library, then delete the device-local group once the note exists).
 # Adding a command to `build.rs` without a matching entry here is a security bug.
 
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the mobile captures plugin (seal/take/ack the pending-capture queue)."
+description = "Default permission set for the mobile captures plugin (seal/take/ack the pending-capture queue; seal arrived watch meeting audio)."
 permissions = [
     "allow-seal-staged",
     "allow-take-pending",
     "allow-ack",
+    "allow-seal-meeting-chunk",
+    "allow-seal-meeting-inbox",
+    "allow-drain-pending-meetings",
+    "allow-set-meeting-session-note",
+    "allow-ack-meeting-session",
 ]
 
 [[permission]]
@@ -32,3 +43,28 @@ commands.allow = ["take_pending"]
 identifier = "allow-ack"
 description = "Allow invoking captures:ack (delete a drained capture once its note has been created)."
 commands.allow = ["ack"]
+
+[[permission]]
+identifier = "allow-seal-meeting-chunk"
+description = "Allow invoking captures:seal_meeting_chunk (seal one arrived watch meeting-audio chunk under the device-local key and record it in the pending-meeting manifest; runs while locked)."
+commands.allow = ["seal_meeting_chunk"]
+
+[[permission]]
+identifier = "allow-seal-meeting-inbox"
+description = "Allow invoking captures:seal_meeting_inbox (seal every watch meeting-audio chunk left in the app-owned inbox, recovering each delivery's grouping from its filename; the retry half of the on-arrival seal, runs while locked)."
+commands.allow = ["seal_meeting_inbox"]
+
+[[permission]]
+identifier = "allow-drain-pending-meetings"
+description = "Allow invoking captures:drain_pending_meetings (decrypt each sealed watch meeting-audio chunk and import it into the vault library as an attachment; requires the unlocked vault)."
+commands.allow = ["drain_pending_meetings"]
+
+[[permission]]
+identifier = "allow-set-meeting-session-note"
+description = "Allow invoking captures:set_meeting_session_note (record the vault note a drained meeting session produced, so a re-drain appends to it instead of creating a second note)."
+commands.allow = ["set_meeting_session_note"]
+
+[[permission]]
+identifier = "allow-ack-meeting-session"
+description = "Allow invoking captures:ack_meeting_session (delete a drained meeting session's sealed entries + manifest record once its note exists)."
+commands.allow = ["ack_meeting_session"]

@@ -35,6 +35,7 @@ import {
 import { dateTimeDisplay, formatInstant } from "../../lib/datetimeFormat";
 import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
+import { EmptyState } from "../primitives/EmptyState";
 import { SettingRow } from "./SettingRow";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import { BrowserIcon, browserLabel } from "./browser-icons";
@@ -200,9 +201,18 @@ export function ConnectedExtensions() {
         <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_HELPER}</p>
 
       {paired.length === 0 ? (
-        <p style={HELPER_STYLE} data-testid="settings.connected-extensions-empty">
-          {CONNECTED_EXTENSIONS_EMPTY}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="paperclip"
+          size="sm"
+          // The literal, unchanged: `CONNECTED_EXTENSIONS_EMPTY` is load-bearing
+          // copy that E2E asserts by full equality. It is a complete sentence
+          // and reads as the title; inventing a second line to sit under it
+          // would mean adding copy to a module whose whole point is that its
+          // strings are pinned.
+          title={CONNECTED_EXTENSIONS_EMPTY}
+          testId="settings.connected-extensions-empty"
+        />
       ) : (
         <>
           <div style={LIST_STYLE}>

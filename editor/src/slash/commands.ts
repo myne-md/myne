@@ -412,6 +412,25 @@ export function slashCommands(): readonly SlashCommand[] {
       },
     },
     {
+      // `/meeting` (myne-md/myne#789): start a meeting session. Removes the
+      // trigger, then hands off to the host, which owns the session bar, the
+      // per-clip transcription and the note. Absent on a host that does not
+      // provide the seam, so the trigger is inert rather than throwing.
+      id: "meeting",
+      label: i18n.t("editor.slash.meeting"),
+      icon: "◍",
+      svgIcon: "mic",
+      apply: (v, f, t) => {
+        v.dispatch({
+          changes: { from: f, to: t, insert: "" },
+          selection: { anchor: f },
+          userEvent: "slash.apply",
+        });
+        const host = getHost();
+        if (host.meetingSession) host.meetingSession(v);
+      },
+    },
+    {
       // `/drawing` (MYND-634): create a sibling drawing note in THIS note's
       // folder and embed it inline as `![[Title]]`, which `drawing-embed.ts`
       // renders as a thumbnail that opens an edit-in-place canvas. The trigger is

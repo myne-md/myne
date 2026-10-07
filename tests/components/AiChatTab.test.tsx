@@ -78,6 +78,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+import { AI_CHAT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import {
@@ -344,28 +345,62 @@ describe("AiChatTab resting cause", () => {
   const chip = () => screen.getByTestId("ai.chrome-status");
   const body = () => screen.getByTestId("ai.status-no-model");
 
+  /**
+   * The degraded region NAMES the fault and then explains it (task 11 of
+   * myne-md/myne#771). It used to be a bare sentence in `--fg-3`, with the name
+   * carried only by the header chip a glance away — so the transcript said why
+   * without saying what. `toContain` rather than `toBe` because the region now
+   * holds both, and both are asserted: a title that stopped matching its chip
+   * would put two different names for one fault on one screen.
+   */
+  function expectsFault(titleKey: string, bodyKey: string): void {
+    expect(chip().textContent).toBe(titleKey);
+    expect(body().textContent, "the fault is not named where it is explained").toContain(
+      titleKey,
+    );
+    expect(body().textContent).toContain(bodyKey);
+  }
+
   it("says no provider when nothing is set up", () => {
     surfaceState = { kind: "unavailable", cause: "no_model" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusNoModel");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.noModelHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusNoModel",
+      "editor.chrome.rightPanel.aiChat.noModelHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("no-provider");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("no-provider");
   });
 
   it("says not answering when the configured backend is unreachable", () => {
     surfaceState = { kind: "unavailable", cause: "unreachable" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnreachable");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unreachableHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusUnreachable",
+      "editor.chrome.rightPanel.aiChat.unreachableHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("unreachable");
   });
 
   it("says unavailable when the build has no local AI at all", () => {
     surfaceState = { kind: "absent" };
     render(<AiChatTab />);
-    expect(chip().textContent).toBe("editor.chrome.rightPanel.aiChat.statusUnavailable");
-    expect(body().textContent).toBe("editor.chrome.rightPanel.aiChat.unavailableHint");
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusUnavailable",
+      "editor.chrome.rightPanel.aiChat.unavailableHint",
+    );
     expect(chip().getAttribute("data-ai-cause")).toBe("unavailable");
+    // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
+    // reads both off one node, and splitting them would make that scenario
+    // silently read `null` rather than fail.
+    expect(body().getAttribute("data-ai-cause")).toBe("unavailable");
   });
 
   it("keeps the three apart — no two render the same sentence", () => {
@@ -959,9 +994,14 @@ describe("AiChatTab: the shape of a chat", () => {
     const composer = screen.getByTestId("ai.composer");
     const transcript = screen.getByTestId("ai.transcript");
 
-    // The composer is the tab's LAST child, which is what keeps it under the
-    // reader's hands instead of somewhere down a page that scrolls as a whole.
-    expect(tab.lastElementChild).toBe(composer);
+    // **The composer is the surface's LAST child** (myne-md/myne#771), which is
+    // what keeps it under the reader's hands instead of somewhere down a page
+    // that scrolls as a whole. The conversation body moved out of the tab into
+    // the shared `ConversationSurface`, so the tab's own last child is that
+    // surface; the invariant is unchanged and follows the composer's parent.
+    const surface = composer.parentElement!;
+    expect(surface.lastElementChild).toBe(composer);
+    expect(tab.contains(surface)).toBe(true);
 
     // …and the region that scrolls is the transcript's own container, not the
     // tab. A tab that scrolled as one would carry the composer off screen the
@@ -1074,5 +1114,208 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
     });
     fireEvent.keyDown(screen.getByTestId("ai.composer-input"), { key: "Enter" });
     expect(agentStart).not.toHaveBeenCalled();
+  });
+});
+
+describe("AiChatTab: the panel's exit to the deep surface", () => {
+  // Task 10 of myne-md/myne#771. The panel is the shallow end — one
+  // conversation, no list, no history chrome — and this control is the way out
+  // of it into the agent tab, focused on the open note.
+  //
+  // It shipped wired and untested: `tsc` is content either way, the button
+  // renders whether or not the callback is reachable, and the failure mode is
+  // a control that does nothing. The panel is a sibling subtree of the
+  // workspace controller, so "the callback is threaded" is the whole risk.
+
+  it("offers the control only when the panel has somewhere to send you", () => {
+    // The prop is optional, and absent is a real case: the panel is rendered in
+    // tests and in surfaces with no workspace behind them. Offering an exit
+    // that goes nowhere is worse than not offering one.
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.focus-agent")).toBeNull();
+    cleanup();
+
+    render(<AiChatTab onFocusAgent={() => {}} />);
+    expect(screen.getByTestId("ai.focus-agent")).toBeTruthy();
+  });
+
+  it("calls back exactly once when pressed", () => {
+    const onFocusAgent = vi.fn();
+    render(<AiChatTab onFocusAgent={onFocusAgent} />);
+    fireEvent.click(screen.getByTestId("ai.focus-agent"));
+    expect(onFocusAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it("is reachable and operable from the keyboard", () => {
+    // It is an icon-only control in a row of icon-only controls, so it is
+    // exactly the kind that ends up mouse-only by accident.
+    const onFocusAgent = vi.fn();
+    render(<AiChatTab onFocusAgent={onFocusAgent} />);
+    const button = screen.getByTestId("ai.focus-agent") as HTMLButtonElement;
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.disabled).toBe(false);
+    button.focus();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("names itself, since its glyph does not", () => {
+    render(<AiChatTab onFocusAgent={() => {}} />);
+    const button = screen.getByTestId("ai.focus-agent");
+    expect(button.getAttribute("aria-label")?.length ?? 0).toBeGreaterThan(0);
+    expect(
+      button.textContent?.trim(),
+      "an icon-only control's name is its aria-label, not its contents",
+    ).toBe("");
+  });
+});
+
+describe("AiChatTab: telling the two speakers apart", () => {
+  // A transcript at panel width is a column of near-identical blocks, and the
+  // one distinction that matters — what YOU said against what a model said
+  // about your notes — was the weakest signal on the surface: two adjacent
+  // greys, distinguished further only by an alignment a long wrapped turn
+  // erases, under a caption in `--text-xs`.
+  //
+  // Driven through the STORE, like every other transcript case in this file: a
+  // turn is what is under test, not the path that produced one.
+
+  function twoTurns(): HTMLElement[] {
+    const token = sendChatMessage("what does tf:drive do");
+    appendChatToken(token, "It is the **one-command orchestrator**.");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+    return screen.getAllByTestId("ai.turn");
+  }
+
+  it("gives the user's side the accent and the model's the paper", () => {
+    const [user, assistant] = twoTurns();
+    expect(user!.getAttribute("data-role")).toBe("user");
+    expect(user!.style.background).toContain("var(--accent-soft)");
+    expect(user!.style.border).toContain("var(--accent)");
+    // The model's side stays neutral deliberately: the accent is the app's
+    // emphasis colour, and lending it to model output would emphasise the one
+    // thing this surface's own honesty note says may be wrong.
+    expect(assistant!.style.background).not.toContain("var(--accent-soft)");
+    expect(assistant!.style.background).toContain("var(--paper-2)");
+  });
+
+  it("puts a glyph beside each speaker's name, hidden from a reader", () => {
+    // The word already names the speaker. A screen reader announcing "image,
+    // robot, Assistant" is the same fact twice with a guess in the middle.
+    const turns = twoTurns();
+    for (const turn of turns) {
+      const glyph = turn.querySelector("svg");
+      expect(glyph, "the speaker has no glyph").not.toBeNull();
+      expect(
+        glyph!.closest("[aria-hidden='true']"),
+        "the glyph is announced to a screen reader",
+      ).not.toBeNull();
+    }
+  });
+
+  it("renders the model's markdown and leaves the user's text alone", () => {
+    // Only the model wrote markdown on purpose. Re-interpreting what the user
+    // typed would mean a message containing `*` coming back italic.
+    const [user, assistant] = twoTurns();
+    expect(assistant!.querySelector("strong")?.textContent).toBe(
+      "one-command orchestrator",
+    );
+    expect(user!.textContent).toContain("what does tf:drive do");
+    expect(user!.querySelector("strong")).toBeNull();
+  });
+});
+
+describe("AiChatTab: the honesty note costs a line, not a third of the panel", () => {
+  // Load-bearing copy, pinned by full-literal equality. It is CLAMPED once
+  // there is a conversation, never hidden: the text is in the DOM either way,
+  // so it is present to a screen reader, to a text search and to the three
+  // tests earlier in this file that assert its exact wording.
+
+  it("is fully expanded while the transcript is empty", () => {
+    // The moment the claim is being made. Clamping it here would be hiding it.
+    render(<AiChatTab />);
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBeNull();
+    expect(screen.queryByTestId("ai.honesty-toggle")).toBeNull();
+  });
+
+  it("clamps once there is a conversation, and offers the way back", () => {
+    const token = sendChatMessage("hello");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBe("true");
+    const toggle = screen.getByTestId("ai.honesty-toggle");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(toggle);
+    expect(screen.getByTestId("ai.honesty-note").getAttribute("data-clamped")).toBeNull();
+    expect(screen.getByTestId("ai.honesty-toggle").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps the whole sentence in the DOM while clamped", () => {
+    // Clamped, not conditionally rendered. `-webkit-line-clamp` hides overflow
+    // visually and changes nothing about what is there — which is what makes
+    // reducing its height a layout decision rather than a copy one.
+    const token = sendChatMessage("hello");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+    const note = screen.getByTestId("ai.honesty-note");
+    expect(note.getAttribute("data-clamped")).toBe("true");
+    expect(note.textContent).toBe(AI_CHAT_HONESTY_NOTE);
+  });
+});
+
+describe("AiChatTab: the status chip leads somewhere", () => {
+  // It was a `<span>` — a passive label naming a fault with no route out of
+  // it. And the sentence written to GIVE that route was rendered nowhere at
+  // all, in any client: `noSearchModelHint` exists in `locales/en` and in 31
+  // translations and had never been on a screen. `check-i18n.mjs` cannot see
+  // that; it verifies a USED key exists, not that an existing key is used.
+
+  it("is a button with the hint, when the fault has a fix", () => {
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    const onOpenSettings = vi.fn();
+    render(<AiChatTab onOpenSettings={onOpenSettings} />);
+    const chip = screen.getByTestId("ai.chrome-status");
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip.getAttribute("data-actionable")).toBe("true");
+  });
+
+  it("lands ON the control that clears it, not at the top of a panel", () => {
+    // The AI panel is a dozen blocks tall. Opening it and leaving the user to
+    // find the models block is the failure a deep link exists to prevent, and
+    // the machinery was already here with one caller.
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    const onOpenSettings = vi.fn();
+    render(<AiChatTab onOpenSettings={onOpenSettings} />);
+    fireEvent.click(screen.getByTestId("ai.chrome-status"));
+    expect(onOpenSettings).toHaveBeenCalledWith("ai", "ai.models");
+  });
+
+  it("stays a plain label when the chip is a statement", () => {
+    // A healthy chip names the provider that is answering. A statement with a
+    // click target invites a press that would do nothing useful.
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    const chip = screen.getByTestId("ai.chrome-status");
+    expect(chip.tagName).toBe("SPAN");
+    expect(chip.getAttribute("data-actionable")).toBeNull();
+  });
+
+  it("stays a plain label when nothing can open Settings", () => {
+    // Rendered in isolation, and in any surface with no settings shell behind
+    // it. A button that goes nowhere is worse than a label.
+    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    render(<AiChatTab />);
+    expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
+  });
+
+  it("does not offer a fix for a state the user chose", () => {
+    // AI switched off is a deliberate choice, and a chip offering to undo one
+    // is nagging. Same for a build compiled without local AI: no setting
+    // changes it, so a control going somewhere would change nothing.
+    aiEnabled = false;
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
   });
 });

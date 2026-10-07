@@ -30,8 +30,8 @@ import { installMockIpc } from "../mock-ipc";
 
 const PASSWORD = "correct horse battery staple";
 
-/** Walk Welcome to briefing to password to the phrase reveal. */
-async function reachPhraseStep(page: import("@playwright/test").Page): Promise<void> {
+/** Walk Welcome to briefing to name to password to the recovery kit. */
+async function reachKitStep(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
   // First run is identity-first (myne-md/myne#768): the vault path is the
   // "Create a local vault instead" ghost button, not the old "Create a vault".
@@ -48,6 +48,11 @@ async function reachPhraseStep(page: import("@playwright/test").Page): Promise<v
   }
   await page.getByRole("button", { name: "Continue" }).click();
 
+  // The vault-name step (myne-md/myne#468) sits between the briefing and the
+  // password, and the kit's Copy copies the whole kit, header included.
+  await page.getByTestId("create-vault.name-input").fill("Gate Kasa");
+  await page.getByTestId("create-vault.name-continue").click();
+
   const pwInputs = page.locator('input[type="password"]');
   await expect(pwInputs).toHaveCount(2);
   await pwInputs.nth(0).fill(PASSWORD);
@@ -62,7 +67,7 @@ async function reachPhraseStep(page: import("@playwright/test").Page): Promise<v
 test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
   test("iOS: no Copy while the pasteboard behaviour is unverified", async ({ page }) => {
     await installMockIpc(page, { freshDevice: true, devicePlatform: "ios" });
-    await reachPhraseStep(page);
+    await reachKitStep(page);
 
     // Save to file first, as the control: this assertion is an ABSENCE, and an
     // absence passes trivially if the step never rendered at all.
@@ -72,7 +77,7 @@ test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
 
   test("Android: no Copy, and that one does not change when the gate opens", async ({ page }) => {
     await installMockIpc(page, { freshDevice: true, devicePlatform: "android" });
-    await reachPhraseStep(page);
+    await reachKitStep(page);
 
     await expect(page.getByRole("button", { name: "Save to file" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);

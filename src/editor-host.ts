@@ -75,6 +75,7 @@ import { startTranscription } from "./lib/transcribe";
 import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
 import { setAttachmentToastSink } from "./editor/attachments/toast";
 import { toast } from "./components/toast/toastStore";
+import { startMeetingSession } from "./notes/meetingSession";
 
 /**
  * The editor preferences the plain surface answers with (myne-md/myne#788).
@@ -236,6 +237,17 @@ const host: EditorHost = {
   // is the interim task 44 fixes; a capability flag would be the wrong tool
   // because the browser CAN capture audio (`getUserMedia`) — the decision owed
   // here is which backend, not whether.
+  // Meeting sessions (myne-md/myne#789). The controller lives desktop-side
+  // (`src/notes/meetingSession.ts`) because it needs the note-creation path,
+  // the transcription binding and the i18n catalog; the shared bar it mounts
+  // comes back from `@myne/editor`.
+  meetingSession: (view: unknown) => {
+    // The sidebar surface travels through the module binding set by
+    // `EditorChrome` (`setMeetingSidebarSurface`), not through this seam: the
+    // seam carries the `EditorView` and the controller reads the surface at
+    // stop time.
+    void startMeetingSession(view);
+  },
   voice: {
     start: voiceRecordStart,
     stop: voiceRecordStop,
