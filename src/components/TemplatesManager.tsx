@@ -25,6 +25,7 @@ import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
 import { HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { useWorkspaceOptional } from "../notes/workspaceContext";
 import {
   createTemplate,
   convertTemplateToNote,
@@ -167,6 +168,10 @@ export function TemplatesManager({
   onOpenNote,
 }: TemplatesManagerProps) {
   const { t } = useTranslation();
+  // Optional: the manager is always mounted inside `WorkspaceProvider` in the
+  // app, but its unit test renders it bare, so a missing provider must degrade
+  // to "no panes to close" rather than throw.
+  const ws = useWorkspaceOptional();
   /** Default name for a brand-new template (renamed later via the editor). */
   const newTemplateName = t("templates.manager.newTemplateName");
   // `null` = loading; `[]` = loaded-but-empty (first-run empty state).
@@ -208,6 +213,25 @@ export function TemplatesManager({
       void p.finally(refresh);
     },
     [refresh],
+  );
+
+  // Delete a template: soft-trash it, then close any pane tab holding it
+  // (myne-md/myne#819). A template is an ordinary note and the row-open button
+  // above opens it into a pane, so a resident tab would let the next autosave
+  // write the pre-trash buffer back and return it from the trash. Only on
+  // SUCCESS: a failed delete left the note alone, so its tab stays.
+  const handleDelete = useCallback(
+    (id: NoteId) => {
+      void deleteTemplate(id)
+        .then(() => {
+          ws?.closeNoteEverywhere(id);
+        })
+        .catch(() => {
+          /* refresh() below re-reads the authoritative list */
+        })
+        .finally(refresh);
+    },
+    [refresh, ws],
   );
 
   const handleNew = useCallback(() => {
@@ -363,7 +387,7 @@ export function TemplatesManager({
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => afterMutation(deleteTemplate(id))}
+                  onClick={() => handleDelete(id)}
                   style={{ color: "var(--danger)", padding: "var(--space-1)" }}
                   aria-label={t("templates.manager.deleteRowLabel", { name })}
                   data-testid="templates.row-delete"

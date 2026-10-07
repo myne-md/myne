@@ -1057,6 +1057,25 @@ function detachTab(
 }
 
 /**
+ * Close `item`'s tab in `paneId` WITHOUT the pinned close-guard, but otherwise
+ * identical to {@link closeTab} (same focus/collapse rules).
+ *
+ * This is the path for a note that is being removed from the vault (delete,
+ * trash, archive). `pinned` is a user preference about a TAB, and it must not
+ * keep a stale, still-editable autosave buffer resident for a note that no
+ * longer exists: the next keystroke's autosave writes the pre-delete buffer
+ * back and resurrects the note (myne-md/myne#819). A delete is not a "close
+ * this tab" gesture, so the guard does not apply to it.
+ */
+export function forceCloseTab(
+  state: WorkspaceState,
+  paneId: PaneId,
+  item: WorkspaceItem,
+): WorkspaceState {
+  return detachTab(state, paneId, item);
+}
+
+/**
  * Move `item` from `fromPaneId` to `toPaneId`, inserting at `toIndex`
  * and activating it there. Same-pane move = reorder within the strip.
  * Cross-pane move that empties the source removes the source pane (the

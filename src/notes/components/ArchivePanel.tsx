@@ -36,6 +36,7 @@ import {
   topLevelArchivedFolders,
 } from "../archivedFolders";
 import { archivedRecords, useSelectedNote, type NoteId } from "../sidebarState";
+import { useWorkspace } from "../workspaceContext";
 import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PanelEmptyState } from "./PanelEmptyState";
 import {
@@ -88,6 +89,7 @@ export function ArchivePanel({
 }: ArchivePanelProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const [status, setStatus] = useState<string | null>(null);
   // Folder path armed for the inline "Move N to Trash?" confirm (null = none).
   const [confirmFolder, setConfirmFolder] = useState<string | null>(null);
@@ -166,11 +168,19 @@ export function ArchivePanel({
   // clears `archived:` and sets `trashed:`, so the note leaves the Archive.
   const deleteToTrash = useCallback(
     (id: NoteId) => {
-      void ctx.trashWithRollback(id).catch(() => {
-        setStatus(t("notes.archive.deleteError"));
-      });
+      void ctx
+        .trashWithRollback(id)
+        .then(() => {
+          // Trashing removes the note from the live tree: close its tabs, or a
+          // pane keeps a resident, editable buffer whose next autosave writes
+          // `trashed:` back off and resurrects the note (myne-md/myne#819).
+          ws.closeNoteEverywhere(id);
+        })
+        .catch(() => {
+          setStatus(t("notes.archive.deleteError"));
+        });
     },
-    [ctx, t],
+    [ctx, t, ws],
   );
 
   const confirmDeleteFolder = useCallback(() => {
