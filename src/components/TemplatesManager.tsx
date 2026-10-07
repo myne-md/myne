@@ -24,8 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
-import { ModalShell } from "./primitives/ModalShell";
-import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { HOVER_TRANSITION } from "./primitives/hoverSurface";
 import { useWorkspaceOptional } from "../notes/workspaceContext";
 import {
   createTemplate,
@@ -38,6 +37,11 @@ import {
 
 interface TemplatesManagerProps {
   open: boolean;
+  /**
+   * Close the surface. As a tab this is "open a note and replace me", which the
+   * `onOpenNote` path already does — so it survives only for the callers that
+   * had one, and a tab body can pass a no-op.
+   */
   onClose: () => void;
   /** Open a template in the normal note editor (selects it + closes the surface). */
   onOpenNote: (id: NoteId) => void;
@@ -105,18 +109,6 @@ const REMOVE_BUTTON_STYLE: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "var(--radius-1)",
   whiteSpace: "nowrap",
-  transition: HOVER_TRANSITION,
-};
-
-const DELETE_BUTTON_STYLE: CSSProperties = {
-  background: "transparent",
-  border: 0,
-  color: "var(--danger)",
-  cursor: "pointer",
-  padding: 6,
-  display: "inline-flex",
-  alignItems: "center",
-  borderRadius: "var(--radius-1)",
   transition: HOVER_TRANSITION,
 };
 
@@ -262,14 +254,19 @@ export function TemplatesManager({
   }, [onOpenNote, onClose, newTemplateName, draftName, creating, t]);
 
   return (
-    <ModalShell
-      open={open}
-      title={t("templates.manager.title")}
-      onClose={onClose}
-      labelId="templates-modal-title"
-      width={560}
-      height={560}
-      closeLabel={t("templates.manager.closeLabel")}
+    // A TAB body, not a modal (myne-md/myne#779, docs/decisions/ui/0633). A
+    // template library is something you browse, rename in and delete from —
+    // none of which is a question the app is asking, which is the test that
+    // decides the shape. The title and the close affordance come from the tab
+    // strip now, so neither is rendered here.
+    <div
+      data-testid="templates.pane"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
     >
       <div style={TOOLBAR_STYLE}>
         {!naming ? (
@@ -362,14 +359,13 @@ export function TemplatesManager({
             const name = displayName(rec, newTemplateName);
             return (
               <div key={id} role="listitem" style={ROW_STYLE} data-testid="templates.row">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     onOpenNote(id);
                     onClose();
                   }}
                   style={ROW_OPEN_STYLE}
-                  {...hoverSurface()}
                   aria-label={t("templates.manager.editTemplateLabel", { name })}
                   data-testid="templates.row-open"
                 >
@@ -379,32 +375,30 @@ export function TemplatesManager({
                     style={{ color: "var(--fg-3)" }}
                   />
                   <span style={ROW_NAME_STYLE}>{name}</span>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => afterMutation(convertTemplateToNote(id))}
                   style={REMOVE_BUTTON_STYLE}
-                  {...hoverSurface()}
                   aria-label={t("templates.manager.removeRowLabel", { name })}
                   data-testid="templates.row-remove"
                 >
                   {t("templates.manager.removeFromTemplates")}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => handleDelete(id)}
-                  style={DELETE_BUTTON_STYLE}
-                  {...hoverSurface()}
+                  style={{ color: "var(--danger)", padding: "var(--space-1)" }}
                   aria-label={t("templates.manager.deleteRowLabel", { name })}
                   data-testid="templates.row-delete"
                 >
                   <Icon name="trash-2" size={16} />
-                </button>
+                </Button>
               </div>
             );
           })}
         </div>
       )}
-    </ModalShell>
+    </div>
   );
 }

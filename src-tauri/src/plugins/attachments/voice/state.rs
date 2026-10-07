@@ -40,7 +40,7 @@ impl ActiveSession {
     /// that imports those clips off the capture thread.
     pub(crate) fn spawn(
         factory: SourceFactory,
-        level_sink: Box<dyn Fn(f32) + Send>,
+        level_sink: Box<dyn Fn(f32, Option<f32>) + Send>,
         clip_sink: Box<dyn Fn(Zeroizing<Vec<i16>>, u32) + Send>,
         consumer: TaskJoinHandle<usize>,
     ) -> Self {

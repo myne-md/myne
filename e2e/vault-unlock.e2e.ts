@@ -77,10 +77,16 @@ describeE2E("VU-1/VU-9/VU-10 happy path + decrypting cluster (MYND-125 task 1)",
         await input.sendKeys(password);
         const submit2 = await app.session.byTestId("unlock.submit");
         await submit2.click();
-        // Story 3/6: input + submit disabled; label flips; links hidden.
+        // Story 3/6: input + submit disabled; the wait is said in words (the
+        // status line under the field, now that the submit is an arrow); links
+        // hidden.
         await app.session.waitUntil(
-          async () => (await submit2.text()).includes("Decrypting") || null,
-          { label: "decrypting label", timeoutMs: 10_000 },
+          async () => {
+            const status = await app.session.byTestIdAll("unlock.password-input-status");
+            if (status.length === 0) return null;
+            return (await status[0]!.text()).includes("Decrypting") || null;
+          },
+          { label: "decrypting status", timeoutMs: 10_000 },
         );
         expect(await input.enabled()).toBe(false);
         expect(await submit2.enabled()).toBe(false);

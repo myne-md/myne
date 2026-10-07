@@ -19,6 +19,8 @@ import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor";
 import i18n from "../i18n";
 import { Icon } from "../components/primitives/Icon";
+import { Button } from "../components/primitives/Button";
+import { IconButton } from "../components/primitives/IconButton";
 import { StatusMark } from "../components/Spinner";
 import { MIN_TARGET } from "../components/primitives/targetSize";
 import { ImportPlainFileButton } from "../components/plain/ImportPlainFileButton";
@@ -57,22 +59,14 @@ function ConflictCopyButton({ handle }: { handle: number }) {
 
   return (
     <>
-      <button
+      <Button
+        variant="secondary"
         data-testid="plain-file.conflict.copy"
         disabled={busy}
         onClick={() => void copy()}
-        style={{
-          border: "1px solid var(--line-1)",
-          borderRadius: "var(--radius-2)",
-          background: "var(--paper)",
-          color: "var(--fg-1)",
-          padding: "var(--space-1) var(--space-2)",
-          cursor: "pointer",
-          opacity: busy ? 0.6 : 1,
-        }}
       >
         {t("plainFile.conflict.copy")}
-      </button>
+      </Button>
       {failed && (
         <span
           role="alert"
@@ -260,21 +254,25 @@ export function PlainFileScreen() {
                   flexShrink: 0,
                 }}
               >
-                <button
+                {/* The tab WIDGET: `<Button variant="ghost">` carrying
+                    `role="tab"`, so it is the primitive rather than a
+                    hand-rolled control while keeping the tab semantics. The
+                    variant supplies the hover surface; the inline style strips
+                    the button padding and inherits the tab's own type, so the
+                    row keeps painting the active-tab background
+                    (myne-md/myne#788). */}
+                <Button
+                  variant="ghost"
                   role="tab"
                   aria-selected={isActive}
                   data-testid="plain-file.tab"
                   onClick={() => setActive(file.handle)}
                   style={{
                     ...MIN_TARGET,
-                    display: "flex",
-                    alignItems: "center",
+                    padding: 0,
                     gap: "var(--space-1)",
-                    border: "none",
-                    background: "transparent",
                     color: "inherit",
                     font: "inherit",
-                    cursor: "pointer",
                   }}
                 >
                   {file.name}
@@ -308,10 +306,12 @@ export function PlainFileScreen() {
                       testId="plain-file.tab-failed"
                     />
                   )}
-                </button>
-                <button
-                  aria-label={t("plainFile.closeTab", { name: file.name })}
-                  data-testid="plain-file.close"
+                </Button>
+                <IconButton
+                  icon="x"
+                  iconSize={14}
+                  label={t("plainFile.closeTab", { name: file.name })}
+                  testId="plain-file.close"
                   onClick={() => {
                     // A failed tab refuses to close (`store.ts::close` keeps it
                     // because its text exists only in RAM). Selecting it makes
@@ -323,19 +323,7 @@ export function PlainFileScreen() {
                     }
                     void close(file.handle);
                   }}
-                  style={{
-                    ...MIN_TARGET,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--fg-2)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon name="x" size={14} />
-                </button>
+                />
               </div>
             );
           })}
@@ -364,20 +352,13 @@ export function PlainFileScreen() {
           }}
         >
           <span>{t("plainFile.saveError")}</span>
-          <button
+          <Button
+            variant="secondary"
             data-testid="plain-file.save-error.retry"
             onClick={() => void save(active.handle)}
-            style={{
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
-              background: "var(--paper)",
-              color: "var(--fg-1)",
-              padding: "var(--space-1) var(--space-2)",
-              cursor: "pointer",
-            }}
           >
             {t("plainFile.retry")}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -402,35 +383,21 @@ export function PlainFileScreen() {
               the arm is absent rather than a button that cannot act; the copy
               and overwrite arms below need no source read and stay. */}
           {active.diskContent !== undefined && (
-            <button
+            <Button
+              variant="secondary"
               data-testid="plain-file.conflict.reload"
               onClick={() => resolveReload(active.handle)}
-              style={{
-                border: "1px solid var(--line-1)",
-                borderRadius: "var(--radius-2)",
-                background: "var(--paper)",
-                color: "var(--fg-1)",
-                padding: "var(--space-1) var(--space-2)",
-                cursor: "pointer",
-              }}
             >
               {t("plainFile.conflict.reload")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="secondary"
             data-testid="plain-file.conflict.overwrite"
             onClick={() => resolveOverwrite(active.handle)}
-            style={{
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
-              background: "var(--paper)",
-              color: "var(--fg-1)",
-              padding: "var(--space-1) var(--space-2)",
-              cursor: "pointer",
-            }}
           >
             {t("plainFile.conflict.overwrite")}
-          </button>
+          </Button>
           {/* The third arm (task 14): keep the user's text as a copy of their
               choosing instead of choosing between the two files. */}
           <ConflictCopyButton handle={active.handle} />

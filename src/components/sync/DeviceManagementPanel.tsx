@@ -32,6 +32,7 @@ import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { Icon } from "../primitives/Icon";
 import { Tooltip } from "../primitives/Tooltip";
+import { EmptyState } from "../primitives/EmptyState";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -515,7 +516,14 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
             <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.loading")}</div>
           )
         ) : approved.length === 0 ? (
-          <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.noDevices")}</div>
+          <EmptyState
+            variant="firstRun"
+            icon="hard-drive"
+            size="sm"
+            title={t("sync.devices.noDevices")}
+            body={t("sync.devices.noDevicesBody")}
+            testId="sync.devices-empty"
+          />
         ) : (
           <div style={SECTION}>
           {approved.map((d) => (

@@ -7,7 +7,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
 import { refreshTorState } from "../../hooks/useTorState";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { Button } from "../primitives/Button";
+import { Input } from "../primitives/Input";
 import { Icon } from "../primitives/Icon";
 
 /**
@@ -32,28 +33,9 @@ const ROW: CSSProperties = {
   alignItems: "center",
 };
 
-const INPUT: CSSProperties = {
+const FIELD_FILL: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-sm)",
-  background: "var(--paper)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--font-sans)",
-};
-
-const BTN: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-sm)",
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-1)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  transition: HOVER_TRANSITION,
 };
 
 const HELP: CSSProperties = {
@@ -76,16 +58,6 @@ const NOTE_BLOCK: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
   lineHeight: "var(--leading-normal)",
-};
-
-// The "Connected" resting state of the connect button: muted, non-accent, and
-// clearly inert (E4c) — the input matches the endpoint already in use.
-const BTN_CONNECTED: CSSProperties = {
-  ...BTN,
-  background: "var(--bg-2)",
-  color: "var(--fg-3)",
-  border: "1px solid var(--line-1)",
-  cursor: "default",
 };
 
 export function EndpointConfig({
@@ -246,7 +218,7 @@ export function EndpointConfig({
         </div>
       )}
       <div style={ROW}>
-        <input
+        <Input
           value={url}
           readOnly={lockedUrl}
           onChange={(e) => {
@@ -260,34 +232,23 @@ export function EndpointConfig({
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          style={lockedUrl ? { ...INPUT, color: "var(--fg-3)" } : INPUT}
+          style={lockedUrl ? { ...FIELD_FILL, color: "var(--fg-3)" } : FIELD_FILL}
           data-testid="sync.endpoint-input"
         />
         {isConnectedUnedited && !revealCode ? (
-          <button
-            type="button"
-            disabled
-            style={BTN_CONNECTED}
+          <Button variant="secondary" disabled data-testid="sync.endpoint-connect">
+            {t("sync.endpoint.connected")}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={connect}
+            disabled={busy}
             data-testid="sync.endpoint-connect"
           >
-            {t("sync.endpoint.connected")}
-          </button>
-        ) : (
-            <button
-              type="button"
-              onClick={connect}
-              disabled={busy}
-              style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
-              {...hoverSurface({
-                restBg: "var(--accent)",
-                hoverBg: "var(--accent-hover)",
-                disabled: busy,
-              })}
-              data-testid="sync.endpoint-connect"
-            >
-              {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
-            </button>
-          )}
+            {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
+          </Button>
+        )}
       </div>
       {/* The invite code for a gated server (myne-md/myne#800). Optional: an
           open server ignores it, and a self-host operator never sets one. It
@@ -314,7 +275,7 @@ export function EndpointConfig({
             {t("sync.endpoint.inviteLabel")}
           </label>
           <div style={ROW}>
-            <input
+            <Input
               id="sync-endpoint-invite"
               value={inviteCode}
               onChange={(e) => {
@@ -325,7 +286,7 @@ export function EndpointConfig({
               spellCheck={false}
               autoCapitalize="off"
               autoComplete="off"
-              style={INPUT}
+              style={FIELD_FILL}
               data-testid="sync.endpoint-invite-input"
             />
           </div>
@@ -336,14 +297,14 @@ export function EndpointConfig({
           (myne-md/myne#822). Hidden on the self-hosted door, where editing the
           address already re-reveals the field. */}
       {lockedUrl && isConnectedUnedited && !revealCode && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setRevealCode(true)}
-          style={{ ...HELP, alignSelf: "flex-start", background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--accent)" }}
+          style={{ alignSelf: "flex-start" }}
           data-testid="sync.endpoint-change-invite"
         >
           {t("sync.endpoint.changeInviteCode")}
-        </button>
+        </Button>
       )}
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">

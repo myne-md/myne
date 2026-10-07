@@ -20,6 +20,7 @@ import {
   dragRegionProps,
   TITLE_BAR_CONTROL_HEIGHT,
   TITLE_BAR_CONTROL_TOP,
+  TITLE_BAR_RIGHT_EDGE,
 } from "../../screens/titlebar";
 import {
   useState,
@@ -55,11 +56,21 @@ export const STRIP_HEIGHT = 38;
 
 
 /** Base strip layout. Per-pane: each pane owns its own strip atop its editor
- *  body. A `--line-1` bottom hairline runs the FULL strip width — the editor's
- *  top edge — continuously (the active tab sits on it, Obsidian-style; the
- *  line does NOT break under it). A small top inset gives the tabs breathing
- *  room. Fixed height; fills the pane width. `paddingLeft`/`paddingRight` are
- *  overridden per-instance to clear the corner window controls (insets). */
+ *  body. A `--line-1` bottom hairline runs the strip width — the editor's top
+ *  edge — and the ACTIVE tab BREAKS it: the tab's own side hairlines run down
+ *  into the gap, so the tab reads as one continuous surface with the note body
+ *  beneath it rather than as a card resting on a closed lid (myne-md/myne#773).
+ *
+ *  This file used to say, in this comment, that the line does not break under
+ *  the tab and that not breaking it was the Obsidian look. It is the opposite:
+ *  Obsidian breaks it, and the reason is legibility rather than taste — an
+ *  unbroken rule under the active tab draws a closed box around the tab, and a
+ *  closed box says "this is a chip", not "this is the thing you are looking
+ *  at". The gap is what makes a tab strip read as tabs.
+ *
+ *  A small top inset gives the tabs breathing room. Fixed height; fills the
+ *  pane width. `paddingLeft`/`paddingRight` are overridden per-instance to
+ *  clear the corner window controls (insets). */
 const STRIP_BASE_PADDING_LEFT = 6;
 /** Top inset that gives the tabs breathing room. Named rather than inlined
  *  because the strip's own buttons offset against it to land on the title-bar
@@ -88,6 +99,14 @@ const scrollAreaStyle: CSSProperties = {
   minWidth: 0,
   overflowX: "auto",
   overflowY: "hidden",
+  // One pixel of room BELOW the tabs, inside this box's clip. The active tab
+  // hangs 1px past its row to paint over the strip's bottom rule (see the tab
+  // style), and `overflow-x: auto` forces `overflow-y` to clip as well — so
+  // without this the hang was cut off at this element's padding edge and the
+  // rule ran straight under the active tab. Padding extends the clip region;
+  // the equal negative margin keeps the strip's own height unchanged.
+  paddingBottom: "var(--hairline)",
+  marginBottom: "calc(var(--hairline) * -1)",
 };
 
 /** Height of the small strip buttons (+ / overflow). Matched to the floated
@@ -251,7 +270,12 @@ export function TabStrip({
       style={{
         ...stripStyle,
         paddingInlineStart: STRIP_BASE_PADDING_LEFT + insetLeft,
-        paddingInlineEnd: insetRight,
+        // Never flush against the edge. `insetRight` clears the floated
+        // right-side controls when the right sidebar is collapsed (and already
+        // includes their edge offset); when it is 0 the strip's own caret is the
+        // last control on the row, and it takes the same edge offset the
+        // right-sidebar toggle uses so the two land on one line.
+        paddingInlineEnd: insetRight > 0 ? insetRight : TITLE_BAR_RIGHT_EDGE,
         // The insets clear the floated window controls (traffic lights /
         // sidebar toggles / back-forward nav) when a side has no sidebar, so
         // they flip with the sidebar's collapsed state. Transition them on the
@@ -552,9 +576,10 @@ function Tab({
   };
 
   // Obsidian-style tabs: the active tab is a rounded-top card with a top/side
-  // hairline, sitting ON the strip's full-width bottom line (which runs left→
-  // right continuously, NOT broken under the tab). It has NO bottom border, so
-  // it reads as open toward the body beneath the line. Inactive tabs recede —
+  // hairline, and it BREAKS the strip's bottom line — it hangs 1px past the
+  // strip's content box and paints that last pixel in its own fill, so the rule
+  // stops at one side hairline and resumes at the other. That is what joins the
+  // tab to the note body under it. Inactive tabs recede —
   // transparent, dimmed `--fg-3`, lower opacity, no border. Tabs shrink
   // (ellipsizing their title) as the pane narrows, then the row scrolls once
   // they hit their content floor.
@@ -578,6 +603,29 @@ function Tab({
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
     borderInlineEnd:
       active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
+    // The gap in the strip's rule. `marginBottom: -1` hangs the tab one pixel
+    // past the strip's content box — which is exactly where the strip paints
+    // its `border-bottom` — and the bottom border repaints that pixel in the
+    // tab's own fill. A child paints after its parent's background AND border,
+    // so no z-index is needed; the order is the cascade's, not ours.
+    //
+    // Only the ACTIVE tab does this. An inactive tab is transparent, so a
+    // transparent bottom border there would erase nothing and a filled one
+    // would punch a hole in the rule under a tab that is not open.
+    //
+    // The overhang is a HEIGHT, not a negative margin. The app sets
+    // `box-sizing: border-box` globally (`src/styles/tokens.css`), so
+    // `height: 100%` already contains the tab's own bottom border, and that
+    // border landed one pixel ABOVE the strip's rule. A negative bottom margin
+    // does not move a flex item with an explicit height, so the earlier
+    // `marginBottom: -1` never reached the rule at all. The tab is one pixel
+    // taller instead, and the scrolling row leaves room for that pixel inside
+    // its clip (`scrollAreaStyle`). Measured, not reasoned: a probe page with
+    // these exact styles under border-box showed the rule through the tab in
+    // WebKit until both halves were in.
+    ...(active
+      ? { height: "calc(100% + 1px)", borderBottom: "1px solid var(--bg-1)" }
+      : null),
     background: active
       ? "var(--bg-1)"
       : stacked
@@ -800,7 +848,11 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
         display: "flex",
         alignItems: "center",
         gap: 6,
-        height: "100%",
+        // The active tab's covering pixel (see the tab style above): the chip
+        // IS the selected tab while a new tab is pending, so it owes the same
+        // one-pixel overhang or the strip's rule shows through it.
+        height: "calc(100% + 1px)",
+        borderBottom: "1px solid var(--bg-1)",
         padding: "0 6px 0 10px",
         borderTopLeftRadius: 8,
         borderTopRightRadius: 8,

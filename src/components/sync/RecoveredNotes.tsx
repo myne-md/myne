@@ -26,7 +26,7 @@ import {
 } from "../../notes/components/DeleteConfirmModal";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
 import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
-import { Icon } from "../primitives/Icon";
+import { EmptyState } from "../primitives/EmptyState";
 
 const LIST_STYLE: CSSProperties = {
   display: "flex",
@@ -102,17 +102,6 @@ const ERROR_STYLE: CSSProperties = {
 
 // Zero-state: a muted glyph over the copy so an empty section reads as
 // intentional ("nothing to recover") rather than a blank gap under the helper.
-const EMPTY_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-5)",
-  textAlign: "center",
-  color: "var(--fg-3)",
-  fontSize: 12,
-};
-
 const PREVIEW_CARD_STYLE: CSSProperties = {
   width: 560,
   maxWidth: "90vw",
@@ -347,10 +336,13 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
       )}
 
       {entries.length === 0 && error === null && (
-        <div style={EMPTY_STYLE} data-testid="sync.recovered-empty">
-          <Icon name="archive" size={30} style={{ color: "var(--fg-3)" }} />
-          <span>{t("sync.panel.recovered.empty")}</span>
-        </div>
+        <EmptyState
+          variant="firstRun"
+          icon="archive"
+          size="sm"
+          title={t("sync.panel.recovered.empty")}
+          testId="sync.recovered-empty"
+        />
       )}
 
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}

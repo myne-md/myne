@@ -107,6 +107,13 @@ export function serveLayoutWorker(
       case "release":
         sim?.release(cmd.id);
         return;
+      case "dragWarm":
+        sim?.dragWarm(cmd.on);
+        // `kick()` on the way IN only: entering a gesture must wake the tick
+        // loop if it had gone quiet, where leaving one wants it to coast down
+        // on its own rather than be handed one more impulse on release.
+        if (cmd.on) kick();
+        return;
     }
   };
 }

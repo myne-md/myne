@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
-import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
+import { StepCard, StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 
 interface BriefingStepProps {
   /** Exit the create flow (reprobe → welcome at 0 vaults). */
@@ -87,8 +87,11 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
         {t("vaultCreation.briefing.intro")}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        {STATEMENTS.map((s) => {
+      {/* One card, three rows (the Welcome card's shape): the statements read
+          as one contract rather than three alerts, and a row is ticked where
+          it is read. */}
+      <StepCard variant="rows">
+        {STATEMENTS.map((s, i) => {
           const isExpanded = !!expanded[s.id];
           return (
             <div
@@ -96,56 +99,66 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "var(--space-3)",
-                padding: "var(--space-4)",
-                background: "var(--paper-2)",
-                border: "1px solid var(--line-1)",
-                borderRadius: "var(--radius-2)",
+                gap: "var(--space-2)",
+                padding: "var(--space-4) 0",
+                borderBottom:
+                  i === STATEMENTS.length - 1 ? undefined : "1px solid var(--line-1)",
               }}
             >
               <div
                 style={{
-                  fontSize: 15,
-                  fontWeight: "var(--weight-semibold)",
-                  lineHeight: 1.4,
-                  color: "var(--fg-1)",
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "var(--space-3)",
                 }}
               >
-                {s.statement}
+                <div
+                  style={{
+                    flex: 1,
+                    fontSize: "var(--text-base)",
+                    fontWeight: "var(--weight-medium)",
+                    lineHeight: 1.4,
+                    color: "var(--fg-1)",
+                  }}
+                >
+                  {s.statement}
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  onClick={() =>
+                    setExpanded((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+                  }
+                  data-testid="create.briefing-why"
+                  data-ack-id={s.id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "var(--space-1)",
+                    flexShrink: 0,
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    color: "var(--fg-3)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                  }}
+                >
+                  {t("vaultCreation.briefing.why")}
+                  <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={14} />
+                </button>
               </div>
-
-              <button
-                type="button"
-                aria-expanded={isExpanded}
-                onClick={() =>
-                  setExpanded((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
-                }
-                data-testid="create.briefing-why"
-                data-ack-id={s.id}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "var(--space-1)",
-                  alignSelf: "flex-start",
-                  padding: 0,
-                  border: "none",
-                  background: "none",
-                  cursor: "pointer",
-                  color: "var(--accent)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: "var(--weight-medium)",
-                }}
-              >
-                {t("vaultCreation.briefing.why")}
-                <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
-              </button>
 
               {isExpanded && (
                 <div
                   data-testid="create.briefing-why-text"
                   data-ack-id={s.id}
-                  style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fg-2)" }}
+                  style={{
+                    fontSize: "var(--text-sm)",
+                    lineHeight: 1.6,
+                    color: "var(--fg-2)",
+                  }}
                 >
                   {s.why}
                 </div>
@@ -154,9 +167,12 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
               <label
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
+                  alignItems: "center",
+                  gap: "var(--space-2)",
                   cursor: "pointer",
+                  fontSize: "var(--text-sm)",
+                  lineHeight: 1.5,
+                  color: acked[s.id] ? "var(--fg-1)" : "var(--fg-2)",
                 }}
               >
                 <input
@@ -165,20 +181,16 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                   onChange={(e) =>
                     setAcked((prev) => ({ ...prev, [s.id]: e.target.checked }))
                   }
-                  style={{ marginTop: 2, accentColor: "var(--accent)" }}
+                  style={{ margin: 0, accentColor: "var(--accent)" }}
                   data-testid="create.briefing-ack"
                   data-ack-id={s.id}
                 />
-                <div
-                  style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-1)" }}
-                >
-                  {s.ackLabel}
-                </div>
+                {s.ackLabel}
               </label>
             </div>
           );
         })}
-      </div>
+      </StepCard>
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         <Button

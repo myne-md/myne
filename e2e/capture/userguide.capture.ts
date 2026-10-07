@@ -40,7 +40,7 @@ import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
   activeNoteId,
-  clickNewMenuItem,
+  clickNewItem,
   clickRibbonUntilVisible,
   clickUntilVisible,
   clickNoteRow,
@@ -125,7 +125,7 @@ async function createNote(session: Session, title: string): Promise<void> {
 /** Create a top-level folder named `name`. Enter commits the name input;
  *  then wait for at least one folder row to materialize. */
 async function createFolder(session: Session, name: string): Promise<void> {
-  await clickNewMenuItem(session, "notes.new-folder");
+  await clickNewItem(session, "notes.new-folder");
   await (await session.byTestId("notes.new-folder-input")).sendKeys(name + ENTER);
   await session.byTestId("notes.folder-row", { timeoutMs: 10000 });
 }

@@ -25,6 +25,20 @@ function backdrop(): HTMLElement | null {
   return document.querySelector(".cm-attach-lightbox-backdrop");
 }
 
+/**
+ * One CSS rule's own declaration block, comments stripped.
+ *
+ * Exists because the assertions below used to slice from a selector to the END
+ * of the stylesheet and ask whether a value was anywhere in the remainder —
+ * which is a question every later rule can answer for you.
+ */
+function ruleBlock(css: string, selector: string): string {
+  const at = css.indexOf(selector + " {");
+  if (at < 0) return "";
+  const open = css.indexOf("{", at);
+  return css.slice(open + 1, css.indexOf("}", open)).replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 describe("attachment lightbox", () => {
   it("opens a backdrop with a full-size image at the attachment URL", () => {
     showAttachmentLightbox({ url: URL_A, alt: "photo.png" });
@@ -98,13 +112,25 @@ describe("attachment lightbox", () => {
     expect(backdrop()).toBeNull();
   });
 
-  it("has no white-frame wrapper around the image — image is a direct backdrop child", () => {
+  it("frames the image without putting a card around it", () => {
     showAttachmentLightbox({ url: URL_A, alt: "x" });
     const bd = backdrop()!;
     const img = bd.querySelector("img.cm-attach-lightbox-img") as HTMLImageElement;
-    // The image's direct parent is the backdrop itself, not an intermediate
-    // framed/padded box.
-    expect(img.parentElement).toBe(bd);
+    const stage = bd.querySelector(".cm-attach-lightbox-stage");
+    // There IS a wrapper now, and it has to be there: `mountZoom` fits the
+    // image to `stage.clientWidth/clientHeight`, and on the backdrop that
+    // measurement includes its padding — so the gutter was invisible to the
+    // fit and the picture ran under the × and the zoom bar.
+    expect(stage, "no stage to inset the picture into").not.toBeNull();
+    expect(img.parentElement).toBe(stage);
+    expect(stage!.parentElement).toBe(bd);
+    // But it is a FRAME, not a card: the original property still holds, which
+    // is that nothing draws a surface around the picture.
+    const styleEl = document.getElementById("myne-attachment-insert-styles");
+    const stageBlock = ruleBlock(styleEl!.textContent ?? "", ".cm-attach-lightbox-stage");
+    for (const prop of [/box-shadow\s*:/, /border\s*:/, /background\s*:/, /padding\s*:/]) {
+      expect(stageBlock, `${String(prop)} in ${stageBlock}`).not.toMatch(prop);
+    }
   });
 
   it("caps the preview size (no full-bleed) and carries no white frame in CSS", () => {
@@ -112,20 +138,52 @@ describe("attachment lightbox", () => {
     const styleEl = document.getElementById("myne-attachment-insert-styles");
     expect(styleEl).not.toBeNull();
     const css = styleEl!.textContent ?? "";
-    const imgRule = css.slice(css.indexOf(".cm-attach-lightbox-img"));
-    expect(imgRule).toContain("max-width: min(80vw, 1100px)");
-    expect(imgRule).toContain("max-height: 80vh");
-    expect(imgRule).toContain("object-fit: contain");
-    // No white frame on the image: no border / background / box-shadow /
-    // padding *declarations* (strip the comment first so its prose doesn't
-    // trip the property check).
-    const imgBlock = imgRule
-      .slice(0, imgRule.indexOf("}"))
-      .replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(imgBlock).not.toMatch(/box-shadow\s*:/);
-    expect(imgBlock).not.toMatch(/border\s*:/);
-    expect(imgBlock).not.toMatch(/background\s*:/);
-    expect(imgBlock).not.toMatch(/padding\s*:/);
+
+    // **Read the rule's own block.** This test used to slice from the
+    // selector to the END OF THE STYLESHEET and assert `max-width: min(80vw,
+    // 1100px)` / `max-height: 80vh` were "in" it. They were — in the PDF
+    // surface's rule, hundreds of characters later. So a test named "caps the
+    // preview size" passed for as long as the image rule has said
+    // `max-width: 100%`, which is the full-bleed it claims to forbid.
+    const imgBlock = ruleBlock(css, ".cm-attach-lightbox-img");
+    expect(imgBlock).toContain("object-fit: contain");
+    // The image fills its frame; the CAP is the frame, which is the only place
+    // it can be, since the fit is computed from the frame's client box.
+    expect(imgBlock).toContain("max-width: 100%");
+    expect(imgBlock).toContain("max-height: 100%");
+
+    const stageBlock = ruleBlock(css, ".cm-attach-lightbox-stage");
+    // A max width, and a height bounded by insets that clear the chrome at
+    // both ends — the × / Export row above and the zoom bar below. Asserted as
+    // the RELATION rather than as three numbers: what must hold is that the
+    // picture stops short of the viewport on every side.
+    expect(stageBlock).toMatch(/width:\s*min\(/);
+    expect(stageBlock).toMatch(/1600px/);
+    const top = Number(/top:\s*(\d+)px/.exec(stageBlock)?.[1]);
+    const bottom = Number(/bottom:\s*(\d+)px/.exec(stageBlock)?.[1]);
+    // 56px down plus a 32px button is 88px of top chrome; the zoom bar is 20px
+    // up and ~42px tall. Anything less and the picture is under them again.
+    expect(top, stageBlock).toBeGreaterThanOrEqual(88);
+    expect(bottom, stageBlock).toBeGreaterThanOrEqual(62);
+    // No white frame on the image itself.
+    for (const prop of [/box-shadow\s*:/, /border\s*:/, /background\s*:/, /padding\s*:/]) {
+      expect(imgBlock).not.toMatch(prop);
+    }
+  });
+
+  it("puts the picture on an OPAQUE backdrop, not a scrim", () => {
+    // A 72% scrim left the app legible underneath, so a screenshot — which is
+    // most of what gets previewed — was read against a tab strip and a sidebar
+    // showing through it.
+    showAttachmentLightbox({ url: URL_A, alt: "x" });
+    const css = document.getElementById("myne-attachment-insert-styles")!.textContent ?? "";
+    const block = ruleBlock(css, ".cm-attach-lightbox-backdrop");
+    const bg = /background:\s*([^;]+);/.exec(block)?.[1]?.trim();
+    expect(bg, block).toBeTruthy();
+    // Opaque, however it is spelled. `rgba(…, 0.72)` is the defect; a bare
+    // colour, or an alpha of 1, is not.
+    const alpha = /rgba?\([^)]*?,\s*([\d.]+)\s*\)/.exec(bg!)?.[1];
+    expect(alpha === undefined || Number(alpha) === 1, bg).toBe(true);
   });
 
   it("Escape listener is removed after close (no leak on second Esc)", () => {

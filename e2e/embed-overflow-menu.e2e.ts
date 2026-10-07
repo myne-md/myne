@@ -92,7 +92,7 @@ async function frameAligned(s: Session, align: string): Promise<boolean> {
 
 /** Open the embed's overflow menu and wait for the body-mounted list. */
 async function openEmbedMenu(s: Session): Promise<void> {
-  // Re-click until the menu is actually up, the same shape `clickNewMenuItem`
+  // Re-click until the menu is actually up, the same shape `clickNewItem`
   // uses and for the same recorded reason: a wait with nothing to re-fire spends
   // its whole budget and reports a timeout that reads like a dead surface. Here
   // it read as `attachment-image.menu` never existing while its button was

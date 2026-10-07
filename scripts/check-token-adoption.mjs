@@ -120,14 +120,24 @@ const SCAN_EXT = new Set([".ts", ".tsx", ".css"]);
 /**
  * The literal shapes that make a surface unthemable.
  *
- * Hex colours, and the numeric forms of the properties a measure token governs.
- * `0` is excluded throughout: zero is zero in every theme, and counting it would
- * bury the signal under `padding: 0`.
+ * Hex colours and numeric colour functions, plus the numeric forms of the
+ * properties a measure token governs. `0` is excluded from the MEASURE
+ * patterns: zero is zero in every theme, and counting it would bury the signal
+ * under `padding: 0`. It is NOT excluded from the colour patterns, where
+ * `rgba(0,0,0,0.32)` is a real scrim literal rather than a no-op.
  */
 const PATTERNS = [
   // `(?<!\w)` keeps an issue reference out of the count: `myne#394` is not a
   // colour, and counting it made a comment citing this very issue trip the guard.
   { name: "colour", re: /(?<!\w)#[0-9a-fA-F]{3,8}\b/g },
+  // A colour FUNCTION with a numeric first argument. The hex-only pattern above
+  // was blind to `rgba()` / `hsl()`, which is how the two translucent backdrops
+  // and the on-accent spinner track stayed uncounted while their siblings were
+  // converted to `--scrim`/`--mat-black`: a translucent colour is exactly the
+  // family those tokens were added for. A `var()` inside is stripped to TOKEN
+  // first, so `rgb(var(--x), 0.5)` is not counted (its colour is a token); a
+  // bare `rgba(0,0,0,0.32)` is.
+  { name: "colour-fn", re: /\b(?:rgba?|hsla?)\(\s*[0-9.]+/g },
   { name: "radius", re: /\bborderRadius:\s*[1-9]/g },
   {
     name: "spacing",

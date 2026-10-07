@@ -47,15 +47,19 @@ export interface LayoutHandle {
   hold(id: string, x: number, y: number): void;
   /** Release a held node, so the link force pulls it back. */
   release(id: string): void;
+  /** Hold the simulation warm for a whole gesture, rather than kicking it once
+   *  per pointer move — which is an impulse train, and lurches. */
+  dragWarm(on: boolean): void;
   /** Tear the layout down. Safe to call more than once, and safe on the
    *  fallback path, where it only cancels the deferred settle. */
   stop(): void;
 }
 
-const INERT: Pick<LayoutHandle, "reheat" | "hold" | "release"> = {
+const INERT: Pick<LayoutHandle, "reheat" | "hold" | "release" | "dragWarm"> = {
   reheat() {},
   hold() {},
   release() {},
+  dragWarm() {},
 };
 
 export function startLayout(
@@ -122,6 +126,7 @@ export function startLayout(
     reheat: () => send({ kind: "reheat" }),
     hold: (id, x, y) => send({ kind: "hold", id, x, y }),
     release: (id) => send({ kind: "release", id }),
+    dragWarm: (on) => send({ kind: "dragWarm", on }),
     stop: () => {
       // `terminate` is the teardown: it discards anything the worker still has
       // queued, so there is no point posting a stop command first and no point

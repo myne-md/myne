@@ -13,6 +13,8 @@ export {
   Checkbox,
   Switch,
   Segmented,
+  MonoField,
+  MonoBox,
 } from "./inputs";
 export { Banner, Toast, Spinner, BlockingOverlay } from "./feedback";
 export { Chip, AccountNumber, Fab, Sheet, SidePanel, useEnterTransition } from "./misc";
@@ -41,6 +43,7 @@ export {
   HideVaultNamesBlock,
   type HideVaultNamesBlockProps,
 } from "./HideVaultNamesBlock";
+export { RecoveryDrillBlock } from "./RecoveryDrillBlock";
 // The per-provider consent screen (myne-md/myne#456). Its clauses come from
 // `@myne/copy` verbatim, so they are byte-identical to the desktop screen's.
 export { AiConsentScreen } from "./AiConsentScreen";

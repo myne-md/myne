@@ -45,7 +45,7 @@ async function expectNavDisabled(
 }
 
 // DE-QUARANTINED (myne-md/myne#555). It was quarantined as a
-// contended-runner victim, then re-diagnosed twice — the `clickNewMenuItem`
+// contended-runner victim, then re-diagnosed twice — the `clickNewItem`
 // re-click, then the driver port — and neither closed it: on an idle machine, in
 // a warm container, `--retry=0`, it still failed about one run in five, always
 // as `Test timed out in 180000ms`.

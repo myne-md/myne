@@ -96,6 +96,25 @@ row is the only coverage of the join between those proven ends. Requires a paire
 | 4.2.2 | **Drain on unlock** — unlock the phone, land in the editor | each queued capture becomes a real note and is acked; the MYK1 queue empties (device-keychain `wrap_key` seal, NOT `root_key`-derived) |
 | 4.2.3 | **Multi-capture ordering** — dictate several before unlocking | all drain, none lost or duplicated (each `capture_id` acked once) |
 
+### 4.3 Apple Watch meeting capture (myne-md/myne#812)
+
+The watch meeting lane crosses the same transport + device-keychain seam as §4.2, plus a native
+microphone capture path and a chunked file transfer, none of which any automated tier exercises.
+The phone-side halves (seal-on-arrival, the pending-meeting manifest's grouping/ordering/duplicate
+delivery, and the unlock drain) are covered by Rust and flow-logic tests; what no lane can cross is
+the **device-only WatchConnectivity `transferFile`** hop from a separate watchOS app to the iPhone
+receiver, which a simulator does not support, plus the watch microphone itself. Requires a paired
+Watch + iPhone. Log watch model + watchOS build + iPhone model + iOS build per run.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 4.3.1 | **Start on the wrist, phone LOCKED throughout** — tap start on the watch meeting surface, speak for ~30 s, tap stop, with the iPhone locked the whole time | the bright recording state and live elapsed counter show on the wrist; the phone never needs unlocking; every chunk transfers (or queues for delivery) while the phone is locked |
+| 4.3.2 | **A real `transferFile`, then unlock-drain and the note** — after 4.3.1 unlock the phone and open Myne | each arrived chunk was sealed on arrival under the device-local `wrap_key` (no plaintext audio file on the phone's disk); on unlock exactly ONE note appears with the audio embeds in chunk order and the on-device transcript beneath them, and the device-local entries + manifest record are then deleted |
+| 4.3.3 | **Long meeting (multiple chunks)** — record past one chunk boundary (a session long enough to produce at least three chunks), phone locked | the session is simply more chunks; the watch deletes each chunk file only once its transfer reports complete; the drain produces one note with all chunks in order, none missing and none duplicated |
+| 4.3.4 | **Mid-meeting disconnect** — start a recording, move the watch out of Bluetooth range from the phone for a minute, return, keep recording, stop | the not-yet-transferred chunk(s) stay on the watch until contact returns and the transfer completes; nothing is lost, and a duplicate delivery does not double-count in the manifest |
+| 4.3.5 | **No crypto on the wrist** — with the phone locked, browse the watch meeting surface and record | the watch shows start/recording/elapsed/stop only: no note content, no note list, no vault name; it holds no vault key and runs no crypto |
+| 4.3.6 | **Stop ends the microphone** — after stopping, leave the watch on the surface | no microphone remains active (no OS microphone indicator / no further capture); a second start begins a new session |
+
 ## 5. Cadence
 
 **Per release.** Log device model + iOS build + server (hosted / self-host) + pass/fail per scenario

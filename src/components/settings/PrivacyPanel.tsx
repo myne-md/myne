@@ -38,6 +38,7 @@ import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
+import { RecoveryDrillRow } from "./RecoveryDrillRow";
 import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
@@ -507,6 +508,16 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         }}
       />
       <QuickUnlockSettings />
+      {/* The recovery drill (myne-md/myne#468). In Privacy rather than Account
+          because what it protects is the ability to get back IN, which is the
+          same family as the auto-lock and quick-unlock rows it sits beside, and
+          because Account is where the vault's NAME and number live — a phrase
+          field there would read as another identifier to manage.
+
+          Ungated: it needs no capability the web client lacks (the command is
+          `myne-core`'s and the web dispatcher routes it), and it is not behind
+          Developer mode because a first-time user is exactly who it is for. */}
+      <RecoveryDrillRow />
       {/* CLI terminal access (cli-thin-client task 12, MYND-490). Omitted where
           `cliAccess` is absent rather than greyed out: a browser tab cannot host
           a terminal's Unix socket, and the sidecar it would talk to is a file

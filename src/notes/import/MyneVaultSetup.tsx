@@ -285,7 +285,7 @@ function PhraseGrid({
       {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => (
         <label key={i} htmlFor={`import-myne-word-${i}`} style={CELL_WRAP}>
           <span style={CELL_NUMBER}>{i + 1}</span>
-          <input
+          <Input
             id={`import-myne-word-${i}`}
             type="text"
             value={cells[i] ?? ""}

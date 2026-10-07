@@ -2903,6 +2903,7 @@ mod tests {
                 title: "migrate me".to_string(),
                 updated_at: 2_000,
                 version: 2,
+                note_id: None,
             },
         );
         let old_chats_catalog_kek = derive_subkey(&OLD_ROOT, SubkeyRole::ChatsCatalogKey);

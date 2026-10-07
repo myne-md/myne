@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { SettingsIndexEntry } from "./settingsSearchIndex";
 import { groupResultsByPanel } from "./resultsGrouping";
 import { panelLabelKey } from "./searchSettings";
+import { EmptyState } from "../../primitives/EmptyState";
 
 const ROOT_STYLE: CSSProperties = {
   width: "100%",
@@ -50,12 +51,6 @@ const ROW_TITLE_STYLE: CSSProperties = {
   color: "var(--fg-1)",
 };
 
-const EMPTY_STYLE: CSSProperties = {
-  fontSize: "var(--text-base)",
-  color: "var(--fg-3)",
-  padding: "var(--space-4) var(--space-3)",
-};
-
 interface SettingsSearchResultsProps {
   results: SettingsIndexEntry[];
   query: string;
@@ -80,9 +75,18 @@ export function SettingsSearchResults({
         aria-label={t("settings.search.resultsLabel")}
         style={ROOT_STYLE}
       >
-        <p role="status" style={EMPTY_STYLE} data-testid="settings.search-empty">
-          {t("settings.search.empty", { query })}
-        </p>
+        {/* The status role stays on a wrapper: the primitive sets none, and a
+            screen reader has to hear that the typed query found nothing. */}
+        <div role="status">
+          <EmptyState
+            variant="filtered"
+            icon="search"
+            size="sm"
+            title={t("settings.search.empty", { query })}
+            body={t("settings.search.emptyBody")}
+            testId="settings.search-empty"
+          />
+        </div>
       </div>
     );
   }

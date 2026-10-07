@@ -29,11 +29,38 @@
     "title": "Enter your account number"
   },
   "agent": {
+    "hub": {
+      "title": "Agent",
+      "loading": "Loading conversations…",
+      "modeLabel": "Which conversations",
+      "modeVault": "All",
+      "modeNote": "This note",
+      "renamedAnnouncement": "Renamed to {{name}}",
+      "deletedAnnouncement": "Conversation deleted",
+      "loadFailed": "Your conversations could not be loaded just now.",
+      "emptyTitle": "No conversations yet",
+      "anchorLabel": "On a note",
+      "searchLabel": "Search conversations",
+      "searchPlaceholder": "Search conversations…",
+      "noMatchTitle": "No matches",
+      "noMatchBody": "No conversation matches “{{query}}”. Clear the search to see them all.",
+      "emptyBody": "Conversations you start appear here.",
+      "emptyNeedsNote": "A run works on notes you choose, so a conversation starts from one. Open a note, then come back — or use the AI panel beside it.",
+      "newConversation": "New conversation",
+      "historyLabel": "History"
+    },
+    "focus": {
+      "title": "Agent on note",
+      "backToHub": "All conversations",
+      "openNote": "Open note"
+    },
     "composer": {
-      "placeholder": "Ask the AI to change these notes",
+      "placeholder": "Ask the AI…",
       "scopeLabel": "Working on",
       "scopeChange": "Change",
       "scopeOpenNote": "This note",
+      "scopeChoose": "Choose a folder",
+      "needsScope": "Pick a folder below, or open a note, so the agent has something to work on.",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
@@ -240,22 +267,26 @@
       "actionsAriaLabel": "Attachment actions",
       "actionsTitle": "Actions",
       "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
-      "corpusIncompleteNotice": "Finish syncing first. This device doesn't have all your notes yet, so it can't tell which attachments are unused.",
       "checking": "Checking…",
       "cleanUnused": "Clean unused",
       "cleanUnusedTitle": "Delete attachments not used in any note",
+      "clearSearchAriaLabel": "Clear search",
       "colCreated": "Created",
       "colName": "Name",
       "colSize": "Size",
       "colType": "Type",
       "colUsedIn": "Used in",
+      "corpusIncompleteNotice": "Finish syncing first. This device doesn't have all your notes yet, so it can't tell which attachments are unused.",
       "decrypting": "Decrypting attachments…",
-      "clearSearchAriaLabel": "Clear search",
       "emptyClearSearch": "Clear search",
-      "emptyImportHint": "Import a file to keep it in your vault.",
-      "emptyLoadError": "Couldn't read the attachments catalog.",
-      "emptyNoAttachments": "No attachments yet.",
-      "emptyNoResultsTitle": "No attachments match your search.",
+      "emptyFilteredBody": "Nothing here matches the current type filter. Clear it to see the whole library again.",
+      "emptyFilteredBodyQuery": "Nothing in the library matches",
+      "emptyImportHint": "Files you add to a note are kept in your vault, encrypted on this device before they go anywhere. Import one to start.",
+      "emptyLoadError": "Couldn't read the attachments catalog",
+      "emptyLoadErrorBody": "The catalog is encrypted with your vault, so this is usually a read that was interrupted rather than lost data. Try again; if it keeps failing, your notes and their files are unaffected.",
+      "emptyNoAttachments": "No attachments yet",
+      "emptyNoResultsTitle": "No attachments match",
+      "emptyRetry": "Try again",
       "filterAriaLabel": "Filter by type",
       "gridView": "Grid view",
       "import": "Import",
@@ -370,6 +401,10 @@
       "cancel": "Cancel",
       "close": "Close",
       "copying": "Copying {{done}} of {{total}}…",
+      "drillBody": "A backup alone will not get you back in if you lose your password.",
+      "drillCta": "Check it",
+      "drillOnce": "Shown once. After you close this it will not come back.",
+      "drillTitle": "Have you checked your recovery phrase too?",
       "preparing": "Preparing…",
       "successToast": "Backup verified and saved.",
       "title": "Back up vault",
@@ -416,6 +451,30 @@
   },
   "commands": {
     "actions": {
+      "aiOpenChat": {
+        "label": "Open AI Chat"
+      },
+      "aiOpenAgentVault": {
+        "label": "Agent: open on vault"
+      },
+      "aiOpenAgentNote": {
+        "label": "Agent: open on note"
+      },
+      "aiRewriteSelection": {
+        "label": "Rewrite selection"
+      },
+      "aiSummarizeNote": {
+        "label": "Summarize note"
+      },
+      "meetingSummarize": {
+        "label": "Summarize meeting with AI…"
+      },
+      "applyCustomTheme": {
+        "label": "Apply custom theme…"
+      },
+      "archiveNote": {
+        "label": "Archive note"
+      },
       "backupVault": {
         "label": "Back up vault…"
       },
@@ -428,29 +487,14 @@
         "vault": "Vault",
         "view": "View"
       },
-      "aiOpenChat": {
-        "label": "Open AI Chat"
+      "closePane": {
+        "label": "Close pane"
       },
-      "toggleLineNumbers": {
-        "label": "Toggle line numbers"
+      "closeTab": {
+        "label": "Close tab"
       },
-      "toggleVimMode": {
-        "label": "Toggle vim keyboard mode"
-      },
-      "toggleSpellCheck": {
-        "label": "Toggle spell check"
-      },
-      "toggleTypewriter": {
-        "label": "Toggle typewriter scrolling"
-      },
-      "toggleDimInactive": {
-        "label": "Toggle dim inactive lines"
-      },
-      "toggleEditorFont": {
-        "label": "Toggle editor font (mono / sans)"
-      },
-      "cycleTextSize": {
-        "label": "Cycle editor text size"
+      "convertWikilinks": {
+        "label": "Convert imported wikilinks in this note…"
       },
       "cycleContentWidth": {
         "label": "Cycle editor content width"
@@ -458,161 +502,29 @@
       "cycleDefaultViewMode": {
         "label": "Cycle default view mode"
       },
-      "toggleTimestamps": {
-        "label": "Toggle sidebar note timestamps"
-      },
-      "toggleArchiving": {
-        "label": "Toggle note archiving"
-      },
-      "toggleAiEnabled": {
-        "label": "Toggle AI features (beta)"
-      },
-      "toggleScreenCapture": {
-        "label": "Toggle screen-capture protection"
-      },
-      "cycleTheme": {
-        "label": "Cycle theme"
-      },
-      "themeLight": {
-        "label": "Theme: Light"
-      },
-      "themeDark": {
-        "label": "Theme: Dark"
-      },
-      "themeAmoled": {
-        "label": "Theme: AMOLED"
-      },
-      "themeSystem": {
-        "label": "Theme: Follow system"
-      },
-      "applyCustomTheme": {
-        "label": "Apply custom theme…"
-      },
-      "splitRight": {
-        "label": "Split pane right"
-      },
-      "splitDown": {
-        "label": "Split pane down"
-      },
-      "closePane": {
-        "label": "Close pane"
-      },
-      "closeTab": {
-        "label": "Close tab"
-      },
-      "nextTab": {
-        "label": "Next tab"
-      },
-      "prevTab": {
-        "label": "Previous tab"
-      },
-      "focusNextPane": {
-        "label": "Focus next pane"
-      },
-      "focusPrevPane": {
-        "label": "Focus previous pane"
-      },
-      "focusSidebarRegion": {
-        "label": "Focus notes sidebar"
-      },
-      "focusEditorRegion": {
-        "label": "Focus editor"
-      },
-      "focusRightPanelRegion": {
-        "label": "Focus right panel"
+      "cycleHeading": {
+        "label": "Cycle heading level"
       },
       "cycleRegion": {
         "label": "Cycle focus between regions"
       },
-      "goBack": {
-        "label": "Go back"
+      "cycleTextSize": {
+        "label": "Cycle editor text size"
       },
-      "goForward": {
-        "label": "Go forward"
-      },
-      "togglePreview": {
-        "label": "Toggle side-by-side preview"
-      },
-      "findInNote": {
-        "label": "Find in note"
-      },
-      "findReplace": {
-        "label": "Find and replace in note"
-      },
-      "newNote": {
-        "label": "New note"
-      },
-      "duplicateNote": {
-        "label": "Duplicate note"
-      },
-      "openInNewWindow": {
-        "label": "Open note in new window"
-      },
-      "archiveNote": {
-        "label": "Archive note"
-      },
-      "renameNote": {
-        "label": "Rename note"
-      },
-      "trashNote": {
-        "label": "Move note to trash"
-      },
-      "toggleFavorite": {
-        "label": "Toggle favorite"
-      },
-      "moveNote": {
-        "label": "Move note to folder…"
-      },
-      "emptyTrash": {
-        "label": "Empty trash"
-      },
-      "showBacklinks": {
-        "label": "Show backlinks"
-      },
-      "showOutline": {
-        "label": "Show outline"
-      },
-      "showUnlinked": {
-        "label": "Show unlinked mentions"
-      },
-      "newFolder": {
-        "label": "New folder"
-      },
-      "openTrash": {
-        "label": "Open trash"
-      },
-      "openArchive": {
-        "label": "Open archive"
-      },
-      "cycleHeading": {
-        "label": "Cycle heading level"
-      },
-      "restoreBackup": {
-        "label": "Restore vault from backup…"
-      },
-      "revealVaultFolder": {
-        "label": "Reveal vault folder in file manager"
-      },
-      "aiSummarizeNote": {
-        "label": "Summarize note"
-      },
-      "aiRewriteSelection": {
-        "label": "Rewrite selection"
-      },
-      "convertWikilinks": {
-        "label": "Convert imported wikilinks in this note…"
+      "cycleTheme": {
+        "label": "Cycle theme"
       },
       "deleteWorkspace": {
         "label": "Delete workspace…"
       },
+      "duplicateNote": {
+        "label": "Duplicate note"
+      },
+      "emptyTrash": {
+        "label": "Empty trash"
+      },
       "exportNoteHtml": {
         "label": "Export note as HTML…"
-      },
-      "exportSelectionImage": {
-        "label": "Export selection as image…",
-        "saved": "Selection saved as an image.",
-        "noSelection": "Select some text first, then export it as an image.",
-        "failed": "Could not export the selection as an image."
       },
       "exportNoteMarkdown": {
         "label": "Export note as Markdown…"
@@ -623,11 +535,44 @@
       "exportNoteTxt": {
         "label": "Export note as Plain Text…"
       },
+      "exportSelectionImage": {
+        "label": "Export selection as image…",
+        "saved": "Selection saved as an image.",
+        "noSelection": "Select some text first, then export it as an image.",
+        "failed": "Could not export the selection as an image."
+      },
       "exportVaultMarkdown": {
         "label": "Export vault as Markdown…"
       },
+      "findInNote": {
+        "label": "Find in note"
+      },
+      "findReplace": {
+        "label": "Find and replace in note"
+      },
+      "focusEditorRegion": {
+        "label": "Focus editor"
+      },
+      "focusNextPane": {
+        "label": "Focus next pane"
+      },
+      "focusPrevPane": {
+        "label": "Focus previous pane"
+      },
+      "focusRightPanelRegion": {
+        "label": "Focus right panel"
+      },
+      "focusSidebarRegion": {
+        "label": "Focus notes sidebar"
+      },
       "foldAll": {
         "label": "Fold all"
+      },
+      "goBack": {
+        "label": "Go back"
+      },
+      "goForward": {
+        "label": "Go forward"
       },
       "importBaseView": {
         "label": "Import .base view…"
@@ -641,11 +586,32 @@
       "manageTemplates": {
         "label": "Manage templates…"
       },
+      "moveNote": {
+        "label": "Move note to folder…"
+      },
+      "newFolder": {
+        "label": "New folder"
+      },
+      "newNote": {
+        "label": "New note"
+      },
       "newNoteFromTemplate": {
         "label": "New note from template…"
       },
+      "nextTab": {
+        "label": "Next tab"
+      },
+      "openArchive": {
+        "label": "Open archive"
+      },
       "openAttachments": {
         "label": "Open attachments…"
+      },
+      "openInNewWindow": {
+        "label": "Open note in new window"
+      },
+      "openPalette": {
+        "label": "Search and run a command…"
       },
       "openSettings": {
         "label": "Open settings…"
@@ -653,29 +619,47 @@
       "openSnapshots": {
         "label": "Snapshots…"
       },
-      "openTodayNote": {
-        "label": "Open today's note"
+      "openThisMonthNote": {
+        "label": "Open this month's note"
       },
       "openThisWeekNote": {
         "label": "Open this week's note"
       },
-      "openThisMonthNote": {
-        "label": "Open this month's note"
+      "openTodayNote": {
+        "label": "Open today's note"
+      },
+      "openTrash": {
+        "label": "Open trash"
+      },
+      "prevTab": {
+        "label": "Previous tab"
       },
       "randomNote": {
         "label": "Open random note"
       },
+      "removeNoteCover": {
+        "label": "Remove note cover"
+      },
+      "renameNote": {
+        "label": "Rename note"
+      },
       "renameWorkspace": {
         "label": "Rename workspace…"
+      },
+      "restoreBackup": {
+        "label": "Restore vault from backup…"
+      },
+      "revealVaultFolder": {
+        "label": "Reveal vault folder in file manager"
       },
       "saveWorkspaceAs": {
         "label": "Save workspace as…"
       },
-      "removeNoteCover": {
-        "label": "Remove note cover"
-      },
       "setNoteCover": {
         "label": "Set note cover…"
+      },
+      "showBacklinks": {
+        "label": "Show backlinks"
       },
       "showGraph": {
         "label": "Show graph view…"
@@ -683,17 +667,56 @@
       "showIsolatedGraph": {
         "label": "Open isolated graph"
       },
-      "showTasks": {
-        "label": "Show tasks"
+      "showOutline": {
+        "label": "Show outline"
       },
       "showTags": {
         "label": "Browse tags…"
       },
+      "showTasks": {
+        "label": "Show tasks"
+      },
+      "showUnlinked": {
+        "label": "Show unlinked mentions"
+      },
       "showViews": {
         "label": "Browse views…"
       },
+      "splitDown": {
+        "label": "Split pane down"
+      },
+      "splitRight": {
+        "label": "Split pane right"
+      },
       "switchWorkspace": {
         "label": "Switch workspace…"
+      },
+      "themeAmoled": {
+        "label": "Theme: AMOLED"
+      },
+      "themeDark": {
+        "label": "Theme: Dark"
+      },
+      "themeLight": {
+        "label": "Theme: Light"
+      },
+      "themeSystem": {
+        "label": "Theme: Follow system"
+      },
+      "toggleAiEnabled": {
+        "label": "Toggle AI features (beta)"
+      },
+      "toggleArchiving": {
+        "label": "Toggle note archiving"
+      },
+      "toggleDimInactive": {
+        "label": "Toggle dim inactive lines"
+      },
+      "toggleEditorFont": {
+        "label": "Toggle editor font (mono / sans)"
+      },
+      "toggleFavorite": {
+        "label": "Toggle favorite"
       },
       "toggleFocus": {
         "label": "Toggle focus mode"
@@ -701,17 +724,41 @@
       "toggleLeftSidebar": {
         "label": "Toggle notes sidebar"
       },
+      "toggleLineNumbers": {
+        "label": "Toggle line numbers"
+      },
+      "togglePreview": {
+        "label": "Toggle side-by-side preview"
+      },
       "toggleReading": {
         "label": "Toggle reading view"
       },
       "toggleRightSidebar": {
         "label": "Toggle backlinks sidebar"
       },
+      "toggleScreenCapture": {
+        "label": "Toggle screen-capture protection"
+      },
       "toggleSource": {
         "label": "Toggle source mode"
       },
+      "toggleSpellCheck": {
+        "label": "Toggle spell check"
+      },
       "toggleStackedTabs": {
         "label": "Toggle stacked tabs"
+      },
+      "toggleTimestamps": {
+        "label": "Toggle sidebar note timestamps"
+      },
+      "toggleTypewriter": {
+        "label": "Toggle typewriter scrolling"
+      },
+      "toggleVimMode": {
+        "label": "Toggle vim keyboard mode"
+      },
+      "trashNote": {
+        "label": "Move note to trash"
       },
       "unfoldAll": {
         "label": "Unfold all"
@@ -1031,6 +1078,47 @@
         "confirm": "Save"
       }
     },
+    "meeting": {
+      "ai": {
+        "cancelled": "Stopped. Nothing was added to the note.",
+        "close": "Close",
+        "discard": "Discard",
+        "failed": "The AI pass failed. The transcript is unchanged.",
+        "generate": "Generate",
+        "insert": "Insert into note",
+        "notice": "AI-generated from the transcript above. It can be wrong; the transcript is the record.",
+        "noAttribution": "The transcript does not say who spoke, so action items have no owners.",
+        "noModel": "No AI model is installed for generating text. The meeting summary needs one; download it in Settings, AI.",
+        "offer": "Meeting saved. Summarize it with AI?",
+        "offerAction": "Summarize",
+        "openSettings": "Open AI settings",
+        "pickIntro": "Choose what to generate from the transcript.",
+        "progress": "Part {{done}} of {{total}}",
+        "reviewIntro": "Review before inserting. The transcript stays as it is.",
+        "running": "Generating…",
+        "section": {
+          "actionItems": "Action items",
+          "decisions": "Decisions",
+          "openQuestions": "Open questions",
+          "summary": "Summary"
+        },
+        "stop": "Stop",
+        "title": "Meeting AI"
+      },
+      "barAria": "Meeting session",
+      "cancel": "Cancel",
+      "chunksMissing": "Part of the meeting did not transfer, so the note has a gap. The audio that arrived is still there.",
+      "clipFailed": "A part of the meeting could not be saved. The rest is still in the note.",
+      "machineNotice": "This is a machine transcript of the meeting and may contain errors.",
+      "noteTitle": "Meeting {{date}}",
+      "noteWriteFailed": "The meeting's note could not be written. The recorded audio is still in your vault as attachments.",
+      "saving": "Writing the note…",
+      "stop": "Stop",
+      "systemAudioUnavailable": "This device cannot capture system audio, so the other participants will not be in the note.",
+      "tapSilent": "The other participants' audio is not coming through. Check System Settings, Privacy & Security, Screen & System Audio Recording.",
+      "transcriptHeading": "Transcript",
+      "transcriptionFailed": "A part of the meeting could not be transcribed. The audio is still in the note."
+    },
     "callout": {
       "label": {
         "attention": "Attention",
@@ -1152,6 +1240,8 @@
       "rightPanel": {
         "aiChat": {
           "agentTurn": {
+            "honestyExpand": "Show the full note",
+            "honestyCollapse": "Shorten the note",
             "noAnswer": "The agent stopped without an answer. Try asking again, or rephrase it.",
             "newNotes_one": "{{count}} new note.",
             "newNotes_other": "{{count}} new notes.",
@@ -1163,7 +1253,8 @@
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
           "assistant": "Assistant",
-          "empty": "AI output (summaries, answers, and suggestions) appears here.",
+          "emptyTitle": "Ask about your notes",
+          "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
           "gettingReadyHint": "Preparing your notes for AI. One moment.",
@@ -1173,7 +1264,7 @@
           "newChat": "New chat",
           "noModelHint": "No AI provider is set up, so chat, summaries, rewriting and semantic search have nothing to run on. Set one up in Settings → Developer → AI.",
           "unreachableHint": "The provider you set up is not answering. Check that it is running, then send again.",
-          "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run.",
+          "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run. No setting will change that — it takes a build with AI included.",
           "offHint": "Local AI is off. Turn it on in Settings → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Preparing…",
@@ -1206,6 +1297,7 @@
           "revertConfirmBody": "Notes this run changed go back to how they were before it. Notes it created stay where they are.",
           "persistWarning": "Saving to the vault failed. Your messages are still here and will be retried.",
           "memory": "Memory",
+          "focusAgent": "Open in agent tab",
           "memoryPopoverTitle": "What the assistant remembers",
           "memoryPopoverEmpty": "Nothing remembered yet.",
           "memoryPopoverDelete": "Delete",
@@ -1385,6 +1477,7 @@
       "taskQuery": "Task list",
       "time": "Time",
       "todoList": "To-do list",
+      "meeting": "Meeting session",
       "voiceNote": "Voice note",
       "wikiLink": "Wiki link",
       "remind": "Reminder"
@@ -2232,7 +2325,6 @@
       "addToFavorites": "Add to favorites",
       "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
-      "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "archiveFolder": "Archive folder",
       "archiveNote": "Archive",
       "archiveSingleError": "Couldn't archive the note.",
@@ -2243,13 +2335,12 @@
       "bulkDelete": "Delete {{count}} notes",
       "bulkDelete_one": "Delete {{count}} note",
       "bulkDelete_other": "Delete {{count}} notes",
-      "moveTo": "Move to…",
       "bulkMove": "Move {{count}} notes to…",
       "bulkMove_one": "Move {{count}} note to…",
       "bulkMove_other": "Move {{count}} notes to…",
       "caseMergeBody": "A folder named “{{name}}” already exists. These will merge. Rename one to keep them separate?",
       "color": "Color…",
-      "createFirstNote": "+ Create your first note",
+      "createFirstNote": "Create your first note",
       "createFolderNote": "Create folder note",
       "customize": "Customize…",
       "delete": "Delete",
@@ -2260,10 +2351,19 @@
       "deleteFolderWarning": "The notes move to Trash. You can restore them later.",
       "duplicate": "Duplicate",
       "editFilterTitle": "Edit filter",
-      "emptyState": "No notes yet.",
+      "emptyBody": "Notes are plain markdown, encrypted on this device before they go anywhere. Create one to start, or press the search row above to run any command.",
+      "emptyState": "No notes yet",
       "favoritesHeading": "Favorites",
       "icon": "Icon…",
+      "importNoMarkdown": "No markdown files in that drop",
+      "importedWithSkips": "Imported {{count}} · {{skipped}} skipped",
+      "importedWithSkips_one": "Imported {{count}} · {{skipped}} skipped",
+      "importedWithSkips_other": "Imported {{count}} · {{skipped}} skipped",
+      "imported_one": "Imported 1 note into this folder",
+      "imported_other": "Imported {{count}} notes into this folder",
       "mergeAnyway": "Merge anyway",
+      "moveFolderTo": "Move folder to…",
+      "moveTo": "Move to…",
       "newDrawingHere": "New drawing here",
       "newDrawingMenu": "New drawing",
       "newFolder": "New folder",
@@ -2279,9 +2379,6 @@
       "newViewTitle": "New view",
       "noteMovedToTrash": "Note moved to Trash",
       "notesHeading": "Notes",
-      "treeLabel": "Notes and folders",
-      "selectionAnnouncement": "Selected {{title}}",
-      "untitled": "Untitled",
       "notesMovedToTrash_one": "{{count}} note moved to Trash",
       "notesMovedToTrash_other": "{{count}} notes moved to Trash",
       "openArchive": "Open the archive",
@@ -2293,6 +2390,9 @@
       "removeFolderNote": "Remove folder note",
       "removeFromFavorites": "Remove from favorites",
       "rename": "Rename",
+      "renameFailed": "Couldn't save that name, so the note kept its old one.",
+      "search": "Search",
+      "selectionAnnouncement": "Selected {{title}}",
       "setAsFolderNote": "Set as folder note",
       "trash": "Trash",
       "trashBulkError": "Couldn't move the notes to Trash.",
@@ -2303,16 +2403,11 @@
       "trashConfirmTitle": "Move to Trash?",
       "trashConfirmWarning": "You can restore it from Trash later.",
       "trashSingleError": "Couldn't move the note to Trash.",
+      "treeLabel": "Notes and folders",
       "undo": "Undo",
+      "untitled": "Untitled",
       "vaultRoot": "Vault root",
-      "viewSettingsTitle": "View settings",
-      "imported_one": "Imported 1 note into this folder",
-      "imported_other": "Imported {{count}} notes into this folder",
-      "importedWithSkips": "Imported {{count}} · {{skipped}} skipped",
-      "importedWithSkips_one": "Imported {{count}} · {{skipped}} skipped",
-      "importedWithSkips_other": "Imported {{count}} · {{skipped}} skipped",
-      "importNoMarkdown": "No markdown files in that drop",
-      "moveFolderTo": "Move folder to…"
+      "viewSettingsTitle": "View settings"
     },
     "newFromTemplate": {
       "back": "Back",
@@ -2330,18 +2425,31 @@
       "untitledTemplate": "Untitled template"
     },
     "newTab": {
-      "createNote": "Create a new note",
       "createDrawing": "New drawing",
-      "noNotesMatch": "No notes match.",
+      "createFromTemplate": "From template",
+      "createNote": "New note",
+      "kindCommand": "Command",
+      "kindNote": "Note",
+      "noMatch": "Nothing matches.",
       "noNotesYet": "No notes yet.",
-      "recent": "Recent",
-      "searchAriaLabel": "Search notes to open",
-      "searchPlaceholder": "Search notes…",
+      "places": {
+        "agent": "Agent",
+        "attachments": "Attachments",
+        "graph": "Graph",
+        "tasks": "Tasks",
+        "today": "Today"
+      },
+      "placesLabel": "Go to",
+      "recent": "Jump back in",
+      "results": "Results",
+      "searchAriaLabel": "Search notes and commands",
+      "searchPlaceholder": "Search notes and commands…",
       "untitled": "Untitled"
     },
     "pane": {
       "graphTab": "Graph",
       "tasksTab": "Tasks",
+      "agentTab": "Agent",
       "loading": "Loading…",
       "untitledView": "Untitled view"
     },
@@ -2566,7 +2674,7 @@
       "viewTypeTable": "Table"
     },
     "welcome": {
-      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nWe're glad you're here. To learn more about Myne, visit https://myne.md\n",
+      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
       "title": "Welcome to Myne"
     },
     "workspace": {
@@ -2614,7 +2722,7 @@
     "createForm": {
       "checkingStrength": "Checking strength…",
       "confirmLabel": "Confirm master password",
-      "defaultEmptyCaption": "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.",
+      "defaultEmptyCaption": "Choose something you can remember. It cannot be reset.",
       "mismatch": "Passwords do not match.",
       "passwordLabel": "Master password",
       "suggestPassword": "Suggest password",
@@ -2761,7 +2869,7 @@
   },
   "restore": {
     "backLabel": "Back",
-    "cancelLabel": "Cancel",
+    "cancelLabel": "Back",
     "collision": {
       "body": "A vault from this backup already exists on this device. You can keep both: the restored copy appears as a separate vault in your vault list. Or you can restore now and then remove the existing vault from the vault list yourself. Removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens.",
       "keepBoth": "Keep both",
@@ -2866,10 +2974,23 @@
       "accentHexAria": "Accent color hex value",
       "accentLabel": "Accent color",
       "accentReset": "Reset to theme default",
+      "barCustomize": {
+        "label": "Bottom bar",
+        "helper": "Choose which indicators the bottom bar shows. Hide every one and the bar itself is removed, reclaiming the space. Drag or right-click an item on the bar to reorder it."
+      },
+      "editorFont": "Editor font",
+      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself. Open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
+      "graphSettingsLabel": "Graph appearance",
       "homeQuickActions": "Home quick actions",
+      "openGraph": "Open graph",
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
       "showEditTimesLabel": "Show edit times",
+      "showEditTimesSubtitle": "Timestamps under each note",
+      "sizeL": "L",
+      "sizeM": "M",
+      "sizeS": "S",
+      "sizeXL": "XL",
       "taskMarkerAria": "Show the task marker on task notes",
       "taskMarkerHelper": "Marks notes you have declared as tasks in the sidebar and on their tab.",
       "taskMarkerLabel": "Show task marker",
@@ -2884,16 +3005,7 @@
       "themeLabel": "Theme",
       "themeOptionAria": "{{label}} theme",
       "themeSaveError": "Couldn't save theme. Please try again.",
-      "timestampsSaveError": "Couldn't save preference. Please try again.",
-      "sizeS": "S",
-      "sizeM": "M",
-      "sizeL": "L",
-      "sizeXL": "XL",
-      "editorFont": "Editor font",
-      "showEditTimesSubtitle": "Timestamps under each note",
-      "graphSettingsLabel": "Graph appearance",
-      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself. Open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
-      "openGraph": "Open graph"
+      "timestampsSaveError": "Couldn't save preference. Please try again."
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
@@ -3015,7 +3127,8 @@
       "confirm": "Confirm",
       "delete": "Delete",
       "deleteError": "Couldn't delete that theme. Please try again.",
-      "empty": "No custom themes yet. Import a theme file to get started.",
+      "emptyTitle": "No custom themes yet",
+      "empty": "Import a theme file, or browse the gallery to find one.",
       "error": {
         "aColorFallback": "a color",
         "invalidFile": "Invalid theme file.",
@@ -3185,7 +3298,7 @@
     },
     "ribbonCustomize": {
       "add": "Add",
-      "empty": "No commands on the ribbon yet. Use Add to pin one.",
+      "empty": "Use Add to pin a command to the ribbon.",
       "errorSave": "Could not save the ribbon setting.",
       "helper": "The commands on the left ribbon, in order. Drag to reorder, add more from the command list, or remove with the ×. The rail hides commands unavailable in the current state.",
       "label": "Left ribbon",
@@ -3195,7 +3308,8 @@
       "searchPlaceholder": "Search commands…",
       "searchResultsLabel": "Matching commands",
       "showHelper": "Show the left ribbon on this device.",
-      "showLabel": "Show left ribbon"
+      "showLabel": "Show left ribbon",
+      "emptyTitle": "Nothing pinned yet"
     },
     "language": {
       "helper": "Choose the display language for the app.",
@@ -3238,6 +3352,9 @@
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
+      "meetingPromptHelper": "The instruction the meeting AI pass uses to turn a transcript into sections. Leave it empty for the built-in default. It replaces the default output format, so if you set it, ask for the sections you want yourself.",
+      "meetingPromptLabel": "Meeting summary prompt",
+      "meetingPromptReset": "Reset to default",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
@@ -3354,7 +3471,8 @@
     "memory": {
       "heading": "What the assistant remembers",
       "helper": "Facts the AI learned from working with you. It writes them itself (at most one per run); you see and can correct every one. Entries sync to your other devices and stay encrypted.",
-      "empty": "Nothing remembered yet. Entries appear here when the assistant learns something during a run.",
+      "emptyTitle": "Nothing remembered yet",
+      "empty": "Entries appear here when the assistant learns something during a run.",
       "editLabel": "Edit",
       "deleteLabel": "Delete",
       "save": "Save",
@@ -3449,7 +3567,14 @@
       "autoLock30m": "30m",
       "autoLock1h": "1h",
       "quickUnlockSubtitleAndroid": "Re-enter with a PIN after auto-lock",
-      "quickUnlockSubtitle": "Re-enter with {{method}} or a PIN after auto-lock"
+      "quickUnlockSubtitle": "Re-enter with {{method}} or a PIN after auto-lock",
+      "recoveryDrillCheck": "Check phrase",
+      "recoveryDrillChecking": "Checking…",
+      "recoveryDrillError": "Couldn't run the check just now. Nothing changed. Try again in a moment.",
+      "recoveryDrillHelper": "Type the 24 words you wrote down. Myne checks whether they still open this vault and tells you nothing else — the words are never shown here.",
+      "recoveryDrillLabel": "Check your recovery phrase",
+      "recoveryDrillPassed": "These words open this vault. Keep them where you found them.",
+      "recoveryDrillPlaceholder": "The 24 words, in order, separated by spaces"
     },
     "quickUnlock": {
       "errorBiometricAuthFailed": "Touch ID couldn't be set up. Make sure a fingerprint is enrolled in System Settings, or use a PIN instead.",
@@ -3641,11 +3766,12 @@
     "search": {
       "placeholder": "Search settings…",
       "ariaLabel": "Search settings",
-      "empty": "No settings match “{{query}}”.",
+      "empty": "No settings match “{{query}}”",
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
+        "aiMeetingPrompt": "meeting summary prompt instruction custom transcript action items decisions",
         "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
         "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
@@ -3685,7 +3811,9 @@
         "newNoteLocation": "new note location folder default where notes created",
         "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
+        "recoveryDrill": "recovery phrase check verify drill test 24 words seed backup lost password",
         "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
+        "bar": "bottom bar status bar indicators customize reorder hide show toolbar",
         "ribbon": "left ribbon rail pin pins command commands customize reorder unpin toolbar shortcuts",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "screenCaptureOverride": "screen capture override allow disable magnifier remote desktop accessibility unlock screen black",
@@ -3716,7 +3844,8 @@
         "timezone": "timezone time zone tz utc iana region today",
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
         "syncMembers": "members, share, invite, team, collaboration, vault"
-      }
+      },
+      "emptyBody": "Try a shorter word, or the name of a panel."
     },
     "dateTime": {
       "dateLabel": "Date format",
@@ -3797,14 +3926,15 @@
       "compareTheirs": "Conflicting copy",
       "compareTitle": "Comparing “{{title}}”",
       "discard": "Discard",
-      "empty": "No conflicts. Your devices are in sync.",
+      "empty": "Your devices are in sync.",
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",
       "groupTitle_other": "{{count}} conflicting copies of {{original}}",
       "keepAsSeparate": "Keep as separate",
       "tookTheirsToast": "Local version moved to Trash.",
       "tookTheirsUndo": "Undo",
       "untitled": "Untitled ({{hex}})",
-      "useThisVersion": "Use this version"
+      "useThisVersion": "Use this version",
+      "emptyTitle": "No conflicts"
     },
     "deviceJoinQr": {
       "accountLabel": "Account number",
@@ -3822,7 +3952,7 @@
       "awaitingApproval_one": "{{count}} device awaiting approval",
       "awaitingApproval_other": "{{count}} devices awaiting approval",
       "loading": "Loading…",
-      "noDevices": "No devices synced yet.",
+      "noDevices": "No other devices yet",
       "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
       "platform": {
         "android": "Android phone",
@@ -3846,15 +3976,12 @@
       "syncedHere": "Synced here",
       "thisDevice": "This device",
       "reasonUnreachable": "the server didn’t answer",
-      "reasonTls": "the server’s HTTPS certificate could not be verified",
       "reasonUnexpected": "an unexpected error",
       "reasonRejected": "the server rejected this device’s sign-in",
       "reasonFrozen": "the account is frozen",
       "reasonDeviceLimit": "the account is at its device limit",
       "reasonAwaitingApproval": "this device is still waiting to be approved",
       "reasonNotConfigured": "no sync server is configured",
-      "tlsFailure": "The sync server’s HTTPS certificate could not be verified.",
-      "tlsFailureHint": "Check the server address, certificate validity and CA trust. Myne will reconnect when the server presents a valid certificate.",
       "transportHint": "If the server moved, enter its new address under “Sync server” above. Check that its HTTPS certificate is valid.",
       "unreachable": "Couldn’t reach sync ({{error}}).",
       "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they’re on your account. If it doesn’t, remove the device.",
@@ -3865,7 +3992,11 @@
       "verifySyncing": "Syncing…",
       "verifyTitle": "Verify the new device",
       "verifyAction": "Compare code",
-      "yourDevices": "Your devices"
+      "yourDevices": "Your devices",
+      "noDevicesBody": "Devices you add to this account appear here, with the date each last synced.",
+      "reasonTls": "the server’s HTTPS certificate could not be verified",
+      "tlsFailure": "The sync server’s HTTPS certificate could not be verified.",
+      "tlsFailureHint": "Check the server address, certificate validity and CA trust. Myne will reconnect when the server presents a valid certificate."
     },
     "members": {
       "title": "Members & Security",
@@ -3879,17 +4010,20 @@
       "connected": "Connected",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedPlatformTrust": "Connected over TLS. The certificate and server name were verified.",
-      "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
-      "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
       "connecting": "Connecting…",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here: the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
       "pinPlatformTrust": "Server certificate verified by this client’s trust store.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Couldn’t reach that server. Check the URL and that it’s running.",
+      "copyFingerprint": "Copy fingerprint",
+      "fingerprintCopied": "Fingerprint copied.",
+      "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand.",
+      "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
+      "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
       "inviteLabel": "Invite code (only if this server asks for one)",
       "invitePlaceholder": "The code the server’s operator gave you",
-      "changeInviteCode": "Change invite code",
-      "unreachable": "Couldn’t reach that server. Check the URL and that it’s running."
+      "changeInviteCode": "Change invite code"
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -3922,23 +4056,33 @@
     },
     "join": {
       "accountLabel": "Account number",
+      "backToWaiting": "Back to waiting",
       "cancel": "Cancel",
       "error": "Couldn’t add this device. Check the server URL, account number, and password, and that the server is reachable.",
+      "errorPhrase": "Couldn’t add this device. Check the server URL, account number, and recovery phrase, and that the server is reachable.",
       "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
+      "modePassword": "My password",
+      "modePhrase": "My recovery phrase",
+      "noDeviceBody": "No other device to approve this one? You can confirm with your recovery phrase instead.",
       "passwordLabel": "Password",
-      "serverLabel": "Sync server",
-      "serverPlaceholder": "https://your-server.example",
+      "phraseEscapeBody": "Your recovery phrase is the full key to this account, so it confirms this device without approval from another device. You keep the password you just used.",
+      "phraseTitle": "Confirm with your recovery phrase",
+      "phraseWarning": "Your recovery phrase is the full key to this account, so this device is added without approval from another device. Use it only if you have no other device to approve from. You will set a new password next.",
+      "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted.",
       "sasMatch": "They match, continue",
       "sasMismatch": "They don’t match, remove this device",
+      "serverLabel": "Sync server",
+      "serverPlaceholder": "https://your-server.example",
       "submit": "Add device",
       "submitting": "Adding…",
       "title": "Add this device to an account",
+      "usePhrase": "Use my recovery phrase",
       "verifyBody": "Check that this code matches the one on the device you approved from.",
       "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifyTitle": "Verify this device",
       "waitingHint": "Keep this window open. Once approved, a verification code appears here to compare with your other device.",
       "waitingTitle": "Waiting for approval",
-      "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted."
+      "back": "Back"
     },
     "panel": {
       "addDevice": {
@@ -3961,7 +4105,7 @@
         "deleteConfirmTitle": "Delete this recovered note?",
         "deleteConfirmWarning": "This permanently deletes the only copy kept on this device. This cannot be undone.",
         "deleteCta": "Delete",
-        "empty": "No recovered notes.",
+        "empty": "No recovered notes",
         "errorGeneric": "Something went wrong. Try again.",
         "helper": "When a note deleted on another device is removed here, its encrypted copy is kept on this device. Restore one as a new note, or delete it permanently.",
         "label": "Recovered notes",
@@ -4006,9 +4150,7 @@
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen: uploads paused",
-      "errorIdentityLocked": "Unlock your identity to sync",
       "errorDeviceRevoked": "This device was removed from your account",
-      "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "errorStorageFull": "Storage full: syncing paused",
       "errorQuota": "Storage full: uploads paused",
       "errorRateLimited": "Sync throttled: retrying",
@@ -4019,6 +4161,8 @@
       "synced": "Synced",
       "syncing": "Syncing…",
       "syncNow": "Sync now",
+      "errorIdentityLocked": "Unlock your identity to sync",
+      "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "unlockIdentityCta": "Unlock identity"
     },
     "usage": {
@@ -4051,8 +4195,8 @@
       "transportError": "Couldn't reach the sync server. Check the server address and its HTTPS certificate.",
       "retiredSelf": "This device was removed from another device.",
       "resetAndAddAgain": "Reset and add again",
-      "noDevices": "No devices yet.",
-      "syncingHere": "Syncing here"
+      "syncingHere": "Syncing here",
+      "noDevices": "No devices yet."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict needs review",
@@ -4069,7 +4213,7 @@
       "loading": "Loading members…",
       "error": "Could not read the vault roster.",
       "hint": "Members of this vault. Each joins with their own identity and credentials.",
-      "empty": "No members yet. Inviting someone is the next step.",
+      "empty": "Invite someone to share this vault. They join with their own identity.",
       "rotated": "Key rotated",
       "keyChanged": "Key changed. Verify with the owner.",
       "relinkConfirmed": "Relink confirmed by owner",
@@ -4087,12 +4231,8 @@
       "invitationClaimed": "Accepted",
       "invitationPending": "Not accepted yet",
       "invitationsFailed": "Could not load your invitations.",
-      "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
-      "shareConfirmTitle": "Share this vault?",
-      "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
-      "shareConfirmCta": "Share and invite",
-      "shareFailed": "Could not start sharing this vault.",
       "title": "Vault members",
+      "personHint": "Unlock it with your identity's recovery phrase to invite or manage members.",
       "identityHeading": "Your identity",
       "membersHeading": "Members",
       "personUnlock": "Unlock member identity",
@@ -4101,12 +4241,6 @@
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
       "personLock": "Lock member identity",
       "personError": "That phrase did not open a member identity.",
-      "identityForgetCta": "Forget this identity on this device",
-      "identityForgetCheckbox": "I understand this identity will be removed from this device.",
-      "identityForgetConfirm": "Forget identity",
-      "identityForgetCancel": "Keep it",
-      "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
-      "identityForgetError": "Could not forget the identity. Try again.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
       "inviteCodeLabel": "Member identity code",
       "inspect": "Check fingerprint",
@@ -4118,7 +4252,22 @@
       "mldsaLabel": "ML-DSA public key",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
-      "removeFailed": "The member could not be removed."
+      "removeFailed": "The member could not be removed.",
+      "emptyTitle": "No members yet",
+      "personLockedTitle": "Member identity locked",
+      "personUnlockOpen": "Unlock",
+      "personUnlockCancel": "Cancel",
+      "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
+      "shareConfirmTitle": "Share this vault?",
+      "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
+      "shareConfirmCta": "Share and invite",
+      "shareFailed": "Could not start sharing this vault.",
+      "identityForgetCta": "Forget this identity on this device",
+      "identityForgetCheckbox": "I understand this identity will be removed from this device.",
+      "identityForgetConfirm": "Forget identity",
+      "identityForgetCancel": "Keep it",
+      "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
+      "identityForgetError": "Could not forget the identity. Try again."
     }
   },
   "tasks": {
@@ -4336,7 +4485,9 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Unlock with PIN",
       "unlockWithTouchId": "Unlock with Touch ID",
-      "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
+      "wrongCredential": "Incorrect. {{remaining}} attempt(s) left.",
+      "showPin": "Show PIN",
+      "hidePin": "Hide PIN"
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
     "recoveryInterruptedBody": "Set a new password first, then re-seal your vault.",
@@ -4350,7 +4501,8 @@
       "lockedDuringChange": "Password change cancelled: vault was locked.",
       "metaChangedExternally": "Vault was modified in another session. Please unlock again."
     },
-    "title": "Unlock your vault.",
+    "title": "Unlock your vault",
+    "titleNamed": "Unlock {{vault}}",
     "vaultUnreadable": "Vault file is unreadable. Restore from a backup.",
     "unlockFailedGeneric": "Couldn't unlock. Please try again.",
     "biometricTooManyAttempts": "Too many {{biometric}} attempts. Use your password.",
@@ -4387,28 +4539,10 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "ackLabel": "I have saved my account number where I can find it later.",
-      "back": "Back",
-      "commit": "Create vault",
-      "committing": "Saving…",
-      "copied": "Copied",
-      "copy": "Copy",
-      "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
-      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-      "eyebrow": "Step 4 of 4: account number",
-      "heading": "Save your account number.",
-      "intro": "This is your bearer token. Treat it like cash.",
-      "saveAsFile": "Save as file",
-      "saveFailed": "Couldn't save the file. Copy the number instead, or write it down.",
-      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read.",
-      "shownOnceBody": "Save it now. Myne cannot recover it for you. Required to register for sync later.",
-      "shownOnceEmphasis": "This is shown only once."
-    },
     "briefing": {
       "back": "Back",
       "continue": "Continue to vault creation",
-      "eyebrow": "Before you create your vault",
+      "eyebrow": "New vault",
       "heading": "Before you create your vault",
       "intro": "Myne encrypts your notes so that only you can open them. Three things follow from that. Read them, then continue.",
       "statements": {
@@ -4432,22 +4566,18 @@
     },
     "confirm": {
       "back": "Back",
-      "continue": "Continue",
-      "eyebrow": "Step 3 of 4: confirm phrase",
-      "heading": "Type back four words from your phrase.",
-      "intro": "We'll ask for specific positions to verify you saved it.",
-      "mismatch": "Doesn't match word #{{pos}}.",
-      "wordAtPosition": "Word at position {{pos}}"
+      "commit": "Create vault",
+      "committing": "Saving…",
+      "eyebrowLabel": "Confirm phrase",
+      "heading": "Confirm your recovery phrase",
+      "intro": "Type the words at these four positions, to check you saved them.",
+      "mismatch": "Doesn't match word {{pos}}.",
+      "wordAtPosition": "Word {{pos}}"
     },
     "encrypting": {
       "caption": "This takes a moment.",
       "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
       "heading": "Encrypting your vault"
-    },
-    "provisioning": {
-      "heading": "Creating your account",
-      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
-      "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "errors": {
       "accountNumberInvalid": {
@@ -4523,6 +4653,34 @@
         "body": "Try again with less content."
       }
     },
+    "kit": {
+      "accountFor": "Account number — when you add another device",
+      "back": "Back",
+      "continue": "I've saved this, confirm phrase",
+      "copied": "The kit is on your clipboard. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
+      "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the kit stays on it until you copy something else.",
+      "copy": "Copy",
+      "copyFailed": "Couldn't copy. Use “Save recovery kit” instead.",
+      "documentTitle": "Myne recovery kit",
+      "downloadStarted": "Sent to your browser's downloads. Check the kit arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
+      "eyebrowLabel": "Recovery kit",
+      "heading": "Save your recovery kit",
+      "intro": "The file you are about to save is exactly this. It is shown once.",
+      "phraseFor": "Recovery phrase — if you forget your password",
+      "save": "Save recovery kit",
+      "saveFailed": "Couldn't save the file. Copy the kit instead, or write both parts down.",
+      "savedToFile": "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read.",
+      "whyEnglish": "The words are English in every language. They are part of the BIP-39 standard, so any Myne client can read a phrase written by any other one. Do not translate them: translated words are not in the wordlist, and the phrase would stop working."
+    },
+    "name": {
+      "back": "Back",
+      "continue": "Continue",
+      "eyebrowLabel": "Name your vault",
+      "heading": "What should we call this vault?",
+      "helper": "The name is stored encrypted with the vault. On this device it is shown on the startup vault picker before you unlock, so anyone who can see that screen can read it; hide vault names in Settings to turn that off. You can change it later.",
+      "intro": "You will see this name on the lock screen and in your vault list.",
+      "placeholder": "Personal"
+    },
     "orchestrator": {
       "closePrompt": {
         "cancelLabel": "Cancel",
@@ -4541,45 +4699,46 @@
     },
     "password": {
       "back": "Back",
-      "eyebrow": "Step 1 of 4: master password",
-      "heading": "Create vault",
+      "eyebrowLabel": "Master password",
+      "heading": "Choose a master password",
       "helperLead": "Myne does not store your password or recovery phrase.",
       "submit": "Generate recovery phrase"
     },
     "phrase": {
-      "back": "Back",
       "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
-      "continue": "I've saved this, confirm phrase",
       "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the words stay on it until you copy something else.",
       "copy": "Copy",
-      "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
-      "eyebrow": "Step 2 of 4: recovery phrase",
-      "heading": "Write down these 24 words.",
-      "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline: paper, password manager, hardware wallet. Treat it like cash.",
+      "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "reveal": "Reveal phrase",
       "saveAsFile": "Save as file",
       "saveFailed": "Couldn't save the file. Copy the words instead, or write them down.",
       "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read."
     },
+    "provisioning": {
+      "heading": "Creating your account",
+      "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
+      "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
+    },
     "ready": {
-      "backedUp": "Backed up ✓",
+      "backedUp": "Backed up",
       "backingUp": "Backing up…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Backup didn't complete. No file was left behind. You can back up any time from Settings → Storage.",
       "backupFilterName": "Myne backup",
-      "backUpNow": "Back up this vault now",
-      "body": "Myne wrote your vault to your application data folder. Your master password and recovery phrase are the only way back in. Make sure both are saved somewhere safe.",
+      "backUpNow": "Back up now",
+      "body": "Your notes are encrypted and stored on this device. Keep your password and recovery kit somewhere safe: they are the only way back in.",
       "decrypting": "Decrypting…",
-      "done": "Done",
-      "heading": "Your vault is ready.",
+      "done": "Open vault",
+      "heading": "Your vault is ready",
       "showFolder": "Show vault folder"
     },
     "sessionLost": {
       "startOver": "Start over"
-    }
+    },
+    "stepIndicator": "Step {{n}} of {{total}} · {{label}}"
   },
   "vaultPicker": {
     "accountFallback": "Account",
@@ -4601,7 +4760,10 @@
     "renameCancel": "Cancel",
     "renamePlaceholder": "Account name",
     "renameSave": "Rename",
-    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed.",
+    "createShort": "New vault",
+    "joinShort": "Add device",
+    "restoreShort": "Restore backup"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4670,13 +4832,19 @@
       "heading": "Choose a sync server",
       "chooseHeading": "Where should your notes sync?",
       "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "myneSync": "Use Myne Sync",
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
+      "connecting": "Connecting…",
+      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
       "selfHosted": "Use my own server",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
-      "continue": "Continue"
+      "continue": "Continue",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "Your own server",
+      "selfHostedHint": "A sync server you run. You enter its address on the next screen.",
+      "connectAction": "Connect",
+      "setUpAction": "Set up"
     }
   },
   "identityFlow": {
@@ -4727,12 +4895,9 @@
     }
   },
   "identitySetup": {
-    "changeServer": "Change or verify sync server",
-    "createCta": "Create an identity",
     "doneCta": "Done",
     "error": "Could not set up the identity. Try again.",
     "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
-    "errorTlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address and its certificate.",
     "errorNotConfigured": "Could not set up the identity. Check that a sync server is configured, then try again.",
     "forgetCancel": "Keep it",
     "forgetConfirm": "Forget and create new",
@@ -4743,9 +4908,17 @@
     "pending": "This device is waiting for another device on the account to approve it.",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
     "recoverCta": "Recover an identity",
-    "recoverIntro": "Already have an identity? Enter its 24-word recovery phrase.",
+    "recoverIntro": "Identity recovery phrase",
     "recovered": "Identity recovered.",
-    "title": "Identity only"
+    "title": "Create an identity",
+    "newTitle": "A new identity",
+    "createAction": "Create",
+    "recoverTitle": "I already have one",
+    "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
+    "recoverAction": "Recover",
+    "back": "Back",
+    "changeServer": "Change or verify sync server",
+    "errorTlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address and its certificate."
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -4774,24 +4947,20 @@
     "acceptErrorTransport": "Could not reach the sync server. Check your connection and try again.",
     "acceptErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
     "acceptInvalid": "That is not a valid owner identity code.",
+    "shareCodeHeading": "Your invite code",
+    "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",
+    "title": "Your identity",
     "forgetCancel": "Keep it",
     "forgetCheckbox": "I understand this identity will be removed from this device.",
     "forgetConfirm": "Forget identity",
     "forgetCta": "Forget this identity on this device",
     "forgetError": "Could not forget the identity. Try again.",
-    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it.",
-    "shareCodeHeading": "Your invite code",
-    "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",
-    "title": "Your identity"
+    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it."
   },
   "welcome": {
     "startIdentity": "Create an identity",
     "startLocal": "Create a local vault instead",
     "createCta": "Create new vault",
-    "headlineLine1": "Encrypted markdown notes.",
-    "headlineLine2": "No email at signup.",
-    "identityCta": "Create an identity only",
-    "joinCta": "Add this device to an account",
     "repairResidue": {
       "cancel": "Cancel",
       "cleaningUp": "Cleaning up…",
@@ -4811,8 +4980,6 @@
       "partialBody_other": "{{count}} files may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
       "partialTitle": "Some files couldn't be removed"
     },
-    "restoreCta": "Restore from backup",
-    "subtitle": "Your notes are encrypted on this device before they leave it. The server only stores ciphertext.",
     "repairCleanedUp_one": "Cleaned up {{count}} leftover file.",
     "repairCleanedUp_other": "Cleaned up {{count}} leftover files.",
     "repairFailed": "Couldn't finish cleaning up. Please try again.",
@@ -4823,7 +4990,20 @@
     "residueBanner": "Leftover files from an interrupted delete ({{n}}). Clean them up before creating a vault.",
     "cleanUpFiles": "Clean up leftover files",
     "create": "Create a vault",
-    "connect": "Connect to my account"
+    "connect": "Connect to my account",
+    "tagline": "Encrypted markdown notes. No email at signup.",
+    "identityTitle": "Create an identity",
+    "identityBody": "One identity for all your vaults, so people can invite you. Needs a sync server.",
+    "localTitle": "Create a local vault",
+    "localBody": "An encrypted vault on this device. Add sync or an identity later.",
+    "restoreTitle": "Restore from backup",
+    "restoreBody": "Open a .myne-backup file you saved earlier.",
+    "joinTitle": "Add this device to an account",
+    "joinBody": "Use a vault you already have on another device.",
+    "createAction": "Create",
+    "restoreAction": "Restore",
+    "joinAction": "Add device",
+    "version": "Version {{version}} · pre-alpha"
   },
   "wikiGraph": {
     "canvasLabel": "Knowledge graph of {{count}} notes",

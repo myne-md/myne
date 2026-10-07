@@ -131,6 +131,11 @@ export const BACKUP_SCHEDULE_FAILED_TOAST =
 // while mobile imported it zero times and nothing failed if one side was edited
 // alone.
 export {
+  // The recovery drill's failure sentence (myne-md/myne#468). In `@myne/copy`
+  // rather than hand-copied into each client's file, which is the lesson of
+  // myne-md/myne#474: both clients render it, so byte identity has to be a
+  // property of construction and not of somebody remembering.
+  RECOVERY_DRILL_FAILED_SENTENCE,
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
   SYNC_INTEGRITY_ALERT,

@@ -20,6 +20,7 @@
 interface JoinDeviceModalProps {
   onCancel: () => void;
   onJoined: (vaultId: string) => void;
+  onRecovering: () => void;
 }
 
 export function JoinDeviceModal(_props: JoinDeviceModalProps) {

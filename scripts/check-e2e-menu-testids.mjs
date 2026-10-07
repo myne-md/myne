@@ -10,8 +10,10 @@
 // "is the sidebar mounted yet" anchor — an anchor that had stopped being one.
 //
 // The rule: a testid rendered only inside `notes.new-menu-dropdown` may be
-// referenced ONLY through `clickNewMenuItem`, which opens the menu first (and
-// checks it is not already open, since clicking `+` while open toggles it shut).
+// referenced ONLY through the opening helper. That dropdown no longer exists —
+// the three create actions are direct icon buttons again — so `MENU_ONLY` is
+// empty and this rule currently has no subjects. See its comment for why the
+// machinery is kept rather than deleted.
 //
 // SECOND RULE, same failure one menu over (myne#611). The four export formats
 // moved behind a single `Export…` row with a submenu, and their leaf ids did NOT
@@ -22,7 +24,7 @@
 // or `data-action` VALUE, so the roster is keyed on the value instead.
 //
 // It is also FILE-scoped rather than line-scoped, and that is a deliberate
-// weakening. `clickNewMenuItem` takes the testid as an argument, so the helper
+// weakening. the helper takes the testid as an argument, so the helper
 // and the id sit on one line and a line check is exact. The submenu helper takes
 // a format and returns the row, so the id and the helper are lines apart, and a
 // line rule would fire on the file that legitimately drives the submenu. What
@@ -59,16 +61,49 @@ const scanAt = process.argv.indexOf("--scan");
 const ROOT = scanAt === -1 ? REPO : process.argv[scanAt + 1];
 
 /** Testids that render only while the sidebar's `+` menu is open. */
-const MENU_ONLY = [
-  "notes.create",
-  "notes.new-folder",
-  "notes.create-drawing",
-  // myne#282 — "New drawing" joined the `+` menu.
-  "notes.new-drawing",
-];
+/**
+ * Testids that render ONLY inside an open `+` dropdown.
+ *
+ * EMPTY, and deliberately so rather than deleted. #230 folded the sidebar's
+ * loose new-note and new-folder buttons into one `+` menu, which is what this
+ * rule was written for; #282 then added a fourth row. The epic that made the
+ * sidebar's search row put the three create actions back as direct icon
+ * buttons, so none of those ids is behind a menu any more — and a scenario
+ * reaching `byTestId("notes.create")` directly is now the CORRECT pattern, not
+ * a violation. Leaving them listed would forbid it.
+ *
+ * The list stays because the failure it guards is a UI shape, not a moment: the
+ * create actions have already been loose buttons, then a menu, and now buttons
+ * again. If they go behind a menu a third time, the ids go back here in the
+ * same change — and the rule below starts working again with no other edit.
+ *
+ * Rule 2 (`SUBMENU_ONLY`, the export formats) carries the guard meanwhile.
+ */
+const MENU_ONLY = [];
 
-/** The one helper allowed to name them — it opens the menu first. */
-const HELPER = "clickNewMenuItem";
+/**
+ * `--menu-only <a,b>`: run rule 1 against THIS roster instead of the empty one.
+ *
+ * A second test seam beside `--scan`, and it exists for the same reason the
+ * first does — except this one is about the rule staying TESTED rather than the
+ * tree staying untouched. With the production roster empty, rule 1 has no
+ * subjects, so its spec could only assert that nothing happens; injecting the
+ * defect it is supposed to catch would pass, which is the vacuous shape this
+ * repository keeps finding in its own tests.
+ *
+ * With the seam, the rule's logic stays under test through the whole period it
+ * has no production subjects — so when the create actions go behind a menu a
+ * third time and the ids come back, the machinery is known to work rather than
+ * hoped to.
+ */
+const menuOnlyAt = process.argv.indexOf("--menu-only");
+const MENU_ONLY_EFFECTIVE =
+  menuOnlyAt !== -1 && process.argv[menuOnlyAt + 1] !== undefined
+    ? process.argv[menuOnlyAt + 1].split(",").filter((x) => x.length > 0)
+    : MENU_ONLY;
+
+/** The one helper allowed to name them — it would open the menu first. */
+const HELPER = "clickNewItem";
 
 /** Row discriminator VALUES that render only inside an open SUBMENU, and the
  *  helper that opens it. A file naming one of these must mention that helper. */
@@ -109,7 +144,7 @@ for (const tree of TREES) {
     src.split("\n").forEach((line, i) => {
       // The helper's own definition names them as a parameter, not a literal.
       if (line.includes(HELPER)) return;
-      for (const id of MENU_ONLY) {
+      for (const id of MENU_ONLY_EFFECTIVE) {
         // `byTestId("x")` / `byTestIdAll("x")` / `testIdSelector("x")` — the
         // three ways a scenario reaches for an element by testid.
         const re = new RegExp(`(byTestId|byTestIdAll|testIdSelector)\\(\\s*"${id.replace(".", "\\.")}"`);
@@ -163,7 +198,7 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `e2e-menu-testid: ok (${MENU_ONLY.length} menu-only testid(s) through ${HELPER}; ` +
+  `e2e-menu-testid: ok (${MENU_ONLY_EFFECTIVE.length} menu-only testid(s) through ${HELPER}; ` +
     `${SUBMENU_ONLY.reduce((n, g) => n + g.values.length, 0)} submenu row value(s) through ` +
     `${SUBMENU_ONLY.map((g) => g.helper).join(", ")})`,
 );

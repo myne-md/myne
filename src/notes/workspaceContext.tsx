@@ -46,6 +46,11 @@ import {
   focusedLeaf,
   graphItem,
   tasksItem,
+  attachmentsItem,
+  templatesItem,
+  agentItem,
+  agentViewToPersisted,
+  AGENT_TAB_ID,
   listSlots,
   noteItem,
   openInFocusedTab,
@@ -59,6 +64,7 @@ import {
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
   setTaskViewState as setTaskViewStateOp,
+  setAgentViewState as setAgentViewStateOp,
   resolveTaskView,
   taskViewToPersisted,
   splitPane,
@@ -74,6 +80,7 @@ import {
   type PaneId,
   type SplitDirection,
   type ViewId,
+  type PersistedAgentView,
   type WorkspaceItem,
   type WorkspaceNode,
   type WorkspaceSlot,
@@ -297,6 +304,10 @@ export type WorkspaceApi = {
   /** Open (or reveal) the vault-wide task list - a singleton tab, like the
    *  graph, so calling twice reveals rather than duplicating (MYND-616). */
   openTasks: () => void;
+  /** Open (or reveal) the attachment-library tab (myne-md/myne#773). */
+  openAttachments: () => void;
+  /** Open (or reveal) the template-library tab (myne-md/myne#779). */
+  openTemplates: () => void;
   /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
   setTaskViewState: (paneId: PaneId, next: TaskView) => void;
@@ -307,6 +318,18 @@ export type WorkspaceApi = {
    *  written before the container-level field existed, where the panel falls
    *  back to the tab's own persisted view (myne-md/myne#656 review). */
   taskViewIsSet: boolean;
+  /** Open (or reveal) the agent hub - a singleton tab like the graph and the
+   *  task list, born on its Hub view (myne-md/myne#771). */
+  openAgent: () => void;
+  /** Open (or reveal) the agent tab on a note, in its Focus view. Without a
+   *  note id the focused pane's open note is used. */
+  openAgentOnNote: (noteId?: NoteId) => void;
+  /** Persist the agent tab's view (Hub or Focus, and which note) WITH the tab.
+   *  Session state, per tab, never a preference. */
+  setAgentViewState: (paneId: PaneId, next: PersistedAgentView) => void;
+  /** The focused pane's open note id, or `null`. The agent tab's Focus view and
+   *  the "open agent on note" verb both need it. */
+  focusedNoteId: NoteId | null;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -627,24 +650,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setPending],
   );
-  const openGraph = useCallback(() => {
-    const wasPending = pendingRef.current;
-    setPending(null);
-    setState((s) =>
-      wasPending !== null && wasPending === s.focusedPaneId
-        ? openInNewTab(s, graphItem())
-        : openInFocusedTab(s, graphItem()),
-    );
-  }, [setPending]);
-  const openTasks = useCallback(() => {
-    const wasPending = pendingRef.current;
-    setPending(null);
-    setState((s) =>
-      wasPending !== null && wasPending === s.focusedPaneId
-        ? openInNewTab(s, tasksItem())
-        : openInFocusedTab(s, tasksItem()),
-    );
-  }, [setPending]);
+  /**
+   * Open (or reveal) a SINGLETON tab. One implementation for every singleton
+   * kind — the graph, the task list, the attachment library — because they were
+   * three byte-identical copies differing only in which item they built
+   * (myne-md/myne#773). The duplicate-forbid invariant does the "reveal, never a
+   * second tab" half; what this owns is the pending-new-tab case, where the user
+   * opened the "+" chooser and picking a surface must fill THAT tab rather than
+   * replacing whatever was focused behind it.
+   */
+  const openSingleton = useCallback(
+    (item: WorkspaceItem) => {
+      const wasPending = pendingRef.current;
+      setPending(null);
+      setState((s) =>
+        wasPending !== null && wasPending === s.focusedPaneId
+          ? openInNewTab(s, item)
+          : openInFocusedTab(s, item),
+      );
+    },
+    [setPending],
+  );
+  const openGraph = useCallback(() => openSingleton(graphItem()), [openSingleton]);
+  const openTasks = useCallback(() => openSingleton(tasksItem()), [openSingleton]);
+  const openAttachments = useCallback(
+    () => openSingleton(attachmentsItem()),
+    [openSingleton],
+  );
+  const openTemplates = useCallback(
+    () => openSingleton(templatesItem()),
+    [openSingleton],
+  );
   const setTaskViewState = useCallback(
     (paneId: PaneId, next: TaskView) => {
       setState((s) => setTaskViewStateOp(s, paneId, next));
@@ -653,6 +689,54 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setContainer((c) => ({ ...c, taskView: taskViewToPersisted(next) }));
     },
     [setContainer],
+  );
+  // ── the agent tab (myne-md/myne#771) ──────────────────────────────────────
+  // The reveal, born on the Hub. A singleton like the graph and the task list,
+  // so a second call reveals rather than duplicating. The PENDING VIEW is applied
+  // here (rather than left in a module slot) because this is where the item is
+  // built: the tab is born carrying the view the caller asked for.
+  const openAgentInternal = useCallback(
+    (view: PersistedAgentView | null) => {
+      const wasPending = pendingRef.current;
+      setPending(null);
+      setState((s) => {
+        // `agentViewToPersisted` decides whether there is anything to carry, so
+        // the omit-when-default rule lives in ONE place rather than being
+        // re-derived from a discriminator here. It returned `undefined` for
+        // everything but a Focus-with-a-note when the tab had two views; now it
+        // returns `undefined` only for a genuinely empty selection.
+        const persisted = view === null ? undefined : agentViewToPersisted(view);
+        const item: WorkspaceItem = persisted === undefined
+          ? agentItem()
+          : { kind: "agent", id: AGENT_TAB_ID, agentView: persisted };
+        return wasPending !== null && wasPending === s.focusedPaneId
+          ? openInNewTab(s, item)
+          : openInFocusedTab(s, item);
+      });
+    },
+    [setPending],
+  );
+  const openAgent = useCallback(() => openAgentInternal(null), [openAgentInternal]);
+  const openAgentOnNote = useCallback(
+    (noteId?: NoteId) => {
+      // The caller (a palette action) passes the open note from its own
+      // `CommandContext`. A call with no note still opens the tab — a
+      // conversation about the vault rather than one note is a normal state
+      // since the two views became one screen, and refusing here used to send
+      // the user to a list with no way onward.
+      if (noteId === undefined || noteId === "") {
+        openAgentInternal(null);
+        return;
+      }
+      openAgentInternal({ noteId });
+    },
+    [openAgentInternal],
+  );
+  const setAgentViewState = useCallback(
+    (paneId: PaneId, next: PersistedAgentView) => {
+      setState((s) => setAgentViewStateOp(s, paneId, next));
+    },
+    [],
   );
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
@@ -848,6 +932,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
+  // The focused pane's open note, or `null`. The agent tab's Focus view and the
+  // "open agent on note" verb both read it (myne-md/myne#771).
+  const focusedNoteId: NoteId | null =
+    focused.activeTab !== null && focused.activeTab.kind === "note"
+      ? focused.activeTab.id
+      : null;
   // Stable identity for the staging-effect dep in Editor.tsx: resolveTaskView
   // builds a fresh object per call, so exposing its result directly would
   // re-fire staging on every render (myne-md/myne#656 review). Keyed on the
@@ -904,6 +994,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
+      openAttachments,
+      openTemplates,
+      openAgent,
+      openAgentOnNote,
+      setAgentViewState,
+      focusedNoteId,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,
@@ -960,6 +1056,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openView,
       openGraph,
       openTasks,
+      openAttachments,
+      openTemplates,
       setTaskViewState,
       activateItemInPane,
       closeItemInPane,

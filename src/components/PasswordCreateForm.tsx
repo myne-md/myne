@@ -91,7 +91,23 @@ interface PasswordCreateFormProps {
    * `<prefix>.submit`.
    */
   testIdPrefix?: string;
+  /**
+   * Seat the two password fields (and the strength meter between them) on a
+   * raised card, the surface the first-run steps put their working content
+   * on. Opt-in, so a caller with its own layout keeps it.
+   */
+  fieldsCard?: boolean;
 }
+
+const FIELDS_CARD_STYLE = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-4)",
+  padding: "var(--space-5)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-3)",
+} as const;
 
 export function PasswordCreateForm({
   submitLabel,
@@ -103,6 +119,7 @@ export function PasswordCreateForm({
   emptyCaption,
   autoFocus = true,
   testIdPrefix,
+  fieldsCard = false,
 }: PasswordCreateFormProps) {
   const { t } = useTranslation();
   // Resolve the default at render time (not module scope) so a language switch
@@ -157,65 +174,75 @@ export function PasswordCreateForm({
     onSubmit(password);
   };
 
+  const fields = (
+    <>
+        <PasswordInput
+          label={t("password.createForm.passwordLabel")}
+          value={password}
+          onChange={setPassword}
+          show={showPassword}
+          onToggleShow={() => setShowPassword((s) => !s)}
+          invalid={tooShort}
+          caption={passwordCaption}
+          captionTone={passwordTone}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          testId={tid("password-input")}
+          labelTrailing={
+            <button
+              type="button"
+              onClick={handleSuggest}
+              disabled={disabled}
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 12,
+                fontWeight: "var(--weight-medium)",
+                color: "var(--accent)",
+                background: "none",
+                border: 0,
+                padding: 0,
+                cursor: disabled ? "default" : "pointer",
+              }}
+            >
+              {t("password.createForm.suggestPassword")}
+            </button>
+          }
+        />
+
+        {showStrength && result && (
+          <PasswordStrength
+            score={result.score}
+            warning={result.warning}
+            suggestion={result.suggestion}
+          />
+        )}
+
+        <PasswordInput
+          label={t("password.createForm.confirmLabel")}
+          value={confirm}
+          onChange={setConfirm}
+          show={showConfirm}
+          onToggleShow={() => setShowConfirm((s) => !s)}
+          invalid={mismatch}
+          caption={mismatch ? t("password.createForm.mismatch") : undefined}
+          captionTone="danger"
+          disabled={disabled}
+          testId={tid("confirm-input")}
+        />
+    </>
+  );
+
   return (
     <>
       {errorBanner}
 
-      {helperCopy}
+      {/* With the card, the note reads as a footnote to the fields; without
+          it, it keeps its place as the lead-in the recovery flow relies on. */}
+      {!fieldsCard && helperCopy}
 
-      <PasswordInput
-        label={t("password.createForm.passwordLabel")}
-        value={password}
-        onChange={setPassword}
-        show={showPassword}
-        onToggleShow={() => setShowPassword((s) => !s)}
-        invalid={tooShort}
-        caption={passwordCaption}
-        captionTone={passwordTone}
-        autoFocus={autoFocus}
-        disabled={disabled}
-        testId={tid("password-input")}
-        labelTrailing={
-          <button
-            type="button"
-            onClick={handleSuggest}
-            disabled={disabled}
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              fontWeight: "var(--weight-medium)",
-              color: "var(--accent)",
-              background: "none",
-              border: 0,
-              padding: 0,
-              cursor: disabled ? "default" : "pointer",
-            }}
-          >
-            {t("password.createForm.suggestPassword")}
-          </button>
-        }
-      />
+      {fieldsCard ? <div style={FIELDS_CARD_STYLE}>{fields}</div> : fields}
 
-      {showStrength && result && (
-        <PasswordStrength
-          score={result.score}
-          warning={result.warning}
-          suggestion={result.suggestion}
-        />
-      )}
-
-      <PasswordInput
-        label={t("password.createForm.confirmLabel")}
-        value={confirm}
-        onChange={setConfirm}
-        show={showConfirm}
-        onToggleShow={() => setShowConfirm((s) => !s)}
-        invalid={mismatch}
-        caption={mismatch ? t("password.createForm.mismatch") : undefined}
-        captionTone="danger"
-        disabled={disabled}
-        testId={tid("confirm-input")}
-      />
+      {fieldsCard && helperCopy}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         {secondaryAction && (

@@ -9,6 +9,15 @@
 //! shared commands. On non-Apple targets the device key is unavailable and the
 //! commands no-op — the feature is Apple-Watch-specific.
 //!
+//! The same plugin also carries the watch **meeting-capture** lane
+//! (myne-md/myne#812): `seal_meeting_chunk` seals each arrived audio chunk under
+//! the device-local share-import key and records it in a per-session manifest;
+//! `seal_meeting_inbox` re-scans the app-owned inbox and seals every chunk left
+//! there (the retry half of the on-arrival seal, since the native move consumes
+//! the WatchConnectivity transfer); `drain_pending_meetings` imports every sealed
+//! chunk into the vault library as an attachment on unlock; and
+//! `ack_meeting_session` removes a drained group once its note exists.
+//!
 //! See: main repo `docs/decisions.md` 2026-07-12 (Apple Watch companion V1).
 
 // Re-exported so `crate::plugins::captures::{commands, error}::…` paths resolve.
@@ -28,6 +37,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             myne_core::plugins::captures::commands::seal_staged,
             myne_core::plugins::captures::commands::take_pending,
             myne_core::plugins::captures::commands::ack,
+            myne_core::plugins::captures::commands::seal_meeting_chunk,
+            myne_core::plugins::captures::commands::seal_meeting_inbox,
+            myne_core::plugins::captures::commands::drain_pending_meetings,
+            myne_core::plugins::captures::commands::set_meeting_session_note,
+            myne_core::plugins::captures::commands::ack_meeting_session,
         ])
         .build()
 }

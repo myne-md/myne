@@ -4,7 +4,7 @@
 // # The measurement this exists for
 //
 // `nav1` was quarantined as a runner-contention victim, then re-diagnosed twice
-// (the `clickNewMenuItem` re-click, then the driver port). Neither closed it: on
+// (the `clickNewItem` re-click, then the driver port). Neither closed it: on
 // an idle machine, in a warm container, `--retry=0`, it still failed roughly one
 // run in five, always as `Test timed out in 180000ms`.
 //
