@@ -466,6 +466,9 @@
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
+      "meetingSummarize": {
+        "label": "Summarize meeting with AI…"
+      },
       "applyCustomTheme": {
         "label": "Apply custom theme…"
       },

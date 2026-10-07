@@ -74,6 +74,14 @@ export type CommandContext = {
    */
   onSummarizeNote: () => void;
   /**
+   * Re-run the meeting AI pass on the OPEN note (meeting-ai). The pass is
+   * offered once after a meeting stops; this is the way back to it, for a note
+   * the user dismissed the offer on or wants to regenerate. Reads the note's
+   * transcript out of its body and opens the same dialog. Gated by the action on
+   * `editor + selectedNote + aiEnabled + developer_mode`.
+   */
+  onSummarizeMeeting: () => void;
+  /**
    * Rewrite the current editor selection in place (writing-assistant MYND-410
    * `/yeniden-yaz` as a palette action — a slash trigger has no selection). Runs
    * the local `Engine.infer` on the selection and replaces it as plain markdown
