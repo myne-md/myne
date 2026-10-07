@@ -103,6 +103,16 @@ targets:
         # (ios-watch/Receiver). Without this, xcodegen leaves the Swift dialect to
         # Xcode's default and the receiver fails the CONFIGURATION check.
         SWIFT_VERSION: "5.0"
+        # The Receiver directory compiles INSIDE this app target, and one of its
+        # files (`WCMeetingReceiver.swift`, myne-md/myne#840) subclasses Tauri's
+        # `Plugin`, so it needs `import Tauri`. A plugin resolves that module
+        # because it lives in its own SwiftPM package; the app target has no such
+        # package dependency, so the compiler cannot resolve it even though the
+        # LINK force-loads `libTauri.globalized.a` (force-load supplies symbols to
+        # the linker, not the module interface to the compiler). `mobile/scripts/
+        # ios-link.sh` stages the built `Tauri.swiftmodule` (and `SwiftRs`) beside
+        # that archive, and this search path is how the app compile finds it.
+        SWIFT_INCLUDE_PATHS: "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: __MYNE_DEVELOPMENT_TEAM__
         # ObjC +load reaches the receiver class only via NSClassFromString, so
@@ -150,6 +160,16 @@ targets:
         outputFiles:
           - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a
           - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a
+      # The Receiver sources compile inside THIS app target and import the Tauri
+      # Swift module (`WCMeetingReceiver.swift` subclasses `Plugin`), which the app
+      # target cannot resolve on its own. Stage the module the Rust build just
+      # produced so the app target's SWIFT_INCLUDE_PATHS finds it. Ordered AFTER
+      # "Build Rust Code", which is what produces it. myne-md/myne#840.
+      - script: |
+          set -euo pipefail
+          "${SRCROOT}/../../../scripts/ios-stage-tauri-module.sh"
+        name: Stage Tauri Swift Module
+        basedOnDependencyAnalysis: false
       # Build the Apple Watch app + complication under the REAL watchOS SDK and
       # stage them for embedding. This has to be a script rather than a target
       # dependency: `tauri ios build` archives under `-sdk iphoneos`, and that flag
