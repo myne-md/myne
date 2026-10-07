@@ -74,9 +74,13 @@ export async function sealStagedCaptures(): Promise<void> {
  *  Device-key based, so it runs while the vault is LOCKED; the Rust command
  *  reads `path`, seals it under the share-import wrap key into the meeting
  *  entries dir, records it in the pending-meeting manifest, and deletes the
- *  source. Inert (swallows) without a host / plugin or on a transient failure —
- *  WatchConnectivity re-delivers an unconsumed transfer, so a dropped seal
- *  costs a retry rather than the chunk. */
+ *  source. Inert (swallows) without a host / plugin or on a transient failure.
+ *
+ *  A swallowed failure does NOT lose the chunk: the native receiver names each
+ *  inbox file with its delivery metadata, so the chunk stays in the app-owned
+ *  inbox and `sealMeetingInbox` (below) retries it on the next boot / unlock.
+ *  WatchConnectivity does NOT re-deliver — the native move consumed the transfer
+ *  — which is exactly why the inbox re-scan exists. */
 export async function sealMeetingChunk(delivery: MeetingChunkDelivery): Promise<void> {
   try {
     await invoke("plugin:captures|seal_meeting_chunk", {
@@ -86,7 +90,23 @@ export async function sealMeetingChunk(delivery: MeetingChunkDelivery): Promise<
       path: delivery.path,
     });
   } catch {
-    // No host / plugin, or a transient failure — inert (WC re-delivers).
+    // No host / plugin, or a transient failure — the inbox re-scan retries it.
+  }
+}
+
+/** Seal every chunk left in the app-owned meeting inbox (myne-md/myne#812
+ *  review). The retry half of the on-arrival seal: the native receiver MOVES a
+ *  delivery into the inbox (consuming the WatchConnectivity transfer), so a seal
+ *  that failed or never ran — a keychain error before the first post-boot
+ *  unlock, or a process death between the move and the seal — would otherwise
+ *  orphan the plaintext chunk forever. Called on boot and on unlock; the Rust
+ *  command recovers each chunk's grouping from its filename and is idempotent.
+ *  Inert without a host / plugin. */
+export async function sealMeetingInbox(): Promise<void> {
+  try {
+    await invoke("plugin:captures|seal_meeting_inbox");
+  } catch {
+    // No host / plugin, or a transient failure — the next boot / unlock retries.
   }
 }
 
@@ -144,6 +164,10 @@ export async function initCaptures(): Promise<void> {
   // Seal anything staged before this launch (a capture delivered while the app
   // was not running).
   void sealStagedCaptures();
+  // Seal any meeting-audio chunk left in the app-owned inbox: a delivery whose
+  // on-arrival seal failed or never ran (the receiver moved it and consumed the
+  // WatchConnectivity transfer, so nothing re-delivers it). Idempotent.
+  void sealMeetingInbox();
   try {
     // The native WatchConnectivity receiver emits a `capture` event whenever it
     // stages a freshly-delivered capture; seal it promptly.

@@ -40,9 +40,22 @@ import Foundation
 /// 2. WatchConnectivity's queue is durable but not bounded in any way the
 ///    program can observe; a fresh chunk every 15 s keeps a lost connection from
 ///    holding one huge file hostage.
-/// 3. 15 s at the Opus bitrate below is roughly 30–60 KB per chunk, orders of
+/// 3. 15 s of 16 kHz mono linear PCM is roughly 480 KB per chunk, orders of
 ///    magnitude under the phone's 64 MiB per-chunk cap, so the cap is a
 ///    sanity bound rather than a limit a meeting can hit.
+///
+/// # The chunk is WAV, not CAF (myne-md/myne#812 review)
+///
+/// Each chunk is written as a **RIFF/WAVE** file (16 kHz mono 16-bit linear PCM),
+/// deliberately. The phone's attachment sniffer recognizes audio only as
+/// `RIFF....WAVE` (`core/src/plugins/attachments/sniff.rs`) and both transcription
+/// parsers accept only RIFF/WAVE (`local_inference/audio.rs`), so an earlier
+/// revision that recorded Opus/AAC into a `.caf` container landed every chunk as
+/// `application/octet-stream`: unplayable and un-transcribable, and the meeting
+/// note shipped with no transcript and export-only file cards. Linear PCM is
+/// universally encodable on watchOS and produces a real WAV, which is the shape
+/// the rest of the pipeline was already built to accept. The cost is size — about
+/// 8x Opus — which the 64 MiB per-chunk cap absorbs with room to spare.
 ///
 /// 15 s is also short enough that a *stop* mid-meeting loses at most the tail of
 /// one chunk, and long enough that the re-arm cost (closing a file, starting
@@ -66,17 +79,11 @@ final class MeetingRecorder: NSObject, ObservableObject {
     /// server-side `transferFile` + one phone-side seal per 15 s of meeting.
     static let chunkSeconds: TimeInterval = 15
 
-    /// 64 KiB/s Opus-in-CAF. watchOS ships the Opus encoder in
-    /// `AVAudioRecorder` on Series 9 and later; on older watches the format
-    /// request degrades to AAC (also ~64 kbps, same ballpark), so the chunk size
-    /// ceiling holds either way. Deliberately lossy: this is meeting speech, not
-    /// music, and the point is to keep each chunk small enough to cross a
-    /// battery-limited Bluetooth link quickly.
-    private static let bitrate = 64_000
-
-    /// Chunk files live in `tmp` — the OS owns eviction, and a file is deleted the
-    /// moment its transfer completes. A chunk that never transfers (watch left
-    /// mid-send) is cleaned up by `tmp` reclamation rather than accumulating.
+    /// Chunk files live in `tmp` — the OS owns eviction. A file is deleted once
+    /// its transfer reports success (`MeetingTransfer.didFinish`); a chunk whose
+    /// transfer never reports (the watch app was relaunched and the in-flight
+    /// mapping was lost, or the watch was left mid-send) is cleaned up by `tmp`
+    /// reclamation rather than accumulating.
     private let workDir: URL
 
     private var recorder: AVAudioRecorder?
@@ -183,30 +190,26 @@ final class MeetingRecorder: NSObject, ObservableObject {
 
     /// Open the next chunk file and start recording into it. Returns `false` when
     /// `AVAudioRecorder` could not be created.
+    ///
+    /// The chunk is **16 kHz mono 16-bit linear-PCM WAV** (see the type doc): the
+    /// `.wav` extension makes `AVAudioRecorder` write a RIFF/WAVE container, which
+    /// is the only audio shape the phone's sniffer and transcription parser accept.
+    /// Linear PCM is encodable on every watchOS version, so there is no codec
+    /// fallback path.
     private func openChunk() -> Bool {
         let index = nextChunkIndex
-        let url = workDir.appendingPathComponent("chunk-\(sessionID)-\(index).caf")
+        let url = workDir.appendingPathComponent("chunk-\(sessionID)-\(index).wav")
         let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatOpus,
+            AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: 16_000,
             AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: Self.bitrate,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
         ]
         guard let next = try? AVAudioRecorder(url: url, settings: settings) else {
-            // Opus is unavailable on this watch generation; fall back to the AAC
-            // default, which every watchOS version can encode.
-            guard let aac = try? AVAudioRecorder(
-                url: url,
-                settings: [
-                    AVFormatIDKey: kAudioFormatMPEG4AAC,
-                    AVSampleRateKey: 16_000,
-                    AVNumberOfChannelsKey: 1,
-                    AVEncoderBitRateKey: Self.bitrate,
-                ]
-            ) else {
-                return false
-            }
-            return arm(aac, index: index, url: url)
+            return false
         }
         return arm(next, index: index, url: url)
     }
@@ -266,7 +269,7 @@ final class MeetingRecorder: NSObject, ObservableObject {
         )
     }
 
-    /// Parse `chunk-<session>-<index>.caf` back to its index.
+    /// Parse `chunk-<session>-<index>.wav` back to its index.
     private static func index(of url: URL) -> UInt32? {
         let name = url.deletingPathExtension().lastPathComponent
         guard let dash = name.lastIndex(of: "-") else { return nil }

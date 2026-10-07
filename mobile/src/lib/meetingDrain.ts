@@ -34,6 +34,7 @@
 
 import i18n from "@myne/i18n";
 import {
+  appendMeetingChunk,
   buildMeetingNote,
   meetingNoteHasContent,
   type MeetingNoteCopy,
@@ -41,7 +42,7 @@ import {
 import { invoke } from "../platform/core";
 import { showToast } from "../components/ToastHost";
 import { patchTitleField } from "../dialect/surgery";
-import { noteCreate } from "./notes";
+import { noteCreate, noteRead, noteUpdate } from "./notes";
 import { startTranscription } from "./transcribe";
 
 /** One sealed chunk that drained into the vault library, in capture order
@@ -65,6 +66,11 @@ interface DrainedMeeting {
   /** Chunk indices whose import failed TRANSIENTLY. Their entries must survive,
    *  so they are NOT acked and the session re-drains on the next unlock. */
   retryable_chunk_indices: number[];
+  /** The vault note this session already drained into, when an earlier drain
+   *  created one. A re-drain APPENDS to it instead of creating a second note, so
+   *  a transiently-failed chunk that later resolves cannot fragment the meeting
+   *  (myne-md/myne#812 review). */
+  note_id?: string | null;
 }
 
 let isDraining = false;
@@ -89,12 +95,25 @@ export async function drainPendingMeetings(): Promise<number> {
     }
     for (const session of sessions) {
       let madeNote = false;
+      let noteId: string | null = null;
       try {
-        madeNote = await writeMeetingNote(session);
+        const result = await writeMeetingNote(session);
+        madeNote = result.created;
+        noteId = result.noteId;
       } catch {
         // Vault locked mid-drain (or note-create failure): stop and leave the
         // un-acked sessions for the next unlock. Never ack on failure.
         return created;
+      }
+      // Record the note the session drained into BEFORE the ack, so a later
+      // drain that resolves a previously-retryable chunk appends to THIS note
+      // instead of creating a second, fragmenting one (myne-md/myne#812 review).
+      // Best-effort: a failed record costs a rare duplicate note, never audio.
+      if (noteId !== null) {
+        await invoke("plugin:captures|set_meeting_session_note", {
+          sessionId: session.session_id,
+          noteId,
+        }).catch(() => {});
       }
       // Ack only AFTER the note exists (at-least-once), and only the chunks the
       // drain RESOLVED: imported, or gone for good. A chunk whose import failed
@@ -133,32 +152,53 @@ export async function drainPendingMeetings(): Promise<number> {
  * failed meeting (the audio is still in the note), so it is caught per chunk and
  * the transcript simply omits that chunk.
  */
-async function writeMeetingNote(session: DrainedMeeting): Promise<boolean> {
+async function writeMeetingNote(
+  session: DrainedMeeting,
+): Promise<{ created: boolean; noteId: string | null }> {
   const copy: MeetingNoteCopy = {
     transcriptHeading: i18n.t("editor.meeting.transcriptHeading"),
     machineNotice: i18n.t("editor.meeting.machineNotice"),
   };
-  const clips = session.chunks.map((c) => ({ attachmentId: c.attachment_id }));
-
-  const parts: string[] = [];
+  // Transcribe each chunk once, paired with its clip, so the append path can
+  // place each transcript under the right embed.
+  const chunkTexts: { attachmentId: string; text: string }[] = [];
   for (const chunk of session.chunks) {
+    let text = "";
     try {
-      const text = await startTranscription(chunk.attachment_id).done;
-      if (text.trim().length > 0) parts.push(text.trim());
+      text = (await startTranscription(chunk.attachment_id).done).trim();
     } catch {
       // Transcription unavailable / failed: the audio is still committed to the
       // note. Omit this chunk's text rather than failing the note.
     }
+    chunkTexts.push({ attachmentId: chunk.attachment_id, text });
   }
 
-  const body = buildMeetingNote(clips, parts.join("\n\n"), copy);
-  if (!meetingNoteHasContent(body)) return false;
+  // A session that already produced a note re-drains into THAT note: append each
+  // newly-resolved chunk instead of creating a second, fragmenting one. The
+  // append is idempotent on the attachment id, so a chunk already embedded (a
+  // re-imported, content-addressed duplicate) is left alone.
+  if (session.note_id) {
+    let body = await noteRead(session.note_id);
+    for (const c of chunkTexts) {
+      body = appendMeetingChunk(body, { attachmentId: c.attachmentId }, c.text, copy);
+    }
+    await noteUpdate(session.note_id, body);
+    return { created: false, noteId: session.note_id };
+  }
+
+  const clips = chunkTexts.map((c) => ({ attachmentId: c.attachmentId }));
+  const transcript = chunkTexts
+    .map((c) => c.text)
+    .filter((t) => t.length > 0)
+    .join("\n\n");
+  const body = buildMeetingNote(clips, transcript, copy);
+  if (!meetingNoteHasContent(body)) return { created: false, noteId: null };
   // Title from the SESSION START, not from now. The phone can stay locked for
   // hours after the meeting ends, so titling from `now` dated a 09:00 walking
   // 1:1 at 18:00. `started_at` is the one field that carries the real moment.
   const name = i18n.t("editor.meeting.noteTitle", { date: localTimestamp(session.started_at) });
-  await createTitledNote(body, name);
-  return true;
+  const noteId = await createTitledNote(body, name);
+  return { created: true, noteId };
 }
 
 /** Create a note from an explicit body + title, at the vault root. Mirrors the

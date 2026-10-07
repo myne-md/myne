@@ -355,6 +355,92 @@ pub async fn seal_meeting_chunk<R: Runtime>(
     Ok(sealed)
 }
 
+/// Parse a meeting inbox filename back to its delivery metadata, or `None` when
+/// the name is not one this lane wrote.
+///
+/// The native receiver (`WCMeetingReceiver.moveIntoInbox`) names each moved
+/// delivery `<session-id>.<chunk-index>.<started-at>.<uuid>`. A session id is
+/// ASCII alphanumerics plus `-`/`_` ([`meeting_manifest::is_session_id`]) and can
+/// never contain a `.`, so the four fields split unambiguously on `.`. Embedding
+/// the metadata in the name is what makes the inbox re-scannable: the
+/// WatchConnectivity metadata that carried it is consumed the moment the native
+/// delegate returns.
+fn parse_meeting_inbox_name(name: &str) -> Option<(String, u32, u64)> {
+    let mut parts = name.split('.');
+    let session_id = parts.next()?;
+    let chunk_index = parts.next()?.parse::<u32>().ok()?;
+    let started_at = parts.next()?.parse::<u64>().ok()?;
+    let _uuid = parts.next()?;
+    if parts.next().is_some() || !meeting_manifest::is_session_id(session_id) {
+        return None;
+    }
+    Some((session_id.to_string(), chunk_index, started_at))
+}
+
+/// Seal every chunk sitting in the app-owned inbox, recovering each delivery's
+/// grouping from its filename.
+///
+/// This is the retry half of the arrival path (myne-md/myne#812 review). The
+/// native receiver MOVES a delivery into the inbox inside the delegate callback,
+/// which consumes the WatchConnectivity transfer, so a seal that fails or never
+/// runs — a keychain error, a vault state before the first post-boot unlock (the
+/// share-import key is `AfterFirstUnlockThisDeviceOnly`), or a process death
+/// between the move and the seal — would otherwise leave the plaintext chunk in
+/// the inbox forever, out of the meeting and outside the
+/// `delivery-and-seal` window `threat-model.md` AS18 claims. Re-scanning on boot
+/// and on unlock bounds that window to the retry interval, matching the
+/// dictated-capture lane's boot re-seal of `staging/`. Idempotent: a chunk
+/// already sealed is removed from the inbox, and a duplicate
+/// `(session_id, chunk_index)` is a successful no-op.
+///
+/// A file whose name does not carry the metadata shape is left alone (it is not
+/// this lane's), so a stray file cannot be sealed under the device key.
+pub fn seal_meeting_inbox_from_dir(
+    dirs: &MeetingDirs<'_>,
+    key: &[u8; 32],
+) -> Result<u32, CaptureError> {
+    let mut sealed = 0;
+    for path in queue::list_files(dirs.inbox) {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some((session_id, chunk_index, started_at)) = parse_meeting_inbox_name(name) else {
+            continue;
+        };
+        // The seal primitive never deletes the source (its caller owns it). On a
+        // successful seal the plaintext is now inside an entry, so remove it; on
+        // a refusal (too large / backend) leave it for the next scan rather than
+        // deleting an unsealed chunk.
+        if seal_meeting_chunk_from_file(dirs, key, &session_id, chunk_index, started_at, &path)
+            .is_ok()
+        {
+            let _ = std::fs::remove_file(&path);
+            sealed += 1;
+        }
+    }
+    Ok(sealed)
+}
+
+/// Seal every arrived watch meeting-audio chunk left in the app-owned inbox.
+/// Device-key based, so it runs while the vault is locked; called on boot and on
+/// unlock as the retry half of the on-arrival seal (see
+/// [`seal_meeting_inbox_from_dir`]).
+#[tauri::command]
+pub async fn seal_meeting_inbox<R: Runtime>(app: AppHandle<R>) -> Result<u32, CaptureError> {
+    let _guard = QUEUE_LOCK.lock().await;
+    let entries = queue::meeting_entries_dir(&app)?;
+    let manifest = queue::meeting_manifest_dir(&app)?;
+    let inbox = queue::meeting_inbox_dir(&app)?;
+    let key = crate::plugins::share_import::device_key::get_or_create()
+        .map_err(|_| CaptureError::Backend)?;
+    let dirs = MeetingDirs {
+        entries: &entries,
+        manifest: &manifest,
+        inbox: &inbox,
+    };
+    seal_meeting_inbox_from_dir(&dirs, &key)
+}
+
 /// One sealed chunk that drained into the vault's attachment library, in
 /// capture order: its wire `chunk_index` plus the content-addressed attachment
 /// id the note's embed resolves against.
@@ -395,16 +481,31 @@ pub struct DrainedMeeting {
     /// entries must NOT be deleted: the caller leaves the session un-acked (or
     /// acks only the resolved chunks) so the next unlock retries them.
     pub retryable_chunk_indices: Vec<u32>,
+    /// The vault note this session already drained into, when an earlier drain
+    /// created one ([`meeting_manifest::set_note_id`]). The caller APPENDS the
+    /// newly-resolved chunks to that note rather than creating a second one, so a
+    /// transiently-failed chunk that later resolves cannot fragment a meeting
+    /// into two disconnected notes (myne-md/myne#812 review).
+    pub note_id: Option<String>,
 }
 
 /// Every chunk index in `0..=max`, minus the indices that actually resolved.
-/// "Resolved" means imported successfully OR failed transiently, because a
-/// retryable chunk is not missing: it is still on disk and will be retried, so
-/// counting it as a permanent gap would tell the user audio is gone when it is
-/// not. The watch's indices start at 0, so a session whose first chunk never
-/// arrived is incomplete too — reporting only interior holes would hide it.
-fn missing_chunk_indices(present: &[u32], retryable: &[u32]) -> Vec<u32> {
-    let mut seen: Vec<u32> = present.iter().chain(retryable).copied().collect();
+/// "Resolved" means imported successfully, failed transiently, OR was already
+/// drained by an earlier pass and acked. A retryable chunk is not missing — it
+/// is still on disk and will be retried — and an already-drained chunk is safely
+/// in the vault's library, so counting either as a permanent gap would tell the
+/// user audio is gone when it is not. (The already-drained case is the false
+/// "chunks missing" toast a re-drain used to fire for a chunk that was in the
+/// vault all along: myne-md/myne#812 review.) The watch's indices start at 0, so
+/// a session whose first chunk never arrived is incomplete too — reporting only
+/// interior holes would hide it.
+fn missing_chunk_indices(present: &[u32], retryable: &[u32], already_drained: &[u32]) -> Vec<u32> {
+    let mut seen: Vec<u32> = present
+        .iter()
+        .chain(retryable)
+        .chain(already_drained)
+        .copied()
+        .collect();
     let Some(max) = seen.iter().copied().max() else {
         return Vec::new();
     };
@@ -454,12 +555,23 @@ pub async fn drain_pending_meetings<R: Runtime>(
         let mut chunks = Vec::new();
         let mut present = Vec::new();
         let mut retryable = Vec::new();
+        let mut already_drained = Vec::new();
         for chunk in &session.chunks {
             // Open the sealed entry: filename/header agreement first (best-
             // effort — a stray name is skipped rather than opened), then decode.
             let Some(mut blob) = read_validated_entry(&entries, &key, &chunk.entry_id) else {
-                // A chunk whose entry can never open is a permanent hole, not a
-                // retry: it is reported in `missing` and its entry may be acked.
+                // No decodable entry. Distinguish "already drained" from a
+                // permanent hole: a previous ack REMOVES the resolved chunk's
+                // entry file, so a manifest row whose entry is GONE names a chunk
+                // already in the vault — not a gap — while an entry file that is
+                // PRESENT but will not open is corrupt/foreign (a permanent hole,
+                // left to the missing computation). Both used to fall through to
+                // `missing`, which fired a false "chunks missing" toast for an
+                // already-drained chunk on a re-drain (myne-md/myne#812 review).
+                if queue::is_capture_id(&chunk.entry_id) && !entries.join(&chunk.entry_id).exists()
+                {
+                    already_drained.push(chunk.chunk_index);
+                }
                 continue;
             };
             let source = ImportSource::Bytes {
@@ -500,13 +612,14 @@ pub async fn drain_pending_meetings<R: Runtime>(
             }
         }
         chunks.sort_by_key(|c| c.chunk_index);
-        let missing = missing_chunk_indices(&present, &retryable);
+        let missing = missing_chunk_indices(&present, &retryable, &already_drained);
         out.push(DrainedMeeting {
             session_id: session.session_id,
             started_at: session.started_at,
             chunks,
             missing_chunk_indices: missing,
             retryable_chunk_indices: retryable,
+            note_id: session.note_id,
         });
     }
     Ok(out)
@@ -605,6 +718,22 @@ pub fn ack_meeting_session_in_dirs(
     } else {
         meeting_manifest::delete_session(manifest, session_id)
     }
+}
+
+/// Record the vault note a drained meeting session produced, so a later re-drain
+/// that resolves a previously-retryable chunk APPENDS to it instead of creating a
+/// second note (myne-md/myne#812 review). Called by the WebView right after the
+/// note exists and before the ack; a no-op when the session record is already
+/// gone.
+#[tauri::command]
+pub async fn set_meeting_session_note<R: Runtime>(
+    app: AppHandle<R>,
+    session_id: String,
+    note_id: String,
+) -> Result<(), CaptureError> {
+    let _guard = QUEUE_LOCK.lock().await;
+    let manifest = queue::meeting_manifest_dir(&app)?;
+    meeting_manifest::set_note_id(&manifest, &session_id, &note_id)
 }
 
 /// Seal every staged plaintext capture into the encrypted queue. Device-key
@@ -862,6 +991,50 @@ mod tests {
             .expect("session");
         assert_eq!(session.chunks.len(), 1);
         assert_eq!(session.chunks[0].entry_id, id);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The inbox re-scan seals a chunk whose metadata lives only in its filename,
+    /// removes it, and leaves a foreign file alone. This is the retry path that
+    /// bounds the plaintext window when the on-arrival seal never ran
+    /// (myne-md/myne#812 review).
+    #[test]
+    fn inbox_rescan_seals_named_chunks_and_leaves_foreign_files() {
+        let root = tmp();
+        let entries = root.join("entries");
+        let manifest = root.join("manifest");
+        let dirs = MeetingDirs {
+            entries: &entries,
+            manifest: &manifest,
+            inbox: &root,
+        };
+
+        // Named the way `WCMeetingReceiver.moveIntoInbox` names a delivery.
+        let named = root.join("sess-9.2.1700000000000.deadbeef");
+        std::fs::write(&named, b"watch audio bytes").unwrap();
+        // A file with no metadata shape is not this lane's and must survive.
+        let foreign = root.join("chunk-src-whatever");
+        std::fs::write(&foreign, b"not ours").unwrap();
+
+        assert_eq!(
+            seal_meeting_inbox_from_dir(&dirs, &KEY).unwrap(),
+            1,
+            "exactly the named chunk sealed"
+        );
+        assert!(!named.exists(), "sealed chunk removed from the inbox");
+        assert!(foreign.exists(), "a foreign file is left alone");
+
+        let session = meeting_manifest::read_session(&manifest, "sess-9")
+            .unwrap()
+            .expect("session");
+        assert_eq!(session.chunks.len(), 1);
+        assert_eq!(
+            session.chunks[0].chunk_index, 2,
+            "index recovered from name"
+        );
+
+        // Idempotent: a second scan seals nothing and leaves the session intact.
+        assert_eq!(seal_meeting_inbox_from_dir(&dirs, &KEY).unwrap(), 0);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1144,14 +1317,14 @@ mod tests {
     #[test]
     fn missing_indices_report_a_hole_and_a_lost_first_chunk() {
         // Interior hole: {0,2} is missing 1.
-        assert_eq!(missing_chunk_indices(&[0, 2], &[]), vec![1]);
+        assert_eq!(missing_chunk_indices(&[0, 2], &[], &[]), vec![1]);
         // A lost FIRST chunk is a gap too (indices start at 0).
-        assert_eq!(missing_chunk_indices(&[1, 2], &[]), vec![0]);
+        assert_eq!(missing_chunk_indices(&[1, 2], &[], &[]), vec![0]);
         // Contiguous → no gap.
-        assert!(missing_chunk_indices(&[0, 1, 2], &[]).is_empty());
+        assert!(missing_chunk_indices(&[0, 1, 2], &[], &[]).is_empty());
         // A singleton at 4 means chunks 0..=3 never arrived: they are holes.
-        assert_eq!(missing_chunk_indices(&[4], &[]), vec![0, 1, 2, 3]);
-        assert!(missing_chunk_indices(&[], &[]).is_empty());
+        assert_eq!(missing_chunk_indices(&[4], &[], &[]), vec![0, 1, 2, 3]);
+        assert!(missing_chunk_indices(&[], &[], &[]).is_empty());
     }
 
     /// A chunk that failed TRANSIENTLY is not missing: its audio is still on
@@ -1160,10 +1333,22 @@ mod tests {
     #[test]
     fn a_retryable_chunk_is_not_reported_as_missing() {
         // {0 imported, 1 retryable, 2 imported} → nothing is missing.
-        assert!(missing_chunk_indices(&[0, 2], &[1]).is_empty());
+        assert!(missing_chunk_indices(&[0, 2], &[1], &[]).is_empty());
         // A retryable chunk still bounds the range: {0 imported, 3 retryable}
         // means 1 and 2 never arrived at all.
-        assert_eq!(missing_chunk_indices(&[0], &[3]), vec![1, 2]);
+        assert_eq!(missing_chunk_indices(&[0], &[3], &[]), vec![1, 2]);
+    }
+
+    /// A chunk a PREVIOUS drain already acked (its entry removed) is not a gap
+    /// either: its audio is in the vault, and re-reporting it fired a false
+    /// "chunks missing" toast on a re-drain (myne-md/myne#812 review).
+    #[test]
+    fn an_already_drained_chunk_is_not_reported_as_missing() {
+        // {0 already drained, 1 imported now} → nothing missing.
+        assert!(missing_chunk_indices(&[1], &[], &[0]).is_empty());
+        // The range still bounds: {2 imported, 0 already drained} means 1 never
+        // arrived.
+        assert_eq!(missing_chunk_indices(&[2], &[], &[0]), vec![1]);
     }
 
     /// A restored entry decodes to the exact bytes that were sealed, and a
