@@ -160,6 +160,18 @@ pub trait AudioSource {
     /// Drain the mono i16 samples captured since the last poll (empty if none
     /// ready yet).
     fn poll(&mut self) -> Vec<i16>;
+    /// Peak level of the SYSTEM-AUDIO half of this source on the most recent
+    /// `poll`, in `[0, 1]`, or `None` when the source has no such half.
+    ///
+    /// The meeting session's silence warning is driven by this rather than by
+    /// the mixed level, because a denied CoreAudio tap delivers zeroed buffers
+    /// rather than an error: a quiet microphone is normal, a quiet tap while
+    /// the user is talking is a permission problem, and only a per-source
+    /// answer can tell those apart. A microphone-only source (the voice-note
+    /// flow, and a meeting on a platform with no tap) answers `None`.
+    fn tap_level(&self) -> Option<f32> {
+        None
+    }
 }
 
 /// Which source the capture thread builds. `Send` (unlike the source itself),
@@ -195,6 +207,15 @@ pub enum SourceFactory {
     /// is `MAX_SAMPLES` and therefore invisible.
     #[cfg(test)]
     FixtureAt(u32),
+    /// A meeting session (myne-md/myne#789): the microphone mixed with the
+    /// system-audio tap where this platform can supply one. Never selected by
+    /// the voice-note flow, which stays microphone-only.
+    ///
+    /// The tap is optional rather than required, and that is the platform
+    /// matrix rather than a degradation: on Linux, and on macOS below 14.2,
+    /// there is no system-audio capture path to build, and the session runs on
+    /// the microphone alone with the UI saying so.
+    Meeting,
 }
 
 impl SourceFactory {
@@ -205,8 +226,74 @@ impl SourceFactory {
             SourceFactory::Fixture => Ok(Box::new(FixtureSource::default())),
             #[cfg(test)]
             SourceFactory::FixtureAt(rate) => Ok(Box::new(FixtureSource::at_rate(rate))),
+            SourceFactory::Meeting => {
+                #[cfg(feature = "voice-capture-stub")]
+                let mic: Box<dyn AudioSource> = Box::new(FixtureSource::default());
+                #[cfg(not(feature = "voice-capture-stub"))]
+                let mic: Box<dyn AudioSource> = Box::new(CpalSource::start()?);
+                Ok(super::mix::build_meeting_mix(mic, meeting_tap_source()))
+            }
         }
     }
+}
+
+/// The system-audio half of a meeting mix, where this platform can supply one.
+///
+/// `None` is a supported answer, not a failure: Linux has no app-facing
+/// system-audio capture path short of the desktop portal, and macOS only grew
+/// the CoreAudio process tap in 14.2. The session still runs in both cases, on
+/// the microphone alone, and the UI states the limitation before the session
+/// starts rather than after.
+///
+/// The stub build returns a second fixture at a DIFFERENT rate from the
+/// microphone's, so the E2E drives the mix and the resampler with no device.
+#[cfg(all(feature = "voice-capture-stub", not(test)))]
+fn meeting_tap_source() -> Option<Box<dyn AudioSource>> {
+    Some(Box::new(FixtureSource::at_rate(44_100)))
+}
+
+#[cfg(all(target_os = "macos", not(feature = "voice-capture-stub"), not(test)))]
+fn meeting_tap_source() -> Option<Box<dyn AudioSource>> {
+    // A refused tap is not a refused session: the microphone is still a valid
+    // meeting, and the UI has already said the other side will not be captured.
+    super::tap::TapSource::start()
+        .ok()
+        .map(|t| Box::new(t) as Box<dyn AudioSource>)
+}
+
+#[cfg(all(
+    not(target_os = "macos"),
+    not(feature = "voice-capture-stub"),
+    not(test)
+))]
+fn meeting_tap_source() -> Option<Box<dyn AudioSource>> {
+    // Linux has no app-facing system-audio capture path short of the desktop
+    // portal, which is separate work. This is the stated platform matrix.
+    None
+}
+
+/// Whether a meeting session on this build can arm a system-audio source.
+///
+/// The UI's platform notice renders only where this is false, so it must answer
+/// the same question `meeting_tap_source` does rather than a nearby one: on the
+/// stub build there is no real tap, and below macOS 14.2 there is no API.
+#[cfg(all(target_os = "macos", not(feature = "voice-capture-stub")))]
+pub fn meeting_tap_available() -> bool {
+    super::tap::is_available()
+}
+
+#[cfg(not(all(target_os = "macos", not(feature = "voice-capture-stub"))))]
+pub fn meeting_tap_available() -> bool {
+    false
+}
+
+/// Under `cargo test` the tap is never reached: a unit test that built a real
+/// aggregate device would open the microphone and ask for a permission prompt
+/// on a developer's machine. The mix itself is exercised by `mix.rs`, and the
+/// macOS path by the manual-test roster entry.
+#[cfg(test)]
+fn meeting_tap_source() -> Option<Box<dyn AudioSource>> {
+    None
 }
 
 // --- fixture source (tests / E2E) ------------------------------------------
@@ -224,13 +311,15 @@ pub struct FixtureSource {
     samples_per_poll: usize,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "voice-capture-stub"))]
 impl FixtureSource {
     /// The default tone at a stated sample rate, so a test can drive the
-    /// per-rate clip clamp in `run_session`. Only the rate moves: the poll size
-    /// stays at 480 samples so the clamp is reached in a bounded number of
-    /// polls whatever the rate says.
-    fn at_rate(sample_rate: u32) -> Self {
+    /// per-rate clip clamp in `run_session`, and so the meeting mix has a
+    /// second source at a rate that differs from the microphone's (the E2E
+    /// build's stand-in for the tap). Only the rate moves: the poll size stays
+    /// at 480 samples so the clamp is reached in a bounded number of polls
+    /// whatever the rate says.
+    pub(super) fn at_rate(sample_rate: u32) -> Self {
         Self {
             sample_rate,
             ..Self::default()
@@ -377,10 +466,16 @@ impl AudioSource for CpalSource {
     }
 
     fn poll(&mut self) -> Vec<i16> {
-        match self.shared.lock() {
-            Ok(mut g) => std::mem::take(&mut *g),
-            Err(_) => Vec::new(),
+        // `append` moves the samples out while leaving the producer's buffer
+        // with its CAPACITY intact. `mem::take` replaced it with a fresh empty
+        // `Vec`, so the cpal callback re-allocated on its next buffer; the
+        // capture poll runs at ~100 Hz per source, and the callback for a real
+        // device is on an audio thread that must not allocate.
+        let mut out = Vec::new();
+        if let Ok(mut g) = self.shared.lock() {
+            out.append(&mut g);
         }
+        out
     }
 }
 
@@ -419,7 +514,7 @@ fn push_mono<T: Copy>(
 pub fn run_session(
     factory: SourceFactory,
     stop_rx: &Receiver<StopKind>,
-    level_sink: &(dyn Fn(f32) + Send),
+    level_sink: &(dyn Fn(f32, Option<f32>) + Send),
     clip_sink: &(dyn Fn(Zeroizing<Vec<i16>>, u32) + Send),
     max_samples: usize,
 ) -> SessionResult {
@@ -446,7 +541,9 @@ pub fn run_session(
         let chunk = source.poll();
         // Stream the input level so the meter moves — and so macOS's
         // denial-as-silence surfaces as a flat meter, not a silent success.
-        level_sink(peak_level(&chunk));
+        // The second value is the system-audio side's own peak where the source
+        // has one, which is what the meeting session's silence warning watches.
+        level_sink(peak_level(&chunk), source.tap_level());
         buffer.extend_from_slice(&chunk);
         // Seamless continuation: flush every full clip at the cap. The flush is
         // a cheap buffer swap (split_off) — the cpal callback keeps filling its
@@ -474,7 +571,7 @@ pub fn run_session(
 }
 
 /// Peak input level of `chunk` in `[0, 1]` (max absolute sample / i16::MAX).
-fn peak_level(chunk: &[i16]) -> f32 {
+pub(super) fn peak_level(chunk: &[i16]) -> f32 {
     chunk
         .iter()
         .map(|s| s.unsigned_abs())
@@ -484,7 +581,7 @@ fn peak_level(chunk: &[i16]) -> f32 {
 
 /// Below this absolute amplitude a sample counts as silence — a muted or denied
 /// mic yields ~zero samples; real audio easily exceeds it (~0.2% of full scale).
-const SILENCE_PEAK_THRESHOLD: u16 = 64;
+pub(super) const SILENCE_PEAK_THRESHOLD: u16 = 64;
 
 /// Whether `samples` is effectively silent (no sample reaches the threshold).
 /// Empty input is silent. Drives the save-time silence guard so a muted-mic
@@ -560,7 +657,7 @@ mod tests {
             run_session(
                 SourceFactory::Fixture,
                 &rx,
-                &move |l| levels_cb.lock().unwrap().push(l),
+                &move |l, _tap| levels_cb.lock().unwrap().push(l),
                 &|_, _| {},
                 MAX_SAMPLES,
             )
@@ -587,7 +684,7 @@ mod tests {
             run_session(
                 SourceFactory::Fixture,
                 &rx,
-                &|_| {},
+                &|_, _tap| {},
                 &|_, _| {},
                 MAX_SAMPLES,
             )
@@ -609,7 +706,7 @@ mod tests {
             run_session(
                 SourceFactory::Fixture,
                 &rx,
-                &|_| {},
+                &|_, _tap| {},
                 &move |samples, _| clips_cb.lock().unwrap().push(samples.len()),
                 SMALL,
             )
@@ -668,7 +765,7 @@ mod tests {
             run_session(
                 SourceFactory::FixtureAt(RATE),
                 &rx,
-                &|_| {},
+                &|_, _tap| {},
                 &move |samples, _| clips_cb.lock().unwrap().push(samples.len()),
                 // The caller's cap is the blob cap, deliberately: the RATE bound
                 // has to be what binds, so a regression cannot hide behind this

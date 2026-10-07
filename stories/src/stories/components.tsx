@@ -100,6 +100,8 @@ import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
 import { ThemeChiplet } from "@app/components/primitives/ThemeChiplet";
 import { ThemeInstallDialog } from "@app/components/ThemeInstallDialog";
+import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
+import { offerMeetingAi } from "@app/components/meeting/meetingAiStore";
 import { Toast } from "@app/components/Toast";
 import { Toaster } from "@app/components/toast/Toaster";
 import { TorStatusBanner } from "@app/components/sync/TorStatusBanner";
@@ -901,6 +903,18 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "ThemeInstallDialog",
     state: "default",
     render: () => <ThemeInstallDialog />,
+  },
+  {
+    id: "components/meetingaidialog/default",
+    group: "components",
+    surface: "MeetingAiDialog",
+    state: "default",
+    render: () => {
+      // The dialog renders nothing until an offer exists; publish one so the
+      // story shows the section picker.
+      offerMeetingAi("story-note", "A short meeting transcript.");
+      return <MeetingAiDialog />;
+    },
   },
   {
     id: "components/identitysetupdialog/default",

@@ -110,6 +110,10 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
     setLevel(level: number): void {
       const clamped = Math.min(1, Math.max(0, level));
       if (clamped > maxLevel) maxLevel = clamped;
+      // The warning means "no input has been seen", so real input clears it.
+      // Without this it latched: a quiet start kept "No audio detected" on a
+      // recording whose microphone was working, with no path back to hidden.
+      if (clamped >= SILENCE_LEVEL) warning.hidden = true;
       // Scroll the rolling history one step (oldest out, newest in) and paint
       // each bar's height from its stored level — a moving waveform of the
       // recent input. A modest curve (sqrt) makes quiet speech still visible.

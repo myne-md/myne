@@ -41,6 +41,9 @@ permissions = [
   "allow-voice-record-start",
   "allow-voice-record-stop",
   "allow-voice-record-cancel",
+  "allow-meeting-session-start",
+  "allow-meeting-session-stop",
+  "allow-meeting-session-cancel",
 ]
 
 # Detached (pop-out) note-window seat (myne#677, epic #173; capabilities/detached-note.json,
@@ -73,6 +76,21 @@ commands.allow = ["voice_record_stop"]
 identifier = "allow-voice-record-cancel"
 description = "Allow invoking attachments:voice_record_cancel (discard the active recording — wipes the in-RAM buffer and stores nothing; idempotent when nothing is recording; MYND-259)."
 commands.allow = ["voice_record_cancel"]
+
+[[permission]]
+identifier = "allow-meeting-session-start"
+description = "Allow invoking attachments:meeting_session_start (Slot::Unlocked-gated start of a meeting session, myne-md/myne#789: the microphone mixed with the macOS system-audio tap where the platform supplies one, captured natively into a Zeroizing RAM buffer, encrypted in Rust through the existing import core; refuses while a session or a voice recording already runs; never a plaintext temp file)."
+commands.allow = ["meeting_session_start"]
+
+[[permission]]
+identifier = "allow-meeting-session-stop"
+description = "Allow invoking attachments:meeting_session_stop (Slot::Unlocked-gated finalize of the active meeting session: awaits every continuation clip's import, imports the final sub-cap clip, and returns the whole session's attachment metadata in capture order. The raw PCM never crosses IPC)."
+commands.allow = ["meeting_session_stop"]
+
+[[permission]]
+identifier = "allow-meeting-session-cancel"
+description = "Allow invoking attachments:meeting_session_cancel (discard the active meeting session's in-flight tail, wiping the in-RAM buffer; already-committed clips remain, matching voice_record_cancel's checkpoint semantics; idempotent when no session runs)."
+commands.allow = ["meeting_session_cancel"]
 
 [[permission]]
 identifier = "allow-attachment-import"

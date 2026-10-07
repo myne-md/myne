@@ -20,6 +20,7 @@ import {
   resetPreviewCache,
   resetTranscripts,
 } from "../editor/attachments/session-caches";
+import { teardownMeetingSessionForLock } from "../notes/meetingSession";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetPersonIdentityState } from "../components/sync/personIdentityState";
 
@@ -148,6 +149,12 @@ export async function lockVault(): Promise<void> {
   // button does not reload the WebView.
   teardownStep("resetPreviewCache", () => resetPreviewCache());
   teardownStep("resetTranscripts", () => resetTranscripts());
+  // The meeting session (myne-md/myne#789): the same class of store as
+  // `resetTranscripts` above, and the same failure if it is skipped. The
+  // transcript map holds third-party speech decoded from vault attachments and
+  // the session bar is body-mounted, so neither goes away on its own; `active`
+  // staying set also left `/meeting` silently dead in the next vault.
+  teardownStep("teardownMeetingSessionForLock", () => teardownMeetingSessionForLock());
   // The remembered mermaid diagram zoom (myne-md/myne#708): module scope, keyed
   // by a hash of the diagram source, so it is vault-derived the same way the
   // preview cache is. Cleared with its neighbours on this leg.

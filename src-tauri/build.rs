@@ -176,6 +176,8 @@ fn main() {
                 "set_ai_provider_consent",
                 "set_ai_provider_key",
                 "set_ai_provider_model",
+                // meeting-ai: the custom meeting AI prompt (Shared / ScalarLww).
+                "set_meeting_ai_prompt",
                 "ai_provider_has_key",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
@@ -305,6 +307,9 @@ fn main() {
                 "voice_record_start",
                 "voice_record_stop",
                 "voice_record_cancel",
+                "meeting_session_start",
+                "meeting_session_stop",
+                "meeting_session_cancel",
             ]),
         )
         .plugin(
@@ -755,6 +760,7 @@ fn main() {
             tauri_build::InlinedPlugin::new().commands(&[
                 "infer",
                 "infer_ambient",
+                "infer_batch",
                 "embed",
                 "semantic_search",
                 "chat_stop",

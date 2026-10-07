@@ -76,6 +76,17 @@ describe("mountRecordingBar", () => {
     handle.teardown();
   });
 
+  it("clears the silent-denial warning once real input arrives after it appeared", () => {
+    const handle = mountRecordingBar({ onStop: () => {}, onCancel: () => {} });
+    vi.advanceTimersByTime(3000);
+    const warning = el("voice-record.warning") as HTMLElement;
+    expect(warning.hidden).toBe(false);
+    // The warning means "no input has been seen"; real input makes it false.
+    handle.setLevel(0.5);
+    expect(warning.hidden).toBe(true);
+    handle.teardown();
+  });
+
   it("setLevel paints the newest sample into the right-most meter bar", () => {
     const handle = mountRecordingBar({ onStop: () => {}, onCancel: () => {} });
     handle.setLevel(1); // max input → full-scale bar (12 + sqrt(1)*88 = 100%)

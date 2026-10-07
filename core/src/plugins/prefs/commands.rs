@@ -1299,6 +1299,83 @@ pub(crate) async fn set_ai_provider_with_dir(
     Ok(())
 }
 
+/// `Slot::Unlocked`-gated setter for the **meeting AI prompt** (meeting-ai).
+/// `None` or an all-whitespace value clears it, restoring the built-in default
+/// instruction; a non-empty value is stored verbatim and replaces the meeting
+/// AI reduce instruction. Bounded in length so a compromised WebView cannot use
+/// the blob as storage. Classified Shared / scalar last-write-wins
+/// (`sync-protocol.md` 10.2), so the instruction reaches the account's other
+/// devices. The value is user text, so it is never logged (DENY list).
+pub async fn set_meeting_ai_prompt_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    prompt: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_meeting_ai_prompt_with_dir(&dir, state, hooks, prompt, io, host).await
+}
+
+/// IPC wrapper for [`set_meeting_ai_prompt_from_host`].
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_meeting_ai_prompt<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    prompt: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_meeting_ai_prompt_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        prompt,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// The maximum stored meeting-AI prompt length, in bytes. A bound rather than a
+/// shape: the value is free user text, so the only thing to keep in check is
+/// that a compromised WebView cannot park an arbitrarily large blob here.
+pub const MAX_MEETING_AI_PROMPT_LEN: usize = 4000;
+
+/// Testable core of [`set_meeting_ai_prompt`].
+pub(crate) async fn set_meeting_ai_prompt_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    prompt: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let prompt = match prompt {
+        // An all-whitespace value is a clear, not a stored blank that would
+        // replace the default with an empty instruction.
+        Some(p) if p.trim().is_empty() => None,
+        Some(p) if p.len() > MAX_MEETING_AI_PROMPT_LEN => {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+        other => other,
+    };
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.meeting_ai_prompt = prompt.clone();
+        },
+        io,
+        host,
+    )
+    .await?;
+    // The prompt is user text: the field name is logged, never the value.
+    tracing::info!(event = "prefs_written", field = "meeting_ai_prompt");
+    Ok(())
+}
+
 /// `Slot::Unlocked`-gated setter for the remote-provider consent
 /// (myne#415, SYNC-22; device-local since myne-md/myne#456).
 ///
@@ -6735,6 +6812,7 @@ mod tests {
                     ai_provider_consent: None,
                     ai_provider_key: None,
                     ai_provider_model: None,
+                    meeting_ai_prompt: None,
                     bar_items_order: Vec::new(),
                     cli_enabled: false,
                     cli_excluded_folders: Vec::new(),
