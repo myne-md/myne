@@ -188,6 +188,10 @@ describe("capability descriptor", () => {
       // wrap or rotate the vault `itemsKey`, so the roster commands are refused
       // and the panel is gated behind this absent capability.
       "memberSharing",
+      // Desktop self-update. `tauri-plugin-updater` has no browser target and a
+      // served page cannot replace itself, so the About/banner affordances are
+      // omitted on web rather than rendered against commands that reject.
+      "selfUpdate",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

@@ -1,0 +1,39 @@
+# Permissions for the in-app `update` Tauri plugin (desktop self-update).
+# Picked up under the `update:` ACL namespace because `build.rs` declares this
+# as an `InlinedPlugin`. Capability files reference these as `update:default`.
+#
+# The check is host-side: the WebView never reaches `tauri-plugin-updater`'s own
+# commands, only these two narrow wrappers. No vault data is sent; the check
+# transmits only the running version and platform to the first-party update
+# origin. `no_egress.rs` still forbids granting the raw `updater:` commands.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the desktop self-update plugin: check for, and install, a signed update, and toggle the device-local automatic check."
+permissions = [
+    "allow-update-check",
+    "allow-update-install",
+    "allow-update-get-auto-check",
+    "allow-update-set-auto-check",
+]
+
+[[permission]]
+identifier = "allow-update-check"
+description = "Allow invoking update:update_check (host-side fetch of the signed update manifest for this build's channel; returns up-to-date or an available version; sends no vault data)."
+commands.allow = ["update_check"]
+
+[[permission]]
+identifier = "allow-update-install"
+description = "Allow invoking update:update_install (downloads and installs the offered signed update, then relaunches; the install is signature-verified by the updater)."
+commands.allow = ["update_install"]
+
+[[permission]]
+identifier = "allow-update-get-auto-check"
+description = "Allow invoking update:update_get_auto_check (reads the device-local 'check for updates automatically' toggle; no vault data)."
+commands.allow = ["update_get_auto_check"]
+
+[[permission]]
+identifier = "allow-update-set-auto-check"
+description = "Allow invoking update:update_set_auto_check (writes the device-local 'check for updates automatically' toggle)."
+commands.allow = ["update_set_auto_check"]

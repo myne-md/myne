@@ -53,6 +53,9 @@ const CAPABILITY_BACKING = {
   // myne-md/myne#788. The whole plugin, absent on web by the feature's own
   // verdict (no OS file ingress in a browser).
   plainFile: ["plain-file"],
+  // Desktop self-update: the whole `update` plugin, absent on web by platform
+  // fact (`tauri-plugin-updater` has no browser target).
+  selfUpdate: ["update"],
   // No ported command surface: the watch queue is drained by native code, and
   // `captures` is gated out of the wasm build at the module level.
   watchCapture: [],

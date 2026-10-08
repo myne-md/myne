@@ -210,6 +210,10 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // window of the app; the single-tab OPFS lock is the whole model. Absent by
   // platform fact. The pop-out affordance is omitted here rather than greyed.
   "detachedWindows",
+  // Desktop self-update. `tauri-plugin-updater` has no browser target, and a
+  // served page cannot replace itself. Absent by platform fact; the About and
+  // banner affordances are omitted here rather than greyed.
+  "selfUpdate",
 ]);
 
 export function has(cap: Capability): boolean {

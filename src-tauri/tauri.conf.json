@@ -33,11 +33,17 @@
       "desktop": {
         "schemes": ["myne"]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXkgQTNDNzZCQTAzREUzREY2NApSV1JrMytNOW9HdkhvMzNvSGc1a09MN2E1RGJOajhzUjJLUExnMGd3SE11am5IT3BRSStrWCtubQ==",
+      "requireSignedVersion": true,
+      "endpoints": ["https://downloads.myne.md/releases/latest.json"]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "publisher": "Myne",
     "homepage": "https://myne.md",
     "category": "Productivity",
