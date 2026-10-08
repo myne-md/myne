@@ -22,6 +22,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify("test"),
     __BUILD_COMMIT__: JSON.stringify("test"),
+    __UPDATE_CHANNEL__: JSON.stringify("stable"),
   },
   // The shared editor/dialect engines are pnpm-workspace packages symlinked into
   // node_modules, which Vitest treats as EXTERNAL deps — so `vi.mock` hoisting is

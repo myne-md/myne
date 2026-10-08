@@ -706,6 +706,30 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "app.self-update",
+    title: "Desktop self-update",
+    paths: [
+      "src/platform/update.ts",
+      "src/hooks/useUpdateAvailable.ts",
+      "src/components/UpdateBanner.tsx",
+      "src/components/settings/AboutPanel.tsx",
+      "src-tauri/src/update/",
+      "src-tauri/src/plugins/update/",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/self-update.e2e.ts"],
+    manual: [
+      {
+        see: "On macOS, with a signed and notarized build installed and biometric quick-unlock enabled, let the app check for updates (or press Check for updates under Settings, About), open the update banner, press Restart to update, and confirm the app relaunches on the new version. Then confirm biometric quick-unlock still works, that the vault-label cache still shows the vault's name on the locked picker, and that Gatekeeper did not warn on the updated app. Repeat the update on Windows and on the Linux AppImage, confirming each replaces in place. Finally turn the automatic check off under About, relaunch, and confirm no request is made.",
+        whyNotAutomated: "The in-place bundle replacement and the keychain item's survival can only be observed on a signed build on real macOS hardware, and no CI lane builds a signed or notarized macOS app or holds a login keychain. Whether quick-unlock and the vault-label cache still work after the swap is a product-level outcome with no seam a test can drive.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 25,
+        tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "app.reminders",
     title: "Reminders (scheduling, delivery surface and the OS permission gate)",
     paths: [

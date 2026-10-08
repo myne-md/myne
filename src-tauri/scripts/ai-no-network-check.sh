@@ -66,7 +66,7 @@
 #
 # FIVE checks run, and checks 1-2 prove LESS than their names suggest:
 #   1. ABSOLUTE — scan the shipped (default, AI-on) closure; fail on any
-#      denylisted crate that is NOT in the SYNC_TLS_ALLOW allowlist. If sync
+#      denylisted crate that is NOT in the ALLOWED_NETWORK_CRATES allowlist. If sync
 #      ever swaps its TLS crate, this fails on purpose and forces a conscious
 #      TB9 review rather than silently widening the network surface.
 #      PROVES: no third-party crate in the closure originates outbound
@@ -116,19 +116,26 @@ REPO_ROOT="$(cd .. && pwd)"
 PKG="myne-desktop"
 FEATURE="local-inference"
 
-# Narrow allowlist: networked crates that are legitimately in the shipped tree
-# — the shared TLS transport stack. These are transport primitives (no HTTP
-# client, no model download). They are reachable from TWO paths, not one: the
-# Phase-2 sync transport (CSP `connect-src` + Tauri sync capabilities) and, as
-# of myne#415, the AI remote-provider arm (four host-side preconditions since
-# myne-md/myne#456, all defaulting to off). The header above spells both out; the short version is
-# that "not an AI dependency" stopped being true on 2026-08-09 and the list did
-# not grow to accommodate that — the RATIONALE changed, which is the honest
-# edit. Keep this list minimal: a new entry is a deliberate TB9 decision.
-SYNC_TLS_ALLOW=$(cat <<'EOF'
+# Narrow allowlist: networked crates that are legitimately in the shipped tree.
+# It is no longer only the TLS transport stack. The desktop self-update
+# (tauri-plugin-updater) adds an HTTP client for the signed update check, so
+# three gated paths reach these crates: the Phase-2 sync transport (CSP
+# `connect-src` + Tauri sync capabilities), the AI remote-provider arm (four
+# host-side preconditions since myne-md/myne#456, all defaulting to off), and
+# the host-side update check (never granted to the WebView). Keep this list
+# minimal: a new entry is a deliberate TB9 decision.
+#   rustls / rustls-pki-types / rustls-webpki: TLS transport primitives.
+#   reqwest / hyper / hyper-util / socket2: the update check's HTTP client and
+#   its socket layer, reached only through tauri-plugin-updater
+#   (docs/dependency-policy.md, decisions entry).
+ALLOWED_NETWORK_CRATES=$(cat <<'EOF'
 rustls
 rustls-pki-types
 rustls-webpki
+reqwest
+hyper
+hyper-util
+socket2
 EOF
 )
 
@@ -190,14 +197,14 @@ on="$(closure --features "$FEATURE")"      # shipped tree (default == local-infe
 violation=0
 
 # ── Check 1: ABSOLUTE — no networked crate in the shipped tree except the
-#    documented sync-TLS allowlist. ───────────────────────────────────────
+#    documented gated-path allowlist. ─────────────────────────────────────
 echo "== absolute scan of the shipped tree =="
 found_net=""
 while IFS= read -r crate; do
   [ -z "$crate" ] && continue
   if printf '%s\n' "$DENYLIST" | grep -qx "$crate"; then
-    if printf '%s\n' "$SYNC_TLS_ALLOW" | grep -qx "$crate"; then
-      echo "  · allowed (sync TLS, not AI): $crate"
+    if printf '%s\n' "$ALLOWED_NETWORK_CRATES" | grep -qx "$crate"; then
+      echo "  · allowed (gated network path): $crate"
     else
       echo "  ✗ DENYLISTED networked crate present in the shipped tree: $crate"
       violation=1
@@ -206,7 +213,7 @@ while IFS= read -r crate; do
   fi
 done <<< "$on"
 [ -z "$found_net" ] && echo "  (no denylist-family crate present at all)"
-[ "$violation" -eq 0 ] && echo "  ✓ shipped tree carries no networked crate outside the sync-TLS allowlist"
+[ "$violation" -eq 0 ] && echo "  ✓ shipped tree carries no networked crate outside the gated-path allowlist"
 
 # ── Check 2: AI DELTA — enabling the AI path over the AI-free baseline adds
 #    no networked crate (belt-and-suspenders). ─────────────────────────────
@@ -565,4 +572,4 @@ if [ "$violation" -ne 0 ]; then
   echo "FAIL: AI egress invariant violated"
   exit 1
 fi
-echo "PASS: no networked crate beyond the sync-TLS allowlist; no unrecorded egress call site on the AI path; lockfile + version discipline intact"
+echo "PASS: no networked crate beyond the gated-path allowlist; no unrecorded egress call site on the AI path; lockfile + version discipline intact"
