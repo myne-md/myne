@@ -2,12 +2,18 @@
 //! predicates + static scanners (local-ai epic, ai-egress-guardrail MYND-407,
 //! tasks 1–3).
 //!
-//! **App-global by design, NOT AI-scoped.** The whole Myne client must never
-//! gain a network egress path: the WebView is bound by the CSP `connect-src`
-//! allowlist, and the Rust host has no HTTP-client / telemetry crate and no
-//! network-bearing capability. The AI runtime (`local_inference`) is the
-//! occasion for the guard, but the invariant it enforces is global — a future
-//! contributor adding `reqwest` for *any* feature trips it.
+//! **App-global by design, NOT AI-scoped.** The whole Myne client must not
+//! gain a network egress path beyond the three named, gated ones: the Phase-2
+//! sync TLS transport, the AI remote provider arm (four host-side
+//! preconditions, all default off), and the desktop self-update check. The
+//! WebView is bound by the CSP `connect-src` allowlist; the Rust host carries
+//! exactly one HTTP client, `reqwest` (via `hyper`), reached only through
+//! `tauri-plugin-updater` for the update check, and no network-bearing
+//! capability is granted to page context (the updater's own commands are never
+//! granted; the check is host-side). The AI runtime (`local_inference`) is the
+//! occasion for the guard, but the invariant it enforces is global, so a future
+//! contributor adding a NEW HTTP-client crate for any other feature still trips
+//! it.
 //!
 //! Three layers, one canonical source here so the CI gate (task 2) cannot
 //! drift from the lists:
@@ -31,6 +37,14 @@
 //! sink, and it is not reachable from the AI module. The denylist targets
 //! crates that *originate* outbound requests, not TLS primitives.
 //!
+//! `reqwest`, `hyper` and `tauri-plugin-updater` left this denylist when the
+//! desktop self-update shipped: they are the one deliberate HTTP-client
+//! exception, admitted in `docs/dependency-policy.md` and a decisions entry,
+//! and reached only by the host-side update check. The WebView still may not be
+//! granted the updater's commands (`updater` stays in
+//! [`NETWORK_PERMISSION_PREFIXES`]), so the capability-layer half of this guard
+//! is unchanged.
+//!
 //! Logging: predicates + scanners are pure over their string inputs and emit
 //! nothing; the gate test (below) only prints crate/token names on failure —
 //! never secret material.
@@ -53,21 +67,21 @@ pub const CSP_CONNECT_SRC_ALLOWLIST: &[&str] = &[
 ];
 
 /// Crates whose presence anywhere in the dependency closure means the client
-/// gained an outbound-request or telemetry capability. HTTP clients +
-/// crash/analytics SDKs. NOT TLS primitives (see module docs on `rustls`).
+/// gained an outbound-request or telemetry capability it was not meant to have.
+/// HTTP clients + crash/analytics SDKs, MINUS the one deliberate exception:
+/// `reqwest`/`hyper` arrive through `tauri-plugin-updater` for the host-side
+/// update check (see module docs and `docs/dependency-policy.md`), so none of
+/// the three is listed here. NOT TLS primitives (see module docs on `rustls`).
 pub const DENYLISTED_CRATES: &[&str] = &[
-    // HTTP clients
-    "reqwest",
-    "hyper",
+    // HTTP clients (`reqwest`/`hyper` are the admitted update exception, above)
     "ureq",
     "isahc",
     "surf",
     "attohttpc",
     "curl",
     "curl-sys",
-    // Tauri network plugins
+    // Tauri network plugins (`tauri-plugin-updater` is the admitted exception)
     "tauri-plugin-http",
-    "tauri-plugin-updater",
     // Telemetry / crash reporters / analytics
     "sentry",
     "sentry-core",
@@ -548,13 +562,17 @@ mod tests {
 
     #[test]
     fn crate_denied_flags_each_denylisted_name_normalization_robust() {
-        assert!(crate_denied("reqwest"));
+        assert!(crate_denied("ureq"));
         assert!(crate_denied("tauri-plugin-http"));
         assert!(crate_denied("tauri_plugin_http")); // underscore form
         assert!(crate_denied("  Sentry  ")); // trim + case
         assert!(!crate_denied("rustls")); // TLS transport, legit (sync)
         assert!(!crate_denied("serde"));
         assert!(!crate_denied("tokio"));
+        // The one admitted exception: the update check's HTTP client.
+        assert!(!crate_denied("reqwest"));
+        assert!(!crate_denied("hyper"));
+        assert!(!crate_denied("tauri-plugin-updater"));
     }
 
     #[test]
@@ -1020,15 +1038,12 @@ commands.allow = ["mystery"]
     }
 
     #[test]
-    fn negative_reqwest_in_manifest_and_lock_trips_the_gate() {
-        let manifest = "[dependencies]\nserde = \"1\"\nreqwest = { version = \"0.12\" }\n";
-        assert_eq!(
-            manifest_denied_crates(manifest),
-            vec!["reqwest".to_string()]
-        );
+    fn negative_ureq_in_manifest_and_lock_trips_the_gate() {
+        let manifest = "[dependencies]\nserde = \"1\"\nureq = { version = \"2\" }\n";
+        assert_eq!(manifest_denied_crates(manifest), vec!["ureq".to_string()]);
 
-        let lock = "[[package]]\nname = \"reqwest\"\nversion = \"0.12.0\"\n";
-        assert_eq!(lock_denied_crates(lock), vec!["reqwest".to_string()]);
+        let lock = "[[package]]\nname = \"ureq\"\nversion = \"2.0.0\"\n";
+        assert_eq!(lock_denied_crates(lock), vec!["ureq".to_string()]);
     }
 
     #[test]

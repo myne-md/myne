@@ -103,6 +103,13 @@ tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+# Desktop self-update (in-app). The ONE dependency that brings an HTTP client
+# (`reqwest` + `hyper`) into the shipped runtime closure, admitted deliberately
+# (docs/dependency-policy.md, decisions entry) so the client can fetch a signed
+# update manifest. The signature check is the plugin's and cannot be disabled;
+# the check is host-side, so no updater capability is granted to the WebView.
+# See `src-tauri/src/update/` and `src-tauri/src/no_egress.rs`.
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 theme-validator = { path = "../theme-validator" }

@@ -582,7 +582,7 @@ Used in: MYND-444
 
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
-**Retired as a description of Myne, and kept as the term it is not.** This entry said Myne's desktop installers and auto-update payloads were signed with hardware-backed keys and that auto-update refused any artifact failing the check. Every clause is false: no Apple Developer ID and no Windows Authenticode certificate exists, so the `.dmg`, `.deb`, `.AppImage` and `.pkg.tar.zst` carry no signature any OS checks, and there is no in-app auto-update to verify anything (`threat-model.md` TB7 and A9, corrected by `decisions.md` 2026-08-15 entry 0496; this definition was missed by that sweep and corrected by entry 0534). What Myne actually has is **signed release hashes**: each release's `SHA256SUMS` is signed with an offline **minisign** key and cross-published on a second origin, and the user verifies it by hand. The signature authenticates the hash list, not the installer, and no operating system checks it. The Android `.apk` is the one artifact carrying an OS-checked signature, because Android refuses to install an unsigned package.
+**Retired as a description of Myne, and kept as the term it is not.** This entry said Myne's desktop installers and auto-update payloads were signed with hardware-backed keys and that auto-update refused any artifact failing the check. Every clause is false: no Apple Developer ID and no Windows Authenticode certificate exists, so the `.dmg`, `.deb`, `.AppImage` and `.pkg.tar.zst` carry no signature any OS checks, and, until 2026-10-07, there was no in-app auto-update to verify anything: a signature-gated auto-update now ships (`decisions/clients/0649`), though the installers still carry no OS-checked signature (`threat-model.md` TB7 and A9; this definition was missed by the 0496/0534 sweep and reconciled here). What Myne actually has is **signed release hashes**: each release's `SHA256SUMS` is signed with an offline **minisign** key and cross-published on a second origin, and the user verifies it by hand. The signature authenticates the hash list, not the installer, and no operating system checks it. The Android `.apk` is the one artifact carrying an OS-checked signature, because Android refuses to install an unsigned package.
 
 Used in: `threat-model.md` TB7, §4 A9, §6
 
@@ -2892,6 +2892,12 @@ User-operated deployment of the Myne sync server. First-class in the product pla
 
 Used in: `vision.md`, `threat-model.md` §3
 
+### **self-update** &nbsp; 📦 *Product*
+
+In-app updating of a desktop Myne client. The client fetches a signed per-channel [update manifest](#update-manifest) from the first-party download origin, verifies the offered artifact against the offline release key (the signature check cannot be disabled), refuses on signature or hash failure, and installs only a strictly newer version, never a silent downgrade. Shipped 2026-10-07 (`decisions/clients/0649`), meeting the TB7 crossing condition. Runs host-side: the WebView reaches only the `update` plugin's commands. macOS, Windows and the Linux AppImage self-update; the Android store and the web client do not (the stores own their update, and a served page cannot replace itself). The automatic check is default-on, user-disablable, and the one egress the user has not named a provider for (`decisions/security/0650`).
+
+Used in: `threat-model.md` TB7, §7
+
 ### **served-code delivery** &nbsp; ⚠️ *Threat*
 
 The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the distribution channel TB7 describes, whose crossing conditions a served bundle satisfies none of. (This entry called that channel "signed, hash-published, reproducible" until 2026-08-25, and two of the three were wrong: desktop artifacts carry no signature any OS checks and are not reproducible. Hash-published is the one that holds. Entry 0534.) Compensating controls are detection-oriented and close *later substitution*, not *targeted first delivery*. Two of them ship, and one of those two is not yet usable by the reader it is for: the reproducible bundle build, and the per-release bundle hashes written to an append-only record ([`web-bundle-hashes.md`](web-bundle-hashes.md)) that lives in a private repository, so nobody outside the project can look a hash up in it. The third — a [service worker](#service-worker) pinning the code after first load — has its policy fixed (`decisions.md` 2026-07-26) but no implementation, so today nothing bounds a later substitution either.
@@ -3551,6 +3557,18 @@ It **depicts the sentence**, and after three attempts that is the whole of the l
 It **never moves and is never `--accent`**, unlike the readout's own marks. There is no bounded in-flight variant of it to express: a note can sit unsynced for a week on a machine that is shut, so motion and the accent colour both stay with the save readout, where the work ends.
 
 Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`, `src/notes/components/NoteRow.tsx`, `src/notes/components/SaveStatus.tsx`
+
+### **update channel** &nbsp; 📦 *Product*
+
+Which release line a desktop client's [self-update](#self-update) follows: `stable` (default) or `beta`. Baked at build time (`MYNE_UPDATE_CHANNEL`), not chosen in-app, so there is no runtime switcher and no downgrade path. The **update manifest** is the static signed document the channel points at: a version, notes, and per-platform artifact URLs and signatures, in the shape `tauri-plugin-updater` expects. Both manifests live on `downloads.myne.md` (`latest.json`, `latest-beta.json`) and both are signed with the same offline release key; both are published by hand (`decisions/clients/0651`).
+
+Used in: `threat-model.md` TB7, `decisions/clients/0651`
+
+### **update manifest** &nbsp; 📦 *Product*
+
+The static document a desktop client's [update channel](#update-channel) points at: a version, optional notes and publication date, and per-platform artifact URLs with their signatures, in the shape `tauri-plugin-updater` reads. The signatures cover each downloaded artifact, not the manifest, so a substituted manifest cannot forge an install (the artifact signature and the version gate hold); what it can do is withhold an offer or alter the notes the client reads over TLS. Both manifests (`latest.json`, `latest-beta.json`) live on `downloads.myne.md`.
+
+Used in: `threat-model.md` TB7; `scripts/emit-update-manifest.mjs`
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 
