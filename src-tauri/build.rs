@@ -781,5 +781,19 @@ fn main() {
         );
     }
 
+    // The desktop self-update commands (host-side check + install). The
+    // InlinedPlugin declaration creates the `update:` ACL namespace; without it
+    // `permissions/update/` flattens into `__app-acl__` and the grants never
+    // match `plugin:update|<cmd>`.
+    attributes = attributes.plugin(
+        "update",
+        tauri_build::InlinedPlugin::new().commands(&[
+            "update_check",
+            "update_install",
+            "update_get_auto_check",
+            "update_set_auto_check",
+        ]),
+    );
+
     tauri_build::try_build(attributes).unwrap();
 }

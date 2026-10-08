@@ -325,7 +325,16 @@ export type Capability =
    * none of which a browser page has. Absent rather than degraded: the
    * surface is omitted, never rendered against commands that refuse.
    */
-  | "plainFile";
+  | "plainFile"
+  /**
+   * In-app desktop self-update (check for, and install, a signed update).
+   *
+   * Desktop-only by construction: `tauri-plugin-updater` has no browser target,
+   * and a served page cannot replace itself. Absent on web rather than degraded,
+   * so the About/banner affordances are omitted instead of shown against a
+   * command that refuses. See `src-tauri/src/update` and the `update` plugin.
+   */
+  | "selfUpdate";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -375,6 +384,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   memberSharing: true,
   detachedWindows: true,
   plainFile: true,
+  selfUpdate: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

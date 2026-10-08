@@ -54,6 +54,7 @@
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-confirm",
-    "secret-export:default"
+    "secret-export:default",
+    "update:default"
   ]
 }

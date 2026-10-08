@@ -17,3 +17,6 @@ declare const __APP_VERSION__: string;
  * `servedBuildInfo()` on the platform seam.
  */
 declare const __BUILD_COMMIT__: string;
+
+/** The update channel this build follows: `"stable"` or `"beta"` (desktop). */
+declare const __UPDATE_CHANNEL__: string;

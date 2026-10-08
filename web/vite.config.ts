@@ -493,6 +493,10 @@ export default defineConfig({
     // lives, for the same reason a bundle cannot contain its own hash — and
     // `servedBuildInfo()` is what About and the diagnostics blob read.
     __BUILD_COMMIT__: JSON.stringify("unknown"),
+    // The web client never self-updates (`selfUpdate` is absent), so the update
+    // block in the shared About panel is gated off here; the define exists only
+    // so the shared tree does not reference an undefined global.
+    __UPDATE_CHANNEL__: JSON.stringify("stable"),
   },
 
   build: {
