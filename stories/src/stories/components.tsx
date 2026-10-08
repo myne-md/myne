@@ -107,6 +107,7 @@ import { Toaster } from "@app/components/toast/Toaster";
 import { TorStatusBanner } from "@app/components/sync/TorStatusBanner";
 import { TranscriptionModal } from "@app/components/attachments/TranscriptionModal";
 import { Unlock } from "@app/screens/Unlock";
+import { UpdateBanner } from "@app/components/UpdateBanner";
 import { UsedInNotesPopover } from "@app/components/attachments/UsedInNotesPopover";
 import { VaultExportModal } from "@app/components/export/VaultExportModal";
 import { VaultPicker } from "@app/screens/VaultPicker";
@@ -804,6 +805,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     state: "default",
     fixture: "unlocked",
     render: () => <SyncBanners />,
+  },
+  {
+    id: "components/updatebanner/default",
+    group: "components",
+    surface: "UpdateBanner",
+    state: "default",
+    fixture: "unlocked",
+    render: () => <UpdateBanner />,
   },
   {
     id: "components/syncstatusindicator/default",

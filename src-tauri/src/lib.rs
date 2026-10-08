@@ -75,6 +75,13 @@ mod tor_sidecar;
 // Shared Unix-domain-socket bind (owner-only 0600, TOCTOU-closed), used by
 // both local ingresses: `clipper::relay` and `cli_bridge::socket`.
 mod uds;
+// The desktop self-update domain model (the channel, the check status, the
+// closed failure set). Desktop-only by design: `tauri-plugin-updater` exists on
+// Linux/Windows/macOS and not on mobile, and `myne-core` compiles for wasm32 and
+// mobile where an update type would be a false affordance. Signature
+// verification and the anti-rollback version gate are the plugin's, never
+// reimplemented here. Consumed by `plugins::update`.
+mod update;
 #[cfg(test)]
 pub use myne_core::test_support;
 pub use myne_core::text;
@@ -331,6 +338,13 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // Desktop self-update. The ONE registered plugin that carries an HTTP
+        // client (`reqwest`); it is reached only from host-side Rust (the
+        // `update` plugin's commands), never granted to the WebView. Its
+        // signature check cannot be disabled. See `src-tauri/src/update/`,
+        // `src-tauri/src/no_egress.rs` and `docs/dependency-policy.md`.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(plugins::update::init())
         .plugin(plugins::backup::init())
         .plugin(plugins::export::init())
         .plugin(plugins::secret_export::init())

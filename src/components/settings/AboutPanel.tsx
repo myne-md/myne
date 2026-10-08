@@ -31,6 +31,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
 import { openUrl } from "../../platform/opener";
+import { has } from "../../platform/capabilities";
+import { updateCheck, updateInstall, getAutoCheck, setAutoCheck, type UpdateCheckError, type UpdateStatus } from "../../platform/update";
+import { renameFlushHooks } from "../../notes/renameFlushHook";
 import { LEGAL_LINKS, legalUrl, type LegalDoc } from "../../lib/legal-urls";
 import { usePrefs } from "../../hooks/usePrefs";
 import { Button } from "../primitives/Button";
@@ -131,6 +134,22 @@ function handleLegalClick(doc: LegalDoc, locale: string) {
   });
 }
 
+type CheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "status"; status: UpdateStatus }
+  | { kind: "failed"; error: UpdateCheckError };
+
+/** Narrow a rejected invoke to the closed update-error union, defaulting to `other`. */
+function updateErrorKind(error: unknown): UpdateCheckError {
+  return error === "unreachable" ||
+    error === "verification" ||
+    error === "unsupported" ||
+    error === "other"
+    ? error
+    : "other";
+}
+
 export function AboutPanel() {
   const { t, i18n } = useTranslation();
   const { prefs, setDeveloperMode } = usePrefs();
@@ -167,6 +186,86 @@ export function AboutPanel() {
       ? t("settings.about.buildChannelDevelopment")
       : t("settings.about.buildChannelStable");
 
+  // The manual update check. Idle until the user presses the button; a failure
+  // is a calm line, never an error dialog.
+  const [check, setCheck] = useState<CheckState>({ kind: "idle" });
+  const runUpdateCheck = () => {
+    setCheck({ kind: "checking" });
+    updateCheck()
+      .then((status) => {
+        setCheck({ kind: "status", status });
+      })
+      .catch((error: unknown) => {
+        setCheck({ kind: "failed", error: updateErrorKind(error) });
+      });
+  };
+
+  // A manual check that finds an update must offer the install, not just the
+  // sentence: with the automatic check off, the banner never runs, so this is the
+  // only reachable affordance. Same command the banner's button calls.
+  const [installing, setInstalling] = useState(false);
+  const runUpdateInstall = () => {
+    setInstalling(true);
+    void (async () => {
+      // Flush unsaved note edits before the process exits to install, as every
+      // other exit path does.
+      try {
+        await renameFlushHooks().flushOpenPanes();
+      } catch {
+        // best effort
+      }
+      updateInstall().catch(() => {
+        setInstalling(false);
+        setCheck({ kind: "failed", error: "other" });
+      });
+    })();
+  };
+
+  const updateChannelLabel =
+    __UPDATE_CHANNEL__ === "beta"
+      ? t("settings.about.updateChannelBeta")
+      : t("settings.about.updateChannelStable");
+
+  const updateStatusText = (() => {
+    switch (check.kind) {
+      case "checking":
+        return t("settings.about.updateChecking");
+      case "status":
+        return check.status.kind === "up_to_date"
+          ? t("settings.about.updateUpToDate")
+          : t("settings.about.updateAvailable", { version: check.status.version });
+      case "failed":
+        return t("settings.about.updateFailed");
+      default:
+        return t("settings.about.updateIdle");
+    }
+  })();
+
+  // The device-local automatic-check toggle. Null until the read resolves, so
+  // the row does not render a guessed value.
+  const [autoCheck, setAutoCheckState] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!has("selfUpdate")) return;
+    let cancelled = false;
+    getAutoCheck()
+      .then((value) => {
+        if (!cancelled) setAutoCheckState(value);
+      })
+      .catch(() => {
+        // Leave null; the row stays hidden rather than showing a guess.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const toggleAutoCheck = (next: boolean) => {
+    setAutoCheckState(next);
+    setAutoCheck(next).catch(() => {
+      // Revert if the write failed, so the switch reflects what is stored.
+      setAutoCheckState(!next);
+    });
+  };
+
   return (
     <div style={PANEL_ROOT_STYLE}>
       <Block>
@@ -183,6 +282,63 @@ export function AboutPanel() {
         <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
         <p style={VALUE_STYLE}>{buildChannelLabel}</p>
       </Block>
+
+      {has("selfUpdate") && (
+        <>
+          <Block data-setting-anchor="about.update-channel" data-setting-row="true">
+            <span style={LABEL_STYLE}>{t("settings.about.updateChannelLabel")}</span>
+            <p style={VALUE_STYLE} data-testid="about.update-channel">
+              {updateChannelLabel}
+            </p>
+          </Block>
+
+          <Block data-setting-anchor="about.update" data-setting-row="true">
+            <span style={LABEL_STYLE}>{t("settings.about.updateLabel")}</span>
+            <div>
+              <Button
+                variant="secondary"
+                onClick={runUpdateCheck}
+                disabled={check.kind === "checking"}
+                data-testid="about.update-check"
+              >
+                {t("settings.about.updateCheckButton")}
+              </Button>
+            </div>
+            <p style={HELPER_STYLE} data-testid="about.update-status">
+              {updateStatusText}
+            </p>
+            {check.kind === "status" && check.status.kind === "available" && (
+              <div>
+                <Button
+                  variant="primary"
+                  onClick={runUpdateInstall}
+                  disabled={installing}
+                  data-testid="about.update-install"
+                >
+                  {t("settings.about.updateInstallButton")}
+                </Button>
+              </div>
+            )}
+            <p style={HELPER_STYLE}>{t("settings.about.updateHelper")}</p>
+          </Block>
+
+          {autoCheck !== null && (
+            <SettingRow
+              label={t("settings.about.updateAutoCheckLabel")}
+              helper={t("settings.about.updateAutoCheckHelper")}
+              control={(helperId) => (
+                <Switch
+                  checked={autoCheck}
+                  onChange={toggleAutoCheck}
+                  ariaLabel={t("settings.about.updateAutoCheckLabel")}
+                  ariaDescribedBy={helperId}
+                  testId="about.update-auto-check"
+                />
+              )}
+            />
+          )}
+        </>
+      )}
 
       <Block>
         <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
