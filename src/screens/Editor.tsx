@@ -89,6 +89,7 @@ import { activeVaultId } from "../lib/vault-list";
 import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
 import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
+import { UpdateBanner } from "../components/UpdateBanner";
 import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
 import {
@@ -2275,6 +2276,10 @@ function EditorChrome({
           three-pane row. Non-blocking + dismissable; renders nothing while sync
           is off (the common case). */}
       <SyncBanners />
+      {/* Desktop self-update. A calm, dismissable strip beside the sync
+          banners; renders nothing while no update is offered or the client
+          cannot self-update (web). */}
+      <UpdateBanner />
       {/* MYND-336: keep the editor toolbar plugin's layout in sync with the
           user's vault.prefs customization (no render). */}
       <ToolbarLayoutSync />

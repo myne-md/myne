@@ -55,6 +55,7 @@ pub mod secret_export;
 pub mod snapshots;
 pub mod sync;
 pub mod themes;
+pub mod update;
 pub mod vault_change_password;
 // `vault_creation` core (commands + state + error + `init()`) moved to
 // `myne-core` (shared with the mobile client). Re-exported so existing

@@ -419,6 +419,11 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // cannot be a native-messaging host; the extension talks to the desktop app
     // or to nothing. Task 27 "Absent on web: clipper".
     ("clipper-pairing", Class::Unsupported),
+    // Desktop self-update (the `update` plugin: `update_check` /
+    // `update_install`). `tauri-plugin-updater` has no browser target, and a
+    // served page cannot replace itself. `Unsupported` rather than `Pending`:
+    // this is a platform fact, not a port owed.
+    ("update", Class::Unsupported),
     // On-device LLM inference. Task 27 "Absent on web: local AI".
     //
     // The IN-PROCESS arm genuinely cannot run here: candle + multi-GiB GGUF

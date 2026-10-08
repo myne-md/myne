@@ -2928,6 +2928,20 @@
       "tagline": "Pre-alpha · Phase 1 desktop client",
       "threatModelHelper": "Open the public threat-model document in your browser.",
       "threatModelLabel": "Threat model",
+      "updateAutoCheckHelper": "Myne downloads a small signed file from myne.md to see whether a newer version exists, then tells you. It sends your current version and platform, and nothing else. You can still check by hand with the button above.",
+      "updateAutoCheckLabel": "Check for updates automatically",
+      "updateAvailable": "Version {{version}} is available.",
+      "updateChannelBeta": "Beta",
+      "updateChannelLabel": "Update channel",
+      "updateChannelStable": "Stable",
+      "updateCheckButton": "Check for updates",
+      "updateChecking": "Checking…",
+      "updateFailed": "Couldn't check for updates. It will retry later.",
+      "updateHelper": "Myne verifies every update against an offline release key before installing it. The check asks downloads.myne.md for the latest version, sending only your version and platform (and your IP, which that origin does not log); never your notes or account.",
+      "updateIdle": "Signed updates, fetched from downloads.myne.md when you check.",
+      "updateInstallButton": "Restart to update",
+      "updateLabel": "Updates",
+      "updateUpToDate": "You're on the latest version.",
       "version": "Version",
       "dev": "Dev"
     },
@@ -3784,6 +3798,7 @@
         "autoLock": "auto lock timeout idle lock timer inactivity session",
         "backup": "backup export .myne-backup restore save copy",
         "buildChannel": "build channel version release stable beta nightly",
+        "update": "update upgrade check for updates new version release download",
         "changePassword": "change password passphrase credentials update reset",
         "changelog": "changelog release notes what is new history",
         "cliAccess": "cli terminal access command line shell myne command console",
@@ -3882,6 +3897,15 @@
     "unsyncedOverflow": "…and {{count}} more.",
     "unsyncedOverflow_one": "…and {{count}} more.",
     "unsyncedOverflow_other": "…and {{count}} more."
+  },
+  "update": {
+    "banner": {
+      "available": "Myne {{version}} is available.",
+      "failed": "Couldn't install the update. Try again.",
+      "installing": "Downloading the update…",
+      "later": "Later",
+      "restart": "Restart to update"
+    }
   },
   "sync": {
     "betaTerms": {
