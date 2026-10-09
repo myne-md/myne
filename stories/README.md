@@ -24,14 +24,18 @@ Every story is addressable by URL: the fragment is the story id
 ## The four regions
 
 - **Navbar.** The Myne mark, the wordmark and the version, with search in the
-  centre and a **group filter** beside it. Search matches a story's id, its
-  derived name, its state, its description and its tags, so "sync error" finds a
-  story whose id says nothing about either. It **proposes** rather than filters:
-  results appear as a listbox directly under the input, walked with the arrow
-  keys and opened with Enter or a click. It deliberately does **not** touch the
-  rail, because replacing the tree with a flat "matches" list loses the reader's
-  place in the hierarchy; narrowing the rail is the filter's job, and the two
-  controls answer two different questions.
+  centre, a **group filter** beside it, the theme switcher, and **File issue**.
+  Search matches a story's id, its derived name, its state, its description and
+  its tags, so "sync error" finds a story whose id says nothing about either. It
+  **proposes** rather than filters: results appear as a listbox directly under
+  the input, walked with the arrow keys and opened with Enter or a click. It
+  deliberately does **not** touch the rail, because replacing the tree with a
+  flat "matches" list loses the reader's place in the hierarchy; narrowing the
+  rail is the filter's job, and the two controls answer two different questions.
+  **File issue** opens the repo's `design-system.yml` issue form with the story,
+  the state, the theme, the catalogue version and the page URL already filled in,
+  so a finding arrives reproducible. The form field id and the query parameter
+  are one contract: renaming either side silently drops the context.
 - **Rail.** One row per surface with its states grouped beneath, reachable with
   the up and down arrows. A name is derived from the component name and changes
   **casing only** (`ModalShell` reads as "Modal Shell"); `title` on a descriptor

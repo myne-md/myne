@@ -1,0 +1,40 @@
+name: Design system finding
+description: Something in the design-system catalogue looks wrong. A spacing, a state, a theme, a token, a component that does not render.
+title: "[Design system]: "
+labels: ["type: bug", "area: ui"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This template is reached from the catalogue's own **File issue** button, so the
+        context block below arrives pre-filled with the story you were looking at, the theme, and the URL.
+
+        A few things first:
+
+        - **Security issues do not go here.** Anything touching cryptography, key handling, recovery, sync
+          integrity, or the reproducible-build chain goes to **security@myne.md** privately. See
+          [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **Never paste note content, an account number, a master password, or a recovery phrase.** The
+          catalogue runs on synthetic fixtures, so nothing here needs real data.
+        - **Search first.** The finding may already be filed, and a duplicate costs more than it saves.
+  - type: textarea
+    id: what
+    attributes:
+      label: What looks wrong?
+      description: What you saw, in plain terms. "The padding between the rows is too tight" is a complete report.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+      description: Optional, but it is what turns a report into a decision.
+    validations:
+      required: false
+  - type: textarea
+    id: catalogue-context
+    attributes:
+      label: Catalogue context
+      description: Pre-filled by the catalogue. Do not clear it; it is how the finding gets reproduced.
+    validations:
+      required: true
