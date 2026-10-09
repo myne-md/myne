@@ -128,6 +128,17 @@ const TOOLBAR_GROUP_STYLE: CSSProperties = {
   background: "var(--bg-1)",
 };
 
+/** The second row: the controls that change how the stage is drawn. */
+const REVIEW_BAR_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  borderBlockEnd: "1px solid var(--line-2)",
+  background: "var(--bg-2)",
+};
+
 const SEARCH_WRAP_STYLE: CSSProperties = {
   flex: "1 1 auto",
   maxWidth: "520px",
@@ -1214,6 +1225,80 @@ export function App() {
 
         {/* The toolbar. RTL is the first axis and proves the mechanism: the
             control, the URL key, and the stage application (myne-md/myne#847). */}
+        <div
+          style={{ display: "flex", alignItems: "center" }}
+          data-testid="stories.filter"
+        >
+          <Select
+            value={groupFilter}
+            onChange={(next) => setGroupFilter(next)}
+            aria-label="Filter the rail by group"
+            icon="layout-grid"
+            options={[
+              { value: "all", label: "All groups" },
+              ...GROUP_ORDER.map((group) => ({
+                value: group,
+                label: group[0].toUpperCase() + group.slice(1),
+              })),
+            ]}
+          />
+        </div>
+
+        {/* Report what you are looking at. The URL carries the story, the theme
+            and the page URL into the repo's issue form, so a finding arrives
+            reproducible rather than as a description of a memory. */}
+        <Button
+          variant="secondary"
+          icon="message-square"
+          title="File an issue about this story"
+          onClick={() => window.open(issueUrl(selected, theme), "_blank", "noopener,noreferrer")}
+          data-testid="stories.file-issue"
+        >
+          File issue
+        </Button>
+      </header>
+      )}
+
+      <div style={{ display: "flex", flex: "1 1 auto", minHeight: 0 }}>
+        {!fullscreen && (
+        <nav
+          ref={railRef}
+          style={RAIL_STYLE}
+          aria-label="Stories"
+          data-testid="stories.rail"
+          onKeyDown={onRailKeyDown}
+        >
+          {tree.groups.map((entry) => (
+            <div key={entry.group}>
+              <div style={GROUP_TITLE_STYLE}>
+                <Icon name={entryIcon(entry.group)} size={12} />
+                {entry.group}
+              </div>
+              {entry.nodes.map((node) => (
+                <TreeRow
+                  key={node.surface}
+                  node={node}
+                  depth={0}
+                  selectedId={selected?.id}
+                  onSelect={select}
+                />
+              ))}
+            </div>
+          ))}
+        </nav>
+        )}
+
+        {/* The stage and the inspector share one column, so the inspector sits
+            under the content rather than running beneath the rail. */}
+        <div
+          style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minWidth: 0 }}
+        >
+          {/* The review bar. The navbar carries what changes what the CATALOGUE
+              shows you (search, filter, file issue); this carries what changes
+              how the STAGE is drawn. Ten controls in one row was unreadable, and
+              the split is the one the search/filter change already drew
+              (myne-md/myne#847). */}
+          <div style={REVIEW_BAR_STYLE} data-testid="stories.review-bar">
         <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.review">
         <Select
           value={rtl}
@@ -1305,25 +1390,6 @@ export function App() {
 
         <div
           style={{ display: "flex", alignItems: "center" }}
-          data-testid="stories.filter"
-        >
-          <Select
-            value={groupFilter}
-            onChange={(next) => setGroupFilter(next)}
-            aria-label="Filter the rail by group"
-            icon="layout-grid"
-            options={[
-              { value: "all", label: "All groups" },
-              ...GROUP_ORDER.map((group) => ({
-                value: group,
-                label: group[0].toUpperCase() + group.slice(1),
-              })),
-            ]}
-          />
-        </div>
-        <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.chrome">
-        <div
-          style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.theme-switcher"
         >
           <Select
@@ -1337,57 +1403,7 @@ export function App() {
             }))}
           />
         </div>
-
-        {/* Report what you are looking at. The URL carries the story, the theme
-            and the page URL into the repo's issue form, so a finding arrives
-            reproducible rather than as a description of a memory. */}
-        <Button
-          variant="secondary"
-          icon="message-square"
-          title="File an issue about this story"
-          onClick={() => window.open(issueUrl(selected, theme), "_blank", "noopener,noreferrer")}
-          data-testid="stories.file-issue"
-        >
-          File issue
-        </Button>
-        </div>
-      </header>
-      )}
-
-      <div style={{ display: "flex", flex: "1 1 auto", minHeight: 0 }}>
-        {!fullscreen && (
-        <nav
-          ref={railRef}
-          style={RAIL_STYLE}
-          aria-label="Stories"
-          data-testid="stories.rail"
-          onKeyDown={onRailKeyDown}
-        >
-          {tree.groups.map((entry) => (
-            <div key={entry.group}>
-              <div style={GROUP_TITLE_STYLE}>
-                <Icon name={entryIcon(entry.group)} size={12} />
-                {entry.group}
-              </div>
-              {entry.nodes.map((node) => (
-                <TreeRow
-                  key={node.surface}
-                  node={node}
-                  depth={0}
-                  selectedId={selected?.id}
-                  onSelect={select}
-                />
-              ))}
-            </div>
-          ))}
-        </nav>
-        )}
-
-        {/* The stage and the inspector share one column, so the inspector sits
-            under the content rather than running beneath the rail. */}
-        <div
-          style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minWidth: 0 }}
-        >
+          </div>
           {fullscreen && (
             <div style={{ position: "absolute", insetBlockStart: "var(--space-3)", insetInlineEnd: "var(--space-3)", zIndex: "var(--z-top-chrome)" }}>
               <Button
