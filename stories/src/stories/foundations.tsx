@@ -12,8 +12,10 @@
 // no runtime fetch and the catalogue stays a static bundle (which is what lets it
 // deploy as a served SPA).
 
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import tokensCss from "../../../client-core/src/tokens.css?raw";
+import { Button } from "@app/components/primitives/Button";
 import { Icon } from "@app/components/primitives/Icon";
 import { ICON_PATHS } from "@app/lib/icons";
 import type { IconName } from "@app/lib/icons";
@@ -245,26 +247,112 @@ export function ShadowsSpecimen(): ReactNode {
   );
 }
 
+/**
+ * An easing token's `cubic-bezier(a, b, c, d)` as an SVG path (myne-md/myne#847
+ * task 12).
+ *
+ * Four numbers are not a shape: the whole point of an easing curve is how it
+ * leaves and arrives, and reading `0.2, 0, 0, 1` tells a reviewer nothing about
+ * that. Pure, so it is asserted rather than eyeballed.
+ *
+ * The path is drawn in a 100x100 box with the y-axis flipped, because SVG grows
+ * downward and an easing curve is plotted upward.
+ */
+export function curvePath(value: string): string | null {
+  const match = value.match(/cubic-bezier\(\s*([\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*([\d.]+)\s*,\s*(-?[\d.]+)\s*\)/);
+  if (match === null) return null;
+  const [x1, y1, x2, y2] = match.slice(1, 5).map(Number);
+  if ([x1, y1, x2, y2].some((n) => Number.isNaN(n))) return null;
+  const px = (x: number) => Math.round(x * 100);
+  const py = (y: number) => Math.round(100 - y * 100);
+  return `M 0 100 C ${px(x1)} ${py(y1)}, ${px(x2)} ${py(y2)}, 100 0`;
+}
+
+/**
+ * The easing tokens, each drawn as its own curve.
+ */
+export function EasingSpecimen(): ReactNode {
+  const easings = TOKEN_GROUPS.motion.filter((name) => name.startsWith("--ease-"));
+  return (
+    <div style={{ ...SPECIMEN_STYLE, ...GRID_STYLE }}>
+      {easings.map((name) => {
+        const value = defaultValue(SHEET, name) ?? "";
+        const path = curvePath(value);
+        return (
+          <div key={name}>
+            {path === null ? (
+              <div style={{ ...CAPTION_STYLE }}>not a cubic-bezier</div>
+            ) : (
+              <svg viewBox="0 0 100 100" width="100%" height="var(--space-8)" role="img" aria-label={`${name} curve`}>
+                <rect x="0" y="0" width="100" height="100" fill="var(--bg-2)" />
+                <path d={path} fill="none" stroke="var(--accent)" strokeWidth="3" />
+              </svg>
+            )}
+            <div style={CAPTION_STYLE}>
+              {name}
+              <br />
+              {value}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * One duration token, with a control that RUNS it.
+ *
+ * The first version of this page declared a `transition` and never changed the
+ * property, so nothing ever animated: it showed a duration it did not exercise.
+ * Here the control flips the transform, so 120ms can be felt against 180ms
+ * rather than read off a table (myne-md/myne#847 task 12).
+ */
+function MotionRow({ name }: { name: string }) {
+  const [moved, setMoved] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+      <Button
+        variant="secondary"
+        onClick={() => setMoved((on) => !on)}
+        data-testid={`stories.motion.replay.${name}`}
+      >
+        Replay
+      </Button>
+      <span style={{ ...CAPTION_STYLE, width: "var(--space-9)" }}>{name}</span>
+      <span
+        style={{
+          display: "inline-block",
+          width: "var(--space-4)",
+          height: "var(--space-4)",
+          borderRadius: "var(--radius-1)",
+          background: "var(--accent)",
+          // The token under test IS the transition, so the specimen is the value.
+          transition: `transform var(${name}) var(--ease-standard)`,
+          transform: moved ? "translateX(var(--space-7))" : "none",
+        }}
+      />
+      <span style={{ ...CAPTION_STYLE }}>{defaultValue(SHEET, name)}</span>
+    </div>
+  );
+}
+
 export function MotionSpecimen(): ReactNode {
+  const durations = TOKEN_GROUPS.motion.filter((name) => name.startsWith("--duration-"));
   return (
     <div style={SPECIMEN_STYLE}>
-      {TOKEN_GROUPS.motion.map((name) => (
-        <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-          <span style={{ ...CAPTION_STYLE, width: "var(--space-9)" }}>{name}</span>
-          <span
-            style={{
-              display: "inline-block",
-              width: "var(--space-4)",
-              height: "var(--space-4)",
-              borderRadius: "var(--radius-1)",
-              background: "var(--accent)",
-              // The duration under test, so the specimen is the value itself.
-              transition: `transform var(${name}) var(--ease-standard)`,
-            }}
-          />
-          <span style={{ ...CAPTION_STYLE }}>{defaultValue(SHEET, name)}</span>
-        </div>
+      <div style={LABEL_STYLE}>
+        Press Replay to run the transition at that token. The duration under test is the
+        transition, so the specimen is the value rather than a picture of it.
+      </div>
+      {durations.map((name) => (
+        <MotionRow key={name} name={name} />
       ))}
+      <div style={{ ...CAPTION_STYLE, marginBlockStart: "var(--space-4)" }}>
+        Under the reduced-motion axis the shared sheet zeroes every transition, so the same
+        press produces no travel. That is the app's existing behaviour, shown rather than
+        invented.
+      </div>
     </div>
   );
 }
@@ -408,9 +496,15 @@ export const FOUNDATION_STORIES: StoryDescriptor[] = [
     group: "foundations",
     surface: "Tokens",
     state: "motion",
-    description: "The duration and easing tokens, each named beside its value.",
-    tags: ["tokens", "motion", "animation", "foundations"],
-    render: () => <MotionSpecimen />,
+    description:
+      "The duration and easing tokens: each duration replays on demand, and each easing is drawn as its curve.",
+    tags: ["tokens", "motion", "animation", "easing", "foundations"],
+    render: () => (
+      <>
+        <MotionSpecimen />
+        <EasingSpecimen />
+      </>
+    ),
   },
   {
     id: "foundations/tokens/metrics",
