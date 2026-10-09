@@ -389,6 +389,7 @@ export function FilterBuilder({
               <div key={ci} data-testid="view-filter.condition" data-gi={gi} data-ci={ci} style={ROW_STYLE}>
                 <SearchableSelect
                   testId="view-filter.condition-type"
+                  aria-label={t("notes.filterBuilder.conditionType")}
                   options={TYPE_OPTIONS}
                   selected={[cond.type]}
                   onChange={(next) =>
@@ -403,6 +404,7 @@ export function FilterBuilder({
                   // covers negation (and keeps `not(property)` unrepresentable).
                   <SearchableSelect
                     testId="view-filter.condition-negate"
+                  aria-label={t("notes.filterBuilder.conditionNegate")}
                     options={NEGATE_OPTIONS}
                     selected={[cond.negated ? "not" : "is"]}
                     onChange={(next) =>
@@ -455,6 +457,7 @@ export function FilterBuilder({
                 ) : (
                   <SearchableSelect
                     testId="view-filter.condition-value"
+                  aria-label={t("notes.filterBuilder.conditionValue")}
                     options={valueOptionsFor(cond)}
                     selected={cond.value ? [cond.value] : []}
                     onChange={(next) =>
