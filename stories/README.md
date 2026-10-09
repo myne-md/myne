@@ -78,3 +78,50 @@ connect-src 'none';
 token, seam and i18n guards scan it like any other consumer of the shared tree.
 The story host is the one file allowed to name the Tauri runtime global, the
 same reasoned exemption `src/lib/app-window.ts` holds.
+
+## Review pass (myne-md/myne#843)
+
+Every registered story was mounted and reviewed against the canon, and each
+finding below is either fixed here or recorded with the reason it is not.
+
+**Fixed.**
+
+- **The catalogue could go completely blank.** `stories/vite.config.ts` defined
+  `__APP_VERSION__` and `__BUILD_COMMIT__` but not `__UPDATE_CHANNEL__`, which
+  `AboutPanel` reads during render. Selecting `settings/aboutpanel/default`
+  threw `ReferenceError`, and with no boundary in the shell it unmounted every
+  story at once. The third global is now defined in both the catalogue's Vite
+  config and `vitest.stories.config.ts` (whose smoke check hit the same throw),
+  and `stories/src/ErrorBoundary.tsx` wraps each story so one failure renders a
+  message in place of that story instead of taking the rail down with it.
+- **Three modal backdrops bypassed the scrim token.** `CommandPalette`,
+  `QuickPicker` and `promptForText` hardcoded `rgba(0, 0, 0, 0.32)`, which
+  neither matched `--scrim` nor followed the theme. They now use `var(--scrim)`,
+  the token `ModalShell` already reads. `check-token-adoption` recorded three
+  fewer literals.
+- **`settings/syncpanel/default` rendered `NaN KiB of NaN KiB`.** The fixture
+  answered no `sync_account_status`, so the fake host's `{}` default reached
+  `SyncUsageBlock`. Not enrolled means the block is absent, so the fixture now
+  answers `null` and supplies an empty device list.
+- **`MemberVaultUnlockCard` printed one sentence twice.** The intro paragraph and
+  the phrase field's `hint` were both `unlock.memberHint`; the field hint is now
+  the shared `sync.enroll.recoveryPhraseHint`.
+- **`ai-panel/chat` showed the "compiled without local AI" state.** The fixture
+  set `ai_enabled` but answered no `ai_capability_report`, so the capability gate
+  read it as uncompiled. Its handler is now present, and the story shows the chat
+  it describes (the same story a user-guide screenshot is taken from).
+
+**Reviewed, not a defect.**
+
+- Stories that render nothing under their default state (`RemoteMergeHint`,
+  `SyncBanners`, `RepairResidueBanner`, `ThemeInstallDialog`, …) are deliberate:
+  the header of `components.tsx` documents "breadth over depth", and mounting
+  them is what catches a module-scope crash. The new boundary strengthens that
+  purpose rather than changing it.
+- Controls below 24px (`Switch` at 36×20, several 20px icon buttons) pass axe's
+  `target-size` through its spacing exception; the `--target-min` work is
+  myne-md/myne#728's, not this pass's.
+- Hardcoded colours in `AppearancePanel` are theme-swatch and accent-preset
+  data, which a single token cannot express.
+- The disabled "Save" label's 2.32 contrast is a disabled control, which WCAG
+  exempts.

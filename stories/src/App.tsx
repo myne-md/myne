@@ -12,6 +12,7 @@ import { Button } from "@app/components/primitives/Button";
 import { storiesByGroup, storyById, STORIES } from "./registry";
 import { resolveFixture } from "../fixtures";
 import { setStoryFixture } from "./host/internals";
+import { StoryErrorBoundary } from "./ErrorBoundary";
 import type { StoryDescriptor } from "./types";
 
 /** One value for the rail width, so it is named once rather than twice. */
@@ -83,7 +84,9 @@ function StoryStage({ story }: { story: StoryDescriptor }) {
         {story.id}
       </div>
       <div style={{ width: story.viewport ?? "100%" }} data-testid="stories.story">
-        {story.render()}
+        {/* Keyed by id via `StoryStage`'s own key, so a failed story's boundary
+            is thrown away when a different story is selected. */}
+        <StoryErrorBoundary id={story.id}>{story.render()}</StoryErrorBoundary>
       </div>
     </div>
   );
