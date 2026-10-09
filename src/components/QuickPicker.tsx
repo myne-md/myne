@@ -12,7 +12,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { createPortal } from "react-dom";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useOverlayInert } from "../hooks/useOverlayInert";
 
@@ -38,6 +37,17 @@ export type QuickPickerProps = {
   onClose: () => void;
 };
 
+// Rendered INLINE, not through a portal, and that is load-bearing rather than a
+// style choice. Every other overlay surface in the tree (CommandPalette,
+// ModalShell, SettingsModal, VaultSwitcher, PairingDialog) renders inline, so
+// it lands inside whatever container mounts it. In the app that container is
+// the editor, and `position: fixed` resolves against the viewport either way.
+// In the story catalogue it is the stage, which carries `transform:
+// translateZ(0)` to be the containing block for fixed descendants, so an inline
+// overlay is confined to the content area. QuickPicker was the one surface that
+// portalled to `document.body`, which escaped that box: its scrim covered the
+// catalogue's own navbar and rail, and its centring resolved against the window
+// rather than the stage (myne-md/myne#845).
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
@@ -210,7 +220,7 @@ export function QuickPicker({
     }
   };
 
-  return createPortal(
+  return (
     <div
       ref={backdropRef}
       style={BACKDROP_STYLE}
@@ -303,7 +313,6 @@ export function QuickPicker({
           </div>
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

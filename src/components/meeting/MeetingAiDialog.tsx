@@ -201,7 +201,24 @@ function MeetingAiDialogInner({
   // `ModalShell`'s body carries no padding of its own: every caller supplies
   // its own, and this dialog was the one that did not, so its content sat flush
   // against the card edges (myne-md/myne#843).
-  const BODY_STYLE: CSSProperties = { padding: "var(--space-5)" };
+  // A flex column with a gap, because the children carry no rhythm of their
+  // own: `SettingRow` stacks flush, a browser default margin was the only
+  // thing separating two paragraphs, and the button row sat directly on the
+  // last option. One gap for every child is what makes the spacing uniform
+  // instead of a mix of default margins and nothing (myne-md/myne#845).
+  const BODY_STYLE: CSSProperties = {
+    padding: "var(--space-5)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--space-4)",
+  };
+  /** Paragraphs carry no margin: the body gap is the only rhythm. */
+  const PARA_STYLE: CSSProperties = { margin: 0 };
+  /** Two actions side by side, spaced by the shared gap rather than flush. */
+  const BUTTON_ROW_STYLE: CSSProperties = {
+    display: "flex",
+    gap: "var(--space-2)",
+  };
 
   return (
     <ModalShell
@@ -214,7 +231,7 @@ function MeetingAiDialogInner({
       <div style={BODY_STYLE}>
         {phase === "pick" && noModel && (
           <>
-            <p data-testid="meeting.ai.no-model">
+            <p style={PARA_STYLE} data-testid="meeting.ai.no-model">
               {t("editor.meeting.ai.noModel")}
             </p>
             <div>
@@ -239,8 +256,8 @@ function MeetingAiDialogInner({
 
         {phase === "pick" && !noModel && (
           <>
-            <p>{t("editor.meeting.ai.pickIntro")}</p>
-            <p>{t("editor.meeting.ai.noAttribution")}</p>
+            <p style={PARA_STYLE}>{t("editor.meeting.ai.pickIntro")}</p>
+            <p style={PARA_STYLE}>{t("editor.meeting.ai.noAttribution")}</p>
             {MEETING_SECTION_IDS.map((id) => (
               <SettingRow
                 key={id}
@@ -258,7 +275,7 @@ function MeetingAiDialogInner({
                 }
               />
             ))}
-            <div>
+            <div style={BUTTON_ROW_STYLE}>
               <Button
                 variant="primary"
                 data-testid="meeting.ai.generate"
@@ -272,14 +289,14 @@ function MeetingAiDialogInner({
 
         {phase === "running" && (
           <>
-            <p data-testid="meeting.ai.running">{t("editor.meeting.ai.running")}</p>
-            <p data-testid="meeting.ai.progress">
+            <p style={PARA_STYLE} data-testid="meeting.ai.running">{t("editor.meeting.ai.running")}</p>
+            <p style={PARA_STYLE} data-testid="meeting.ai.progress">
               {t("editor.meeting.ai.progress", {
                 done: progress[0],
                 total: progress[1],
               })}
             </p>
-            <div>
+            <div style={BUTTON_ROW_STYLE}>
               <Button
                 variant="secondary"
                 data-testid="meeting.ai.stop"
@@ -297,14 +314,14 @@ function MeetingAiDialogInner({
 
         {phase === "review" && (
           <>
-            <p>{t("editor.meeting.ai.reviewIntro")}</p>
+            <p style={PARA_STYLE}>{t("editor.meeting.ai.reviewIntro")}</p>
             {present.map((id) => (
               <div key={id} data-testid={`meeting.ai.preview.${id}`}>
                 <h3>{MEETING_SECTION_HEADINGS[id]}</h3>
-                <p>{sections[id]}</p>
+                <p style={PARA_STYLE}>{sections[id]}</p>
               </div>
             ))}
-            <div>
+            <div style={BUTTON_ROW_STYLE}>
               <Button
                 variant="primary"
                 data-testid="meeting.ai.insert"
@@ -325,8 +342,8 @@ function MeetingAiDialogInner({
 
         {phase === "error" && (
           <>
-            <p data-testid="meeting.ai.error">{t("editor.meeting.ai.failed")}</p>
-            <div>
+            <p style={PARA_STYLE} data-testid="meeting.ai.error">{t("editor.meeting.ai.failed")}</p>
+            <div style={BUTTON_ROW_STYLE}>
               <Button
                 variant="secondary"
                 data-testid="meeting.ai.close"
@@ -340,10 +357,10 @@ function MeetingAiDialogInner({
 
         {phase === "cancelled" && (
           <>
-            <p data-testid="meeting.ai.cancelled">
+            <p style={PARA_STYLE} data-testid="meeting.ai.cancelled">
               {t("editor.meeting.ai.cancelled")}
             </p>
-            <div>
+            <div style={BUTTON_ROW_STYLE}>
               <Button
                 variant="secondary"
                 data-testid="meeting.ai.close"

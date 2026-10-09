@@ -9,6 +9,7 @@
 // default state is.
 
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { ActionStatus } from "@app/components/ActionStatus";
 import { AccountBootstrap } from "@app/screens/AccountBootstrap";
 import { CreateVault } from "@app/screens/CreateVault";
@@ -104,6 +105,7 @@ import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
 import { offerMeetingAi } from "@app/components/meeting/meetingAiStore";
 import { Toast } from "@app/components/Toast";
 import { Toaster } from "@app/components/toast/Toaster";
+import { dismissToast, toast } from "@app/components/toast/toastStore";
 import { TorStatusBanner } from "@app/components/sync/TorStatusBanner";
 import { TranscriptionModal } from "@app/components/attachments/TranscriptionModal";
 import { Unlock } from "@app/screens/Unlock";
@@ -194,6 +196,46 @@ const RECOVER_PASSWORD_RESET: VaultRecoverState = {
 /** A centered child, so a layout primitive has something to lay out. */
 function Prose({ children }: { children: ReactNode }) {
   return <p>{children}</p>;
+}
+
+/**
+ * `<Toast>` is a HEADLESS bridge (myne#238): it draws nothing at all and pushes
+ * its message into the shared store, which the ONE `<Toaster>` renders. So a
+ * story mounting the bridge alone showed an empty box, and a story mounting the
+ * Toaster alone subscribed to an empty store. Neither was broken; both were
+ * half of a pair. These two helpers mount the pair the way the app does
+ * (Editor mounts the Toaster once, every surface mounts the bridge), so the
+ * stories finally show a toast (myne-md/myne#845).
+ */
+function ToastWithStack({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
+}
+
+/**
+ * The Toaster's own subject is the STACK: the newest toast fully shown, older
+ * ones peeking behind it. So this pushes three. `HOLD_MS` is deliberately long,
+ * because the real default is 2.5s and a catalogue story must not empty itself
+ * while somebody is looking at it.
+ */
+const TOAST_HOLD_MS = 600_000;
+
+function ToasterStackDemo() {
+  useEffect(() => {
+    const ids = [
+      toast({ message: "Saved", variant: "success", durationMs: TOAST_HOLD_MS }),
+      toast({ message: "Attachment uploaded", variant: "info", durationMs: TOAST_HOLD_MS }),
+      toast({ message: "Sync failed", variant: "error", durationMs: TOAST_HOLD_MS }),
+    ];
+    return () => {
+      for (const id of ids) dismissToast(id, { silent: true });
+    };
+  }, []);
+  return <Toaster />;
 }
 
 export const COMPONENT_STORIES: StoryDescriptor[] = [
@@ -1024,7 +1066,11 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     state: "default",
     description: "Toast, a default state.",
     tags: ["components", "toast", "default"],
-    render: () => <Toast message="Saved" onDone={action("onDone")} />,
+    render: () => (
+      <ToastWithStack>
+        <Toast message="Saved" onDone={action("onDone")} />
+      </ToastWithStack>
+    ),
   },
   {
     id: "components/toaster/default",
@@ -1033,7 +1079,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     state: "default",
     description: "Toaster, a default state.",
     tags: ["components", "toaster", "default"],
-    render: () => <Toaster />,
+    render: () => <ToasterStackDemo />,
   },
 
   // ── Dialog and picker surfaces ───────────────────────────────────────────
@@ -1080,6 +1126,19 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     state: "default",
     description: "Pairing Dialog, a default state.",
     tags: ["components", "pairingdialog", "default"],
+    // Without this the dialog answered the fake host's benign default, so the
+    // challenge box rendered EMPTY and its height collapsed to the padding: the
+    // story showed a shape the app never produces (myne-md/myne#845).
+    fixture: {
+      description: "a clipper pairing session waiting for the user to compare a code",
+      handlers: {
+        "plugin:clipper-pairing|pairing_pending": () => ({
+          extension_id: "sample-extension-id",
+          challenge: "004291",
+          request_id: null,
+        }),
+      },
+    },
     render: () => <PairingDialog />,
   },
   {
