@@ -15,8 +15,13 @@
 import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import tokensCss from "../../../client-core/src/tokens.css?raw";
+// The component sheet, read only for the `.t-*` role pairing (myne-md/myne#847
+// task 13): the values stay the token sheet's, this is where the three
+// properties that make a step on the scale are declared together.
+import stylesCss from "../../../src/styles/tokens.css?raw";
 import { Button } from "@app/components/primitives/Button";
 import { Icon } from "@app/components/primitives/Icon";
+import { Input } from "@app/components/primitives/Input";
 import { ICON_PATHS } from "@app/lib/icons";
 import type { IconName } from "@app/lib/icons";
 import type { StoryDescriptor } from "../types";
@@ -167,18 +172,116 @@ export function ColoursSpecimen(): ReactNode {
   );
 }
 
+/** One `.t-*` role: the three properties that only mean something together. */
+export interface TypeRole {
+  role: string;
+  size: string;
+  leading: string;
+  weight: string;
+  tracking: string;
+  transform: string;
+}
+
+/**
+ * The type roles, read from the component sheet that ships (myne-md/myne#847
+ * task 13).
+ *
+ * A size on its own is half a specimen: `--text-3xl` at `--leading-tight` is a
+ * heading, the same size at `--leading-relaxed` is a pull quote, and a reader
+ * shown only the size learns neither. So the page reads the pairing from
+ * `src/styles/tokens.css`'s `.t-*` blocks rather than from a second table here,
+ * because a hand-copied pairing is a pairing that drifts and the drift is
+ * invisible: both values still resolve.
+ *
+ * Pure and exported, so the pairing is asserted rather than eyeballed.
+ */
+export function parseTypeRoles(css: string): TypeRole[] {
+  const out: TypeRole[] = [];
+  const blockRe = /\.(t-[a-z0-9-]+)\s*\{([^}]*)\}/g;
+  let block: RegExpExecArray | null;
+  while ((block = blockRe.exec(css)) !== null) {
+    const decls = new Map<string, string>();
+    const declRe = /([a-z-]+)\s*:\s*([^;]+);/g;
+    let decl: RegExpExecArray | null;
+    while ((decl = declRe.exec(block[2])) !== null) decls.set(decl[1], decl[2].trim());
+    const size = decls.get("font-size");
+    // A role with no size is a family or a colour variant, not a step on the
+    // scale, and rendering it would put a duplicate line in the specimen.
+    if (size === undefined) continue;
+    out.push({
+      role: block[1],
+      size,
+      leading: decls.get("line-height") ?? "",
+      weight: decls.get("font-weight") ?? "",
+      tracking: decls.get("letter-spacing") ?? "",
+      transform: decls.get("text-transform") ?? "",
+    });
+  }
+  return out;
+}
+
+const SAMPLE_INPUT_STYLE: CSSProperties = {
+  width: "100%",
+  padding: "var(--space-2) var(--space-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+};
+
 export function TypeSpecimen(): ReactNode {
+  const [sample, setSample] = useState("The quick brown fox jumps over the lazy dog");
+  const roles = parseTypeRoles(stylesCss);
   const sizes = TOKEN_GROUPS.type.filter((name) => name.startsWith("--text-"));
+
   return (
     <div style={SPECIMEN_STYLE}>
+      {/* The sample is the reviewer's own text, because a fixed sentence hides
+          the thing type is judged on: the letters they actually read. */}
+      <label style={LABEL_STYLE} htmlFor="stories.type.sample">
+        Sample text, applied to every role below
+      </label>
+      <Input
+        id="stories.type.sample"
+        data-testid="stories.type.sample"
+        value={sample}
+        onChange={(event) => setSample(event.target.value)}
+        style={SAMPLE_INPUT_STYLE}
+      />
+
+      <div style={LABEL_STYLE}>
+        The roles: size, line-height and weight together, read from the component sheet
+      </div>
+      {roles.map((role) => (
+        <div key={role.role} style={{ marginBlockEnd: "var(--space-4)" }}>
+          <div style={CAPTION_STYLE}>
+            .{role.role} · {role.size} · {role.leading || "inherited"} ·{" "}
+            {role.weight || "inherited"}
+          </div>
+          <div
+            style={{
+              fontSize: role.size,
+              lineHeight: role.leading,
+              fontWeight: role.weight,
+              letterSpacing: role.tracking,
+              textTransform: role.transform as CSSProperties["textTransform"],
+              color: "var(--fg-1)",
+            }}
+          >
+            {sample}
+          </div>
+        </div>
+      ))}
+
+      <div style={LABEL_STYLE}>Every size token, on its own</div>
       {sizes.map((name) => (
         <div key={name} style={{ marginBlockEnd: "var(--space-3)" }}>
           <div style={CAPTION_STYLE}>
             {name} {defaultValue(SHEET, name)}
           </div>
-          <div style={{ fontSize: `var(${name})`, color: "var(--fg-1)" }}>
-            The quick brown fox jumps over the lazy dog
-          </div>
+          <div style={{ fontSize: `var(${name})`, color: "var(--fg-1)" }}>{sample}</div>
         </div>
       ))}
     </div>
@@ -460,8 +563,9 @@ export const FOUNDATION_STORIES: StoryDescriptor[] = [
     group: "foundations",
     surface: "Tokens",
     state: "type",
-    description: "The type scale rendered at each size token.",
-    tags: ["tokens", "type", "font", "foundations"],
+    description:
+      "The type scale with an editable sample, each role's size, line-height and weight together.",
+    tags: ["tokens", "type", "font", "leading", "weight", "foundations"],
     render: () => <TypeSpecimen />,
   },
   {

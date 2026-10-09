@@ -37,6 +37,40 @@ import { TrashPanel } from "@app/notes/components/TrashPanel";
 import { TreeRails } from "@app/notes/components/TreeRails";
 import { VirtualList } from "@app/notes/components/VirtualList";
 
+// ── Batch: the context-bound and prop-driven surfaces (myne-md/myne#845 task 14).
+// The graph family lives in `graph.tsx` to keep this file readable.
+import { useEffect, type ReactNode } from "react";
+import type { SidebarState } from "@app/notes/sidebarState";
+import type { TitleRecord } from "@app/notes/loadNoteBatch";
+import type { FolderNode } from "@app/notes/folderTree";
+import type { ResolverNote } from "@app/notes/resolveWikilink";
+import type { WikilinkEdge } from "@app/notes/graphModel";
+import {
+  tasksItem,
+  type LeafPane,
+  type WorkspaceNode,
+  type WorkspaceState,
+} from "@app/notes/workspaceState";
+import { foldSegment } from "@app/dialect/folderPath";
+import { emitStoryEvent } from "../host/internals";
+
+import { AiHydrationProbe } from "@app/notes/components/AiHydrationProbe";
+import { BacklinksTab } from "@app/notes/components/BacklinksTab";
+import { ChatComposer } from "@app/notes/components/ChatComposer";
+import { ConflictsView } from "@app/notes/components/ConflictsView";
+import { FolderRow } from "@app/notes/components/FolderRow";
+import { NoteList } from "@app/notes/components/NoteList";
+import { OutlineTab } from "@app/notes/components/OutlineTab";
+import { PaneTree } from "@app/notes/components/PaneTree";
+import { PaneView } from "@app/notes/components/PaneView";
+import { ProposalDiffModal } from "@app/notes/components/ProposalDiffModal";
+import { SidebarSearchRow } from "@app/notes/components/SidebarSearchRow";
+import { SnapshotFailedIndicator } from "@app/notes/components/SnapshotFailedIndicator";
+import { SnapshotsPanel } from "@app/notes/components/SnapshotsPanel";
+import { TagBrowser } from "@app/notes/components/TagBrowser";
+import { TasksPane } from "@app/notes/components/TasksPane";
+import { UnlinkedMentionsSection } from "@app/notes/components/UnlinkedMentionsSection";
+
 /** The notes panels read `vault.prefs`; supply the whole default object. */
 const NOTES_FIXTURE: Fixture = {
   description: "one unlocked vault with default prefs",
@@ -65,6 +99,237 @@ function Frame({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+/** A `TitleRecord` with every field the sidebar derives from, defaulted. */
+function noteRecord(
+  over: Partial<TitleRecord> & { noteUuid: string },
+): TitleRecord {
+  return {
+    title: null,
+    folder: null,
+    updatedAt: null,
+    trashed: null,
+    deleted: null,
+    archived: null,
+    template: false,
+    folderIndex: false,
+    conflict: false,
+    conflictOf: null,
+    hasSource: true,
+    kind: null,
+    done: null,
+    ...over,
+  };
+}
+
+/** Three live notes: two in a folder, one loose, so a tree renders populated. */
+const SEEDED_CACHE = new Map<string, TitleRecord>([
+  [
+    "n1",
+    noteRecord({
+      noteUuid: "n1",
+      title: "Meeting notes",
+      folder: "Projects/",
+      updatedAt: new Date("2026-10-09T09:00:00Z"),
+    }),
+  ],
+  [
+    "n2",
+    noteRecord({
+      noteUuid: "n2",
+      title: "Reading list",
+      folder: null,
+      updatedAt: new Date("2026-10-08T09:00:00Z"),
+    }),
+  ],
+  [
+    "n3",
+    noteRecord({
+      noteUuid: "n3",
+      title: "Weekly review",
+      folder: "Projects/",
+      updatedAt: new Date("2026-10-07T09:00:00Z"),
+    }),
+  ],
+]);
+
+/** A sidebar seeded with those notes and "Meeting notes" open. */
+const SEEDED_SIDEBAR: SidebarState = {
+  selectedId: "n1",
+  selectedIds: new Set(),
+  anchorId: null,
+  renamingId: null,
+  justCreatedId: null,
+  cache: SEEDED_CACHE,
+  contentReloadNonce: 0,
+};
+
+/** The resolver note-set the reader surfaces resolve wikilinks against. */
+const SEEDED_RESOLVER_NOTES: ResolverNote[] = [
+  { noteUuid: "n1", title: "Meeting notes", folder: "Projects/" },
+  { noteUuid: "n2", title: "Reading list", folder: null },
+  { noteUuid: "n3", title: "Weekly review", folder: "Projects/" },
+];
+
+/** One wikilink edge, the shape the index returns for `forward`/candidates. */
+function wikilinkEdge(target: string): WikilinkEdge {
+  return {
+    target,
+    targetKind: "title",
+    titleKey: foldSegment(target),
+    anchor: null,
+    blockId: null,
+    alias: null,
+    embed: false,
+    byteStart: 0,
+    byteEnd: 0,
+  };
+}
+
+/** A workspace descriptor for a seeded pane tree. */
+function seedWorkspace(
+  root: WorkspaceNode,
+  focusedPaneId: string,
+): WorkspaceState {
+  return { root, focusedPaneId };
+}
+
+/** One empty leaf pane, the state a fully-closed workspace lands in. */
+const EMPTY_LEAF: LeafPane = {
+  kind: "leaf",
+  id: "pane-1",
+  tabs: [],
+  activeTab: null,
+};
+
+/** A row split of two empty panes, for the pane-tree story. */
+const SPLIT_TREE: WorkspaceNode = {
+  kind: "split",
+  id: "split-1",
+  direction: "row",
+  children: [
+    { kind: "leaf", id: "pane-1", tabs: [], activeTab: null },
+    { kind: "leaf", id: "pane-2", tabs: [], activeTab: null },
+  ],
+};
+
+/**
+ * Fire a backend event once, after the child has subscribed.
+ *
+ * The child's passive effect runs before this parent's (React flushes child
+ * effects first), and the fake host registers a listener synchronously inside
+ * `listen`'s `invoke`, so the emit lands on a live subscription. Used by the
+ * two event-driven surfaces, whose only reachable state is the one the event
+ * produces (myne-md/myne#845).
+ */
+function EmitStoryEvent({
+  name,
+  payload,
+  children,
+}: {
+  name: string;
+  payload?: unknown;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    emitStoryEvent(name, payload);
+  }, [name, payload]);
+  return <>{children}</>;
+}
+
+/** A fixed-size box so a full-bleed surface is judged in its own frame. */
+function Box({
+  width,
+  height,
+  children,
+}: {
+  width: number;
+  height: number;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        width,
+        height,
+        background: "var(--paper-2)",
+        border: "1px solid var(--line-1)",
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The default prefs plus the IPC the reader surfaces call. `note_read` returns
+ * one body with a heading structure, `backlink_candidates`/`forward` return the
+ * edges that resolve against {@link SEEDED_RESOLVER_NOTES}, and `tag_tree` /
+ * `by_tag` drive the tag browser. All three reuse the same three notes so the
+ * stories stay consistent.
+ */
+const NOTES_POPULATED_FIXTURE: Fixture = {
+  description: "one unlocked vault with three notes and the index answers they need",
+  handlers: {
+    ...NOTES_FIXTURE.handlers,
+    "plugin:notes|note_read": () =>
+      "# Meeting notes\n\n## Agenda\n\n### Attendees\n\n## Actions\n",
+    "plugin:notes|note_search": () => [
+      {
+        note_id: "n2",
+        title: "Reading list",
+        score: 1,
+        matched_in: { title: false, body: true },
+        attachment_id: null,
+      },
+    ],
+    "plugin:vault-indices|vault_indices_backlink_candidates": () => [
+      { source: "n2", edge: wikilinkEdge("Meeting notes") },
+    ],
+    "plugin:vault-indices|vault_indices_forward": () => [
+      wikilinkEdge("Reading list"),
+    ],
+    "plugin:vault-indices|vault_indices_tag_tree": () => [
+      { key: "project", display: "project", depth: 0, directCount: 2, subtreeCount: 2 },
+      { key: "project/alpha", display: "project/alpha", depth: 1, directCount: 1, subtreeCount: 1 },
+    ],
+    "plugin:vault-indices|vault_indices_by_tag": () => ["n1", "n3"],
+    "plugin:vault-indices|vault_indices_tasks": () => [
+      {
+        noteId: "n1",
+        noteTitle: "Meeting notes",
+        noteFolder: "Projects/",
+        lineIndex: 4,
+        rawLine: "- [ ] Send the recap",
+        completed: false,
+        oversized: false,
+        due: "2026-10-12",
+      },
+      {
+        noteId: "n1",
+        noteTitle: "Meeting notes",
+        noteFolder: "Projects/",
+        lineIndex: 5,
+        rawLine: "- [x] Book the room",
+        completed: true,
+        oversized: false,
+      },
+    ],
+    "plugin:snapshots|snapshot_list": () => [
+      {
+        snapshot_uuid: "00000000-0000-7000-8000-0000000000b1",
+        captured_at_ms: Date.UTC(2026, 9, 9, 8, 55, 0),
+        size_bytes: 4096,
+      },
+      {
+        snapshot_uuid: "00000000-0000-7000-8000-0000000000b2",
+        captured_at_ms: Date.UTC(2026, 9, 8, 17, 20, 0),
+        size_bytes: 2048,
+      },
+    ],
+  },
+};
 
 export const NOTES_STORIES: StoryDescriptor[] = [
   {
@@ -629,5 +894,389 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         </Frame>
       );
     },
+  },
+
+  // ── Batch: the remaining surfaces (myne-md/myne#845 task 14) ───────────────
+  {
+    id: "notes/folderrow/populated",
+    group: "components",
+    surface: "FolderRow",
+    state: "populated",
+    description: "A folder row with notes inside, its disclosure chevron and a colour label.",
+    tags: ["notes", "folder", "row", "sidebar", "tree"],
+    render: () => {
+      const node: FolderNode = {
+        path: "Projects/",
+        key: "projects",
+        name: "Projects",
+        depth: 1,
+        deliberate: true,
+        noteIds: ["n1", "n3"],
+        indexNoteId: null,
+        indexConflictIds: [],
+        children: [],
+      };
+      return (
+        <Frame>
+          {/* `role="treeitem"` needs a `role="tree"` parent; the sidebar always
+              supplies one (NoteList), and a bare treeitem is an
+              `aria-required-parent` violation the app never renders. */}
+          <div role="tree" aria-label="Notes" style={{ width: 260 }}>
+            <FolderRow
+              node={node}
+              depth={1}
+              hierarchy={{ level: 1, posInSet: 1, setSize: 1 }}
+              collapsed={false}
+              empty={false}
+              colorSlot="clay"
+              onToggle={action("onToggle")}
+              onContextMenu={action("onContextMenu")}
+              onCommitRename={action("onCommitRename")}
+              onCancelRename={action("onCancelRename")}
+              onOpenIndexNote={action("onOpenIndexNote")}
+              onCreateFolderNote={action("onCreateFolderNote")}
+              onActivate={action("onActivate")}
+            />
+          </div>
+        </Frame>
+      );
+    },
+  },
+  {
+    id: "notes/sidebarsearchrow/default",
+    group: "components",
+    surface: "SidebarSearchRow",
+    state: "default",
+    description: "The sidebar search entry, with the command palette's chord in its tooltip.",
+    tags: ["notes", "sidebar", "search", "palette"],
+    fixture: NOTES_FIXTURE,
+    render: () => (
+      <Frame>
+        <Box width={260} height={48}>
+          <div style={{ padding: "var(--space-2)" }}>
+            <SidebarSearchRow />
+          </div>
+        </Box>
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/notelist/populated",
+    group: "components",
+    surface: "NoteList",
+    state: "populated",
+    description: "The notes sidebar with a folder, its notes and a loose note in the tree.",
+    tags: ["notes", "sidebar", "list", "tree", "folder"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={280} height={520}>
+            <NoteList />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/backlinkstab/populated",
+    group: "components",
+    surface: "BacklinksTab",
+    state: "populated",
+    description: "The links tab with one incoming and one outgoing wikilink row.",
+    tags: ["notes", "backlinks", "links", "right panel"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <Box width={280} height={260}>
+          <div style={{ padding: "var(--space-3)" }}>
+            <BacklinksTab />
+          </div>
+        </Box>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/outlinetab/populated",
+    group: "components",
+    surface: "OutlineTab",
+    state: "populated",
+    description: "The outline tab listing the open note's heading structure.",
+    tags: ["notes", "outline", "headings", "right panel"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <Box width={280} height={260}>
+          <div style={{ padding: "var(--space-3)" }}>
+            <OutlineTab />
+          </div>
+        </Box>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/unlinkedmentionssection/populated",
+    group: "components",
+    surface: "UnlinkedMentionsSection",
+    state: "populated",
+    description: "The unlinked-mentions section with one note that names this title in prose.",
+    tags: ["notes", "mentions", "backlinks", "right panel"],
+    // `backlink_candidates` answers EMPTY here, unlike the shared fixture: a
+    // note that already wikilinks this title is excluded from unlinked
+    // mentions by construction, so the two answers cannot both hold for n2.
+    fixture: {
+      description: "one note mentions the open title in prose without linking it",
+      handlers: {
+        ...NOTES_POPULATED_FIXTURE.handlers,
+        "plugin:vault-indices|vault_indices_backlink_candidates": () => [],
+      },
+    },
+    render: () => (
+      <Box width={300} height={220}>
+        <div style={{ padding: "var(--space-3)" }}>
+          <UnlinkedMentionsSection
+            openNoteId="n1"
+            openTitle="Meeting notes"
+            notes={SEEDED_RESOLVER_NOTES}
+            onNavigate={action("onNavigate")}
+            onLinkMention={async () => {
+              action("onLinkMention")();
+              return true;
+            }}
+            asTab
+          />
+        </div>
+      </Box>
+    ),
+  },
+  {
+    id: "notes/tagbrowser/seeded-tag",
+    group: "components",
+    surface: "TagBrowser",
+    state: "seeded-tag",
+    description: "The tag browser opened on one tag, its chips and the filtered note list.",
+    tags: ["notes", "tags", "browser", "filter", "modal"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <TagBrowser open onClose={action("onClose")} seedTagKey="project" />
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/taskspane/vault-tasks",
+    group: "components",
+    surface: "TasksPane",
+    state: "vault-tasks",
+    description: "The vault-wide task tab with an open and a completed task.",
+    tags: ["notes", "tasks", "pane", "list"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={520} height={420}>
+            <TasksPane paneId="pane-1" item={tasksItem()} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/paneview/empty-pane",
+    group: "components",
+    surface: "PaneView",
+    state: "empty-pane",
+    description: "A pane with no active tab: its tab strip and the new-tab chooser.",
+    tags: ["notes", "pane", "tabs", "empty", "chooser"],
+    fixture: NOTES_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={520} height={380}>
+            <PaneView leaf={EMPTY_LEAF} focused onReadout={action("onReadout")} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/panetree/row-split",
+    group: "components",
+    surface: "PaneTree",
+    state: "row-split",
+    description: "A workspace split into two side-by-side panes, each showing its own chooser.",
+    tags: ["notes", "pane", "split", "layout", "workspace"],
+    fixture: NOTES_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(SPLIT_TREE, "pane-1")}>
+          <Box width={640} height={380}>
+            <PaneTree node={SPLIT_TREE} focusedPaneId="pane-1" onReadout={action("onReadout")} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/conflictsview/grouped",
+    group: "components",
+    surface: "ConflictsView",
+    state: "grouped",
+    description: "Two conflict copies of one note, grouped, with their reconcile actions.",
+    tags: ["notes", "conflicts", "sync", "reconcile", "diff"],
+    render: () => {
+      const originalUuid = "00000000-0000-7000-8000-0000000000aa";
+      const groups = new Map<string, TitleRecord[]>([
+        [
+          originalUuid,
+          [
+            noteRecord({
+              noteUuid: "c1",
+              title: "Meeting notes (conflict)",
+              conflict: true,
+              conflictOf: originalUuid,
+            }),
+            noteRecord({
+              noteUuid: "c2",
+              title: "Meeting notes (conflict 2)",
+              conflict: true,
+              conflictOf: originalUuid,
+            }),
+          ],
+        ],
+      ]);
+      return (
+        <Frame>
+          <div style={{ width: 560 }}>
+            <ConflictsView
+              groups={groups}
+              onKeepBoth={action("onKeepBoth")}
+              onDiscard={action("onDiscard")}
+              onTakeTheirs={action("onTakeTheirs")}
+              onCompare={action("onCompare")}
+              compare={null}
+              onCloseCompare={action("onCloseCompare")}
+            />
+          </div>
+        </Frame>
+      );
+    },
+  },
+  {
+    id: "notes/proposaldiffmodal/default",
+    group: "components",
+    surface: "ProposalDiffModal",
+    state: "default",
+    description: "A frozen agent proposal: one edit diffed and one new note.",
+    tags: ["notes", "agent", "proposal", "diff", "modal"],
+    render: () => (
+      <ProposalDiffModal
+        open
+        onClose={action("onClose")}
+        proposal={{
+          edits: [
+            {
+              noteId: "n1",
+              kind: "replace",
+              anchor: "## Agenda\n\n- Ship the workbench",
+              replacement: "## Agenda\n\n- Ship the workbench, and the rules that keep it true",
+            },
+          ],
+          newNotes: [
+            {
+              title: "Follow-ups",
+              body: "- Confirm the room\n- Send the recap",
+              folder: "Projects/",
+            },
+          ],
+        }}
+      />
+    ),
+  },
+  {
+    id: "notes/snapshotspanel/listed",
+    group: "components",
+    surface: "SnapshotsPanel",
+    state: "listed",
+    description: "The snapshot panel listing two encrypted snapshots of the open note.",
+    tags: ["notes", "snapshots", "recovery", "history", "modal"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => (
+      <SnapshotsPanel
+        open
+        onClose={action("onClose")}
+        noteId="n1"
+        noteTitle="Meeting notes"
+        onRestored={action("onRestored")}
+      />
+    ),
+  },
+  {
+    id: "notes/chatcomposer/idle",
+    group: "components",
+    surface: "ChatComposer",
+    state: "idle",
+    description: "The agent composer at rest, with the open note as its scope.",
+    tags: ["notes", "ai", "agent", "composer", "chat"],
+    fixture: NOTES_FIXTURE,
+    render: () => (
+      <Box width={320} height={220}>
+        <div style={{ padding: "var(--space-3)" }}>
+          <ChatComposer
+            openNoteId="n1"
+            folders={["Projects/"]}
+            onNotesWritten={action("onNotesWritten")}
+          />
+        </div>
+      </Box>
+    ),
+  },
+  {
+    id: "notes/snapshotfailedindicator/failed",
+    group: "components",
+    surface: "SnapshotFailedIndicator",
+    state: "failed",
+    description: "The non-blocking notice shown when a pre-overwrite snapshot could not be written.",
+    tags: ["notes", "snapshots", "notice", "toast", "error"],
+    render: () => (
+      <Frame>
+        {/* The notice renders `null` until the backend fires
+            `snapshot://write-failed`, and there is no other way to reach it: the
+            fake host dispatches that event for the story. */}
+        <EmitStoryEvent name="snapshot://write-failed">
+          <SnapshotFailedIndicator />
+        </EmitStoryEvent>
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/aihydrationprobe/hydrate-hit",
+    group: "components",
+    surface: "AiHydrationProbe",
+    state: "hydrate-hit",
+    description: "The hidden AI hydration probe after a persistence hit, reported on data attributes.",
+    tags: ["notes", "ai", "embeddings", "observability", "probe"],
+    render: () => (
+      <Frame>
+        <div style={{ maxWidth: 420, color: "var(--fg-2)", fontSize: "var(--text-sm)" }}>
+          {/* The probe is a zero-chrome E2E observability marker: it renders a
+              `display:none` element and puts its outcome on `data-*`, so it has
+              no visible state of its own. The story fires the hydrate event so
+              the marker really exists in this DOM, and names what it reports. */}
+          <EmitStoryEvent
+            name="ai://vectors-hydrated"
+            payload={{ embedded: 3, loaded_from_blob: true, reembedded: 0 }}
+          >
+            <AiHydrationProbe />
+          </EmitStoryEvent>
+          <p style={{ margin: 0 }}>
+            AiHydrationProbe draws nothing: it is a hidden marker whose state
+            lives on data-embedded, data-loaded-from-blob, data-reembedded and
+            data-seq, read by the AI-embeddings E2E scenario. This story has the
+            persistence-HIT event fired.
+          </p>
+        </div>
+      </Frame>
+    ),
   },
 ];

@@ -11,6 +11,7 @@ import { SETTINGS_STORIES } from "./stories/settings";
 import { COMPONENT_STORIES } from "./stories/components";
 import { AI_STORIES } from "./stories/ai-panels";
 import { NOTES_STORIES } from "./stories/notes";
+import { GRAPH_STORIES } from "./stories/graph";
 import { WELCOME_STORIES } from "./stories/welcome";
 import { DOC_STORIES } from "./stories/docs";
 import { FOUNDATION_STORIES } from "./stories/foundations";
@@ -24,6 +25,7 @@ export const STORIES: readonly StoryDescriptor[] = [
   ...COMPONENT_STORIES,
   ...AI_STORIES,
   ...NOTES_STORIES,
+  ...GRAPH_STORIES,
   ...SCREEN_STORIES,
   ...SETTINGS_STORIES,
 ];

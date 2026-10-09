@@ -394,14 +394,24 @@ const EMPTY_EXPANDED: readonly string[] = [];
 
 const WorkspaceContext = createContext<WorkspaceApi | null>(null);
 
-export function WorkspaceProvider({ children }: { children: ReactNode }) {
+export function WorkspaceProvider({
+  children,
+  initialState,
+}: {
+  children: ReactNode;
+  /** Seed the pane tree for an isolated render (the story catalogue,
+   *  myne-md/myne#845). Production callers pass nothing, so this is inert
+   *  there. Read once at mount: the provider still owns every later
+   *  transition. */
+  initialState?: WorkspaceState;
+}) {
   // Named workspaces (MYND-308 task 4): the live workspace is backed by a
   // `NamedWorkspaces` container (N named slots + an active pointer), but the
   // existing reducer surface is preserved EXACTLY - `state` is the active slot's
   // descriptor and `setState` edits that slot. Every existing reducer call site
   // (`setState((s) => op(s, …))`) keeps compiling and behaving identically.
   const [container, setContainer] = useState<NamedWorkspaces>(() =>
-    wrapAsSingleSlot(emptyWorkspace(newPaneId())),
+    wrapAsSingleSlot(initialState ?? emptyWorkspace(newPaneId())),
   );
   const state = activeSlotState(container);
   // The wrapped `setState` preserves BOTH the value form and the updater form,

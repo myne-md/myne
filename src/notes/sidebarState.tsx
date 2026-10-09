@@ -816,8 +816,18 @@ const SidebarStateContext = createContext<UseSelectedNoteReturn | null>(null);
  * CenterPane / RightSidebar tree). Owns the `useState<SidebarState>`
  * slot + the IPC orchestration callbacks (memoized via `useCallback`).
  */
-export function SidebarStateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<SidebarState>(EMPTY_SIDEBAR_STATE);
+export function SidebarStateProvider({
+  children,
+  initialState,
+}: {
+  children: ReactNode;
+  /** Seed the provider for an isolated render (the story catalogue,
+   *  myne-md/myne#845). Production callers pass nothing, so this is inert
+   *  there. Read once at mount: the provider still owns every later
+   *  transition. */
+  initialState?: SidebarState;
+}) {
+  const [state, setState] = useState<SidebarState>(initialState ?? EMPTY_SIDEBAR_STATE);
   // Always-current snapshot of `state` for synchronous reads inside async
   // callbacks (e.g. `commitRename` must read the PRE-rename cache before the
   // optimistic `setState` updater is flushed). Updated on every render.
