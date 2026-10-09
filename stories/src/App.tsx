@@ -31,7 +31,8 @@ import { clearActions, useActionLog } from "./actions";
 import { failingContrast, focusOrder, roleNames, targetSizeFindings } from "./a11y";
 import { a11yLevelOf } from "./a11y-level";
 import { documentationFor, documentationTitle } from "./documentation";
-import { dirFor, parseView, serialiseView } from "./axes";
+import { dirFor, MIRRORED_AXES, parseView, serialiseView } from "./axes";
+import { clearMirroredMedia, mirrorMedia } from "./mediaMirror";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -453,10 +454,14 @@ function StoryStage({
   story,
   theme,
   rtl,
+  reducedMotion,
+  forcedColors,
 }: {
   story: StoryDescriptor;
   theme: Theme;
   rtl: boolean;
+  reducedMotion: boolean;
+  forcedColors: boolean;
 }) {
   const fullBleed = story.fullBleed === true;
   return (
@@ -468,7 +473,9 @@ function StoryStage({
       // own chrome stays LTR while the story mirrors. A reviewer reads the rail
       // and the story at once, and mirroring both would make the chrome the
       // thing under review (myne-md/myne#847).
-      dir={dirFor({ storyId: story.id, rtl, theme })}
+      dir={dirFor({ storyId: story.id, rtl, reducedMotion, forcedColors, theme })}
+      data-axis-reduced-motion={reducedMotion ? "true" : undefined}
+      data-axis-forced-colors={forcedColors ? "true" : undefined}
     >
       <div style={STORY_ID_STYLE} data-testid="stories.story-id">
         {story.id}
@@ -794,6 +801,12 @@ export function App() {
   });
   // The view state a link carries, parsed once above and kept in step below.
   const [rtl, setRtl] = useState<boolean>(() => parseView(window.location.hash).rtl);
+  const [reducedMotion, setReducedMotion] = useState<boolean>(
+    () => parseView(window.location.hash).reducedMotion,
+  );
+  const [forcedColors, setForcedColors] = useState<boolean>(
+    () => parseView(window.location.hash).forcedColors,
+  );
   const [query, setQuery] = useState("");
   // The suggestion panel under the search input. Search no longer filters the
   // rail (it answered a different question than "where am I in the tree"): it
@@ -818,6 +831,8 @@ export function App() {
       activate(story);
       setSelectedId(story?.id);
       setRtl(view.rtl);
+      setReducedMotion(view.reducedMotion);
+      setForcedColors(view.forcedColors);
       setTheme(view.theme);
       setForced(null);
     };
@@ -829,9 +844,32 @@ export function App() {
   // story in the light palette with no axis on stays as short as it was before
   // this change and every existing link keeps resolving.
   useEffect(() => {
-    const next = serialiseView({ storyId: selectedId, rtl, theme });
+    const next = serialiseView({ storyId: selectedId, rtl, reducedMotion, forcedColors, theme });
     if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
-  }, [selectedId, rtl, theme]);
+  }, [selectedId, rtl, reducedMotion, forcedColors, theme]);
+
+  // The two media-query axes are MIRRORED rather than set: a stylesheet cannot be
+  // told that `prefers-reduced-motion` is on. The mirrored rules are scoped to a
+  // marker on the stage, so the catalogue's own chrome keeps rendering normally.
+  useEffect(() => {
+    const active: string[] = [];
+    if (reducedMotion) active.push("reduced-motion");
+    if (forcedColors) active.push("forced-colors");
+    let mirrored = 0;
+    for (const axis of active) {
+      const spec = MIRRORED_AXES[axis];
+      if (spec !== undefined) mirrored += mirrorMedia(spec.condition, spec.marker);
+    }
+    // A forced axis that mirrors ZERO rules is the failure mode this guard
+    // against silence exists for: it would render as "nothing changed" and read
+    // as "the app has no rules for this", which is a different claim.
+    if (active.length > 0 && mirrored === 0) {
+      console.warn(
+        `[stories] no stylesheet rule matched the forced axis(es) ${active.join(", ")}; the view is not what it claims`,
+      );
+    }
+    return () => clearMirroredMedia();
+  }, [reducedMotion, forcedColors]);
 
   // Theme is applied to the document element, the same mechanism the clients use.
   useEffect(() => {
@@ -1035,6 +1073,28 @@ export function App() {
           RTL
         </Button>
 
+        <Button
+          variant={reducedMotion ? "primary" : "secondary"}
+          icon="pause"
+          aria-pressed={reducedMotion}
+          title="Mirror the reduced-motion rules onto the stage"
+          onClick={() => setReducedMotion((on) => !on)}
+          data-testid="stories.axis.reduced-motion"
+        >
+          Reduced motion
+        </Button>
+
+        <Button
+          variant={forcedColors ? "primary" : "secondary"}
+          icon="circle-dashed"
+          aria-pressed={forcedColors}
+          title="Mirror the forced-colors rules onto the stage"
+          onClick={() => setForcedColors((on) => !on)}
+          data-testid="stories.axis.forced-colors"
+        >
+          Forced colors
+        </Button>
+
         <div
           style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.filter"
@@ -1116,7 +1176,14 @@ export function App() {
           style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minWidth: 0 }}
         >
           {selected ? (
-            <StoryStage key={selected.id} story={selected} theme={theme} rtl={rtl} />
+            <StoryStage
+              key={selected.id}
+              story={selected}
+              theme={theme}
+              rtl={rtl}
+              reducedMotion={reducedMotion}
+              forcedColors={forcedColors}
+            />
           ) : null}
 
           <section
