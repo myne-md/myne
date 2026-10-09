@@ -62,6 +62,10 @@ export interface View {
    * reviewer has to hold in their head (myne-md/myne#847 task 6).
    */
   rtl: "off" | "on" | "both";
+  /** Whether the outline overlay marks containers and leaves. */
+  outline: boolean;
+  /** Whether the canvas fills the window and the chrome is hidden. */
+  fullscreen: boolean;
   /** The width preset. `fit` honours the story's own `viewport`. */
   viewport: Viewport;
   /** Whether the reduced-motion rules are mirrored onto the stage. */
@@ -76,6 +80,8 @@ export interface View {
 export const DEFAULT_VIEW: View = {
   storyId: undefined,
   rtl: "off",
+  outline: false,
+  fullscreen: false,
   viewport: "fit",
   reducedMotion: false,
   forcedColors: false,
@@ -98,6 +104,8 @@ export function parseView(fragment: string): View {
   return {
     storyId: id === undefined || id.length === 0 ? undefined : id,
     rtl: params.get("rtl") === "both" ? "both" : params.get("rtl") === "on" ? "on" : "off",
+    outline: params.get("outline") === "1",
+    fullscreen: params.get("fullscreen") === "1",
     viewport: (VIEWPORTS as readonly string[]).includes(params.get("viewport") ?? "")
       ? (params.get("viewport") as Viewport)
       : "fit",
@@ -120,6 +128,8 @@ export function parseView(fragment: string): View {
 export function serialiseView(view: View): string {
   const params = new URLSearchParams();
   if (view.rtl !== "off") params.set("rtl", view.rtl);
+  if (view.outline) params.set("outline", "1");
+  if (view.fullscreen) params.set("fullscreen", "1");
   if (view.viewport !== "fit") params.set("viewport", view.viewport);
   if (view.reducedMotion) params.set("reduced-motion", "1");
   if (view.forcedColors) params.set("forced-colors", "1");

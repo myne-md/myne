@@ -42,6 +42,7 @@ import {
   type Viewport,
 } from "./axes";
 import { clearMirroredMedia, mirrorMedia } from "./mediaMirror";
+import { applyOutline, clearOutline } from "./outline";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -463,6 +464,8 @@ function StoryStage({
   story,
   theme,
   rtl,
+  outline,
+  fullscreen,
   viewport,
   reducedMotion,
   forcedColors,
@@ -470,6 +473,8 @@ function StoryStage({
   story: StoryDescriptor;
   theme: Theme;
   rtl: "off" | "on" | "both";
+  outline: boolean;
+  fullscreen: boolean;
   viewport: Viewport;
   reducedMotion: boolean;
   forcedColors: boolean;
@@ -484,7 +489,16 @@ function StoryStage({
       // own chrome stays LTR while the story mirrors. A reviewer reads the rail
       // and the story at once, and mirroring both would make the chrome the
       // thing under review (myne-md/myne#847).
-      dir={dirFor({ storyId: story.id, rtl, viewport, reducedMotion, forcedColors, theme })}
+      dir={dirFor({
+        storyId: story.id,
+        rtl,
+        outline,
+        fullscreen,
+        viewport,
+        reducedMotion,
+        forcedColors,
+        theme,
+      })}
       data-axis-reduced-motion={reducedMotion ? "true" : undefined}
       data-axis-forced-colors={forcedColors ? "true" : undefined}
     >
@@ -834,6 +848,12 @@ export function App() {
   const [viewport, setViewport] = useState<Viewport>(
     () => parseView(window.location.hash).viewport,
   );
+  const [outline, setOutline] = useState<boolean>(
+    () => parseView(window.location.hash).outline,
+  );
+  const [fullscreen, setFullscreen] = useState<boolean>(
+    () => parseView(window.location.hash).fullscreen,
+  );
   const [reducedMotion, setReducedMotion] = useState<boolean>(
     () => parseView(window.location.hash).reducedMotion,
   );
@@ -865,6 +885,8 @@ export function App() {
       setSelectedId(story?.id);
       setRtl(view.rtl);
       setViewport(view.viewport);
+      setOutline(view.outline);
+      setFullscreen(view.fullscreen);
       setReducedMotion(view.reducedMotion);
       setForcedColors(view.forcedColors);
       setTheme(view.theme);
@@ -881,13 +903,39 @@ export function App() {
     const next = serialiseView({
       storyId: selectedId,
       rtl,
+      outline,
+      fullscreen,
       viewport,
       reducedMotion,
       forcedColors,
       theme,
     });
     if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
-  }, [selectedId, rtl, viewport, reducedMotion, forcedColors, theme]);
+  }, [selectedId, rtl, outline, fullscreen, viewport, reducedMotion, forcedColors, theme]);
+
+  // The outline overlay marks the STORY, after the story has rendered. It is
+  // cleared on the way out so the marks never reach the drift baseline or a
+  // screenshot taken with the overlay off.
+  useEffect(() => {
+    const root = document.querySelector('[data-testid="stories.story"]');
+    if (outline && root !== null) {
+      applyOutline(root);
+    } else {
+      clearOutline();
+    }
+    return () => clearOutline();
+  }, [outline, selectedId, theme, viewport, rtl, reducedMotion, forcedColors]);
+
+  // Escape leaves fullscreen. Both exits are required: a fullscreen with no
+  // visible way out is a trap, so the floating control and the key both exist.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
   // The two media-query axes are MIRRORED rather than set: a stylesheet cannot be
   // told that `prefers-reduced-motion` is on. The mirrored rules are scoped to a
@@ -1017,6 +1065,7 @@ export function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "var(--font-sans)" }}>
+      {!fullscreen && (
       <header style={NAV_STYLE} data-testid="stories.navbar">
         <Button
           variant="ghost"
@@ -1116,6 +1165,28 @@ export function App() {
           ]}
         />
 
+        <Button
+          variant={outline ? "primary" : "secondary"}
+          icon="layout-grid"
+          aria-pressed={outline}
+          title="Outline every box on the stage"
+          onClick={() => setOutline((on) => !on)}
+          data-testid="stories.axis.outline"
+        >
+          Outline
+        </Button>
+
+        <Button
+          variant={fullscreen ? "primary" : "secondary"}
+          icon="maximize-2"
+          aria-pressed={fullscreen}
+          title="Fill the window with the canvas"
+          onClick={() => setFullscreen((on) => !on)}
+          data-testid="stories.axis.fullscreen"
+        >
+          Fullscreen
+        </Button>
+
         <Select
           value={viewport}
           onChange={(next) => setViewport(next)}
@@ -1197,8 +1268,10 @@ export function App() {
           File issue
         </Button>
       </header>
+      )}
 
       <div style={{ display: "flex", flex: "1 1 auto", minHeight: 0 }}>
+        {!fullscreen && (
         <nav
           ref={railRef}
           style={RAIL_STYLE}
@@ -1224,18 +1297,33 @@ export function App() {
             </div>
           ))}
         </nav>
+        )}
 
         {/* The stage and the inspector share one column, so the inspector sits
             under the content rather than running beneath the rail. */}
         <div
           style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minWidth: 0 }}
         >
+          {fullscreen && (
+            <div style={{ position: "absolute", insetBlockStart: "var(--space-3)", insetInlineEnd: "var(--space-3)", zIndex: "var(--z-top-chrome)" }}>
+              <Button
+                variant="secondary"
+                icon="x"
+                onClick={() => setFullscreen(false)}
+                data-testid="stories.fullscreen-exit"
+              >
+                Exit fullscreen (Esc)
+              </Button>
+            </div>
+          )}
           {selected ? (
             <StoryStage
               key={selected.id}
               story={selected}
               theme={theme}
               rtl={rtl}
+              outline={outline}
+              fullscreen={fullscreen}
               viewport={viewport}
               reducedMotion={reducedMotion}
               forcedColors={forcedColors}

@@ -92,3 +92,16 @@ describe("the viewport presets", () => {
     expect(parseView(`#${serialiseView(view)}`)).toEqual(view);
   });
 });
+
+describe("the outline and fullscreen toggles", () => {
+  it("round-trip on their own keys", () => {
+    const outline = { ...DEFAULT_VIEW, outline: true };
+    expect(parseView(`#${serialiseView(outline)}`)).toEqual(outline);
+    const fullscreen = { ...DEFAULT_VIEW, fullscreen: true };
+    expect(parseView(`#${serialiseView(fullscreen)}`)).toEqual(fullscreen);
+  });
+
+  it("are omitted from the URL at their defaults", () => {
+    expect(serialiseView({ ...DEFAULT_VIEW, storyId: "a/b/c" })).toBe("a/b/c");
+  });
+});
