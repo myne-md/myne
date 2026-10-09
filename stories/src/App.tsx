@@ -43,6 +43,7 @@ import {
 } from "./axes";
 import { clearMirroredMedia, mirrorMedia } from "./mediaMirror";
 import { applyOutline, clearOutline } from "./outline";
+import { formatBox, formatGaps, gaps } from "./measure";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -464,6 +465,9 @@ function StoryStage({
   story,
   theme,
   rtl,
+  measure,
+  pinned,
+  onMeasureClick,
   outline,
   fullscreen,
   viewport,
@@ -473,6 +477,9 @@ function StoryStage({
   story: StoryDescriptor;
   theme: Theme;
   rtl: "off" | "on" | "both";
+  measure: boolean;
+  pinned: { box: string; gap: string } | null;
+  onMeasureClick: (event: React.MouseEvent) => void;
   outline: boolean;
   fullscreen: boolean;
   viewport: Viewport;
@@ -492,6 +499,7 @@ function StoryStage({
       dir={dirFor({
         storyId: story.id,
         rtl,
+        measure,
         outline,
         fullscreen,
         viewport,
@@ -499,9 +507,18 @@ function StoryStage({
         forcedColors,
         theme,
       })}
+      onClickCapture={onMeasureClick}
+      data-axis-measure={measure ? "true" : undefined}
       data-axis-reduced-motion={reducedMotion ? "true" : undefined}
       data-axis-forced-colors={forcedColors ? "true" : undefined}
     >
+      {measure && (
+        <div style={{ ...REF_STYLE, padding: "var(--space-2) var(--space-4)" }} data-testid="stories.measure-readout">
+          {pinned === null
+            ? "Click an element on the stage to measure it."
+            : `${pinned.box} · gaps: ${pinned.gap}`}
+        </div>
+      )}
       <div style={STORY_ID_STYLE} data-testid="stories.story-id">
         {story.id}
         <SourceReference story={story} />
@@ -851,6 +868,10 @@ export function App() {
   const [outline, setOutline] = useState<boolean>(
     () => parseView(window.location.hash).outline,
   );
+  // The measure MODE is state; the pinned measurement is transient and is
+  // deliberately not part of the view contract.
+  const [measure, setMeasure] = useState(false);
+  const [pinned, setPinned] = useState<{ box: string; gap: string } | null>(null);
   const [fullscreen, setFullscreen] = useState<boolean>(
     () => parseView(window.location.hash).fullscreen,
   );
@@ -903,6 +924,7 @@ export function App() {
     const next = serialiseView({
       storyId: selectedId,
       rtl,
+      measure,
       outline,
       fullscreen,
       viewport,
@@ -911,7 +933,29 @@ export function App() {
       theme,
     });
     if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
-  }, [selectedId, rtl, outline, fullscreen, viewport, reducedMotion, forcedColors, theme]);
+  }, [selectedId, rtl, measure, outline, fullscreen, viewport, reducedMotion, forcedColors, theme]);
+
+  // Measuring: the story is inert, so a click can only measure and never fires
+  // the component's own handler.
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>('[data-testid="stories.story"]');
+    if (root === null) return;
+    root.style.pointerEvents = measure ? "none" : "";
+    return () => {
+      root.style.pointerEvents = "";
+    };
+  }, [measure, selectedId]);
+
+  /** Pin a measurement for the element under the pointer. */
+  const onMeasureClick = (event: React.MouseEvent) => {
+    if (!measure) return;
+    const target = event.target as HTMLElement;
+    const parent = target.parentElement;
+    setPinned({
+      box: formatBox(target.getBoundingClientRect()),
+      gap: parent === null ? "no parent" : formatGaps(gaps(target.getBoundingClientRect(), parent.getBoundingClientRect())),
+    });
+  };
 
   // The outline overlay marks the STORY, after the story has rendered. It is
   // cleared on the way out so the marks never reach the drift baseline or a
@@ -1166,6 +1210,20 @@ export function App() {
         />
 
         <Button
+          variant={measure ? "primary" : "secondary"}
+          icon="search"
+          aria-pressed={measure}
+          title="Click an element to measure its box and its gaps"
+          onClick={() => {
+            setMeasure((on) => !on);
+            setPinned(null);
+          }}
+          data-testid="stories.axis.measure"
+        >
+          Measure
+        </Button>
+
+        <Button
           variant={outline ? "primary" : "secondary"}
           icon="layout-grid"
           aria-pressed={outline}
@@ -1322,6 +1380,9 @@ export function App() {
               story={selected}
               theme={theme}
               rtl={rtl}
+              measure={measure}
+              pinned={pinned}
+              onMeasureClick={onMeasureClick}
               outline={outline}
               fullscreen={fullscreen}
               viewport={viewport}

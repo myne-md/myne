@@ -62,6 +62,8 @@ export interface View {
    * reviewer has to hold in their head (myne-md/myne#847 task 6).
    */
   rtl: "off" | "on" | "both";
+  /** Whether a click measures rather than activates. Not persisted. */
+  measure: boolean;
   /** Whether the outline overlay marks containers and leaves. */
   outline: boolean;
   /** Whether the canvas fills the window and the chrome is hidden. */
@@ -80,6 +82,7 @@ export interface View {
 export const DEFAULT_VIEW: View = {
   storyId: undefined,
   rtl: "off",
+  measure: false,
   outline: false,
   fullscreen: false,
   viewport: "fit",
@@ -104,6 +107,7 @@ export function parseView(fragment: string): View {
   return {
     storyId: id === undefined || id.length === 0 ? undefined : id,
     rtl: params.get("rtl") === "both" ? "both" : params.get("rtl") === "on" ? "on" : "off",
+    measure: false,
     outline: params.get("outline") === "1",
     fullscreen: params.get("fullscreen") === "1",
     viewport: (VIEWPORTS as readonly string[]).includes(params.get("viewport") ?? "")

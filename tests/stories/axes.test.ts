@@ -16,6 +16,7 @@ import {
   serialiseView,
   stageWidth,
 } from "../../stories/src/axes";
+import { formatBox, formatGaps, gaps } from "../../stories/src/measure";
 
 describe("the view contract", () => {
   it("reads a bare story id, which is every link written before this change", () => {
@@ -103,5 +104,35 @@ describe("the outline and fullscreen toggles", () => {
 
   it("are omitted from the URL at their defaults", () => {
     expect(serialiseView({ ...DEFAULT_VIEW, storyId: "a/b/c" })).toBe("a/b/c");
+  });
+});
+
+describe("the measure arithmetic", () => {
+  it("formats a box the way a reviewer would quote it", () => {
+    expect(formatBox({ width: 1199.4, height: 32.6, top: 0, right: 0, bottom: 0, left: 0 })).toBe(
+      "1199 x 33",
+    );
+  });
+
+  it("reports the gap on each side of a contained element", () => {
+    const outer = { width: 100, height: 100, top: 0, right: 100, bottom: 100, left: 0 };
+    const inner = { width: 60, height: 60, top: 16, right: 84, bottom: 84, left: 16 };
+    expect(gaps(inner, outer)).toEqual({ top: 16, right: 16, bottom: 16, left: 16 });
+  });
+
+  it("KEEPS a negative gap rather than clamping it", () => {
+    // An element that overflows its parent is a finding, and clamping it to zero
+    // would report the case a reviewer most needs to see as the case where
+    // everything is fine.
+    const outer = { width: 100, height: 100, top: 0, right: 100, bottom: 100, left: 0 };
+    const overflowing = { width: 140, height: 40, top: -10, right: 130, bottom: 30, left: -10 };
+    const gap = gaps(overflowing, outer);
+    expect(gap.top).toBe(-10);
+    expect(gap.left).toBe(-10);
+  });
+
+  it("says so when there is no gap rather than printing zeros", () => {
+    expect(formatGaps({ top: 0, right: 0, bottom: 0, left: 0 })).toBe("no gap");
+    expect(formatGaps({ top: 8, right: 0, bottom: 0, left: 8 })).toBe("top 8, left 8");
   });
 });
