@@ -45,7 +45,9 @@ use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
-use super::daily_match::fm_deleted_value_strict;
+use super::daily_match::{
+    fm_archived_value_strict, fm_deleted_value_strict, fm_trashed_value_strict,
+};
 use super::drawing_text::{is_drawing, project_drawing_text};
 use super::error::{
     NoteBatchError, NoteCreateError, NoteDeleteError, NoteListError, NoteReadError,
@@ -838,10 +840,8 @@ pub async fn note_update_from_host(
             //
             // `fm_deleted_value_strict` is the same strict reader the daily-note
             // matcher uses, so "is this deleted" has one answer in this crate.
-            let tombstoned = extract_title_slices(plaintext.as_bytes())
-                .frontmatter_bytes
-                .and_then(fm_deleted_value_strict)
-                .is_some();
+            let fm_bytes = extract_title_slices(plaintext.as_bytes()).frontmatter_bytes;
+            let tombstoned = fm_bytes.and_then(fm_deleted_value_strict).is_some();
             if tombstoned {
                 hooks.search_remove(&note_id);
             } else if is_drawing(plaintext.as_bytes()) {
@@ -862,6 +862,28 @@ pub async fn note_update_from_host(
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
+            // myne-md/myne#839: a soft-trash or archive takes the note out of
+            // the live tree exactly as a permanent delete does, so a detached
+            // (pop-out) window holding it must reach the same terminal state.
+            // Before this it did not: `trashNote`/`archiveNote` are ordinary
+            // `note_update` writes and only the hard-delete path emitted
+            // `notes://deleted`, so the pop-out stayed open and its next
+            // autosave wrote its stale buffer back without the just-set
+            // `trashed:`/`archived:` field, resurrecting the note the user had
+            // removed. Emitting through `HostCtx` (not the desktop-only hooks)
+            // means every client inherits the behaviour, and folding in the
+            // `deleted:` tombstone closes the same gap for the routed permanent
+            // delete, which also arrives here as a plain update. Payload is the
+            // note id only, never plaintext, matching the hard-delete event.
+            let removed_from_live_tree = tombstoned
+                || fm_bytes.and_then(fm_trashed_value_strict).is_some()
+                || fm_bytes.and_then(fm_archived_value_strict).is_some();
+            if removed_from_live_tree {
+                host.emit(
+                    NOTES_DELETED_EVENT,
+                    crate::host::EventPayload::Text(note_id.clone()),
+                );
+            }
             // SYNC-8: a best-effort snapshot failure is surfaced non-blockingly
             // (the note itself saved fine). The frontend shows it on the
             // save-status channel; the IPC return stays `Ok(())`.
@@ -904,12 +926,15 @@ pub async fn note_update<R: Runtime>(
 /// blocks editing and never implies the live note was lost.
 pub const SNAPSHOT_WRITE_FAILED_EVENT: &str = "snapshot://write-failed";
 
-/// Tauri event emitted (non-blocking) when a note is deleted (myne-md/myne#681).
-/// Payload is the note id. A detached (pop-out) note window holding that id shows
-/// the terminal "deleted elsewhere" state instead of autosaving its stale buffer
-/// back; every other window ignores an id it does not hold. The change/rename
-/// reload path reuses the existing `sync://changed` instead (deletes are one-shot,
-/// so this needs its own event and is not the autosave path).
+/// Tauri event emitted (non-blocking) when a note leaves the live tree: a hard
+/// delete, a soft-trash, an archive, or the `deleted:` tombstone the routed
+/// permanent delete writes (myne-md/myne#681; the soft-removal half is
+/// myne-md/myne#839). Payload is the note id. A detached (pop-out) note window
+/// holding that id shows the terminal "removed elsewhere" state instead of
+/// autosaving its stale buffer back; every other window ignores an id it does not
+/// hold. The change/rename reload path reuses the existing `sync://changed`
+/// instead (removals are one-shot, so this needs its own event and is not the
+/// autosave path).
 pub const NOTES_DELETED_EVENT: &str = "notes://deleted";
 
 /// Internal outcome of [`note_update_with_dir`] — carries a non-blocking
@@ -2726,7 +2751,10 @@ mod tests {
     // fixture + the notes with_dir cores); the broader CRUD integration tests
     // stay desktop-side as documented above.
 
-    use super::{note_create_with_dir, note_read_with_dir, note_update_with_dir};
+    use super::{
+        note_create_from_host, note_create_with_dir, note_read_with_dir, note_update_from_host,
+        note_update_with_dir,
+    };
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::vault_unlock::state::{
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
@@ -3186,6 +3214,110 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(on_disk, "guardless overwrite");
+        })
+    }
+
+    /// myne-md/myne#839: an update that takes a note out of the live tree (a
+    /// soft-trash, an archive, or the `deleted:` tombstone the routed permanent
+    /// delete writes) must notify every window exactly as the hard-delete path
+    /// does. Before this, only the hard delete emitted `notes://deleted`, so a
+    /// detached (pop-out) window holding a soft-trashed note stayed open and its
+    /// next autosave wrote its stale buffer back without the `trashed:` field
+    /// and resurrected the note. A plain live edit must NOT emit.
+    #[test]
+    fn removing_a_note_from_the_live_tree_emits_notes_deleted() {
+        use crate::host::test_host::TestHost;
+        use crate::host::EventPayload;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("removed-emit").unwrap();
+            let state = unlocked().await;
+            let host = TestHost::new(tmp.path());
+            // `note_*_from_host` resolves `<app_data_dir>/vaults/<id>/notes` and
+            // requires the vault root to exist (a `NotFound` before any write),
+            // so create it, as an unlocked vault on disk always would.
+            let data_dir = crate::host::HostCtx::app_data_dir(&host).unwrap();
+            std::fs::create_dir_all(crate::paths::vault_root_for_id_from_base(
+                &data_dir,
+                test_vault_id(),
+            ))
+            .unwrap();
+
+            async fn drive(
+                host: &TestHost,
+                state: &VaultRuntimeState,
+                body: &str,
+                edited: &str,
+            ) -> String {
+                let id = note_create_from_host(
+                    host,
+                    state,
+                    &noop_hooks(),
+                    body.to_string(),
+                    &crate::vault_io::StdVaultIo,
+                )
+                .await
+                .unwrap();
+                note_update_from_host(
+                    host,
+                    state,
+                    &noop_hooks(),
+                    id.clone(),
+                    edited.to_string(),
+                    None,
+                    &crate::vault_io::StdVaultIo,
+                )
+                .await
+                .unwrap();
+                id
+            }
+
+            // The events are filtered by note id, so one host serves every case.
+            let emitted = |id: &str| {
+                host.events().iter().any(|(name, payload)| {
+                    *name == super::NOTES_DELETED_EVENT
+                        && matches!(payload, EventPayload::Text(t) if t.as_str() == id)
+                })
+            };
+
+            let id = drive(
+                &host,
+                &state,
+                "---\ntitle: Live\n---\n\nbody",
+                "---\ntitle: Live\n---\n\nedited",
+            )
+            .await;
+            assert!(!emitted(&id), "a live edit must not emit notes://deleted");
+
+            let id = drive(
+                &host,
+                &state,
+                "---\ntitle: T\n---\n\nbody",
+                "---\ntitle: T\ntrashed: 2026-01-01T00:00:00Z\n---\n\nbody",
+            )
+            .await;
+            assert!(emitted(&id), "soft-trash must emit notes://deleted");
+
+            let id = drive(
+                &host,
+                &state,
+                "---\ntitle: A\n---\n\nbody",
+                "---\ntitle: A\narchived: 2026-01-01T00:00:00Z\n---\n\nbody",
+            )
+            .await;
+            assert!(emitted(&id), "archive must emit notes://deleted");
+
+            let id = drive(
+                &host,
+                &state,
+                "---\ntitle: D\n---\n\nbody",
+                "---\ntitle: D\ndeleted: 2026-01-01T00:00:00Z\n---\n\nbody",
+            )
+            .await;
+            assert!(
+                emitted(&id),
+                "a deleted: tombstone must emit notes://deleted"
+            );
         })
     }
 

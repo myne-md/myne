@@ -32,6 +32,7 @@ import {
   type TaskDisplaySettings,
 } from "./taskDisplay";
 import type { NoteId } from "./sidebarState";
+import type { FlushOptions } from "./useAutosave";
 import { openDetachedWindow } from "../lib/detachedWindow";
 import {
   activeSlotState,
@@ -368,10 +369,23 @@ export type WorkspaceApi = {
    *  and FALSE when it did not, which is the only way `flushAll` can tell a
    *  save that failed from one that landed: every layer below swallows the
    *  rejection into that pane's `saveStatus`. */
-  registerFlush: (paneId: PaneId, flush: () => Promise<boolean>) => void;
+  registerFlush: (
+    paneId: PaneId,
+    flush: (opts?: FlushOptions) => Promise<boolean>,
+  ) => void;
   unregisterFlush: (paneId: PaneId) => void;
-  /** Flush every registered pane editor's pending save (lock / close). */
-  flushAll: () => Promise<void>;
+  /** Flush every registered pane editor's pending save (lock / close).
+   *
+   *  `forceBaseGuard` is the one-shot override the detached-window
+   *  `notes://deleted` handler passes (myne-md/myne#839 follow-up): a
+   *  cross-window trash/archive HAS changed disk, so the flush must declare its
+   *  expected base even on a no-sync install, or a hashless last-write-wins
+   *  flush resurrects the removed note. */
+  flushAll: (opts?: FlushOptions) => Promise<void>;
+  /** Flush only the pane(s) showing `id`, with the given options (myne-md/myne#839
+   *  removal: guard the removed note's buffer before its pane closes, without
+   *  force-guarding unrelated dirty panes the way `flushAll` would). */
+  flushNote: (id: NoteId, opts?: FlushOptions) => Promise<void>;
 };
 
 /** Stable empty reference for `expandedFolders` when unset, so the sidebar's
@@ -818,9 +832,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Flush registry. Refs, so no re-render. Keyed by paneId.
-  const flushers = useRef<Map<PaneId, () => Promise<boolean>>>(new Map());
+  const flushers = useRef<
+    Map<PaneId, (opts?: FlushOptions) => Promise<boolean>>
+  >(new Map());
   const registerFlush = useCallback(
-    (paneId: PaneId, flush: () => Promise<boolean>) => {
+    (
+      paneId: PaneId,
+      flush: (opts?: FlushOptions) => Promise<boolean>,
+    ) => {
       flushers.current.set(paneId, flush);
     },
     [],
@@ -850,10 +869,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
    * after every normal save. The comment at the call site in `PaneView.tsx`
    * carries the measurement.
    */
-  const flushAll = useCallback(async () => {
+  const flushAll = useCallback(async (opts?: FlushOptions) => {
     const settled = await Promise.all(
       [...flushers.current.entries()].map(([paneId, f]) =>
-        f().then(
+        f(opts).then(
           (ok) => (ok ? null : paneId),
           // A flusher that REJECTS outright did not settle either. Caught here
           // rather than left to `Promise.all` so one pane's failure does not
@@ -886,6 +905,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
     return () => clearRenameFlushHooks();
   }, [flushAll]);
+
+  // Flush ONLY the pane(s) showing `id`. A removal (myne-md/myne#839) must
+  // guard the removed note's own buffer before its pane closes, without the
+  // `forceBaseGuard` override leaking onto unrelated dirty panes the way
+  // `flushAll` would.
+  const flushNote = useCallback(async (id: NoteId, opts?: FlushOptions) => {
+    const paneIds = collectLeaves(stateRef.current.root)
+      .filter((l) => l.activeTab?.kind === "note" && l.activeTab.id === id)
+      .map((l) => l.id);
+    const settled = await Promise.all(
+      paneIds.map((paneId) => {
+        const f = flushers.current.get(paneId);
+        if (f === undefined) return Promise.resolve(null);
+        return f(opts).then(
+          (ok) => (ok ? null : paneId),
+          () => paneId,
+        );
+      }),
+    );
+    const unsettled = settled.filter((x): x is PaneId => x !== null);
+    if (unsettled.length > 0) throw new PanesNotSettledError(unsettled);
+  }, []);
 
   // ── Back/forward navigation history (MYND-260) ─────────────────────
   // Per-pane, EPHEMERAL: held next to - never inside - the persisted pane
@@ -1014,6 +1055,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       registerFlush,
       unregisterFlush,
       flushAll,
+      flushNote,
     }),
     [
       state,
@@ -1072,6 +1114,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       registerFlush,
       unregisterFlush,
       flushAll,
+      flushNote,
     ],
   );
 
