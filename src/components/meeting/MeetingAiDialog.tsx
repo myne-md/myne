@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type ReactElement,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -197,6 +198,11 @@ function MeetingAiDialogInner({
     return text !== undefined && text.trim().length > 0;
   });
 
+  // `ModalShell`'s body carries no padding of its own: every caller supplies
+  // its own, and this dialog was the one that did not, so its content sat flush
+  // against the card edges (myne-md/myne#843).
+  const BODY_STYLE: CSSProperties = { padding: "var(--space-5)" };
+
   return (
     <ModalShell
       open
@@ -205,148 +211,150 @@ function MeetingAiDialogInner({
       labelId="meeting-ai-title"
       testId="meeting.ai-dialog"
     >
-      {phase === "pick" && noModel && (
-        <>
-          <p data-testid="meeting.ai.no-model">
-            {t("editor.meeting.ai.noModel")}
-          </p>
-          <div>
-            {onOpenAiSettings !== undefined && (
+      <div style={BODY_STYLE}>
+        {phase === "pick" && noModel && (
+          <>
+            <p data-testid="meeting.ai.no-model">
+              {t("editor.meeting.ai.noModel")}
+            </p>
+            <div>
+              {onOpenAiSettings !== undefined && (
+                <Button
+                  variant="primary"
+                  data-testid="meeting.ai.open-settings"
+                  onClick={() => {
+                    onOpenAiSettings();
+                    close();
+                  }}
+                >
+                  {t("editor.meeting.ai.openSettings")}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={close}>
+                {t("editor.meeting.ai.close")}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {phase === "pick" && !noModel && (
+          <>
+            <p>{t("editor.meeting.ai.pickIntro")}</p>
+            <p>{t("editor.meeting.ai.noAttribution")}</p>
+            {MEETING_SECTION_IDS.map((id) => (
+              <SettingRow
+                key={id}
+                label={sectionLabel(id, t)}
+                testId={`meeting.ai.section.${id}`}
+                control={
+                  <Switch
+                    checked={selected[id]}
+                    onChange={(next) =>
+                      setSelected((prev) => ({ ...prev, [id]: next }))
+                    }
+                    ariaLabel={sectionLabel(id, t)}
+                    testId={`meeting.ai.section.${id}.switch`}
+                  />
+                }
+              />
+            ))}
+            <div>
               <Button
                 variant="primary"
-                data-testid="meeting.ai.open-settings"
+                data-testid="meeting.ai.generate"
+                onClick={generate}
+              >
+                {t("editor.meeting.ai.generate")}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {phase === "running" && (
+          <>
+            <p data-testid="meeting.ai.running">{t("editor.meeting.ai.running")}</p>
+            <p data-testid="meeting.ai.progress">
+              {t("editor.meeting.ai.progress", {
+                done: progress[0],
+                total: progress[1],
+              })}
+            </p>
+            <div>
+              <Button
+                variant="secondary"
+                data-testid="meeting.ai.stop"
                 onClick={() => {
-                  onOpenAiSettings();
-                  close();
+                  stoppedRef.current = true;
+                  runRef.current?.stop();
+                  setPhase("cancelled");
                 }}
               >
-                {t("editor.meeting.ai.openSettings")}
+                {t("editor.meeting.ai.stop")}
               </Button>
-            )}
-            <Button variant="secondary" onClick={close}>
-              {t("editor.meeting.ai.close")}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {phase === "pick" && !noModel && (
-        <>
-          <p>{t("editor.meeting.ai.pickIntro")}</p>
-          <p>{t("editor.meeting.ai.noAttribution")}</p>
-          {MEETING_SECTION_IDS.map((id) => (
-            <SettingRow
-              key={id}
-              label={sectionLabel(id, t)}
-              testId={`meeting.ai.section.${id}`}
-              control={
-                <Switch
-                  checked={selected[id]}
-                  onChange={(next) =>
-                    setSelected((prev) => ({ ...prev, [id]: next }))
-                  }
-                  ariaLabel={sectionLabel(id, t)}
-                  testId={`meeting.ai.section.${id}.switch`}
-                />
-              }
-            />
-          ))}
-          <div>
-            <Button
-              variant="primary"
-              data-testid="meeting.ai.generate"
-              onClick={generate}
-            >
-              {t("editor.meeting.ai.generate")}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {phase === "running" && (
-        <>
-          <p data-testid="meeting.ai.running">{t("editor.meeting.ai.running")}</p>
-          <p data-testid="meeting.ai.progress">
-            {t("editor.meeting.ai.progress", {
-              done: progress[0],
-              total: progress[1],
-            })}
-          </p>
-          <div>
-            <Button
-              variant="secondary"
-              data-testid="meeting.ai.stop"
-              onClick={() => {
-                stoppedRef.current = true;
-                runRef.current?.stop();
-                setPhase("cancelled");
-              }}
-            >
-              {t("editor.meeting.ai.stop")}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {phase === "review" && (
-        <>
-          <p>{t("editor.meeting.ai.reviewIntro")}</p>
-          {present.map((id) => (
-            <div key={id} data-testid={`meeting.ai.preview.${id}`}>
-              <h3>{MEETING_SECTION_HEADINGS[id]}</h3>
-              <p>{sections[id]}</p>
             </div>
-          ))}
-          <div>
-            <Button
-              variant="primary"
-              data-testid="meeting.ai.insert"
-              onClick={insert}
-            >
-              {t("editor.meeting.ai.insert")}
-            </Button>
-            <Button
-              variant="secondary"
-              data-testid="meeting.ai.discard"
-              onClick={close}
-            >
-              {t("editor.meeting.ai.discard")}
-            </Button>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
-      {phase === "error" && (
-        <>
-          <p data-testid="meeting.ai.error">{t("editor.meeting.ai.failed")}</p>
-          <div>
-            <Button
-              variant="secondary"
-              data-testid="meeting.ai.close"
-              onClick={close}
-            >
-              {t("editor.meeting.ai.close")}
-            </Button>
-          </div>
-        </>
-      )}
+        {phase === "review" && (
+          <>
+            <p>{t("editor.meeting.ai.reviewIntro")}</p>
+            {present.map((id) => (
+              <div key={id} data-testid={`meeting.ai.preview.${id}`}>
+                <h3>{MEETING_SECTION_HEADINGS[id]}</h3>
+                <p>{sections[id]}</p>
+              </div>
+            ))}
+            <div>
+              <Button
+                variant="primary"
+                data-testid="meeting.ai.insert"
+                onClick={insert}
+              >
+                {t("editor.meeting.ai.insert")}
+              </Button>
+              <Button
+                variant="secondary"
+                data-testid="meeting.ai.discard"
+                onClick={close}
+              >
+                {t("editor.meeting.ai.discard")}
+              </Button>
+            </div>
+          </>
+        )}
 
-      {phase === "cancelled" && (
-        <>
-          <p data-testid="meeting.ai.cancelled">
-            {t("editor.meeting.ai.cancelled")}
-          </p>
-          <div>
-            <Button
-              variant="secondary"
-              data-testid="meeting.ai.close"
-              onClick={close}
-            >
-              {t("editor.meeting.ai.close")}
-            </Button>
-          </div>
-        </>
-      )}
+        {phase === "error" && (
+          <>
+            <p data-testid="meeting.ai.error">{t("editor.meeting.ai.failed")}</p>
+            <div>
+              <Button
+                variant="secondary"
+                data-testid="meeting.ai.close"
+                onClick={close}
+              >
+                {t("editor.meeting.ai.close")}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {phase === "cancelled" && (
+          <>
+            <p data-testid="meeting.ai.cancelled">
+              {t("editor.meeting.ai.cancelled")}
+            </p>
+            <div>
+              <Button
+                variant="secondary"
+                data-testid="meeting.ai.close"
+                onClick={close}
+              >
+                {t("editor.meeting.ai.close")}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </ModalShell>
   );
 }
