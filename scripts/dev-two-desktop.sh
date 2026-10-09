@@ -8,9 +8,10 @@
 # `tauri::generate_context!` from the `TAURI_CONFIG` env the CLI sets when
 # `--config` is passed, and `tauri-build` emits `rerun-if-env-changed=TAURI_CONFIG`
 # so the top crate relinks when it changes). So a plain second `pnpm tauri dev`
-# from this checkout only focuses the first window. Giving the second instance a
-# different identifier separates BOTH the lock and the data directory, which is
-# what produces two independent apps with two independent vaults.
+# from this checkout only focuses the first window. Giving EACH instance its own
+# identifier (neither the default) separates BOTH the lock and the data directory,
+# which produces two independent apps with two independent vaults AND leaves the
+# real `md.myne.desktop` vault untouched.
 #
 # Shared on purpose, all of them identifier-independent and hardcoded in the
 # client, so they are caveats rather than bugs:
@@ -24,7 +25,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_A_ID="md.myne.desktop"
+APP_A_ID="md.myne.desktop.a"
 APP_B_ID="md.myne.desktop.b"
 
 # Job control: each background job gets its own process group, which is what lets
@@ -56,7 +57,7 @@ else
 fi
 
 echo "==> instance A ($APP_A_ID)"
-pnpm tauri dev --config '{"build":{"beforeDevCommand":""}}' &
+pnpm tauri dev --config "{\"identifier\":\"$APP_A_ID\",\"build\":{\"beforeDevCommand\":\"\"}}" &
 PIDS+=("$!")
 
 echo "==> instance B ($APP_B_ID)"
