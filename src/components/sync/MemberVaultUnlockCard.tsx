@@ -61,7 +61,6 @@ export function MemberVaultUnlockCard({
         <EnrollPhraseCredential
           baseId="unlock-member"
           label={t("unlock.memberPhraseLabel")}
-          hint={t("unlock.memberHint")}
           disabled={busy}
           cells={phraseCells}
           onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {

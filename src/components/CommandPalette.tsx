@@ -65,7 +65,7 @@ import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-resul
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0, 0, 0, 0.32)",
+  background: "var(--scrim)",
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "center",

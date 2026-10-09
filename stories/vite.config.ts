@@ -32,11 +32,16 @@ export default defineConfig({
     },
   },
   define: {
-    // Both are referenced by components the catalogue mounts (AboutPanel reads
-    // them). The commit is a fixed sentinel here: the catalogue is dev tooling,
-    // not a shipped build whose provenance needs recording.
+    // All three compile-time globals are referenced by components the catalogue
+    // mounts (AboutPanel reads every one of them). Missing `__UPDATE_CHANNEL__`
+    // was not a missing label: it is a bare identifier read during render, so
+    // the panel threw `ReferenceError` and, with no boundary in the shell, took
+    // the whole catalogue down with it. The commit and channel are fixed
+    // sentinels here: the catalogue is dev tooling, not a shipped build whose
+    // provenance needs recording.
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __BUILD_COMMIT__: JSON.stringify("stories"),
+    __UPDATE_CHANNEL__: JSON.stringify("stable"),
   },
   // The shared tree lives above the Vite root; allow the whole checkout.
   server: {

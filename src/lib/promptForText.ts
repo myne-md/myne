@@ -60,7 +60,7 @@ export function promptForText(
       backdropStyle: {
         position: "fixed",
         inset: "0",
-        background: "rgba(0, 0, 0, 0.32)",
+        background: "var(--scrim)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

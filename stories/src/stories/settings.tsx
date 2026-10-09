@@ -113,6 +113,12 @@ const SYNC_FIXTURE: Fixture = {
       group_key_epoch: null,
     }),
     "plugin:sync|sync_list_vault_invites": () => [],
+    // Not enrolled means the server has no account to report on, so the usage
+    // block is ABSENT rather than zeroed. Omitting this handler left the fake
+    // host answering `{}`, and `SyncUsageBlock` then rendered
+    // "NaN KiB of NaN KiB" and "undefined of undefined" (myne-md/myne#843).
+    "plugin:sync|sync_account_status": () => null,
+    "plugin:sync|sync_list_devices": () => [],
   },
 };
 
