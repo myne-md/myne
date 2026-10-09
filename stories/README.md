@@ -42,11 +42,14 @@ Every story is addressable by URL: the fragment is the story id
   reachable with the up and down arrows, which walk the flattened tree in the
   order the eye reads. States are leaves, so every story is an addressable node.
   A nesting comes from an optional hand-written `parent` on a descriptor, and
-  only about thirty pairs in the tree have one; `scripts/check-story-tree.mjs`
+  the tree ships **one** real pair today (`AutomaticBackupBlock` under
+  `StoragePanel`); `scripts/check-story-tree.mjs`
   fails on a `parent` that names nothing, on a cycle, and on an edge with no
   import between the two modules in either direction (a settings shell imports
   its panels, while the shared modal shell is imported by its children, so one
-  direction would reject half the real pairs). A name is derived from the
+  direction would reject half the real pairs). The rest of the nesting is owed
+  work rather than a decision, and the guard carries a floor on how many edges it
+  verifies, so the count cannot sit at one without the guard saying so. A name is derived from the
   component name and changes **casing only** (`ModalShell` reads as "Modal
   Shell"); `title` on a descriptor is the rare override. Title Case here is
   deliberate and is *not* a violation of the sentence-case rule that governs

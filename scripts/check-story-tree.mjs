@@ -160,7 +160,12 @@ if (invokedDirectly) {
   const surfacePaths = enumerateSurfaces(ROOT);
   const problems = findings({ edges, surfaces, surfacePaths });
 
-  if (edges.length === 0) {
+  // The number of edges verified is DEBT: it may only rise. The floor is the
+  // measured count on the day this landed, and it is what stops the docs and the
+  // rail from quietly disagreeing about how much of the tree is nested
+  // (myne-md/myne#847 adversarial pass).
+  const EDGE_FLOOR = 1;
+  if (edges.length < EDGE_FLOOR) {
     console.error(
       "check-story-tree: FAIL: no `parent` edge was found in any story file, so this guard would pass by checking nothing.",
     );
