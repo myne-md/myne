@@ -6,14 +6,12 @@
     "BacklinksTab",
     "ChatComposer",
     "ConflictsView",
-    "FilterBuilder",
     "FolderRow",
     "GraphCanvas",
     "GraphList",
     "GraphSettingsPanel",
     "GraphView",
     "NoteList",
-    "NoteRow",
     "OutlineTab",
     "PaneTree",
     "PaneView",
@@ -22,10 +20,7 @@
     "SnapshotFailedIndicator",
     "SnapshotsPanel",
     "TagBrowser",
-    "TaskListPanel",
     "TasksPane",
-    "UnlinkedMentionsSection",
-    "ViewSettings",
-    "ViewsSection"
+    "UnlinkedMentionsSection"
   ]
 }

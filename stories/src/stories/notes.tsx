@@ -23,6 +23,13 @@ import { LeftRibbon } from "@app/notes/components/LeftRibbon";
 import { MemoryPopover } from "@app/notes/components/MemoryPopover";
 import { NewTabChooser } from "@app/notes/components/NewTabChooser";
 import { NoteActionsMenu } from "@app/notes/components/NoteActionsMenu";
+import { NoteRow } from "@app/notes/components/NoteRow";
+import { FilterBuilder } from "@app/notes/components/FilterBuilder";
+import { TaskListPanel } from "@app/notes/components/TaskListPanel";
+import { ViewSettings } from "@app/notes/components/ViewSettings";
+import { ViewsSection } from "@app/notes/components/ViewsSection";
+import { DEFAULT_TASK_VIEW } from "@app/notes/taskView";
+import type { SavedView } from "@app/lib/prefs";
 import { PanelEmptyState } from "@app/notes/components/PanelEmptyState";
 import { SaveStatus } from "@app/notes/components/SaveStatus";
 import { TabStrip } from "@app/notes/components/TabStrip";
@@ -399,5 +406,228 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         />
       </Frame>
     ),
+  },
+  {
+    id: "notes/noterow/selected",
+    group: "components",
+    surface: "NoteRow",
+    state: "selected",
+    description: "A sidebar row in its selected state, with a colour slot and a timestamp.",
+    tags: ["notes", "sidebar", "row", "selected"],
+    render: () => (
+      <Frame>
+        {/* The sidebar wraps rows in `role="tree"` (NoteList); `role="treeitem"`
+            outside one is `aria-required-parent`, and it is a shape the app never
+            renders (myne-md/myne#845). */}
+        <div role="tree" aria-label="Notes">
+          <NoteRow
+          record={{
+            noteUuid: "n1",
+            title: "Meeting notes",
+            folder: "Projects/",
+            updatedAt: new Date(),
+            trashed: null,
+            deleted: null,
+            archived: null,
+            template: false,
+            folderIndex: false,
+            conflict: false,
+            conflictOf: null,
+            hasSource: true,
+            kind: null,
+            done: null,
+          }}
+          selected
+          renaming={false}
+          colorSlot="clay"
+          showTimestamps
+          onSelect={action("onSelect")}
+          onStartRename={action("onStartRename")}
+          onContextMenu={action("onContextMenu")}
+          onCommitRename={action("onCommitRename")}
+          onCancelRename={action("onCancelRename")}
+        />
+        </div>
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/noterow/untitled",
+    group: "components",
+    surface: "NoteRow",
+    state: "untitled",
+    description: "A row with no title yet, which is what a brand-new note looks like.",
+    tags: ["notes", "sidebar", "row", "untitled", "empty"],
+    render: () => (
+      <Frame>
+        {/* The sidebar wraps rows in `role="tree"` (NoteList); `role="treeitem"`
+            outside one is `aria-required-parent`, and it is a shape the app never
+            renders (myne-md/myne#845). */}
+        <div role="tree" aria-label="Notes">
+          <NoteRow
+          record={{
+            noteUuid: "n2",
+            title: null,
+            folder: null,
+            updatedAt: null,
+            trashed: null,
+            deleted: null,
+            archived: null,
+            template: false,
+            folderIndex: false,
+            conflict: false,
+            conflictOf: null,
+            hasSource: true,
+            kind: null,
+            done: null,
+          }}
+          selected={false}
+          renaming={false}
+          onSelect={action("onSelect")}
+          onStartRename={action("onStartRename")}
+          onContextMenu={action("onContextMenu")}
+          onCommitRename={action("onCommitRename")}
+            onCancelRename={action("onCancelRename")}
+          />
+        </div>
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/filterbuilder/default",
+    fixture: NOTES_FIXTURE,
+    group: "components",
+    surface: "FilterBuilder",
+    state: "default",
+    description: "The view filter builder with one seeded condition and a folder choice.",
+    tags: ["notes", "views", "filter", "builder"],
+    render: () => (
+      <SidebarStateProvider>
+        <Frame>
+          <FilterBuilder
+            title="Edit filter"
+            initialDraft={{
+              combinator: "and",
+              groups: [
+                {
+                  combinator: "and",
+                  conditions: [{ type: "tag", value: "project", negated: false }],
+                },
+              ],
+            }}
+            folderOptions={[{ path: "Projects/", label: "Projects" }]}
+            onCancel={action("onCancel")}
+            onSave={action("onSave")}
+          />
+        </Frame>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/tasklistpanel/default",
+    group: "components",
+    surface: "TaskListPanel",
+    state: "default",
+    description: "The vault-wide task list with an open, a due and a completed task.",
+    tags: ["notes", "tasks", "list", "panel"],
+    render: () => (
+      <Frame>
+        <TaskListPanel
+          tasks={[
+            {
+              noteId: "n1",
+              noteTitle: "Meeting notes",
+              noteFolder: "Projects/",
+              lineIndex: 12,
+              rawLine: "- [ ] Send the recap",
+              completed: false,
+              oversized: false,
+              due: "2026-10-12",
+            },
+            {
+              noteId: "n1",
+              noteTitle: "Meeting notes",
+              noteFolder: "Projects/",
+              lineIndex: 13,
+              rawLine: "- [x] Book the room",
+              completed: true,
+              oversized: false,
+            },
+            {
+              noteId: "n2",
+              noteTitle: null,
+              noteFolder: null,
+              lineIndex: null,
+              rawLine: "- [ ] Untitled note task",
+              completed: false,
+              oversized: false,
+              priority: "high",
+            },
+          ]}
+          view={DEFAULT_TASK_VIEW}
+          today="2026-10-09"
+          rowScope="vault"
+          onViewChange={action("onViewChange")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/viewsettings/default",
+    group: "components",
+    surface: "ViewSettings",
+    state: "default",
+    description: "The per-view display settings, seeded from the view being edited.",
+    tags: ["notes", "views", "settings", "display"],
+    render: () => (
+      <Frame>
+        <ViewSettings
+          title="Reading list"
+          initial={{}}
+          propertyKeys={["status", "priority", "owner"]}
+          onCancel={action("onCancel")}
+          onSave={action("onSave")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "notes/viewssection/default",
+    group: "components",
+    surface: "ViewsSection",
+    state: "default",
+    description: "The saved-views list with one active view and one unfiltered view.",
+    tags: ["notes", "views", "sidebar", "section"],
+    render: () => {
+      const views: SavedView[] = [
+        {
+          id: "v1",
+          name: "Reading list",
+          view_type: "list",
+          filters: { kind: "hasTag", tag: "reading" },
+        },
+        {
+          id: "v2",
+          name: "Everything",
+          view_type: "table",
+          filters: { kind: "all" },
+        },
+      ];
+      return (
+        <Frame>
+          <ViewsSection
+            views={views}
+            activeViewId="v1"
+            onOpenView={action("onOpenView")}
+            onNewView={action("onNewView")}
+            onEditFilter={action("onEditFilter")}
+            onViewSettings={action("onViewSettings")}
+            onRename={action("onRename")}
+            onDelete={action("onDelete")}
+            onMoveView={action("onMoveView")}
+          />
+        </Frame>
+      );
+    },
   },
 ];
