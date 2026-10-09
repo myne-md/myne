@@ -68,6 +68,8 @@ import { VimModeSettings } from "@app/components/settings/VimModeSettings";
 import { BrowserIcon } from "@app/components/settings/browser-icons";
 import { SettingsSearch } from "@app/components/settings/search/SettingsSearch";
 import { SettingsSearchResults } from "@app/components/settings/search/SettingsSearchResults";
+import { action } from "../actions";
+import { Switch } from "@app/components/primitives/Switch";
 
 const noop = () => {};
 
@@ -97,6 +99,12 @@ const PREFS_FIXTURE: Fixture = {
     "plugin:local-inference|get_model_path": () => null,
     "plugin:local-inference|ai_capability_report": () => ({ compiled: false }),
     "plugin:prefs|ai_provider_has_key": () => false,
+    // `AboutPanel` reads this as a boolean and gates its toggle row on
+    // `!== null`. Left unanswered, the fake host's benign `[]` default is not
+    // null, so the row rendered with `aria-checked=""`. An invalid value for
+    // `role="switch"`, which axe reports as a missing required attribute. The
+    // real command returns a bool, so the fixture answers one (myne-md/myne#845).
+    "plugin:update|update_get_auto_check": () => true,
   },
 };
 
@@ -152,7 +160,15 @@ function CustomizeListDemo() {
     { id: "settings", icon: "settings", label: "Settings" },
   ];
   return (
-    <div style={CUSTOMIZE_LIST_STYLE}>
+    <div
+      style={CUSTOMIZE_LIST_STYLE}
+      // Both real callers (`BarCustomizeSettings`, the ribbon panel) put
+      // `role="list"` here; the demo omitted it, so its `role="listitem"` rows
+      // had no list parent and axe reported `aria-required-parent`. The story
+      // was showing a shape the app never renders (myne-md/myne#845).
+      role="list"
+      data-testid="stories.customize.list"
+    >
       {rows.map((row, i) => (
         <CustomizeRow
           key={row.id}
@@ -176,6 +192,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AboutPanel",
     state: "default",
+    description: "About Panel, a default state.",
+    tags: ["settings", "aboutpanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -185,16 +203,24 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/accountpanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "AccountPanel",
     state: "default",
+    description: "Account Panel, a default state.",
+    tags: ["settings", "accountpanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <AccountPanel
           vaultId={FIXTURE_VAULT_ID}
-          onChangePasswordSuccess={noop}
-          onDeleteVaultSuccess={noop}
+          onChangePasswordSuccess={action("onChangePasswordSuccess")}
+          onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
         />
       </Frame>
     ),
@@ -204,14 +230,16 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AiOnboardingSurface",
     state: "default",
+    description: "Ai Onboarding Surface, a default state.",
+    tags: ["settings", "aionboardingsurface", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <AiOnboardingSurface
           open
-          onClose={noop}
+          onClose={action("onClose")}
           downloads={false}
-          onOpenProviderSetup={noop}
+          onOpenProviderSetup={action("onOpenProviderSetup")}
         />
       </Frame>
     ),
@@ -221,10 +249,12 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AiPanel",
     state: "default",
+    description: "Ai Panel, a default state.",
+    tags: ["settings", "aipanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <AiPanel onShowToast={noop} onDialogOpenChange={noop} />
+        <AiPanel onShowToast={action("onShowToast")} onDialogOpenChange={action("onDialogOpenChange")} />
       </Frame>
     ),
   },
@@ -233,13 +263,15 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AiProviderConsent",
     state: "default",
+    description: "Ai Provider Consent, a default state.",
+    tags: ["settings", "aiproviderconsent", "default"],
     render: () => (
       <Frame>
         <AiProviderConsent
           open
           providerLabel="Local runtime"
-          onAccept={noop}
-          onCancel={noop}
+          onAccept={action("onAccept")}
+          onCancel={action("onCancel")}
         />
       </Frame>
     ),
@@ -249,10 +281,12 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AppearancePanel",
     state: "default",
+    description: "Appearance Panel, a default state.",
+    tags: ["settings", "appearancepanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <AppearancePanel onOpenGraph={noop} onDialogOpenChange={noop} />
+        <AppearancePanel onOpenGraph={action("onOpenGraph")} onDialogOpenChange={action("onDialogOpenChange")} />
       </Frame>
     ),
   },
@@ -261,6 +295,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "ArchiveSettings",
     state: "default",
+    description: "Archive Settings, a default state.",
+    tags: ["settings", "archivesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -275,6 +311,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AttachmentCompressionSettings",
     state: "default",
+    description: "Attachment Compression Settings, a default state.",
+    tags: ["settings", "attachmentcompressionsettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -287,6 +325,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "AttachmentOcrSettings",
     state: "default",
+    description: "Attachment Ocr Settings, a default state.",
+    tags: ["settings", "attachmentocrsettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -296,13 +336,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/automaticbackupblock/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "AutomaticBackupBlock",
     state: "default",
+    description: "Automatic Backup Block, a default state.",
+    tags: ["settings", "automaticbackupblock", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <AutomaticBackupBlock vaultId={FIXTURE_VAULT_ID} onShowToast={noop} />
+        <AutomaticBackupBlock vaultId={FIXTURE_VAULT_ID} onShowToast={action("onShowToast")} />
       </Frame>
     ),
   },
@@ -311,6 +359,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "CliAccessSettings",
     state: "default",
+    description: "Cli Access Settings, a default state.",
+    tags: ["settings", "cliaccesssettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -318,18 +368,26 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           enabled={false}
           excludedFolders={[]}
           rateLimitDisabled={null}
-          onSetEnabled={noop}
-          onSetExcludedFolders={noop}
-          onSetRateLimitDisabled={noop}
+          onSetEnabled={action("onSetEnabled")}
+          onSetExcludedFolders={action("onSetExcludedFolders")}
+          onSetRateLimitDisabled={action("onSetRateLimitDisabled")}
         />
       </Frame>
     ),
   },
   {
     id: "settings/connectedextensions/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "ConnectedExtensions",
     state: "default",
+    description: "Connected Extensions, a default state.",
+    tags: ["settings", "connectedextensions", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -342,12 +400,20 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "ControlBlock",
     state: "default",
+    description: "Control Block, a default state.",
+    tags: ["settings", "controlblock", "default"],
     render: () => (
       <Frame>
         <ControlBlock
           label="Reordered item list"
-          helper="A block that needs the full content width."
-          control={<span>Control</span>}
+          helper="A block that needs the full content width, such as a reorderable list."
+          control={
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+              <span style={{ color: "var(--fg-1)" }}>Pinned</span>
+              <span style={{ color: "var(--fg-1)" }}>Search</span>
+              <span style={{ color: "var(--fg-1)" }}>Settings</span>
+            </div>
+          }
         />
       </Frame>
     ),
@@ -357,10 +423,12 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "CustomThemesSection",
     state: "default",
+    description: "Custom Themes Section, a default state.",
+    tags: ["settings", "customthemessection", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <CustomThemesSection activeCustom={null} onActiveCustomChange={noop} />
+        <CustomThemesSection activeCustom={null} onActiveCustomChange={action("onActiveCustomChange")} />
       </Frame>
     ),
   },
@@ -369,6 +437,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "DateTimeSettings",
     state: "default",
+    description: "Date Time Settings, a default state.",
+    tags: ["settings", "datetimesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -381,6 +451,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "DefaultViewModeSettings",
     state: "default",
+    description: "Default View Mode Settings, a default state.",
+    tags: ["settings", "defaultviewmodesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -390,15 +462,23 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/editorpanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "EditorPanel",
     state: "default",
+    description: "Editor Panel, a default state.",
+    tags: ["settings", "editorpanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <SidebarStateProvider>
           <WorkspaceProvider>
-            <EditorPanel onShowToast={noop} />
+            <EditorPanel onShowToast={action("onShowToast")} />
           </WorkspaceProvider>
         </SidebarStateProvider>
       </Frame>
@@ -409,6 +489,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "FilesPanel",
     state: "default",
+    description: "Files Panel, a default state.",
+    tags: ["settings", "filespanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -421,6 +503,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "FocusModeSettings",
     state: "default",
+    description: "Focus Mode Settings, a default state.",
+    tags: ["settings", "focusmodesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -433,6 +517,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "FolderNotesSettings",
     state: "default",
+    description: "Folder Notes Settings, a default state.",
+    tags: ["settings", "foldernotessettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -445,6 +531,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "HotkeysPanel",
     state: "default",
+    description: "Hotkeys Panel, a default state.",
+    tags: ["settings", "hotkeyspanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -457,6 +545,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "LanguageSelect",
     state: "default",
+    description: "Language Select, a default state.",
+    tags: ["settings", "languageselect", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -469,6 +559,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "LineNumbersSettings",
     state: "default",
+    description: "Line Numbers Settings, a default state.",
+    tags: ["settings", "linenumberssettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -481,10 +573,12 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "MemorySection",
     state: "default",
+    description: "Memory Section, a default state.",
+    tags: ["settings", "memorysection", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <MemorySection onShowToast={noop} aiEnabled={false} />
+        <MemorySection onShowToast={action("onShowToast")} aiEnabled={false} />
       </Frame>
     ),
   },
@@ -493,18 +587,28 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "MigrateVaultForm",
     state: "default",
+    description: "Migrate Vault Form, a default state.",
+    tags: ["settings", "migratevaultform", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <MigrateVaultForm onMigrated={noop} />
+        <MigrateVaultForm onMigrated={action("onMigrated")} />
       </Frame>
     ),
   },
   {
     id: "settings/networkpanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "NetworkPanel",
     state: "default",
+    description: "Network Panel, a default state.",
+    tags: ["settings", "networkpanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -517,6 +621,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "NewNoteLocationSettings",
     state: "default",
+    description: "New Note Location Settings, a default state.",
+    tags: ["settings", "newnotelocationsettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -529,6 +635,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "PeriodicNotesSettings",
     state: "default",
+    description: "Periodic Notes Settings, a default state.",
+    tags: ["settings", "periodicnotessettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -538,9 +646,17 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/plainfilesettings/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "PlainFileSettings",
     state: "default",
+    description: "Plain File Settings, a default state.",
+    tags: ["settings", "plainfilesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -550,13 +666,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/privacypanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "PrivacyPanel",
     state: "default",
+    description: "Privacy Panel, a default state.",
+    tags: ["settings", "privacypanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <PrivacyPanel onShowToast={noop} />
+        <PrivacyPanel onShowToast={action("onShowToast")} />
       </Frame>
     ),
   },
@@ -565,6 +689,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "QuickUnlockSettings",
     state: "default",
+    description: "Quick Unlock Settings, a default state.",
+    tags: ["settings", "quickunlocksettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -577,10 +703,12 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "ReminderSettings",
     state: "default",
+    description: "Reminder Settings, a default state.",
+    tags: ["settings", "remindersettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <ReminderSettings enabled onEnabledChange={noop} />
+        <ReminderSettings enabled onEnabledChange={action("onEnabledChange")} />
       </Frame>
     ),
   },
@@ -589,6 +717,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "RibbonCustomizeSettings",
     state: "default",
+    description: "Ribbon Customize Settings, a default state.",
+    tags: ["settings", "ribboncustomizesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -601,12 +731,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SettingRow",
     state: "default",
+    description: "Setting Row, a default state.",
+    tags: ["settings", "settingrow", "default"],
     render: () => (
       <Frame>
         <SettingRow
-          label="Example setting"
-          helper="Label left, control right, helper below."
-          control={<span>Control</span>}
+          label="Show note timestamps"
+          helper="Label left, control right, helper below. This is the shape every setting row takes."
+          control={
+            <Switch
+              checked
+              onChange={action("onChange")}
+              ariaLabel="Show note timestamps"
+              testId="stories.settingrow.switch"
+            />
+          }
         />
       </Frame>
     ),
@@ -616,6 +755,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SettingsSection",
     state: "default",
+    description: "Settings Section, a default state.",
+    tags: ["settings", "settingssection", "default"],
     render: () => (
       <Frame>
         <SettingsSection title="Section heading">
@@ -629,10 +770,16 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SettleMigrationBlock",
     state: "default",
+    description: "Settle Migration Block, a default state.",
+    unreachable: {
+      what: "the block offering to settle a completed migration",
+      why: "it renders only when the backend reports an unsettled legacy snapshot, and the fake host reports none",
+    },
+    tags: ["settings", "settlemigrationblock", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <SettleMigrationBlock onSettled={noop} />
+        <SettleMigrationBlock onSettled={action("onSettled")} />
       </Frame>
     ),
   },
@@ -641,6 +788,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SpellSettings",
     state: "default",
+    description: "Spell Settings, a default state.",
+    tags: ["settings", "spellsettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -653,6 +802,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "StartupOpenSettings",
     state: "default",
+    description: "Startup Open Settings, a default state.",
+    tags: ["settings", "startupopensettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -662,19 +813,27 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/storagepanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "settings",
     surface: "StoragePanel",
     state: "default",
+    description: "Storage Panel, a default state.",
+    tags: ["settings", "storagepanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <StoragePanel
           vaultId={FIXTURE_VAULT_ID}
-          onImportObsidian={noop}
-          onBackupVault={noop}
-          onRestoreBackup={noop}
-          onExportVault={noop}
-          onShowToast={noop}
+          onImportObsidian={action("onImportObsidian")}
+          onBackupVault={action("onBackupVault")}
+          onRestoreBackup={action("onRestoreBackup")}
+          onExportVault={action("onExportVault")}
+          onShowToast={action("onShowToast")}
         />
       </Frame>
     ),
@@ -684,11 +843,13 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SyncPanel",
     state: "default",
+    description: "Sync Panel, a default state.",
+    tags: ["settings", "syncpanel", "default"],
     fixture: SYNC_FIXTURE,
     render: () => (
       <Frame>
         <SidebarStateProvider>
-          <SyncPanel onMigrated={noop} onDialogOpenChange={noop} />
+          <SyncPanel onMigrated={action("onMigrated")} onDialogOpenChange={action("onDialogOpenChange")} />
         </SidebarStateProvider>
       </Frame>
     ),
@@ -698,6 +859,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "ToolbarCustomizeSettings",
     state: "default",
+    description: "Toolbar Customize Settings, a default state.",
+    tags: ["settings", "toolbarcustomizesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -710,6 +873,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "TranscriptionPanel",
     state: "default",
+    description: "Transcription Panel, a default state.",
+    tags: ["settings", "transcriptionpanel", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -722,6 +887,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "TypographySettings",
     state: "default",
+    description: "Typography Settings, a default state.",
+    tags: ["settings", "typographysettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -734,6 +901,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "ViewsSettings",
     state: "default",
+    description: "Views Settings, a default state.",
+    tags: ["settings", "viewssettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -746,6 +915,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "VimModeSettings",
     state: "default",
+    description: "Vim Mode Settings, a default state.",
+    tags: ["settings", "vimmodesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -758,6 +929,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "browser-icons",
     state: "default",
+    description: "browser-icons, a default state.",
+    tags: ["settings", "browser-icons", "default"],
     render: () => (
       <Frame>
         <BrowserIcon extensionId="example-extension-id" />
@@ -769,9 +942,11 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SettingsSearch",
     state: "default",
+    description: "Settings Search, a default state.",
+    tags: ["settings", "settingssearch", "default"],
     render: () => (
       <Frame>
-        <SettingsSearch query="" onQueryChange={noop} />
+        <SettingsSearch query="" onQueryChange={action("onQueryChange")} />
       </Frame>
     ),
   },
@@ -780,11 +955,13 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "SettingsSearchResults",
     state: "default",
+    description: "Settings Search Results, a default state.",
+    tags: ["settings", "settingssearchresults", "default"],
     render: () => (
       <Frame>
         <SettingsSearchResults
           query="theme"
-          onSelect={noop}
+          onSelect={action("onSelect")}
           results={[
             {
               id: "settings.appearance.theme",
@@ -802,6 +979,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "BarCustomizeSettings",
     state: "default",
+    description: "Bar Customize Settings, a default state.",
+    tags: ["settings", "barcustomizesettings", "default"],
     fixture: PREFS_FIXTURE,
     render: () => <BarCustomizeSettings />,
   },
@@ -810,6 +989,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "RecoveryDrillRow",
     state: "default",
+    description: "Recovery Drill Row, a default state.",
+    tags: ["settings", "recoverydrillrow", "default"],
     fixture: PREFS_FIXTURE,
     render: () => <RecoveryDrillRow />,
   },
@@ -818,6 +999,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     group: "settings",
     surface: "CustomizeList",
     state: "default",
+    description: "Customize List, a default state.",
+    tags: ["settings", "customizelist", "default"],
     render: () => <CustomizeListDemo />,
   },
 ];

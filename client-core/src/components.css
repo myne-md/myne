@@ -245,7 +245,7 @@
   bottom: 0;
   left: 0;
   background: var(--accent);
-  z-index: 0;
+  z-index: var(--z-ground);
   pointer-events: none;
   transition:
     transform var(--duration-base) var(--ease-standard),
@@ -254,7 +254,7 @@
 
 .myne-segmented__segment {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-local);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -310,7 +310,7 @@
 
 .myne-segmented__divider {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-local);
   width: 1px;
   background: var(--line-2);
   align-self: stretch;
@@ -504,7 +504,7 @@
   /* Above modal surfaces (`ModalShell` / `SettingsModal` sit at 1000): a Select
      opened INSIDE a modal must render over it, not behind. At the old z-index 60
      the options were covered by the backdrop and could not be clicked. */
-  z-index: 1100;
+  z-index: var(--z-overlay);
   min-width: 160px;
   background: var(--bg-1);
   border: 1px solid var(--line-1);
@@ -634,7 +634,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
   animation: settings-backdrop-in var(--duration-fast) var(--ease-standard);
 }
 
@@ -918,7 +918,7 @@
 .myne-empty__wash {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: var(--z-ground);
   pointer-events: none;
   background:
     radial-gradient(
@@ -953,7 +953,7 @@
   animation: myne-empty-in var(--duration-base) var(--ease-emphasized) var(--stagger-step)
     both;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-local);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1171,7 +1171,7 @@
   background: var(--accent);
   border-radius: var(--radius-1);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-local);
 }
 .myne-drop-line[data-edge="before"] { top: -1px; }
 .myne-drop-line[data-edge="after"] { bottom: -1px; }

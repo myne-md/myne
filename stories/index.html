@@ -3,7 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Site chrome (myne-md/myne#845). The catalogue is a served SPA, so a
+         shared link should look like a deliberate artefact rather than a bare
+         page. The mark is the same asset the app ships. -->
     <title>Myne design system</title>
+    <meta
+      name="description"
+      content="Every component, screen and state of Myne, mounted from the real source against a fake host. A design-system workbench for review."
+    />
+    <link rel="icon" type="image/svg+xml" href="/myne-mark.svg" />
+    <link rel="apple-touch-icon" href="/myne-mark.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Myne" />
+    <meta property="og:title" content="Myne design system" />
+    <meta
+      property="og:description"
+      content="Every component, screen and state of Myne, mounted from the real source against a fake host."
+    />
+    <meta property="og:image" content="/myne-mark.svg" />
+    <!-- Absolute URLs come from one value the deploy fills in, so this file
+         hardcodes no origin and a local build stays origin-free. -->
+    <meta property="og:url" content="%VITE_STORIES_PUBLIC_ORIGIN%/" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Myne design system" />
+    <meta
+      name="twitter:description"
+      content="Every component, screen and state of Myne, mounted from the real source against a fake host."
+    />
+    <meta name="twitter:image" content="/myne-mark.svg" />
   </head>
   <body>
     <div id="root"></div>

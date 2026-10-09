@@ -17,8 +17,8 @@ import { CredentialField } from "@app/components/primitives/CredentialField";
 import { EmptyState } from "@app/components/primitives/EmptyState";
 import { Skeleton } from "@app/components/primitives/Skeleton";
 import type { StoryDescriptor } from "../types";
+import { action } from "../actions";
 
-const noop = () => {};
 
 /** A row laid out on the app's surface so primitive spacing reads correctly. */
 function Row({ children }: { children: ReactNode }) {
@@ -48,6 +48,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Button",
     state: "variants",
+    description: "Button, a variants state.",
+    tags: ["primitives", "button", "variants"],
     render: () => (
       <Row>
         {BUTTON_VARIANTS.map((variant) => (
@@ -66,6 +68,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Button",
     state: "disabled",
+    description: "Button, a disabled state.",
+    tags: ["primitives", "button", "disabled"],
     render: () => (
       <Row>
         {BUTTON_VARIANTS.map((variant) => (
@@ -81,11 +85,13 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "IconButton",
     state: "default",
+    description: "Icon Button, a default state.",
+    tags: ["primitives", "iconbutton", "default"],
     render: () => (
       <Row>
-        <IconButton icon="settings" label="Settings" onClick={noop} />
-        <IconButton icon="search" label="Search" onClick={noop} />
-        <IconButton icon="trash-2" label="Delete" onClick={noop} />
+        <IconButton icon="settings" label="Settings" onClick={action("onClick")} />
+        <IconButton icon="search" label="Search" onClick={action("onClick")} />
+        <IconButton icon="trash-2" label="Delete" onClick={action("onClick")} />
       </Row>
     ),
   },
@@ -94,10 +100,12 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "IconButton",
     state: "disabled",
+    description: "Icon Button, a disabled state.",
+    tags: ["primitives", "iconbutton", "disabled"],
     render: () => (
       <Row>
-        <IconButton icon="settings" label="Settings" onClick={noop} disabled />
-        <IconButton icon="trash-2" label="Delete" onClick={noop} disabled />
+        <IconButton icon="settings" label="Settings" onClick={action("onClick")} disabled />
+        <IconButton icon="trash-2" label="Delete" onClick={action("onClick")} disabled />
       </Row>
     ),
   },
@@ -106,6 +114,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "default",
+    description: "Input, a default state.",
+    tags: ["primitives", "input", "default"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
@@ -119,10 +129,12 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "invalid",
+    description: "Input, an invalid state.",
+    tags: ["primitives", "input", "invalid"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
-          <Input defaultValue="Not a valid value" invalid />
+          <Input defaultValue="Not a valid value" invalid aria-label="Example value" />
         </div>
       </Row>
     ),
@@ -132,10 +144,12 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "mono-disabled",
+    description: "Input, a mono-disabled state.",
+    tags: ["primitives", "input", "mono-disabled"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
-          <Input mono defaultValue="MY-ABCD-EFGH-JKMN-PQRS-TVWX" disabled />
+          <Input mono defaultValue="MY-ABCD-EFGH-JKMN-PQRS-TVWX" disabled aria-label="Account number" />
         </div>
       </Row>
     ),
@@ -145,12 +159,14 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Segmented",
     state: "default",
+    description: "Segmented, a default state.",
+    tags: ["primitives", "segmented", "default"],
     render: () => (
       <Row>
         <Segmented
           ariaLabel="Editor typography"
           value="sans"
-          onChange={noop}
+          onChange={action("onChange")}
           options={[
             { value: "sans", label: "Sans" },
             { value: "serif", label: "Serif" },
@@ -165,10 +181,12 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Switch",
     state: "on-off-and-disabled",
+    description: "Switch, an on-off-and-disabled state.",
+    tags: ["primitives", "switch", "on-off-and-disabled"],
     render: () => (
       <Row>
-        <Switch checked ariaLabel="On" onChange={noop} />
-        <Switch checked={false} ariaLabel="Off" onChange={noop} />
+        <Switch checked ariaLabel="On" onChange={action("onChange")} />
+        <Switch checked={false} ariaLabel="Off" onChange={action("onChange")} />
         <Switch checked={false} ariaLabel="Disabled placeholder" />
       </Row>
     ),
@@ -178,12 +196,14 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Select",
     state: "default",
+    description: "Select, a default state.",
+    tags: ["primitives", "select", "default"],
     render: () => (
       <Row>
         <Select
           aria-label="Theme"
           value="system"
-          onChange={noop}
+          onChange={action("onChange")}
           options={[
             { value: "system", label: "System" },
             { value: "light", label: "Light" },
@@ -198,6 +218,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Tooltip",
     state: "default",
+    description: "Tooltip, a default state.",
+    tags: ["primitives", "tooltip", "default"],
     render: () => (
       <Row>
         <Tooltip label="Tooltip label" delayMs={0}>
@@ -211,6 +233,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Spinner",
     state: "default",
+    description: "Spinner, a default state.",
+    tags: ["primitives", "spinner", "default"],
     render: () => (
       <Row>
         <Spinner />
@@ -222,12 +246,14 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "CredentialField",
     state: "default",
+    description: "Credential Field, a default state.",
+    tags: ["primitives", "credentialfield", "default"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
           <CredentialField
             value=""
-            onChange={noop}
+            onChange={action("onChange")}
             ariaLabel="Password"
             busyLabel="Unlocking"
             submitLabel="Unlock"
@@ -241,6 +267,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "EmptyState",
     state: "first-run",
+    description: "Empty State, a first-run state.",
+    tags: ["primitives", "emptystate", "first-run"],
     render: () => (
       <Row>
         <div style={{ width: 360 }}>
@@ -259,6 +287,8 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Skeleton",
     state: "default",
+    description: "Skeleton, a default state.",
+    tags: ["primitives", "skeleton", "default"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>

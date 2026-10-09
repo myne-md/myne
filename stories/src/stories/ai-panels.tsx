@@ -15,7 +15,7 @@ const AI_FIXTURE: Fixture = {
     // Without this the fake host answers `{}` (its benign default for an
     // unhandled command), `aiCapabilityReport` reads that as `compiled: false`,
     // and the story rendered the "compiled without local AI" empty state
-    // instead of the chat it exists to show — including for the user-guide
+    // instead of the chat it exists to show, including for the user-guide
     // screenshot taken from this same story (myne-md/myne#843).
     "plugin:local-inference|ai_capability_report": () => ({
       compiled: true,
@@ -49,6 +49,8 @@ export const AI_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AiChatTab",
     state: "default",
+    description: "Ai Chat Tab, a default state.",
+    tags: ["components", "aichattab", "default"],
     fixture: AI_FIXTURE,
     render: () => (
       <div style={{ width: 320, height: 800, display: "flex", background: "var(--bg-1)" }}>

@@ -465,6 +465,19 @@ pre-commit:
       # a code one, and the guard is a directory walk that costs milliseconds.
       run: node scripts/check-story-coverage.mjs
 
+    stories-catalogue:
+      # myne-md/myne#845: every story carries the description and tags the navbar
+      # search reads, and no story renders a known placeholder phrase. Unfiltered
+      # for the same reason as the coverage guard above.
+      run: node scripts/check-story-catalogue.mjs
+
+    foundations-coverage:
+      # myne-md/myne#845: every token in the sheet and every icon in the registry
+      # has a specimen in the Foundations group. Unfiltered: a token lands in a
+      # CSS file, which is exactly the commit that would otherwise skip a guard
+      # scoped to TypeScript.
+      run: node scripts/check-foundations-coverage.mjs
+
     stories-isolation:
       # myne-md/myne#832: the catalogue is a separate Vite target, so it cannot
       # enter an app bundle by construction. This is the guard on that

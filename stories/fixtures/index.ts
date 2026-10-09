@@ -35,6 +35,11 @@ function withVault(slot: string, prefs: Record<string, unknown> = {}): Fixture {
       "plugin:vault-unlock|vault_list": () => [vault()],
       "plugin:vault-unlock|vault_slot_kind": () => slot,
       "plugin:prefs|prefs_read": () => prefs,
+      // A vault-backed story may mount a settings surface, and `AboutPanel` reads
+      // this as a boolean: unanswered, the benign `[]` default is not `null`, so
+      // its toggle rendered `aria-checked=""` on a `role="switch"`
+      // (myne-md/myne#845). The real command returns a bool.
+      "plugin:update|update_get_auto_check": () => true,
     },
   };
 }
@@ -169,5 +174,15 @@ export const DEFAULT_PREFS: Record<string, unknown> = {
   view_order: [],
   ribbon_items: null,
   ribbon_visible: true,
+  // The four fields this object was missing, found by the accessibility gate
+  // rather than by reading it (myne-md/myne#845): a panel whose switch read one
+  // of them received `undefined` and rendered a `role="switch"` with no
+  // `aria-checked`, which is a required attribute. The claim above. That this
+  // mirrors `PrefsView::default()`. Was false by these four, and the defaults
+  // below are theirs, copied from `protocol/src/prefs.rs`.
+  field_clocks: {},
+  paired_extensions: [],
+  ai_provider_key: null,
+  meeting_ai_prompt: null,
 };
 ;

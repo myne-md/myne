@@ -687,6 +687,8 @@ steps:
       # screen may not land without a story. Nothing else notices a missing
       # story: it breaks no build, fails no type and renders nothing.
       - node scripts/check-story-coverage.mjs
+      - node scripts/check-story-catalogue.mjs
+      - node scripts/check-foundations-coverage.mjs
       # Story-catalogue isolation (myne-md/myne#832): no app build config or
       # Tauri bundle manifest may reference `stories/`, so "deployable" cannot
       # quietly become "shipped to users".
