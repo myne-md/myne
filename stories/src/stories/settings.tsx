@@ -336,6 +336,10 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/automaticbackupblock/default",
+    // A real subcomponent edge: `StoragePanel` composes this block, and the
+    // import runs parent to child, so the tree nests it rather than listing it
+    // beside its parent (myne-md/myne#847).
+    parent: "StoragePanel",
     // A `role="switch"` whose value is unresolved: this story does not answer
     // the command that drives the toggle, so `checked` is not a boolean and
     // `aria-checked` is missing. The catalogue is showing a frame the app

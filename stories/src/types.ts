@@ -118,6 +118,22 @@ export interface StoryDescriptor {
   /** Set when the state cannot be reached here; the stage renders the reason. */
   unreachable?: UnreachableState;
   /**
+   * The surface this one is a subcomponent of, named by module basename
+   * (myne-md/myne#847).
+   *
+   * Hand-written and optional, because a composition edge is a judgement the
+   * module graph cannot make on its own: a directory is a code layout, and
+   * deriving the tree from it would nest panels under a parent they do not
+   * belong to. Only real parent-child pairs carry it; everything else is
+   * top-level.
+   *
+   * `scripts/check-story-tree.mjs` holds the claim to the tree: the parent must
+   * exist, the edges must not cycle, and the two modules must be connected by an
+   * import edge in EITHER direction, because the settings shell imports its
+   * panels while the shared modal shell is imported by its children.
+   */
+  parent?: string;
+  /**
    * The accessibility level this story declares (myne-md/myne#845).
    *
    * - `error`: axe must find nothing here, and a violation FAILS the build.
