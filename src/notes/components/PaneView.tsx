@@ -56,7 +56,7 @@ import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
-import { useAutosave, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
+import { useAutosave, type FlushOptions, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
 import { refreshThenOpen } from "../openFreshNote";
 import {
@@ -1379,7 +1379,7 @@ export function PaneView({
   // copy for a note no remote writer ever touched.
   const saveInFlight = autosave.saveInFlight;
   const flushAndReport = useCallback(
-    async (opts?: { forceBaseGuard?: boolean }) => {
+    async (opts?: FlushOptions) => {
       await flushIfDirty(opts);
       return !lastSaveFailed() && !saveInFlight();
     },

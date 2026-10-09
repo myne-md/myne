@@ -32,6 +32,7 @@ import {
   type TaskDisplaySettings,
 } from "./taskDisplay";
 import type { NoteId } from "./sidebarState";
+import type { FlushOptions } from "./useAutosave";
 import { openDetachedWindow } from "../lib/detachedWindow";
 import {
   activeSlotState,
@@ -370,7 +371,7 @@ export type WorkspaceApi = {
    *  rejection into that pane's `saveStatus`. */
   registerFlush: (
     paneId: PaneId,
-    flush: (opts?: { forceBaseGuard?: boolean }) => Promise<boolean>,
+    flush: (opts?: FlushOptions) => Promise<boolean>,
   ) => void;
   unregisterFlush: (paneId: PaneId) => void;
   /** Flush every registered pane editor's pending save (lock / close).
@@ -380,7 +381,7 @@ export type WorkspaceApi = {
    *  cross-window trash/archive HAS changed disk, so the flush must declare its
    *  expected base even on a no-sync install, or a hashless last-write-wins
    *  flush resurrects the removed note. */
-  flushAll: (opts?: { forceBaseGuard?: boolean }) => Promise<void>;
+  flushAll: (opts?: FlushOptions) => Promise<void>;
 };
 
 /** Stable empty reference for `expandedFolders` when unset, so the sidebar's
@@ -828,12 +829,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Flush registry. Refs, so no re-render. Keyed by paneId.
   const flushers = useRef<
-    Map<PaneId, (opts?: { forceBaseGuard?: boolean }) => Promise<boolean>>
+    Map<PaneId, (opts?: FlushOptions) => Promise<boolean>>
   >(new Map());
   const registerFlush = useCallback(
     (
       paneId: PaneId,
-      flush: (opts?: { forceBaseGuard?: boolean }) => Promise<boolean>,
+      flush: (opts?: FlushOptions) => Promise<boolean>,
     ) => {
       flushers.current.set(paneId, flush);
     },
@@ -864,7 +865,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
    * after every normal save. The comment at the call site in `PaneView.tsx`
    * carries the measurement.
    */
-  const flushAll = useCallback(async (opts?: { forceBaseGuard?: boolean }) => {
+  const flushAll = useCallback(async (opts?: FlushOptions) => {
     const settled = await Promise.all(
       [...flushers.current.entries()].map(([paneId, f]) =>
         f(opts).then(

@@ -113,6 +113,46 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(plain).toHaveBeenCalledWith("note-2", "w1", undefined);
   });
 
+  it("forceBaseGuard re-fires a guarded save when one is already in flight", async () => {
+    // The override must survive the in-flight join: a removal event landing
+    // while a save is mid-flight must still dispatch a save that declares the
+    // expected base, or the hashless in-flight save clobbers the removal
+    // (myne-md/myne#839). The joined save was fired BEFORE the force was set.
+    const first = defer();
+    const calls: Array<{ body: string; base: string | undefined }> = [];
+    const saveImpl = vi.fn((_id: string, body: string, base?: string) => {
+      calls.push({ body, base });
+      // The first call stays in flight until released; later calls resolve.
+      return calls.length === 1 ? first.promise : Promise.resolve(body);
+    });
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, undefined, false),
+      { initialProps: { body: "v0" } },
+    );
+    rerender({ body: "v1" });
+    // Fire the idle timer so a hashless (no-sync) save is IN FLIGHT.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+    expect(calls[0].base).toBeUndefined();
+
+    // Start the force flush without awaiting it (it joins the in-flight save).
+    let forced: Promise<void> = Promise.resolve();
+    await act(async () => {
+      forced = result.current.flushIfDirty({ forceBaseGuard: true });
+    });
+    // Release the in-flight save; the flush then dispatches the guarded save.
+    await act(async () => {
+      first.resolve("v1");
+      await forced;
+    });
+
+    // A save carrying a declared base ran after the join.
+    expect(calls.some((c) => c.base !== undefined)).toBe(true);
+  });
+
   it("γ2 max timer fires when continuous typing keeps resetting γ1", async () => {
     const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
     const { result, rerender } = renderHook(
