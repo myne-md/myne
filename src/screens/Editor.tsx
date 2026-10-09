@@ -206,6 +206,7 @@ import { clearAgentForLock } from "../notes/agent/agentStore";
 import { AgentReviewTakeover } from "../notes/agent/components/AgentReviewTakeover";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
+import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
@@ -1555,6 +1556,29 @@ function EditorChrome({
   const markDetached = ws.markDetached;
   const unmarkDetached = ws.unmarkDetached;
 
+  // One removal handler for both the backend event (a local soft/hard delete)
+  // and the frontend `NOTE_REMOVED_EVENT` (a note that left the live tree via a
+  // sync pull — myne-md/myne#839, cross-device). A detached window shows the
+  // terminal "removed elsewhere" state after a forced-base flush preserves any
+  // unsaved edit as a conflict copy; the main window closes every pane showing
+  // the note, the same close a local removal drives (myne-md/myne#819).
+  const handleNoteRemoved = useCallback(
+    (id: string) => {
+      if (detachedNoteId != null) {
+        if (id !== detachedNoteId) return;
+        // `forceBaseGuard`: the removal IS a cross-window write, so the flush
+        // must declare its expected base even on a no-sync install, or a
+        // hashless last-write-wins flush writes the stale pre-removal buffer
+        // back over the just-set `trashed:`/`archived:`/`deleted:` field and
+        // resurrects the note (myne-md/myne#839).
+        void flushAll({ forceBaseGuard: true }).finally(() => setDeletedElsewhere(true));
+      } else {
+        ws.closeNoteEverywhere(id);
+      }
+    },
+    [detachedNoteId, flushAll, ws.closeNoteEverywhere],
+  );
+
   // myne#681 task 2 (SYNC-11): a detached (pop-out) window reacts to its note
   // leaving the live tree from ANOTHER surface. Change and rename already reload
   // through the `sync://changed` listener below (a rename keeps the note id); a
@@ -1571,14 +1595,7 @@ function EditorChrome({
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void listen<string>("notes://deleted", (e) => {
-      if (e.payload !== detachedNoteId) return;
-      // `forceBaseGuard`: the removal that fired this event IS a cross-window
-      // write, so the flush must declare its expected base even on a no-sync
-      // install. Without it the flush is hashless last-write-wins and writes
-      // the stale pre-removal buffer back over the just-set `trashed:` /
-      // `archived:` / `deleted:` field, resurrecting the note (myne-md/myne#839;
-      // the finding that the emit alone did not close the no-sync case).
-      void flushAll({ forceBaseGuard: true }).finally(() => setDeletedElsewhere(true));
+      handleNoteRemoved(e.payload);
     }).then((h) => {
       if (cancelled) h();
       else unlisten = h;
@@ -1587,7 +1604,21 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [detachedNoteId, flushAll]);
+  }, [detachedNoteId, handleNoteRemoved]);
+
+  // myne-md/myne#839 (cross-device): the sync pull never emits `notes://deleted`
+  // (the orchestrator writes the pulled blob straight to disk and holds no host),
+  // so a note that left the live tree on ANOTHER device is detected on the pane's
+  // reload and reported through this window event. Subscribed in every window:
+  // the main window closes the pane, the detached one terminalises.
+  useEffect(() => {
+    const onRemoved = (e: Event): void => {
+      const detail = (e as CustomEvent<NoteRemovedDetail>).detail;
+      if (detail?.noteId != null) handleNoteRemoved(detail.noteId);
+    };
+    window.addEventListener(NOTE_REMOVED_EVENT, onRemoved);
+    return () => window.removeEventListener(NOTE_REMOVED_EVENT, onRemoved);
+  }, [handleNoteRemoved]);
 
   // myne#681 (SYNC-6, cross-window): EVERY window keeps the workspace's
   // detached-note set in step, so the reveal-guard holds no matter which window
