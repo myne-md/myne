@@ -97,6 +97,24 @@ describe("the catalogue shell's search proposes rather than filters", () => {
     expect(el.querySelector('[data-testid="stories.search-results"]')).toBeNull();
   });
 
+  it("round-trips RTL through the URL and onto the stage", async () => {
+    const el = await mountShell();
+    const button = el.querySelector('[data-testid="stories.axis.rtl"]');
+    expect(button, "the RTL control must exist").not.toBeNull();
+
+    await act(async () => {
+      fireEvent.click(button as HTMLElement);
+    });
+
+    // The URL is the contract, and the stage is where the axis has to land. The
+    // catalogue's own chrome stays LTR on purpose: mirroring the rail too would
+    // make the chrome the thing under review.
+    expect(window.location.hash).toContain("rtl=1");
+    const stage = el.querySelector('[data-testid="stories.stage"]');
+    expect(stage?.getAttribute("dir")).toBe("rtl");
+    expect(el.querySelector('[data-testid="stories.rail"]')?.getAttribute("dir")).toBeNull();
+  });
+
   it("files an issue whose URL carries the story and the form", async () => {
     const el = await mountShell();
     const button = el.querySelector('[data-testid="stories.file-issue"]');
