@@ -30,6 +30,7 @@ import { entryName } from "./naming";
 import { clearActions, useActionLog } from "./actions";
 import { failingContrast, focusOrder, roleNames, targetSizeFindings } from "./a11y";
 import { a11yLevelOf } from "./a11y-level";
+import { documentationFor, documentationTitle } from "./documentation";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -40,8 +41,13 @@ import type { StoryGroup } from "./types";
 const RAIL_WIDTH_PX = 300;
 const INSPECTOR_HEIGHT_PX = 260;
 
-/** The four inspector tabs. */
-type Tab = "controls" | "actions" | "accessibility" | "interactions";
+/** The five inspector tabs. */
+type Tab =
+  | "controls"
+  | "actions"
+  | "accessibility"
+  | "documentation"
+  | "interactions";
 
 /** A glyph per group, so the rail reads as sections rather than a flat list. */
 const GROUP_ICON: Record<string, IconName> = {
@@ -61,6 +67,7 @@ const TABS: readonly { id: Tab; label: string }[] = [
   { id: "controls", label: "Controls" },
   { id: "actions", label: "Actions" },
   { id: "accessibility", label: "Accessibility" },
+  { id: "documentation", label: "Documentation" },
   { id: "interactions", label: "Interactions" },
 ];
 
@@ -374,6 +381,51 @@ function TreeRow({
           selectedId={selectedId}
           onSelect={onSelect}
         />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The Documentation tab (myne-md/myne#847).
+ *
+ * It lives in the inspector rather than as a rail row: a rail row needs a parent
+ * node to hang from, and a single-state surface is hoisted into one row, so a
+ * rail row would either double the rail or leave those surfaces without a page.
+ *
+ * Every section is LABELLED `generated` or `authored`, because a reader has to
+ * know whether they are trusting a generator or a person.
+ */
+function DocumentationTab({
+  surface,
+  stories,
+}: {
+  surface: string;
+  stories: readonly StoryDescriptor[];
+}) {
+  const sections = documentationFor(surface, stories);
+  const generated = sections.filter((section) => section.kind === "generated").length;
+  const authored = sections.length - generated;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div style={REF_STYLE} data-testid="stories.docs.summary">
+        {documentationTitle(surface, stories)}: {generated} generated section(s), {authored}{" "}
+        authored
+      </div>
+      {sections.map((section) => (
+        <section key={section.heading}>
+          <div style={SURFACE_TITLE_STYLE}>
+            {section.heading}{" "}
+            <span style={{ color: "var(--fg-3)" }}>
+              {section.kind === "generated" ? "(from the registry)" : "(authored)"}
+            </span>
+          </div>
+          <ul style={{ margin: 0, paddingInlineStart: "var(--space-4)" }}>
+            {section.lines.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
+        </section>
       ))}
     </div>
   );
@@ -1076,6 +1128,12 @@ export function App() {
                 theme={theme}
                 level={a11yLevelOf(selected ?? {})}
                 reason={selected?.a11yReason}
+              />
+            )}
+            {tab === "documentation" && selected && (
+              <DocumentationTab
+                surface={selected.surface}
+                stories={STORIES.filter((story) => story.surface === selected.surface)}
               />
             )}
             {tab === "interactions" && (
