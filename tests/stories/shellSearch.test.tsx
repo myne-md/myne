@@ -97,6 +97,25 @@ describe("the catalogue shell's search proposes rather than filters", () => {
     expect(el.querySelector('[data-testid="stories.search-results"]')).toBeNull();
   });
 
+  it("keeps the navbar for catalogue chrome and the review bar for the stage", async () => {
+    const el = await mountShell();
+    const navbar = el.querySelector('[data-testid="stories.navbar"]');
+    const review = el.querySelector('[data-testid="stories.review-bar"]');
+    expect(review, "the review bar must exist").not.toBeNull();
+
+    // What the catalogue SHOWS stays up top; what the STAGE looks like moved
+    // down, and neither may drift into the other.
+    for (const id of ["stories.search", "stories.filter", "stories.file-issue"]) {
+      expect(navbar?.querySelector(`[data-testid="${id}"]`), `${id} stays in the navbar`).not.toBeNull();
+    }
+    for (const id of ["stories.axis.rtl", "stories.axis.viewport", "stories.axis.measure"]) {
+      expect(review?.querySelector(`[data-testid="${id}"]`), `${id} moved to the review bar`).not.toBeNull();
+      expect(navbar?.querySelector(`[data-testid="${id}"]`), `${id} left the navbar`).toBeNull();
+    }
+    // The theme is a review control, so it moved with them.
+    expect(review?.querySelector('[data-testid="stories.theme-switcher"]')).not.toBeNull();
+  });
+
   it("round-trips RTL through the URL and onto the stage", async () => {
     const el = await mountShell();
     expect(
