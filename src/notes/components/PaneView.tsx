@@ -56,7 +56,8 @@ import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
-import { useAutosave, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
+import { useAutosave, type FlushOptions, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
+import { dispatchNoteRemoved, isRemovedFromLiveTree } from "../noteRemoved";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
 import { refreshThenOpen } from "../openFreshNote";
 import {
@@ -1287,17 +1288,18 @@ export function PaneView({
     // note's own re-read happens just below.
     stateCacheRef.current.clear();
     if (activeId === null) return;
-    // Never clobber unsaved local edits: a dirty buffer means the engine kept
-    // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
-    // would either resurrect stale bytes or discard the user's work. Leave the
-    // dirty buffer alone; its edit pushes on the next sync.
+    // Read the body even when the buffer is dirty: a note pulled from another
+    // device may have LEFT the live tree, and a dirty pop-out is exactly the
+    // resurrection case (its stale buffer would be autosaved back over the
+    // just-pulled trash). The removal is detected from the read below and
+    // reported before the dirty guard; `noteRead` never clobbers the buffer, so
+    // that guard still prevents adopting a body that would discard unsaved work.
     //
-    // `hasPendingWork()` and NOT `status` (myne#167): `status` is React state
-    // written from a passive effect, so it still reads `saved`/`clean` for a
-    // whole scheduler slice after the user has typed - long enough for this
-    // reload to resolve inside it and overwrite those keystrokes with disk
-    // bytes. The predicate reads refs only.
-    if (autosaveRef.current.hasPendingWork()) return;
+    // The dirty guard uses `hasPendingWork()` and NOT `status` (myne#167):
+    // `status` is React state written from a passive effect, so it still reads
+    // `saved`/`clean` for a whole scheduler slice after the user has typed -
+    // long enough for this reload to resolve inside it and overwrite those
+    // keystrokes with disk bytes. The predicate reads refs only.
     const before = contentRef.current;
     let cancelled = false;
     void (async () => {
@@ -1321,6 +1323,18 @@ export function PaneView({
         // copy for a note nothing ever conflicted on and relocating the user's
         // in-progress edit into it.
         if (activeIdRef.current !== activeId) return;
+        // myne-md/myne#839 (cross-device): a note pulled from another device
+        // that has left the live tree (trashed:/archived:/deleted:) must close
+        // this pane, not merely reload. The sync pull writes the blob straight
+        // to disk and the orchestrator holds no host, so no `notes://deleted`
+        // fires for it; this reload is where the removal is observable. Checked
+        // BEFORE the dirty guard: a dirty pop-out is the resurrection case (its
+        // stale buffer would be autosaved back over the just-pulled trash), and
+        // the removal handler flushes that buffer as a conflict copy first.
+        if (isRemovedFromLiveTree(body)) {
+          dispatchNoteRemoved(activeId);
+          return;
+        }
         // Re-check dirtiness AFTER the await: typing may have started while the
         // read was in flight, and re-baselining now would clobber those keys
         // with the just-read (already-stale) bytes.
@@ -1378,10 +1392,13 @@ export function PaneView({
   // caller's, so it is refused `BaseMismatch` and mints a keep-both conflict
   // copy for a note no remote writer ever touched.
   const saveInFlight = autosave.saveInFlight;
-  const flushAndReport = useCallback(async () => {
-    await flushIfDirty();
-    return !lastSaveFailed() && !saveInFlight();
-  }, [flushIfDirty, lastSaveFailed, saveInFlight]);
+  const flushAndReport = useCallback(
+    async (opts?: FlushOptions) => {
+      await flushIfDirty(opts);
+      return !lastSaveFailed() && !saveInFlight();
+    },
+    [flushIfDirty, lastSaveFailed, saveInFlight],
+  );
   useEffect(() => {
     registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);

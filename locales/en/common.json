@@ -3525,13 +3525,13 @@
       "postureInactive": "Sync goes straight to the sync server",
       "postureUnavailable": "Tor is unavailable: sync is paused",
       "postureUnavailableDetail": "Nothing is being sent directly. Turn this setting off and on again to try starting the Tor client, or turn it off to sync without Tor.",
-      "residualExit": "The last relay in a Tor circuit, the exit node, sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
+      "residualExit": "The last relay in a Tor circuit, the exit node, sees which sync server you connect to, and on desktop with this on, which AI provider you reach. It can't read what you sync; that stays encrypted end to end.",
       "residualMetadata": "The sync server still sees when you sync, how many blobs you push and how large they are, and how many devices you have. Tor doesn't change that.",
       "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
-      "residualScope": "Only Myne's own sync traffic goes through Tor. Nothing else on this device does.",
+      "residualScope": "On desktop this covers your sync traffic and your remote AI provider requests. Mobile has no Tor routing yet, so its provider requests go direct. Nothing else on this device goes through Tor.",
       "residualsToggle": "What this doesn't hide",
-      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider. They can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
-      "torLabel": "Route sync through Tor"
+      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with (and, on desktop, which AI provider you reach) from your network and your internet provider. They can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
+      "torLabel": "Route sync and desktop AI through Tor"
     },
     "prefs": {
       "folderListFull": "That folder list is full. Remove a folder from it before adding another.",
