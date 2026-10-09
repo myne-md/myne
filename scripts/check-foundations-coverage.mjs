@@ -78,42 +78,49 @@ export function classify(name, value) {
   return null;
 }
 
-if (!existsSync(SHEET)) {
-  console.error(`check-foundations-coverage: FAIL: token sheet not found at ${SHEET}`);
-  process.exit(1);
-}
+// Importable: the spec drives `classify` and `declaredTokens` directly, and the
+// executable half calls `process.exit`, which would kill the test runner.
+const invokedDirectly =
+  process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split("/").pop());
 
-const tokens = declaredTokens(readFileSync(SHEET, "utf8"));
-if (tokens.size === 0) {
-  console.error("check-foundations-coverage: FAIL: no tokens read from the sheet; the scan is broken");
-  process.exit(1);
-}
+if (invokedDirectly) {
+  if (!existsSync(SHEET)) {
+    console.error(`check-foundations-coverage: FAIL: token sheet not found at ${SHEET}`);
+    process.exit(1);
+  }
 
-const uncovered = [];
-for (const [name, value] of tokens) {
-  if (classify(name, value) === null) uncovered.push(name);
-}
+  const tokens = declaredTokens(readFileSync(SHEET, "utf8"));
+  if (tokens.size === 0) {
+    console.error("check-foundations-coverage: FAIL: no tokens read from the sheet; the scan is broken");
+    process.exit(1);
+  }
 
-if (!existsSync(ICONS)) {
-  console.error(`check-foundations-coverage: FAIL: icon registry not found at ${ICONS}`);
-  process.exit(1);
-}
-const iconSource = readFileSync(ICONS, "utf8");
-const iconKeys = iconSource.match(/^\s*"?[A-Za-z0-9-]+"?\s*:/gm) ?? [];
-if (iconKeys.length === 0) {
-  console.error("check-foundations-coverage: FAIL: no icons read from the registry; the scan is broken");
-  process.exit(1);
-}
+  const uncovered = [];
+  for (const [name, value] of tokens) {
+    if (classify(name, value) === null) uncovered.push(name);
+  }
 
-if (uncovered.length > 0) {
-  console.error(`check-foundations-coverage: ${uncovered.length} token(s) with no specimen group`);
-  for (const name of uncovered) console.error(`  ${name}`);
-  console.error(
-    "  Add the token to a specimen group in stories/src/foundations.tsx (and to GROUPS here if it opens a new family).",
+  if (!existsSync(ICONS)) {
+    console.error(`check-foundations-coverage: FAIL: icon registry not found at ${ICONS}`);
+    process.exit(1);
+  }
+  const iconSource = readFileSync(ICONS, "utf8");
+  const iconKeys = iconSource.match(/^\s*"?[A-Za-z0-9-]+"?\s*:/gm) ?? [];
+  if (iconKeys.length === 0) {
+    console.error("check-foundations-coverage: FAIL: no icons read from the registry; the scan is broken");
+    process.exit(1);
+  }
+
+  if (uncovered.length > 0) {
+    console.error(`check-foundations-coverage: ${uncovered.length} token(s) with no specimen group`);
+    for (const name of uncovered) console.error(`  ${name}`);
+    console.error(
+      "  Add the token to a specimen group in stories/src/foundations.tsx (and to GROUPS here if it opens a new family).",
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `check-foundations-coverage: ok (${tokens.size} token(s) classified across ${Object.keys(GROUPS).length + 1} specimen group(s); icon registry readable)`,
   );
-  process.exit(1);
 }
-
-console.log(
-  `check-foundations-coverage: ok (${tokens.size} token(s) classified across ${Object.keys(GROUPS).length + 1} specimen group(s); icon registry readable)`,
-);

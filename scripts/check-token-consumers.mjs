@@ -89,6 +89,23 @@ export const THEME_ONLY = Object.freeze({
     "the longest step, same reason; the shipped UI tops out at --duration-base",
 });
 
+/**
+ * The guarded-family tokens that nothing outside the sheet reads, and the
+ * recorded exemptions that have gone stale.
+ *
+ * Pure and exported, so the spec drives BOTH arms rather than only the good
+ * path: the guard's own central decision was the one thing no test exercised
+ * (myne-md/myne#847 review).
+ */
+export function unusedTokens(families, used, themeOnly = THEME_ONLY) {
+  return [...families].filter((name) => !used.has(name) && !(name in themeOnly)).sort();
+}
+
+/** The recorded exemptions whose token HAS a consumer: the record went stale. */
+export function staleExemptions(used, themeOnly = THEME_ONLY) {
+  return Object.keys(themeOnly).filter((name) => used.has(name));
+}
+
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split("/").pop());
 
@@ -125,7 +142,7 @@ if (invokedDirectly) {
 
   // An exemption whose token HAS a consumer is stale: the record has stopped
   // describing anything.
-  const stale = Object.keys(THEME_ONLY).filter((name) => used.has(name));
+  const stale = staleExemptions(used);
   if (stale.length > 0) {
     console.error("check-token-consumers: recorded exemption(s) whose token is now read:");
     for (const name of stale) console.error(`  ${name}`);
@@ -133,9 +150,7 @@ if (invokedDirectly) {
     process.exit(1);
   }
 
-  const unused = [...families]
-    .filter((name) => !used.has(name) && !(name in THEME_ONLY))
-    .sort();
+  const unused = unusedTokens(families, used);
 
   if (unused.length > 0) {
     console.error(

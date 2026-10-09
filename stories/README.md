@@ -130,8 +130,8 @@ ships and the catalogue needs no runtime fetch.
 
 The `--z-*` ladder is new and worth knowing about: every step it names was
 already a bare `z-index:` literal in the tree, and a bare literal cannot be read
-, the order exists only by grepping for it, and the numbers lie about their
-neighbours. The values are unchanged, so nothing restacks; the Z-index page
+as an order: the order exists only by grepping for it, and the numbers lie about
+their neighbours. The values are unchanged, so nothing restacks; the Z-index page
 records the call sites still holding a bare number.
 
 ## Documentation pages

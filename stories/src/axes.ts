@@ -148,7 +148,11 @@ export function serialiseView(view: View): string {
  * Returned rather than applied, so the decision is testable without a DOM.
  */
 export function dirFor(view: View): "rtl" | undefined {
-  return view.rtl === "off" ? undefined : "rtl";
+  // `both` renders two columns, and each column sets its OWN direction (the
+  // side-by-side view's whole point is that the two differ). Marking the stage
+  // RTL for `both` would make both columns mirror, which is a comparison that
+  // can never show a difference (myne-md/myne#847 review).
+  return view.rtl === "on" ? "rtl" : undefined;
 }
 
 // Task 7: viewport presets.

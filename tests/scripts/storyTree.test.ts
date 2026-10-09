@@ -138,7 +138,7 @@ describe("the parent-edge guard", () => {
   it("does not count a specifier that merely contains the other basename", () => {
     // A resolved-path comparison, not a substring one: this is the difference
     // between the guard checking composition and the guard checking spelling.
-    const { surfacePaths, read } = world({
+    const { read } = world({
       Child: { path: "src/components/Child.tsx", source: 'import { X } from "./ChildishHelpers";' },
       Parent: { path: "src/components/Parent.tsx", source: "export const Parent = 1;" },
     });

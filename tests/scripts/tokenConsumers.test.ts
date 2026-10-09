@@ -7,7 +7,13 @@
 // declares and no shipped rule reads.
 
 import { describe, expect, it } from "vitest";
-import { consumedTokens, familyTokens } from "../../scripts/check-token-consumers.mjs";
+import {
+  THEME_ONLY,
+  consumedTokens,
+  familyTokens,
+  staleExemptions,
+  unusedTokens,
+} from "../../scripts/check-token-consumers.mjs";
 
 const SHEET = `
 :root {
@@ -54,5 +60,30 @@ describe("the token-consumer guard", () => {
     const used = consumedTokens(["a.css"], () => ".x { transition: color var(--duration-fast) ease; }");
     const unused = [...familyTokens(SHEET)].filter((name) => !used.has(name));
     expect(unused).toContain("--duration-slow");
+  });
+
+  it("keeps a recorded exemption out of the unused set", () => {
+    // The guard's central decision, driven directly: `--duration-slow` is
+    // declared and unread, and the exemption is what keeps the tree green.
+    const used = consumedTokens(["a.css"], () => ".x { color: var(--duration-fast); }");
+    expect(unusedTokens(familyTokens(SHEET), used, { "--duration-slow": "reason" })).not.toContain(
+      "--duration-slow",
+    );
+  });
+
+  it("reports an exemption whose token has gained a consumer", () => {
+    // The other arm: an exemption that has stopped describing anything fails, so
+    // the list cannot quietly outlive the fact it records.
+    const used = consumedTokens(["a.css"], () => ".x { color: var(--duration-slow); }");
+    expect(staleExemptions(used, { "--duration-slow": "reason" })).toEqual(["--duration-slow"]);
+  });
+
+  it("ships the exemptions the guard records, each with a reason", () => {
+    // Non-vacuity: the exported map is the one the executable half reads, and a
+    // reasonless entry would be a token the guard silently stopped checking.
+    for (const [name, reason] of Object.entries(THEME_ONLY)) {
+      expect(name.startsWith("--")).toBe(true);
+      expect((reason as string).length).toBeGreaterThan(20);
+    }
   });
 });
