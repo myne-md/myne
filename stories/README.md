@@ -24,9 +24,14 @@ Every story is addressable by URL: the fragment is the story id
 ## The four regions
 
 - **Navbar.** The Myne mark, the wordmark and the version, with search in the
-  centre. Search matches a story's id, its derived name, its state, its
-  description and its tags, so "sync error" finds a story whose id says nothing
-  about either.
+  centre and a **group filter** beside it. Search matches a story's id, its
+  derived name, its state, its description and its tags, so "sync error" finds a
+  story whose id says nothing about either. It **proposes** rather than filters:
+  results appear as a listbox directly under the input, walked with the arrow
+  keys and opened with Enter or a click. It deliberately does **not** touch the
+  rail, because replacing the tree with a flat "matches" list loses the reader's
+  place in the hierarchy; narrowing the rail is the filter's job, and the two
+  controls answer two different questions.
 - **Rail.** One row per surface with its states grouped beneath, reachable with
   the up and down arrows. A name is derived from the component name and changes
   **casing only** (`ModalShell` reads as "Modal Shell"); `title` on a descriptor
@@ -157,6 +162,7 @@ connect-src 'none';
 | `scripts/check-stories-bundle.mjs` | an unrecorded origin, a BIP-39 word list (so no phrase can be shown or typed) or an account-number-shaped string in the served bundle | `stories-build` (CI) |
 | `tests/stories/smoke.test.tsx` | a story that will not mount | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/a11yLevels.test.tsx` | a story whose `a11y: "error"` level has an axe violation; also that axe actually ran on every story it did not skip | `pnpm stories:test` (CI `vitest`) |
+| `tests/stories/shellSearch.test.tsx` | the shell's search and filter: that typing opens the suggestion panel, that it does NOT narrow the rail, that the filter is a labelled control, and that Escape closes the panel. The shell is not a story, so nothing else reached it | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/drift.test.tsx` | an unintended rendering change (WARNING only) | `pnpm stories:test` (CI `vitest`) |
 
 `stories/` is a guarded shared root in `scripts/lib/shared-roots.mjs`, so the
