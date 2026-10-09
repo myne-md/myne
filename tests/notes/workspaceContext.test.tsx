@@ -214,6 +214,23 @@ describe("useWorkspace — flush registry", () => {
     expect(f2).toHaveBeenCalledTimes(1); // not called again
   });
 
+  it("flushAll forwards its options to every flusher", async () => {
+    // Proves the `forceBaseGuard` override is threaded through the registry:
+    // replacing `f(opts)` with `f()` would silently disable the detached-window
+    // removal fix (myne-md/myne#839) and this assertion is what catches it.
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    const f1 = vi.fn().mockResolvedValue(true);
+    act(() => result.current.registerFlush("p1", f1));
+    await act(async () => {
+      await result.current.flushAll({ forceBaseGuard: true });
+    });
+    expect(f1).toHaveBeenCalledWith({ forceBaseGuard: true });
+    await act(async () => {
+      await result.current.flushAll();
+    });
+    expect(f1).toHaveBeenLastCalledWith(undefined);
+  });
+
   // myne-md/myne#520. `flushAll` used to swallow every per-flusher rejection,
   // and `useAutosave.fireSave` swallows one of its own into that pane's
   // `saveStatus`, so a pane whose `note_update` FAILED reported success to

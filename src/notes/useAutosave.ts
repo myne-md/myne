@@ -52,12 +52,19 @@ export type SaveStatus =
    *  once the pane adopts the pulled disk body. */
   | { status: "conflict" };
 
+/** Options for a pane flush. `forceBaseGuard` is the one-shot §11.3 override the
+ *  detached-window `notes://deleted` handler passes (myne-md/myne#839): declare
+ *  `savedBodyRef` as the expected base even when `guardEnabled` is false, so a
+ *  cross-window removal surfaces as a `BaseMismatch` and the buffer is preserved
+ *  as a conflict copy rather than a hashless last-write-wins overwrite. */
+export type FlushOptions = { forceBaseGuard?: boolean };
+
 export type UseAutosaveReturn = {
   status: SaveStatus;
   /** Re-fire the last save with the current body. Used by the Retry button. */
   retry: () => void;
   /** Flush any pending save synchronously (awaitable). No-op when clean. */
-  flushIfDirty: (opts?: { forceBaseGuard?: boolean }) => Promise<void>;
+  flushIfDirty: (opts?: FlushOptions) => Promise<void>;
   /** Best-effort save of the buffer for whatever note the hook currently holds
    *  — for a caller that is about to stop being that note's editor (myne#288).
    *  Hashless, and it touches no hook state, because the caller is about to
@@ -235,6 +242,14 @@ export function useAutosave(
    *  avoid, and a hashless last-write-wins flush would write the stale pre-removal
    *  buffer back over the just-set `trashed:`/`archived:` field and resurrect the note. */
   const forceGuardRef = useRef<boolean>(false);
+  /** Set by a forced-base removal flush that FAILED to settle. The unmount
+   *  cleanup reads it to skip its hashless last-write-wins save: for a note
+   *  that left the live tree from another surface, that save would write the
+   *  stale pre-removal buffer back and resurrect the note, which is the exact
+   *  failure the forced flush exists to prevent (myne-md/myne#839). A settled
+   *  forced flush leaves the pane clean, so the unmount save is a no-op there
+   *  and does not need the suppression. */
+  const suppressUnmountFlushRef = useRef<boolean>(false);
   /** Latest `onBaseMismatch` handler — read through a ref at fire time so
    *  `fireSave`'s identity doesn't churn with per-render callbacks (the
    *  `autosaveRef` pattern PaneView already uses in the other direction). */
@@ -607,7 +622,7 @@ export function useAutosave(
   );
 
   const flushIfDirty = useCallback(
-    async (opts?: { forceBaseGuard?: boolean }): Promise<void> => {
+    async (opts?: FlushOptions): Promise<void> => {
       // One-shot: set before firing, cleared once this flush's chain settles. A
       // concurrent timer save is the only way the override could leak, and it
       // self-corrects on the next fire.
@@ -615,17 +630,30 @@ export function useAutosave(
       try {
         if (!dirtyRef.current && inFlightRef.current === null) return;
         if (inFlightRef.current !== null) {
-          await inFlightRef.current;
-          // If a follow-up save was queued (latest-wins), it will have
-          // re-armed in-flight; await again.
-          if (inFlightRef.current !== null) {
+          // Drain the in-flight chain (a latest-wins hand-off re-arms it).
+          while (inFlightRef.current !== null) {
             await inFlightRef.current;
           }
-          return;
+          // The joined save(s) were fired BEFORE the force was set, so on a
+          // no-sync install they are hashless and cannot see the cross-window
+          // removal. When the caller asked for the override, dispatch one save
+          // now that the force is in effect so a base IS declared: the removal
+          // then surfaces as a BaseMismatch and the buffer is preserved as a
+          // conflict copy instead of a hashless overwrite (myne-md/myne#839; a
+          // back-to-back flush would otherwise drop the override entirely).
+          if (!opts?.forceBaseGuard) return;
         }
         await fireSave();
       } finally {
-        if (opts?.forceBaseGuard) forceGuardRef.current = false;
+        if (opts?.forceBaseGuard) {
+          // A removal flush that did NOT settle must not be followed by the
+          // unmount's hashless last-write-wins save: that would write the stale
+          // pre-removal buffer back and resurrect the note. Suppress it (see the
+          // unmount cleanup). A settled flush leaves the pane clean (or a
+          // conflict copy), so the unmount save is a harmless no-op there.
+          if (saveFailedRef.current) suppressUnmountFlushRef.current = true;
+          forceGuardRef.current = false;
+        }
       }
     },
     [fireSave],
@@ -692,7 +720,10 @@ export function useAutosave(
   useEffect(() => {
     return () => {
       clearTimers();
-      flushOutgoingRef.current();
+      // A failed forced-base removal flush (see `suppressUnmountFlushRef`) owns
+      // the discard: the note left the live tree, so the unmount must not write
+      // the stale buffer back hashless.
+      if (!suppressUnmountFlushRef.current) flushOutgoingRef.current();
     };
     // Intentionally empty deps — runs only on unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
