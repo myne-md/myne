@@ -61,6 +61,34 @@ export const NON_SURFACE = Object.freeze({
 export const STORY_ONLY_SURFACES = Object.freeze({
   AiChatTab:
     "the desktop AI chat panel lives under src/notes/components, outside the surface roots; the screenshot harness shoots it from the catalogue (myne-md/myne#832 task 14)",
+  Overview:
+    "the catalogue's own Welcome page (myne-md/myne#845): documentation about the workbench, not a surface of the app",
+  Tokens:
+    "the Foundations token specimens (myne-md/myne#845): the design system's values, generated from the sheet, not a component",
+  Icons:
+    "the Foundations icon specimen (myne-md/myne#845): generated from the icon registry, not a component",
+  Typography:
+    "a design-system documentation page (myne-md/myne#845): prose about the type scale, not a component",
+  Colour:
+    "a design-system documentation page (myne-md/myne#845): prose about colour roles, not a component",
+  Spacing:
+    "a design-system documentation page (myne-md/myne#845): prose about the spacing scale, not a component",
+  Elevation:
+    "a design-system documentation page (myne-md/myne#845): prose about the shadow steps, not a component",
+  Motion:
+    "a design-system documentation page (myne-md/myne#845): prose about durations and easings, not a component",
+  Iconography:
+    "a design-system documentation page (myne-md/myne#845): prose about the icon set, not a component",
+  Accessibility:
+    "a design-system documentation page (myne-md/myne#845): prose about what the catalogue shows versus what the suites assert, not a component",
+  "Border Radius":
+    "a design-system documentation page (myne-md/myne#845): prose about the radius scale, split out of Elevation, not a component",
+  "Z-index":
+    "a design-system documentation page (myne-md/myne#845): prose about the layering ladder, not a component",
+  "Story Definition of Done":
+    "a design-system documentation page (myne-md/myne#845): prose about what a story must answer, not a component",
+  "Keeping This True":
+    "a design-system documentation page (myne-md/myne#845): prose about the symptom-driven audit, not a component",
 });
 
 /** Walk a directory recursively for `.tsx` files. */

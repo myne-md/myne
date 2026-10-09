@@ -109,6 +109,12 @@ The one surface where a completed task is drawn with state-by-fill: a finished r
 
 Used in: `decisions.md` 2026-09-13 (myne-md/myne#656); `docs/design/README.md` "Task completion"
 
+### **accessibility level** &nbsp; 🛠️ *Tooling*
+
+The gate state a [story catalogue](#story-catalogue) entry declares: `error` (the default, where axe must find nothing and a violation fails the build), `todo` (a known finding recorded rather than hidden, so the debt is visible and may shrink), or `off` (axe must not run, and the entry carries a reason naming a mechanism). It is the `off | todo | error` vocabulary a mature accessibility panel uses, and it exists so that "is this story gated, or is it not" is a stated fact rather than something inferred from whether a test happens to exist. `tests/stories/a11yLevels.test.tsx` is the gate; the Accessibility tab in the catalogue is a view, and says so.
+
+Used in: `stories/src/a11y-level.ts`; `stories/src/stories/docs.tsx`
+
 ### **Active language set** &nbsp; 📦 *Product*
 
 The set of bundled dictionaries the [spell checker](#spell-check) currently checks against (SYNC-11). A word is accepted if it is valid in **any** member of the set (set-union, no per-note language detection) or in the **Personal dictionary**. The set is settings-driven (Settings → Appearance language picker) and defaults to the OS locale when bundled, unioned with en-US; it is passed to the engine's batch check as the `spell_check` command's `langs` argument. v0.1 bundles 23 languages (Turkish deferred).
@@ -1662,6 +1668,12 @@ An optional `vault.prefs` field (Unix epoch seconds, encrypted like every pref) 
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-10
 
+### **layering ladder** &nbsp; 🎨 *Design*
+
+The `--z-*` token family in `client-core/src/tokens.css`, which names the stacking order the tree had already been painting at as bare `z-index:` literals. A surface belongs on the step that names its ROLE (a dropdown, a modal, an overlay that must clear a modal) rather than on a value raised until it beat the thing it collided with; the shape that rule prevents is an in-modal `Select` sitting at 60 under a modal backdrop at 1000, with its options unclickable and nothing in either rule saying so. Every value is the one that was already shipping, so naming the ladder restacks nothing; the debt is the call sites still holding the bare number, recorded on the Z-index page. The editor owns a band above the app on purpose, which is why the two sequences are interleaved rather than merged.
+
+Used in: `client-core/src/tokens.css`; `stories/src/stories/docs.tsx`
+
 ### **libsodium** &nbsp; 🛠️ *Tooling*
 
 The reference cryptographic library the v0.1 primitive choices are stated against, and the byte-level interoperability target for independent implementations — **not** the library Myne's own clients use. Superseded on the Rust side by the **RustCrypto stack** (`decisions.md` 2026-04-28), which the desktop, mobile and — compiled to `wasm32-unknown-unknown` — **web** clients all run; the Go server uses `golang.org/x/crypto`. Byte-level agreement with libsodium is preserved and machine-checked by `myne-test-vectors/`, which is what keeps the reference role meaningful. No Myne client links libsodium, and none links `libsodium-js`.
@@ -3095,9 +3107,17 @@ Used in: `threat-model.md` §1 (A10)
 
 ### **story catalogue** &nbsp; 🛠️ *Tooling*
 
+*(Aliases: design-system workbench. The catalogue grew into a workbench with a navbar, a searchable rail, a collapsible inspector and generated Foundations specimens (myne-md/myne#845); the term of record stays "story catalogue".)*
+
 A dev-only, in-repo catalogue of every component, screen and state in the shared `src/` tree, mounted from the **real** components (myne-md/myne#832). It lives at `stories/` on the `web/` model (its own Vite target, no `package.json`, root scripts) and is served by `pnpm stories` on :1423. One entry per (surface × state) is declared in `stories/src/registry.ts`, so every state is addressable by URL; `scripts/check-story-coverage.mjs` is a ratchet that fails when a component or screen lands without a story, and `scripts/check-stories-isolation.mjs` fails if any app build config or Tauri bundle manifest references `stories/`, so "deployable" cannot become "shipped to users". It is not a shipped surface: it carries no backend, makes no network call, and stands outside every app bundle. See also [story host](#story-host), [fixture](#fixture).
 
 Used in: `decisions.md` 2026-10-05; `stories/README.md`
+
+### **story definition of done** &nbsp; 🛠️ *Tooling*
+
+The nine-item anatomy a [story catalogue](#story-catalogue) entry must answer before it counts as covering a surface: overview, when to use it and when not, anatomy, states and variants, behaviour, content guidance, accessibility, tokens and theming, related surfaces. It is borrowed from the component-anatomy model a mature design system documents, and it doubles as the measurable definition of the surfaces still in coverage debt. Four of the nine have a machine behind them (the surface has a story, the story carries a description and non-empty tags, it mounts, and its declared [accessibility level](#accessibility-level) is enforced); the rest are review questions, named rather than left to taste.
+
+Used in: `stories/src/stories/docs.tsx`; `stories/README.md`
 
 ### **story host** &nbsp; 🛠️ *Tooling*
 

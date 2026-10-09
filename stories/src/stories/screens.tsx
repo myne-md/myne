@@ -11,8 +11,8 @@ import { Welcome } from "@app/screens/Welcome";
 import { AccountNumberEntry } from "@app/screens/AccountNumberEntry";
 import { StorageLost } from "@app/screens/StorageLost";
 import { DeviceRevoked } from "@app/screens/DeviceRevoked";
+import { action } from "../actions";
 
-const noop = () => {};
 
 export const SCREEN_STORIES: StoryDescriptor[] = [
   {
@@ -20,13 +20,16 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "Welcome",
     state: "default",
+    description: "Welcome, a default state.",
+    fullBleed: true,
+    tags: ["screens", "welcome", "default"],
     fixture: "no-vault",
     render: () => (
       <Welcome
-        onCreateVault={noop}
-        onRestoreBackup={noop}
-        onJoinDevice={noop}
-        onIdentityCreated={noop}
+        onCreateVault={action("onCreateVault")}
+        onRestoreBackup={action("onRestoreBackup")}
+        onJoinDevice={action("onJoinDevice")}
+        onIdentityCreated={action("onIdentityCreated")}
       />
     ),
   },
@@ -35,19 +38,25 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "AccountNumberEntry",
     state: "default",
-    render: () => <AccountNumberEntry onValid={noop} onCreateAccount={noop} />,
+    description: "Account Number Entry, a default state.",
+    fullBleed: true,
+    tags: ["screens", "accountnumberentry", "default"],
+    render: () => <AccountNumberEntry onValid={action("onValid")} onCreateAccount={action("onCreateAccount")} />,
   },
   {
     id: "screens/storagelost/evicted-with-unsynced-notes",
     group: "screens",
     surface: "StorageLost",
     state: "evicted-with-unsynced-notes",
+    description: "Storage Lost, an evicted-with-unsynced-notes state.",
+    fullBleed: true,
+    tags: ["screens", "storagelost", "evicted-with-unsynced-notes"],
     render: () => (
       <StorageLost
         kind="evicted"
         unsyncedTitles={["Meeting notes", "Reading list", "Trips"]}
-        onReDownload={noop}
-        onLock={noop}
+        onReDownload={action("onReDownload")}
+        onLock={action("onLock")}
       />
     ),
   },
@@ -56,12 +65,15 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "StorageLost",
     state: "unopenable-local-only",
+    description: "Storage Lost, an unopenable-local-only state.",
+    fullBleed: true,
+    tags: ["screens", "storagelost", "unopenable-local-only"],
     render: () => (
       <StorageLost
         kind="unopenable"
         unsyncedTitles={[]}
-        onReDownload={noop}
-        onLock={noop}
+        onReDownload={action("onReDownload")}
+        onLock={action("onLock")}
       />
     ),
   },
@@ -70,8 +82,11 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "DeviceRevoked",
     state: "default",
+    description: "Device Revoked, a default state.",
+    fullBleed: true,
+    tags: ["screens", "devicerevoked", "default"],
     render: () => (
-      <DeviceRevoked onEraseLocalCopy={async () => {}} onDismiss={noop} />
+      <DeviceRevoked onEraseLocalCopy={async () => {}} onDismiss={action("onDismiss")} />
     ),
   },
 ];

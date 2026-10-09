@@ -597,7 +597,7 @@ a:focus-visible,
   margin: 0;
   padding: 0;
   list-style: none;
-  z-index: 1100;
+  z-index: var(--z-overlay);
   pointer-events: none; /* the empty area never blocks the app; rows opt back in */
 }
 .myne-toast-row {
@@ -625,7 +625,7 @@ a:focus-visible,
   inset-inline-end: var(--space-5);
   width: 356px;
   max-width: calc(100vw - 2 * var(--space-5));
-  z-index: 1100;
+  z-index: var(--z-overlay);
   --toast-off-x: 110%;
   transition:
     transform var(--duration-base) var(--ease-out),

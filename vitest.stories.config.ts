@@ -21,7 +21,7 @@ export default defineConfig({
     __BUILD_COMMIT__: JSON.stringify("test"),
     // `AboutPanel` reads all three compile-time globals during render. Without
     // this one the smoke check died on `settings/aboutpanel/default` with
-    // `ReferenceError: __UPDATE_CHANNEL__ is not defined` — the same gap the
+    // `ReferenceError: __UPDATE_CHANNEL__ is not defined`. The same gap the
     // catalogue's own Vite config had (myne-md/myne#843).
     __UPDATE_CHANNEL__: JSON.stringify("stable"),
   },
