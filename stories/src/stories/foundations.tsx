@@ -413,6 +413,7 @@ export function EasingSpecimen(): ReactNode {
  */
 function MotionRow({ name }: { name: string }) {
   const [moved, setMoved] = useState(false);
+  const travel = moved ? "translateX(var(--space-7))" : "none";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
       <Button
@@ -423,7 +424,12 @@ function MotionRow({ name }: { name: string }) {
         Replay
       </Button>
       <span style={{ ...CAPTION_STYLE, width: "var(--space-9)" }}>{name}</span>
+      {/* The two renderings sit BESIDE each other: "the same press under reduced
+          motion" is the comparison the token exists to answer, and a caption
+          describing it is not the same as seeing it (myne-md/myne#847 review). */}
       <span
+        aria-hidden="true"
+        title="normal"
         style={{
           display: "inline-block",
           width: "var(--space-4)",
@@ -432,7 +438,23 @@ function MotionRow({ name }: { name: string }) {
           background: "var(--accent)",
           // The token under test IS the transition, so the specimen is the value.
           transition: `transform var(${name}) var(--ease-standard)`,
-          transform: moved ? "translateX(var(--space-7))" : "none",
+          transform: travel,
+        }}
+      />
+      <span
+        aria-hidden="true"
+        title="reduced motion"
+        style={{
+          display: "inline-block",
+          width: "var(--space-4)",
+          height: "var(--space-4)",
+          borderRadius: "var(--radius-1)",
+          background: "var(--accent)",
+          // What the shared sheet already does under `prefers-reduced-motion`: it
+          // zeroes the transition, so the same press produces no travel. Shown
+          // rather than invented, which is the point of the axis.
+          transition: "none",
+          transform: travel,
         }}
       />
       <span style={{ ...CAPTION_STYLE }}>{defaultValue(SHEET, name)}</span>
@@ -452,9 +474,9 @@ export function MotionSpecimen(): ReactNode {
         <MotionRow key={name} name={name} />
       ))}
       <div style={{ ...CAPTION_STYLE, marginBlockStart: "var(--space-4)" }}>
-        Under the reduced-motion axis the shared sheet zeroes every transition, so the same
-        press produces no travel. That is the app's existing behaviour, shown rather than
-        invented.
+        The second square in each row is the same press under reduced motion. The shared sheet
+        already zeroes every transition under the global rule, so the view shows an existing
+        behaviour rather than inventing a policy.
       </div>
     </div>
   );

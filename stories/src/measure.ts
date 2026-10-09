@@ -70,3 +70,20 @@ export function formatGaps(gap: Gaps): string {
   if (gap.left !== 0) parts.push(`left ${gap.left}`);
   return parts.length === 0 ? "no gap" : parts.join(", ");
 }
+
+/**
+ * The gap between two rectangles that sit apart on one axis, or `null` when
+ * they overlap on both (two boxes on top of each other have no gap to report,
+ * and reporting one would be a number a reviewer would quote).
+ *
+ * Siblings are the half of "the gaps around it" that the parent edge cannot
+ * express: a row of buttons evenly spaced reads as correct against its parent
+ * and wrong against its neighbour (myne-md/myne#847 review).
+ */
+export function neighbourGap(a: RectLike, b: RectLike): number | null {
+  if (b.right <= a.left) return Math.round(a.left - b.right);
+  if (a.right <= b.left) return Math.round(b.left - a.right);
+  if (b.bottom <= a.top) return Math.round(a.top - b.bottom);
+  if (a.bottom <= b.top) return Math.round(b.top - a.bottom);
+  return null;
+}

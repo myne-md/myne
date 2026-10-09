@@ -66,7 +66,11 @@ export function mirrorMedia(condition: string, marker: string): number {
     element.id = STYLE_ELEMENT_ID;
     document.head.appendChild(element);
   }
-  element.textContent = parts.join("\n");
+  // APPEND rather than assign: the caller runs once per active axis, so an
+  // assignment makes the second axis overwrite the first while both toolbar
+  // buttons stay pressed and `mirrored` sums both calls, which is why the
+  // zero-rule warning could not fire either (myne-md/myne#847 review).
+  if (parts.length > 0) element.appendChild(document.createTextNode(`${parts.join("\n")}\n`));
   return mirrored;
 }
 

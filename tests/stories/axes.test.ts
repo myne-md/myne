@@ -16,7 +16,7 @@ import {
   serialiseView,
   stageWidth,
 } from "../../stories/src/axes";
-import { formatBox, formatGaps, gaps } from "../../stories/src/measure";
+import { formatBox, formatGaps, gaps, neighbourGap } from "../../stories/src/measure";
 
 describe("the view contract", () => {
   it("reads a bare story id, which is every link written before this change", () => {
@@ -68,7 +68,9 @@ describe("the view contract", () => {
 
   it("applies `dir` to the stage only when the axis is on", () => {
     expect(dirFor({ ...DEFAULT_VIEW, rtl: "on" })).toBe("rtl");
-    expect(dirFor({ ...DEFAULT_VIEW, rtl: "both" })).toBe("rtl");
+    // `both` leaves the stage alone: each compare column carries its own `dir`,
+    // and mirroring the stage too would make both columns render RTL.
+    expect(dirFor({ ...DEFAULT_VIEW, rtl: "both" })).toBeUndefined();
     expect(dirFor(DEFAULT_VIEW)).toBeUndefined();
   });
 });
@@ -134,5 +136,23 @@ describe("the measure arithmetic", () => {
   it("says so when there is no gap rather than printing zeros", () => {
     expect(formatGaps({ top: 0, right: 0, bottom: 0, left: 0 })).toBe("no gap");
     expect(formatGaps({ top: 8, right: 0, bottom: 0, left: 8 })).toBe("top 8, left 8");
+  });
+
+  it("measures the gap to a SIBLING, which the parent edge cannot express", () => {
+    // A row of buttons evenly spaced reads as correct against its parent and
+    // wrong against its neighbour, and the first version computed only the
+    // parent edge (myne-md/myne#847 review).
+    const a = { width: 40, height: 20, top: 0, right: 40, bottom: 20, left: 0 };
+    const b = { width: 40, height: 20, top: 0, right: 92, bottom: 20, left: 52 };
+    expect(neighbourGap(a, b)).toBe(12);
+    expect(neighbourGap(b, a)).toBe(12);
+  });
+
+  it("reports no gap between two boxes that overlap on both axes", () => {
+    // Two boxes on top of each other have no gap to report, and a number here
+    // would be one a reviewer would quote.
+    const a = { width: 40, height: 20, top: 0, right: 40, bottom: 20, left: 0 };
+    const b = { width: 40, height: 20, top: 5, right: 35, bottom: 25, left: -5 };
+    expect(neighbourGap(a, b)).toBeNull();
   });
 });

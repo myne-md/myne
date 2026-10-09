@@ -28,8 +28,11 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const STORIES_DIR = join(ROOT, "stories/src/stories");
 
 /**
- * Placeholder phrases that mean a story is demonstrating nothing. Matched inside
- * a `render` body, which is where a specimen's visible text lives.
+ * Placeholder phrases that mean a story is demonstrating nothing. Matched over
+ * the WHOLE file rather than scoped to a `render` body, deliberately: the first
+ * version of this header claimed the narrower scope and the code never had it,
+ * and a scanner that tried to honour the claim would be a scanner with a bypass
+ * (the reason `check-clipboard-feedback.mjs` states for its own plain match).
  *
  * `Control` is matched only as a whole JSX text node, because the word appears
  * legitimately in prose elsewhere.

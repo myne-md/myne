@@ -485,6 +485,12 @@ pre-commit:
       # duration and a size are numbers a reader takes on trust.
       run: node scripts/check-token-consumers.mjs
 
+    story-source-map:
+      # myne-md/myne#847 review: the generated surface -> source map had no caller and
+      # no gate, so the branch that moved QuickPicker and Select left the rail's
+      # "Show on GitHub" link pointing at the old lines and nothing reported it.
+      run: node scripts/gen-story-source-map.mjs --check
+
     foundations-coverage:
       # myne-md/myne#845: every token in the sheet and every icon in the registry
       # has a specimen in the Foundations group. Unfiltered: a token lands in a

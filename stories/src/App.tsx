@@ -43,7 +43,7 @@ import {
 } from "./axes";
 import { clearMirroredMedia, mirrorMedia } from "./mediaMirror";
 import { applyOutline, clearOutline } from "./outline";
-import { formatBox, formatGaps, gaps } from "./measure";
+import { formatBox, formatGaps, gaps, neighbourGap } from "./measure";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -381,6 +381,7 @@ function TreeRow({
           paddingInlineStart: `calc(var(--space-2) + ${indent})`,
         }}
         onClick={() => onSelect(story.id)}
+        data-story-id={story.id}
         data-testid={`stories.item.${node.surface}`}
       >
         <Icon name={entryIcon(node.group)} size={14} />
@@ -410,6 +411,7 @@ function TreeRow({
             paddingInlineStart: `calc(var(--space-5) + ${indent})`,
           }}
           onClick={() => onSelect(story.id)}
+          data-story-id={story.id}
           data-testid={`stories.item.${node.surface}.${story.state}`}
         >
           {story.state}
@@ -507,7 +509,7 @@ function StoryStage({
   theme: Theme;
   rtl: "off" | "on" | "both";
   measure: boolean;
-  pinned: { box: string; gap: string } | null;
+  pinned: { box: string; gap: string; neighbour: string } | null;
   onMeasureClick: (event: React.MouseEvent) => void;
   outline: boolean;
   fullscreen: boolean;
@@ -545,7 +547,7 @@ function StoryStage({
         <div style={{ ...REF_STYLE, padding: "var(--space-2) var(--space-4)" }} data-testid="stories.measure-readout">
           {pinned === null
             ? "Click an element on the stage to measure it."
-            : `${pinned.box} · gaps: ${pinned.gap}`}
+            : `${pinned.box} · gaps: ${pinned.gap} · ${pinned.neighbour}`}
         </div>
       )}
       <div style={STORY_ID_STYLE} data-testid="stories.story-id">
@@ -900,7 +902,7 @@ export function App() {
   // The measure MODE is state; the pinned measurement is transient and is
   // deliberately not part of the view contract.
   const [measure, setMeasure] = useState(false);
-  const [pinned, setPinned] = useState<{ box: string; gap: string } | null>(null);
+  const [pinned, setPinned] = useState<{ box: string; gap: string; neighbour: string } | null>(null);
   const [fullscreen, setFullscreen] = useState<boolean>(
     () => parseView(window.location.hash).fullscreen,
   );
@@ -964,27 +966,52 @@ export function App() {
     if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
   }, [selectedId, rtl, measure, outline, fullscreen, viewport, reducedMotion, forcedColors, theme]);
 
-  // Measuring: the story is inert, so a click can only measure and never fires
-  // the component's own handler.
-  useEffect(() => {
-    const root = document.querySelector<HTMLElement>('[data-testid="stories.story"]');
-    if (root === null) return;
-    root.style.pointerEvents = measure ? "none" : "";
-    return () => {
-      root.style.pointerEvents = "";
-    };
-  }, [measure, selectedId]);
-
-  /** Pin a measurement for the element under the pointer. */
+  /**
+   * Pin a measurement for the element under the pointer.
+   *
+   * The stage handles this in the CAPTURE phase and stops propagation, so the
+   * component's own click handler never fires while measuring. The first
+   * version made the story subtree `pointer-events: none` instead, which
+   * suppressed the handler but also made `event.target` the STAGE, so the
+   * readout described the stage rather than the element clicked
+   * (myne-md/myne#847 review).
+   */
   const onMeasureClick = (event: React.MouseEvent) => {
     if (!measure) return;
+    event.stopPropagation();
+    event.preventDefault();
     const target = event.target as HTMLElement;
+    const rect = target.getBoundingClientRect();
     const parent = target.parentElement;
     setPinned({
-      box: formatBox(target.getBoundingClientRect()),
-      gap: parent === null ? "no parent" : formatGaps(gaps(target.getBoundingClientRect(), parent.getBoundingClientRect())),
+      box: formatBox(rect),
+      gap:
+        parent === null
+          ? "no parent"
+          : formatGaps(gaps(rect, parent.getBoundingClientRect())),
+      neighbour: nearestNeighbourGap(target, rect),
     });
   };
+
+/**
+ * The gap to the nearest element sibling, as a label.
+ *
+ * Siblings are the half of "the gaps around it" the parent edge cannot express:
+ * a row of buttons evenly spaced reads as correct against its parent and wrong
+ * against its neighbour.
+ */
+function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
+  const parent = target.parentElement;
+  if (parent === null) return "no neighbour";
+  let best: number | null = null;
+  for (const sibling of Array.from(parent.children)) {
+    if (sibling === target) continue;
+    const gap = neighbourGap(rect, sibling.getBoundingClientRect());
+    if (gap === null) continue;
+    if (best === null || Math.abs(gap) < Math.abs(best)) best = gap;
+  }
+  return best === null ? "no neighbour" : `nearest ${best}`;
+}
 
   // The outline overlay marks the STORY, after the story has rendered. It is
   // cleared on the way out so the marks never reach the drift baseline or a
@@ -1133,7 +1160,15 @@ export function App() {
     event.preventDefault();
     const next = event.key === "ArrowDown" ? index + 1 : index - 1;
     const clamped = Math.max(0, Math.min(railIds.length - 1, next));
-    select(railIds[clamped]);
+    const id = railIds[clamped];
+    select(id);
+    // Move focus WITH the selection. Leaving the ring on the row the user just
+    // left means the next Enter re-activates the story they navigated away from,
+    // so the focus order and the reading order disagree (myne-md/myne#847
+    // review).
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-story-id="${id}"]`)?.focus();
+    });
   };
 
   return (
@@ -1298,6 +1333,7 @@ export function App() {
               how the STAGE is drawn. Ten controls in one row was unreadable, and
               the split is the one the search/filter change already drew
               (myne-md/myne#847). */}
+          {!fullscreen && (
           <div style={REVIEW_BAR_STYLE} data-testid="stories.review-bar">
         <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.review">
         <Select
@@ -1404,6 +1440,7 @@ export function App() {
           />
         </div>
           </div>
+          )}
           {fullscreen && (
             <div style={{ position: "absolute", insetBlockStart: "var(--space-3)", insetInlineEnd: "var(--space-3)", zIndex: "var(--z-top-chrome)" }}>
               <Button
@@ -1433,6 +1470,10 @@ export function App() {
             />
           ) : null}
 
+          {/* Hidden in fullscreen: the mode exists so the stage fills the
+              window, and leaving these mounted keeps a 260px column beside the
+              stage and a bar above it (myne-md/myne#847 review). */}
+          {!fullscreen && (
           <section
             style={panelOpen ? INSPECTOR_STYLE : INSPECTOR_COLLAPSED_STYLE}
             aria-label="Inspector"
@@ -1496,6 +1537,7 @@ export function App() {
           </div>
         )}
           </section>
+          )}
         </div>
       </div>
     </div>
