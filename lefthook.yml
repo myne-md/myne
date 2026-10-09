@@ -478,6 +478,13 @@ pre-commit:
       # direction, which is the half that catches a fabricated composition claim.
       run: node scripts/check-story-tree.mjs
 
+    token-consumers:
+      # myne-md/myne#847: a duration, ease or text token is READ somewhere outside the
+      # sheet. Those three families are the ones a catalogue can only DISPLAY: a colour
+      # has a swatch and a spacing step has a bar, so an unused one is visible, while a
+      # duration and a size are numbers a reader takes on trust.
+      run: node scripts/check-token-consumers.mjs
+
     foundations-coverage:
       # myne-md/myne#845: every token in the sheet and every icon in the registry
       # has a specimen in the Foundations group. Unfiltered: a token lands in a
