@@ -32,6 +32,7 @@ import {
 import { createPortal } from "react-dom";
 import { placeMenu, type MenuPlacement } from "./menuPlacement";
 import { Icon } from "./Icon";
+import type { IconName } from "../../lib/icons";
 
 export interface SelectOption<T extends string> {
   value: T;
@@ -74,6 +75,15 @@ interface SelectProps<T extends string> {
   style?: CSSProperties;
   /** Optional `data-testid` on the trigger button (E2E observability). */
   testId?: string;
+  /**
+   * Optional leading glyph rendered INSIDE the trigger, before the value.
+   *
+   * It exists so a control can carry its own subject: a glyph floating beside
+   * the pill reads as a stray label rather than as part of the control, and it
+   * is the thing a reader aims at when they mean "the theme dropdown"
+   * (myne-md/myne#845).
+   */
+  icon?: IconName;
 }
 
 export function Select<T extends string>({
@@ -84,6 +94,7 @@ export function Select<T extends string>({
   ariaDescribedBy,
   style,
   testId,
+  icon,
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -251,6 +262,7 @@ export function Select<T extends string>({
         }}
         onKeyDown={onTriggerKeyDown}
       >
+        {icon !== undefined && <Icon name={icon} size={14} />}
         <span style={{ flex: 1, minWidth: 0 }}>{current?.label ?? ""}</span>
         <Icon name="chevron-down" size={14} />
       </button>
