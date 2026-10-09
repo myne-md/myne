@@ -1558,7 +1558,7 @@ function EditorChrome({
 
   // One removal handler for both the backend event (a local soft/hard delete)
   // and the frontend `NOTE_REMOVED_EVENT` (a note that left the live tree via a
-  // sync pull — myne-md/myne#839, cross-device). A detached window shows the
+  // sync pull, myne-md/myne#839, cross-device). A detached window shows the
   // terminal "removed elsewhere" state after a forced-base flush preserves any
   // unsaved edit as a conflict copy; the main window closes every pane showing
   // the note, the same close a local removal drives (myne-md/myne#819).
@@ -1573,10 +1573,15 @@ function EditorChrome({
         // resurrects the note (myne-md/myne#839).
         void flushAll({ forceBaseGuard: true }).finally(() => setDeletedElsewhere(true));
       } else {
-        ws.closeNoteEverywhere(id);
+        // A dirty pane's unmount flush is hashless last-write-wins, so guard it
+        // first (myne-md/myne#839): a cross-device trash must not be overwritten
+        // by the stale buffer before the pane closes.
+        void ws
+          .flushNote(id, { forceBaseGuard: true })
+          .finally(() => ws.closeNoteEverywhere(id));
       }
     },
-    [detachedNoteId, flushAll, ws.closeNoteEverywhere],
+    [detachedNoteId, flushAll, ws.flushNote, ws.closeNoteEverywhere],
   );
 
   // myne#681 task 2 (SYNC-11): a detached (pop-out) window reacts to its note
