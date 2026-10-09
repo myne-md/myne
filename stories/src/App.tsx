@@ -25,6 +25,7 @@ import { resolveFixture } from "../fixtures";
 import { setStoryFixture } from "./host/internals";
 import { StoryErrorBoundary } from "./ErrorBoundary";
 import { searchStories } from "./search";
+import { entryName } from "./naming";
 import { clearActions, useActionLog } from "./actions";
 import { failingContrast, focusOrder, roleNames, targetSizeFindings } from "./a11y";
 import { a11yLevelOf } from "./a11y-level";
@@ -33,6 +34,7 @@ import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
 import { SOURCE_MAP } from "./source-map";
 import type { StoryDescriptor } from "./types";
+import type { StoryGroup } from "./types";
 
 const RAIL_WIDTH_PX = 300;
 const INSPECTOR_HEIGHT_PX = 260;
@@ -51,8 +53,7 @@ const GROUP_ICON: Record<string, IconName> = {
 };
 
 /** A glyph per surface family, so an entry is recognisable at a glance. */
-function entryIcon(group: string): IconName {
-  return GROUP_ICON[group] ?? "file-text";
+function entryIcon(group: string): IconName {  return GROUP_ICON[group] ?? "file-text";
 }
 
 const TABS: readonly { id: Tab; label: string }[] = [
@@ -64,6 +65,22 @@ const TABS: readonly { id: Tab; label: string }[] = [
 
 /** The built-in palettes the switcher offers (myne-md/myne#845). */
 const THEMES = ["light", "dark", "amoled"] as const;
+
+/**
+ * The rail's section order, in one place.
+ *
+ * Shared by the rail and the filter's option list, because two hand-kept copies
+ * of "which groups exist, in what order" is exactly how a filter ends up
+ * offering a group the rail does not render.
+ */
+const GROUP_ORDER: readonly StoryGroup[] = [
+  "documentation",
+  "foundations",
+  "primitives",
+  "components",
+  "screens",
+  "settings",
+];
 type Theme = (typeof THEMES)[number];
 
 /** The pseudo-states the Interactions tab can force. */
@@ -91,6 +108,48 @@ const SEARCH_WRAP_STYLE: CSSProperties = {
   flex: "1 1 auto",
   maxWidth: "520px",
   margin: "0 auto",
+  // The suggestion panel is anchored to this box, so it sits directly under the
+  // input rather than floating somewhere in the viewport.
+  position: "relative",
+};
+
+/** The suggestion panel: a listbox under the search input. */
+const SEARCH_RESULTS_STYLE: CSSProperties = {
+  position: "absolute",
+  insetInline: 0,
+  insetBlockStart: "calc(100% + var(--space-1))",
+  zIndex: "var(--z-dropdown)",
+  maxHeight: "60vh",
+  overflowY: "auto",
+  padding: "var(--space-1)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  boxShadow: "var(--shadow-2)",
+};
+
+const SEARCH_RESULT_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-3)",
+  borderRadius: "var(--radius-1)",
+  cursor: "pointer",
+  fontSize: "var(--text-sm)",
+};
+
+const SEARCH_RESULT_GROUP_STYLE: CSSProperties = {
+  marginInlineStart: "auto",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  textTransform: "uppercase",
+  letterSpacing: "var(--tracking-caps)",
+};
+
+const SEARCH_EMPTY_STYLE: CSSProperties = {
+  padding: "var(--space-3)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-3)",
 };
 
 const RAIL_STYLE: CSSProperties = {
@@ -562,6 +621,13 @@ export function App() {
     return story?.id;
   });
   const [query, setQuery] = useState("");
+  // The suggestion panel under the search input. Search no longer filters the
+  // rail (it answered a different question than "where am I in the tree"): it
+  // proposes, and picking a proposal navigates (myne-md/myne#845).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchIndex, setSearchIndex] = useState(0);
+  // The rail's own narrowing control, which is what search used to do.
+  const [groupFilter, setGroupFilter] = useState<StoryGroup | "all">("all");
   const [tab, setTab] = useState<Tab>("controls");
   const [theme, setTheme] = useState<Theme>("light");
   const [forced, setForced] = useState<ForcedState | null>(null);
@@ -618,18 +684,54 @@ export function App() {
     setForced(null);
   };
 
-  // The rail: surfaces in registry order, searched when a query is present.
+  // The rail: surfaces in registry order, narrowed by the FILTER and never by
+  // the search. Search proposes destinations; the filter changes what the tree
+  // shows. Conflating the two is why a query used to replace the whole rail with
+  // a flat list and lose the reader's place in the hierarchy.
   const surfaces = useMemo(() => {
     const all = storiesBySurface();
-    const trimmed = query.trim();
-    if (trimmed.length === 0) return all;
-    const matches = new Set(searchStories(STORIES, trimmed).map((story) => story.id));
-    return all
-      .map((group) => ({ ...group, stories: group.stories.filter((s) => matches.has(s.id)) }))
-      .filter((group) => group.stories.length > 0);
-  }, [query]);
+    if (groupFilter === "all") return all;
+    return all.filter((group) => group.group === groupFilter);
+  }, [groupFilter]);
 
+  // Ranked proposals for the search panel. Capped, because a panel that scrolls
+  // past a dozen entries is a worse answer than the rail itself.
+  const results = useMemo(() => searchStories(STORIES, query).slice(0, 12), [query]);
   const searching = query.trim().length > 0;
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchIndex(0);
+  };
+
+  /** Pick a proposal: navigate, clear the query, close the panel. */
+  const acceptResult = (id: string) => {
+    select(id);
+    setQuery("");
+    closeSearch();
+  };
+
+  const onSearchKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      closeSearch();
+      return;
+    }
+    if (results.length === 0) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      // The arrow keys belong to the panel while it is open, not to the rail:
+      // otherwise typing and arrowing fight over the same key.
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setSearchIndex((index) => (index + step + results.length) % results.length);
+      setSearchOpen(true);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const hit = results[searchIndex] ?? results[0];
+      if (hit !== undefined) acceptResult(hit.id);
+    }
+  };
 
   // One rail row per surface: the states switch in the inspector, not here, so a
   // crowded list of `x · default`, `x · disabled`, `x · error` never appears and
@@ -675,9 +777,87 @@ export function App() {
             type="search"
             placeholder="Search stories by name, state or intent"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSearchIndex(0);
+              setSearchOpen(e.target.value.trim().length > 0);
+            }}
+            onFocus={() => setSearchOpen(searching)}
+            onKeyDown={onSearchKeyDown}
+            // A combobox, because the panel below IS the listbox for this field.
+            // `aria-activedescendant` names the highlighted row rather than
+            // moving focus into the panel, so the caret stays in the input while
+            // the arrow keys walk the proposals.
+            role="combobox"
+            aria-expanded={searchOpen && results.length > 0}
+            aria-controls="stories-search-results"
+            aria-autocomplete="list"
+            aria-activedescendant={
+              searchOpen && results[searchIndex] !== undefined
+                ? `stories-search-result-${results[searchIndex].id}`
+                : undefined
+            }
             aria-label="Search stories"
             data-testid="stories.search"
+          />
+          {searchOpen && searching && (
+            <div
+              id="stories-search-results"
+              role="listbox"
+              aria-label="Search results"
+              style={SEARCH_RESULTS_STYLE}
+              data-testid="stories.search-results"
+            >
+              {results.length === 0 ? (
+                <div style={SEARCH_EMPTY_STYLE}>Nothing matches that.</div>
+              ) : (
+                results.map((hit, index) => (
+                  <div
+                    key={hit.id}
+                    id={`stories-search-result-${hit.id}`}
+                    role="option"
+                    aria-selected={index === searchIndex}
+                    onMouseEnter={() => setSearchIndex(index)}
+                    // `onMouseDown`, not `onClick`: the input's blur would close
+                    // the panel before a click could land on it.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      acceptResult(hit.id);
+                    }}
+                    style={{
+                      ...SEARCH_RESULT_STYLE,
+                      background: index === searchIndex ? "var(--accent-soft)" : "transparent",
+                    }}
+                    data-testid={`stories.search-result.${hit.id}`}
+                  >
+                    <span style={{ color: "var(--fg-1)" }}>
+                      {entryName(hit.surface, hit.title)}
+                    </span>
+                    <span style={{ color: "var(--fg-3)" }}>{hit.state}</span>
+                    <span style={{ ...SEARCH_RESULT_GROUP_STYLE }}>{hit.group}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+          data-testid="stories.filter"
+        >
+          <Icon name="layout-grid" size={15} />
+          <Select
+            value={groupFilter}
+            onChange={(next) => setGroupFilter(next)}
+            aria-label="Filter the rail by group"
+            options={[
+              { value: "all", label: "All groups" },
+              ...GROUP_ORDER.map((group) => ({
+                value: group,
+                label: group[0].toUpperCase() + group.slice(1),
+              })),
+            ]}
           />
         </div>
         <div
@@ -705,19 +885,9 @@ export function App() {
           data-testid="stories.rail"
           onKeyDown={onRailKeyDown}
         >
-          {(searching
-            ? ["matches"]
-            : [
-                "documentation",
-                "foundations",
-                "primitives",
-                "components",
-                "screens",
-                "settings",
-              ]
-          ).map(
+          {GROUP_ORDER.map(
             (groupName) => {
-              const inGroup = surfaces.filter((group) => (searching ? true : group.group === groupName));
+              const inGroup = surfaces.filter((group) => group.group === groupName);
               if (inGroup.length === 0) return null;
               return (
                 <div key={groupName}>
@@ -741,7 +911,7 @@ export function App() {
                       data-testid={`stories.item.${group.surface}`}
                     >
                       <Icon name={entryIcon(group.group)} size={14} />
-                      {searching ? `${group.name} · ${group.stories[0].state}` : group.name}
+                      {group.name}
                     </Button>
                   ))}
                 </div>
