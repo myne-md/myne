@@ -134,6 +134,24 @@ export interface StoryDescriptor {
    */
   parent?: string;
   /**
+   * The AUTHORED half of this surface's Documentation page (myne-md/myne#847).
+   *
+   * Optional, and on the descriptor rather than in a second file, so it travels
+   * with the story and a surface cannot be silently missing from a docs
+   * directory. Only the items no generator can produce belong here: whether a
+   * surface should NOT be used, what its copy says, and which surfaces it is
+   * easily confused with. Everything else the page needs is read from the
+   * registry, so it cannot go stale.
+   */
+  docs?: {
+    /** The judgement a reader needs most: when this is the wrong component. */
+    whenNotToUse?: string;
+    /** What the copy says, in sentence case, and what it must not say. */
+    content?: string;
+    /** Surfaces this one is easily confused with, by surface name. */
+    related?: readonly string[];
+  };
+  /**
    * The accessibility level this story declares (myne-md/myne#845).
    *
    * - `error`: axe must find nothing here, and a violation FAILS the build.

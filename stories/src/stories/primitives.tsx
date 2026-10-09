@@ -87,6 +87,15 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     state: "default",
     description: "Icon Button, a default state.",
     tags: ["primitives", "iconbutton", "default"],
+    // The authored half of the Documentation page, on the surface where the
+    // judgement is real: an icon-only control is the wrong choice the moment the
+    // action needs a word (myne-md/myne#847).
+    docs: {
+      whenNotToUse:
+        "Not for an action whose meaning is not already obvious from the icon alone. If a reader would have to hover to find out what it does, the action needs a label, so it needs Button.",
+      content: "The label is an accessible name, not visible copy, so it is sentence case and it names the action rather than the glyph.",
+      related: ["Button"],
+    },
     render: () => (
       <Row>
         <IconButton icon="settings" label="Settings" onClick={action("onClick")} />
