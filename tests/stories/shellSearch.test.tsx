@@ -96,4 +96,37 @@ describe("the catalogue shell's search proposes rather than filters", () => {
     });
     expect(el.querySelector('[data-testid="stories.search-results"]')).toBeNull();
   });
+
+  it("files an issue whose URL carries the story and the form", async () => {
+    const el = await mountShell();
+    const button = el.querySelector('[data-testid="stories.file-issue"]');
+    expect(button, "the File issue button must exist").not.toBeNull();
+
+    // `window.open` is what the button calls, so the URL is only observable by
+    // intercepting it. Asserting the built string is the point: the form field
+    // id and the query parameter are one contract, and a rename on either side
+    // silently drops the context.
+    const opened: string[] = [];
+    const original = window.open;
+    window.open = ((url?: string | URL) => {
+      opened.push(String(url));
+      return null;
+    }) as typeof window.open;
+    await act(async () => {
+      fireEvent.click(button as HTMLElement);
+    });
+    window.open = original;
+
+    expect(opened.length, "one click opens one tab").toBe(1);
+    const url = opened[0];
+    expect(url).toContain("github.com/myne-md/myne/issues/new");
+    expect(url).toContain("template=design-system.yml");
+    // `URLSearchParams` encodes a space as `+`, which `decodeURIComponent` does
+    // not reverse, so the `+` is decoded too rather than the assertion loosened.
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    // The context is the whole reason this button exists.
+    expect(decoded).toContain("documentation/welcome/introduction");
+    expect(decoded).toContain("Theme: light");
+    expect(decoded).toContain("Story: documentation/welcome/introduction");
+  });
 });

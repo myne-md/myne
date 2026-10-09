@@ -271,6 +271,44 @@ function SourceReference({ story }: { story: StoryDescriptor }) {
 }
 
 /**
+ * The GitHub issue URL for the story on screen, pre-filled through the issue
+ * form's own field ids.
+ *
+ * The form is `.github/ISSUE_TEMPLATE/design-system.yml`, and GitHub prefills a
+ * form field when a query parameter matches the field's `id`. That is why
+ * `catalogue-context` is spelled identically here and in the template: the two
+ * are one contract, and a rename on either side silently drops the context.
+ *
+ * The context block is the point. A report that arrives naming the story, the
+ * theme and the URL is reproducible; one that says "the padding is wrong
+ * somewhere" is a conversation (myne-md/myne#845).
+ */
+function issueUrl(story: StoryDescriptor | undefined, theme: Theme): string {
+  const where =
+    story === undefined
+      ? "the catalogue"
+      : `${entryName(story.surface, story.title)} (${story.state})`;
+  const context = [
+    story === undefined ? "No story was open." : `Story: ${story.id}`,
+    story === undefined ? "" : `Surface: ${story.surface}`,
+    story === undefined ? "" : `State: ${story.state}`,
+    story === undefined ? "" : `Group: ${story.group}`,
+    `Theme: ${theme}`,
+    `Catalogue: ${__APP_VERSION__} (${__STORIES_BRANCH__})`,
+    `URL: ${window.location.href}`,
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
+
+  const params = new URLSearchParams({
+    template: "design-system.yml",
+    title: `[Design system] ${where}`,
+    "catalogue-context": context,
+  });
+  return `https://github.com/myne-md/myne/issues/new?${params.toString()}`;
+}
+
+/**
  * Installs a story's fixture before its render.
  *
  * Called from the two places that can change the selection (a click, a hash
@@ -875,6 +913,19 @@ export function App() {
             }))}
           />
         </div>
+
+        {/* Report what you are looking at. The URL carries the story, the theme
+            and the page URL into the repo's issue form, so a finding arrives
+            reproducible rather than as a description of a memory. */}
+        <Button
+          variant="secondary"
+          icon="message-square"
+          title="File an issue about this story"
+          onClick={() => window.open(issueUrl(selected, theme), "_blank", "noopener,noreferrer")}
+          data-testid="stories.file-issue"
+        >
+          File issue
+        </Button>
       </header>
 
       <div style={{ display: "flex", flex: "1 1 auto", minHeight: 0 }}>
