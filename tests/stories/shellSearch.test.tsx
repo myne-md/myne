@@ -140,6 +140,36 @@ describe("the catalogue shell's search proposes rather than filters", () => {
     }
   });
 
+  it("hides the chrome in fullscreen and leaves on Escape", async () => {
+    const el = await mountShell();
+    expect(el.querySelector('[data-testid="stories.rail"]'), "the rail starts visible").not.toBeNull();
+
+    await act(async () => {
+      window.location.hash = "documentation/welcome/introduction?fullscreen=1";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(el.querySelector('[data-testid="stories.rail"]'), "fullscreen hides the rail").toBeNull();
+    expect(el.querySelector('[data-testid="stories.navbar"]')).toBeNull();
+    // Both exits exist: a visible control, and the key.
+    expect(el.querySelector('[data-testid="stories.fullscreen-exit"]')).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+    expect(el.querySelector('[data-testid="stories.rail"]'), "Escape returns the rail").not.toBeNull();
+  });
+
+  it("marks the outline overlay and clears it again", async () => {
+    const el = await mountShell();
+    await act(async () => {
+      window.location.hash = "documentation/welcome/introduction?outline=1";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    const marked = el.querySelectorAll("[data-outline]");
+    expect(marked.length, "the overlay marks boxes").toBeGreaterThan(0);
+    expect(el.querySelector('[data-outline="container"]')).not.toBeNull();
+  });
+
   it("files an issue whose URL carries the story and the form", async () => {
     const el = await mountShell();
     const button = el.querySelector('[data-testid="stories.file-issue"]');
