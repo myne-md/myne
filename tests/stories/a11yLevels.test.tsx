@@ -140,6 +140,11 @@ describe("axe over every story", () => {
   });
 
   it("publishes where the tree stands, and the debt does not grow", () => {
+    // The ceiling must measure its OWN input: this test is read alone by
+    // `vitest -t`, and a ceiling over an empty array is a gate reporting on
+    // nothing (myne-md/myne#847 review).
+    const notOff = STORIES.filter((s) => a11yLevelOf(s) !== "off").length;
+    expect(measured.length, "the ceiling must measure every non-off story").toBe(notOff);
     const gated = measured.filter((m) => m.level === "error");
     const debt = measured.filter((m) => m.level === "todo" && m.rules.length > 0);
     console.log(

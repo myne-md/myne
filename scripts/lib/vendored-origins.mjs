@@ -66,7 +66,7 @@ export const VENDORED_ORIGINS = new Map([
   ["https://sync.myne.md", "the documented production sync origin, a placeholder in Myne's own copy"],
   [
     "https://app.myne.md",
-    "Myne's own web-client origin: a link the catalogue's Welcome page offers. Never fetched (the catalogue pins connect-src 'none'), and the served bundle cannot carry it, hence WEB_EXCLUDED.",
+    "Myne's own web-client origin: a link the catalogue's Welcome page offers. Never fetched: the Welcome page LINKS out and the catalogue makes no request. The deploy is recommended to pin `connect-src 'none'` (`stories/README.md`), and the served bundle cannot carry the origin, hence WEB_EXCLUDED.",
   ],
   [
     "https://status.myne.md",

@@ -32,6 +32,20 @@ describe("the foundations-coverage guard", () => {
     expect(classify("--zzz-new-family", "1")).toBeNull();
   });
 
+  it("classifies an ALIAS by what it resolves to, not by its syntax", () => {
+    // The hole the adversarial pass found: a new family defined as an alias was
+    // filed under colours and passed with no specimen, which is the invisible
+    // family the guard exists to catch.
+    const tokens = new Map([
+      ["--blur-base", "8px"],
+      ["--blur-1", "var(--blur-base)"],
+      ["--accent", "var(--_accent-dark)"],
+      ["--_accent-dark", "#2c4a7a"],
+    ]);
+    expect(classify("--blur-1", "var(--blur-base)", tokens)).toBeNull();
+    expect(classify("--accent", "var(--_accent-dark)", tokens)).toBe("colours");
+  });
+
   it("reads every declaration, the first value winning", () => {
     const tokens = declaredTokens(":root { --a: 1; --a: 2; --b: 3; }");
     expect(tokens.get("--a")).toBe("1");

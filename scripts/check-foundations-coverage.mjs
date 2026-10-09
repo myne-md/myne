@@ -69,9 +69,27 @@ export function declaredTokens(css) {
   return out;
 }
 
+/**
+ * A value with its `var(--x)` chain followed, so an ALIAS is classified by what
+ * it resolves to rather than by its syntax.
+ *
+ * The first version treated any `var(--` value as a colour, so a new
+ * alias-valued family (`--blur-1: var(--blur-base)`) was filed under colours and
+ * passed with no specimen, which is exactly the "invisible family" this guard
+ * exists to catch (myne-md/myne#847 review). Bounded, and an unresolvable name
+ * keeps the raw value rather than failing the classification.
+ */
+export function resolveValue(value, tokens, depth = 0) {
+  if (tokens === null || depth > 4) return value;
+  const match = value.match(/^var\(\s*(--[A-Za-z0-9-]+)\s*\)$/);
+  if (match === null) return value;
+  const next = tokens.get(match[1]);
+  return next === undefined ? value : resolveValue(next, tokens, depth + 1);
+}
+
 /** Which group classifies a token, or null when none does. */
-export function classify(name, value) {
-  if (isColour(name, value)) return "colours";
+export function classify(name, value, tokens = null) {
+  if (isColour(name, resolveValue(value, tokens))) return "colours";
   for (const [group, pattern] of Object.entries(GROUPS)) {
     if (pattern.test(name)) return group;
   }
@@ -97,7 +115,7 @@ if (invokedDirectly) {
 
   const uncovered = [];
   for (const [name, value] of tokens) {
-    if (classify(name, value) === null) uncovered.push(name);
+    if (classify(name, value, tokens) === null) uncovered.push(name);
   }
 
   if (!existsSync(ICONS)) {
