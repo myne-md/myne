@@ -22,6 +22,10 @@ export interface FakeInternals {
   convertFileSrc(path: string, protocol?: string): string;
   /** Read by `@tauri-apps/api/window`'s `getCurrentWindow()`. */
   metadata: { currentWindow: { label: string } };
+  /** Dispatch a backend→UI event to every handler registered for `name`.
+   *  The real host emits from Rust; the fake one needs a way in, and this is
+   *  what a story showing an event-driven state calls (myne-md/myne#845). */
+  emitEvent(name: string, payload?: unknown): void;
 }
 
 /**
@@ -38,14 +42,40 @@ const BENIGN_DEFAULT: readonly unknown[] = Object.freeze([]);
 
 function makeInternals(fixture: Fixture | undefined): FakeInternals {
   const handlers = fixture?.handlers ?? {};
+  // Backend→UI event subscriptions. The seam's `listen()` passes the handler
+  // through `transformCallback`, which the fake host returns unchanged, so the
+  // function itself arrives here and can be held. Rebuilt per install, so
+  // swapping the fixture drops every listener from the previous story.
+  const eventHandlers = new Map<string, Set<(event: unknown) => void>>();
   return {
     invoke: (cmd, args) => {
+      // `@tauri-apps/api/event`'s listen/unlisten route through `invoke`, so
+      // the fake host answers them here rather than falling through to the
+      // benign default. Registration is SYNCHRONOUS inside `invoke`, which is
+      // what lets a parent effect emit in the same commit a child subscribed.
+      if (cmd === "plugin:event|listen") {
+        const name = String((args ?? {}).event ?? "");
+        const handler = (args ?? {}).handler;
+        if (typeof handler === "function") {
+          const set = eventHandlers.get(name) ?? new Set();
+          set.add(handler as (event: unknown) => void);
+          eventHandlers.set(name, set);
+        }
+        return Promise.resolve(0);
+      }
+      if (cmd === "plugin:event|unlisten") return Promise.resolve(undefined);
       const handler = handlers[cmd];
       try {
         return Promise.resolve(handler ? handler(args ?? {}) : BENIGN_DEFAULT);
       } catch (err) {
         return Promise.reject(err);
       }
+    },
+    emitEvent: (name, payload) => {
+      const set = eventHandlers.get(name);
+      if (set === undefined) return;
+      const event = { event: name, id: 0, payload };
+      for (const handler of [...set]) handler(event);
     },
     transformCallback: (cb) => cb,
     unregisterCallback: () => undefined,
@@ -72,4 +102,15 @@ export function installStoryHost(fixture?: Fixture): void {
 /** Alias that reads better at a call site that is swapping mid-session. */
 export function setStoryFixture(fixture: Fixture | undefined): void {
   installStoryHost(fixture);
+}
+
+/**
+ * Fire a backend→UI event at whatever the current fixture's host has
+ * subscribed. A story that renders an event-driven state wraps its surface in
+ * an effect that calls this after mount; see `notes.tsx`'s `EmitStoryEvent`.
+ */
+export function emitStoryEvent(name: string, payload?: unknown): void {
+  const internals = (globalThis as { __TAURI_INTERNALS__?: FakeInternals })
+    .__TAURI_INTERNALS__;
+  internals?.emitEvent(name, payload);
 }

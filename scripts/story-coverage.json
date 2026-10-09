@@ -1,26 +1,5 @@
 {
   "$comment": "Surfaces with no story yet (myne-md/myne#832). DEBT: this set may only SHRINK. Do not add an entry by hand; write the story. `node scripts/check-story-coverage.mjs --record` refuses to grow it.",
   "floor": 215,
-  "debt": [
-    "AiHydrationProbe",
-    "BacklinksTab",
-    "ChatComposer",
-    "ConflictsView",
-    "FolderRow",
-    "GraphCanvas",
-    "GraphList",
-    "GraphSettingsPanel",
-    "GraphView",
-    "NoteList",
-    "OutlineTab",
-    "PaneTree",
-    "PaneView",
-    "ProposalDiffModal",
-    "SidebarSearchRow",
-    "SnapshotFailedIndicator",
-    "SnapshotsPanel",
-    "TagBrowser",
-    "TasksPane",
-    "UnlinkedMentionsSection"
-  ]
+  "debt": []
 }

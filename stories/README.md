@@ -21,10 +21,12 @@ pnpm stories:record   # re-record the DOM-hash baseline
 Every story is addressable by URL: the fragment is the story id
 (`#primitives/button/variants`), so a link can be pasted into an issue.
 
-## The four regions
+## The shell
 
 - **Navbar.** The Myne mark, the wordmark and the version, with search in the
-  centre, a **group filter** beside it, the theme switcher, and **File issue**.
+  centre, a **group filter** beside it, and **File issue**. It carries what
+  changes what the catalogue *shows you*; the controls that change how the
+  *stage* is drawn live in the review bar below (myne-md/myne#847).
   Search matches a story's id, its derived name, its state, its description and
   its tags, so "sync error" finds a story whose id says nothing about either. It
   **proposes** rather than filters: results appear as a listbox directly under
@@ -36,13 +38,21 @@ Every story is addressable by URL: the fragment is the story id
   the state, the theme, the catalogue version and the page URL already filled in,
   so a finding arrives reproducible. The form field id and the query parameter
   are one contract: renaming either side silently drops the context.
-- **Rail.** One row per surface with its states grouped beneath, reachable with
-  the up and down arrows. A name is derived from the component name and changes
-  **casing only** (`ModalShell` reads as "Modal Shell"); `title` on a descriptor
-  is the rare override. Title Case here is deliberate and is *not* a violation of
-  the sentence-case rule that governs product copy: a rail entry is a **name in a
-  list**, not a sentence. The two casings answer two different questions, and the
-  Typography page states the split.
+- **Rail.** A tree: `group > component > [subcomponent] > Documentation | story`,
+  reachable with the up and down arrows, which walk the flattened tree in the
+  order the eye reads. States are leaves, so every story is an addressable node.
+  A nesting comes from an optional hand-written `parent` on a descriptor, and
+  only about thirty pairs in the tree have one; `scripts/check-story-tree.mjs`
+  fails on a `parent` that names nothing, on a cycle, and on an edge with no
+  import between the two modules in either direction (a settings shell imports
+  its panels, while the shared modal shell is imported by its children, so one
+  direction would reject half the real pairs). A name is derived from the
+  component name and changes **casing only** (`ModalShell` reads as "Modal
+  Shell"); `title` on a descriptor is the rare override. Title Case here is
+  deliberate and is *not* a violation of the sentence-case rule that governs
+  product copy: a rail entry is a **name in a list**, not a sentence. The two
+  casings answer two different questions, and the Typography page states the
+  split.
 - **Stage.** The story, framed with padding by default. A surface that genuinely
   is full width (a screen, the editor) sets `fullBleed: true`. The active theme
   is named under the story so a screenshot is unambiguous.
@@ -64,9 +74,51 @@ Every story is addressable by URL: the fragment is the story id
     marker attribute. The UI says it is a forced state, because a screenshot of
     one must never be read as real.
 
-There is also a theme switcher for the three built-in palettes (light, dark,
-amoled), applied as `data-theme` on the document element, the same mechanism the
-clients use.
+## The review bar, and the URL contract
+
+Above the stage, a second bar carries the controls that change how the stage is
+drawn rather than what the story is: **direction** (LTR, RTL, or both side by
+side from one fixture), a **viewport preset** (Fit, Mobile 390, Mobile 360,
+Tablet 768, Desktop 1280, Wide 1440), **Measure**, **Outline**, **Fullscreen**,
+**Reduced motion**, **Forced colors**, and the **theme**. Every one of them is
+written into the URL, so a link reproduces the whole view (myne-md/myne#847).
+
+- **The axes apply at view time and have no per-story opt-out.** Reduced motion
+  and forced colors do not invent a policy: they **mirror** the matching media
+  rules onto a marker attribute, so the axis shows a behaviour the app already
+  has. A forced axis that mirrors zero rules warns rather than rendering as
+  "nothing changed". The axis set is three, not five: compact density is a width
+  to boolean function (`settingsCompact` over a `ResizeObserver`), so the
+  viewport preset is what exercises it, and text scale is `editor_text_size`, the
+  editor's own base size rather than a global mechanism.
+- **`Fit` honours a story's own `viewport`**, and any other preset overrides it.
+  A story pins a width only when it is narrow by nature.
+- **Outline** draws containers and leaves in two colours. One colour is correct
+  for a component-sized story and a wall of lines for the whole screens this
+  catalogue mounts.
+- **Measure** pins an element's box and the gaps to its neighbours. While it is
+  on, the stage is inert, so a click can only measure and never fires the
+  component's own handler. A measurement is not written to the URL: it is
+  transient state, and a shared link to a measurement is a link to nothing.
+- **Fullscreen** is a layout mode, not the Fullscreen API. The accessibility spec
+  queries the story in the same document and the drift baseline hashes its DOM,
+  so the story has to stay where it is. Escape leaves and a floating control
+  returns, because a fullscreen with no visible way out is a trap.
+
+### The theme
+
+The theme dropdown offers the three built-in palettes (light, dark, amoled),
+applied as `data-theme` on the document element, the same mechanism the clients
+use, and the theme is part of the URL contract like every other view control.
+
+A **shipped** theme (the ten in `myne-themes`) is deliberately not offered yet.
+It needs a **committed snapshot** plus a guard that compares the snapshot to the
+companion's index when the companion is present and reports what it could not
+check when it is absent, because a build-time read of a companion repository
+would make the catalogue's contents a function of which machine built it, which
+breaks the property the URL contract exists to provide. That task was scoped and
+then deferred (`myne-agents/features/design-system-coverage/tasks.md` task 11),
+so the mechanism the two would share is not written down here until it exists.
 
 ## Foundations
 
@@ -161,12 +213,16 @@ connect-src 'none';
 |---|---|---|
 | `scripts/check-story-coverage.mjs` | a component or screen landing with no story | pre-commit + `pnpm-build` |
 | `scripts/check-story-catalogue.mjs` | a story landing with no description or tags, or a story rendering a known placeholder phrase | pre-commit + `pnpm-build` |
+| `scripts/check-story-tree.mjs` | a fabricated rail edge: a `parent` naming nothing, a cycle, or an edge with no import behind it in either direction | pre-commit + `pnpm-build` |
+| `scripts/check-token-consumers.mjs` | a `--duration-*`, `--ease-*` or `--text-*` token the sheet declares that nothing outside the sheet reads. Those three families are the ones a catalogue can only *display*, so an unused one looks authoritative and changes no pixel | pre-commit + `pnpm-build` |
 | `scripts/check-foundations-coverage.mjs` | a token landing with no specimen group. One direction only: it reads the sheet, not the catalogue, so a group deleted from `stories/src/foundations.tsx` is not caught and the guard's header says so | pre-commit + `pnpm-build` |
 | `scripts/check-stories-isolation.mjs` | the catalogue entering an app bundle (an app build config or a Tauri bundle manifest referencing `stories/`) | pre-commit + `pnpm-build` |
 | `scripts/check-stories-bundle.mjs` | an unrecorded origin, a BIP-39 word list (so no phrase can be shown or typed) or an account-number-shaped string in the served bundle | `stories-build` (CI) |
 | `tests/stories/smoke.test.tsx` | a story that will not mount | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/a11yLevels.test.tsx` | a story whose `a11y: "error"` level has an axe violation; also that axe actually ran on every story it did not skip | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/shellSearch.test.tsx` | the shell's search and filter: that typing opens the suggestion panel, that it does NOT narrow the rail, that the filter is a labelled control, and that Escape closes the panel. The shell is not a story, so nothing else reached it | `pnpm stories:test` (CI `vitest`) |
+| `tests/stories/axes.test.ts` | the URL contract: that every view key round-trips through parse and serialise, and that an unknown key is ignored rather than fatal | `pnpm stories:test` (CI `vitest`) |
+| `tests/stories/type.test.ts`, `tests/stories/motion.test.ts` | the two things a page can only draw and a reader must take on trust: the `.t-*` role pairing read out of the component sheet, and the easing curve arithmetic (including the y-axis flip a hand-drawn curve gets wrong) | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/drift.test.tsx` | an unintended rendering change (WARNING only) | `pnpm stories:test` (CI `vitest`) |
 
 `stories/` is a guarded shared root in `scripts/lib/shared-roots.mjs`, so the
