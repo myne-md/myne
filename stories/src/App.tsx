@@ -12,7 +12,7 @@
 // to show would be the one place the rules stop applying.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Input } from "@app/components/primitives/Input";
 import { Button } from "@app/components/primitives/Button";
 import { MyneMark } from "@app/components/primitives/MyneMark";
@@ -20,7 +20,8 @@ import { Select } from "@app/components/primitives/Select";
 import { Icon } from "@app/components/primitives/Icon";
 import { IconButton } from "@app/components/primitives/IconButton";
 import type { IconName } from "@app/lib/icons";
-import { storiesBySurface, storyById, STORIES } from "./registry";
+import { flattenTree, storyById, storyTree, STORIES, GROUP_ORDER } from "./registry";
+import type { TreeNode } from "./registry";
 import { resolveFixture } from "../fixtures";
 import { setStoryFixture } from "./host/internals";
 import { StoryErrorBoundary } from "./ErrorBoundary";
@@ -66,21 +67,6 @@ const TABS: readonly { id: Tab; label: string }[] = [
 /** The built-in palettes the switcher offers (myne-md/myne#845). */
 const THEMES = ["light", "dark", "amoled"] as const;
 
-/**
- * The rail's section order, in one place.
- *
- * Shared by the rail and the filter's option list, because two hand-kept copies
- * of "which groups exist, in what order" is exactly how a filter ends up
- * offering a group the rail does not render.
- */
-const GROUP_ORDER: readonly StoryGroup[] = [
-  "documentation",
-  "foundations",
-  "primitives",
-  "components",
-  "screens",
-  "settings",
-];
 type Theme = (typeof THEMES)[number];
 
 /** The pseudo-states the Interactions tab can force. */
@@ -306,6 +292,91 @@ function issueUrl(story: StoryDescriptor | undefined, theme: Theme): string {
     "catalogue-context": context,
   });
   return `https://github.com/myne-md/myne/issues/new?${params.toString()}`;
+}
+
+/**
+ * One rail row, and its subtree (myne-md/myne#847).
+ *
+ * A surface with exactly one story and no subcomponents renders as a SINGLE
+ * row, the surface's own. That is Storybook's hoisting, and it is here for a
+ * measured reason rather than a taste one: 195 surfaces against 224 stories
+ * means a pure "parent node plus leaves" tree is 419 rows where the rail has
+ * 195 today, so a state leaf has to replace its parent's row rather than sit
+ * under it. A surface with several states keeps a non-clickable parent row and
+ * one leaf per state, which is what makes the states findable by browsing.
+ */
+function TreeRow({
+  node,
+  depth,
+  selectedId,
+  onSelect,
+}: {
+  node: TreeNode;
+  depth: number;
+  selectedId: string | undefined;
+  onSelect: (id: string) => void;
+}): ReactNode {
+  const indent = `calc(var(--space-3) * ${depth})`;
+  const sole = node.stories.length === 1 && node.children.length === 0;
+
+  if (sole) {
+    const story = node.stories[0];
+    return (
+      <Button
+        type="button"
+        variant={story.id === selectedId ? "primary" : "ghost"}
+        style={{
+          width: "100%",
+          justifyContent: "flex-start",
+          gap: "var(--space-2)",
+          paddingInlineStart: `calc(var(--space-2) + ${indent})`,
+        }}
+        onClick={() => onSelect(story.id)}
+        data-testid={`stories.item.${node.surface}`}
+      >
+        <Icon name={entryIcon(node.group)} size={14} />
+        {node.name}
+      </Button>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        style={{ ...GROUP_TITLE_STYLE, paddingInlineStart: `calc(var(--space-2) + ${indent})` }}
+        data-testid={`stories.surface.${node.surface}`}
+      >
+        <Icon name={entryIcon(node.group)} size={12} />
+        {node.name}
+      </div>
+      {node.stories.map((story) => (
+        <Button
+          key={story.id}
+          type="button"
+          variant={story.id === selectedId ? "primary" : "ghost"}
+          style={{
+            width: "100%",
+            justifyContent: "flex-start",
+            gap: "var(--space-2)",
+            paddingInlineStart: `calc(var(--space-5) + ${indent})`,
+          }}
+          onClick={() => onSelect(story.id)}
+          data-testid={`stories.item.${node.surface}.${story.state}`}
+        >
+          {story.state}
+        </Button>
+      ))}
+      {node.children.map((child) => (
+        <TreeRow
+          key={child.surface}
+          node={child}
+          depth={depth + 1}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -722,14 +793,14 @@ export function App() {
     setForced(null);
   };
 
-  // The rail: surfaces in registry order, narrowed by the FILTER and never by
-  // the search. Search proposes destinations; the filter changes what the tree
-  // shows. Conflating the two is why a query used to replace the whole rail with
-  // a flat list and lose the reader's place in the hierarchy.
-  const surfaces = useMemo(() => {
-    const all = storiesBySurface();
-    if (groupFilter === "all") return all;
-    return all.filter((group) => group.group === groupFilter);
+  // The rail: a TREE, narrowed by the filter and never by the search. Search
+  // proposes destinations; the filter changes what the tree shows. Conflating
+  // the two is why a query used to replace the whole rail with a flat list and
+  // lose the reader's place in the hierarchy (myne-md/myne#847).
+  const tree = useMemo(() => {
+    const full = storyTree();
+    if (groupFilter === "all") return full;
+    return { ...full, groups: full.groups.filter((entry) => entry.group === groupFilter) };
   }, [groupFilter]);
 
   // Ranked proposals for the search panel. Capped, because a panel that scrolls
@@ -771,16 +842,10 @@ export function App() {
     }
   };
 
-  // One rail row per surface: the states switch in the inspector, not here, so a
-  // crowded list of `x · default`, `x · disabled`, `x · error` never appears and
-  // the arrow keys step through surfaces rather than through every state.
-  const railIds = useMemo(
-    () =>
-      surfaces
-        .map((group) => group.stories[0]?.id)
-        .filter((id): id is string => id !== undefined),
-    [surfaces],
-  );
+  // Every story is a row now, so the arrow keys walk stories rather than
+  // surfaces. The order comes from the tree builder, so the keyboard and the eye
+  // cannot disagree about what "next" means.
+  const railIds = useMemo(() => flattenTree(tree), [tree]);
 
   // Arrow keys move through the rail (the user asked for keyboard navigation).
   const onRailKeyDown = (event: React.KeyboardEvent) => {
@@ -936,39 +1001,23 @@ export function App() {
           data-testid="stories.rail"
           onKeyDown={onRailKeyDown}
         >
-          {GROUP_ORDER.map(
-            (groupName) => {
-              const inGroup = surfaces.filter((group) => group.group === groupName);
-              if (inGroup.length === 0) return null;
-              return (
-                <div key={groupName}>
-                  <div style={GROUP_TITLE_STYLE}>
-                    <Icon name={entryIcon(inGroup[0].group)} size={12} />
-                    {groupName}
-                  </div>
-                  {inGroup.map((group) => (
-                    <Button
-                      key={group.surface}
-                      type="button"
-                      variant={
-                        group.stories.some((s) => s.id === selected?.id) ? "primary" : "ghost"
-                      }
-                      style={{
-                        width: "100%",
-                        justifyContent: "flex-start",
-                        gap: "var(--space-2)",
-                      }}
-                      onClick={() => select(group.stories[0].id)}
-                      data-testid={`stories.item.${group.surface}`}
-                    >
-                      <Icon name={entryIcon(group.group)} size={14} />
-                      {group.name}
-                    </Button>
-                  ))}
-                </div>
-              );
-            },
-          )}
+          {tree.groups.map((entry) => (
+            <div key={entry.group}>
+              <div style={GROUP_TITLE_STYLE}>
+                <Icon name={entryIcon(entry.group)} size={12} />
+                {entry.group}
+              </div>
+              {entry.nodes.map((node) => (
+                <TreeRow
+                  key={node.surface}
+                  node={node}
+                  depth={0}
+                  selectedId={selected?.id}
+                  onSelect={select}
+                />
+              ))}
+            </div>
+          ))}
         </nav>
 
         {/* The stage and the inspector share one column, so the inspector sits
