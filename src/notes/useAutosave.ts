@@ -364,6 +364,9 @@ export function useAutosave(
       // reports an unsettled save and vim `:w` reports a failure for a write
       // that had nothing to do.
       saveFailedRef.current = false;
+      // The suppression is scoped to the note that left the live tree; this
+      // pane now holds a different note, whose unmount flush must run again.
+      suppressUnmountFlushRef.current = false;
       setStatus({ status: "clean" });
     } else {
       noteIdRef.current = noteId;
