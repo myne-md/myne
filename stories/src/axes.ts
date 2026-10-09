@@ -17,9 +17,36 @@
 // The measure overlay is NOT here on purpose: it is transient state, and a
 // shared link to a measurement is a link to nothing.
 
-/** The axes a reviewer can turn on. */
-export const AXES = ["rtl"] as const;
+/**
+ * The axes a reviewer can turn on.
+ *
+ * `compact density` and `text scale` are deliberately ABSENT, and the reasons are
+ * different. Compact density is not a flag in this app: `settingsCompact` is a
+ * width to boolean function over a `ResizeObserver`, so what exercises it is a
+ * narrow VIEWPORT rather than an axis (myne-md/myne#847, task 7). Text scale is
+ * not a global mechanism either: `editor_text_size` is the editor's own base
+ * size, which a story's fixture can set, and forcing it on every story would be
+ * a claim the app does not make.
+ */
+export const AXES = ["rtl", "reduced-motion", "forced-colors"] as const;
 export type Axis = (typeof AXES)[number];
+
+/**
+ * The media query each mirrored axis stands for, and the marker attribute the
+ * mirrored rules are scoped to.
+ *
+ * The marker lives on the STAGE, so the catalogue's own chrome keeps rendering
+ * as it normally does: a reviewer reads the rail and the story at once, and
+ * forcing the axis on the chrome too would make the chrome the thing under
+ * review.
+ */
+export const MIRRORED_AXES: Readonly<Record<string, { condition: string; marker: string }>> = {
+  "reduced-motion": {
+    condition: "prefers-reduced-motion: reduce",
+    marker: "data-axis-reduced-motion",
+  },
+  "forced-colors": { condition: "forced-colors: active", marker: "data-axis-forced-colors" },
+};
 
 /** The built-in palettes, which are also part of the view. */
 export const VIEW_THEMES = ["light", "dark", "amoled"] as const;
@@ -31,12 +58,22 @@ export interface View {
   storyId: string | undefined;
   /** Whether the stage renders right to left. */
   rtl: boolean;
+  /** Whether the reduced-motion rules are mirrored onto the stage. */
+  reducedMotion: boolean;
+  /** Whether the forced-colors rules are mirrored onto the stage. */
+  forcedColors: boolean;
   /** The active palette. */
   theme: ViewTheme;
 }
 
 /** The default view: no story named, no axis on, the light palette. */
-export const DEFAULT_VIEW: View = { storyId: undefined, rtl: false, theme: "light" };
+export const DEFAULT_VIEW: View = {
+  storyId: undefined,
+  rtl: false,
+  reducedMotion: false,
+  forcedColors: false,
+  theme: "light",
+};
 
 /**
  * Parse a URL fragment into a view.
@@ -54,6 +91,8 @@ export function parseView(fragment: string): View {
   return {
     storyId: id === undefined || id.length === 0 ? undefined : id,
     rtl: params.get("rtl") === "1",
+    reducedMotion: params.get("reduced-motion") === "1",
+    forcedColors: params.get("forced-colors") === "1",
     theme: (VIEW_THEMES as readonly string[]).includes(theme ?? "")
       ? (theme as ViewTheme)
       : DEFAULT_VIEW.theme,
@@ -71,6 +110,8 @@ export function parseView(fragment: string): View {
 export function serialiseView(view: View): string {
   const params = new URLSearchParams();
   if (view.rtl) params.set("rtl", "1");
+  if (view.reducedMotion) params.set("reduced-motion", "1");
+  if (view.forcedColors) params.set("forced-colors", "1");
   if (view.theme !== DEFAULT_VIEW.theme) params.set("theme", view.theme);
   const query = params.toString();
   return query.length === 0 ? (view.storyId ?? "") : `${view.storyId ?? ""}?${query}`;

@@ -115,6 +115,23 @@ describe("the catalogue shell's search proposes rather than filters", () => {
     expect(el.querySelector('[data-testid="stories.rail"]')?.getAttribute("dir")).toBeNull();
   });
 
+  it("round-trips the two mirrored axes onto the stage", async () => {
+    const el = await mountShell();
+    for (const axis of ["reduced-motion", "forced-colors"]) {
+      const button = el.querySelector(`[data-testid="stories.axis.${axis}"]`);
+      expect(button, `${axis} must have a control`).not.toBeNull();
+      await act(async () => {
+        fireEvent.click(button as HTMLElement);
+      });
+      expect(window.location.hash, `${axis} must reach the URL`).toContain(`${axis}=1`);
+      const stage = el.querySelector('[data-testid="stories.stage"]');
+      // The marker is what the mirrored rules are scoped to, so it is the
+      // observable half: whether jsdom carries the sheets is a separate question
+      // and the marker is what a real browser needs.
+      expect(stage?.getAttribute(`data-axis-${axis}`)).toBe("true");
+    }
+  });
+
   it("files an issue whose URL carries the story and the form", async () => {
     const el = await mountShell();
     const button = el.querySelector('[data-testid="stories.file-issue"]');

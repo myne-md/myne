@@ -20,8 +20,24 @@ describe("the view contract", () => {
   });
 
   it("round-trips the axes and the theme", () => {
-    const view = { storyId: "components/button/variants", rtl: true, theme: "amoled" as const };
+    const view = {
+      ...DEFAULT_VIEW,
+      storyId: "components/button/variants",
+      rtl: true,
+      reducedMotion: true,
+      forcedColors: true,
+      theme: "amoled" as const,
+    };
     expect(parseView(`#${serialiseView(view)}`)).toEqual(view);
+  });
+
+  it("round-trips the two mirrored axes on their own", () => {
+    // Each is carried by its own key, so a link can turn on exactly one of them
+    // rather than all-or-nothing.
+    const onlyReduced = { ...DEFAULT_VIEW, reducedMotion: true };
+    expect(parseView(`#${serialiseView(onlyReduced)}`)).toEqual(onlyReduced);
+    const onlyForced = { ...DEFAULT_VIEW, forcedColors: true };
+    expect(parseView(`#${serialiseView(onlyForced)}`)).toEqual(onlyForced);
   });
 
   it("omits the defaults, so a default view serialises to the bare id", () => {
