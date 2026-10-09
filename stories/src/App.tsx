@@ -881,14 +881,14 @@ export function App() {
         </div>
 
         <div
-          style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+          style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.filter"
         >
-          <Icon name="layout-grid" size={15} />
           <Select
             value={groupFilter}
             onChange={(next) => setGroupFilter(next)}
             aria-label="Filter the rail by group"
+            icon="layout-grid"
             options={[
               { value: "all", label: "All groups" },
               ...GROUP_ORDER.map((group) => ({
@@ -899,14 +899,14 @@ export function App() {
           />
         </div>
         <div
-          style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+          style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.theme-switcher"
         >
-          <Icon name="sun" size={15} />
           <Select
             value={theme}
             onChange={(next) => setTheme(next)}
             aria-label="Theme"
+            icon="sun"
             options={THEMES.map((candidate) => ({
               value: candidate,
               label: candidate[0].toUpperCase() + candidate.slice(1),
