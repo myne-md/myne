@@ -110,6 +110,24 @@ const VERSION_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+/**
+ * A cluster of toolbar controls (myne-md/myne#847 task 16).
+ *
+ * Nine controls in one row is unreadable, and the reference implementation
+ * groups them. Two groups: the REVIEW controls, which change how the stage is
+ * drawn, and the CATALOGUE controls, which change what the catalogue shows you.
+ * The distinction is the one the search/filter change already drew.
+ */
+const TOOLBAR_GROUP_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "var(--space-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--bg-1)",
+};
+
 const SEARCH_WRAP_STYLE: CSSProperties = {
   flex: "1 1 auto",
   maxWidth: "520px",
@@ -1196,6 +1214,7 @@ export function App() {
 
         {/* The toolbar. RTL is the first axis and proves the mechanism: the
             control, the URL key, and the stage application (myne-md/myne#847). */}
+        <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.review">
         <Select
           value={rtl}
           onChange={(next) => setRtl(next)}
@@ -1223,6 +1242,9 @@ export function App() {
           Measure
         </Button>
 
+        </div>
+
+        <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.overlay">
         <Button
           variant={outline ? "primary" : "secondary"}
           icon="layout-grid"
@@ -1279,6 +1301,8 @@ export function App() {
           Forced colors
         </Button>
 
+        </div>
+
         <div
           style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.filter"
@@ -1297,6 +1321,7 @@ export function App() {
             ]}
           />
         </div>
+        <div style={TOOLBAR_GROUP_STYLE} data-testid="stories.toolbar.chrome">
         <div
           style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.theme-switcher"
@@ -1325,6 +1350,7 @@ export function App() {
         >
           File issue
         </Button>
+        </div>
       </header>
       )}
 
