@@ -31,6 +31,7 @@ import { clearActions, useActionLog } from "./actions";
 import { failingContrast, focusOrder, roleNames, targetSizeFindings } from "./a11y";
 import { a11yLevelOf } from "./a11y-level";
 import { documentationFor, documentationTitle } from "./documentation";
+import { dirFor, parseView, serialiseView } from "./axes";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
 import { forceState, clearForcedState } from "./interactions";
@@ -444,21 +445,31 @@ function activate(story: StoryDescriptor | undefined): void {
   clearActions();
 }
 
-function readHashId(): string | undefined {
-  return window.location.hash.replace(/^#/, "") || undefined;
-}
+// `readHashId` was replaced by `parseView` (myne-md/myne#847): a bare story id
+// is now one case of a view, and keeping a second reader is how the two drift.
 
 /** Renders one story, framed and isolated. */
 function StoryStage({
   story,
   theme,
+  rtl,
 }: {
   story: StoryDescriptor;
   theme: Theme;
+  rtl: boolean;
 }) {
   const fullBleed = story.fullBleed === true;
   return (
-    <div style={STAGE_STYLE} data-testid="stories.stage" data-story-id={story.id}>
+    <div
+      style={STAGE_STYLE}
+      data-testid="stories.stage"
+      data-story-id={story.id}
+      // The axis is applied HERE rather than to the document, so the catalogue's
+      // own chrome stays LTR while the story mirrors. A reviewer reads the rail
+      // and the story at once, and mirroring both would make the chrome the
+      // thing under review (myne-md/myne#847).
+      dir={dirFor({ storyId: story.id, rtl, theme })}
+    >
       <div style={STORY_ID_STYLE} data-testid="stories.story-id">
         {story.id}
         <SourceReference story={story} />
@@ -777,10 +788,12 @@ function InteractionsTab({
 
 export function App() {
   const [selectedId, setSelectedId] = useState<string | undefined>(() => {
-    const story = storyById(readHashId());
+    const story = storyById(parseView(window.location.hash).storyId);
     activate(story);
     return story?.id;
   });
+  // The view state a link carries, parsed once above and kept in step below.
+  const [rtl, setRtl] = useState<boolean>(() => parseView(window.location.hash).rtl);
   const [query, setQuery] = useState("");
   // The suggestion panel under the search input. Search no longer filters the
   // rail (it answered a different question than "where am I in the tree"): it
@@ -790,22 +803,35 @@ export function App() {
   // The rail's own narrowing control, which is what search used to do.
   const [groupFilter, setGroupFilter] = useState<StoryGroup | "all">("all");
   const [tab, setTab] = useState<Tab>("controls");
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(() => parseView(window.location.hash).theme);
   const [forced, setForced] = useState<ForcedState | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
 
   // Hash is the URL contract: a story link is copy-pasteable and restores on
-  // reload.
+  // reload, and it now carries the VIEW as well as the story, so one link
+  // reproduces what a reviewer saw rather than only which component they were
+  // looking at (myne-md/myne#847).
   useEffect(() => {
     const onHash = () => {
-      const story = storyById(readHashId());
+      const view = parseView(window.location.hash);
+      const story = storyById(view.storyId);
       activate(story);
       setSelectedId(story?.id);
+      setRtl(view.rtl);
+      setTheme(view.theme);
       setForced(null);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  // The single writer. Defaults are omitted by `serialiseView`, so a link to a
+  // story in the light palette with no axis on stays as short as it was before
+  // this change and every existing link keeps resolving.
+  useEffect(() => {
+    const next = serialiseView({ storyId: selectedId, rtl, theme });
+    if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
+  }, [selectedId, rtl, theme]);
 
   // Theme is applied to the document element, the same mechanism the clients use.
   useEffect(() => {
@@ -840,7 +866,6 @@ export function App() {
 
   const select = (id: string) => {
     activate(storyById(id));
-    window.location.hash = id;
     setSelectedId(id);
     setForced(null);
   };
@@ -997,6 +1022,19 @@ export function App() {
           )}
         </div>
 
+        {/* The toolbar. RTL is the first axis and proves the mechanism: the
+            control, the URL key, and the stage application (myne-md/myne#847). */}
+        <Button
+          variant={rtl ? "primary" : "secondary"}
+          icon="arrow-left"
+          aria-pressed={rtl}
+          title="Render the stage right to left"
+          onClick={() => setRtl((on) => !on)}
+          data-testid="stories.axis.rtl"
+        >
+          RTL
+        </Button>
+
         <div
           style={{ display: "flex", alignItems: "center" }}
           data-testid="stories.filter"
@@ -1077,7 +1115,9 @@ export function App() {
         <div
           style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minWidth: 0 }}
         >
-          {selected ? <StoryStage key={selected.id} story={selected} theme={theme} /> : null}
+          {selected ? (
+            <StoryStage key={selected.id} story={selected} theme={theme} rtl={rtl} />
+          ) : null}
 
           <section
             style={panelOpen ? INSPECTOR_STYLE : INSPECTOR_COLLAPSED_STYLE}
