@@ -31,7 +31,16 @@ import { clearActions, useActionLog } from "./actions";
 import { failingContrast, focusOrder, roleNames, targetSizeFindings } from "./a11y";
 import { a11yLevelOf } from "./a11y-level";
 import { documentationFor, documentationTitle } from "./documentation";
-import { dirFor, MIRRORED_AXES, parseView, serialiseView } from "./axes";
+import {
+  dirFor,
+  MIRRORED_AXES,
+  parseView,
+  serialiseView,
+  stageWidth,
+  VIEWPORTS,
+  viewportLabel,
+  type Viewport,
+} from "./axes";
 import { clearMirroredMedia, mirrorMedia } from "./mediaMirror";
 import { axeAvailable, runAxe, type AxeReport } from "./axe";
 import type { A11yLevel } from "./types";
@@ -454,12 +463,14 @@ function StoryStage({
   story,
   theme,
   rtl,
+  viewport,
   reducedMotion,
   forcedColors,
 }: {
   story: StoryDescriptor;
   theme: Theme;
-  rtl: boolean;
+  rtl: "off" | "on" | "both";
+  viewport: Viewport;
   reducedMotion: boolean;
   forcedColors: boolean;
 }) {
@@ -473,7 +484,7 @@ function StoryStage({
       // own chrome stays LTR while the story mirrors. A reviewer reads the rail
       // and the story at once, and mirroring both would make the chrome the
       // thing under review (myne-md/myne#847).
-      dir={dirFor({ storyId: story.id, rtl, reducedMotion, forcedColors, theme })}
+      dir={dirFor({ storyId: story.id, rtl, viewport, reducedMotion, forcedColors, theme })}
       data-axis-reduced-motion={reducedMotion ? "true" : undefined}
       data-axis-forced-colors={forcedColors ? "true" : undefined}
     >
@@ -483,14 +494,31 @@ function StoryStage({
       </div>
       <div
         style={{
-          width: story.viewport ?? "100%",
+          width: stageWidth(viewport, story.viewport),
           padding: fullBleed ? undefined : "var(--space-6)",
         }}
         data-testid="stories.story"
         data-fullbleed={fullBleed ? "true" : undefined}
       >
         <StoryErrorBoundary id={story.id}>
-          {story.unreachable ? (
+          {rtl === "both" ? (
+            // Two independent mounts, so the two directions cannot share state.
+            // A mirroring mistake shows up as a DIFFERENCE between the two
+            // columns rather than as something a reviewer has to hold in mind.
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(0px, 1fr))",
+                gap: "var(--space-3)",
+              }}
+              data-testid="stories.compare"
+            >
+              <div data-testid="stories.compare.ltr">{story.render()}</div>
+              <div dir="rtl" data-testid="stories.compare.rtl">
+                {story.render()}
+              </div>
+            </div>
+          ) : story.unreachable ? (
             <div data-testid="stories.unreachable" style={{ maxWidth: "var(--content-max-w)" }}>
               <p style={{ color: "var(--fg-1)", marginBlockEnd: "var(--space-2)" }}>
                 This state is not reachable from the catalogue.
@@ -800,7 +828,12 @@ export function App() {
     return story?.id;
   });
   // The view state a link carries, parsed once above and kept in step below.
-  const [rtl, setRtl] = useState<boolean>(() => parseView(window.location.hash).rtl);
+  const [rtl, setRtl] = useState<"off" | "on" | "both">(
+    () => parseView(window.location.hash).rtl,
+  );
+  const [viewport, setViewport] = useState<Viewport>(
+    () => parseView(window.location.hash).viewport,
+  );
   const [reducedMotion, setReducedMotion] = useState<boolean>(
     () => parseView(window.location.hash).reducedMotion,
   );
@@ -831,6 +864,7 @@ export function App() {
       activate(story);
       setSelectedId(story?.id);
       setRtl(view.rtl);
+      setViewport(view.viewport);
       setReducedMotion(view.reducedMotion);
       setForcedColors(view.forcedColors);
       setTheme(view.theme);
@@ -844,9 +878,16 @@ export function App() {
   // story in the light palette with no axis on stays as short as it was before
   // this change and every existing link keeps resolving.
   useEffect(() => {
-    const next = serialiseView({ storyId: selectedId, rtl, reducedMotion, forcedColors, theme });
+    const next = serialiseView({
+      storyId: selectedId,
+      rtl,
+      viewport,
+      reducedMotion,
+      forcedColors,
+      theme,
+    });
     if (window.location.hash.replace(/^#/, "") !== next) window.location.hash = next;
-  }, [selectedId, rtl, reducedMotion, forcedColors, theme]);
+  }, [selectedId, rtl, viewport, reducedMotion, forcedColors, theme]);
 
   // The two media-query axes are MIRRORED rather than set: a stylesheet cannot be
   // told that `prefers-reduced-motion` is on. The mirrored rules are scoped to a
@@ -1062,16 +1103,30 @@ export function App() {
 
         {/* The toolbar. RTL is the first axis and proves the mechanism: the
             control, the URL key, and the stage application (myne-md/myne#847). */}
-        <Button
-          variant={rtl ? "primary" : "secondary"}
+        <Select
+          value={rtl}
+          onChange={(next) => setRtl(next)}
+          aria-label="Text direction"
           icon="arrow-left"
-          aria-pressed={rtl}
-          title="Render the stage right to left"
-          onClick={() => setRtl((on) => !on)}
-          data-testid="stories.axis.rtl"
-        >
-          RTL
-        </Button>
+          testId="stories.axis.rtl"
+          options={[
+            { value: "off", label: "LTR" },
+            { value: "on", label: "RTL" },
+            { value: "both", label: "Both" },
+          ]}
+        />
+
+        <Select
+          value={viewport}
+          onChange={(next) => setViewport(next)}
+          aria-label="Viewport preset"
+          icon="columns-2"
+          testId="stories.axis.viewport"
+          options={VIEWPORTS.map((preset) => ({
+            value: preset,
+            label: viewportLabel(preset),
+          }))}
+        />
 
         <Button
           variant={reducedMotion ? "primary" : "secondary"}
@@ -1181,6 +1236,7 @@ export function App() {
               story={selected}
               theme={theme}
               rtl={rtl}
+              viewport={viewport}
               reducedMotion={reducedMotion}
               forcedColors={forcedColors}
             />

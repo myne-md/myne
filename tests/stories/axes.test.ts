@@ -9,13 +9,19 @@
 // serialises back to that same short form, so no existing link changes shape.
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_VIEW, dirFor, parseView, serialiseView } from "../../stories/src/axes";
+import {
+  DEFAULT_VIEW,
+  dirFor,
+  parseView,
+  serialiseView,
+  stageWidth,
+} from "../../stories/src/axes";
 
 describe("the view contract", () => {
   it("reads a bare story id, which is every link written before this change", () => {
     const view = parseView("#components/button/variants");
     expect(view.storyId).toBe("components/button/variants");
-    expect(view.rtl).toBe(false);
+    expect(view.rtl).toBe("off");
     expect(view.theme).toBe("light");
   });
 
@@ -23,7 +29,8 @@ describe("the view contract", () => {
     const view = {
       ...DEFAULT_VIEW,
       storyId: "components/button/variants",
-      rtl: true,
+      rtl: "both" as const,
+      viewport: "tablet-768" as const,
       reducedMotion: true,
       forcedColors: true,
       theme: "amoled" as const,
@@ -51,7 +58,7 @@ describe("the view contract", () => {
     // it names: a fatal parse would turn a stale link into a blank page.
     const view = parseView("#components/button/variants?density=compact&nonsense=1");
     expect(view.storyId).toBe("components/button/variants");
-    expect(view.rtl).toBe(false);
+    expect(view.rtl).toBe("off");
   });
 
   it("falls back to the default palette for an unknown theme", () => {
@@ -59,7 +66,29 @@ describe("the view contract", () => {
   });
 
   it("applies `dir` to the stage only when the axis is on", () => {
-    expect(dirFor({ ...DEFAULT_VIEW, rtl: true })).toBe("rtl");
+    expect(dirFor({ ...DEFAULT_VIEW, rtl: "on" })).toBe("rtl");
+    expect(dirFor({ ...DEFAULT_VIEW, rtl: "both" })).toBe("rtl");
     expect(dirFor(DEFAULT_VIEW)).toBeUndefined();
+  });
+});
+
+describe("the viewport presets", () => {
+  it("honours a story's own width under `Fit`", () => {
+    expect(stageWidth("fit", 360)).toBe("360px");
+  });
+
+  it("fills the stage under `Fit` when the story pins nothing", () => {
+    expect(stageWidth("fit", undefined)).toBe("100%");
+  });
+
+  it("overrides a story's own width under any other preset", () => {
+    // The story keeps the one fact only it can carry, and a preset is a
+    // deliberate override rather than a silent one.
+    expect(stageWidth("desktop-1280", 360)).toBe("1280px");
+  });
+
+  it("round-trips the preset through the URL", () => {
+    const view = { ...DEFAULT_VIEW, viewport: "wide-1440" as const };
+    expect(parseView(`#${serialiseView(view)}`)).toEqual(view);
   });
 });

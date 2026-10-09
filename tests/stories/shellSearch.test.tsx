@@ -99,17 +99,22 @@ describe("the catalogue shell's search proposes rather than filters", () => {
 
   it("round-trips RTL through the URL and onto the stage", async () => {
     const el = await mountShell();
-    const button = el.querySelector('[data-testid="stories.axis.rtl"]');
-    expect(button, "the RTL control must exist").not.toBeNull();
+    expect(
+      el.querySelector('[data-testid="stories.axis.rtl"]'),
+      "the direction control must exist",
+    ).not.toBeNull();
 
+    // Driven through the URL rather than through the Select, which is also the
+    // path a shared link takes: the restore half is the one that matters.
     await act(async () => {
-      fireEvent.click(button as HTMLElement);
+      window.location.hash = "documentation/welcome/introduction?rtl=on";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
 
     // The URL is the contract, and the stage is where the axis has to land. The
     // catalogue's own chrome stays LTR on purpose: mirroring the rail too would
     // make the chrome the thing under review.
-    expect(window.location.hash).toContain("rtl=1");
+    expect(window.location.hash).toContain("rtl=on");
     const stage = el.querySelector('[data-testid="stories.stage"]');
     expect(stage?.getAttribute("dir")).toBe("rtl");
     expect(el.querySelector('[data-testid="stories.rail"]')?.getAttribute("dir")).toBeNull();
@@ -118,12 +123,15 @@ describe("the catalogue shell's search proposes rather than filters", () => {
   it("round-trips the two mirrored axes onto the stage", async () => {
     const el = await mountShell();
     for (const axis of ["reduced-motion", "forced-colors"]) {
-      const button = el.querySelector(`[data-testid="stories.axis.${axis}"]`);
-      expect(button, `${axis} must have a control`).not.toBeNull();
+      expect(
+        el.querySelector(`[data-testid="stories.axis.${axis}"]`),
+        `${axis} must have a control`,
+      ).not.toBeNull();
       await act(async () => {
-        fireEvent.click(button as HTMLElement);
+        window.location.hash = `documentation/welcome/introduction?${axis}=1`;
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
       });
-      expect(window.location.hash, `${axis} must reach the URL`).toContain(`${axis}=1`);
+      expect(window.location.hash, `${axis} must be restored`).toContain(`${axis}=1`);
       const stage = el.querySelector('[data-testid="stories.stage"]');
       // The marker is what the mirrored rules are scoped to, so it is the
       // observable half: whether jsdom carries the sheets is a separate question

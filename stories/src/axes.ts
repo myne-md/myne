@@ -56,8 +56,14 @@ export type ViewTheme = (typeof VIEW_THEMES)[number];
 export interface View {
   /** The story the fragment names, or `undefined` for the first story. */
   storyId: string | undefined;
-  /** Whether the stage renders right to left. */
-  rtl: boolean;
+  /**
+   * The direction mode. `both` renders the story twice, once per direction, so a
+   * mirroring mistake is visible as a difference rather than as something a
+   * reviewer has to hold in their head (myne-md/myne#847 task 6).
+   */
+  rtl: "off" | "on" | "both";
+  /** The width preset. `fit` honours the story's own `viewport`. */
+  viewport: Viewport;
   /** Whether the reduced-motion rules are mirrored onto the stage. */
   reducedMotion: boolean;
   /** Whether the forced-colors rules are mirrored onto the stage. */
@@ -69,7 +75,8 @@ export interface View {
 /** The default view: no story named, no axis on, the light palette. */
 export const DEFAULT_VIEW: View = {
   storyId: undefined,
-  rtl: false,
+  rtl: "off",
+  viewport: "fit",
   reducedMotion: false,
   forcedColors: false,
   theme: "light",
@@ -90,7 +97,10 @@ export function parseView(fragment: string): View {
   const theme = params.get("theme");
   return {
     storyId: id === undefined || id.length === 0 ? undefined : id,
-    rtl: params.get("rtl") === "1",
+    rtl: params.get("rtl") === "both" ? "both" : params.get("rtl") === "on" ? "on" : "off",
+    viewport: (VIEWPORTS as readonly string[]).includes(params.get("viewport") ?? "")
+      ? (params.get("viewport") as Viewport)
+      : "fit",
     reducedMotion: params.get("reduced-motion") === "1",
     forcedColors: params.get("forced-colors") === "1",
     theme: (VIEW_THEMES as readonly string[]).includes(theme ?? "")
@@ -109,7 +119,8 @@ export function parseView(fragment: string): View {
  */
 export function serialiseView(view: View): string {
   const params = new URLSearchParams();
-  if (view.rtl) params.set("rtl", "1");
+  if (view.rtl !== "off") params.set("rtl", view.rtl);
+  if (view.viewport !== "fit") params.set("viewport", view.viewport);
   if (view.reducedMotion) params.set("reduced-motion", "1");
   if (view.forcedColors) params.set("forced-colors", "1");
   if (view.theme !== DEFAULT_VIEW.theme) params.set("theme", view.theme);
@@ -123,5 +134,42 @@ export function serialiseView(view: View): string {
  * Returned rather than applied, so the decision is testable without a DOM.
  */
 export function dirFor(view: View): "rtl" | undefined {
-  return view.rtl ? "rtl" : undefined;
+  return view.rtl === "off" ? undefined : "rtl";
+}
+
+// Task 7: viewport presets.
+//
+// A preset OVERRIDES a story's own `viewport`, and `Fit` honours it. The story
+// keeps the one piece of information only it can carry (a surface that is narrow
+// by nature) and any other width becomes a deliberate override
+// (myne-md/myne#847 task 7).
+
+/** The named widths, in the order the toolbar lists them. */
+export const VIEWPORTS = ["fit", "mobile-390", "mobile-360", "tablet-768", "desktop-1280", "wide-1440"] as const;
+export type Viewport = (typeof VIEWPORTS)[number];
+
+const VIEWPORT_PX: Readonly<Record<Exclude<Viewport, "fit">, number>> = {
+  "mobile-390": 390,
+  "mobile-360": 360,
+  "tablet-768": 768,
+  "desktop-1280": 1280,
+  "wide-1440": 1440,
+};
+
+/** The label the toolbar shows for a preset. */
+export function viewportLabel(viewport: Viewport): string {
+  if (viewport === "fit") return "Fit";
+  return `${viewport.replace("-", " ")} px`;
+}
+
+/**
+ * The width the stage should apply, as a CSS value.
+ *
+ * Pure, so the resolution between a preset and a story's own pin is asserted
+ * directly rather than through a rendered stage. `Fit` is the default and is what
+ * makes the story's `viewport` field mean something.
+ */
+export function stageWidth(viewport: Viewport, storyViewport: number | undefined): string {
+  if (viewport !== "fit") return `${VIEWPORT_PX[viewport]}px`;
+  return storyViewport === undefined ? "100%" : `${storyViewport}px`;
 }
