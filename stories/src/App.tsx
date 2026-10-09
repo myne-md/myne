@@ -253,7 +253,7 @@ function StoryStage({
       >
         <StoryErrorBoundary id={story.id}>
           {story.unreachable ? (
-            <div data-testid="stories.unreachable" style={{ maxWidth: "var(--space-9)" }}>
+            <div data-testid="stories.unreachable" style={{ maxWidth: "var(--content-max-w)" }}>
               <p style={{ color: "var(--fg-1)", marginBlockEnd: "var(--space-2)" }}>
                 This state is not reachable from the catalogue.
               </p>
