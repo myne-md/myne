@@ -471,6 +471,13 @@ pre-commit:
       # for the same reason as the coverage guard above.
       run: node scripts/check-story-catalogue.mjs
 
+    story-tree:
+      # myne-md/myne#847: the rail's `parent` edges are hand-written, so a guard holds
+      # them to the tree. It checks that the parent exists, that the edges do not
+      # cycle, and that the two modules are connected by an import in EITHER
+      # direction, which is the half that catches a fabricated composition claim.
+      run: node scripts/check-story-tree.mjs
+
     foundations-coverage:
       # myne-md/myne#845: every token in the sheet and every icon in the registry
       # has a specimen in the Foundations group. Unfiltered: a token lands in a
