@@ -175,7 +175,13 @@ export function DecorationPopover({
     <div
       ref={ref}
       style={{ ...POPOVER_STYLE, left: position.left, top: position.top }}
-      role="menu"
+      // `role="group"`, not `role="menu"`. The popover is a labelled set of
+      // toggle buttons (`aria-pressed` swatches), and it implements no menu
+      // keyboard semantics: no arrow navigation, no roving focus, only Escape.
+      // `role="menu"` therefore announced a menu whose children were not
+      // `menuitem*`, which axe reports as `aria-required-children` and which a
+      // screen reader hears as an empty menu (myne-md/myne#845).
+      role="group"
       aria-label={t("notes.decoration.menuLabel")}
       data-testid="notes.decoration-popover"
     >
