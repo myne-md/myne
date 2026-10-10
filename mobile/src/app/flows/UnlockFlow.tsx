@@ -17,6 +17,15 @@ import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
 import { soleVaultId } from "../../lib/vault-list";
 import {
+  memberUnlockStatus,
+  memberVaultStatus,
+  personUnlockMemberVault,
+  personUnlockMemberVaultWithBiometric,
+  personUnlockMemberVaultWithPassword,
+  personUnlockMemberVaultWithPin,
+  type MemberUnlockMethod,
+} from "../../lib/personAccount";
+import {
   quickUnlockStatus,
   quickUnlockWithPin,
   quickUnlockWithBiometric,
@@ -306,6 +315,9 @@ function messageForUnlockError(e: unknown, t: TFunction): string {
  * fail-closed surface for `Corrupted` / `IoError`. The typed password is held
  * in component-local state + a ref and wiped on every exit path / unmount.
  */
+/** Which member credential the surface is offering (`"phrase"` when none). */
+type MemberUnlockMode = MemberUnlockMethod | "phrase";
+
 export function UnlockFlow(props: UnlockFlowProps) {
   const { initialStatus, vaultId, suspicionReason, fromPicker, onBackToPicker } = props;
   const { t } = useTranslation();
@@ -342,6 +354,83 @@ export function UnlockFlow(props: UnlockFlowProps) {
   const [bioFailed, setBioFailed] = useState(false);
   const [bioSubmitting, setBioSubmitting] = useState(false);
   const bioAutoTried = useRef(false);
+
+  // B2B member vault: a member has NO vault password, so the boot surface offers
+  // the person recovery phrase plus any device-local fast credential
+  // (`vault.member-unlock`, decisions/protocol/0653). Detected once per mount.
+  const [member, setMember] = useState(false);
+  const [memberMethod, setMemberMethod] = useState<MemberUnlockMethod | null>(null);
+  const [memberMode, setMemberMode] = useState<MemberUnlockMode>("phrase");
+  const [memberPhrase, setMemberPhrase] = useState("");
+  const [memberPassword, setMemberPasswordInput] = useState("");
+  const [memberPin, setMemberPinInput] = useState("");
+  const [memberBusy, setMemberBusy] = useState(false);
+  const [memberError, setMemberError] = useState(false);
+
+  useEffect(() => {
+    if (!HAS_TAURI || initialStatus.kind !== "Exists" || !vaultId) return;
+    let cancelled = false;
+    void memberVaultStatus(vaultId)
+      .then((isMember) => {
+        if (cancelled || isMember !== true) return;
+        setMember(true);
+        void memberUnlockStatus(vaultId)
+          .then((m) => {
+            if (cancelled) return;
+            setMemberMethod(m ?? null);
+            setMemberMode(m ?? "phrase");
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId, initialStatus.kind]);
+
+  const canMemberSubmit =
+    memberMode === "phrase"
+      ? memberPhrase.trim().split(/\s+/).filter(Boolean).length >= 12
+      : memberMode === "pin"
+        ? memberPin.length >= 6
+        : memberMode === "biometric"
+          ? true
+          : memberPassword.length > 0;
+
+  const handleMemberUnlock = useCallback(async () => {
+    if (memberBusy || !vaultId) return;
+    setMemberError(false);
+    setShowSuspicion(false);
+    setMemberBusy(true);
+    try {
+      if (!HAS_TAURI) {
+        await new Promise((r) => setTimeout(r, 350));
+      } else if (memberMode === "phrase") {
+        await personUnlockMemberVault(vaultId, memberPhrase);
+      } else if (memberMode === "password") {
+        await personUnlockMemberVaultWithPassword(vaultId, memberPassword);
+      } else if (memberMode === "pin") {
+        await personUnlockMemberVaultWithPin(vaultId, memberPin);
+      } else {
+        await personUnlockMemberVaultWithBiometric(vaultId);
+      }
+      setMemberPhrase("");
+      setMemberPasswordInput("");
+      setMemberPinInput("");
+      props.onUnlocked();
+    } catch {
+      setMemberError(true);
+      setMemberBusy(false);
+    }
+  }, [
+    memberBusy,
+    memberMode,
+    memberPhrase,
+    memberPassword,
+    memberPin,
+    vaultId,
+    props,
+  ]);
 
   useEffect(() => {
     if (!HAS_TAURI || initialStatus.kind !== "Exists") return;
@@ -602,7 +691,94 @@ export function UnlockFlow(props: UnlockFlowProps) {
         </div>
       )}
 
-      {bioMode && qu?.available ? (
+      {member ? (
+        <>
+          <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
+            <FieldLabel>
+              {memberMode === "phrase"
+                ? t("unlock.memberPhraseLabel")
+                : memberMode === "pin"
+                  ? t("unlock.memberPinLabel")
+                  : t("unlock.memberPasswordLabel")}
+            </FieldLabel>
+            {memberMode === "phrase" ? (
+              <textarea
+                value={memberPhrase}
+                onChange={(e) => {
+                  setMemberError(false);
+                  setMemberPhrase(e.target.value);
+                }}
+                rows={3}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label={t("unlock.memberPhraseLabel")}
+                data-testid="unlock-member-phrase"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  border: `${memberError ? 1.5 : 1}px solid ${memberError ? "var(--danger)" : "var(--line-2)"}`,
+                  borderRadius: "var(--radius-2)",
+                  background: "var(--bg-1)",
+                  padding: "var(--space-3) var(--space-4)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg-1)",
+                  resize: "none",
+                }}
+              />
+            ) : memberMode === "biometric" ? (
+              <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
+                {t("unlock.memberBiometricHint")}
+              </div>
+            ) : (
+              <PasswordInput
+                value={memberMode === "pin" ? memberPin : memberPassword}
+                onChange={memberMode === "pin" ? setMemberPinInput : setMemberPasswordInput}
+                onSubmit={handleMemberUnlock}
+                error={memberError}
+                numeric={memberMode === "pin"}
+                ariaLabel={
+                  memberMode === "pin" ? t("unlock.memberPinLabel") : t("unlock.memberPasswordLabel")
+                }
+                testId="unlock-member-input"
+              />
+            )}
+            {memberError && (
+              <div data-testid="unlock-member-error" style={{ marginTop: "var(--space-2)" }}>
+                <Banner kind="danger">
+                  {memberMode === "phrase"
+                    ? t("unlock.memberError")
+                    : t("unlock.memberPasswordError")}
+                </Banner>
+              </div>
+            )}
+          </div>
+          <Button
+            style={{ marginTop: "var(--space-4)" }}
+            disabled={memberBusy || !canMemberSubmit}
+            onClick={() => void handleMemberUnlock()}
+            data-testid="unlock-member-submit"
+          >
+            {memberMode === "biometric"
+              ? t("unlock.memberBiometricSubmit")
+              : t("unlock.memberSubmit")}
+          </Button>
+          {memberMethod != null && (
+            <TextButton
+              height={40}
+              style={{ marginTop: "var(--space-1)" }}
+              onClick={() => {
+                setMemberError(false);
+                setMemberMode((m) => (m === "phrase" ? memberMethod : "phrase"));
+              }}
+              testId="unlock-member-toggle"
+            >
+              {memberMode === "phrase" ? t("unlock.memberUseFast") : t("unlock.memberUsePhrase")}
+            </TextButton>
+          )}
+        </>
+      ) : bioMode && qu?.available ? (
         <>
           <div
             style={{

@@ -868,6 +868,13 @@ mod tests {
             // than by an exclusion anyone maintains: the allowlist is closed,
             // so a new family is rejected until someone adds it deliberately.
             ("vault.label", None),
+            // The B2B device-local member credential stores: OUT by the same
+            // closed-allowlist property. `vault.member-key` seals the member's
+            // vault keys under the phrase; `vault.member-unlock` seals them (and
+            // the person keypair) under a member-chosen password. Neither is
+            // vault content, and a backup must not carry either.
+            ("vault.member-key", None),
+            ("vault.member-unlock", None),
             ("attachments-text/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", None),
             ("notes/whatever.txt", None),
             ("notes/0190a000-0000-7000-8000-000000000001.myn.tmp", None),
