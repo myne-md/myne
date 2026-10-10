@@ -34,7 +34,11 @@ export const FAMILIES = Object.freeze({
   text: /^--text-/,
 });
 
-/** Every declared token name in the sheet, once. */
+/**
+ * Every declared token name in the sheet, once.
+ * @param {string} css
+ * @returns {Set<string>}
+ */
 export function declaredTokens(css) {
   const out = new Set();
   const re = /(--[A-Za-z0-9-]+)\s*:/g;
@@ -43,7 +47,11 @@ export function declaredTokens(css) {
   return out;
 }
 
-/** Token names in the guarded families. */
+/**
+ * Token names in the guarded families.
+ * @param {string} css
+ * @returns {Set<string>}
+ */
 export function familyTokens(css) {
   const out = new Set();
   for (const name of declaredTokens(css)) {
@@ -62,6 +70,9 @@ export function familyTokens(css) {
  *
  * The sheet itself is excluded, because a declaration is not a use: a token whose
  * only mention is its own definition is exactly the token this guard exists for.
+ * @param {Iterable<string>} files
+ * @param {(path: string) => string} [read]
+ * @returns {Set<string>}
  */
 export function consumedTokens(files, read = (p) => readFileSync(p, "utf8")) {
   const out = new Set();
@@ -96,12 +107,21 @@ export const THEME_ONLY = Object.freeze({
  * Pure and exported, so the spec drives BOTH arms rather than only the good
  * path: the guard's own central decision was the one thing no test exercised
  * (myne-md/myne#847 review).
+ * @param {Iterable<string>} families
+ * @param {Set<string>} used
+ * @param {Record<string, string>} [themeOnly]
+ * @returns {string[]}
  */
 export function unusedTokens(families, used, themeOnly = THEME_ONLY) {
   return [...families].filter((name) => !used.has(name) && !(name in themeOnly)).sort();
 }
 
-/** The recorded exemptions whose token HAS a consumer: the record went stale. */
+/**
+ * The recorded exemptions whose token HAS a consumer: the record went stale.
+ * @param {Set<string>} used
+ * @param {Record<string, string>} [themeOnly]
+ * @returns {string[]}
+ */
 export function staleExemptions(used, themeOnly = THEME_ONLY) {
   return Object.keys(themeOnly).filter((name) => used.has(name));
 }
