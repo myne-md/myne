@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  dropDuplicateTopLevelKeys,
   patchFirstH1Line,
   patchSourceRanges,
   patchFolderField,
@@ -613,5 +614,59 @@ describe("multi-line YAML values (myne#324)", () => {
   it("does not eat a blank line that ends the value", () => {
     const out = title("---\ntitle: Old\n\nfolder: keep\n---\n\nb\n");
     expect(out).toContain("folder: keep");
+  });
+});
+
+// ── Duplicate managed keys ──────────────────────────────────────────────────
+//
+// js-yaml rejects a block with a top-level key twice WHOLESALE ("duplicated
+// mapping key"). `parseFrontmatterSlice` therefore returned `{}`, the sidebar
+// read no title/folder/`updated:` at all, and the note showed "Untitled" and
+// unfiled forever — because the managed writers replace only the FIRST
+// occurrence, so a rename rewrote the title and the duplicate survived, and the
+// Properties widget has no delete for a scalar row. The write half now collapses
+// later duplicates; the read half drops them before js-yaml sees the block.
+describe("duplicate managed keys (Untitled-and-unfiled rescue)", () => {
+  it("patchUpdatedField collapses a duplicated `updated:` to the FIRST value", () => {
+    const out = dec.decode(
+      patchUpdatedField(
+        enc.encode(
+          "---\ntitle: T\nfolder: w\n" +
+            "updated: 2020-01-01T00:00:00Z\nupdated: 2019-01-01T00:00:00Z\n---\n\nb\n",
+        ),
+        TEST_ISO,
+      ),
+    );
+    expect(out).toBe("---\ntitle: T\nfolder: w\nupdated: " + TEST_ISO + "\n---\n\nb\n");
+    expect(out.match(/^updated:/gm)).toHaveLength(1);
+  });
+
+  it("patchTitleField collapses a duplicated `title:` to the patched value", () => {
+    const out = dec.decode(
+      patchTitleField(
+        enc.encode("---\ntitle: Old\ntitle: Older\nfolder: w\n---\n\nb\n"),
+        "New",
+      ),
+    );
+    expect(out).toBe("---\ntitle: New\nfolder: w\n---\n\nb\n");
+  });
+
+  it("dropDuplicateTopLevelKeys keeps the first occurrence, drops the rest", () => {
+    const out = dropDuplicateTopLevelKeys(
+      "title: First\ntitle: Second\nfolder: w\nupdated: A\nupdated: B\n",
+    );
+    expect(out).toBe("title: First\nfolder: w\nupdated: A\n");
+  });
+
+  it("dropDuplicateTopLevelKeys takes a duplicate's continuation lines with it", () => {
+    const out = dropDuplicateTopLevelKeys(
+      "tags:\n  - a\n  - b\ntags:\n  - c\nfolder: w\n",
+    );
+    expect(out).toBe("tags:\n  - a\n  - b\nfolder: w\n");
+  });
+
+  it("dropDuplicateTopLevelKeys leaves a duplicate-free block byte-identical", () => {
+    const src = "title: T\nfolder: w\nupdated: 2020-01-01T00:00:00Z\n";
+    expect(dropDuplicateTopLevelKeys(src)).toBe(src);
   });
 });

@@ -243,6 +243,53 @@ function logicalValueEnd(lines: readonly string[], i: number, valueIsEmpty: bool
   return j;
 }
 
+/** A top-level (column-zero) frontmatter key — the shape `logicalValueEnd`
+ *  treats as owning a following logical value. */
+const TOP_LEVEL_KEY_RE = /^([A-Za-z0-9_-]+)[ \t]*:/;
+
+/**
+ * Return `fmBody` with every LATER duplicate of a top-level key dropped,
+ * keeping the FIRST occurrence.
+ *
+ * Used to rescue a frontmatter block that js-yaml rejects WHOLESALE as
+ * `duplicated mapping key`. The cost of not doing this is the whole record:
+ * `parseFrontmatterSlice` (the sidebar's js-yaml reader) swallows the throw and
+ * returns `{}`, so the note loses title, folder and `updated:` together —
+ * rendering as "Untitled", filed at the root, with no in-app way to repair it,
+ * because the managed-field writers replace only the FIRST occurrence and the
+ * Properties widget offers no delete for a scalar row.
+ *
+ * The FIRST occurrence wins, matching the value-strict readers
+ * (`readTitleFromFmBody` / `fm_raw_value`), so the rescued title is the same
+ * one those readers would return. Each dropped key takes its continuation lines
+ * with it, so a duplicate sequence/block value cannot leak into the survivor.
+ */
+export function dropDuplicateTopLevelKeys(fmBody: string): string {
+  const lines = fmBody.split(NEWLINE);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; ) {
+    const line = lines[i] ?? "";
+    const m = TOP_LEVEL_KEY_RE.exec(line);
+    if (m === null) {
+      out.push(line);
+      i++;
+      continue;
+    }
+    const key = m[1] ?? "";
+    const valueIsEmpty = line.slice(m[0].length).trim() === "";
+    const end = logicalValueEnd(lines, i, valueIsEmpty);
+    if (seen.has(key)) {
+      i = end;
+      continue;
+    }
+    seen.add(key);
+    for (let k = i; k < end; k++) out.push(lines[k] ?? "");
+    i = end;
+  }
+  return out.join(NEWLINE);
+}
+
 function applyStateCImpl(
   source: string,
   bodyStart: number,
@@ -270,6 +317,23 @@ function applyStateCImpl(
       // the YAML needs.
       lines[i] = /[ \t]$/.test(prefix) ? prefix + rendered : prefix + " " + rendered;
       lines.splice(i + 1, valueEnd - (i + 1));
+      // Collapse every LATER duplicate of this managed key. A frontmatter block
+      // carrying a key twice is rejected WHOLESALE by js-yaml ("duplicated
+      // mapping key"), which nulls the note's whole record in the sidebar
+      // (title + folder + updated together → "Untitled" and unfiled). Managed
+      // fields are singletons Myne writes, so a later occurrence is always
+      // stale. Only the first occurrence is replaced below, so without this the
+      // duplicate survived every rewrite and no in-app action could repair it.
+      // Read-side rescue: `dropDuplicateTopLevelKeys`.
+      for (let k = i + 1; k < lines.length; ) {
+        const dm = keyRe.exec(lines[k] ?? "");
+        if (dm === null) {
+          k++;
+          continue;
+        }
+        const dend = logicalValueEnd(lines, k, (dm[2] ?? "").trim() === "");
+        lines.splice(k, dend - k);
+      }
       return lines.join(NEWLINE);
     };
 
