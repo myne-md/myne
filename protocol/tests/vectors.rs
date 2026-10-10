@@ -273,6 +273,13 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/person-member-key-store/v0.2/cases.json"),
         ),
         (
+            "person-member-unlock-store",
+            "v0.2",
+            include_str!(
+                "../../myne-test-vectors/vectors/person-member-unlock-store/v0.2/cases.json"
+            ),
+        ),
+        (
             "person-vault-carrier",
             "v0.2",
             include_str!("../../myne-test-vectors/vectors/person-vault-carrier/v0.2/cases.json"),
@@ -2825,6 +2832,132 @@ fn person_member_key_store_vectors() {
             "person-member-key-store must cover the '{required}' case kind"
         );
     }
+}
+
+/// `person-member-unlock-store` v0.2: the B2B member vault-unlock password KEK
+/// derivation and the device-local `vault.member-unlock` AAD
+/// (`decisions/protocol/0653`).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn person_member_unlock_store_vectors() {
+    use protocol::{
+        aad_person_member_unlock_store, derive_person_vault_member_unlock_key,
+        DEFAULT_V0_1_KDF_PARAMS,
+    };
+
+    let Some(raw) = cases_json_v0_2("person-member-unlock-store") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-member-unlock-store/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-member-unlock-store");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    for case in cases {
+        let kind = case["case_kind"]
+            .as_str()
+            .expect("case_kind must be a string");
+        seen_kinds.insert(kind.to_string());
+        match kind {
+            "member-unlock-derivation" => {
+                let password = case["input_password"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{kind}] missing input_password"));
+                let salt: [u8; 16] = hex_decode_array(
+                    case["input_salt_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_salt_hex")),
+                );
+                let acct: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{kind}] missing input_account_number_hash_hex")
+                        }),
+                );
+                let expected: [u8; 32] = hex_decode_array(
+                    case["expected_member_unlock_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{kind}] missing expected_member_unlock_key_hex")
+                        }),
+                );
+                let actual = derive_person_vault_member_unlock_key(
+                    password,
+                    &salt,
+                    &acct,
+                    &DEFAULT_V0_1_KDF_PARAMS,
+                )
+                .expect("derive member unlock key");
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[member-unlock-derivation] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&*actual),
+                );
+            }
+            "member-unlock-store-aad" => {
+                let vault: [u8; 16] = hex_decode_array(
+                    case["input_vault_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing input_vault_id_hex")),
+                );
+                let acct: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{kind}] missing input_account_number_hash_hex")
+                        }),
+                );
+                let expected: [u8; 71] = hex_decode_array(
+                    case["expected_aad_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{kind}] missing expected_aad_hex")),
+                );
+                let actual = aad_person_member_unlock_store(&vault, &acct);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[member-unlock-store-aad] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            other => panic!("[{other}] unknown case_kind for person-member-unlock-store"),
+        }
+    }
+    for required in ["member-unlock-derivation", "member-unlock-store-aad"] {
+        assert!(
+            seen_kinds.contains(required),
+            "person-member-unlock-store must cover the '{required}' case kind"
+        );
+    }
+}
+
+/// Regenerate the `person-member-unlock-store/v0.2` cases (companion repo).
+/// `cargo test -p protocol --test vectors emit_person_member_unlock -- --ignored --nocapture`
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[ignore]
+fn emit_person_member_unlock_store_vectors_for_paste() {
+    use protocol::{
+        aad_person_member_unlock_store, derive_person_vault_member_unlock_key,
+        DEFAULT_V0_1_KDF_PARAMS,
+    };
+    let password = "correct horse battery staple";
+    let salt: [u8; 16] = [0xab; 16];
+    let acct: [u8; 16] = [0x7c; 16];
+    let vault: [u8; 16] = [0x11; 16];
+    let key =
+        derive_person_vault_member_unlock_key(password, &salt, &acct, &DEFAULT_V0_1_KDF_PARAMS)
+            .expect("derive");
+    let aad = aad_person_member_unlock_store(&vault, &acct);
+    println!("MEMBER_UNLOCK_KEY_HEX {}", hex_encode(&*key));
+    println!("MEMBER_UNLOCK_AAD_HEX {}", hex_encode(&aad));
 }
 
 /// `person-vault-carrier` v0.2: the device-local vault-bound person-identity

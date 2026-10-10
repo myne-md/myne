@@ -5503,6 +5503,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/settings/PrivacyPanel.tsx",
       "src/components/settings/QuickUnlockSettings.tsx",
+      "src/components/settings/MemberPasswordSettings.tsx",
       "src/components/settings/CliAccessSettings.tsx",
       "src/platform/capabilities.ts",
       "mobile/src/app/flows/SettingsSheet.tsx",
@@ -5986,7 +5987,7 @@ export const ROSTER = Object.freeze([
     ],
      manual: [
        {
-         see: "On two real devices signed into one person account, create a disposable vault as the owner, copy the owner's public identity code, and send an invite to the second device. On the second device, confirm the invite appears, inspect the owner's fingerprint out of band, enter the member phrase, and accept. Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
+         see: "On two real devices signed into one person account, create a disposable vault as the owner, copy the owner's public identity code, and send an invite to the second device. On the second device, confirm the invite appears, inspect the owner's fingerprint out of band, enter the member phrase, and accept. Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Then, while the member vault is unlocked, open Settings, Privacy, Shared vault unlock, and in turn set a password, a PIN, and (on macOS/iOS) the device biometric; after each, lock the member vault, reopen it, and confirm it unlocks with that credential (not the phrase), that the wrong credential is refused, that the PIN's five-attempt wipe works, and that sync still runs. Use the on-screen toggle to switch to the recovery phrase and confirm it still opens the same vault, and use Remove to clear the credential and confirm the phrase is then the only fast path. On the phone, confirm the same vault opens from the phrase and from the configured fast credential through the mobile unlock view. Finally, lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
          whyNotAutomated: "The Linux E2E lane covers the local invite form, identity-home code, and a deliberately failed invitation fetch, but it does not provision two live person accounts or drive the member vault's real acceptance and re-unlock path. The pass condition is a cross-session identity handoff over a real relay and a real second device.",
          clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
          estimateMin: 10,

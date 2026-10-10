@@ -36,6 +36,14 @@ permissions = [
     "allow-sync-person-accept-invite",
     "allow-sync-person-unlock-member-vault",
     "allow-sync-member-vault-status",
+    "allow-sync-person-set-member-password",
+    "allow-sync-person-unlock-member-vault-with-password",
+    "allow-sync-person-set-member-pin",
+    "allow-sync-person-set-member-biometric",
+    "allow-sync-person-unlock-member-vault-with-pin",
+    "allow-sync-person-unlock-member-vault-with-biometric",
+    "allow-sync-member-unlock-status",
+    "allow-sync-person-clear-member-unlock",
     "allow-sync-person-profile-write",
     "allow-sync-person-profile-read",
     "allow-sync-list-roster",
@@ -172,9 +180,44 @@ description = "Allow invoking sync:sync_person_unlock_member_vault (B2B: re-unlo
 commands.allow = ["sync_person_unlock_member_vault"]
 
 [[permission]]
-identifier = "allow-sync-member-vault-status"
-description = "Allow invoking sync:sync_member_vault_status (read-only: whether a vault is a member vault, so the Unlock surface asks for the phrase instead of a password)."
-commands.allow = ["sync_member_vault_status"]
+identifier = "allow-sync-person-set-member-password"
+description = "Allow invoking sync:sync_person_set_member_password (B2B: while an unlocked member vault holds the person session, seal its group + items keys and person keypair into the device-local vault.member-unlock store under a member-chosen password, so the member vault re-unlocks without the recovery phrase). Password crosses IPC once; no key material does."
+commands.allow = ["sync_person_set_member_password"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock-member-vault-with-password"
+description = "Allow invoking sync:sync_person_unlock_member_vault_with_password (B2B: re-unlock a member vault from its device-local password by opening vault.member-unlock and installing the member slot plus the person session)."
+commands.allow = ["sync_person_unlock_member_vault_with_password"]
+
+[[permission]]
+identifier = "allow-sync-person-set-member-pin"
+description = "Allow invoking sync:sync_person_set_member_pin (B2B: seal the same member vault credential under a PIN via the quick-unlock PIN provider). PIN crosses IPC once; no key material does."
+commands.allow = ["sync_person_set_member_pin"]
+
+[[permission]]
+identifier = "allow-sync-person-set-member-biometric"
+description = "Allow invoking sync:sync_person_set_member_biometric (B2B: seal the member vault credential under an Apple-Keychain biometric credential; HardwareUnavailable off Apple targets)."
+commands.allow = ["sync_person_set_member_biometric"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock-member-vault-with-pin"
+description = "Allow invoking sync:sync_person_unlock_member_vault_with_pin (B2B: re-unlock a member vault from its device-local PIN; a wrong PIN burns an attempt and the fifth wipes the credential)."
+commands.allow = ["sync_person_unlock_member_vault_with_pin"]
+
+[[permission]]
+identifier = "allow-sync-person-unlock-member-vault-with-biometric"
+description = "Allow invoking sync:sync_person_unlock_member_vault_with_biometric (B2B: re-unlock a member vault from its device-local biometric credential; HardwareUnavailable off Apple targets)."
+commands.allow = ["sync_person_unlock_member_vault_with_biometric"]
+
+[[permission]]
+identifier = "allow-sync-member-unlock-status"
+description = "Allow invoking sync:sync_member_unlock_status (read-only: the member vault's configured fast-unlock method, password / pin / biometric / null, so the Unlock surface offers the right credential)."
+commands.allow = ["sync_member_unlock_status"]
+
+[[permission]]
+identifier = "allow-sync-person-clear-member-unlock"
+description = "Allow invoking sync:sync_person_clear_member_unlock (B2B: remove the device-local member fast-unlock credential for the active vault)."
+commands.allow = ["sync_person_clear_member_unlock"]
 
 [[permission]]
 identifier = "allow-sync-person-profile-write"

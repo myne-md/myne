@@ -1549,6 +1549,37 @@ impl VaultRuntimeState {
         })
     }
 
+    /// Read-lock peek that returns CLONES of `(group_key, items_key,
+    /// items_key_id)` from a **member-held** [`Slot::Unlocked`], or `None` for an
+    /// owner session or an empty slot. The two `Zeroizing<[u8; 32]>` clones wipe
+    /// on drop; `items_key_id` is non-secret (the singleton UUIDv7).
+    ///
+    /// Used by the member vault-password setup, which seals exactly this material
+    /// (plus the person keypair) under a member-chosen password. The
+    /// `root_key.is_none()` guard is what makes it member-only: an owner session
+    /// answers `None`, so a member credential can never be written over an owner
+    /// vault.
+    pub async fn peek_unlocked_member_keys_clone(
+        &self,
+    ) -> Option<(
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+        [u8; 16],
+    )> {
+        let slots = self.slots.read().await;
+        slots.values().find_map(|slot| match slot {
+            Slot::Unlocked(uv) => match (&uv.group_key, uv.root_key.is_none()) {
+                (Some(group), true) => Some((
+                    Zeroizing::new(**group),
+                    uv.items_key.clone(),
+                    uv.items_key_id,
+                )),
+                _ => None,
+            },
+            _ => None,
+        })
+    }
+
     /// Writer-quiescence guard for `vault_export_backup` (SYNC-6, MYND-32):
     /// holding the slots WRITE lock means every `hold_unlocked_*`-bound
     /// writer has drained and none can start — the export's phase-one copy

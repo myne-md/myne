@@ -94,6 +94,8 @@ pub mod poke_listener;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod member_key_store;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod member_unlock_store;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod person_vault_carrier;
 // The person account, membership and invite plane: host-only, like the
 // `rustls_transport` it drives. Gated off wasm32 (the web client is

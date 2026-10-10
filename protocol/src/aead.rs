@@ -1178,6 +1178,30 @@ pub fn aad_person_member_key_store(vault_id: &[u8; 16], account_number_hash: &[u
     aad
 }
 
+/// AAD for the device-local member vault-unlock credential store
+/// (`vault.member-unlock`): the member's group and items keys plus their person
+/// keypair sealed at rest under a member-chosen password, so a member vault
+/// re-unlocks without the 24-word recovery phrase. A distinct device-local role
+/// from `person-member-key-store` (the phrase store). Binds the vault id the
+/// reader expected AND the vault's account-number hash, so a store copied to
+/// another vault name or re-labelled to another account does not open. v0.2
+/// prefix, matching the person plane.
+pub fn aad_person_member_unlock_store(
+    vault_id: &[u8; 16],
+    account_number_hash: &[u8; 16],
+) -> Vec<u8> {
+    const ROLE_STR_PERSON_MEMBER_UNLOCK_STORE: &[u8] = b"person-member-unlock-store";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_PERSON_MEMBER_UNLOCK_STORE.len() + 32,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_MEMBER_UNLOCK_STORE);
+    aad.extend_from_slice(vault_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// AAD for the device-local, vault-bound person-identity carrier
 /// (the device-local carrier file `<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`): the person keypair sealed at rest
 /// under the owner `root_key`, so an `NTV6` owner-vault unlock installs the

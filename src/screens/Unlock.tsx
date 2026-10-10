@@ -531,10 +531,12 @@ export function Unlock({
     [vaultId, vaults, t],
   );
 
-  // A B2B member vault has no password: it is opened from the member's recovery
-  // phrase (myne-md/myne#711 task 25). Probed once; when true the password form
-  // is replaced by a phrase form. A failed probe leaves `false` (the pre-B2B
-  // password path).
+  // A B2B member vault has no password of its own: it is opened from the member's
+  // recovery phrase (myne-md/myne#711 task 25), or from a device-local password
+  // the member set (`vault.member-unlock`, decisions/protocol/0653). Probed once;
+  // when true the password form is replaced by the member card, which offers the
+  // password or the phrase. A failed probe leaves `false` (the pre-B2B password
+  // path).
   const [memberVault, setMemberVault] = useState(false);
   useEffect(() => {
     let cancelled = false;

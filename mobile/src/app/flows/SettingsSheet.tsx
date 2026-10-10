@@ -14,7 +14,7 @@ import {
   SyncMembersPanel,
 } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
-import { HideVaultNamesBlock, RecoveryDrillBlock } from "../../components";
+import { HideVaultNamesBlock, MemberUnlockBlock, RecoveryDrillBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
 import { MemorySection } from "./MemorySection";
 import { applyTheme } from "../../formfactor/theme";
@@ -2488,6 +2488,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 identifier to manage. The desktop twin sits in the same place for
                 the same reason. */}
             <RecoveryDrillBlock />
+            {/* Shared-vault fast unlock (myne-md/myne#711). Self-gates on the
+                active vault being a B2B member vault, so it renders nothing on
+                an owner vault. */}
+            <MemberUnlockBlock />
             <SegmentBlock
               label={t("settings.privacy.autoLockAfter")}
               options={[60, 300, 900, 1800, 3600]}

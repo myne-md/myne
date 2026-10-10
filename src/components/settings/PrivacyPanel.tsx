@@ -38,6 +38,7 @@ import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
+import { MemberPasswordSettings } from "./MemberPasswordSettings";
 import { RecoveryDrillRow } from "./RecoveryDrillRow";
 import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
@@ -508,6 +509,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         }}
       />
       <QuickUnlockSettings />
+      <MemberPasswordSettings />
       {/* The recovery drill (myne-md/myne#468). In Privacy rather than Account
           because what it protects is the ability to get back IN, which is the
           same family as the auto-lock and quick-unlock rows it sits beside, and

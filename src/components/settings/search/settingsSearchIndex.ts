@@ -194,6 +194,18 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.quickUnlock.setupHelper",
     keywordsKey: "settings.search.keywords.quickUnlock",
   },
+  // Shared vault password (myne-md/myne#711). Carries `memberSharing`: the row is
+  // rendered only while a B2B member vault is active, so an ungated entry would
+  // navigate to an anchor that was never rendered.
+  {
+    id: "privacy.member-password",
+    capability: "memberSharing",
+    panelId: "privacy",
+    testid: "settings.member-password",
+    titleKey: "settings.memberPassword.title",
+    descriptionKey: "settings.memberPassword.helperNotConfigured",
+    keywordsKey: "settings.search.keywords.memberPassword",
+  },
   // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
   // omitted where the capability is absent, so an ungated entry would navigate
   // to an anchor that was never rendered. All three ALSO carry

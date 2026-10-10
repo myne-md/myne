@@ -127,6 +127,14 @@ const SETTINGS_PLATFORM_CALL_SITES: ReadonlyArray<{ file: string; why: string }>
       "chord GLYPH rendering (Cmd/Opt/Shift/Ctrl against Ctrl/Alt/Shift). " +
       "Chooses how a binding is drawn, never whether its row exists.",
   },
+  {
+    file: "src/components/settings/MemberPasswordSettings.tsx",
+    why:
+      "the Touch ID BUTTON inside the shared-vault unlock row (decisions/protocol/0653). " +
+      "macOS is the only desktop OS with a biometric provider; Linux and Windows " +
+      "answer HardwareUnavailable. The row itself renders everywhere (it self-gates " +
+      "on memberVaultStatus, not on the OS).",
+  },
 ];
 
 function settingsSources(): string[] {
