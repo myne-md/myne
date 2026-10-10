@@ -147,6 +147,10 @@ const V = {
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
   ],
+  "src/components/settings/MemberPasswordSettings.tsx": [
+    "adapted",
+    "The shared-vault unlock row (password / PIN / biometric). It self-gates on `memberVaultStatus`, which is `Unsupported` on web (the dispatcher answers `Unsupported` for the whole B2B member plane), so it renders nothing in a browser rather than offering a setting that cannot land. `setMemberPassword` / `setMemberPin` / `setMemberBiometric` / `clearMemberUnlock` / `memberUnlockStatus` are likewise `Unsupported`.",
+  ],
   "src/components/settings/RecoveryDrillRow.tsx": [
     "ported",
     "The recovery drill (myne-md/myne#468), and it renders unchanged on web because the web client HAS phrase recovery: `plugin:vault-recover|verify_recovery_phrase` is on the wasm dispatcher's DISPATCHED roster beside `recover_with_phrase`, so the row works rather than sitting there reporting an error. No capability gate for the same reason, and no `developer_mode` gate because a first-time user is exactly who it is for.",

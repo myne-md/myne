@@ -1842,6 +1842,12 @@ The device-local `vault.member-key` file that lets a B2B member re-unlock a shar
 
 Used in: `docs/decisions/protocol/0606-member-vault-key-store.md`; `docs/spec/protocol.md` §5.2; `myne-md/myne#711`.
 
+### **member vault unlock password** &nbsp; 🗝️ *Key/identifier*
+
+The device-local `vault.member-unlock` file that lets a B2B member re-unlock a shared vault from a member-chosen fast credential instead of retyping the 24-word recovery phrase every session (`decisions/protocol/0653`). It holds `group_key || items_key || items_key_id || group_key_epoch || person_id || person keypair` AEAD-sealed under a KEK that depends on the configured method: a **password** under the salt domain `"myne.v0.2 argon2id-person-vault-member-unlock|"` (a per-device random salt plus the vault's `account_number_hash` in the domain scope), or a **PIN / biometric** derived by the owner quick-unlock wrap-key providers. AAD `aad_person_member_unlock_store(vault_id, account_number_hash)`. The bundled keypair is what makes a fast unlock install the person session too, so sync runs without the phrase; the metadata rides inside the sealed payload so tampering fails closed. Device-local, never synced or backed up; the phrase store (`member vault key store`) remains the portable fallback. A wrong credential and a tampered payload are the same AEAD failure.
+
+Used in: `docs/decisions/protocol/0653-member-vault-unlock-password.md`; `docs/spec/protocol.md` §5.2.
+
 ### **meeting AI sections** &nbsp; 📦 *Product*
 
 The opt-in, machine-generated block a meeting note can gain beneath its verbatim transcript: a summary, action items, decisions and open questions, produced on demand by an on-device (or user-consented remote) AI pass and appended as ordinary markdown under a machine-generated notice distinct from the transcript's own. The block is wrapped in two HTML comment markers, so a regenerate replaces exactly that region and never touches the transcript or user text. It never replaces the transcript (`decisions/ai/0648`, which amends `docs/decisions/storage/0646`).

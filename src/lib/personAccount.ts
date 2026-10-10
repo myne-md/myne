@@ -120,3 +120,75 @@ export async function personUnlockMemberVault(
     phrase,
   });
 }
+
+/** The configured member-vault fast-unlock method, or null. */
+export type MemberUnlockMethod = "password" | "pin" | "biometric";
+
+/**
+ * The configured member-vault fast-unlock method, or `null`, so the Unlock
+ * surface offers the right credential instead of the recovery phrase.
+ */
+export async function memberUnlockStatus(
+  vaultIdHex: string,
+): Promise<MemberUnlockMethod | null> {
+  return invoke<MemberUnlockMethod | null>("plugin:sync|sync_member_unlock_status", {
+    vaultIdHex,
+  });
+}
+
+/**
+ * Set (or replace) the device-local member vault password. Requires the active
+ * vault to be an unlocked member vault holding the person session: the store
+ * seals the vault keys AND the person keypair, so a later password unlock is as
+ * complete as a phrase one. Replaces a PIN/biometric credential. The recovery
+ * phrase stays the portable fallback.
+ */
+export async function setMemberPassword(password: string): Promise<void> {
+  return invoke("plugin:sync|sync_person_set_member_password", { password });
+}
+
+/** Set (or replace) the device-local member vault PIN (replaces other methods). */
+export async function setMemberPin(pin: string): Promise<void> {
+  return invoke("plugin:sync|sync_person_set_member_pin", { pin });
+}
+
+/** Set (or replace) the device-local member vault biometric credential (Apple only). */
+export async function setMemberBiometric(): Promise<void> {
+  return invoke("plugin:sync|sync_person_set_member_biometric");
+}
+
+/** Remove the device-local member fast-unlock credential for the active vault. */
+export async function clearMemberUnlock(): Promise<void> {
+  return invoke("plugin:sync|sync_person_clear_member_unlock");
+}
+
+/** Re-unlock a member vault from its device-local password. */
+export async function personUnlockMemberVaultWithPassword(
+  vaultIdHex: string,
+  password: string,
+): Promise<void> {
+  return invoke("plugin:sync|sync_person_unlock_member_vault_with_password", {
+    vaultIdHex,
+    password,
+  });
+}
+
+/** Re-unlock a member vault from its device-local PIN. */
+export async function personUnlockMemberVaultWithPin(
+  vaultIdHex: string,
+  pin: string,
+): Promise<void> {
+  return invoke("plugin:sync|sync_person_unlock_member_vault_with_pin", {
+    vaultIdHex,
+    pin,
+  });
+}
+
+/** Re-unlock a member vault from its device-local biometric credential. */
+export async function personUnlockMemberVaultWithBiometric(
+  vaultIdHex: string,
+): Promise<void> {
+  return invoke("plugin:sync|sync_person_unlock_member_vault_with_biometric", {
+    vaultIdHex,
+  });
+}

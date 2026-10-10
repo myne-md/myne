@@ -678,6 +678,32 @@ const PER_COMMAND: &[(&str, Class)] = &[
         Class::Unsupported,
     ),
     ("plugin:sync|sync_member_vault_status", Class::Unsupported),
+    (
+        "plugin:sync|sync_person_set_member_password",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_person_unlock_member_vault_with_password",
+        Class::Unsupported,
+    ),
+    ("plugin:sync|sync_person_set_member_pin", Class::Unsupported),
+    (
+        "plugin:sync|sync_person_set_member_biometric",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_person_unlock_member_vault_with_pin",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_person_unlock_member_vault_with_biometric",
+        Class::Unsupported,
+    ),
+    ("plugin:sync|sync_member_unlock_status", Class::Unsupported),
+    (
+        "plugin:sync|sync_person_clear_member_unlock",
+        Class::Unsupported,
+    ),
     ("plugin:sync|sync_person_lock", Class::Unsupported),
     ("plugin:sync|sync_start_b2b_migration", Class::Unsupported),
     ("plugin:sync|sync_person_create_invite", Class::Unsupported),
