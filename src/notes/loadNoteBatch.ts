@@ -26,6 +26,7 @@
 import { invoke } from "../platform/core";
 import { load as parseYaml } from "js-yaml";
 import {
+  dropDuplicateTopLevelKeys,
   readArchivedFromFmBody,
   readConflictFromFmBody,
   readConflictOfFromFmBody,
@@ -192,16 +193,35 @@ function parseFrontmatterSlice(
   let loaded: unknown;
   try {
     loaded = parseYaml(bytes);
-  } catch {
-    // Malformed YAML → caller sees no title/updated, falls back to H1
-    // or null. Matches the dialect's `parseFrontmatter` "yaml error →
-    // parsed: null" behavior without rebuilding the full Frontmatter
-    // shape here.
-    return {};
+  } catch (err) {
+    // ONE malformed case is rescued rather than swallowed: a duplicate
+    // top-level key makes js-yaml reject the block WHOLESALE ("duplicated
+    // mapping key"), and returning `{}` there nulls title, folder AND
+    // `updated:` together, so the note renders "Untitled" and unfiled with no
+    // in-app way to repair it (the note's own Properties widget still draws the
+    // fields, because it parses line-by-line, but the sidebar reads through
+    // js-yaml). `dropDuplicateTopLevelKeys` keeps the first occurrence and
+    // re-parses. Every OTHER malformed block keeps the original fall-through,
+    // so a genuinely broken `title:` line still reads as no title.
+    if (!isDuplicateMappingKeyError(err)) return {};
+    try {
+      loaded = parseYaml(dropDuplicateTopLevelKeys(bytes));
+    } catch {
+      return {};
+    }
   }
   if (loaded === null || loaded === undefined) return {};
   if (typeof loaded !== "object" || Array.isArray(loaded)) return {};
   return loaded as Record<string, unknown>;
+}
+
+/** True iff `err` is js-yaml's own duplicate-key `YAMLException` (its message
+ *  is `duplicated mapping key`). Matched on the message because js-yaml exports
+ *  no error code, and this is the only shape whose whole-block rejection must
+ *  be rescued rather than treated as malformed. */
+function isDuplicateMappingKeyError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /duplicated mapping key/i.test(message);
 }
 
 function deriveUpdatedAt(parsed: Record<string, unknown>): Date | null {

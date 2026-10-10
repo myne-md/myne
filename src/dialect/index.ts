@@ -54,6 +54,7 @@ export type { NoteKind } from "./surgery";
 export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,
+  dropDuplicateTopLevelKeys,
   formatYamlScalar,
   patchArchivedField,
   patchDeletedField,

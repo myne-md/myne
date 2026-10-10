@@ -193,6 +193,31 @@ describe("loadNoteBatch — title derivation (frontmatter `title:` only)", () =>
     // no title (and no H1 fallback).
     expect(rec.title).toBeNull();
   });
+
+  // A duplicated top-level key makes js-yaml reject the block WHOLESALE
+  // ("duplicated mapping key"). Returning `{}` there nulls title AND folder
+  // together, so the note shows "Untitled" and reads as unfiled with no in-app
+  // repair (the managed writers replace only the first occurrence, and no
+  // scalar row can be deleted). The rescue drops later duplicates and re-parses.
+  it("rescues a block with a duplicated `updated:` (title + folder + updated)", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "dup",
+          frontmatter_bytes:
+            "title: Real Title\nfolder: Getting started/\n" +
+            "updated: 2026-10-10T11:50:48.248Z\n" +
+            "updated: 2026-10-10T00:17:23.757Z\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["dup"]);
+    expect(rec.title).toBe("Real Title");
+    expect(rec.folder).toBe("Getting started/");
+    // First occurrence wins, matching the value-strict readers.
+    expect(rec.updatedAt?.toISOString()).toBe("2026-10-10T11:50:48.248Z");
+  });
 });
 
 describe("loadNoteBatch — updated_at derivation", () => {
