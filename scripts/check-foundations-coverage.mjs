@@ -46,7 +46,12 @@ export const GROUPS = Object.freeze({
   zIndex: /^--z-/,
 });
 
-/** A token whose value reads as a colour, which is the seventh group. */
+/**
+ * A token whose value reads as a colour, which is the seventh group.
+ * @param {string} name
+ * @param {string} value
+ * @returns {boolean}
+ */
 export function isColour(name, value) {
   if (
     /^--(space|text|radius|shadow|ring|duration|ease|weight|tracking|leading|stagger|target|field|control|icon|cover-banner|hairline|segment)(-|$)/.test(
@@ -58,7 +63,11 @@ export function isColour(name, value) {
   return /^(#|rgb|hsl|color-mix|var\(--)/.test(value);
 }
 
-/** Every `--name: value;` declaration in the sheet, unique, first value wins. */
+/**
+ * Every `--name: value;` declaration in the sheet, unique, first value wins.
+ * @param {string} css
+ * @returns {Map<string, string>}
+ */
 export function declaredTokens(css) {
   const out = new Map();
   const re = /(--[A-Za-z0-9-]+)\s*:\s*([^;]+);/g;
@@ -78,6 +87,10 @@ export function declaredTokens(css) {
  * passed with no specimen, which is exactly the "invisible family" this guard
  * exists to catch (myne-md/myne#847 review). Bounded, and an unresolvable name
  * keeps the raw value rather than failing the classification.
+ * @param {string} value
+ * @param {Map<string, string> | null} tokens
+ * @param {number} [depth]
+ * @returns {string}
  */
 export function resolveValue(value, tokens, depth = 0) {
   if (tokens === null || depth > 4) return value;
@@ -87,7 +100,13 @@ export function resolveValue(value, tokens, depth = 0) {
   return next === undefined ? value : resolveValue(next, tokens, depth + 1);
 }
 
-/** Which group classifies a token, or null when none does. */
+/**
+ * Which group classifies a token, or null when none does.
+ * @param {string} name
+ * @param {string} value
+ * @param {Map<string, string> | null} [tokens]
+ * @returns {string | null}
+ */
 export function classify(name, value, tokens = null) {
   if (isColour(name, resolveValue(value, tokens))) return "colours";
   for (const [group, pattern] of Object.entries(GROUPS)) {
