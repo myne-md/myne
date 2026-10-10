@@ -19,6 +19,15 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify("test"),
     __BUILD_COMMIT__: JSON.stringify("test"),
+    // The shell reads this for the source links and the issue URL. Without it a
+    // test that mounts `App` throws on a free variable the moment either path
+    // runs, which is why the shell had no test at all until now.
+    __STORIES_BRANCH__: JSON.stringify("test"),
+    // `AboutPanel` reads all three compile-time globals during render. Without
+    // this one the smoke check died on `settings/aboutpanel/default` with
+    // `ReferenceError: __UPDATE_CHANNEL__ is not defined`. The same gap the
+    // catalogue's own Vite config had (myne-md/myne#843).
+    __UPDATE_CHANNEL__: JSON.stringify("stable"),
   },
   resolve: {
     alias: [
@@ -39,6 +48,7 @@ export default defineConfig({
     globals: false,
     setupFiles: [
       "./tests/setup-jsdom-cm6.ts",
+      "./tests/setup-jsdom-observer.ts",
       "./tests/setup-i18n.ts",
       "./tests/setup-editor-host.ts",
       "./tests/setup-story-host.ts",

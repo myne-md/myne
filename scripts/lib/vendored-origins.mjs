@@ -64,9 +64,21 @@ export const VENDORED_ORIGINS = new Map([
   ["https://sync.example.com", "placeholder in Myne's own copy"],
   ["https://myne.md", "Myne's own site"],
   ["https://sync.myne.md", "the documented production sync origin, a placeholder in Myne's own copy"],
+  [
+    "https://app.example.com",
+    "Myne's own web-client origin: a link the catalogue's Welcome page offers. Never fetched: the Welcome page LINKS out and the catalogue makes no request. The deploy is recommended to pin `connect-src 'none'` (`stories/README.md`), and the served bundle cannot carry the origin, hence WEB_EXCLUDED.",
+  ],
+  [
+    "https://status.myne.md",
+    "Myne's own service-status page: a link the catalogue's Welcome page offers. Never fetched, and the served bundle cannot carry it, hence WEB_EXCLUDED.",
+  ],
   ["http://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
   ["https://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
   ["https://raw.githubusercontent.com", "vendored doc links"],
+  [
+    "https://dequeuniversity.com",
+    "axe-core: the rule documentation links it carries as string constants. Present only where axe is bundled (the story catalogue); inert, and the catalogue makes no network call.",
+  ],
 ]);
 
 /**
@@ -83,7 +95,19 @@ export const VENDORED_ORIGINS = new Map([
  * direction only: an origin the web bundle DOES carry and this set omits would
  * fail the guard's unknown-origin arm, so membership is checked in a test.
  */
-const WEB_EXCLUDED = new Set(["http://scripts.sil.org", "https://scripts.sil.org"]);
+const WEB_EXCLUDED = new Set([
+  "http://scripts.sil.org",
+  "https://scripts.sil.org",
+  // Offered by the catalogue's Welcome page only; the app's web bundle has no
+  // link to either.
+  "https://app.example.com",
+  "https://status.myne.md",
+  // axe-core's rule-documentation links. `axe-core` is a devDependency imported
+  // only by `stories/` and the test lanes, so it cannot reach the served bundle;
+  // leaving it in the web set would pre-approve an origin the web bundle cannot
+  // carry, which is the regression this set exists to prevent.
+  "https://dequeuniversity.com",
+]);
 export const WEB_VENDORED_ORIGINS = new Map(
   [...VENDORED_ORIGINS].filter(([origin]) => !WEB_EXCLUDED.has(origin)),
 );

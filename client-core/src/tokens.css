@@ -301,6 +301,23 @@
      no per-note focal point (myne-md/myne#410). */
   --cover-banner-h: 180px;
 
+  /* -- Readable measure -------------------------------------------------
+     How wide a column of prose is allowed to get before it wraps. Deliberately
+     NOT a `--space-*` step: the spacing scale is the LAYOUT between things, and
+     a column's own width is a SIZE, the same reason `--cover-banner-h` above is
+     its own token rather than a multiple of `--space-5`.
+
+     `ch` rather than `px`, because the canon states this rule in characters
+     (`DESIGN.md` caps a prose measure at 65 to 75) and a px value would have to
+     be re-derived every time the type scale moved. 72 sits inside that band, so
+     the token and the rule cannot drift apart.
+
+     It exists because two catalogue pages asked for `--space-10`, which the
+     scale does not have and never had: the reference resolved to nothing, so
+     `max-width` was simply not applied and the pages ran the full stage width
+     while reading as an intentional flat layout (myne-md/myne#845). */
+  --content-max-w: 72ch;
+
   /* -- Spacing scale (4px base) -------------------------------------- */
   /* The one-pixel hairline used for paint-hang room and 1px rules. A token so
      the value is reachable and so a file using it carries no numeric literal. */
@@ -342,6 +359,48 @@
   /* The padding ring around a bare icon control (a modal's close ×),
      which is its hit area as much as its look. */
   --icon-btn-pad:   6px;
+
+  /* -- Layering --------------------------------------------------------
+     The stacking order, named. Every one of these values was already in the
+     tree as a bare `z-index:` literal, and a bare literal cannot be read: the
+     order is only visible by grepping the whole tree for it, and the numbers
+     lie about their neighbours (an in-modal `Select` sat at 60 under a
+     backdrop at 1000, so its options were unclickable and nothing in either
+     rule said so).
+
+     Naming the ladder in one place is what lets the ORDER be reviewed. Every
+     value here is the value that was already shipping, so nothing that stacks
+     today restacks; the debt is the call sites still holding the bare number,
+     recorded on the Z-index page (myne-md/myne#845).
+
+     Ordered as they paint, low to high. A surface belongs on the step naming
+     its ROLE, never on a value picked to out-rank a neighbour. Choosing a
+     bigger number than the thing you collide with is how the Select above
+     ended up under the backdrop. */
+  --z-ground:         0;     /* content that participates in normal flow */
+  --z-local:          1;     /* one step up INSIDE its own stacking context: a
+                                segment above its thumb, a tab indicator above
+                                its rail */
+  --z-floating:       30;    /* an editor control floating beside its text */
+  --z-dropdown:       50;    /* a menu or disclosure anchored to a control */
+  --z-modal:          1000;  /* a modal's backdrop and the surface it carries */
+  --z-overlay:        1100;  /* must clear a modal: a menu opened INSIDE one,
+                                and the desktop toast */
+  /* The editor's own band, above every app step on purpose: an attachment
+     modal, slash menu, toast or tooltip the editor draws has to clear the app
+     chrome underneath, so it opens fresh at 1200 rather than continuing the
+     app's ladder. */
+  --z-editor-modal:   1200;
+  --z-editor-menu:    1250;
+  --z-editor-toast:   1300;
+  --z-editor-tooltip: 1310;
+  --z-palette:        1500;  /* the command palette, above the app chrome */
+  --z-top-chrome:     2000;  /* skip-to-content and the tooltip */
+  /* The two editor-level steps at the practical maximum: the editor's task
+     panels clear even the editor band, and `--z-top` exists so exactly one
+     surface can be above everything. */
+  --z-task-surface:   2147483000;
+  --z-top:            2147483001;
 
   /* -- Motion --------------------------------------------------------- */
   /* Two tiers, and the split is the whole point (myne-md/myne#772; the

@@ -279,6 +279,12 @@ export function PairingDialog() {
         <div
           style={CHALLENGE_STYLE}
           data-testid="pairing.challenge"
+          // `aria-label` on a bare `<div>` is PROHIBITED: a generic element has
+          // no role, so the name was ignored and axe reported
+          // `aria-prohibited-attr`. `role="group"` is the role that may carry a
+          // name, so the code the user is comparing is announced as a labelled
+          // group (myne-md/myne#845).
+          role="group"
           aria-label={t("clipper.pairing.codeAriaLabel")}
         >
           {pending.challenge}
