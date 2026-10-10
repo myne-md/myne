@@ -25,6 +25,7 @@ use super::person_auth::{
 };
 use super::transport::{HttpMethod, SyncTransport, TransportResponse};
 use crate::host::HostCtx;
+use crate::plugins::quick_unlock::provider::QuickUnlockProvider;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 
@@ -1150,6 +1151,14 @@ pub async fn unlock_member_vault_from_host(
         )
         .await
         .ok_or(SyncDeviceError::Transport)?;
+    // Deliberately does NOT call `mark_full_unlock_done()`. That flag is a
+    // PROCESS-GLOBAL gate the owner quick-unlock path reads
+    // (`quick_unlock::requires_full_unlock_first`), and its contract is "an owner
+    // vault's master password was entered this process" (MYND-641/A6). A member
+    // credential must not open it: a member unlock would otherwise let a PIN
+    // quick-unlock on a DIFFERENT owner vault in the same process skip that
+    // vault's master password after a restart. The member fast path, when it
+    // lands, needs its own per-vault gate rather than this one.
     Ok(())
 }
 
@@ -1180,6 +1189,654 @@ pub async fn sync_person_unlock_member_vault<R: tauri::Runtime>(
     )
     .await;
     Ok(())
+}
+
+/// The material every member-credential WRITE seals: the active member vault's
+/// keys, its identity, and the vault.meta fields the credential needs.
+struct MemberSealMaterial {
+    vault_id: crate::vault_id::VaultId,
+    vault_dir: std::path::PathBuf,
+    account_hash: [u8; 16],
+    kdf_params: protocol::KdfParams,
+    group_key_epoch: u64,
+    items_key_id: [u8; 16],
+    person_id: [u8; 16],
+    group_key: Zeroizing<[u8; 32]>,
+    items_key: Zeroizing<[u8; 32]>,
+    pair: protocol::PersonKeyPair,
+}
+
+/// Gather the material a member-credential write seals. Requires an unlocked
+/// member slot (the peek rejects an owner vault, whose `root_key` is `Some`) and
+/// a held person session.
+async fn member_seal_material(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<MemberSealMaterial, SyncDeviceError> {
+    let active = state
+        .active_vault_id()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let (group_key, items_key, items_key_id) = state
+        .peek_unlocked_member_keys_clone()
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let pair = state
+        .clone_person_identity()
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let person_id = state
+        .clone_person_id()
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(active))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let meta_bytes = io
+        .read(&vault_dir.join("vault.meta"))
+        .await
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b =
+        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    Ok(MemberSealMaterial {
+        vault_id: active,
+        vault_dir,
+        account_hash: b2b.base.account_number_hash,
+        kdf_params: b2b.base.kdf_params,
+        group_key_epoch: b2b.group_key_epoch,
+        items_key_id,
+        person_id,
+        group_key,
+        items_key,
+        pair,
+    })
+}
+
+/// Install the member slot + person session from an opened credential, refusing a
+/// stale `group_key_epoch` (the cache is a generation behind after an owner
+/// group-key rotation; the caller falls back to the recovery phrase). Deliberately
+/// does NOT open the process-global owner quick-unlock gate: a member credential
+/// must not let a PIN quick-unlock on another owner vault skip its password after
+/// a restart (MYND-641/A6).
+async fn install_member_unlock_credential(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_id: crate::vault_id::VaultId,
+    cred: super::member_unlock_store::MemberUnlockCredential,
+    meta_bytes: &[u8],
+    current_epoch: u64,
+) -> Result<(), SyncDeviceError> {
+    if cred.group_key_epoch != current_epoch {
+        return Err(SyncDeviceError::BadRequest);
+    }
+    use sha2::Digest as _;
+    let generation = state.person_session_generation().await;
+    let meta_hash: [u8; 32] = sha2::Sha256::digest(meta_bytes).into();
+    let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Transport)?;
+    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
+        pair: cred.pair,
+        person_id: cred.person_id,
+        profile: None,
+        transition,
+    };
+    state
+        .set_unlocked_locking_others_with_person_session(
+            generation,
+            vault_id,
+            crate::plugins::vault_unlock::state::UnlockedVault::member(
+                cred.group_key,
+                cred.items_key,
+                cred.items_key_id,
+                host.now_unix_secs(),
+                meta_hash,
+            ),
+            Some(install),
+        )
+        .await
+        .ok_or(SyncDeviceError::Transport)?;
+    Ok(())
+}
+
+/// Device-local failed-attempt counter for the member PIN path.
+const MEMBER_ATTEMPT_FILE: &str = "vault.member-unlock.attempts";
+
+async fn read_member_attempts(
+    io: &dyn VaultIo,
+    path: &std::path::Path,
+) -> crate::plugins::quick_unlock::attempt::AttemptState {
+    use crate::plugins::quick_unlock::attempt::{AttemptState, MAX_QUICK_UNLOCK_ATTEMPTS};
+    match io.read(path).await {
+        Ok(b) => crate::plugins::quick_unlock::attempt::parse_attempt_count(&b)
+            .unwrap_or_else(|| AttemptState::from_count(MAX_QUICK_UNLOCK_ATTEMPTS)),
+        // Absent → fresh. Any other read error (present but unreadable) is
+        // fail-safe clamped to the cap, matching the owner counter's posture.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => AttemptState::fresh(),
+        Err(_) => AttemptState::from_count(MAX_QUICK_UNLOCK_ATTEMPTS),
+    }
+}
+
+async fn write_member_attempts(
+    io: &dyn VaultIo,
+    path: &std::path::Path,
+    state: &crate::plugins::quick_unlock::attempt::AttemptState,
+) {
+    let _ = io
+        .write(
+            path,
+            &crate::plugins::quick_unlock::attempt::encode_attempt_count(state),
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await;
+}
+
+/// Remove the member-unlock store and its attempt counter (cap reached).
+async fn wipe_member_unlock(io: &dyn VaultIo, vault_dir: &std::path::Path) {
+    let _ = io
+        .remove_file(&vault_dir.join(super::member_unlock_store::MEMBER_UNLOCK_STORE_FILE))
+        .await;
+    let _ = io.remove_file(&vault_dir.join(MEMBER_ATTEMPT_FILE)).await;
+}
+
+/// **Set (or replace) the device-local member vault password.** Requires the
+/// active vault to be an unlocked member vault whose person session is held: the
+/// store seals exactly the material the phrase path installs (`group_key`,
+/// `items_key`, and the person keypair), so it can only be written while that
+/// material is available. The recovery phrase stays the portable fallback.
+pub async fn set_member_password_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    password: &str,
+) -> Result<(), SyncDeviceError> {
+    protocol::validate_min_length(password).map_err(|_| SyncDeviceError::BadRequest)?;
+    let m = member_seal_material(host, io, state).await?;
+    super::member_unlock_store::write_member_unlock_password(
+        io,
+        &m.vault_dir,
+        m.vault_id.as_uuid().as_bytes(),
+        &m.account_hash,
+        m.group_key_epoch,
+        &m.items_key_id,
+        &m.person_id,
+        &m.kdf_params,
+        password,
+        &m.group_key,
+        &m.items_key,
+        &m.pair,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::Internal)
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_set_member_password<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    password: String,
+) -> Result<(), SyncDeviceError> {
+    let password = zeroize::Zeroizing::new(password);
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    set_member_password_from_host(
+        &host,
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &password,
+    )
+    .await
+}
+
+/// **Re-unlock a member vault from its device-local password.** The fast path
+/// that replaces re-typing the recovery phrase every session: it opens the
+/// device-local member-unlock store, installs the member slot AND the person
+/// session (the store bundles the keypair), so sync runs without the phrase.
+pub async fn unlock_member_vault_with_password_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_id: crate::vault_id::VaultId,
+    password: &str,
+) -> Result<(), SyncDeviceError> {
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let meta_bytes = io
+        .read(&vault_dir.join("vault.meta"))
+        .await
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b =
+        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let cred = super::member_unlock_store::read_member_unlock_password(
+        io,
+        &vault_dir,
+        vault_id.as_uuid().as_bytes(),
+        &b2b.base.kdf_params,
+        password,
+    )
+    .await
+    .ok_or(SyncDeviceError::BadRequest)?;
+    install_member_unlock_credential(
+        host,
+        io,
+        state,
+        vault_id,
+        cred,
+        &meta_bytes,
+        b2b.group_key_epoch,
+    )
+    .await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_unlock_member_vault_with_password<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
+    vault_id_hex: String,
+    password: String,
+) -> Result<(), SyncDeviceError> {
+    let password = zeroize::Zeroizing::new(password);
+    let vault_id =
+        crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    unlock_member_vault_with_password_from_host(&host, &io, state.inner(), vault_id, &password)
+        .await?;
+    if state.inner().active_vault_id().await != Some(vault_id) {
+        return Err(SyncDeviceError::Transport);
+    }
+    crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
+        &host,
+        state.inner(),
+        hooks.inner(),
+        &io,
+        crate::vault_label::key::platform_keychain(),
+    )
+    .await;
+    Ok(())
+}
+
+/// **Set (or replace) the device-local member vault PIN.** Reuses the owner
+/// quick-unlock PIN provider (`PinProvider`): it derives a wrap key from the PIN
+/// via the vault's Argon2id parameters, and the same member payload is sealed
+/// under it. Setting a PIN replaces a password or a biometric credential.
+pub async fn set_member_pin_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    pin: &str,
+) -> Result<(), SyncDeviceError> {
+    crate::plugins::quick_unlock::pin::validate_pin(pin)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let m = member_seal_material(host, io, state).await?;
+    let provider = crate::plugins::quick_unlock::pin::PinProvider::new(
+        Zeroizing::new(pin.to_string()),
+        m.account_hash,
+        m.kdf_params,
+    );
+    let secret = crate::task::run_blocking(move || provider.create())
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .map_err(|_| SyncDeviceError::Internal)?;
+    super::member_unlock_store::write_member_unlock_provider(
+        io,
+        &m.vault_dir,
+        m.vault_id.as_uuid().as_bytes(),
+        &m.account_hash,
+        super::member_unlock_store::METHOD_PIN,
+        &secret.pin_salt,
+        &secret.wrap_key,
+        m.group_key_epoch,
+        &m.items_key_id,
+        &m.person_id,
+        &m.group_key,
+        &m.items_key,
+        &m.pair,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::Internal)
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_set_member_pin<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    pin: String,
+) -> Result<(), SyncDeviceError> {
+    let pin = zeroize::Zeroizing::new(pin);
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    set_member_pin_from_host(&host, &crate::vault_io::StdVaultIo, state.inner(), &pin).await
+}
+
+/// **Set (or replace) the device-local member vault biometric credential.** Reuses
+/// the owner quick-unlock Apple provider. `HardwareUnavailable` off Apple targets.
+pub async fn set_member_biometric_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<(), SyncDeviceError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let m = member_seal_material(host, io, state).await?;
+        let provider = crate::plugins::quick_unlock::apple::AppleBiometricProvider::new(
+            m.account_hash,
+            m.vault_id,
+        );
+        let secret = crate::task::run_blocking(move || provider.create())
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(|_| SyncDeviceError::Internal)?;
+        super::member_unlock_store::write_member_unlock_provider(
+            io,
+            &m.vault_dir,
+            m.vault_id.as_uuid().as_bytes(),
+            &m.account_hash,
+            super::member_unlock_store::METHOD_BIOMETRIC,
+            &secret.pin_salt,
+            &secret.wrap_key,
+            m.group_key_epoch,
+            &m.items_key_id,
+            &m.person_id,
+            &m.group_key,
+            &m.items_key,
+            &m.pair,
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (host, io, state);
+        Err(SyncDeviceError::BadRequest)
+    }
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_set_member_biometric<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+) -> Result<(), SyncDeviceError> {
+    set_member_biometric_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
+}
+
+/// **Re-unlock a member vault from its device-local PIN.** A wrong PIN burns an
+/// attempt; the fifth wipes the credential and the user falls back to the phrase.
+pub async fn unlock_member_vault_with_pin_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_id: crate::vault_id::VaultId,
+    pin: &str,
+) -> Result<(), SyncDeviceError> {
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let meta_bytes = io
+        .read(&vault_dir.join("vault.meta"))
+        .await
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b =
+        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let header = super::member_unlock_store::member_unlock_header(
+        io,
+        &vault_dir,
+        vault_id.as_uuid().as_bytes(),
+    )
+    .await
+    .ok_or(SyncDeviceError::BadRequest)?;
+    if header.method != super::member_unlock_store::METHOD_PIN {
+        return Err(SyncDeviceError::BadRequest);
+    }
+    let attempt_path = vault_dir.join(MEMBER_ATTEMPT_FILE);
+    let mut attempts = read_member_attempts(io, &attempt_path).await;
+    if attempts.must_wipe() {
+        wipe_member_unlock(io, &vault_dir).await;
+        return Err(SyncDeviceError::BadRequest);
+    }
+    let provider = crate::plugins::quick_unlock::pin::PinProvider::new(
+        Zeroizing::new(pin.to_string()),
+        b2b.base.account_number_hash,
+        b2b.base.kdf_params,
+    );
+    let salt = header.salt;
+    let wrap = crate::task::run_blocking(move || provider.retrieve(&salt))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    match super::member_unlock_store::read_member_unlock_with_wrap_key(
+        io,
+        &vault_dir,
+        vault_id.as_uuid().as_bytes(),
+        &wrap,
+    )
+    .await
+    {
+        Some(cred) => {
+            install_member_unlock_credential(
+                host,
+                io,
+                state,
+                vault_id,
+                cred,
+                &meta_bytes,
+                b2b.group_key_epoch,
+            )
+            .await?;
+            write_member_attempts(
+                io,
+                &attempt_path,
+                &crate::plugins::quick_unlock::attempt::AttemptState::fresh(),
+            )
+            .await;
+            Ok(())
+        }
+        None => {
+            match attempts.record_failure() {
+                crate::plugins::quick_unlock::attempt::AttemptOutcome::Wipe => {
+                    wipe_member_unlock(io, &vault_dir).await;
+                }
+                crate::plugins::quick_unlock::attempt::AttemptOutcome::Allowed { .. } => {
+                    write_member_attempts(io, &attempt_path, &attempts).await;
+                }
+            }
+            Err(SyncDeviceError::BadRequest)
+        }
+    }
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_unlock_member_vault_with_pin<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
+    vault_id_hex: String,
+    pin: String,
+) -> Result<(), SyncDeviceError> {
+    let pin = zeroize::Zeroizing::new(pin);
+    let vault_id =
+        crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    unlock_member_vault_with_pin_from_host(&host, &io, state.inner(), vault_id, &pin).await?;
+    run_member_post_unlock(&host, state.inner(), hooks.inner(), &io, vault_id).await
+}
+
+/// **Re-unlock a member vault from its device-local biometric credential.**
+/// `HardwareUnavailable` off Apple targets.
+pub async fn unlock_member_vault_with_biometric_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_id: crate::vault_id::VaultId,
+) -> Result<(), SyncDeviceError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let meta_bytes = io
+            .read(&vault_dir.join("vault.meta"))
+            .await
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+        let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes)
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+        let header = super::member_unlock_store::member_unlock_header(
+            io,
+            &vault_dir,
+            vault_id.as_uuid().as_bytes(),
+        )
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+        if header.method != super::member_unlock_store::METHOD_BIOMETRIC {
+            return Err(SyncDeviceError::BadRequest);
+        }
+        let provider = crate::plugins::quick_unlock::apple::AppleBiometricProvider::new(
+            b2b.base.account_number_hash,
+            vault_id,
+        );
+        let zero_salt = [0u8; protocol::quick_unlock_blob::QUICK_UNLOCK_PIN_SALT_LEN];
+        let wrap = crate::task::run_blocking(move || provider.retrieve(&zero_salt))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+        let cred = super::member_unlock_store::read_member_unlock_with_wrap_key(
+            io,
+            &vault_dir,
+            vault_id.as_uuid().as_bytes(),
+            &wrap,
+        )
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+        install_member_unlock_credential(
+            host,
+            io,
+            state,
+            vault_id,
+            cred,
+            &meta_bytes,
+            b2b.group_key_epoch,
+        )
+        .await
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (host, io, state, vault_id);
+        Err(SyncDeviceError::BadRequest)
+    }
+}
+
+/// Run the shared post-unlock pipeline after a member fast unlock, confirming the
+/// target vault is the active one (the vault-switch discipline every unlock path
+/// observes).
+async fn run_member_post_unlock(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn VaultIo,
+    vault_id: crate::vault_id::VaultId,
+) -> Result<(), SyncDeviceError> {
+    if state.active_vault_id().await != Some(vault_id) {
+        return Err(SyncDeviceError::Transport);
+    }
+    crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
+        host,
+        state,
+        hooks,
+        io,
+        crate::vault_label::key::platform_keychain(),
+    )
+    .await;
+    Ok(())
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_unlock_member_vault_with_biometric<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
+    vault_id_hex: String,
+) -> Result<(), SyncDeviceError> {
+    let vault_id =
+        crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    unlock_member_vault_with_biometric_from_host(&host, &io, state.inner(), vault_id).await?;
+    run_member_post_unlock(&host, state.inner(), hooks.inner(), &io, vault_id).await
+}
+
+/// Remove the device-local member fast-unlock credential for the active vault.
+pub async fn clear_member_unlock_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<(), SyncDeviceError> {
+    let active = state
+        .active_vault_id()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(active))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    wipe_member_unlock(io, &vault_dir).await;
+    Ok(())
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_clear_member_unlock<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, VaultRuntimeState>,
+) -> Result<(), SyncDeviceError> {
+    clear_member_unlock_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
+}
+
+/// The configured member-unlock method (`"password"` / `"pin"` / `"biometric"`),
+/// or `null`, so the Unlock surface offers the right credential instead of the
+/// recovery phrase.
+pub async fn member_unlock_method_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    vault_id: crate::vault_id::VaultId,
+) -> Result<Option<String>, SyncDeviceError> {
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok(super::member_unlock_store::member_unlock_method(io, &vault_dir).await)
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_member_unlock_status<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    vault_id_hex: String,
+) -> Result<Option<String>, SyncDeviceError> {
+    let vault_id =
+        crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
+    member_unlock_method_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        vault_id,
+    )
+    .await
 }
 
 /// Whether a vault is a member vault (has a device-local member-key store), so

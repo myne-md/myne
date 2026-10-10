@@ -447,6 +447,34 @@ pub fn derive_person_vault_member_key(
     )
 }
 
+/// Salt domain for the **member vault unlock password** store: the key that
+/// seals a member's group and items keys AND their person keypair at rest under a
+/// member-chosen password, so a member vault re-unlocks without the 24-word
+/// recovery phrase. Distinct from [`SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2`] (the
+/// phrase store) so the two credentials are never the same key, and scoped per
+/// `(person, vault)` by the account-number hash in the salt.
+pub const SALT_PREFIX_PERSON_VAULT_MEMBER_UNLOCK_V0_2: &[u8] =
+    b"myne.v0.2 argon2id-person-vault-member-unlock|";
+
+/// Derive the KEK that seals a member's vault-unlock credential for one vault
+/// under the member's own password. Unlike the phrase store there is a
+/// per-device `salt_random` (stored in the device-local envelope): the password
+/// is a device-local convenience, not a portable credential, so a random salt is
+/// available and preferred.
+pub fn derive_person_vault_member_unlock_key(
+    password: &str,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(
+        SALT_PREFIX_PERSON_VAULT_MEMBER_UNLOCK_V0_2,
+        account_number_hash,
+        salt_random,
+    );
+    argon2id_derive(password.as_bytes(), &salt, params)
+}
+
 /// Derive the key that seals one person's member-vault keys for one vault
 /// (myne-md/myne#711 task 25). Scoped per `(person, vault)` by the vault's
 /// account-number hash, so a member's key store for one vault does not open for

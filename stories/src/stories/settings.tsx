@@ -51,6 +51,7 @@ import { PeriodicNotesSettings } from "@app/components/settings/PeriodicNotesSet
 import { PlainFileSettings } from "@app/components/settings/PlainFileSettings";
 import { PrivacyPanel } from "@app/components/settings/PrivacyPanel";
 import { QuickUnlockSettings } from "@app/components/settings/QuickUnlockSettings";
+import { MemberPasswordSettings } from "@app/components/settings/MemberPasswordSettings";
 import { ReminderSettings } from "@app/components/settings/ReminderSettings";
 import { RibbonCustomizeSettings } from "@app/components/settings/RibbonCustomizeSettings";
 import { SettingRow } from "@app/components/settings/SettingRow";
@@ -699,6 +700,20 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     render: () => (
       <Frame>
         <QuickUnlockSettings />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/memberpasswordsettings/default",
+    group: "settings",
+    surface: "MemberPasswordSettings",
+    state: "default",
+    description: "Member Password Settings, a default state.",
+    tags: ["settings", "memberpasswordsettings", "default"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <MemberPasswordSettings />
       </Frame>
     ),
   },
