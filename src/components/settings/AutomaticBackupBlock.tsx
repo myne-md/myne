@@ -265,6 +265,12 @@ export function AutomaticBackupBlock({
             value={config.retentionN}
             style={RETENTION_INPUT_STYLE}
             data-testid="settings.auto-backup-retention"
+            // `SettingRow` renders its label as a `<span>` with no association,
+            // so a form control inside a row has NO accessible name. A screen
+            // reader announced this field as a bare number input
+            // (myne-md/myne#845). Naming it here is the local fix; associating
+            // every row control is the row's own change.
+            aria-label={t("settings.autoBackup.keepLast")}
             onChange={(e) => {
               const n = Number(e.currentTarget.value);
               if (!Number.isInteger(n) || n < 1) return; // ignore empty/invalid mid-type

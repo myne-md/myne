@@ -31,6 +31,7 @@
 
 import {
   useEffect,
+  useId,
   useMemo,
   useState,
   type CSSProperties,
@@ -140,6 +141,13 @@ export function PasswordInput({
   testId,
 }: PasswordInputProps) {
   const { t } = useTranslation();
+  // The visible label and the input are siblings in different rows, so the
+  // `<label>` had no `htmlFor` and the field had NO accessible name: a screen
+  // reader announced a bare "password, edit text" for every field in every
+  // password flow (myne-md/myne#845, found by the catalogue's axe gate). One
+  // `useId` associates them, so the announced name IS the visible one and the
+  // two cannot drift.
+  const inputId = useId();
   const captionColor =
     captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
   const captionFontStyle = captionTone === "pending" ? "italic" : "normal";
@@ -154,11 +162,14 @@ export function PasswordInput({
           gap: "var(--space-3)",
         }}
       >
-        <label style={labelStyle}>{label}</label>
+        <label htmlFor={inputId} style={labelStyle}>
+          {label}
+        </label>
         {labelTrailing}
       </div>
       <div style={{ position: "relative" }}>
         <Input
+          id={inputId}
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}

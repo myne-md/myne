@@ -2005,6 +2005,9 @@
       "addCondition": "Add condition",
       "addFilterGroup": "Add filter group",
       "cancel": "Cancel",
+      "conditionNegate": "Condition: is or is not",
+      "conditionType": "Condition: what to match",
+      "conditionValue": "Condition: the value to match",
       "combinator": {
         "all": "all",
         "any": "any"

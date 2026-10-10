@@ -9,6 +9,7 @@
 // default state is.
 
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { ActionStatus } from "@app/components/ActionStatus";
 import { AccountBootstrap } from "@app/screens/AccountBootstrap";
 import { CreateVault } from "@app/screens/CreateVault";
@@ -104,6 +105,7 @@ import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
 import { offerMeetingAi } from "@app/components/meeting/meetingAiStore";
 import { Toast } from "@app/components/Toast";
 import { Toaster } from "@app/components/toast/Toaster";
+import { dismissToast, toast } from "@app/components/toast/toastStore";
 import { TorStatusBanner } from "@app/components/sync/TorStatusBanner";
 import { TranscriptionModal } from "@app/components/attachments/TranscriptionModal";
 import { Unlock } from "@app/screens/Unlock";
@@ -121,6 +123,8 @@ import type { StoryDescriptor } from "../types";
 import { DEFAULT_PREFS, FIXTURE_VAULT_ID } from "../../fixtures";
 import type { CommandContext } from "@app/commands/registry";
 import type { VaultRecoverState } from "@app/screens/vault-recover/reducer";
+import { action } from "../actions";
+import { Button } from "@app/components/primitives/Button";
 
 const noop = () => {};
 const asyncNoop = async (): Promise<void> => {};
@@ -194,6 +198,46 @@ function Prose({ children }: { children: ReactNode }) {
   return <p>{children}</p>;
 }
 
+/**
+ * `<Toast>` is a HEADLESS bridge (myne#238): it draws nothing at all and pushes
+ * its message into the shared store, which the ONE `<Toaster>` renders. So a
+ * story mounting the bridge alone showed an empty box, and a story mounting the
+ * Toaster alone subscribed to an empty store. Neither was broken; both were
+ * half of a pair. These two helpers mount the pair the way the app does
+ * (Editor mounts the Toaster once, every surface mounts the bridge), so the
+ * stories finally show a toast (myne-md/myne#845).
+ */
+function ToastWithStack({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
+}
+
+/**
+ * The Toaster's own subject is the STACK: the newest toast fully shown, older
+ * ones peeking behind it. So this pushes three. `HOLD_MS` is deliberately long,
+ * because the real default is 2.5s and a catalogue story must not empty itself
+ * while somebody is looking at it.
+ */
+const TOAST_HOLD_MS = 600_000;
+
+function ToasterStackDemo() {
+  useEffect(() => {
+    const ids = [
+      toast({ message: "Saved", variant: "success", durationMs: TOAST_HOLD_MS }),
+      toast({ message: "Attachment uploaded", variant: "info", durationMs: TOAST_HOLD_MS }),
+      toast({ message: "Sync failed", variant: "error", durationMs: TOAST_HOLD_MS }),
+    ];
+    return () => {
+      for (const id of ids) dismissToast(id, { silent: true });
+    };
+  }, []);
+  return <Toaster />;
+}
+
 export const COMPONENT_STORIES: StoryDescriptor[] = [
   // ── Intro / status surfaces ──────────────────────────────────────────────
   {
@@ -201,6 +245,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ActionStatus",
     state: "default",
+    description: "Action Status, a default state.",
+    tags: ["components", "actionstatus", "default"],
     render: () => <ActionStatus message="Copied to clipboard" />,
   },
   {
@@ -208,6 +254,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ActionStatus",
     state: "visually-hidden",
+    description: "Action Status, a visually-hidden state.",
+    tags: ["components", "actionstatus", "visually-hidden"],
     render: () => <ActionStatus message="Copied to clipboard" visuallyHidden />,
   },
   {
@@ -215,6 +263,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AnsweredByIndicator",
     state: "default",
+    description: "Answered By Indicator, a default state.",
+    tags: ["components", "answeredbyindicator", "default"],
     render: () => (
       <AnsweredByIndicator answeredBy={{ kind: "local-runtime", name: "llama" }} />
     ),
@@ -224,6 +274,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ErrorBanner",
     state: "default",
+    description: "Error Banner, a default state.",
+    tags: ["components", "errorbanner", "default"],
     render: () => (
       <ErrorBanner
         error={{
@@ -240,8 +292,10 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "FailClosedError",
     state: "invalid-state",
+    description: "Fail Closed Error, an invalid-state state.",
+    tags: ["components", "failclosederror", "invalid-state"],
     render: () => (
-      <FailClosedError reason={{ kind: "invalid-state" }} onCtaClick={noop} />
+      <FailClosedError reason={{ kind: "invalid-state" }} onCtaClick={action("onCtaClick")} />
     ),
   },
   {
@@ -249,6 +303,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SuspicionBanner",
     state: "default",
+    description: "Suspicion Banner, a default state.",
+    tags: ["components", "suspicionbanner", "default"],
     render: () => <SuspicionBanner reason="vault-meta-changed-externally" />,
   },
   {
@@ -256,6 +312,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SkipToContent",
     state: "default",
+    description: "Skip To Content, a default state.",
+    tags: ["components", "skiptocontent", "default"],
     render: () => <SkipToContent />,
   },
   {
@@ -263,6 +321,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "RootErrorBoundary",
     state: "default",
+    description: "Root Error Boundary, a default state.",
+    tags: ["components", "rooterrorboundary", "default"],
     render: () => (
       <RootErrorBoundary>
         <Prose>A healthy subtree.</Prose>
@@ -274,6 +334,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ScreenCaptureEscape",
     state: "default",
+    description: "Screen Capture Escape, a default state.",
+    unreachable: {
+      what: "the escape control shown while screen-capture protection is on",
+      why: "it renders in response to an OS screen-capture event, which the catalogue cannot fire",
+    },
+    tags: ["components", "screencaptureescape", "default"],
     render: () => <ScreenCaptureEscape />,
   },
   {
@@ -281,6 +347,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "WebReloadNotice",
     state: "default",
+    description: "Web Reload Notice, a default state.",
+    tags: ["components", "webreloadnotice", "default"],
     render: () => <WebReloadNotice />,
   },
 
@@ -290,6 +358,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "CenteredCard",
     state: "default",
+    description: "Centered Card, a default state.",
+    tags: ["components", "centeredcard", "default"],
     render: () => (
       <CenteredCard>
         <Prose>Centered content.</Prose>
@@ -301,6 +371,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "Icon",
     state: "default",
+    description: "Icon, a default state.",
+    tags: ["components", "icon", "default"],
     render: () => <Icon name="settings" />,
   },
   {
@@ -308,6 +380,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "Keycaps",
     state: "default",
+    description: "Keycaps, a default state.",
+    tags: ["components", "keycaps", "default"],
     render: () => <Keycaps chord="Mod+K" />,
   },
   {
@@ -315,14 +389,36 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ModalShell",
     state: "default",
+    description: "Modal Shell, a default state.",
+    tags: ["components", "modalshell", "default"],
     render: () => (
       <ModalShell
         open
         title="Modal title"
-        onClose={noop}
+        onClose={action("onClose")}
         labelId="story-modal-title"
       >
-        <Prose>Modal body.</Prose>
+        <div
+          style={{
+            padding: "var(--space-5)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-3)",
+          }}
+        >
+          <Prose>
+            The shell supplies the chrome; the caller supplies the body and pads
+            it. Esc, the backdrop and the close control all dismiss.
+          </Prose>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button variant="primary" onClick={action("onConfirm")}>
+              Confirm
+            </Button>
+            <Button variant="secondary" onClick={action("onClose")}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       </ModalShell>
     ),
   },
@@ -331,6 +427,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "MyneMark",
     state: "default",
+    description: "Myne Mark, a default state.",
+    tags: ["components", "mynemark", "default"],
     render: () => <MyneMark size={48} />,
   },
   {
@@ -338,6 +436,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PanelToggleGlyph",
     state: "default",
+    description: "Panel Toggle Glyph, a default state.",
+    tags: ["components", "paneltoggleglyph", "default"],
     render: () => <PanelToggleGlyph side="left" collapsed={false} />,
   },
   {
@@ -345,6 +445,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ResizeHandle",
     state: "default",
+    description: "Resize Handle, a default state.",
+    tags: ["components", "resizehandle", "default"],
     render: () => (
       <ResizeHandle
         side="left"
@@ -352,8 +454,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         min={180}
         max={480}
         containerRef={ANCHOR_REF}
-        onResize={noop}
-        onToggleCollapse={noop}
+        onResize={action("onResize")}
+        onToggleCollapse={action("onToggleCollapse")}
         label="Resize notes sidebar"
       />
     ),
@@ -363,6 +465,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ScrollArea",
     state: "default",
+    description: "Scroll Area, a default state.",
+    tags: ["components", "scrollarea", "default"],
     render: () => (
       <ScrollArea ariaLabel="Scrollable sample">
         <Prose>Scrollable content.</Prose>
@@ -374,6 +478,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SearchableSelect",
     state: "default",
+    description: "Searchable Select, a default state.",
+    tags: ["components", "searchableselect", "default"],
     render: () => (
       <SearchableSelect
         aria-label="Theme"
@@ -383,7 +489,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           { value: "dark", label: "Dark" },
         ]}
         selected={["system"]}
-        onChange={noop}
+        onChange={action("onChange")}
       />
     ),
   },
@@ -392,6 +498,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ThemeChiplet",
     state: "default",
+    description: "Theme Chiplet, a default state.",
+    tags: ["components", "themechiplet", "default"],
     render: () => (
       <ThemeChiplet
         preview={{
@@ -409,6 +517,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DestructiveBanner",
     state: "default",
+    description: "Destructive Banner, a default state.",
+    tags: ["components", "destructivebanner", "default"],
     render: () => (
       <DestructiveBanner testId="story.destructive">
         <Prose>This cannot be undone.</Prose>
@@ -422,13 +532,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PasswordInput",
     state: "default",
+    description: "Password Input, a default state.",
+    tags: ["components", "passwordinput", "default"],
     render: () => (
       <PasswordInput
         label="Master password"
         value=""
-        onChange={noop}
+        onChange={action("onChange")}
         show={false}
-        onToggleShow={noop}
+        onToggleShow={action("onToggleShow")}
       />
     ),
   },
@@ -437,6 +549,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PasswordStrength",
     state: "default",
+    description: "Password Strength, a default state.",
+    tags: ["components", "passwordstrength", "default"],
     render: () => <PasswordStrength score={3} warning="A common word" />,
   },
   {
@@ -444,25 +558,31 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PasswordCreateForm",
     state: "default",
-    render: () => <PasswordCreateForm submitLabel="Continue" onSubmit={noop} />,
+    description: "Password Create Form, a default state.",
+    tags: ["components", "passwordcreateform", "default"],
+    render: () => <PasswordCreateForm submitLabel="Continue" onSubmit={action("onSubmit")} />,
   },
   {
     id: "components/passwordchangeform/default",
     group: "components",
     surface: "PasswordChangeForm",
     state: "default",
-    render: () => <PasswordChangeForm onSubmit={noop} onCancel={noop} />,
+    description: "Password Change Form, a default state.",
+    tags: ["components", "passwordchangeform", "default"],
+    render: () => <PasswordChangeForm onSubmit={action("onSubmit")} onCancel={action("onCancel")} />,
   },
   {
     id: "components/deletevaultconfirmform/default",
     group: "components",
     surface: "DeleteVaultConfirmForm",
     state: "default",
+    description: "Delete Vault Confirm Form, a default state.",
+    tags: ["components", "deletevaultconfirmform", "default"],
     render: () => (
       <DeleteVaultConfirmForm
-        onSubmit={noop}
-        onCancel={noop}
-        onContinueAfterPartial={noop}
+        onSubmit={action("onSubmit")}
+        onCancel={action("onCancel")}
+        onContinueAfterPartial={action("onContinueAfterPartial")}
         partialFailContext={null}
       />
     ),
@@ -474,6 +594,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AttachmentSyncProgress",
     state: "default",
+    description: "Attachment Sync Progress, a default state.",
+    tags: ["components", "attachmentsyncprogress", "default"],
     render: () => <AttachmentSyncProgress />,
   },
   {
@@ -481,6 +603,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AttachmentThumbnail",
     state: "default",
+    description: "Attachment Thumbnail, a default state.",
+    tags: ["components", "attachmentthumbnail", "default"],
     render: () => (
       <AttachmentThumbnail
         id={ATTACHMENT.id}
@@ -495,6 +619,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AttachmentsLibrary",
     state: "default",
+    description: "Attachments Library, a default state.",
+    tags: ["components", "attachmentslibrary", "default"],
     fixture: "unlocked",
     render: () => (
       <SidebarStateProvider>
@@ -507,11 +633,13 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "CleanUnusedAttachmentsDialog",
     state: "default",
+    description: "Clean Unused Attachments Dialog, a default state.",
+    tags: ["components", "cleanunusedattachmentsdialog", "default"],
     render: () => (
       <CleanUnusedAttachmentsDialog
         attachments={[ATTACHMENT]}
         onConfirm={async () => ({ deleted: 1, skipped: 0, bytes_reclaimed: 204_800 })}
-        onClose={noop}
+        onClose={action("onClose")}
       />
     ),
   },
@@ -520,13 +648,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DeleteAttachmentDialog",
     state: "default",
+    description: "Delete Attachment Dialog, a default state.",
+    tags: ["components", "deleteattachmentdialog", "default"],
     render: () => (
       <DeleteAttachmentDialog
         attachment={ATTACHMENT}
         referencingNoteIds={[]}
         cache={EMPTY_CACHE}
         onConfirm={asyncNoop}
-        onClose={noop}
+        onClose={action("onClose")}
       />
     ),
   },
@@ -535,13 +665,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "CoverPicker",
     state: "default",
+    description: "Cover Picker, a default state.",
+    tags: ["components", "coverpicker", "default"],
     render: () => (
       <CoverPicker
         open
         hasCover={false}
-        onClose={noop}
-        onPick={noop}
-        onRemove={noop}
+        onClose={action("onClose")}
+        onPick={action("onPick")}
+        onRemove={action("onRemove")}
       />
     ),
   },
@@ -550,12 +682,18 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "UsedInNotesPopover",
     state: "default",
+    description: "Used In Notes Popover, a default state.",
+    unreachable: {
+      what: "the popover listing the notes that use an attachment",
+      why: "it positions itself from a live anchor element, and the story passes a detached ref so it has no coordinates",
+    },
+    tags: ["components", "usedinnotespopover", "default"],
     render: () => (
       <UsedInNotesPopover
         noteIds={[]}
         cache={EMPTY_CACHE}
-        onJump={noop}
-        onClose={noop}
+        onJump={action("onJump")}
+        onClose={action("onClose")}
         anchorRef={ANCHOR_REF}
       />
     ),
@@ -565,12 +703,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "TranscriptionModal",
     state: "default",
+    description: "Transcription Modal, a default state.",
+    tags: ["components", "transcriptionmodal", "default"],
     render: () => (
       <TranscriptionModal
         open
         filename="recording.m4a"
         text="Transcribed text."
-        onClose={noop}
+        onClose={action("onClose")}
       />
     ),
   },
@@ -581,12 +721,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "BackupExportModal",
     state: "default",
+    description: "Backup Export Modal, a default state.",
+    tags: ["components", "backupexportmodal", "default"],
     fixture: "unlocked",
     render: () => (
       <BackupExportModal
         open
-        onClose={noop}
-        onOpenDrill={noop}
+        onClose={action("onClose")}
+        onOpenDrill={action("onOpenDrill")}
         vaultId={FIXTURE_VAULT_ID}
       />
     ),
@@ -596,12 +738,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ExportEgressNotice",
     state: "default",
+    description: "Export Egress Notice, a default state.",
+    tags: ["components", "exportegressnotice", "default"],
     render: () => (
       <ExportEgressNotice
         open
         sentence="This will write the note to a file you choose."
-        onCancel={noop}
-        onConfirm={noop}
+        onCancel={action("onCancel")}
+        onConfirm={action("onConfirm")}
       />
     ),
   },
@@ -610,13 +754,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "NoteExportModal",
     state: "default",
+    description: "Note Export Modal, a default state.",
+    tags: ["components", "noteexportmodal", "default"],
     render: () => (
       <NoteExportModal
         open
         attachmentCount={2}
-        onCancel={noop}
-        onConfirm={noop}
-        onCopy={noop}
+        onCancel={action("onCancel")}
+        onConfirm={action("onConfirm")}
+        onCopy={action("onCopy")}
       />
     ),
   },
@@ -625,12 +771,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "NotePdfExportNotice",
     state: "default",
+    description: "Note Pdf Export Notice, a default state.",
+    tags: ["components", "notepdfexportnotice", "default"],
     render: () => (
       <NotePdfExportNotice
         open
         excludedAttachments={[{ id: ATTACHMENT.id, filename: ATTACHMENT.filename }]}
-        onCancel={noop}
-        onConfirm={noop}
+        onCancel={action("onCancel")}
+        onConfirm={action("onConfirm")}
       />
     ),
   },
@@ -639,8 +787,10 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "VaultExportModal",
     state: "default",
+    description: "Vault Export Modal, a default state.",
+    tags: ["components", "vaultexportmodal", "default"],
     render: () => (
-      <VaultExportModal open onClose={noop} folders={["notes/", "archive/"]} />
+      <VaultExportModal open onClose={action("onClose")} folders={["notes/", "archive/"]} />
     ),
   },
 
@@ -650,12 +800,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "BetaTermsConsent",
     state: "default",
+    description: "Beta Terms Consent, a default state.",
+    tags: ["components", "betatermsconsent", "default"],
     render: () => (
       <BetaTermsConsent
         open
         testId="story.beta-terms"
-        onAccept={noop}
-        onCancel={noop}
+        onAccept={action("onAccept")}
+        onCancel={action("onCancel")}
       />
     ),
   },
@@ -664,6 +816,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "BuildingIndexState",
     state: "default",
+    description: "Building Index State, a default state.",
+    tags: ["components", "buildingindexstate", "default"],
     render: () => <BuildingIndexState building />,
   },
   {
@@ -671,6 +825,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DeviceJoinQr",
     state: "default",
+    description: "Device Join Qr, a default state.",
+    tags: ["components", "devicejoinqr", "default"],
     render: () => <DeviceJoinQr />,
   },
   {
@@ -678,6 +834,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DeviceManagementPanel",
     state: "default",
+    description: "Device Management Panel, a default state.",
+    tags: ["components", "devicemanagementpanel", "default"],
     render: () => (
       <DeviceManagementPanel
         hook={{
@@ -698,6 +856,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "EndpointConfig",
     state: "default",
+    description: "Endpoint Config, a default state.",
+    tags: ["components", "endpointconfig", "default"],
     render: () => <EndpointConfig />,
   },
   {
@@ -705,6 +865,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "EnrollDeviceForm",
     state: "default",
+    description: "Enroll Device Form, a default state.",
+    tags: ["components", "enrolldeviceform", "default"],
     render: () => <EnrollDeviceForm />,
   },
   {
@@ -712,6 +874,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "EnrollPhraseCredential",
     state: "default",
+    description: "Enroll Phrase Credential, a default state.",
+    tags: ["components", "enrollphrasecredential", "default"],
     render: () => (
       <EnrollPhraseCredential
         baseId="story-enroll"
@@ -726,8 +890,10 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "FirstRunServerStep",
     state: "default",
+    description: "First Run Server Step, a default state.",
+    tags: ["components", "firstrunserverstep", "default"],
     render: () => (
-      <FirstRunServerStep onConnected={noop} onBack={noop} />
+      <FirstRunServerStep onConnected={action("onConnected")} onBack={action("onBack")} />
     ),
   },
   {
@@ -735,20 +901,26 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "IntegrityAlertBanner",
     state: "default",
-    render: () => <IntegrityAlertBanner present onDismiss={noop} />,
+    description: "Integrity Alert Banner, a default state.",
+    tags: ["components", "integrityalertbanner", "default"],
+    render: () => <IntegrityAlertBanner present onDismiss={action("onDismiss")} />,
   },
   {
     id: "components/joindevicemodal/default",
     group: "components",
     surface: "JoinDeviceModal",
     state: "default",
-    render: () => <JoinDeviceModal onCancel={noop} onJoined={noop} onRecovering={noop} />,
+    description: "Join Device Modal, a default state.",
+    tags: ["components", "joindevicemodal", "default"],
+    render: () => <JoinDeviceModal onCancel={action("onCancel")} onJoined={action("onJoined")} onRecovering={action("onRecovering")} />,
   },
   {
     id: "components/memberrosterpanel/default",
     group: "components",
     surface: "MemberRosterPanel",
     state: "default",
+    description: "Member Roster Panel, a default state.",
+    tags: ["components", "memberrosterpanel", "default"],
     fixture: {
       description: "unlocked vault whose membership roster is empty",
       handlers: {
@@ -766,8 +938,10 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "MemberVaultUnlockCard",
     state: "default",
+    description: "Member Vault Unlock Card, a default state.",
+    tags: ["components", "membervaultunlockcard", "default"],
     render: () => (
-      <MemberVaultUnlockCard vaultId={FIXTURE_VAULT_ID} onUnlocked={noop} />
+      <MemberVaultUnlockCard vaultId={FIXTURE_VAULT_ID} onUnlocked={action("onUnlocked")} />
     ),
   },
   {
@@ -775,13 +949,17 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ReconcileBanner",
     state: "default",
-    render: () => <ReconcileBanner active onDismiss={noop} />,
+    description: "Reconcile Banner, a default state.",
+    tags: ["components", "reconcilebanner", "default"],
+    render: () => <ReconcileBanner active onDismiss={action("onDismiss")} />,
   },
   {
     id: "components/recoverednotes/default",
     group: "components",
     surface: "RecoveredNotes",
     state: "default",
+    description: "Recovered Notes, a default state.",
+    tags: ["components", "recoverednotes", "default"],
     render: () => <RecoveredNotes />,
   },
   {
@@ -789,6 +967,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "RemoteMergeHint",
     state: "default",
+    description: "Remote Merge Hint, a default state.",
+    unreachable: {
+      what: "the hint shown when a peer's changes arrive mid-edit",
+      why: "it appears on a sync event from the running backend, which the fake host does not emit",
+    },
+    tags: ["components", "remotemergehint", "default"],
     render: () => <RemoteMergeHint />,
   },
   {
@@ -796,6 +980,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "RepairResidueBanner",
     state: "default",
+    description: "Repair Residue Banner, a default state.",
+    unreachable: {
+      what: "the banner offering to sweep orphan residue",
+      why: "it appears only when the mount scan finds residue on disk, and the fake host reports none",
+    },
+    tags: ["components", "repairresiduebanner", "default"],
     render: () => <RepairResidueBanner />,
   },
   {
@@ -803,6 +993,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SyncBanners",
     state: "default",
+    description: "Sync Banners, a default state.",
+    unreachable: {
+      what: "the sync status banners",
+      why: "they are driven by live sync state the fake host does not emit",
+    },
+    tags: ["components", "syncbanners", "default"],
     fixture: "unlocked",
     render: () => <SyncBanners />,
   },
@@ -811,6 +1007,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "UpdateBanner",
     state: "default",
+    description: "Update Banner, a default state.",
+    unreachable: {
+      what: "the desktop self-update banner",
+      why: "it appears only when the updater reports an available release, which the host does not answer here",
+    },
+    tags: ["components", "updatebanner", "default"],
     fixture: "unlocked",
     render: () => <UpdateBanner />,
   },
@@ -819,6 +1021,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SyncStatusIndicator",
     state: "default",
+    description: "Sync Status Indicator, a default state.",
+    tags: ["components", "syncstatusindicator", "default"],
     fixture: {
       description: "sync configured and idle",
       handlers: { "plugin:sync|sync_status": () => ({ state: "idle" }) },
@@ -830,6 +1034,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SyncUsageBlock",
     state: "default",
+    description: "Sync Usage Block, a default state.",
+    tags: ["components", "syncusageblock", "default"],
     render: () => (
       <SyncUsageBlock
         status={{
@@ -847,6 +1053,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "TorStatusBanner",
     state: "default",
+    description: "Tor Status Banner, a default state.",
+    tags: ["components", "torstatusbanner", "default"],
     render: () => <TorStatusBanner posture="connecting" />,
   },
 
@@ -856,14 +1064,22 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "Toast",
     state: "default",
-    render: () => <Toast message="Saved" onDone={noop} />,
+    description: "Toast, a default state.",
+    tags: ["components", "toast", "default"],
+    render: () => (
+      <ToastWithStack>
+        <Toast message="Saved" onDone={action("onDone")} />
+      </ToastWithStack>
+    ),
   },
   {
     id: "components/toaster/default",
     group: "components",
     surface: "Toaster",
     state: "default",
-    render: () => <Toaster />,
+    description: "Toaster, a default state.",
+    tags: ["components", "toaster", "default"],
+    render: () => <ToasterStackDemo />,
   },
 
   // ── Dialog and picker surfaces ───────────────────────────────────────────
@@ -872,10 +1088,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "CommandPalette",
     state: "default",
+    description: "Command Palette, a default state.",
+    tags: ["components", "commandpalette", "default"],
     fixture: UNLOCKED_FIXTURE,
     render: () => (
       <SidebarStateProvider>
-        <CommandPalette open onClose={noop} ctx={COMMAND_CONTEXT} />
+        <CommandPalette open onClose={action("onClose")} ctx={COMMAND_CONTEXT} />
       </SidebarStateProvider>
     ),
   },
@@ -884,6 +1102,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "QuickPicker",
     state: "default",
+    description: "Quick Picker, a default state.",
+    tags: ["components", "quickpicker", "default"],
     render: () => (
       <QuickPicker
         open
@@ -894,8 +1114,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           { id: "n2", label: "Reading list", sublabel: "projects" },
         ]}
         emptyText="No matches"
-        onPick={noop}
-        onClose={noop}
+        onPick={action("onPick")}
+        onClose={action("onClose")}
       />
     ),
   },
@@ -904,6 +1124,21 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PairingDialog",
     state: "default",
+    description: "Pairing Dialog, a default state.",
+    tags: ["components", "pairingdialog", "default"],
+    // Without this the dialog answered the fake host's benign default, so the
+    // challenge box rendered EMPTY and its height collapsed to the padding: the
+    // story showed a shape the app never produces (myne-md/myne#845).
+    fixture: {
+      description: "a clipper pairing session waiting for the user to compare a code",
+      handlers: {
+        "plugin:clipper-pairing|pairing_pending": () => ({
+          extension_id: "sample-extension-id",
+          challenge: "004291",
+          request_id: null,
+        }),
+      },
+    },
     render: () => <PairingDialog />,
   },
   {
@@ -911,6 +1146,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ThemeInstallDialog",
     state: "default",
+    description: "Theme Install Dialog, a default state.",
+    unreachable: {
+      what: "the install confirmation for a theme link",
+      why: "it renders only when the app receives a custom-theme deep link from the OS, which the catalogue cannot fire",
+    },
+    tags: ["components", "themeinstalldialog", "default"],
     render: () => <ThemeInstallDialog />,
   },
   {
@@ -918,6 +1159,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "MeetingAiDialog",
     state: "default",
+    description: "Meeting Ai Dialog, a default state.",
+    tags: ["components", "meetingaidialog", "default"],
     render: () => {
       // The dialog renders nothing until an offer exists; publish one so the
       // story shows the section picker.
@@ -930,20 +1173,24 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "IdentitySetupDialog",
     state: "default",
+    description: "Identity Setup Dialog, a default state.",
+    tags: ["components", "identitysetupdialog", "default"],
     fixture: "unlocked",
-    render: () => <IdentitySetupDialog open onClose={noop} />,
+    render: () => <IdentitySetupDialog open onClose={action("onClose")} />,
   },
   {
     id: "components/newnotefromtemplatemodal/default",
     group: "components",
     surface: "NewNoteFromTemplateModal",
     state: "default",
+    description: "New Note From Template Modal, a default state.",
+    tags: ["components", "newnotefromtemplatemodal", "default"],
     render: () => (
       <NewNoteFromTemplateModal
         open
-        onClose={noop}
-        onBlankNote={noop}
-        onCreateFromTemplate={noop}
+        onClose={action("onClose")}
+        onBlankNote={action("onBlankNote")}
+        onCreateFromTemplate={action("onCreateFromTemplate")}
       />
     ),
   },
@@ -952,23 +1199,33 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "TemplatesManager",
     state: "default",
+    description: "Templates Manager, a default state.",
+    tags: ["components", "templatesmanager", "default"],
     fixture: "unlocked",
     render: () => (
-      <TemplatesManager open onClose={noop} onOpenNote={noop} />
+      <TemplatesManager open onClose={action("onClose")} onOpenNote={action("onOpenNote")} />
     ),
   },
   {
     id: "components/settingsmodal/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the toggle, so `checked` is not a boolean and
+    // `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state ,
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
     group: "components",
     surface: "SettingsModal",
     state: "default",
+    description: "Settings Modal, a default state.",
+    tags: ["components", "settingsmodal", "default"],
     fixture: "unlocked",
     render: () => (
       <SettingsModal
         vaultId={FIXTURE_VAULT_ID}
         open
-        onClose={noop}
-        onDeleteVaultSuccess={noop}
+        onClose={action("onClose")}
+        onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
       />
     ),
   },
@@ -977,11 +1234,13 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "VaultSwitcher",
     state: "default",
+    description: "Vault Switcher, a default state.",
+    tags: ["components", "vaultswitcher", "default"],
     fixture: "unlocked",
     render: () => (
       <VaultSwitcher
-        onSwitchVault={noop}
-        onCreateAnother={noop}
+        onSwitchVault={action("onSwitchVault")}
+        onCreateAnother={action("onCreateAnother")}
         switching={false}
       />
     ),
@@ -993,6 +1252,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "BlockingProgressStep",
     state: "default",
+    description: "Blocking Progress Step, a default state.",
+    tags: ["components", "blockingprogressstep", "default"],
     render: () => (
       <BlockingProgressStep
         eyebrow="ENCRYPTING"
@@ -1006,6 +1267,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ImportPlainFileButton",
     state: "default",
+    description: "Import Plain File Button, a default state.",
+    tags: ["components", "importplainfilebutton", "default"],
     render: () => <ImportPlainFileButton handle={1} />,
   },
   {
@@ -1013,13 +1276,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "QuickUnlockEntry",
     state: "default",
+    description: "Quick Unlock Entry, a default state.",
+    tags: ["components", "quickunlockentry", "default"],
     fixture: "locked",
     render: () => (
       <QuickUnlockEntry
         vaultId={FIXTURE_VAULT_ID}
         method="pin"
-        onUnlocked={noop}
-        onUnavailable={noop}
+        onUnlocked={action("onUnlocked")}
+        onUnavailable={action("onUnavailable")}
       />
     ),
   },
@@ -1028,12 +1293,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SecretPhraseReveal",
     state: "default",
+    description: "Secret Phrase Reveal, a default state.",
+    tags: ["components", "secretphrasereveal", "default"],
     render: () => (
       <SecretPhraseReveal
         phrase={PHRASE}
         revealed
-        onReveal={noop}
-        onHide={noop}
+        onReveal={action("onReveal")}
+        onHide={action("onHide")}
         testIdPrefix="story.phrase"
         saveFilename="recovery-phrase.txt"
       />
@@ -1044,6 +1311,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "WebNoAccount",
     state: "default",
+    description: "Web No Account, a default state.",
+    tags: ["components", "webnoaccount", "default"],
     render: () => <WebNoAccount wall="no-account" />,
   },
 
@@ -1053,20 +1322,26 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "BriefingStep",
     state: "default",
-    render: () => <BriefingStep onBack={noop} onContinue={noop} />,
+    description: "Briefing Step, a default state.",
+    tags: ["components", "briefingstep", "default"],
+    render: () => <BriefingStep onBack={action("onBack")} onContinue={action("onContinue")} />,
   },
   {
     id: "components/passwordstep/default",
     group: "components",
     surface: "PasswordStep",
     state: "default",
-    render: () => <PasswordStep error={null} onBack={noop} onSubmit={noop} />,
+    description: "Password Step, a default state.",
+    tags: ["components", "passwordstep", "default"],
+    render: () => <PasswordStep error={null} onBack={action("onBack")} onSubmit={action("onSubmit")} />,
   },
   {
     id: "components/confirmstep/default",
     group: "components",
     surface: "ConfirmStep",
     state: "default",
+    description: "Confirm Step, a default state.",
+    tags: ["components", "confirmstep", "default"],
     render: () => (
       <ConfirmStep
         phrase={[...PHRASE]}
@@ -1074,7 +1349,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         inputs={{}}
         committing={false}
         error={null}
-        dispatch={noop}
+        dispatch={action("dispatch")}
       />
     ),
   },
@@ -1083,6 +1358,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "EncryptingStep",
     state: "default",
+    description: "Encrypting Step, a default state.",
+    tags: ["components", "encryptingstep", "default"],
     render: () => <EncryptingStep />,
   },
   {
@@ -1090,6 +1367,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SessionLostStep",
     state: "default",
+    description: "Session Lost Step, a default state.",
+    tags: ["components", "sessionloststep", "default"],
     render: () => (
       <SessionLostStep
         error={{
@@ -1098,7 +1377,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           primaryAction: "restart",
           displayMode: "dedicated",
         }}
-        dispatch={noop}
+        dispatch={action("dispatch")}
       />
     ),
   },
@@ -1107,6 +1386,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ProvisioningStep",
     state: "default",
+    description: "Provisioning Step, a default state.",
+    tags: ["components", "provisioningstep", "default"],
     render: () => <ProvisioningStep />,
   },
   {
@@ -1114,13 +1395,17 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ReadyStep",
     state: "default",
-    render: () => <ReadyStep onDone={noop} vaultId={FIXTURE_VAULT_ID} />,
+    description: "Ready Step, a default state.",
+    tags: ["components", "readystep", "default"],
+    render: () => <ReadyStep onDone={action("onDone")} vaultId={FIXTURE_VAULT_ID} />,
   },
   {
     id: "components/readylocalartefacts/default",
     group: "components",
     surface: "ReadyLocalArtefacts",
     state: "default",
+    description: "Ready Local Artefacts, a default state.",
+    tags: ["components", "readylocalartefacts", "default"],
     render: () => <ReadyLocalArtefacts pending={false} vaultId={FIXTURE_VAULT_ID} />,
   },
 
@@ -1130,9 +1415,11 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "RecoverySelectStep",
     state: "default",
+    description: "Recovery Select Step, a default state.",
+    tags: ["components", "recoveryselectstep", "default"],
     fixture: "locked",
     render: () => (
-      <RecoverySelectStep onVaultSelected={noop} onCancel={noop} />
+      <RecoverySelectStep onVaultSelected={action("onVaultSelected")} onCancel={action("onCancel")} />
     ),
   },
   {
@@ -1140,12 +1427,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PhraseEntryStep",
     state: "default",
+    description: "Phrase Entry Step, a default state.",
+    tags: ["components", "phraseentrystep", "default"],
     render: () => (
       <PhraseEntryStep
         state={RECOVER_PHRASE_ENTRY}
-        dispatch={noop}
-        onCancel={noop}
-        onSubmitNormalizedPhrase={noop}
+        dispatch={action("dispatch")}
+        onCancel={action("onCancel")}
+        onSubmitNormalizedPhrase={action("onSubmitNormalizedPhrase")}
       />
     ),
   },
@@ -1154,6 +1443,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DecryptingStep",
     state: "default",
+    description: "Decrypting Step, a default state.",
+    tags: ["components", "decryptingstep", "default"],
     render: () => <DecryptingStep />,
   },
   {
@@ -1161,12 +1452,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PasswordResetStep",
     state: "default",
+    description: "Password Reset Step, a default state.",
+    tags: ["components", "passwordresetstep", "default"],
     render: () => (
       <PasswordResetStep
         state={RECOVER_PASSWORD_RESET}
-        dispatch={noop}
-        onCompleteSuccess={noop}
-        onRecoverAnother={noop}
+        dispatch={action("dispatch")}
+        onCompleteSuccess={action("onCompleteSuccess")}
+        onRecoverAnother={action("onRecoverAnother")}
       />
     ),
   },
@@ -1177,16 +1470,20 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AccountBootstrap",
     state: "default",
+    description: "Account Bootstrap, a default state.",
+    tags: ["components", "accountbootstrap", "default"],
     fixture: "no-vault",
-    render: () => <AccountBootstrap onBootstrapped={noop} />,
+    render: () => <AccountBootstrap onBootstrapped={action("onBootstrapped")} />,
   },
   {
     id: "components/agentreview/default",
     group: "components",
     surface: "AgentReview",
     state: "default",
+    description: "Agent Review, a default state.",
+    tags: ["components", "agentreview", "default"],
     render: () => (
-      <AgentReview onClose={noop} titleOf={() => null} />
+      <AgentReview onClose={action("onClose")} titleOf={() => null} />
     ),
   },
   {
@@ -1194,11 +1491,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "Editor",
     state: "default",
+    description: "Editor, a default state.",
+    fullBleed: true,
+    tags: ["components", "editor", "default"],
     fixture: UNLOCKED_FIXTURE,
     render: () => (
       <WorkspaceProvider>
         <SidebarStateProvider>
-          <Editor onRestoreBackup={noop} onDeleteVaultSuccess={noop} />
+          <Editor onRestoreBackup={action("onRestoreBackup")} onDeleteVaultSuccess={action("onDeleteVaultSuccess")} />
         </SidebarStateProvider>
       </WorkspaceProvider>
     ),
@@ -1208,14 +1508,16 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "IdentityHome",
     state: "default",
+    description: "Identity Home, a default state.",
+    tags: ["components", "identityhome", "default"],
     fixture: "unlocked",
     render: () => (
       <IdentityHome
         personIdHex={null}
         identityCode={null}
-        onCreateVault={noop}
-        onAccepted={noop}
-        onForgotten={noop}
+        onCreateVault={action("onCreateVault")}
+        onAccepted={action("onAccepted")}
+        onForgotten={action("onForgotten")}
       />
     ),
   },
@@ -1224,23 +1526,27 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "RestoreBackup",
     state: "default",
+    description: "Restore Backup, a default state.",
+    tags: ["components", "restorebackup", "default"],
     fixture: "no-vault",
-    render: () => <RestoreBackup entry="welcome" onExit={noop} />,
+    render: () => <RestoreBackup entry="welcome" onExit={action("onExit")} />,
   },
   {
     id: "components/unlock/default",
     group: "components",
     surface: "Unlock",
     state: "default",
+    description: "Unlock, a default state.",
+    tags: ["components", "unlock", "default"],
     fixture: "locked",
     render: () => (
       <Unlock
         initialStatus={{ kind: "Exists" }}
-        onUnlocked={noop}
-        onStartRecovery={noop}
-        onResumeRecovery={noop}
-        onDeleteVaultSuccess={noop}
-        onRestoreBackup={noop}
+        onUnlocked={action("onUnlocked")}
+        onStartRecovery={action("onStartRecovery")}
+        onResumeRecovery={action("onResumeRecovery")}
+        onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
+        onRestoreBackup={action("onRestoreBackup")}
       />
     ),
   },
@@ -1249,13 +1555,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "VaultPicker",
     state: "default",
+    description: "Vault Picker, a default state.",
+    tags: ["components", "vaultpicker", "default"],
     fixture: "locked",
     render: () => (
       <VaultPicker
-        onSelect={noop}
-        onRestoreBackup={noop}
-        onCreateAnother={noop}
-        onJoinDevice={noop}
+        onSelect={action("onSelect")}
+        onRestoreBackup={action("onRestoreBackup")}
+        onCreateAnother={action("onCreateAnother")}
+        onJoinDevice={action("onJoinDevice")}
       />
     ),
   },
@@ -1264,13 +1572,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "VaultRecover",
     state: "default",
+    description: "Vault Recover, a default state.",
+    tags: ["components", "vaultrecover", "default"],
     fixture: "no-vault",
     render: () => (
       <VaultRecover
         initialSubStep="phrase-entry"
-        onCancel={noop}
-        onCompleteSuccess={noop}
-        onDeleteVaultSuccess={noop}
+        onCancel={action("onCancel")}
+        onCompleteSuccess={action("onCompleteSuccess")}
+        onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
       />
     ),
   },
@@ -1279,12 +1589,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "CreateVault",
     state: "default",
+    description: "Create Vault, a default state.",
+    tags: ["components", "createvault", "default"],
     fixture: "no-vault",
     render: () => (
       <CreateVault
-        onBack={noop}
-        onAutoUnlockSuccess={noop}
-        onAutoUnlockFailed={noop}
+        onBack={action("onBack")}
+        onAutoUnlockSuccess={action("onAutoUnlockSuccess")}
+        onAutoUnlockFailed={action("onAutoUnlockFailed")}
       />
     ),
   },
@@ -1293,9 +1605,30 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "AuthShell",
     state: "default",
+    description: "Auth Shell, a default state.",
+    tags: ["components", "authshell", "default"],
     render: () => (
       <AuthShell>
-        <div style={{ padding: "var(--space-4)" }}>Auth body</div>
+        <div
+          style={{
+            padding: "var(--space-5)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-4)",
+          }}
+        >
+          <h1 style={{ margin: 0, fontSize: "var(--text-lg)", color: "var(--fg-1)" }}>
+            Unlock your vault
+          </h1>
+          <p style={{ margin: 0, color: "var(--fg-2)" }}>
+            Your password is never sent anywhere; it unwraps the key on this device.
+          </p>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button variant="primary" onClick={action("onUnlock")}>
+              Unlock
+            </Button>
+          </div>
+        </div>
       </AuthShell>
     ),
   },
@@ -1304,8 +1637,10 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "NameStep",
     state: "default",
+    description: "Name Step, a default state.",
+    tags: ["components", "namestep", "default"],
     render: () => (
-      <NameStep value="" onChange={noop} onSubmit={noop} onBack={noop} />
+      <NameStep value="" onChange={action("onChange")} onSubmit={action("onSubmit")} onBack={action("onBack")} />
     ),
   },
   {
@@ -1313,13 +1648,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "KitStep",
     state: "default",
+    description: "Kit Step, a default state.",
+    tags: ["components", "kitstep", "default"],
     render: () => (
       <KitStep
         phrase={[...PHRASE]}
         accountNumber="MY-ABCD-EFGH-JKMN-PQRS-TVWX"
         vaultName="My vault"
         revealed
-        dispatch={noop}
+        dispatch={action("dispatch")}
       />
     ),
   },
@@ -1328,6 +1665,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ChoiceList",
     state: "default",
+    description: "Choice List, a default state.",
+    tags: ["components", "choicelist", "default"],
     render: () => (
       <ChoiceRow
         title="Sync this vault"
@@ -1342,12 +1681,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "PhraseGrid",
     state: "default",
+    description: "Phrase Grid, a default state.",
+    tags: ["components", "phrasegrid", "default"],
     render: () => (
       <PhraseGrid
         phrase={[...PHRASE]}
         revealed
-        onReveal={noop}
-        onHide={noop}
+        onReveal={action("onReveal")}
+        onHide={action("onHide")}
         testIdPrefix="stories.phrase"
       />
     ),
@@ -1357,6 +1698,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "SecretDisplayCaveats",
     state: "default",
+    description: "Secret Display Caveats, a default state.",
+    unreachable: {
+      what: "the platform caveats shown beside a once-only secret",
+      why: "both caveats are conditional on a capability being ABSENT, and on the desktop capability set both are present",
+    },
+    tags: ["components", "secretdisplaycaveats", "default"],
     render: () => <SecretDisplayCaveats testIdPrefix="stories.secret" />,
   },
   {
@@ -1364,13 +1711,17 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DeviceJoinQrDialog",
     state: "default",
-    render: () => <DeviceJoinQrDialog open onClose={noop} />,
+    description: "Device Join Qr Dialog, a default state.",
+    tags: ["components", "devicejoinqrdialog", "default"],
+    render: () => <DeviceJoinQrDialog open onClose={action("onClose")} />,
   },
   {
     id: "components/personidentityunlock/default",
     group: "components",
     surface: "PersonIdentityUnlock",
     state: "default",
-    render: () => <PersonIdentityUnlock open onOpenChange={noop} />,
+    description: "Person Identity Unlock, a default state.",
+    tags: ["components", "personidentityunlock", "default"],
+    render: () => <PersonIdentityUnlock open onOpenChange={action("onOpenChange")} />,
   },
 ];

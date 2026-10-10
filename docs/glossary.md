@@ -109,6 +109,12 @@ The one surface where a completed task is drawn with state-by-fill: a finished r
 
 Used in: `decisions.md` 2026-09-13 (myne-md/myne#656); `docs/design/README.md` "Task completion"
 
+### **accessibility level** &nbsp; 🛠️ *Tooling*
+
+The gate state a [story catalogue](#story-catalogue) entry declares: `error` (the default, where axe must find nothing and a violation fails the build), `todo` (a known finding recorded rather than hidden, so the debt is visible and may shrink), or `off` (axe must not run, and the entry carries a reason naming a mechanism). It is the `off | todo | error` vocabulary a mature accessibility panel uses, and it exists so that "is this story gated, or is it not" is a stated fact rather than something inferred from whether a test happens to exist. `tests/stories/a11yLevels.test.tsx` is the gate; the Accessibility tab in the catalogue is a view, and says so.
+
+Used in: `stories/src/a11y-level.ts`; `stories/src/stories/docs.tsx`
+
 ### **Active language set** &nbsp; 📦 *Product*
 
 The set of bundled dictionaries the [spell checker](#spell-check) currently checks against (SYNC-11). A word is accepted if it is valid in **any** member of the set (set-union, no per-note language detection) or in the **Personal dictionary**. The set is settings-driven (Settings → Appearance language picker) and defaults to the OS locale when bundled, unioned with en-US; it is passed to the engine's batch check as the `spell_check` command's `langs` argument. v0.1 bundles 23 languages (Turkish deferred).
@@ -898,6 +904,12 @@ One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2
 
 Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 
+### **Documentation node** &nbsp; 📦 *Product*
+
+The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
+
+Used in: `stories/README.md`; `decisions/ui/0653`
+
 ### **domain separation** &nbsp; 📋 *Protocol*
 
 The cryptographic principle that contexts which should not produce equal outputs from equal inputs MUST mix in a context-distinguishing string. Myne applies it pervasively: HKDF context strings (§3.2), AAD prefixes (§5.2), KDF-parameter binding (§4.3), and protocol-version magic bytes (§9, §10). Failure to domain-separate is the root cause of many published protocol vulnerabilities.
@@ -1661,6 +1673,12 @@ Used in: `src/editor/code-languages.ts`, `docs/decisions.md` (2026-05-29).
 An optional `vault.prefs` field (Unix epoch seconds, encrypted like every pref) recording when the vault was last exported as a [vault backup file](#vault-backup-file); absent ≡ never backed up. Drives the client's backup reminder. Normative field semantics (omit-when-unset, float ban, the locked-export-cannot-update caveat) live in `spec/protocol.md` §9.5.2.
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-10
+
+### **layering ladder** &nbsp; 🎨 *Design*
+
+The `--z-*` token family in `client-core/src/tokens.css`, which names the stacking order the tree had already been painting at as bare `z-index:` literals. A surface belongs on the step that names its ROLE (a dropdown, a modal, an overlay that must clear a modal) rather than on a value raised until it beat the thing it collided with; the shape that rule prevents is an in-modal `Select` sitting at 60 under a modal backdrop at 1000, with its options unclickable and nothing in either rule saying so. Every value is the one that was already shipping, so naming the ladder restacks nothing; the debt is the call sites still holding the bare number, recorded on the Z-index page. The editor owns a band above the app on purpose, which is why the two sequences are interleaved rather than merged.
+
+Used in: `client-core/src/tokens.css`; `stories/src/stories/docs.tsx`
 
 ### **libsodium** &nbsp; 🛠️ *Tooling*
 
@@ -2740,6 +2758,12 @@ Recreating a vault from a [vault backup file](#vault-backup-file): the file is v
 
 Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-06-10
 
+### **review axis** &nbsp; 📦 *Product*
+
+A view-time control in the design-system catalogue that changes how the stage is drawn rather than what the story is, applied to every story with no per-story opt-out (myne-md/myne#847): right-to-left, reduced motion and forced colors. Each is carried in the URL alongside the theme, so one link reproduces what was on screen. Reduced motion and forced colors do not invent a policy: they mirror the matching media rules onto a marker attribute, so the axis shows an existing behaviour, and a forced axis that mirrors zero rules warns rather than rendering as "nothing changed". Two candidates did not survive contact with the code: compact density is a width-to-boolean function (`settingsCompact` over a `ResizeObserver`), so the viewport preset is what exercises it, and text scale is `editor_text_size`, the editor's own base size rather than a global mechanism. Contrast [Documentation node](#documentation-node).
+
+Used in: `stories/README.md`; `decisions/ui/0653`
+
 ### **root_key** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 The cryptographic core of a Myne vault. A 32-byte random value generated by the OS CSPRNG at vault creation. **Not derived from the password** — instead, two copies are stored on disk encrypted under independent wrap keys (`password_wrap_key` and `recovery_wrap_key`), per the dual-credential wrap pattern. Held in client memory only between unlock and lock; zeroized on lock or process exit. Every Myne subkey (the `server-auth` reservation, the active `itemsKey_wrap_key`, the `backup-key` reservation) is derived from `root_key` via the `derive_key` helper. The architecture is essential to recovery — if `root_key` were a function of the password, losing the password would unconditionally destroy the vault.
@@ -3101,9 +3125,17 @@ Used in: `threat-model.md` §1 (A10)
 
 ### **story catalogue** &nbsp; 🛠️ *Tooling*
 
+*(Aliases: design-system workbench. The catalogue grew into a workbench with a navbar, a searchable rail, a collapsible inspector and generated Foundations specimens (myne-md/myne#845); the term of record stays "story catalogue".)*
+
 A dev-only, in-repo catalogue of every component, screen and state in the shared `src/` tree, mounted from the **real** components (myne-md/myne#832). It lives at `stories/` on the `web/` model (its own Vite target, no `package.json`, root scripts) and is served by `pnpm stories` on :1423. One entry per (surface × state) is declared in `stories/src/registry.ts`, so every state is addressable by URL; `scripts/check-story-coverage.mjs` is a ratchet that fails when a component or screen lands without a story, and `scripts/check-stories-isolation.mjs` fails if any app build config or Tauri bundle manifest references `stories/`, so "deployable" cannot become "shipped to users". It is not a shipped surface: it carries no backend, makes no network call, and stands outside every app bundle. See also [story host](#story-host), [fixture](#fixture).
 
 Used in: `decisions.md` 2026-10-05; `stories/README.md`
+
+### **story definition of done** &nbsp; 🛠️ *Tooling*
+
+The nine-item anatomy a [story catalogue](#story-catalogue) entry must answer before it counts as covering a surface: overview, when to use it and when not, anatomy, states and variants, behaviour, content guidance, accessibility, tokens and theming, related surfaces. It is borrowed from the component-anatomy model a mature design system documents, and it doubles as the measurable definition of the surfaces still in coverage debt. Four of the nine have a machine behind them (the surface has a story, the story carries a description and non-empty tags, it mounts, and its declared [accessibility level](#accessibility-level) is enforced); the rest are review questions, named rather than left to taste.
+
+Used in: `stories/src/stories/docs.tsx`; `stories/README.md`
 
 ### **story host** &nbsp; 🛠️ *Tooling*
 
@@ -3889,6 +3921,12 @@ Used in: `spec/markdown-dialect.md` §3.2/§7
 A ```mermaid fenced code block rendered as an SVG diagram in the editor (MYND-49) via lazy-loaded Mermaid (`securityLevel:'strict'`, `htmlLabels:false`: mermaid sanitizes its own SVG with its bundled DOMPurify). `fenced-code.ts` skips the `mermaid` info-string so the diagram widget renders it instead of a code card; parse-error / load-failure falls back to a monospace card carrying a single line naming mermaid's reason when it gave one. A diagram renders at its NATURAL size and scrolls inside its own card rather than being scaled down to the column width (myne-md/myne#629). Cursor-aware whole-block reveal; render-only (§6 C1). Mermaid is the **heaviest dependency** in the project (≈+100 transitive packages), lazy-loaded so a diagram-free note pays zero bytes. Shipped as a conscious decision (`decisions.md` 2026-06-08) over the auto-grill's defer recommendation. PlantUML is not rendered (stays a code card).
 
 Used in: `spec/markdown-dialect.md` §7; `dependency-policy.md`
+
+### **subcomponent edge** &nbsp; 📦 *Product*
+
+A hand-written `parent` on a story descriptor that nests one surface under another in the catalogue's rail, giving the four-level tree `group > component > [subcomponent] > Documentation | story` (myne-md/myne#847). It is declared rather than inferred from a directory, and the tree ships one real pair today (`AutomaticBackupBlock` under `StoragePanel`); the rest of the nesting is owed work, and `scripts/check-story-tree.mjs` carries a floor on how many edges it verifies so the count cannot sit at one unnoticed. `scripts/check-story-tree.mjs` checks three things about every declared edge: the parent exists, the tree is acyclic, and the two modules are connected by an import edge in either direction. Either direction is required because both real shapes occur: a settings shell imports its panels, while the shared modal shell is imported by its children. Contrast [Documentation node](#documentation-node).
+
+Used in: `stories/README.md`; `decisions/ui/0653`
 
 ### **subscript / superscript (markdown)** &nbsp; 📦 *Product*
 

@@ -14,12 +14,22 @@
 // 1420, web 1421, mobile 1422, so all four can run at once.
 
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import packageJson from "../package.json";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const storiesRoot = fileURLToPath(new URL(".", import.meta.url));
+
+/** The branch the source links point at, so a link resolves for a reader on it. */
+function branchName(): string {
+  try {
+    return execSync("git rev-parse --abbrev-ref HEAD", { cwd: repoRoot, encoding: "utf8" }).trim();
+  } catch {
+    return "develop";
+  }
+}
 
 export default defineConfig({
   root: storiesRoot,
@@ -32,11 +42,19 @@ export default defineConfig({
     },
   },
   define: {
-    // Both are referenced by components the catalogue mounts (AboutPanel reads
-    // them). The commit is a fixed sentinel here: the catalogue is dev tooling,
-    // not a shipped build whose provenance needs recording.
+    // All three compile-time globals are referenced by components the catalogue
+    // mounts (AboutPanel reads every one of them). Missing `__UPDATE_CHANNEL__`
+    // was not a missing label: it is a bare identifier read during render, so
+    // the panel threw `ReferenceError` and, with no boundary in the shell, took
+    // the whole catalogue down with it. The commit and channel are fixed
+    // sentinels here: the catalogue is dev tooling, not a shipped build whose
+    // provenance needs recording.
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __BUILD_COMMIT__: JSON.stringify("stories"),
+    __UPDATE_CHANNEL__: JSON.stringify("stable"),
+    // The branch a source link is pinned to (myne-md/myne#845). A link is only
+    // useful if it resolves to the tree the reader is looking at.
+    __STORIES_BRANCH__: JSON.stringify(branchName()),
   },
   // The shared tree lives above the Vite root; allow the whole checkout.
   server: {

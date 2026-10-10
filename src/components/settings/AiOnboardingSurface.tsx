@@ -194,6 +194,11 @@ export function AiOnboardingSurface({
           display: "flex",
           flexDirection: "column",
           gap: "var(--space-3)",
+          // `ModalShell`'s body carries no padding of its own: every caller
+          // supplies its own, and this surface was one of the two that did not,
+          // so its content sat flush against the card edges (myne-md/myne#847).
+          // The same fix `MeetingAiDialog` needed (myne-md/myne#843).
+          padding: "var(--space-5)",
         }}
       >
       <p data-testid="aiOnboarding.intro" style={CARD_BODY_STYLE}>
@@ -257,7 +262,17 @@ export function AiOnboardingSurface({
 
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: "var(--space-2)",
+          // The footer is a SIBLING of the scrolling body, so the body's own
+          // padding does not reach it and the buttons would sit on the card's
+          // bottom edge.
+          padding: "0 var(--space-5) var(--space-5)",
+        }}
+      >
         <Button
           variant="ghost"
           onClick={onClose}

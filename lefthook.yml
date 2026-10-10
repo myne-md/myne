@@ -465,6 +465,39 @@ pre-commit:
       # a code one, and the guard is a directory walk that costs milliseconds.
       run: node scripts/check-story-coverage.mjs
 
+    stories-catalogue:
+      # myne-md/myne#845: every story carries the description and tags the navbar
+      # search reads, and no story renders a known placeholder phrase. Unfiltered
+      # for the same reason as the coverage guard above.
+      run: node scripts/check-story-catalogue.mjs
+
+    story-tree:
+      # myne-md/myne#847: the rail's `parent` edges are hand-written, so a guard holds
+      # them to the tree. It checks that the parent exists, that the edges do not
+      # cycle, and that the two modules are connected by an import in EITHER
+      # direction, which is the half that catches a fabricated composition claim.
+      run: node scripts/check-story-tree.mjs
+
+    token-consumers:
+      # myne-md/myne#847: a duration, ease or text token is READ somewhere outside the
+      # sheet. Those three families are the ones a catalogue can only DISPLAY: a colour
+      # has a swatch and a spacing step has a bar, so an unused one is visible, while a
+      # duration and a size are numbers a reader takes on trust.
+      run: node scripts/check-token-consumers.mjs
+
+    story-source-map:
+      # myne-md/myne#847 review: the generated surface -> source map had no caller and
+      # no gate, so the branch that moved QuickPicker and Select left the rail's
+      # "Show on GitHub" link pointing at the old lines and nothing reported it.
+      run: node scripts/gen-story-source-map.mjs --check
+
+    foundations-coverage:
+      # myne-md/myne#845: every token in the sheet and every icon in the registry
+      # has a specimen in the Foundations group. Unfiltered: a token lands in a
+      # CSS file, which is exactly the commit that would otherwise skip a guard
+      # scoped to TypeScript.
+      run: node scripts/check-foundations-coverage.mjs
+
     stories-isolation:
       # myne-md/myne#832: the catalogue is a separate Vite target, so it cannot
       # enter an app bundle by construction. This is the guard on that
