@@ -298,6 +298,16 @@ pub enum NoteUpdateError {
     /// deleted-note fold).
     #[error("expected base mismatch")]
     BaseMismatch,
+
+    /// A live co-editing session owns this note (epic live-collab,
+    /// `collab-editor-bridge`): while a session is open it is the SINGLE durable
+    /// writer (`SYNC-33`), so a stateless `note_update` is refused with this
+    /// typed error rather than racing the session's own persistence. The editor
+    /// calls the live command instead while the session exists; this is the
+    /// backend safety net for a save that arrives by another path. Nothing is
+    /// written.
+    #[error("a live session owns this note")]
+    LiveSessionOpen,
 }
 
 impl From<std::io::Error> for NoteUpdateError {
@@ -415,6 +425,12 @@ pub enum NoteBatchError {
     /// "try again".
     #[error("blocking task join failure")]
     JoinFailure,
+
+    /// A live co-editing session owns one of the batch's notes, so that session is
+    /// the only durable writer (`SYNC-33`). Refused before any filesystem touch
+    /// rather than writing behind it.
+    #[error("a live session owns a note in this batch")]
+    LiveSessionOpen,
 }
 
 impl From<std::io::Error> for NoteBatchError {
@@ -1020,6 +1036,10 @@ mod tests {
                 r#"{"kind":"BaseMismatch"}"#,
             ),
             (
+                json(&NoteUpdateError::LiveSessionOpen),
+                r#"{"kind":"LiveSessionOpen"}"#,
+            ),
+            (
                 json(&NoteBatchError::VaultNotUnlocked),
                 r#"{"kind":"VaultNotUnlocked"}"#,
             ),
@@ -1336,6 +1356,7 @@ mod tests {
                 NoteUpdateError::Io { io_error_kind: _ } => {}
                 NoteUpdateError::JoinFailure => {}
                 NoteUpdateError::BaseMismatch => {}
+                NoteUpdateError::LiveSessionOpen => {}
             }
         }
         assert_closed(&NoteUpdateError::VaultNotUnlocked);
@@ -1366,6 +1387,7 @@ mod tests {
                 NoteBatchError::Io { io_error_kind: _ } => {}
                 NoteBatchError::CommittedPendingPublish { io_error_kind: _ } => {}
                 NoteBatchError::JoinFailure => {}
+                NoteBatchError::LiveSessionOpen => {}
             }
         }
         assert_closed(&NoteBatchError::VaultNotUnlocked);

@@ -214,6 +214,26 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // served page cannot replace itself. Absent by platform fact; the About and
   // banner affordances are omitted here rather than greyed.
   "selfUpdate",
+  // Live-collab, `SYNC-31`. Multi-user co-editing needs a PERSON identity: the
+  // B2B group substrate, the roster and the member removal rekey, all held in a
+  // device-local sealed file outside browser storage whose panel prompt is
+  // substituted out of the bundle. A browser origin cannot hold a person
+  // identity, so this is absent for the same reasons `memberSharing` is. Split
+  // from `liveCollabPeerPresence`, which stays PRESENT here, so the client is
+  // not second-class for its own devices while never implying multi-user works
+  // in a page. Omitted, not greyed.
+  //
+  // No command surface of its own: the transport exposes wasm exports, not an
+  // IPC command, and the person/membership commands it would depend on are
+  // already refused under `memberSharing` (hence the empty backing in the guard).
+  "liveCollabMultiUser",
+  // Live-collab, `collab-presence-ui`. The awareness CURSOR consumer is a native
+  // SSE supervisor (`AwarenessSignal` + `AppHandle`); the web Worker-side consumer
+  // is not built, and the local presence report (`live_session_set_presence`) is
+  // refused there. Split from `liveCollabPeerPresence`, which stays PRESENT here,
+  // so a web session still opens for this client's own devices' convergence while
+  // the cursor affordance is omitted. Omitted, not greyed.
+  "liveCollabAwarenessCursors",
 ]);
 
 export function has(cap: Capability): boolean {

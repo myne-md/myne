@@ -95,6 +95,14 @@ pub mod sync_transport;
 /// and unit-tested rather than gated with the JS glue that uses it.
 pub mod sync_origin;
 
+/// The Worker's live-awareness state (live-collab, collab-client-transport task
+/// 4): the received-frame inbox and the outgoing coalescer/POST bound to the
+/// SHARED ~100 ms machine (`awareness_coalesce`). Host-compiled, like
+/// `sync_origin` and `capability`, so `cargo test -p myne-web-wasm` covers the
+/// coalescing and POST classification with no browser. The JS reader that feeds
+/// the inbox is `web/src/worker/sync-loop.ts`.
+pub mod awareness;
+
 /// The browser's sync tick driver — the glue half of `loop_control`, never its
 /// decisions. See the module doc for what differs from the desktop loop and what
 /// deliberately does not (phase3-web-client task 84).

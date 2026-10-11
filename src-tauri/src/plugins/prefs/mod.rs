@@ -235,6 +235,7 @@ mod desktop_tests {
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
         fn detached_windows_teardown_on_lock(&self) {}
+        fn live_session_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}

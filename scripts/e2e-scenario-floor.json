@@ -666,7 +666,7 @@
     "measurement of the whole suite: 366 is the number the note above",
     "established and this adds exactly one scenario file entry to it."
   ],
-  "stable": 367,
+  "stable": 373,
   "stable_max_failures": 0,
   "_comment_361_to_366": [
     "Raised 361 -> 366 for myne-md/myne#728 task 18. `e2e/a11y-keyboard.e2e.ts`",
@@ -736,5 +736,25 @@
     "/Users/omer/mem-697-rerun.log. 359 was the develop base and the new file",
     "executes two scenarios under the AI gate, so the floor holds 361 on",
     "measured runs rather than counting."
+  ],
+  "_comment_367_to_373": [
+    "Raised 367 -> 373 for the live-collab epic (collab-verification task 8).",
+    "SIX new scenarios relative to develop, all in NEW desktop files: four in",
+    "e2e/collab-convergence.e2e.ts (two-device convergence, self-echo, drop-",
+    "fallback, RAM-only) plus one each in e2e/collab-presence.e2e.ts and",
+    "e2e/collab-leak-budget.e2e.ts.",
+    "",
+    "MEASURED, not reasoned: each file ran three times consecutively in one warm",
+    "container, 4/4 then 1/1 then 1/1 passing with none skipped (`PASS:",
+    "collab-convergence collab-convergence collab-convergence`, `PASS:",
+    "collab-presence collab-presence collab-presence`, `PASS: collab-leak-budget",
+    "collab-leak-budget collab-leak-budget`, each with an empty `FAIL:`).",
+    "",
+    "All six need the myne-server binary and self-skip without it, which is why",
+    "the raise is safe only because the lane this floor measures provides it:",
+    ".woodpecker/e2e.yml's myne-server-build step clones and builds the server",
+    "for exactly these sync scenarios, so they execute there rather than skip.",
+    "",
+    "`stable_max_failures` stays 0."
   ]
 }

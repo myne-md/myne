@@ -142,7 +142,7 @@ impl From<ProtocolError> for CrdtNoteOpError {
 }
 
 /// The root single-`Text` object id of a loaded `NC05` note document.
-fn note_text_id(doc: &AutoCommit) -> Result<ObjId, CrdtNoteOpError> {
+pub fn note_text_id(doc: &AutoCommit) -> Result<ObjId, CrdtNoteOpError> {
     doc.get(ROOT, NOTE_TEXT_KEY)
         .map_err(|_| CrdtNoteOpError::Malformed)?
         .map(|(_, id)| id)
@@ -162,6 +162,7 @@ fn note_text_id(doc: &AutoCommit) -> Result<ObjId, CrdtNoteOpError> {
 pub fn encode_note_edit(
     existing_blob: &[u8],
     new_markdown: &str,
+    actor: Option<&[u8; 16]>,
     items_key: &[u8; 32],
     items_key_id: &[u8; 16],
     note_uuid: &[u8; 16],
@@ -170,6 +171,7 @@ pub fn encode_note_edit(
     encode_note_edit_at_millis(
         existing_blob,
         new_markdown,
+        actor,
         items_key,
         items_key_id,
         note_uuid,
@@ -181,9 +183,18 @@ pub fn encode_note_edit(
 /// passes it. The note-update command runs the automerge mutation inside a
 /// `'static` [`crate::task::run_blocking`] closure that cannot borrow the host,
 /// so it reads the clock first and calls this.
+///
+/// `actor` is this device's Automerge actor (`SYNC-42`,
+/// [`crate::plugins::sync::crdt_doc::note_actor_bytes`]): `Some` sets it on the
+/// loaded document before committing, so an edit on a peer-created note is
+/// authored under THIS device. Without it, `load` seeds a fresh RANDOM actor, so
+/// the edit is unattributed, the defect `SYNC-42` fixes. `None` is the
+/// pre-`SYNC-42` shape, kept for a vault with no device identity and for tests
+/// where attribution is not the subject.
 pub fn encode_note_edit_at_millis(
     existing_blob: &[u8],
     new_markdown: &str,
+    actor: Option<&[u8; 16]>,
     items_key: &[u8; 32],
     items_key_id: &[u8; 16],
     note_uuid: &[u8; 16],
@@ -192,6 +203,9 @@ pub fn encode_note_edit_at_millis(
     let save = decode_crdt_note_blob(existing_blob, note_uuid, items_key, items_key_id)
         .map_err(|_| CrdtNoteOpError::CannotDecrypt)?;
     let mut doc = AutoCommit::load(&save).map_err(|_| CrdtNoteOpError::Malformed)?;
+    if let Some(a) = actor {
+        doc.set_actor(automerge::ActorId::from(&a[..]));
+    }
     let text = note_text_id(&doc)?;
     // `update_text` DIFFS the new full text against the current one and records
     // only the minimal splices. The obvious-looking alternative — a whole-body
@@ -591,8 +605,8 @@ mod tests {
         let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
         let base =
             encode_note_blob("first version", &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
-        let upd =
-            encode_note_edit(&base, "second version", &ik, &ikid, &uuid, &host).expect("edit");
+        let upd = encode_note_edit(&base, "second version", None, &ik, &ikid, &uuid, &host)
+            .expect("edit");
         assert_eq!(
             decode_note_blob(&upd.blob, &uuid, &ik, &ikid).expect("decode"),
             "second version"
@@ -624,6 +638,7 @@ mod tests {
         let deleted = encode_note_edit(
             &base,
             "---\ntitle: Groceries\nupdated: 2026-08-11T09:00:00Z\ndeleted: 2026-08-11T09:00:00Z\n---\n\nMilk.\n",
+            None,
             &ik, &ikid, &uuid, &host,
         )
         .expect("delete");
@@ -632,6 +647,7 @@ mod tests {
         let edited = encode_note_edit(
             &base,
             "---\ntitle: Groceries\nupdated: 2026-08-11T09:30:00Z\n---\n\nMilk.\nEggs.\n",
+            None,
             &ik,
             &ikid,
             &uuid,
@@ -657,6 +673,15 @@ mod tests {
             "the note must stay deleted, and `deleted:` must still parse: {:?}",
             ab.text
         );
+        // Exact: the tombstone is the value the deleting device wrote, never a
+        // value blended character-wise from `deleted:` and `updated:` (the #431
+        // fabrication the gate exists to prevent).
+        assert_eq!(
+            deleted_marker(&ab.text).as_deref(),
+            Some("2026-08-11T09:00:00Z"),
+            "`deleted:` must be verbatim, not fabricated: {:?}",
+            ab.text
+        );
         // And the losing edit did not ride along into a note the user deleted.
         assert!(
             !ab.text.contains("Eggs."),
@@ -680,6 +705,7 @@ mod tests {
         let early = encode_note_edit(
             &base,
             "---\ntitle: Groceries\ndeleted: 2026-08-11T09:00:00Z\n---\n\nMilk.\n",
+            None,
             &ik,
             &ikid,
             &uuid,
@@ -689,6 +715,7 @@ mod tests {
         let late = encode_note_edit(
             &base,
             "---\ntitle: Groceries\ndeleted: 2026-08-11T11:00:00Z\n---\n\nMilk.\n",
+            None,
             &ik,
             &ikid,
             &uuid,
@@ -726,6 +753,7 @@ mod tests {
         let a = encode_note_edit(
             &base,
             &format!("{BASE}Added from the desktop.\n"),
+            None,
             &ik,
             &ikid,
             &uuid,
@@ -735,6 +763,7 @@ mod tests {
         let b = encode_note_edit(
             &base,
             &format!("{BASE}Added from the phone.\n"),
+            None,
             &ik,
             &ikid,
             &uuid,
@@ -810,7 +839,7 @@ mod tests {
 
         // A genuine edit → dirty, advanced heads.
         let edited =
-            encode_note_edit(&base, "base + more", &ik, &ikid, &uuid, &host).expect("edit");
+            encode_note_edit(&base, "base + more", None, &ik, &ikid, &uuid, &host).expect("edit");
         let (dirty2, heads2) =
             nc05_convergence(&edited.blob, &base_heads, &ik, &ikid, &uuid).expect("conv");
         assert!(dirty2, "a real edit IS dirty");
@@ -827,9 +856,9 @@ mod tests {
         host.set_now(1000); // seconds → 1_000_000 ms
         let base = encode_note_blob("v1", &ik, &ikid, &uuid, ACTOR, &host).expect("seal");
         host.set_now(2000);
-        let e1 = encode_note_edit(&base, "v2", &ik, &ikid, &uuid, &host).expect("edit");
+        let e1 = encode_note_edit(&base, "v2", None, &ik, &ikid, &uuid, &host).expect("edit");
         host.set_now(3000);
-        let e2 = encode_note_edit(&e1.blob, "v3", &ik, &ikid, &uuid, &host).expect("edit");
+        let e2 = encode_note_edit(&e1.blob, "v3", None, &ik, &ikid, &uuid, &host).expect("edit");
 
         let hist = crdt_note_history(&e2.blob, &uuid, &ik, &ikid).expect("history");
         assert_eq!(hist.len(), 3, "create + 2 edits = 3 revisions");
@@ -849,6 +878,49 @@ mod tests {
         assert_ne!(
             hist[0].change_hash_hex, hist[2].change_hash_hex,
             "distinct revision ids"
+        );
+    }
+
+    /// `SYNC-42`: each device authors under its OWN device actor. Device B
+    /// editing a note device A created must commit under B, otherwise every
+    /// revision is unattributed (`load` seeds a random actor) and "who edited
+    /// this" is a lie.
+    #[test]
+    fn an_edit_is_authored_under_this_devices_actor_not_the_inherited_one() {
+        let host = TestHost::new("/base");
+        let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
+        const A: [u8; 16] = [0xAAu8; 16];
+        const B: [u8; 16] = [0xBBu8; 16];
+
+        // Device A creates the note (encoded under actor A).
+        let base = encode_note_blob("v1", &ik, &ikid, &uuid, &A, &host).expect("seal");
+
+        // Device B edits it and sets its own actor.
+        let e = encode_note_edit(&base, "v2", Some(&B), &ik, &ikid, &uuid, &host).expect("edit B");
+        let hist = crdt_note_history(&e.blob, &uuid, &ik, &ikid).expect("history");
+        assert_eq!(hist[0].actor_hex, hex_lower(&A), "the create is A's");
+        assert_eq!(
+            hist[1].actor_hex,
+            hex_lower(&B),
+            "B's edit is authored under B, not the inherited A"
+        );
+
+        // With no actor, the edit is NOT attributed to A: automerge's `load`
+        // seeds a fresh random actor, so the pre-`SYNC-42` edit path was
+        // effectively unattributed. That is the defect this task fixes, the
+        // production paths now pass `Some(device_actor)`.
+        let inherited =
+            encode_note_edit(&base, "v2", None, &ik, &ikid, &uuid, &host).expect("edit");
+        let hist2 = crdt_note_history(&inherited.blob, &uuid, &ik, &ikid).expect("history");
+        assert_ne!(
+            hist2[1].actor_hex,
+            hex_lower(&A),
+            "no actor → not attributed to A"
+        );
+        assert_eq!(
+            hist2[1].actor_hex.len(),
+            ACTOR.len() * 2,
+            "still well-formed"
         );
     }
 }

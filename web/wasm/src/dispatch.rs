@@ -1154,10 +1154,131 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 a.plaintext,
                 a.expected_base_hash_hex,
                 vault_io(),
+                crate::session::live_sessions(),
             )
             .await
             {
                 Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // live-collab (`collab-editor-bridge` task 3): the collaborative-editor
+        // live-session commands. Single-user multi-device presence ships on web
+        // (SYNC-31), so these dispatch here.
+        "plugin:live|live_session_open" => {
+            use myne_core::plugins::live::commands::live_session_open_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match live_session_open_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::live_sessions(),
+                vault_io(),
+                a.note_id,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:live|live_session_patch_frontmatter" => {
+            use myne_core::plugins::live::commands::live_session_patch_frontmatter_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+                markdown: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match live_session_patch_frontmatter_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::live_sessions(),
+                vault_io(),
+                a.note_id,
+                a.markdown,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:live|live_session_close" => {
+            use myne_core::plugins::live::commands::live_session_close_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match live_session_close_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::live_sessions(),
+                vault_io(),
+                a.note_id,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:live|live_session_take_remote_splices" => {
+            use myne_core::plugins::live::commands::live_session_take_remote_splices_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match live_session_take_remote_splices_from_host(
+                crate::session::live_sessions(),
+                a.note_id,
+            ) {
+                Ok(splices) => Outcome::ok(&splices),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -1218,6 +1339,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 vault_io(),
                 crate::session::state(),
                 crate::session::hooks(),
+                crate::session::live_sessions(),
                 a.notes,
             )
             .await
@@ -1657,9 +1779,39 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 vault_io(),
                 crate::session::state(),
                 crate::session::hooks(),
+                crate::session::live_sessions(),
             )
             .await;
             Outcome::ok(&status)
+        }
+
+        "plugin:sync|resolve_identity" => {
+            use myne_core::plugins::sync::identity_resolver::resolve_identity_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                actor_hex: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match resolve_identity_from_host(
+                host_ctx(),
+                crate::session::state(),
+                vault_io(),
+                a.actor_hex,
+            )
+            .await
+            {
+                Ok(id) => Outcome::ok(&id),
+                Err(e) => Outcome::error(&e),
+            }
         }
 
         // ── the pending-approval wait's two halves (MYND-635) ────────────────

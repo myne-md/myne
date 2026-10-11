@@ -19,8 +19,9 @@ describe("RIGHT_PANEL_TABS vocabulary", () => {
     );
   });
 
-  it("exposes the expected five tabs in canonical order", () => {
-    // The AI Chat tab (ai-ux-surface MYND-408) stays LAST. Tasks (MYND-616)
+  it("exposes the expected six tabs in canonical order", () => {
+    // The AI Chat tab (ai-ux-surface MYND-408) is followed by the "Who's here"
+    // live-presence roster (live-collab, `collab-presence-ui`). Tasks (MYND-616)
     // slots in beside the other this-note surfaces — backlinks are this note's
     // links, the outline its headings, tasks its work.
     expect(RIGHT_PANEL_DEFAULT_ORDER).toEqual([
@@ -29,6 +30,7 @@ describe("RIGHT_PANEL_TABS vocabulary", () => {
       "outline",
       "tasks",
       "ai-chat",
+      "who-is-here",
     ]);
   });
 

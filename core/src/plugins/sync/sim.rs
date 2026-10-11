@@ -408,6 +408,16 @@ impl Device {
     /// [`Device::sync`] without the panic-on-error — the fault-injection
     /// scenarios assert on the error shape instead.
     fn try_sync(&self) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
+        self.try_sync_with_live(&std::collections::HashSet::new())
+    }
+
+    /// [`Device::try_sync`] with a caller-supplied set of blob ids treated as OPEN
+    /// in a live session, so the pull DEFERS their remote revision instead of
+    /// writing it (`collab-editor-bridge` task 7).
+    fn try_sync_with_live(
+        &self,
+        live: &std::collections::HashSet<[u8; 16]>,
+    ) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
         // `run_sync_cycle` became `async` with task 86; the sim's scenarios are
         // synchronous by design (they drive a deterministic two-device timeline
         // step by step), so each cycle is driven on a runtime. The engine under
@@ -433,6 +443,7 @@ impl Device {
                 items_key_id: &self.acct.items_key_id,
             }),
             None,
+            live,
         ))
     }
 
@@ -479,6 +490,7 @@ impl Device {
         let upd = crate::plugins::notes::crdt::encode_note_edit(
             &existing,
             markdown,
+            Some(&self.device_id),
             &self.acct.items_key,
             &self.acct.items_key_id,
             &nb,
@@ -1052,6 +1064,37 @@ fn genuine_concurrent_edit_stages_a_real_conflict() {
     assert!(
         a.pending_conflicts().is_empty(),
         "the winner has no conflict"
+    );
+}
+
+/// Task 7: a note OPEN in a live session has its pulled remote revision DEFERRED,
+/// not written, the session is the single durable writer (`SYNC-33`), so the
+/// orchestrator hands the bytes back (`deferred_live_pulls`) for the caller to merge
+/// (remove-wins) into the session.
+#[test]
+fn a_pull_of_a_live_note_is_deferred_and_not_written() {
+    let (_guard, url) = server_or_skip!("live_pull_deferral");
+    let acct = Account::new(0x6b);
+    let devices = enroll_devices(&acct, &url, 2);
+    let (a, b) = (&devices[0], &devices[1]);
+
+    let n = a.create_note(b"live-base");
+    a.sync();
+    // A publishes a newer revision B has not seen.
+    a.edit_note(&n, b"peer-revision");
+    a.sync();
+
+    let id = *n.as_uuid().as_bytes();
+    let live: std::collections::HashSet<[u8; 16]> = [id].into_iter().collect();
+    let summary = b.try_sync_with_live(&live).expect("cycle");
+
+    assert!(
+        summary.deferred_live_pulls.iter().any(|(i, _, _)| *i == id),
+        "the live note's pulled revision must be deferred: {summary:?}"
+    );
+    assert!(
+        !b.blob_path(&n).exists(),
+        "a deferred live pull must NOT be written to disk"
     );
 }
 

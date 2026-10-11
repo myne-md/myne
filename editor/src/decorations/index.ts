@@ -41,6 +41,7 @@ import { taskChipDecorations } from "./task-chip";
 import { taskQueryBlockDecorations } from "./task-query-block";
 import { tagSuggestionBandDecorations } from "./tag-suggestion-band";
 import { commentDecorations } from "./comment";
+import { awarenessDecorations } from "./awareness";
 
 // SYNC-17 (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08 "Interactive
 // tags ship as ONE unit"): the inline-`#tag` chip decoration ships HERE ONLY
@@ -139,5 +140,10 @@ export function myneDecorations(): readonly Extension[] {
     // multi-line block line-collapse, both revealed raw on-cursor. Render-only,
     // bytes preserved (§6 C1). Last — purely subtractive, no ordering deps.
     ...commentDecorations(),
+    // Live-collaboration awareness (live-collab, `collab-presence-ui` task 2): each
+    // peer's caret/selection drawn on top as a widget/mark, gated on the note the
+    // view holds. Pushed via `setAwareness` (absent = nothing), so it composes over
+    // the inline layers with no ordering dependency and adds no second drawSelection.
+    awarenessDecorations(),
   ];
 }

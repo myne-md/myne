@@ -352,6 +352,7 @@ function healthyFiles(): Record<string, string> {
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
     "src/components/sync/personIdentityState.ts": `export function resetPersonIdentityState(): void {}\n`,
+    "src/notes/collab/awarenessStore.ts": `export function clearAwareness(): void {}\n`,
 
     // The two DELETE paths. Only the display store is asserted on them: what it
     // holds describes the READER, so erasing the vault erases the source of the
@@ -360,6 +361,7 @@ function healthyFiles(): Record<string, string> {
     "src/lib/vault-delete.ts": `export async function deleteVault(vaultId: string): Promise<void> {
   resetDateTimeDisplayForLock();
   resetPersonIdentityState();
+  clearAwareness();
   await invoke("plugin:vault-unlock|vault_delete");
 }
 `,
@@ -381,6 +383,7 @@ export function resetTranscripts(): void {}
 export function resetMermaidZoom(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
+  clearAwareness();
   clearChat();
   clearChatPersistForLock();
   clearAiOutput();
@@ -401,6 +404,7 @@ export function resetMermaidZoom(): void {}\n`,
   reason: string;
 }): Promise<void> {
   clearAgentForLock();
+  clearAwareness();
   clearChat();
   clearChatPersistForLock();
   clearAiOutput();

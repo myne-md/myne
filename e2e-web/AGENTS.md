@@ -225,7 +225,13 @@ settles any argument with this section):
   `single-tab-lock` (#254: two tabs on one origin; the second is refused),
   `chat-history-reload` (myne-md/myne#675: a seeded conversation lists, opens,
   survives a reload, and deletes with its tombstone surviving a second reload;
-  seeds rather than sends because the agent plugin is Unsupported on web).
+  seeds rather than sends because the agent plugin is Unsupported on web),
+  `collab-web-seam` (live-collab SYNC-49: the web-only awareness seam. The
+  Worker ships a `fetch` + `ReadableStream` reader, not `EventSource`; the
+  production CSP's `connect-src` admits the awareness origin and a fetch-streamed
+  request from the app origin connects under it; and `liveCollabPeerPresence` is
+  present while `liveCollabMultiUser` is absent. Single session, no server
+  convergence, the real two-browser co-edit is a manual item).
 - **Runners and config**: `scripts/e2e-web-local.sh`, `scripts/e2e-web-one.sh`,
   `vitest.web-e2e.config.ts`, `pnpm test:e2e:web`.
 

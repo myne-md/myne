@@ -401,8 +401,13 @@ pub async fn vault_migrate_from_host(
         return Err(VaultMigrateError::RecoveryPhraseRequired);
     }
 
-    // Fresh Automerge actor for the migrated notes (device provenance, ASM-3).
-    let actor = crate::plugins::sync::crdt_doc::fresh_actor_bytes()
+    // The migrated notes' Automerge actor is THIS device's stable id (device
+    // provenance, `collab-provenance` task 1), not one fresh actor shared by every
+    // note: a revision must be resolvable to the device that made the migration.
+    // A vault with no device identity yet falls back to a fresh draw
+    // (`note_actor_bytes(None)`), which resolves to `Unknown` downstream.
+    let device_actor = crate::plugins::sync::state::read_device_actor(io, &vault_root).await;
+    let actor = crate::plugins::sync::crdt_doc::note_actor_bytes(device_actor)
         .map_err(|_| VaultMigrateError::Csprng)?;
 
     // Writer quiescence, held across the whole on-disk pass (myne-md/myne#434).

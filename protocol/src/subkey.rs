@@ -338,6 +338,24 @@ const ROLE_STR_AGENT_PERSONALITY_KEY: &[u8] = b"agent-personality-key";
 /// account.
 const ROLE_STR_AGENT_PERSONALITY_SYNC_ID: &[u8] = b"agent-personality-sync-id";
 
+/// Registered role string for the per-note **awareness room id** of the
+/// live-collaboration awareness plane (`protocol.md` § 3.4; SYNC-1/SYNC-9).
+/// The room id sent to the relay is the first 16 bytes of
+/// `HMAC-SHA-256(derive_subkey_v0_2(root_key, AwarenessRoomId), note_uuid)` (the
+/// `attachments-id-hmac` archetype), so it is per-note and note-unlinkable: the
+/// relay cannot invert it to a note id. Derives an **identifier**, NOT key
+/// material (like `catalog-sync-id`); the frame KEK stays `awareness-key`.
+/// Registered in v0.2 only.
+const ROLE_STR_AWARENESS_ROOM_ID: &[u8] = b"awareness-room-id";
+
+/// Registered role string for the **awareness frame** KEK of the
+/// live-collaboration awareness plane (`protocol.md` § 3.4; SYNC-1). The 32-byte
+/// output seals the ephemeral awareness frames (canonical JSON carrying
+/// cursor/selection/presence and opaque Automerge change bytes). Group-derived
+/// for an `NTV6` vault so a member removal rotates it with the group key.
+/// Registered in v0.2 only.
+const ROLE_STR_AWARENESS_KEY: &[u8] = b"awareness-key";
+
 /// Owner-only root material. A member-held [`GroupKey`] cannot be supplied to
 /// [`derive_owner_subkey_v0_2`] without an explicit, review-visible conversion.
 #[derive(Zeroize, ZeroizeOnDrop)]
@@ -445,10 +463,20 @@ pub enum GroupRole {
     GraphLayoutKey,
     /// KEK for the sealed owner-signed group roster in an `NTV6` `vault.meta`.
     GroupRosterKey,
+    /// Per-note awareness room id of the live-collaboration awareness plane
+    /// (`protocol.md` § 3.4; SYNC-1/SYNC-9). The group-tier counterpart of
+    /// `SubkeyRole::AwarenessRoomId`: a member derives the same room id from the
+    /// shared `group_key`, so owner and member address one room. Derives an
+    /// **identifier**, NOT key material.
+    AwarenessRoomId,
+    /// KEK for the live-collaboration awareness frames (`protocol.md` § 3.4;
+    /// SYNC-1). The group-tier counterpart of `SubkeyRole::AwarenessKey`, so a
+    /// member seals and opens the same frames as the owner.
+    AwarenessKey,
 }
 
 impl GroupRole {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 17] = [
         Self::ItemsKeyWrap,
         Self::PrefsKey,
         Self::SearchIndexKey,
@@ -464,6 +492,8 @@ impl GroupRole {
         Self::ThemesSyncId,
         Self::GraphLayoutKey,
         Self::GroupRosterKey,
+        Self::AwarenessRoomId,
+        Self::AwarenessKey,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -483,6 +513,8 @@ impl GroupRole {
             Self::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
             Self::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
             Self::GroupRosterKey => ROLE_STR_GROUP_ROSTER_KEY,
+            Self::AwarenessRoomId => ROLE_STR_AWARENESS_ROOM_ID,
+            Self::AwarenessKey => ROLE_STR_AWARENESS_KEY,
         }
     }
 }
@@ -525,6 +557,8 @@ impl SubkeyRole {
             Self::CustomThemesKey => Some(GroupRole::CustomThemesKey),
             Self::ThemesSyncId => Some(GroupRole::ThemesSyncId),
             Self::GraphLayoutKey => Some(GroupRole::GraphLayoutKey),
+            Self::AwarenessRoomId => Some(GroupRole::AwarenessRoomId),
+            Self::AwarenessKey => Some(GroupRole::AwarenessKey),
             Self::VaultHeadMac
             | Self::ServerAuth
             | Self::AttachmentsIdHmac
@@ -753,6 +787,21 @@ pub enum SubkeyRole {
     /// member holds no `root_key`); never synced. Distinct
     /// from the AAD role `"person-vault-carrier-blob"`.
     PersonVaultCarrier,
+    /// Per-note awareness room id of the live-collaboration awareness plane
+    /// (`protocol.md` § 3.4; SYNC-1/SYNC-9). Derives an **identifier**, NOT key
+    /// material (like `CatalogSyncId` / `AttachmentsIdHmac`): the first 16 bytes
+    /// of an HMAC over the note uuid keyed by this role's output are the room id
+    /// sent to the relay; the frame KEK stays `AwarenessKey`. Distinct from
+    /// `AwarenessKey` so the id and the KEK are domain-separated. Registered in
+    /// v0.2 only; its group counterpart is `GroupRole::AwarenessRoomId`.
+    AwarenessRoomId,
+    /// KEK for the live-collaboration awareness frames (`protocol.md` § 3.4;
+    /// SYNC-1). Seals the ephemeral per-note frames carrying cursor/selection/
+    /// presence and opaque Automerge change bytes under XChaCha20-Poly1305
+    /// (CTX commitment outer). v0.2-only; its group counterpart is
+    /// `GroupRole::AwarenessKey`, so a member removal rotates it with the group
+    /// key.
+    AwarenessKey,
 }
 
 impl SubkeyRole {
@@ -768,7 +817,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 27] = [
+    pub const ALL: [SubkeyRole; 29] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -796,6 +845,8 @@ impl SubkeyRole {
         SubkeyRole::AgentPersonalityKey,
         SubkeyRole::AgentPersonalitySyncId,
         SubkeyRole::PersonVaultCarrier,
+        SubkeyRole::AwarenessRoomId,
+        SubkeyRole::AwarenessKey,
     ];
 
     /// Registered role string (the part appended after the
@@ -830,6 +881,8 @@ impl SubkeyRole {
             SubkeyRole::AgentPersonalityKey => ROLE_STR_AGENT_PERSONALITY_KEY,
             SubkeyRole::AgentPersonalitySyncId => ROLE_STR_AGENT_PERSONALITY_SYNC_ID,
             SubkeyRole::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
+            SubkeyRole::AwarenessRoomId => ROLE_STR_AWARENESS_ROOM_ID,
+            SubkeyRole::AwarenessKey => ROLE_STR_AWARENESS_KEY,
         }
     }
 }
@@ -978,6 +1031,8 @@ mod tests {
                 SubkeyRole::AgentPersonalityKey => 24,
                 SubkeyRole::AgentPersonalitySyncId => 25,
                 SubkeyRole::PersonVaultCarrier => 26,
+                SubkeyRole::AwarenessRoomId => 27,
+                SubkeyRole::AwarenessKey => 28,
             }
         }
 
@@ -1398,6 +1453,12 @@ mod tests {
                 SubkeyRole::AgentPersonalityKey => "agent-personality-key",
                 SubkeyRole::AgentPersonalitySyncId => "agent-personality-sync-id",
                 SubkeyRole::PersonVaultCarrier => "person-vault-carrier",
+                // v0.2-only roles never appear in the v0.1 category: its envelope
+                // promises `"myne.v0.1 "` info bytes. Reaching this arm means a
+                // v0.2-only role was added to the v0.1 case list, which is a bug.
+                SubkeyRole::AwarenessRoomId | SubkeyRole::AwarenessKey => {
+                    panic!("v0.2-only role reached the v0.1 hkdf-sha256 generator")
+                }
             }
         }
 
@@ -1770,7 +1831,7 @@ mod tests {
         let zero_root: [u8; 32] = [0u8; 32];
         let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
 
-        let cases: [(&str, &str, &[u8; 32], bool, SubkeyRole); 4] = [
+        let cases: [(&str, &str, &[u8; 32], bool, SubkeyRole); 8] = [
             (
                 "zero-root-membership-key",
                 "All-zero root_key with the MembershipKey role (§3.4; §9.3.1). KEK for the sealed vault membership field (the account/vault split, decisions.md 2026-09-07); role string 'membership-key' (14 ASCII bytes). Derived under the v0.2 context prefix because the field is NTV5-only: info is 'myne.v0.2 membership-key' (24 bytes). root_key-derived (like prefs/search/workspace), so it is itemsKey-independent. Pairs with the alpha vector under the same derivation: the two must differ only by root.",
@@ -1799,6 +1860,34 @@ mod tests {
                 true,
                 SubkeyRole::PersonVaultCarrier,
             ),
+            (
+                "zero-root-awareness-room-id",
+                "All-zero root_key with the AwarenessRoomId role (§3.4; live-collab). Derives an identifier, NOT key material: the per-note awareness room id sent to the relay is HMAC-SHA-256(DeriveSubkey_v0_2(root_key, 'awareness-room-id'), note_uuid)[0..16]. info is 'myne.v0.2 awareness-room-id'. Pairs with the alpha vector under the same derivation: the two differ only by root. NOTE: the HKDF role string 'awareness-room-id' is DISTINCT from the AAD role string 'awareness-frame' (aad_awareness_frame).",
+                &zero_root,
+                false,
+                SubkeyRole::AwarenessRoomId,
+            ),
+            (
+                "prn-alpha-awareness-room-id",
+                "Pseudorandom alpha root with the AwarenessRoomId role. The informational_info_utf8_hex field carries the canonical HKDF info bytes ('myne.v0.2 awareness-room-id') so independent implementers can verify this role's info assembly without re-parsing the spec.",
+                &alpha,
+                true,
+                SubkeyRole::AwarenessRoomId,
+            ),
+            (
+                "zero-root-awareness-key",
+                "All-zero root_key with the AwarenessKey role (§3.4; live-collab). KEK for the ephemeral, wire-only awareness frames. info is 'myne.v0.2 awareness-key'. Group counterpart GroupRole::AwarenessKey so a member removal rotates it with the group key.",
+                &zero_root,
+                false,
+                SubkeyRole::AwarenessKey,
+            ),
+            (
+                "prn-alpha-awareness-key",
+                "Pseudorandom alpha root with the AwarenessKey role. The informational_info_utf8_hex field carries the canonical HKDF info bytes ('myne.v0.2 awareness-key') so independent implementers can verify this role's info assembly without re-parsing the spec.",
+                &alpha,
+                true,
+                SubkeyRole::AwarenessKey,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -1806,7 +1895,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4 + §10.7\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the v0.2 context prefix (info='myne.v0.2 '||role): the membership KEK (its field is NTV5-only) and the device-local vault-bound PersonVaultCarrier KEK (myne-md/myne#792). Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey_v0_2 byte mapping for the v0.2 context prefix (info='myne.v0.2 '||role): the membership KEK (its field is NTV5-only), the device-local vault-bound PersonVaultCarrier KEK (myne-md/myne#792), and the two live-collaboration awareness roles awareness-room-id and awareness-key (live-collab). Vectors generated by `cargo test -p protocol --lib emit_subkey_v0_2_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, include_info, role)) in cases.iter().enumerate() {
@@ -1868,6 +1957,45 @@ mod tests {
     }
 
     #[test]
+    fn awareness_roles_are_v0_2_only_and_dual_tier() {
+        // The two live-collaboration awareness roles derive under the v0.2
+        // prefix, differ from each other, and differ from their un-migrated
+        // v0.1 namesake (context separation). Each maps to a group counterpart,
+        // so a member addresses the same room and seals the same frames, and a
+        // group key still cannot derive an owner-only role.
+        let root = [0x5Au8; 32];
+        let group = GroupKey::new([0x5Au8; 32]);
+
+        let room_id = derive_subkey_v0_2(&root, SubkeyRole::AwarenessRoomId);
+        let frame_key = derive_subkey_v0_2(&root, SubkeyRole::AwarenessKey);
+        assert_ne!(*room_id, *frame_key, "id and KEK must be domain-separated");
+        assert_ne!(
+            *room_id,
+            *derive_subkey(&root, SubkeyRole::AwarenessRoomId),
+            "a v0.2 subkey must differ from its v0.1 namesake under the same root"
+        );
+
+        assert_eq!(
+            SubkeyRole::AwarenessRoomId.shared_group_role(),
+            Some(GroupRole::AwarenessRoomId)
+        );
+        assert_eq!(
+            SubkeyRole::AwarenessKey.shared_group_role(),
+            Some(GroupRole::AwarenessKey)
+        );
+
+        let group_room_id = derive_group_subkey_v0_2(&group, GroupRole::AwarenessRoomId);
+        let group_frame_key = derive_group_subkey_v0_2(&group, GroupRole::AwarenessKey);
+        assert_ne!(*group_room_id, *group_frame_key);
+
+        assert_eq!(
+            SubkeyRole::ServerAuth.shared_group_role(),
+            None,
+            "an owner-only role must still refuse the group tier"
+        );
+    }
+
+    #[test]
     fn typed_role_registries_are_exhaustive_and_disjoint() {
         fn owner_role_index(role: OwnerRole) -> usize {
             match role {
@@ -1905,6 +2033,8 @@ mod tests {
                 GroupRole::ThemesSyncId => 12,
                 GroupRole::GraphLayoutKey => 13,
                 GroupRole::GroupRosterKey => 14,
+                GroupRole::AwarenessRoomId => 15,
+                GroupRole::AwarenessKey => 16,
             }
         }
 
