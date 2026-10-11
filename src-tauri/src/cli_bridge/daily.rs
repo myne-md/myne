@@ -366,6 +366,7 @@ pub async fn period_append(
     state: &VaultRuntimeState,
     hooks: &Hooks,
     io: &dyn VaultIo,
+    registry: &myne_core::plugins::live::LiveSessionRegistry,
     period: daily_match::Period,
     line: &str,
 ) -> Result<bool, DailyError> {
@@ -382,9 +383,12 @@ pub async fn period_append(
     }
     new_body.push_str(line);
     new_body.push('\n');
-    match note_update_from_host(host, state, hooks, id, new_body, None, io).await {
+    match note_update_from_host(host, state, hooks, id, new_body, None, io, registry).await {
         Ok(()) => Ok(used_device_clock),
         Err(NoteUpdateError::VaultNotUnlocked) => Err(DailyError::VaultLocked),
+        // A live co-editing session owns the note: the CLI append cannot be the
+        // writer, and the caller sees the same "locked" shape (nothing written).
+        Err(NoteUpdateError::LiveSessionOpen) => Err(DailyError::VaultLocked),
         Err(_) => Err(DailyError::Io),
     }
 }
@@ -577,6 +581,7 @@ mod tests {
                 &state,
                 &hooks,
                 &io,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
                 daily_match::Period::Daily,
                 "first line",
             )
@@ -592,6 +597,7 @@ mod tests {
                 &state,
                 &hooks,
                 &io,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
                 daily_match::Period::Daily,
                 "second line",
             )
@@ -627,8 +633,16 @@ mod tests {
                 period_show(&host, &state, &hooks, &io, daily_match::Period::Daily).await;
             assert_eq!(show_result, Err(DailyError::FolderExcluded));
 
-            let append_result =
-                period_append(&host, &state, &hooks, &io, daily_match::Period::Daily, "x").await;
+            let append_result = period_append(
+                &host,
+                &state,
+                &hooks,
+                &io,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
+                daily_match::Period::Daily,
+                "x",
+            )
+            .await;
             assert_eq!(append_result, Err(DailyError::FolderExcluded));
 
             let ids = note_list_from_host(&host, &state, &io)

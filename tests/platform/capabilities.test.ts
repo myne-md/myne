@@ -192,6 +192,19 @@ describe("capability descriptor", () => {
       // served page cannot replace itself, so the About/banner affordances are
       // omitted on web rather than rendered against commands that reject.
       "selfUpdate",
+      // Live-collab `SYNC-31`. Multi-user co-editing needs a person identity the
+      // browser cannot hold (the B2B group substrate and its sealed person-key
+      // file, exactly as `memberSharing`), so it is absent. Split from
+      // `liveCollabPeerPresence` so the client stays present for its OWN devices'
+      // presence while never implying multi-user works in a page.
+      "liveCollabMultiUser",
+      // Live-collab `collab-presence-ui`. The awareness CURSOR consumer is a
+      // native SSE supervisor; the web Worker-side consumer is not built, so the
+      // local presence report is refused there. Split from
+      // `liveCollabPeerPresence`, which stays present, so a web session still
+      // opens for this client's own devices while the cursor affordance is
+      // omitted rather than rendered against a command that refuses.
+      "liveCollabAwarenessCursors",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());
@@ -206,6 +219,10 @@ describe("capability descriptor", () => {
     const present = desktop.ALL_CAPABILITIES.filter((c) => web.has(c));
     expect([...present].sort()).toEqual([
       "changePassword",
+      // Live-collab `SYNC-31`: single-user multi-device presence ships in the
+      // browser, a page can hold the vault and its awareness socket like any
+      // other client, so web is not second-class for its own devices.
+      "liveCollabPeerPresence",
       "phraseRecovery",
       "pinQuickUnlock",
       "vaultCreation",

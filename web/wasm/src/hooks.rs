@@ -206,6 +206,14 @@ impl VaultLifecycleHooks for WebHooks {
     /// client holds no registry to tear down.
     fn detached_windows_teardown_on_lock(&self) {}
 
+    /// **Implemented (epic live-collab).** A live co-editing session holds
+    /// decrypted note plaintext; the Worker's registry is a process-global, so it
+    /// is cleared here on every vault-leaving hook rather than dropped with a
+    /// Tauri `State`.
+    fn live_session_teardown_on_lock(&self) {
+        crate::session::live_sessions().clear();
+    }
+
     /// **Implemented (task 65).** The staged descriptor is the WORKSPACE one —
     /// the pane tree the frontend mirrors into RAM on every layout change — and
     /// clearing it at lock is what stops the open-tab set from outliving the

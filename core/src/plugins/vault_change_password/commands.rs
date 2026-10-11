@@ -121,6 +121,9 @@ pub async fn change_password_from_host(
         // force-relock path too: locking means locked for every plaintext
         // surface, not just "main".
         hooks.detached_windows_teardown_on_lock();
+        // live-collab: drop every open live co-editing session on the
+        // force-relock path too, a session holds decrypted note plaintext.
+        hooks.live_session_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices — note titles,
         // folders, tags, wikilink targets and typed property values
         // (`spec/protocol.md` §9.8.5) — and, on a `local-inference` desktop
@@ -1573,6 +1576,7 @@ mod tests {
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
                     "detached_windows_teardown_on_lock",
+                    "live_session_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

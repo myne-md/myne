@@ -30,6 +30,7 @@ permissions = [
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
+    "allow-resolve-identity",
     "allow-sync-person-create-invite",
     "allow-sync-person-inspect-invite-code",
     "allow-sync-list-vault-invites",
@@ -59,6 +60,7 @@ permissions = [
     "allow-sync-approve-device",
     "allow-sync-remove-device",
     "allow-sync-pending-conflicts",
+    "allow-sync-awareness-stats",
     "allow-sync-take-conflict",
     "allow-sync-resolve-conflict",
     "allow-sync-mark-tombstone",
@@ -122,6 +124,11 @@ commands.allow = ["sync_materialisation_progress"]
 identifier = "allow-sync-now"
 description = "Allow invoking sync:sync_now (request an immediate sync; returns the resulting status). No new vault access beyond the engine's authed session."
 commands.allow = ["sync_now"]
+
+[[permission]]
+identifier = "allow-resolve-identity"
+description = "Allow invoking sync:resolve_identity (map an Automerge actor to a {Device, Person, Unknown} identity for the version-history panel; reads vault.prefs device_names, no id hash crosses to the frontend)."
+commands.allow = ["resolve_identity"]
 
 [[permission]]
 identifier = "allow-sync-person-unlock"
@@ -263,6 +270,11 @@ commands.allow = ["sync_remove_device"]
 identifier = "allow-sync-pending-conflicts"
 description = "Allow invoking sync:sync_pending_conflicts (list the note ids with a staged conflicting remote revision awaiting keep-both materialization). No vault-blob access beyond the device-local conflicts staging dir."
 commands.allow = ["sync_pending_conflicts"]
+
+[[permission]]
+identifier = "allow-sync-awareness-stats"
+description = "Allow invoking sync:sync_awareness_stats (read-only awareness transport counters for the leak budget, `collab-verification` task 3: coalesced batches emitted, frames carried, the last batch's encoded length, the reconnect generation, the subscribed-room count, and the window they span). Counts and lengths only: never a frame byte, a room id or a note id. No vault access. Desktop-only (the web client runs no awareness supervisor)."
+commands.allow = ["sync_awareness_stats"]
 
 [[permission]]
 identifier = "allow-sync-take-conflict"

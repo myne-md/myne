@@ -151,11 +151,24 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
             .into_iter()
             .map(|(note_id, plaintext)| NoteBatchUpdate { note_id, plaintext })
             .collect();
+        // The REAL live-session registry, not a throwaway: this is the write path
+        // that authors an agent's edits (a batch, not the guarded `note_update`), so
+        // a note a live session owns must be refused here or the agent write lands
+        // behind the session's single durable writer (`SYNC-33`). An absent registry
+        // is a host misconfiguration (the desktop plugin manages it in `lib.rs`), so
+        // it fails the write rather than silently skipping the guard.
+        use tauri::Manager as _;
+        let registry = self
+            .host
+            .app()
+            .try_state::<crate::plugins::live::LiveSessionRegistry>()
+            .ok_or(AgentError::WriteFailed)?;
         note_write_batch_transactional_from_host(
             &self.host,
             &StdVaultIo,
             self.state,
             &self.hooks,
+            registry.inner(),
             updates,
         )
         .await

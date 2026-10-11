@@ -54,28 +54,19 @@
 //! exists while the transport is fail-closed — the same answer the sync cycle
 //! gets, rather than a second opinion about it.
 
-use std::io::{BufRead, Read};
+use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Runtime};
 
-use super::proxy::{self, Route};
-use super::token_store::TokenStore as _;
+use super::stream_supervisor::{
+    decide, fingerprint_of, gather_snapshot, sleep_interruptible, stream_identity, teardown,
+    Backoff, ChunkedFrames, ConnSnapshot, Decision, StreamIdentity, WorkerHandle,
+    SNAPSHOT_REFRESH_TICKS, SSE_READ_TIMEOUT, SUPERVISOR_TICK_MS,
+};
 use super::transport::{SseOpenError, SseStream};
-
-/// SSE dead-connection read-timeout: two missed 30 s server heartbeats plus
-/// margin (the server's `DefaultHeartbeatInterval`; change them together).
-const SSE_READ_TIMEOUT: Duration = Duration::from_secs(65);
-/// Reconnect backoff bounds (jittered exponential).
-const BACKOFF_START_MS: u64 = 1_000;
-const BACKOFF_CAP_MS: u64 = 60_000;
-/// Supervisor decision cadence.
-const SUPERVISOR_TICK_MS: u64 = 1_000;
-/// Endpoint/token snapshot refresh cadence, in supervisor ticks (two small
-/// file reads — cheap, but not per-tick cheap).
-const SNAPSHOT_REFRESH_TICKS: u32 = 5;
 
 /// App-managed poke counter: the worker thread bumps it, the sync loop reads it
 /// each tick (`SyncLocalChange` pattern; the `Arc` inner lets the worker hold a
@@ -90,127 +81,6 @@ impl SsePokeSignal {
     }
     pub(crate) fn get(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
-    }
-}
-
-/// The connection identity a worker is bound to. A change in any field is a
-/// different stream (teardown + reconnect under the new identity).
-#[derive(Clone)]
-struct ConnSnapshot {
-    url: String,
-    token_hex: String,
-}
-
-fn fingerprint_of(s: &ConnSnapshot) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    s.url.hash(&mut h);
-    s.token_hex.hash(&mut h);
-    h.finish()
-}
-
-/// Everything a live stream is bound to: the `(endpoint, token)` fingerprint
-/// **and** the route it was opened over. A change in either is a different
-/// stream.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct StreamIdentity {
-    fingerprint: u64,
-    route: Route,
-}
-
-/// The identity a stream for `snap` would have right now, or `None` when no
-/// stream may exist — an endpoint that does not parse, or a routing gate that
-/// refuses (Tor mode on, tunnel not usable), which is the fail-closed answer
-/// the sync cycle also gets.
-fn stream_identity(snap: &ConnSnapshot) -> Option<StreamIdentity> {
-    let (_, host, _) = super::http_transport::parse_endpoint(&snap.url)?;
-    stream_identity_over(snap, &proxy::installed_for(&host))
-}
-
-/// The identity, given the gate — the same gate `build_transport` would consult
-/// for this endpoint.
-///
-/// Split out so a test can drive a **real** [`proxy::ProxyGate`] through the
-/// lifecycle a toggle actually produces, rather than asserting against
-/// hand-built [`StreamIdentity`] literals. The process-wide installed gate is a
-/// `OnceLock`, so a test that installed one would leak its state into every
-/// other test in this binary; a gate passed by reference cannot.
-fn stream_identity_over(snap: &ConnSnapshot, gate: &proxy::ProxyGate) -> Option<StreamIdentity> {
-    Some(StreamIdentity {
-        fingerprint: fingerprint_of(snap),
-        route: gate.route().ok()?,
-    })
-}
-
-/// What the supervisor does with the worker it has, given the identity it
-/// wants. Pure, so the rule that closes the "toggled Tor under a live stream"
-/// hole is one function with a test rather than a `match` in a spawned task.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Decision {
-    /// Leave things as they are.
-    Idle,
-    /// No worker and one is wanted.
-    Spawn,
-    /// The worker must go — either nothing is wanted, or the identity moved
-    /// and the next tick reconnects under the new one.
-    Teardown,
-}
-
-fn decide(current: Option<StreamIdentity>, wanted: Option<StreamIdentity>) -> Decision {
-    match (current, wanted) {
-        (None, Some(_)) => Decision::Spawn,
-        (Some(_), None) => Decision::Teardown,
-        (Some(have), Some(want)) if have != want => Decision::Teardown,
-        _ => Decision::Idle,
-    }
-}
-
-/// Gather the live `(endpoint, token)` snapshot, or `None` when any part
-/// is missing (unconfigured / locked / not enrolled). Reads the same sources as
-/// `run_active_cycle` — but NEVER claims a pending token (that is the cycle's
-/// job; the listener only ever uses an already-stored token).
-async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<ConnSnapshot> {
-    let cfg_path = super::commands::config_path(app).await.ok()?;
-    let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &cfg_path)
-        .await
-        .ok()?;
-    let url = cfg.endpoint_url.clone()?;
-    let state = app.try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()?;
-    let dir = crate::paths::active_vault_root_io(app, state.active_vault_id().await).ok()?;
-    let token = super::token_store::default_store()
-        .read(&crate::vault_io::StdVaultIo, &dir)
-        .await
-        .ok()
-        .flatten()?;
-    let mut token_hex = String::with_capacity(token.len() * 2);
-    for b in &token {
-        token_hex.push_str(&format!("{b:02x}"));
-    }
-    Some(ConnSnapshot { url, token_hex })
-}
-
-struct WorkerHandle {
-    stop: Arc<AtomicBool>,
-    sock: Arc<Mutex<Option<std::net::TcpStream>>>,
-    unauth: Arc<AtomicBool>,
-    join: Option<std::thread::JoinHandle<()>>,
-    identity: StreamIdentity,
-}
-
-/// Signal the worker to stop and unblock its read; join it off-thread so a
-/// worker mid-`connect()` can never stall the supervisor tick.
-fn teardown(w: Option<WorkerHandle>) {
-    let Some(mut w) = w else { return };
-    w.stop.store(true, Ordering::Relaxed);
-    if let Ok(mut slot) = w.sock.lock() {
-        if let Some(s) = slot.take() {
-            let _ = s.shutdown(std::net::Shutdown::Both);
-        }
-    }
-    if let Some(join) = w.join.take() {
-        tauri::async_runtime::spawn_blocking(move || {
-            let _ = join.join();
-        });
     }
 }
 
@@ -444,104 +314,12 @@ pub(crate) fn drain_stream(
     }
 }
 
-/// De-frame `Transfer-Encoding: chunked` bytes into the raw SSE byte stream
-/// (production sits behind a reverse proxy that streams SSE chunked). Chunk
-/// extensions are ignored; the zero chunk ends the stream. The CRLF trailing
-/// each chunk's data surfaces as an empty size-line and is skipped.
-struct ChunkedFrames {
-    inner: Box<dyn BufRead + Send>,
-    left: u64,
-    done: bool,
-}
-
-impl Read for ChunkedFrames {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        fn inval() -> std::io::Error {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "sse chunk framing")
-        }
-        loop {
-            if self.done || buf.is_empty() {
-                return Ok(0);
-            }
-            if self.left == 0 {
-                let mut line = Vec::new();
-                let n = self.inner.read_until(b'\n', &mut line)?;
-                if n == 0 {
-                    self.done = true;
-                    return Ok(0);
-                }
-                let s = std::str::from_utf8(&line).map_err(|_| inval())?.trim();
-                if s.is_empty() {
-                    continue; // the CRLF trailing the previous chunk's data
-                }
-                let size = u64::from_str_radix(s.split(';').next().unwrap_or(""), 16)
-                    .map_err(|_| inval())?;
-                if size == 0 {
-                    self.done = true;
-                    return Ok(0);
-                }
-                self.left = size;
-            }
-            let want = buf.len().min(self.left as usize);
-            let n = self.inner.read(&mut buf[..want])?;
-            self.left -= n as u64;
-            return Ok(n);
-        }
-    }
-}
-
-/// Jittered exponential reconnect backoff: base doubles 1 s → 60 s cap, each
-/// delay lands in `[base·0.75, base·1.25]`. The jitter source is a cheap
-/// xorshift* seeded from wall-clock nanos — decorrelation only, NEVER key
-/// material.
-struct Backoff {
-    next_ms: u64,
-    seed: u64,
-}
-
-impl Backoff {
-    fn new() -> Self {
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.subsec_nanos() as u64)
-            .unwrap_or(0)
-            | 1; // xorshift must not start at 0
-        Self {
-            next_ms: BACKOFF_START_MS,
-            seed,
-        }
-    }
-
-    fn reset(&mut self) {
-        self.next_ms = BACKOFF_START_MS;
-    }
-
-    fn next_jittered(&mut self) -> u64 {
-        let base = self.next_ms;
-        self.next_ms = (self.next_ms * 2).min(BACKOFF_CAP_MS);
-        self.seed ^= self.seed << 13;
-        self.seed ^= self.seed >> 7;
-        self.seed ^= self.seed << 17;
-        let span = base / 2; // total jitter window = ±25% of base
-        let jitter = if span == 0 { 0 } else { self.seed % (span + 1) };
-        base - base / 4 + jitter
-    }
-}
-
-fn sleep_interruptible(total: Duration, stop: &AtomicBool) {
-    let slice = Duration::from_millis(250);
-    let mut remaining = total;
-    while !stop.load(Ordering::Relaxed) && remaining > Duration::ZERO {
-        let d = remaining.min(slice);
-        std::thread::sleep(d);
-        remaining = remaining.saturating_sub(d);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use crate::plugins::sync::proxy::{ProxyGate, Route, TorProxyState};
+    use crate::plugins::sync::stream_supervisor::*;
+    use std::io::{Read, Write};
 
     #[test]
     fn backoff_doubles_to_cap_with_bounded_jitter() {
@@ -583,6 +361,7 @@ mod tests {
         let direct = StreamIdentity {
             fingerprint: fingerprint_of(&s),
             route: Route::Direct,
+            rooms: 0,
         };
         let tunneled = StreamIdentity {
             route: Route::Socks5 { socks_port: 9150 },
@@ -609,6 +388,7 @@ mod tests {
         let live = StreamIdentity {
             fingerprint: 1,
             route: Route::Direct,
+            rooms: 0,
         };
         assert_eq!(decide(Some(live), None), Decision::Teardown);
         assert_eq!(decide(None, None), Decision::Idle);
@@ -628,6 +408,7 @@ mod tests {
             Some(StreamIdentity {
                 fingerprint: fingerprint_of(&s),
                 route: Route::Direct,
+                rooms: 0,
             })
         );
         assert_eq!(stream_identity(&snap("not a url")), None);
@@ -641,8 +422,6 @@ mod tests {
     /// obeys, which is where the Critical lived.
     #[test]
     fn a_real_gate_walked_through_the_toggle_lifecycle_drives_the_decisions() {
-        use super::proxy::{ProxyGate, TorProxyState};
-
         let s = snap("https://sync.myne.md");
         let gate = ProxyGate::new();
 
@@ -754,6 +533,7 @@ mod tests {
             identity: StreamIdentity {
                 fingerprint: 0,
                 route: Route::Direct,
+                rooms: 0,
             },
         }));
         drain.join().expect("drain thread");

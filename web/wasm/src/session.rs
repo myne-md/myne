@@ -34,6 +34,7 @@
 //! silently defeat the whole state machine.
 
 use myne_core::hooks::Hooks;
+use myne_core::plugins::live::LiveSessionRegistry;
 use myne_core::plugins::vault_indices::VaultIndicesState;
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use myne_core::search::SearchIndexState;
@@ -45,6 +46,16 @@ static INDICES: OnceLock<VaultIndicesState> = OnceLock::new();
 static SEARCH: OnceLock<SearchIndexState> = OnceLock::new();
 static CREATION: OnceLock<myne_core::plugins::vault_creation::state::VaultCreationState> =
     OnceLock::new();
+/// The Worker's live co-editing sessions (epic live-collab,
+/// `collab-editor-bridge`). A process-global for the same reason as [`state`]: the
+/// wasm entry surface has no `State` handle to thread. `WebHooks` clears it on
+/// every vault-leaving hook, which is what the lock-teardown guard keys on.
+static LIVE_SESSIONS: OnceLock<LiveSessionRegistry> = OnceLock::new();
+
+/// The Worker's live co-editing sessions. See the static's note.
+pub fn live_sessions() -> &'static LiveSessionRegistry {
+    LIVE_SESSIONS.get_or_init(LiveSessionRegistry::default)
+}
 
 /// The Worker's single [`VaultRuntimeState`].
 pub fn state() -> &'static VaultRuntimeState {

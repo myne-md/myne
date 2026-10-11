@@ -140,6 +140,15 @@ pub struct SyncSummary {
     ///
     /// Written notes only: a `SkippedDirty` or a failed download is not here.
     pub pulled_note_ids: Vec<String>,
+    /// Pulled note revisions for notes OPEN in a live session this cycle
+    /// (`collab-editor-bridge` task 7). The orchestrator does NOT write them, the
+    /// session is the single durable writer (`SYNC-33`), so the caller merges each
+    /// into the session (`LiveSession::merge_pulled`, §11.1 remove-wins) and raises
+    /// the "updated from another device" signal. The third element is the
+    /// device-local baseline `content_nonce` the scan compared against, carried so a
+    /// caller that has to FALL BACK to the plain write can re-apply the same
+    /// dirty-disk check rather than overwriting unconditionally.
+    pub deferred_live_pulls: Vec<([u8; 16], Vec<u8>, Option<String>)>,
     /// Canonical 36-char ids of `NC05` notes whose local copy was updated this
     /// cycle by an **automatic CRDT merge** of a concurrent remote revision
     /// (ASM-6→B / #422) — a strict subset of `pulled_note_ids`. This is the
@@ -338,7 +347,7 @@ fn fetch_window(queue: &[&engine::ChangedBlob]) -> usize {
 }
 
 /// Outcome of one pulled-note write attempt under the notes-write mutex.
-enum PulledNoteApply {
+pub(crate) enum PulledNoteApply {
     /// The blob was written; adopt the manifest + baseline bookkeeping.
     Applied,
     /// The on-disk note diverged from the synced baseline while this cycle was
@@ -370,7 +379,7 @@ enum PulledNoteApply {
 /// exists and the disk no longer matches it (including "file vanished" — a
 /// mid-cycle local delete must not be resurrected) → skip without mutation.
 /// No baseline (fresh pull of a never-held note) → write unconditionally.
-async fn apply_pulled_note_blob(
+pub(crate) async fn apply_pulled_note_blob(
     io: &dyn crate::vault_io::VaultIo,
     notes_dir: &Path,
     id: &[u8; 16],
@@ -4040,6 +4049,11 @@ pub async fn run_sync_cycle(
     // identity is held; `None` keeps the `NTV5` `root_key` HMAC head. Keyed off
     // the vault generation (decisions/protocol/0603, Q2 revised).
     signed: Option<&SignedHeadCtx>,
+    // The blob ids of notes OPEN in a live session (`collab-editor-bridge` task 7).
+    // A pulled revision of one is DEFERRED (not written) so the caller can merge it
+    // into the session; every other pulled note is written as usual. Empty when no
+    // session is open, the desktop/mobile norm and every `sim.rs` run.
+    live_note_ids: &HashSet<[u8; 16]>,
 ) -> Result<SyncSummary, SyncCycleError> {
     let mut state = read_sync_state(io, vault_root)
         .await
@@ -4128,6 +4142,7 @@ pub async fn run_sync_cycle(
             &baseline_vv,
             baseline_seq,
             from_cursor,
+            live_note_ids,
         )
         .await
         {
@@ -4198,6 +4213,9 @@ async fn sync_cycle_attempt(
     baseline_vv: &[VvEntry],
     baseline_seq: u64,
     from_cursor: u64,
+    // The blob ids of notes OPEN in a live session (task 7): their pulled revision
+    // is DEFERRED to `summary.deferred_live_pulls` rather than written.
+    live_note_ids: &HashSet<[u8; 16]>,
 ) -> Result<SyncSummary, SyncCycleError> {
     // --- PULL (head verify + rollback rejection happen inside) ---
     // A `cursor_expired` (410) means the server GC'd past our stored cursor: reset
@@ -5020,6 +5038,9 @@ async fn sync_cycle_attempt(
     pulled += conversations_pulled;
     // The ids this cycle WRITES, for the boundary's re-index (myne#305).
     let mut pulled_note_ids: Vec<String> = Vec::new();
+    // Pulled note revisions for OPEN live sessions, handed back for the caller to
+    // merge into the session (task 7). Not written here, the session owns the note.
+    let mut deferred_live_pulls: Vec<([u8; 16], Vec<u8>, Option<String>)> = Vec::new();
     // The ASM-6/#422 "updated from another device" signal — NC05 notes an
     // automatic CRDT merge reconciled this cycle (a strict subset of the above).
     let mut remote_merged_note_ids: Vec<String> = Vec::new();
@@ -5052,6 +5073,14 @@ async fn sync_cycle_attempt(
                 || chats_scan.contains_key(&c.id))
         })
         .filter(|c| {
+            // A live-session note is ALWAYS a candidate (task 7): the session's own
+            // flushes make the disk nonce diverge from the synced baseline, so the
+            // dirty-skip below would exclude it forever and its remote revisions
+            // would never reconcile until the pane closed. It is handled by the
+            // DEFER branch in `apply_downloaded!` instead of a disk write.
+            if live_note_ids.contains(&c.id) {
+                return true;
+            }
             let baseline_nonce = state.blobs.get(&hex(&c.id)).map(|b| &b.content_nonce_hex);
             let local_nonce = local.get(&c.id).map(|n| hex(n));
             !(baseline_nonce.is_some() && baseline_nonce != local_nonce.as_ref())
@@ -5062,9 +5091,13 @@ async fn sync_cycle_attempt(
     // fallback below so the §11.3 verification and everything downstream of it
     // cannot drift between the two paths.
     macro_rules! apply_downloaded {
-        ($c:expr, $bytes:expr) => {{
+        ($c:expr, $bytes:expr, $live:expr) => {{
             let c: &engine::ChangedBlob = $c;
             let bytes: &[u8] = $bytes;
+            // `$live` is passed in rather than closed over: a free identifier in a
+            // `macro_rules!` body resolves at the definition site, where this
+            // function's `live_note_ids` parameter is not nameable.
+            let live_note_ids: &std::collections::HashSet<[u8; 16]> = $live;
             let baseline_nonce = state
                 .blobs
                 .get(&hex(&c.id))
@@ -5079,55 +5112,64 @@ async fn sync_cycle_attempt(
             // this bug destroy live notes and self-seal.
             match crate::note_nonce::read_myn_content_nonce(bytes) {
                 Some(n) if n == c.content_nonce => {
-                    match apply_pulled_note_blob(
-                        io,
-                        notes_dir,
-                        &c.id,
-                        bytes,
-                        baseline_nonce.as_deref(),
-                    )
-                    .await?
-                    {
-                        PulledNoteApply::Applied => {
-                            // Mirror the write into the in-memory manifest for the
-                            // push-detect phase (ONE scan per attempt).
-                            notes_manifest.insert(c.id, n);
-                            state.blobs.insert(
-                                hex(&c.id),
-                                BlobSyncState {
-                                    version: c.version,
-                                    content_nonce_hex: hex(&c.content_nonce),
-                                    doc_heads_hex: Vec::new(),
-                                },
-                            );
-                            pulled += 1;
-                            // …and reported by id, so the cycle boundary can put it
-                            // in the full-text index. The orchestrator holds no
-                            // `Hooks` (it is deliberately `AppHandle`-free and
-                            // `sim.rs` drives it with none), so it says what it
-                            // wrote rather than indexing it here.
-                            pulled_note_ids.push(uuid::Uuid::from_bytes(c.id).to_string());
-                            // Counted at the WRITE, not at the download: the number
-                            // the user watches is notes that exist locally, and a
-                            // download that then failed to land would otherwise
-                            // advance a bar for work that did not happen.
-                            super::progress::advance();
-                        }
-                        // A local save landed between the cycle-start scan and this
-                        // write — the note is an unpushed local edit now; the push
-                        // phase (or keep-both) owns it. No write, no baseline move.
-                        PulledNoteApply::SkippedDirty => {}
-                        // The store is full (task 91). END the materialisation here
-                        // rather than trying every remaining record against a store
-                        // that cannot take them — each attempt is a round trip and a
-                        // failed write, and the answer will not change within this
-                        // cycle.
-                        //
-                        // `finish()` before the return so the progress readout does
-                        // not sit "active" forever on a bar that stopped.
-                        PulledNoteApply::StorageFull => {
-                            super::progress::finish();
-                            return Err(SyncCycleError::StorageFull);
+                    if live_note_ids.contains(&c.id) {
+                        // Deferred live pull (task 7): the open session is the single
+                        // durable writer, so do NOT write the pulled bytes; hand the
+                        // verified bytes back for the caller to merge into the session
+                        // (remove-wins) after the cycle. The baseline nonce rides along
+                        // so a fallback write can re-apply the same dirty-disk check.
+                        deferred_live_pulls.push((c.id, bytes.to_vec(), baseline_nonce.clone()));
+                    } else {
+                        match apply_pulled_note_blob(
+                            io,
+                            notes_dir,
+                            &c.id,
+                            bytes,
+                            baseline_nonce.as_deref(),
+                        )
+                        .await?
+                        {
+                            PulledNoteApply::Applied => {
+                                // Mirror the write into the in-memory manifest for the
+                                // push-detect phase (ONE scan per attempt).
+                                notes_manifest.insert(c.id, n);
+                                state.blobs.insert(
+                                    hex(&c.id),
+                                    BlobSyncState {
+                                        version: c.version,
+                                        content_nonce_hex: hex(&c.content_nonce),
+                                        doc_heads_hex: Vec::new(),
+                                    },
+                                );
+                                pulled += 1;
+                                // …and reported by id, so the cycle boundary can put it
+                                // in the full-text index. The orchestrator holds no
+                                // `Hooks` (it is deliberately `AppHandle`-free and
+                                // `sim.rs` drives it with none), so it says what it
+                                // wrote rather than indexing it here.
+                                pulled_note_ids.push(uuid::Uuid::from_bytes(c.id).to_string());
+                                // Counted at the WRITE, not at the download: the number
+                                // the user watches is notes that exist locally, and a
+                                // download that then failed to land would otherwise
+                                // advance a bar for work that did not happen.
+                                super::progress::advance();
+                            }
+                            // A local save landed between the cycle-start scan and this
+                            // write, the note is an unpushed local edit now; the push
+                            // phase (or keep-both) owns it. No write, no baseline move.
+                            PulledNoteApply::SkippedDirty => {}
+                            // The store is full (task 91). END the materialisation here
+                            // rather than trying every remaining record against a store
+                            // that cannot take them, each attempt is a round trip and a
+                            // failed write, and the answer will not change within this
+                            // cycle.
+                            //
+                            // `finish()` before the return so the progress readout does
+                            // not sit "active" forever on a bar that stopped.
+                            PulledNoteApply::StorageFull => {
+                                super::progress::finish();
+                                return Err(SyncCycleError::StorageFull);
+                            }
                         }
                     }
                 }
@@ -5151,7 +5193,7 @@ async fn sync_cycle_attempt(
             // pre-#240 shape, with the same per-record dispositions.
             for c in queue {
                 match download_blob_backoff(transport, token, &c.id) {
-                    Ok(bytes) => apply_downloaded!(c, &bytes),
+                    Ok(bytes) => apply_downloaded!(c, &bytes, live_note_ids),
                     // Per-blob unavailability (unknown id / horizon-GC reclaimed
                     // body, §11.3): skip the record WITHOUT any local mutation —
                     // no write, no baseline adoption — and keep the cycle alive.
@@ -5185,7 +5227,7 @@ async fn sync_cycle_attempt(
                 Some(Ok(bytes)) => {
                     served += 1;
                     let bytes = bytes.to_vec();
-                    apply_downloaded!(c, &bytes);
+                    apply_downloaded!(c, &bytes, live_note_ids);
                 }
                 // Same disposition as the single route's 404/410, plus `internal`
                 // and any code this client does not know: skip without mutating.
@@ -6381,6 +6423,7 @@ async fn sync_cycle_attempt(
         dropped,
         pulled_note_ids,
         remote_merged_note_ids,
+        deferred_live_pulls,
     })
 }
 
@@ -6557,6 +6600,7 @@ mod tests {
             MetaVersion::V0_1,
             None,
             None,
+            &std::collections::HashSet::new(),
         ))
     }
 
@@ -7454,6 +7498,7 @@ mod tests {
                 items_key_id: &items_key_id,
             }),
             Some(&ctx),
+            &std::collections::HashSet::new(),
         ));
         assert!(
             res.is_ok(),
@@ -8602,6 +8647,7 @@ mod tests {
             MetaVersion::V0_1,
             None,
             None,
+            &std::collections::HashSet::new(),
         ))
         .expect("the held cycle still runs");
         assert_eq!(held.pushed, 0, "a held cycle pushes no content");
@@ -8682,6 +8728,7 @@ mod tests {
             MetaVersion::V0_1,
             None,
             None,
+            &std::collections::HashSet::new(),
         ))
         .expect("the held first cycle");
         assert!(
@@ -8763,6 +8810,7 @@ mod tests {
             MetaVersion::V0_1,
             None,
             None,
+            &std::collections::HashSet::new(),
         ))
         .expect("the held first cycle");
         assert_eq!(held.pushed, 0, "content is held, as it must be");
@@ -10614,6 +10662,7 @@ mod tests {
                 items_key_id,
             }),
             None,
+            &std::collections::HashSet::new(),
         ))
     }
 

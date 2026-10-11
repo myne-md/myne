@@ -410,6 +410,9 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
                 // windows too, so an idle lock leaves no note text on screen in
                 // any window (the same guarantee the manual lock gives).
                 hooks.detached_windows_teardown_on_lock();
+                // live-collab: the idle lock drops live co-editing sessions too,
+                // so an idle lock leaves no decrypted session in RAM.
+                hooks.live_session_teardown_on_lock();
                 hooks.zeroize_vault_indices();
                 hooks.zeroize_attachment_refs();
                 hooks.abort_active_recording();

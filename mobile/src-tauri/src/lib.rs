@@ -330,6 +330,16 @@ pub fn run() {
             // token. Mirrors the desktop wiring.
             app.manage(myne_core::plugins::sync::poke_listener::SsePokeSignal::default());
             myne_core::plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
+            // Live-awareness stream (live-collab): sibling of the poke supervisor,
+            // same gate, opaque frames. Mirrors the desktop wiring.
+            app.manage(myne_core::plugins::sync::awareness_listener::AwarenessSignal::default());
+            myne_core::plugins::sync::awareness_listener::spawn_awareness_supervisor(
+                app.handle().clone(),
+            );
+            // Live co-editing sessions (live-collab, `collab-editor-bridge`): the
+            // per-device registry of open notes' Automerge documents, cleared on
+            // every vault-leaving hook. Mirrors the desktop wiring.
+            app.manage(myne_core::plugins::live::LiveSessionRegistry::default());
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`

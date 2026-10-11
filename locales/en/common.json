@@ -1322,8 +1322,17 @@
           "backlinks": "Links",
           "outline": "Outline",
           "tasks": "Tasks",
-          "unlinked": "Unlinked mentions"
+          "unlinked": "Unlinked mentions",
+          "whoIsHere": "Who's here"
         }
+      },
+      "presence": {
+        "editing": "is editing",
+        "empty": "You're the only one here",
+        "jumpTo": "Jump to {{name}}",
+        "title_one": "{{count}} person here",
+        "title_other": "{{count}} people here",
+        "unknown": "Someone"
       },
       "sidebarToggle": {
         "hideBacklinks": "Hide backlinks sidebar",
@@ -2518,6 +2527,7 @@
       "confirmBody": "Your current note will be saved as a snapshot first, so you can undo this.",
       "confirmTitle": "Restore this snapshot?",
       "decrypting": "Decrypting…",
+      "deviceFallback": "Device {{code}}",
       "emptyState": "No snapshots yet. Snapshots are saved automatically as you edit and kept for about 7 days. They’re encrypted, and disappear when the note is permanently deleted.",
       "encryptedSize": "Encrypted · {{size}}",
       "errorCannotDecrypt": "This snapshot couldn't be decrypted.",
@@ -2535,6 +2545,7 @@
       "restoredStatus": "Restored. The version you had is saved as a snapshot.",
       "selectPlaceholder": "Select a snapshot to preview what changed since then.",
       "title": "Snapshots",
+      "unknownAuthor": "Unknown device",
       "untitled": "Untitled"
     },
     "tabStrip": {

@@ -1,0 +1,47 @@
+# Permissions for the in-app `live` Tauri plugin (epic live-collab,
+# `collab-editor-bridge` task 3).
+# Picked up under the `live:` ACL namespace because `build.rs` declares this as
+# an `InlinedPlugin`. Capability files reference these as `live:default` (or
+# `live:allow-live-session-open` / … individually).
+#
+# Every command is Slot::Unlocked-gated and operates on the encrypted .myn
+# blob through the single-writer `LiveSessionRegistry`. They inherit the
+# main-window-only invariant shared by the other vault plugins: v0.2 multi-window
+# MUST NOT grant a live write permission to any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the live plugin: the collaborative-editor live-session commands (open / patch-frontmatter / close)."
+permissions = [
+    "allow-live-session-open",
+    "allow-live-session-patch-frontmatter",
+    "allow-live-session-take-remote-splices",
+    "allow-live-session-set-presence",
+    "allow-live-session-close",
+]
+
+[[permission]]
+identifier = "allow-live-session-open"
+description = "Allow invoking live:live_session_open (Slot::Unlocked-gated; loads the note's NC05 blob into a live session under the device actor; idempotent, a second open attaches)."
+commands.allow = ["live_session_open"]
+
+[[permission]]
+identifier = "allow-live-session-patch-frontmatter"
+description = "Allow invoking live:live_session_patch_frontmatter (Slot::Unlocked-gated; the durable frontmatter entry point, persists a re-derived note through the session)."
+commands.allow = ["live_session_patch_frontmatter"]
+
+[[permission]]
+identifier = "allow-live-session-take-remote-splices"
+description = "Allow invoking live:live_session_take_remote_splices (drains the body splices a sync pull merged into the open session, for the pane to dispatch as one ChangeSet; task 7)."
+commands.allow = ["live_session_take_remote_splices"]
+
+[[permission]]
+identifier = "allow-live-session-close"
+description = "Allow invoking live:live_session_close (Slot::Unlocked-gated; flushes the pending durable write then drops the session)."
+commands.allow = ["live_session_close"]
+
+[[permission]]
+identifier = "allow-live-session-set-presence"
+description = "Allow invoking live:live_session_set_presence (records this device's local caret/selection for an open note so peers render its cursor; infallible, a no-op with no open session)."
+commands.allow = ["live_session_set_presence"]

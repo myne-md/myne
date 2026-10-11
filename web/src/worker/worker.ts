@@ -29,6 +29,7 @@ import init, {
   install_sync_transport,
   invoke as wasmInvoke,
   invoke_with_bytes as wasmInvokeWithBytes,
+  sync_awareness_deliver,
   sync_poke_target,
   sync_signal,
   sync_tick,
@@ -256,6 +257,10 @@ async function start(): Promise<void> {
       tick: sync_tick,
       signal: sync_signal,
       pokeTarget: sync_poke_target,
+      // The received-frame sink: the awareness reader hands each opaque `data:`
+      // payload to the wasm inbox, and never parses it. The endpoint and token
+      // come through `sync_poke_target` above.
+      awarenessFrame: sync_awareness_deliver,
     });
 
     // `build_info()` is parsed rather than forwarded raw so a malformed value

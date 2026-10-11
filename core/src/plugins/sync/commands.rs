@@ -231,11 +231,15 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let Some(hooks) = app.try_state::<crate::hooks::Hooks>() else {
         return CycleOutcome::NotReady;
     };
+    let Some(live_registry) = app.try_state::<crate::plugins::live::LiveSessionRegistry>() else {
+        return CycleOutcome::NotReady;
+    };
     super::cycle::run_active_cycle_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
         hooks.inner(),
+        live_registry.inner(),
         allow_push,
     )
     .await
@@ -299,11 +303,15 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
     let Some(hooks) = app.try_state::<crate::hooks::Hooks>() else {
         return Ok(SyncRuntimeStatus::NotEnrolled);
     };
+    let Some(live_registry) = app.try_state::<crate::plugins::live::LiveSessionRegistry>() else {
+        return Ok(SyncRuntimeStatus::NotEnrolled);
+    };
     Ok(super::cycle::sync_now_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
         hooks.inner(),
+        live_registry.inner(),
     )
     .await)
 }
@@ -1564,6 +1572,7 @@ pub async fn sync_remove_member<R: Runtime>(
         rotation.new_epoch.saturating_sub(1),
         rotation.new_epoch,
         &rotation.reclaim_sync_ids_hex,
+        &rotation.packages,
     )
     .await?;
     // The rotation re-keyed every content blob locally, but a member removal is

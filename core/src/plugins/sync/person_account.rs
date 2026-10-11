@@ -1099,7 +1099,7 @@ pub async fn unlock_member_vault_from_host(
         .map_err(|_| SyncDeviceError::BadRequest)?;
     let b2b =
         protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
-    let keys = super::member_key_store::read_member_key_store(
+    let mut keys = super::member_key_store::read_member_key_store(
         io,
         &vault_dir,
         vault_id.as_uuid().as_bytes(),
@@ -1116,6 +1116,70 @@ pub async fn unlock_member_vault_from_host(
     )
     .await
     .map_err(|_| SyncDeviceError::BadRequest)?;
+
+    // An owner group-key rotation may have advanced `vault.meta` past the epoch
+    // this device's member-key store holds (`collab-b2b-sessions` task 1). Fetch
+    // our delivered package, verify it against the PINNED owner half, unwrap the
+    // new group key, and re-seal the store at the new epoch so a later unlock is
+    // not refused as stale. The re-seal needs the member's phrase, which is
+    // available only here; the running-session path (`member_adopt_rotation_...`)
+    // updates the live slot without it.
+    //
+    // **The offline case this refuses, on purpose.** Only a STALE store reaches this
+    // branch (`b2b.group_key_epoch > keys.group_key_epoch`), so a member whose store
+    // already holds the current epoch unlocks offline with no fetch at all. When the
+    // store IS stale there is no offline unlock to fall back on: the re-seal is an
+    // Argon2id over the phrase, so the running-session adoption cannot write it and
+    // the alternative to fetching is using the RETIRED epoch's keys, which is the
+    // silent-loss path this branch exists to prevent. Reachability is therefore a
+    // real availability requirement for that one case, stated rather than implied.
+    if b2b.group_key_epoch > keys.group_key_epoch {
+        let sync_state = super::state::read_sync_state(io, &vault_dir)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let owner_code = sync_state.owner_identity_code.clone().unwrap_or_default();
+        // The package MUST be obtained before the slot is installed (`collab-verification`
+        // D8): the keys this device holds are the RETIRED epoch's, and installing them
+        // over a newer `vault.meta` would seal every later local write under a key the
+        // vault no longer has (silent loss to the member, unreadable to the owner). So an
+        // absent package, an absent pinned owner code, or an unreachable server REFUSES
+        // the unlock rather than degrading to the stale keys. The typed `Transport`
+        // refusal is retryable, which is the correct posture: the fix is reachability,
+        // not re-enrolment.
+        let rotated = if owner_code.is_empty() {
+            None
+        } else {
+            fetch_and_open_rotation_package(host, io, &b2b, b2b.group_key_epoch, &owner_code, &pair)
+                .await
+                .ok()
+                .flatten()
+        };
+        let Some((group_key, items_key)) = rotated else {
+            tracing::warn!(
+                stage = "member_unlock_rotation_pending",
+                "refusing to unlock: the rotation package for the newer epoch is not reachable"
+            );
+            return Err(SyncDeviceError::Transport);
+        };
+        super::member_key_store::write_member_key_store(
+            io,
+            &vault_dir,
+            vault_id.as_uuid().as_bytes(),
+            &b2b.base.account_number_hash,
+            b2b.group_key_epoch,
+            &keys.items_key_id,
+            &b2b.base.kdf_params,
+            &normalized,
+            &group_key,
+            &items_key,
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+        keys.group_key = group_key;
+        keys.items_key = items_key;
+        keys.group_key_epoch = b2b.group_key_epoch;
+    }
+
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
     let person_id = protocol::person_id_hash(normalized.as_str());
@@ -1918,10 +1982,99 @@ pub fn retire_namespace_request(
     }
 }
 
+/// The vault-scoped delivery route for one member's rotation package
+/// (`collab-b2b-sessions` task 1, `docs/spec/server-protocol.md` §3.4).
+fn group_package_path(account_hash_hex: &str, person_id_hex: &str) -> String {
+    format!("/b2b/vaults/{account_hash_hex}/group-packages/{person_id_hex}")
+}
+
+/// Owner POST of one remaining member's rotation package at `epoch`, under the
+/// owner's per-vault membership token. `frame` is the canonical signed group
+/// package ([`protocol::person_invite::encode_signed_group_package`]); the
+/// server stores it verbatim and parses no payload.
+pub fn post_group_package_request(
+    transport: &dyn SyncTransport,
+    owner_token_hex: &str,
+    account_hash_hex: &str,
+    person_id_hex: &str,
+    epoch: u64,
+    frame: &[u8],
+) -> Result<(), SyncDeviceError> {
+    use base64::Engine as _;
+    let path = group_package_path(account_hash_hex, person_id_hex);
+    let body = serde_json::json!({
+        "epoch": epoch,
+        "package_b64": base64::engine::general_purpose::STANDARD.encode(frame),
+    });
+    let bytes = serde_json::to_vec(&body).map_err(|_| SyncDeviceError::Internal)?;
+    let resp = transport
+        .request(HttpMethod::Put, &path, &bytes, Some(owner_token_hex))
+        .map_err(|_| SyncDeviceError::Transport)?;
+    match resp.status {
+        200 => Ok(()),
+        401 | 403 => Err(SyncDeviceError::Unauthenticated),
+        _ => Err(SyncDeviceError::Transport),
+    }
+}
+
+/// A member's GET of its OWN rotation package, authored with the recipient's
+/// person session token. `Ok(None)` when the owner has not written one yet (the
+/// delivery is in flight, or the member has no package at this epoch): the
+/// caller retries on the next cycle rather than failing.
+pub fn fetch_group_package_request(
+    transport: &dyn SyncTransport,
+    person_token_hex: &str,
+    account_hash_hex: &str,
+    person_id_hex: &str,
+) -> Result<Option<(u64, Vec<u8>)>, SyncDeviceError> {
+    use base64::Engine as _;
+    let path = group_package_path(account_hash_hex, person_id_hex);
+    let resp = transport
+        .request(HttpMethod::Get, &path, &[], Some(person_token_hex))
+        .map_err(|_| SyncDeviceError::Transport)?;
+    match resp.status {
+        200 => {
+            let v: serde_json::Value =
+                serde_json::from_slice(&resp.body).map_err(|_| SyncDeviceError::BadRequest)?;
+            let epoch = v
+                .get("epoch")
+                .and_then(|e| e.as_u64())
+                .ok_or(SyncDeviceError::BadRequest)?;
+            let b64 = v
+                .get("package_b64")
+                .and_then(|p| p.as_str())
+                .ok_or(SyncDeviceError::BadRequest)?;
+            let pkg = base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .map_err(|_| SyncDeviceError::BadRequest)?;
+            Ok(Some((epoch, pkg)))
+        }
+        404 => Ok(None),
+        401 | 403 => Err(SyncDeviceError::Unauthenticated),
+        _ => Err(SyncDeviceError::Transport),
+    }
+}
+
+/// The group-key epoch this vault's device-local member-key store was sealed at,
+/// read WITHOUT the phrase (the epoch is cleartext routing metadata in the
+/// envelope). `None` on an absent or unparseable store. Used to detect that
+/// `vault.meta` has advanced past the keys this device holds, which is the
+/// member-side trigger for adopting a rotation (`collab-b2b-sessions` task 1).
+pub async fn member_key_store_epoch(io: &dyn VaultIo, vault_root: &std::path::Path) -> Option<u64> {
+    let bytes = io
+        .read(&vault_root.join(super::member_key_store::MEMBER_KEY_STORE_FILE))
+        .await
+        .ok()?;
+    let v: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    v.get("group_key_epoch")?.as_u64()
+}
+
 /// After a group rotation, push the rotated `vault.meta` under the owner's
-/// per-vault token, record the namespace retirement, and revoke the removed
-/// member's binding + token (myne-md/myne#711 task 14). `person_id_hex` is `None`
-/// for a row migrated from the pre-B2B roster (no person account to revoke).
+/// per-vault token, record the namespace retirement, deliver one package to each
+/// remaining member, and revoke the removed member's binding + token
+/// (myne-md/myne#711 task 14; `collab-b2b-sessions` task 1). `person_id_hex` is
+/// `None` for a row migrated from the pre-B2B roster (no person account to
+/// revoke).
 #[allow(clippy::too_many_arguments)]
 pub async fn push_and_revoke_removed_member_from_host(
     host: &dyn HostCtx,
@@ -1931,6 +2084,7 @@ pub async fn push_and_revoke_removed_member_from_host(
     retired_epoch: u64,
     replacement_epoch: u64,
     reclaim_sync_ids_hex: &[String],
+    packages: &[super::member_removal::GroupPackageDelivery],
 ) -> Result<(), SyncDeviceError> {
     let owner_person_id = state
         .clone_person_id()
@@ -1962,6 +2116,18 @@ pub async fn push_and_revoke_removed_member_from_host(
     let url = endpoint_from_host(host, io).await?;
     let pid = person_id_hex.map(str::to_string);
     let reclaim = reclaim_sync_ids_hex.to_vec();
+    // Canonicalize each remaining member's package to its opaque wire frame
+    // before entering the blocking closure. A package whose frame cannot be
+    // encoded is a programming error, not a transient fault; refuse the whole
+    // delivery rather than silently dropping one member's re-key.
+    let post_packages: Vec<(String, Vec<u8>)> = packages
+        .iter()
+        .map(|d| {
+            protocol::person_invite::encode_signed_group_package(&d.package)
+                .map(|frame| (d.person_id_hex.clone(), frame))
+                .ok_or(SyncDeviceError::Internal)
+        })
+        .collect::<Result<_, _>>()?;
 
     crate::task::run_blocking(move || {
         let transport =
@@ -1971,6 +2137,28 @@ pub async fn push_and_revoke_removed_member_from_host(
         // dies.
         super::enroll::put_vault_meta(transport.as_ref(), &owner_token, &meta_bytes)
             .map_err(|_| SyncDeviceError::Transport)?;
+        // Deliver one package per remaining member, so a member that observes the
+        // greater epoch can fetch, verify and re-key (`collab-b2b-sessions` task
+        // 1). Posted before the revoke: the removed member is never a recipient.
+        //
+        // A single recipient's failure must not abandon the rest. The meta is
+        // already rotated, so a member left without its package can never re-key
+        // and would be stranded on the retired epoch; try EVERY recipient, keep the
+        // first error, and still run the revoke below (leaving a removed member
+        // able to pull would be the worse outcome).
+        let mut first_post_error: Option<SyncDeviceError> = None;
+        for (recipient_hex, frame) in &post_packages {
+            if let Err(e) = post_group_package_request(
+                transport.as_ref(),
+                &owner_token,
+                &account_hash_hex,
+                recipient_hex,
+                replacement_epoch,
+                frame,
+            ) {
+                first_post_error.get_or_insert(e);
+            }
+        }
         // Retire the old epoch's namespace: a write to a retired sync-id is
         // refused and its blob is reclaimed after the grace (decision 0609).
         if retired_epoch != 0 && replacement_epoch == retired_epoch + 1 {
@@ -1986,10 +2174,156 @@ pub async fn push_and_revoke_removed_member_from_host(
         if let Some(pid) = pid {
             revoke_member_request(transport.as_ref(), &owner_token, &account_hash_hex, &pid)?;
         }
+        // Report a package-delivery failure AFTER the revoke, so the caller retries
+        // the deliveries rather than re-running the rotation from scratch.
+        if let Some(e) = first_post_error {
+            return Err(e);
+        }
         Ok(())
     })
     .await
     .map_err(|_| SyncDeviceError::Internal)?
+}
+
+/// Fetch, verify and OPEN this member's delivered rotation package for
+/// `expected_epoch`, returning the new `group_key` and `items_key`, or `None`
+/// when the package has not landed or the server holds none (a retryable
+/// condition). A tampered package or a wrong pinned owner key is `Err`.
+///
+/// The owner public half is PINNED (`owner_code`, the out-of-band identity code
+/// recorded at accept); it is never taken from the package, so a server that
+/// substitutes the owner material is refused rather than trusted.
+#[allow(clippy::too_many_arguments)]
+async fn fetch_and_open_rotation_package(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    b2b: &protocol::B2bVaultMeta,
+    expected_epoch: u64,
+    owner_code: &str,
+    member: &protocol::PersonKeyPair,
+) -> Result<Option<(Zeroizing<[u8; 32]>, Zeroizing<[u8; 32]>)>, SyncDeviceError> {
+    let owner = super::invite::decode_person_identity_code(owner_code)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let auth = read_person_auth(
+        io,
+        &person_auth_path_for_read(host).map_err(|_| SyncDeviceError::Internal)?,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+    .filter(|a| !a.token_hex.is_empty())
+    .ok_or(SyncDeviceError::NotEnrolled)?;
+    let person_id =
+        super::devices::hex16(&auth.person_id_hex).ok_or(SyncDeviceError::BadRequest)?;
+    let account_hash_hex =
+        crate::account::person_identity::hex_lower(&b2b.base.account_number_hash);
+    let pid_hex = crate::account::person_identity::hex_lower(&person_id);
+    let person_token = auth.token_hex.clone();
+    let url = endpoint_from_host(host, io).await?;
+    let fetched = crate::task::run_blocking(move || {
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
+        fetch_group_package_request(
+            transport.as_ref(),
+            &person_token,
+            &account_hash_hex,
+            &pid_hex,
+        )
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?;
+    let Some((pkg_epoch, frame)) = fetched? else {
+        return Ok(None);
+    };
+    // A package at an epoch other than the one we expected is not ours to adopt
+    // silently; the strictly-greater rule keeps a stale or replayed package from
+    // regressing the keys.
+    if pkg_epoch != expected_epoch {
+        return Ok(None);
+    }
+    let package = protocol::person_invite::decode_signed_group_package(&frame)
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let group_key = protocol::person_invite::open_group_package(
+        &owner.public,
+        member,
+        &package,
+        &b2b.base.account_number_hash,
+        expected_epoch,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
+    let group = protocol::GroupKey::new(*group_key);
+    let items_key =
+        protocol::unlock_items_key_ntv6(b2b, &group).map_err(|_| SyncDeviceError::BadRequest)?;
+    Ok(Some((group_key, items_key)))
+}
+
+/// A member's adoption of a group rotation it has observed
+/// (`collab-b2b-sessions` task 1). Idempotent and cheap when there is nothing to
+/// do.
+///
+/// Trigger: this device's `vault.meta` carries a group-key epoch STRICTLY
+/// GREATER than the epoch its device-local member-key store was sealed at, i.e.
+/// the owner rotated and the sync meta phase has already adopted the new
+/// `vault.meta` bytes. On that signal the member fetches its OWN package from
+/// the vault-scoped delivery route with its person session, verifies the owner
+/// double signature against the PINNED owner public half, unwraps the new group
+/// key, derives the vault's `itemsKey` at the new epoch, and installs both on
+/// the live slot so the running session re-keys.
+///
+/// Delivery-tolerant: a member whose package has not landed yet, or a transport
+/// hiccup, returns `Ok(())` and retries on the next cycle. The `vault.member-key`
+/// store is re-sealed on the next unlock, where the member's phrase is available
+/// (`unlock_member_vault_from_host`); between the rotation and that unlock the
+/// live slot holds the new keys and the sync plane stays on the new epoch.
+pub async fn member_adopt_rotation_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<(), SyncDeviceError> {
+    let root = crate::paths::active_vault_root_from_base(
+        &host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?,
+        state.active_vault_id().await,
+    );
+    let Ok(meta_bytes) = io.read(&root.join("vault.meta")).await else {
+        return Ok(());
+    };
+    if meta_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return Ok(());
+    }
+    let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta_bytes) else {
+        return Ok(());
+    };
+    let meta_epoch = b2b.group_key_epoch;
+    let Some(store_epoch) = member_key_store_epoch(io, &root).await else {
+        return Ok(());
+    };
+    if meta_epoch <= store_epoch {
+        return Ok(()); // nothing to adopt
+    }
+
+    let sync_state = super::state::read_sync_state(io, &root)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let owner_code = sync_state
+        .owner_identity_code
+        .clone()
+        .filter(|s| !s.is_empty())
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let member = state
+        .clone_person_identity()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    let Some((new_group_key, new_items_key)) =
+        fetch_and_open_rotation_package(host, io, &b2b, meta_epoch, &owner_code, &member).await?
+    else {
+        return Ok(()); // not delivered yet: retry next cycle
+    };
+
+    let Some(id) = state.active_vault_id().await else {
+        return Ok(());
+    };
+    state.replace_items_key(id, new_items_key).await;
+    state.set_group_key(id, new_group_key).await;
+    Ok(())
 }
 
 /// The active vault's `account_number_hash`, from its `vault.meta`.
@@ -2735,6 +3069,136 @@ mod tests {
                 "an NTV5 vault has no roster to list: {:?}",
                 out.map(|v| v.len())
             );
+        });
+    }
+
+    // ---- collab-b2b-sessions task 1: the rotation-package delivery route ----
+
+    // The owner POSTs one member's group package to the vault-scoped route with
+    // its per-vault token; the body carries the epoch and the opaque frame.
+    #[test]
+    fn post_group_package_posts_to_the_vault_scoped_route() {
+        use base64::Engine as _;
+        let t = FakeTransport::new();
+        let vault = "aa".repeat(16);
+        let recipient = "bb".repeat(16);
+        t.on(
+            HttpMethod::Put,
+            &format!("/b2b/vaults/{vault}/group-packages/{recipient}"),
+            200,
+            b"{\"ok\":true}".to_vec(),
+        );
+        post_group_package_request(&t, "owner-tok", &vault, &recipient, 2, b"opaque-frame")
+            .expect("post package");
+        let reqs = t.requests();
+        assert_eq!(reqs.len(), 1);
+        assert_eq!(reqs[0].0, HttpMethod::Put);
+        assert_eq!(
+            reqs[0].1,
+            format!("/b2b/vaults/{vault}/group-packages/{recipient}")
+        );
+        assert_eq!(reqs[0].3.as_deref(), Some("owner-tok"));
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].2).expect("json");
+        assert_eq!(body["epoch"], 2);
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(body["package_b64"].as_str().unwrap())
+                .unwrap(),
+            b"opaque-frame"
+        );
+    }
+
+    // A refusal is mapped by cause rather than collapsed to Transport.
+    #[test]
+    fn post_group_package_maps_its_refusals() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Put,
+            "/b2b/vaults/aa/group-packages/bb",
+            403,
+            b"{}".to_vec(),
+        );
+        assert_eq!(
+            post_group_package_request(&t, "owner-tok", "aa", "bb", 2, b"x").unwrap_err(),
+            SyncDeviceError::Unauthenticated
+        );
+        let t2 = FakeTransport::new();
+        t2.on(
+            HttpMethod::Put,
+            "/b2b/vaults/aa/group-packages/bb",
+            500,
+            b"{}".to_vec(),
+        );
+        assert_eq!(
+            post_group_package_request(&t2, "owner-tok", "aa", "bb", 2, b"x").unwrap_err(),
+            SyncDeviceError::Transport
+        );
+    }
+
+    // The member GETs its own package with its person session token; a 404 is
+    // "not delivered yet" (Ok(None)), an auth failure is a real refusal.
+    #[test]
+    fn fetch_group_package_reads_own_and_maps_a_miss_to_none() {
+        use base64::Engine as _;
+        let vault = "aa".repeat(16);
+        let me = "bb".repeat(16);
+        let path = format!("/b2b/vaults/{vault}/group-packages/{me}");
+
+        let t = FakeTransport::new();
+        let body = serde_json::to_vec(&serde_json::json!({
+            "epoch": 3,
+            "package_b64": base64::engine::general_purpose::STANDARD.encode(b"frame-bytes"),
+        }))
+        .unwrap();
+        t.on(HttpMethod::Get, &path, 200, body);
+        let got = fetch_group_package_request(&t, "person-tok", &vault, &me)
+            .expect("fetch")
+            .expect("present");
+        assert_eq!(got.0, 3);
+        assert_eq!(got.1, b"frame-bytes");
+        assert_eq!(t.requests()[0].3.as_deref(), Some("person-tok"));
+
+        let miss = FakeTransport::new();
+        miss.on(HttpMethod::Get, &path, 404, b"{}".to_vec());
+        assert!(
+            fetch_group_package_request(&miss, "person-tok", &vault, &me)
+                .expect("fetch")
+                .is_none()
+        );
+
+        let denied = FakeTransport::new();
+        denied.on(HttpMethod::Get, &path, 401, b"{}".to_vec());
+        assert_eq!(
+            fetch_group_package_request(&denied, "person-tok", &vault, &me).unwrap_err(),
+            SyncDeviceError::Unauthenticated
+        );
+    }
+
+    // The member-key store's epoch is read WITHOUT the phrase (it is cleartext
+    // routing metadata), which is the trigger for adopting a rotation.
+    #[test]
+    fn member_key_store_epoch_is_readable_without_the_phrase() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("member-epoch").expect("temp dir");
+            let io = crate::vault_io::StdVaultIo;
+            let root = tmp.path().to_path_buf();
+            assert!(member_key_store_epoch(&io, &root).await.is_none());
+            let env = serde_json::json!({
+                "vault_id_hex": "aa".repeat(16),
+                "account_hash_hex": "bb".repeat(16),
+                "group_key_epoch": 7,
+                "items_key_id_hex": "cc".repeat(16),
+                "nonce_hex": "dd".repeat(24),
+                "sealed_hex": "ee",
+            });
+            io.write(
+                &root.join(crate::plugins::sync::member_key_store::MEMBER_KEY_STORE_FILE),
+                &serde_json::to_vec(&env).unwrap(),
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("write store");
+            assert_eq!(member_key_store_epoch(&io, &root).await, Some(7));
         });
     }
 }
