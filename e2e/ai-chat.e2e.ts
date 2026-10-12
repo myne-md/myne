@@ -161,3 +161,134 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
     );
   });
 });
+
+aiDescribe("ac2 the composer refuses a keystroke when there is nothing in scope", () => {
+  // myne-md/myne#848. A new conversation now starts on the whole vault, so the
+  // only state with no scope at all is a vault the resolution empties: no notes,
+  // or every note inside an excluded folder. The host's own preview answers
+  // "zero" a step before `start_run` refuses with `EmptyGrant`, which is what
+  // lets the field refuse the KEYSTROKE rather than the send.
+  //
+  // Asserted structurally (the outline attribute and the disabled field) rather
+  // than on the copy: the sentence lives in the catalog and the component tests
+  // pin its key, so an E2E assertion on English wording would be a second place
+  // to update for a copy change.
+  it("disables the field and outlines the scope control on an empty vault", async () => {
+    let password = "";
+    await scenario(
+      "ac2-blocked-scope",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        // NO note is created, which is the precondition the scenario is about.
+        await enableAi(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+
+        await s.waitForElement(testIdSelector("ai.composer-input"), { timeoutMs: 15_000 });
+        await s.waitUntil(
+          async () =>
+            (await (
+              await s.byTestId("ai.composer-scope-wrap")
+            ).attribute("data-blocked")) === "true"
+              ? true
+              : null,
+          { label: "the scope control reports an empty scope", timeoutMs: 20_000 },
+        );
+        const input = await s.byTestId("ai.composer-input");
+        expect(await input.attribute("disabled")).not.toBeNull();
+        // And no line under the field: the highlight and the refusal are the
+        // whole message, so a warning paragraph reappearing here is a regression.
+        expect((await s.byTestIdAll("ai.composer-needs-scope")).length).toBe(0);
+      },
+    );
+  });
+});
+
+aiDescribe("ac3 the run's footprint is one line in the transcript", () => {
+  // myne-md/myne#848. The figures used to live in a strip pinned under the
+  // transcript; they are now a disclosure on the run's own turn, which is what
+  // makes them survive scrolling and navigation.
+  it("copies a turn's words, and says which way it went", async () => {
+    let password = "";
+    await scenario(
+      "ac4-turn-copy",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "ac4notealfa7k2m9qx4w8e5rj0aa");
+        await typeIntoEditor(s, "The mitochondria is the powerhouse of the cell.");
+        await waitForSaved(s);
+        await enableAi(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+
+        const composer = await s.byTestId("ai.composer-input", { timeoutMs: 10_000 });
+        await composer.sendKeys("summarize this note");
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+
+        // **The USER's turn is the deterministic half** (myne-md/myne#848). The
+        // stub may answer with a proposal and no words of its own, so the
+        // ANSWER's copy control is conditional, while what the user typed is
+        // always there, and it is the same control either way.
+        const userCopy = await s.findElement(
+          `${testIdSelector("ai.turn", { "data-role": "user" })} ${testIdSelector("ai.turn-copy")}`,
+        );
+        // The control names WHAT it copies, so it is not a bare glyph whose
+        // meaning the user has to guess.
+        expect(await userCopy.attribute("aria-label")).toBe("Copy your message");
+        await userCopy.click();
+        // The outcome is reported ON the control, the `inline-icon` arm of
+        // `lib/clipboard.ts`. "Copied" means the write resolved through the
+        // platform seam; "Could not copy" means it did not, and a failed copy
+        // that looked like a successful one is the exact defect that module
+        // exists to prevent. The clipboard is NOT read back: the WebView holds
+        // no clipboard READ grant, deliberately (myne#379).
+        await s.waitUntil(
+          async () =>
+            (await userCopy.attribute("aria-label")) === "Copied" ? true : null,
+          { label: "the copy reports success on the control", timeoutMs: 10_000 },
+        );
+      },
+    );
+  });
+
+  it("reports the run on its turn, and reveals the figures when asked", async () => {
+    let password = "";
+    await scenario(
+      "ac3-run-footprint",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "ac3notealfa7k2m9qx4w8e5rj0aa");
+        await typeIntoEditor(s, "The mitochondria is the powerhouse of the cell.");
+        await waitForSaved(s);
+        await enableAi(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+
+        const composer = await s.byTestId("ai.composer-input", { timeoutMs: 10_000 });
+        await composer.sendKeys("summarize this note");
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+
+        // The line is on the turn, INSIDE the scrolling transcript.
+        const scroller = await s.byTestId("ai.transcript");
+        await s.waitForElement(testIdSelector("agentFootprint"), { timeoutMs: 20_000 });
+        const footprint = await s.byTestId("agentFootprint");
+        expect(await footprint.attribute("data-settled")).toBe("true");
+        // The figures are NOT on the line until it is opened.
+        expect((await s.byTestIdAll("agentFootprint.runCost")).length).toBe(0);
+        await (await s.byTestId("agentFootprint.disclosure")).click();
+        await s.waitForElement(testIdSelector("agentFootprint.runCost"), {
+          timeoutMs: 10_000,
+        });
+        void scroller;
+      },
+    );
+  });
+});

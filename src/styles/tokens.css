@@ -153,6 +153,23 @@ textarea,
   }
 }
 
+/* -- A run at work (myne-md/myne#848) ---------------------------------------
+   The status line of a run in flight is the only thing on screen saying work is
+   happening while a long run streams nothing back, so it breathes: a slow
+   opacity wave between the muted grey and the full ink. It CARRIES STATE rather
+   than decorating, so it opts into `data-motion="essential"` (see the
+   reduced-motion block above) and slows rather than freezing there. A frozen
+   "Working" reads as hung, which is the one thing this line exists to prevent. */
+
+@keyframes myne-working-wave {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
+.myne-working-wave {
+  animation: myne-working-wave 1.6s ease-in-out infinite alternate;
+}
+
 /* -- Spinner ----------------------------------------------------------------
    Used by <Spinner /> primitive. Border-top accent + linear rotation.
    Under reduced motion it keeps turning at half speed (see the exemption

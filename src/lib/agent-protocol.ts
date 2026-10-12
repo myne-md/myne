@@ -22,33 +22,39 @@
 
 /** What the user approved as a scope. Mirrors the Rust `ScopeGrant`.
  *
- *  Two shapes and no third. There is deliberately no tag or saved-search form:
- *  a predicate is a permission whose contents change after it was granted, and
- *  the agent can write the very tag that would widen its own scope. */
+ *  Three shapes, and still no predicate. There is deliberately no tag or
+ *  saved-search form: a predicate is a permission whose contents change after it
+ *  was granted, and the agent can write the very tag that would widen its own
+ *  scope. `vault` is not that, it is a fixed set resolved once, like the other
+ *  two, and it exists so "everything" has an explicit spelling (myne-md/myne#848). */
 export type ScopeGrant =
   | { kind: "notes"; value: string[] }
-  | { kind: "folder"; value: string };
+  | { kind: "folder"; value: string }
+  | { kind: "vault" };
 
 /**
- * The scope a run gets when the user has set none: the open note, or nothing.
+ * The scope a run gets when the user has attached no folder: the open note when
+ * there is one, and the whole vault when there is not.
  *
- * **`null` rather than "the whole vault", and the host is why.** A folder grant
- * with an empty path IS the vault root, and
- * `core/src/plugins/agent/scope.rs::is_root_grant` exists so a caller refuses
- * one before resolving: `start_run` and `preview_grant` both return
- * `AgentError::RootGrant`, and `resolve_grant`'s own comment says reaching it
- * with an empty key "would silently grant everything, so resolve it to nothing
- * instead". So `{ kind: "folder", value: "" }` is not a wide scope, it is a
- * refused one, and a client that builds it offers a Send that cannot work and a
- * scope figure that reads "could not be checked".
+ * **`vault` rather than `null`, and the host is why** (myne-md/myne#848). This
+ * used to return `null` and document why it could not ask for the whole vault:
+ * a folder grant with an empty path IS the vault root, `is_root_grant` refuses
+ * one before resolving, and a client that built it offered a Send that could not
+ * work. That reasoning still holds for the FOLDER shape, `{ kind: "folder",
+ * value: "" }` is a refused grant, not a wide one, and the conclusion changed
+ * because the host grew an explicit `Vault` shape, which is the caller saying
+ * the vault rather than a folder path that happens to be the root. So the
+ * default is now expressible, and a new conversation opens on the whole vault:
+ * minus the excluded folders, and minus the notes outside the working set, both
+ * resolved host-side.
  *
- * Shared because both clients answer this question and the mobile one answered
- * it the other way for a review round. Desktop's composer already returned
- * `null` here; this is that rule with a name, so the next client inherits it
- * rather than re-deciding.
+ * The open note still wins where there is one. The sidebar chat is scoped to the
+ * note it is showing, and that is a product decision rather than a fallback.
  */
-export function defaultGrantFor(openNoteId: string | null): ScopeGrant | null {
-  return openNoteId === null ? null : { kind: "notes", value: [openNoteId] };
+export function defaultGrantFor(openNoteId: string | null): ScopeGrant {
+  return openNoteId === null || openNoteId === ""
+    ? { kind: "vault" }
+    : { kind: "notes", value: [openNoteId] };
 }
 
 /** A stable dependency key for a grant.
@@ -61,6 +67,7 @@ export function defaultGrantFor(openNoteId: string | null): ScopeGrant | null {
  */
 export function scopeKey(grant: ScopeGrant | null): string {
   if (grant === null) return "";
+  if (grant.kind === "vault") return "v";
   return grant.kind === "folder" ? `f:${grant.value}` : `n:${grant.value.join("\u0000")}`;
 }
 
@@ -68,9 +75,16 @@ export function scopeKey(grant: ScopeGrant | null): string {
  *
  *  A discriminator on the one edit type rather than a second list on the
  *  proposal, so the bulk-approval split, the applied-row bookkeeping and the
- *  review screen all cover an append by construction rather than by a second
- *  wiring nobody would notice was missing. */
-export type EditKind = "replace" | "append";
+ *  review screen all cover a NEW shape by construction rather than by a second
+ *  wiring nobody would notice was missing.
+ *
+ *  `move` carries its destination FOLDER in `replacement` and leaves `anchor`
+ *  empty, the shape the append verb already uses. The host refuses an anchored
+ *  edit that rewrites `folder:` under every approval label, because such an edit
+ *  hides its destination inside that replacement text and there is then nothing
+ *  for the excluded-folder clamp to read. The verb exists so the destination is a
+ *  field the clamp can read and the review can show. */
+export type EditKind = "replace" | "append" | "move";
 
 /** One edit the model proposed. Mirrors the Rust `ProposedEdit`. */
 export interface ProposedEdit {
@@ -83,6 +97,10 @@ export interface ProposedEdit {
    *  once or the edit is refused; there is no fuzzy matching anywhere. Empty
    *  for an append, which has nothing to anchor to. */
   anchor: string;
+  /** What the edit writes. For a `replace` it is the text that takes the
+   *  anchor's place (an empty one deletes the anchor, which is allowed); for an
+   *  append it is the text appended; for a `move` it is the DESTINATION FOLDER,
+   *  not body text at all. */
   replacement: string;
 }
 
@@ -187,12 +205,22 @@ export type EditRejection =
    *  than dropped, so a row the user pressed Apply on never silently does
    *  nothing. */
   | "notProposed"
-  /** The edit would move the note to a different folder. Refused under EVERY
-   *  approval label, unlike `removalNeedsOwnAct`, because `folder:` is what the
-   *  AI-excluded-folder control is keyed on: the clamp reads it before the
-   *  batch runs, so an edit rewriting that line would relocate a note past a
-   *  control that had already made its decision. */
+  /** An ANCHORED EDIT would move the note to a different folder. Refused under
+   *  EVERY approval label, unlike `removalNeedsOwnAct`, because `folder:` is what
+   *  the AI-excluded-folder control is keyed on and such an edit hides its
+   *  destination inside replacement text, so the clamp has nothing to read. A
+   *  `move` edit is the route that IS allowed, and it is allowed precisely
+   *  because it names the destination as a field. */
   | "noteMoved"
+  /** A move asked for the folder the note is already in. Its own reason rather
+   *  than a silent success: destinations are compared canonically, so a note in
+   *  `Work` moved to `work/` is the same folder, and applying it would rewrite
+   *  the note's bytes and advance its sync version for no change. */
+  | "moveToSameFolder"
+  /** A move's destination is an AI-excluded folder. The second half of the
+   *  clamp: `excludedNow` refuses leaving an excluded folder and this refuses
+   *  entering one, so neither direction is reachable. */
+  | "moveIntoExcludedFolder"
   /** An append carried nothing to append. Its own reason rather than
    *  `anchorEmpty`, which would describe a rule an append does not have. */
   | "appendEmpty"
@@ -301,7 +329,13 @@ export function editHidesNoteAs(edit: ProposedEdit): HidingField | null {
   // The over-flagging licence the rest of this function relies on does not
   // stretch this far: it is an argument for flagging when the OUTCOME is
   // uncertain, and here the outcome is known.
-  if (isAppend(edit)) return null;
+  // A move cannot hide a note either, and for the mirror-image reason: its
+  // `replacement` is a folder path rather than body text, so a `trashed:`-shaped
+  // string could only reach the note inside a `folder:` line, which is not a
+  // marker. The host reads the resulting frontmatter and sees nothing, so
+  // flagging one here would route a row out of the bulk approve for a reason
+  // that is not true.
+  if (isAppend(edit) || isMove(edit)) return null;
   const hit = HIDING_MARKERS.find(
     (marker) => marker.test(edit.replacement) && !marker.test(edit.anchor),
   );
@@ -546,6 +580,15 @@ export interface ProbeProgress {
  *  `edit.kind !== "replace"` is a bug waiting for an absent field. */
 export function isAppend(edit: ProposedEdit): boolean {
   return edit.kind === "append";
+}
+
+/** Whether an edit moves the note rather than rewriting its body.
+ *
+ *  A helper for the same reason as {@link isAppend}: `kind` is optional on the
+ *  wire, so `=== "move"` is the only correct test and a `!== "replace"` test
+ *  would treat a payload written before the verb existed as a move. */
+export function isMove(edit: ProposedEdit): boolean {
+  return edit.kind === "move";
 }
 
 /** The largest chat-history seed budget the host will store, in characters.

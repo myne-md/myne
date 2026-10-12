@@ -4730,6 +4730,27 @@ function RightSidebar({
     [selectedId, openTitle],
   );
 
+  // **One handler for both agent-apply call sites** (myne-md/myne#848): the
+  // panel's auto-apply and the review takeover's approved apply write the same
+  // two halves, and they were two inline arrows with the second copy already
+  // behind once, the sidebar re-index reached the panel's handler first.
+  //
+  // The two halves, and why each is owed: the open pane re-reads its body,
+  // because an apply writes through the backend out of band of any pane's own
+  // autosave loop, so without it the editor keeps the pre-apply text AND the
+  // pane's next autosave writes that stale buffer back over the edit the user
+  // just approved. The sidebar re-reads each written note's own slice, because
+  // its tree is derived from its own title/folder cache, which nothing here
+  // touched, so an agent that moved notes left them appearing under their OLD
+  // folders until something else re-read them.
+  const notesWritten = useCallback(
+    (ids: readonly string[]) => {
+      ctx.reloadOpenNote();
+      for (const id of ids) void ctx.refreshOne(id as NoteId);
+    },
+    [ctx],
+  );
+
   const tabOrder = prefs.right_panel_tab_order;
   const hidden = prefs.right_panel_hidden_tabs;
   const order = useMemo(
@@ -4965,8 +4986,11 @@ function RightSidebar({
             onShowToast={onShowToast}
             // The automatic-apply path writes out of band of any pane's own
             // autosave loop, exactly as the manual one does, so it owes the
-            // same reload (myne-md/myne#551).
-            onNotesWritten={() => ctx.reloadOpenNote()}
+            // same reload (myne-md/myne#551). The handler above states both
+            // halves, including the sidebar re-index the user reported missing
+            // (“it moved them but the sidebar did not re-index live”,
+            // myne-md/myne#848).
+            onNotesWritten={notesWritten}
             onInsert={(text) => {
               // "Insert into note" (note-summarization task 5, SYNC-17): append a
               // `## Summary` block to the focused note and let the normal autosave
@@ -5006,13 +5030,19 @@ function RightSidebar({
         titleOf={(noteId) =>
           notes.find((n) => n.noteUuid === noteId)?.title ?? null
         }
+        // The folder a move row shows as its starting point. Resolved from the
+        // same list `titleOf` reads, so the two can never describe different
+        // notes, and `null` when the list does not know the note (a move row then
+        // shows the destination alone rather than inventing a source).
+        folderOf={(noteId) =>
+          notes.find((n) => n.noteUuid === noteId)?.folder ?? null
+        }
         // An apply writes through the backend, out of band of any pane's own
         // autosave loop, so without this the editor keeps showing the pre-apply
         // text AND the pane's next autosave writes that stale buffer back over
-        // the edit the user just approved. Same blanket bump the task-write path
-        // uses; each pane applies its own dirty guard, so it never clobbers
-        // in-flight typing.
-        onNotesWritten={() => ctx.reloadOpenNote()}
+        // the edit the user just approved. Same two halves as the panel's
+        // handler above, and now literally the same handler.
+        onNotesWritten={notesWritten}
       />
 
       {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}

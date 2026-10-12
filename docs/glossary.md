@@ -183,13 +183,13 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529), with exactly one exception: the [remember verb](#remember-verb) writes a memory entry without approval (myne-md/myne#697, `decisions/ai/0591`). Four verbs: edit a note body, append to a note body, create a note (the [append verb](#append-verb) was added by myne-md/myne#616), and remember a fact about the user; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529), with exactly one exception: the [remember verb](#remember-verb) writes a memory entry without approval (myne-md/myne#697, `decisions/ai/0591`). Five verbs: edit a note body, append to a note body, create a note (the [append verb](#append-verb) was added by myne-md/myne#616), move a note to another folder (the [move verb](#move-verb) was added by myne-md/myne#848), and remember a fact about the user; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, and operations ON a folder itself (creating, renaming, deleting one) are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. Moving a note is a verb of its own, stated below, so the folder field is not excluded from the set: what is excluded is every write that would change it WITHOUT naming the destination. **Moving a note is its own verb, and the [folder lock](#folder-lock) is checked BOTH ways**: an anchored edit still may not change a note's folder, and a move is refused when the note is in an excluded folder or when the destination is one, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0662`, which supersedes the refusal clause of `decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
 ### **agent turn** &nbsp; 📦 *Product*
 
-How an [agent run](#agent-run) appears in the [conversational AI chat](#conversational-ai-chat) transcript: the task the user sent, carrying the [agent scope](#agent-scope) label it was sent under, and beside it the turn the run itself renders into. Both belong to the agent flow rather than to the chat, which is what keeps the task out of the ask model's conversation history. The run's turn holds counts and a closed end tag, never the [proposed edits](#proposed-edit). The run's LIVE state (its status, running scope total, Stop, and the scope-expansion approval) is deliberately not in the turn: it renders outside the scrolling transcript, so a control the threat model requires to be continuously visible cannot scroll away or be removed by clearing the conversation.
+How an [agent run](#agent-run) appears in the [conversational AI chat](#conversational-ai-chat) transcript: the task the user sent, carrying the [agent scope](#agent-scope) label it was sent under, and beside it the turn the run itself renders into. Both belong to the agent flow rather than to the chat, which is what keeps the task out of the ask model's conversation history. The run's turn holds counts and a closed end tag, never the [proposed edits](#proposed-edit). The run's LIVE state is on the turn's own footprint line (myne-md/myne#848): its status, its running scope total and its cost figures, which are ON the line while the run works and behind a disclosure once it settles, so a control the threat model requires to be continuously visible is readable without a press. The scope-expansion approval is the exception and stays outside the scrolling transcript: it is a modal question, and mounting it inside the region a reader has scrolled put it below their view.
 
 Used in: `decisions.md` 2026-08-19
 
@@ -1132,13 +1132,17 @@ A *virtual* organizational container for notes, shown as a nested tree in the si
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
+### **folder anchor** &nbsp; 📦 *Product*
+
+The folder a [conversation](#conversation) is scoped to, recorded as the optional `folder` key on its `vault.chats` row (`protocol.md` §9.23) so the agent hub can say what a conversation is about without opening it. A conversation carries **at most one** anchor: a [note anchor](#note-anchor), a folder anchor, or neither, which is a vault-general conversation. Additive and optional, the same shape the note anchor uses, and both are written at create time (myne-md/myne#848).
+
+Used in: `protocol.md` §9.23, `decisions/ai/0662`
+
 ### **folder lock** &nbsp; 📦 *Product*
 
-The host-side rule that no [agent run](#agent-run) write may change which [folder](#folder) a note is in (myne-md/myne#616). It compares the note's `folder:` frontmatter value before and after the write is composed and refuses any write that changes it, under BOTH approval labels, and it is re-derived host-side rather than read from the IPC payload.
+The rule that bounds what an [agent run](#agent-run) may do with the field that decides which folder a note is in, because that field is what `ai_excluded_folders` is keyed on (SYNC-14). It is checked **both ways**. An anchored edit may not change a note's `folder:` line at all, under either approval label. A [move verb](#move-verb) is the one write that may change it, and it is refused when the note is already in an excluded folder and when the destination is one, so neither entering nor leaving an excluded folder is reachable. The destination is written as a quoted YAML scalar when the value needs it, so the folder the clamp compares and the folder the app resolves are the same string (myne-md/myne#848). Supersedes the refusal clause of `decisions/ai/0554`; current form in `decisions/ai/0662`.
 
-The reason it is a refusal rather than a line in the diff: the folder is what `ai_excluded_folders` is keyed on, so a move is the one edit that can change which notes a LATER run may read. A user approving a diff is judging the text in front of them, not re-deriving an exclusion set from it. It covers `folder:` and nothing else, deliberately, because a blanket frontmatter lock would silently withdraw the agent's ability to archive.
-
-Used in: `decisions/ai/0554`, `threat-model.md` §7
+Used in: `decisions/ai/0662`, `threat-model.md` §7
 
 ### **folder note** &nbsp; 📦 *Product*
 
@@ -1380,6 +1384,12 @@ Used in: `spec/markdown-dialect.md` §3.2
 The `==text==` inline construct, rendered with a muted warm-amber `--highlight` wash (MYND-156). The one hand-rolled `MarkdownConfig` in Myne's dialect (`@lezer/markdown` ships sub/sup/emoji but no highlight). Cursor-aware: the `==` markers hide off-cursor and reveal on-cursor; bytes preserved (§6 C1). Has a canonical emit form via the highlight selection-toolbar button (§5). The `.cm-highlight` class is shared with the embedded-HTML `<mark>` element render (SYNC-6). `==text==` is always the **default yellow**; non-yellow highlights use [multi-color highlight](#multi-color-highlight) instead.
 
 Used in: `spec/markdown-dialect.md` §3.2, §5
+
+### **move verb** &nbsp; 📦 *Product*
+
+The [agentic note editing](#agentic-note-editing) verb that changes which folder a note is in, taking a note id and a destination folder (`myne-md/myne#848`). It exists because the alternative was the edit path: the model proposed folder moves through an anchored edit, the [folder lock](#folder-lock) refused them, and the run's own summary still reported the moves as applied. As a verb, the destination is its own field, so the review can render where the note would land and the clamp can read it before the write. It is a [proposed edit](#proposed-edit) like any other and writes nothing until approved.
+
+Used in: `decisions/ai/0662`
 
 ### **motion tier** &nbsp; 📦 *Product*
 
@@ -2428,7 +2438,7 @@ Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **proposed edit** &nbsp; 📦 *Product*
 
-One change an [agent run](#agent-run) suggests to a note body. It comes in two kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over both by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+One change an [agent run](#agent-run) suggests to a note. It comes in three kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). A MOVE carries no anchor either, and its `replacement` is the destination FOLDER rather than note text, which is what lets the review show where the note would land and the [folder lock](#folder-lock) read the destination before the write (see [move verb](#move-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over all three by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -2437,6 +2447,12 @@ Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Face ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
 
 Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
+### **working-set flag** &nbsp; 📦 *Product*
+
+The per-note boolean in the vault index recording whether a note is part of the working set the sidebar tree shows, computed by the SAME predicate the tree uses (`isLiveNote`: not trashed, not tombstoned, not archived, not a template, not a conflict copy). It is the sibling of a [heading record](#heading-record) in the serialized structured index (`protocol.md` §9.8.2), stored rather than re-derived so a consumer that resolves a scope does not form a second opinion about what "live" means: the agent's scope reads this flag, so the notes a run can reach are the notes the user can see (myne-md/myne#848).
+
+Used in: `protocol.md` §9.8.2, `decisions/ai/0662`
 
 ### **wrap-key provider** &nbsp; 🗝️ *Key/identifier*
 

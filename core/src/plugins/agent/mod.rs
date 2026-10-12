@@ -14,25 +14,33 @@
 //! host implements, not on the host's plugin. A change here that wants to reach
 //! into `local_inference` has gone wrong.
 //!
-//! **What this module deliberately cannot do.** It has three verbs, all of them
-//! writes to a note's body or a new note: replace anchored text, append to the
-//! end, and create a note. Deletion is not among them because it does not need
-//! to be: every way Myne takes a note out of the working set is a frontmatter
-//! field, so doing it is a body edit and is reversible.
+//! **What this module can do, and what it still cannot.** Five write verbs, and
+//! they are deliberately few: replace anchored text, append to the end, move a
+//! note to another folder, create a note, and write one memory entry. Deletion is
+//! not among them because it does not need to be: every way Myne takes a note out
+//! of the working set is a frontmatter field, so doing it is a body edit and is
+//! reversible.
 //!
-//! **And one thing the verbs may not do, added with the third**
-//! (myne-md/myne#616): no write may change which folder a note is in. `folder:`
-//! is what the `ai_excluded_folders` clamp reads, and the clamp runs before the
-//! batch, so an edit rewriting that line would relocate a note past a control
-//! that had already decided. [`frontmatter`] is the predicate; unlike the
-//! removal carve-out it refuses under every approval label, because no user act
-//! makes an agent-chosen folder move correct. That is
-//! also why [`hide`] exists: those edits look like any other at the diff layer,
-//! and an approve-all must not carry one. Note move, note rename, folder
-//! operations and attachment operations are all absent. Rename in particular is
-//! absent for a structural reason rather than a cautious one: it would require
-//! rewriting every note that links to the renamed one, and those notes are not
-//! in scope, so rename and the scope model are mutually exclusive.
+//! **A move is a verb rather than a relaxation of the edit rule**
+//! (myne-md/myne#848, which supersedes the folder clause of myne-md/myne#616).
+//! `folder:` is what the `ai_excluded_folders` clamp reads, and an anchored edit
+//! whose anchor spans that line hides its destination inside replacement text, so
+//! that route is still refused under every approval label: [`frontmatter`] is the
+//! predicate and [`hide`] is its sibling for the five working-set markers, which
+//! look like any other edit at the diff layer and must not ride along inside an
+//! approve-all.
+//!
+//! What changed is that the model now has a way to ASK. A move names its
+//! destination as its own field, and that is what lets the clamp read where the
+//! note lands and the review show it before the user approves. The clamp is
+//! therefore two-way: [`apply`] refuses a note whose CURRENT folder is excluded
+//! before the batch runs, and refuses a destination that is excluded as the batch
+//! places it, so neither entering nor leaving an excluded folder is reachable.
+//!
+//! Note rename, folder operations and attachment operations remain absent. Rename
+//! in particular is absent for a structural reason rather than a cautious one: it
+//! would require rewriting every note that links to the renamed one, and those
+//! notes are not in scope, so rename and the scope model are mutually exclusive.
 //!
 //! Spec: `docs/threat-model.md` §7 (the prompt-injection bullet this feature
 //! amends, and the restated SYNC-17), `docs/decisions/ai/0461` (the provider
@@ -94,5 +102,6 @@ pub use scope::{
     ScopeSource,
 };
 pub use tools::{
-    list_scope, read_note, search_scope, NoteReader, ScopeEntry, ScopeSearcher, SearchHit,
+    list_scope, read_note, render_scope_entry, search_scope, NoteReader, ScopeEntry, ScopeSearcher,
+    SearchHit,
 };

@@ -176,13 +176,28 @@ mod tests {
                     level: 2,
                 },
             ],
+            // myne-md/myne#848: rides the same snapshot, so the round-trip below
+            // covers it, a postcard field that encoded but did not decode would
+            // reset every note to LIVE after each unlock, which is the one
+            // direction of this field's failure no other assertion here catches.
+            live: true,
         }
     }
 
     fn records() -> BTreeMap<String, NoteRecord> {
         let mut m = BTreeMap::new();
         m.insert("a".to_string(), record_with_property("Alpha"));
-        m.insert("b".to_string(), record_with_property("Beta"));
+        // `b` is a HIDDEN note (myne-md/myne#848) on purpose: with both records
+        // live, the round-trip below would prove only that `true` survives
+        // postcard, and a field that came back `true` for every record would
+        // pass it. The false side is the one the agent's scope depends on.
+        m.insert(
+            "b".to_string(),
+            NoteRecord {
+                live: false,
+                ..record_with_property("Beta")
+            },
+        );
         m
     }
 
@@ -205,6 +220,9 @@ mod tests {
         assert_eq!(r2, recs);
         // The typed property survived the postcard round-trip.
         assert_eq!(r2["a"].properties[0].value.as_deref(), Some("in-progress"));
+        // …and so did the working-set verdict, on both sides of it.
+        assert!(r2["a"].live);
+        assert!(!r2["b"].live, "a hidden note must not come back live");
     }
 
     #[test]
@@ -239,6 +257,47 @@ mod tests {
     struct PreHeadingsSnapshot<'a> {
         manifest: &'a NonceManifest,
         records: &'a BTreeMap<String, PreHeadingsRecord>,
+    }
+
+    /// A record as it was serialized AFTER `headings` landed and BEFORE `live`
+    /// did, which is the shape a vault that persisted in between holds.
+    ///
+    /// **This is the fixture the `live` question is actually about** (review
+    /// finding). `PreHeadingsRecord` above cannot reach the NEW last field: its
+    /// read dies on `headings` and never arrives, so the pin built on it proves
+    /// something about the field before the one under test.
+    #[derive(Serialize)]
+    struct PreLiveRecord {
+        title: Option<String>,
+        folder: Option<String>,
+        title_key: Option<String>,
+        edges: Vec<WikilinkEdge>,
+        tags: Vec<TagEntry>,
+        properties: Vec<PropertyEntry>,
+        block_anchors: Vec<BlockAnchor>,
+        tasks: Vec<TaskRecord>,
+        headings: Vec<HeadingEntry>,
+    }
+
+    #[derive(Serialize)]
+    struct PreLiveSnapshot<'a> {
+        manifest: &'a NonceManifest,
+        records: &'a BTreeMap<String, PreLiveRecord>,
+    }
+
+    fn pre_live_record(title: &str) -> PreLiveRecord {
+        let full = record_with_property(title);
+        PreLiveRecord {
+            title: full.title,
+            folder: full.folder,
+            title_key: full.title_key,
+            edges: full.edges,
+            tags: full.tags,
+            properties: full.properties,
+            block_anchors: full.block_anchors,
+            tasks: full.tasks,
+            headings: full.headings,
+        }
     }
 
     fn pre_headings_record(title: &str) -> PreHeadingsRecord {
@@ -301,6 +360,46 @@ mod tests {
                  of failing. `#[serde(default)]` is filling it, so an older blob now loads with \
                  an empty heading set and reports itself complete. protocol.md §9.8.2 and \
                  decision 0594 both argue the opposite and must be corrected before this ships"
+            );
+        }
+    }
+
+    /// The shape the per-note trailing-field question is about in THIS change:
+    /// a snapshot written between `headings` and `live`, so the read reaches the
+    /// new last field rather than dying earlier.
+    ///
+    /// One record is the easy case, and it fails to decode at end of input, which
+    /// is why the field can be trailing at all. Two records is the case
+    /// `docs/spec/protocol.md` §9.8.2 warns about: the reader consumes the next
+    /// record's bytes as the missing field, and `from_bytes` has no trailing-byte
+    /// check, so a read whose remaining bytes satisfy the UTF-8 and discriminant
+    /// checks can terminate successfully with a WRONG map. This test pins which
+    /// of the two happens, because `live` is a permission input now rather than
+    /// display data: a wrong map's `live` values are what an agent's scope
+    /// resolves against.
+    #[test]
+    fn a_snapshot_written_before_the_live_field_does_not_load_as_a_complete_index() {
+        for count in [1usize, 2] {
+            let mut recs: BTreeMap<String, PreLiveRecord> = BTreeMap::new();
+            for i in 0..count {
+                recs.insert(format!("note-{i}"), pre_live_record("Alpha"));
+            }
+            let manifest = NonceManifest::new();
+            let plaintext = postcard::to_allocvec(&PreLiveSnapshot {
+                manifest: &manifest,
+                records: &recs,
+            })
+            .expect("the pre-live snapshot serializes");
+            let blob = encode_vault_indices_blob(&KEY, &ACCOUNT_HASH, &plaintext)
+                .expect("the blob envelope encodes");
+
+            assert!(
+                decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
+                "a {count}-record snapshot missing its trailing `live` field decoded. That is \
+                 protocol.md §9.8.2's residual for a per-note trailing field, and it is now a \
+                 permission input: the map it produced is a wrong scope rather than a wrong \
+                 heading list. Close it (a trailing-byte check, or an `index_format_version` \
+                 bump, which §9.8.2 says would) before this field can be trusted"
             );
         }
     }

@@ -69,6 +69,12 @@ export interface IndexRecord {
    *  zero rows. Unlike the other two this costs no extra pass, since
    *  `extractRecord`'s single `parse()` already enumerated them. */
   headings: HeadingEntry[];
+  /** Whether this note is in the user's working set (myne-md/myne#848):
+   *  `isLiveNote(readNoteFlags(body))`, the same predicate `EditorFlow` filters
+   *  the list with. The agent's scope resolves against this on every client, so
+   *  a trashed/template/archived note is outside a run's reach here exactly as
+   *  it is on desktop. */
+  live: boolean;
 }
 
 /** Replace-semantics upsert of a note's index contribution. */
@@ -92,6 +98,9 @@ export function vaultIndicesApply(r: IndexRecord): Promise<void> {
     // moment that default changed.
     blockAnchors: r.blockAnchors,
     headings: r.headings,
+    // myne-md/myne#848: the working-set verdict, so a run's scope on the phone
+    // is the list the phone shows.
+    live: r.live,
   });
 }
 

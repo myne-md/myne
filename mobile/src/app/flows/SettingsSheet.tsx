@@ -983,6 +983,14 @@ function AiPanel({
 
   return (
     <div style={PANEL_STACK}>
+      {/* **The same intent vocabulary as the desktop panel** (myne-md/myne#848),
+          over what this device actually has. The phone has no model files, no
+          auto-tag switch, no meeting prompt and no history budget, those are
+          the surfaces the desktop's five groups are built around, so grouping
+          here is two headings rather than five, and inventing empty ones for
+          parity would be a heading over nothing. What carries across is the
+          WORDING: a user who read the desktop panel recognises these. */}
+      <SectionLabel>{t("settings.ai.groupPrivacy")}</SectionLabel>
       <Group>
         <ToggleRow
           first
@@ -1000,6 +1008,7 @@ function AiPanel({
           normative for a capability a platform lacks. */}
       {prefs.ai_enabled && (
         <>
+          <SectionLabel>{t("settings.ai.groupWriting")}</SectionLabel>
           <SectionLabel>{t("settings.ai.providerLabel")}</SectionLabel>
           <Group>
             <ToggleRow

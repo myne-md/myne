@@ -62,7 +62,7 @@ afterEach(() => clearAgent());
 
 describe("reportRunProgress", () => {
   it("gives the surface a real figure while the run is still working", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
 
@@ -80,7 +80,7 @@ describe("reportRunProgress", () => {
   });
 
   it("takes running totals rather than deltas, so a dropped message cannot under-report", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
 
@@ -95,10 +95,10 @@ describe("reportRunProgress", () => {
   });
 
   it("is dropped when the run it describes was let go of", () => {
-    beginRun();
+    beginRun(null);
     const stale = currentRunEpoch();
     // A vault lock, a vault switch, "New chat", or a second run starting.
-    beginRun();
+    beginRun(null);
 
     expect(
       reportRunProgress({ iterations: 9, notesRead: 9, charsOffDevice: 9999 }, stale),
@@ -111,7 +111,7 @@ describe("reportRunProgress", () => {
   });
 
   it("keeps the figures once the run stops, which is the case this exists for", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
     reportRunProgress({ iterations: 2, notesRead: 1, charsOffDevice: 500 }, epoch);
@@ -131,7 +131,7 @@ describe("reportRunProgress", () => {
   });
 
   it("continues across legs rather than restarting at the second one", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
 
@@ -153,7 +153,7 @@ describe("reportRunProgress", () => {
   });
 
   it("keeps a local run apart from a remote one that has sent nothing yet", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
 

@@ -29,27 +29,7 @@ import {
 } from "../../lib/chats";
 import { clearChatPersistForLock, openConversation } from "../ai/chatPersist";
 import { discardChat, getActiveConversationId } from "../ai/chatStore";
-
-/** Newest first: the list order, applied to every fetch path. */
-function byUpdatedDesc(rows: ConversationListRow[]): ConversationListRow[] {
-  return [...rows].sort((a, b) => b.updated_at - a.updated_at);
-}
-
-function relativeDay(updatedAt: number, locale: string, timeZone: string | null): string {
-  const date = new Date(updatedAt);
-  const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  // Rendered through the shared date/time display store (the app's own
-  // locale and zone, not the OS defaults): the mobile twin renders the same
-  // field relatively, this list absolutely. The relative-vs-absolute split is recorded,
-  // not a pref bypass.
-  return date.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-    ...(timeZone === null ? {} : { timeZone }),
-  });
-}
+import { byUpdatedDesc, relativeDay } from "../ai/conversationList";
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -266,7 +246,13 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                   >
                     {row.title}
                   </button>
-                  <span style={META_STYLE}>{relativeDay(row.updated_at, locale, timeZone)}</span>
+                  <span style={META_STYLE}>
+                    {relativeDay(
+                      row.updated_at > 0 ? row.updated_at : row.created_at,
+                      locale,
+                      timeZone,
+                    )}
+                  </span>
                   <Button
                     type="button"
                     variant="ghost"

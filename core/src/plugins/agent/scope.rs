@@ -17,17 +17,36 @@
 //! what it is for. How many notes it removed is returned so the approval screen
 //! can say so: dropping them silently would leave the user believing a result
 //! covered a folder it did not.
+//!
+//! ## The working set is the sidebar's, not the index's
+//!
+//! The vault index is deliberately **trash-blind**: every accessor returns rows
+//! for trashed, tombstoned, archived, template and conflict-copy notes, and the
+//! exclusion lives wherever the rows are turned into a view. This module is one
+//! such place, so it reads the SAME verdict the sidebar tree reads rather than
+//! forming its own: `NoteRecord::live` is the producer's `isLiveNote` answer,
+//! shipped through `vault_indices_apply`. A hidden note is absent from the
+//! resolved set and from the count, and `list_scope` / `read_note` /
+//! `search_scope` all read the frozen set, so it is absent from every read tool
+//! as well. `conflict:` keeps its meaning by construction, `isLiveNote` already
+//! excludes it.
 
 use crate::folder_key::{canonical_excluded, canonical_folder};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// What the user approved. Two shapes, and no third.
+/// What the user approved.
 ///
-/// There is deliberately no predicate shape (`Tag(..)`, `Search(..)`). Adding
-/// one is not an extension of this enum, it is a reversal of the decision this
-/// module's header states.
+/// **Three shapes, and still no predicate.** There is deliberately no `Tag(..)`
+/// or `Search(..)`: a predicate is a permission whose contents change after it
+/// was granted, and the agent can write the very tag that would widen its own
+/// scope. `Vault` is not that. It is a fixed set resolved once, like the other
+/// two, and it exists so that "everything" has an explicit spelling:
+/// `is_root_grant` still refuses a FOLDER grant whose path canonises to the
+/// root, because a folder that happens to be the root is a mistake rather than
+/// a request for the whole vault, and the earlier design had nothing else to
+/// offer a caller that genuinely meant the vault (myne-md/myne#848).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 pub enum ScopeGrant {
@@ -35,6 +54,10 @@ pub enum ScopeGrant {
     Notes(Vec<String>),
     /// A folder, equal-or-nested. Resolved against the index at approval time.
     Folder(String),
+    /// Every note in the vault, minus the `ai_excluded_folders` clamp and minus
+    /// the notes outside the working set. The shape the composer's default
+    /// resolves to when no folder is attached and no note is open.
+    Vault,
 }
 
 /// A grant, resolved.
@@ -94,10 +117,17 @@ pub fn resolve_grant(
         ScopeGrant::Notes(ids) => {
             for id in ids {
                 match records.get(id) {
-                    Some(record) => {
+                    // myne-md/myne#848: a note the sidebar's working-set
+                    // predicate excludes (trashed, tombstoned, archived,
+                    // template, conflict copy) is not a note the user could
+                    // have meant to grant. Fail closed and drop it, neither
+                    // granted nor counted as unknown, because the index DOES
+                    // know it; it is the working set it is absent from.
+                    Some(record) if record.live => {
                         let key = canonical_folder(record.folder.as_deref().unwrap_or(""));
                         consider(id, &key);
                     }
+                    Some(_) => {}
                     None => unknown_count += 1,
                 }
             }
@@ -114,13 +144,11 @@ pub fn resolve_grant(
                     unknown_count,
                 };
             }
-            for (id, record) in records {
-                let note_folder = canonical_folder(record.folder.as_deref().unwrap_or(""));
-                if note_folder.starts_with(key.as_str()) {
-                    consider(id, &note_folder);
-                }
-            }
+            live_records_in(records, Some(&key), &mut consider);
         }
+        // The whole vault, spelled deliberately (myne-md/myne#848): the same
+        // walk with no prefix to match.
+        ScopeGrant::Vault => live_records_in(records, None, &mut consider),
     }
 
     ResolvedGrant {
@@ -130,13 +158,47 @@ pub fn resolve_grant(
     }
 }
 
+/// Walk every LIVE record, optionally inside one folder, and hand each to
+/// `consider`.
+///
+/// **One walk for the folder and the vault arms** (myne-md/myne#848). They were
+/// two identical loops differing in one `starts_with` test, which is the shape
+/// where the next filter lands in one of them: the working-set gate especially,
+/// which is the only place the run's scope can stop disagreeing with the sidebar
+/// the user is looking at, and the index is deliberately trash-blind, so it
+/// cannot be applied anywhere else.
+///
+/// `prefix` is the canonical folder key, or `None` for the whole vault.
+fn live_records_in(
+    records: &BTreeMap<String, NoteRecord>,
+    prefix: Option<&str>,
+    consider: &mut impl FnMut(&str, &str),
+) {
+    for (id, record) in records {
+        if !record.live {
+            continue;
+        }
+        let note_folder = canonical_folder(record.folder.as_deref().unwrap_or(""));
+        if prefix.is_none_or(|key| note_folder.starts_with(key)) {
+            consider(id, &note_folder);
+        }
+    }
+}
+
 /// Whether a grant names the vault root, which a caller must refuse before
 /// resolving. Separated from [`resolve_grant`] so the refusal is a named error
 /// at the command boundary rather than an empty result the UI has to interpret.
+///
+/// **[`ScopeGrant::Vault`] is not one of these.** This predicate is about a
+/// FOLDER path that canonises to the root, a typed path that slipped through as
+/// `/` or `""`, where the caller meant one folder and would have got the vault.
+/// A `Vault` grant is the caller saying the vault, and refusing it would leave
+/// "everything" inexpressible (myne-md/myne#848).
 pub fn is_root_grant(grant: &ScopeGrant) -> bool {
     match grant {
         ScopeGrant::Folder(f) => canonical_folder(f).is_empty(),
         ScopeGrant::Notes(ids) => ids.is_empty(),
+        ScopeGrant::Vault => false,
     }
 }
 
@@ -385,6 +447,56 @@ mod tests {
         assert!(r.note_ids.is_empty());
     }
 
+    // ── the vault grant (myne-md/myne#848) ──────────────────────────────────
+    //
+    // The composer's default. It is NOT a root FOLDER grant, and the pair of
+    // assertions below is the whole distinction: a typed `""` path is still
+    // refused, and the explicit vault shape is not.
+
+    #[test]
+    fn a_vault_grant_spells_the_whole_vault_without_being_a_root_grant() {
+        assert!(!is_root_grant(&ScopeGrant::Vault));
+    }
+
+    #[test]
+    fn a_vault_grant_is_the_live_notes_minus_the_clamp() {
+        let idx: BTreeMap<String, NoteRecord> = [
+            ("in-folder", record(Some("Projects"))),
+            ("at-root", record(None)),
+            ("hidden", hidden(Some("Projects"))),
+            ("excluded", record(Some("Private"))),
+        ]
+        .into_iter()
+        .map(|(id, r)| (id.to_string(), r))
+        .collect();
+
+        let r = resolve_grant(&ScopeGrant::Vault, &idx, &["Private".into()]);
+        assert_eq!(
+            r.note_ids,
+            ["at-root", "in-folder"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "every live note, the hidden one apart, the excluded one clamped out"
+        );
+        assert_eq!(r.excluded_count, 1);
+        assert_eq!(r.unknown_count, 0);
+    }
+
+    #[test]
+    fn a_vault_grant_the_clamp_emptied_is_refused() {
+        let runs = AgentRunState::default();
+        let mut records = index(&[]);
+        records.insert("a".into(), record(Some("Private")));
+        let src = HiddenSource {
+            records,
+            excluded: vec!["Private".into()],
+        };
+        let err = block_on(start_run(&runs, "r".into(), &ScopeGrant::Vault, &src)).unwrap_err();
+        assert!(matches!(err, AgentError::EmptyGrant));
+        assert!(runs.is_empty());
+    }
+
     // ── the entry points, and the ORDER they encode ─────────────────────────
     //
     // These functions exist so a client cannot assemble the sequence itself, and
@@ -581,6 +693,126 @@ mod tests {
     fn folder_matching_is_case_and_diacritic_insensitive_on_both_sides() {
         let idx = index(&[("a", Some("Özel/Alt"))]);
         let r = resolve_grant(&ScopeGrant::Folder("özel".into()), &idx, &[]);
+        assert_eq!(r.note_ids, ["a"].iter().map(|s| s.to_string()).collect());
+    }
+
+    // ── the working set is the sidebar's ────────────────────────────────────
+    //
+    // myne-md/myne#848. The index is trash-blind by design (see the module
+    // header), so `resolve_grant` is where a hidden note has to leave the run's
+    // scope. Injecting the defect this guards against is deleting the two
+    // `record.live` checks in `resolve_grant`: the first test below then reports
+    // all four notes, and the count goes from the sidebar's 1 to 4.
+
+    /// A note the producer classified as out of the working set.
+    fn hidden(folder: Option<&str>) -> NoteRecord {
+        NoteRecord {
+            live: false,
+            ..record(folder)
+        }
+    }
+
+    #[test]
+    fn trashed_deleted_and_template_notes_leave_the_working_set_and_the_count() {
+        let idx: BTreeMap<String, NoteRecord> = [
+            ("live", record(Some("Projects"))),
+            ("trashed", hidden(Some("Projects"))),
+            ("deleted", hidden(Some("Projects"))),
+            ("template", hidden(Some("Projects"))),
+            ("archived", hidden(Some("Projects"))),
+            ("conflict", hidden(Some("Projects"))),
+        ]
+        .into_iter()
+        .map(|(id, r)| (id.to_string(), r))
+        .collect();
+
+        let r = resolve_grant(&ScopeGrant::Folder("Projects".into()), &idx, &[]);
+        assert_eq!(
+            r.note_ids,
+            ["live"].iter().map(|s| s.to_string()).collect(),
+            "only the live note is in the scope"
+        );
+        assert_eq!(
+            r.note_ids.len(),
+            1,
+            "the count the user sees is the number of notes the sidebar shows"
+        );
+        // Hidden notes are not the excluded-folder clamp's business: keeping the
+        // two counts apart is what lets the approval screen say "3 excluded by
+        // your folder setting" without also claiming these six.
+        assert_eq!(r.excluded_count, 0);
+        assert_eq!(r.unknown_count, 0);
+    }
+
+    #[test]
+    fn a_note_grant_cannot_reach_a_hidden_note() {
+        let idx: BTreeMap<String, NoteRecord> = [
+            ("live", record(Some("Public"))),
+            ("trashed", hidden(Some("Public"))),
+        ]
+        .into_iter()
+        .map(|(id, r)| (id.to_string(), r))
+        .collect();
+
+        let r = resolve_grant(
+            &ScopeGrant::Notes(vec!["live".into(), "trashed".into()]),
+            &idx,
+            &[],
+        );
+        assert_eq!(r.note_ids, ["live"].iter().map(|s| s.to_string()).collect());
+        // Dropped, not reported as unknown: the index knows the note, the
+        // working set does not carry it.
+        assert_eq!(r.unknown_count, 0);
+    }
+
+    #[test]
+    fn a_grant_of_only_hidden_notes_resolves_to_nothing_so_start_run_refuses_it() {
+        let runs = AgentRunState::default();
+        let mut records = index(&[]);
+        records.insert("trashed".into(), hidden(Some("Projects")));
+        let src = HiddenSource {
+            records,
+            excluded: Vec::new(),
+        };
+        let err = block_on(start_run(
+            &runs,
+            "r".into(),
+            &ScopeGrant::Folder("Projects".into()),
+            &src,
+        ))
+        .unwrap_err();
+        assert!(matches!(err, AgentError::EmptyGrant));
+        assert!(runs.is_empty());
+    }
+
+    /// A source whose records are all the test cares about: the working-set
+    /// gate is in `resolve_grant`, so this exists only to drive `start_run`
+    /// through a real trait impl rather than a hand-built map.
+    struct HiddenSource {
+        records: BTreeMap<String, NoteRecord>,
+        excluded: Vec<String>,
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl ScopeSource for HiddenSource {
+        async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, AgentError> {
+            Ok(self.records.clone())
+        }
+        async fn excluded_folders(&self) -> Result<Vec<String>, AgentError> {
+            Ok(self.excluded.clone())
+        }
+    }
+
+    /// The reverse direction, and it is the one that makes the tests above
+    /// meaningful rather than lucky: `live: true` must still resolve. A filter
+    /// that dropped every record would pass every assertion above and empty
+    /// every run in the product.
+    #[test]
+    fn a_live_note_still_resolves() {
+        let idx = index(&[("a", Some("Projects"))]);
+        assert!(idx["a"].live, "a default record is live");
+        let r = resolve_grant(&ScopeGrant::Folder("Projects".into()), &idx, &[]);
         assert_eq!(r.note_ids, ["a"].iter().map(|s| s.to_string()).collect());
     }
 }

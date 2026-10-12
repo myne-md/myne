@@ -1,14 +1,28 @@
-// What a run looks like while it works (myne-md/myne#529, task 8).
+// The scope-expansion dialog, and its provider arm (myne-md/myne#529, task 8).
 //
-// Two jobs, and the second is the load-bearing one.
+// ── This used to be a strip, and the strip is gone (myne-md/myne#848) ───────
+// It rendered the run's status, its running scope total, the grant breakdown and
+// the cost line in a band pinned under the transcript, outside the scrolling
+// region. Three things were wrong with that, and the third is why it moved:
 //
-//   1. A long run must not read as a hang. An agent over a large scope takes
-//      minutes, and a surface that says nothing during it is a surface the user
-//      force-quits.
-//   2. **The running scope total is shown continuously.** With no cap on how far
-//      a scope may grow and no ceiling on how many times the model may ask, this
-//      number is the entire bound on accumulation. It is not a status detail and
-//      it does not belong behind a disclosure.
+//   1. the transcript's own record of a run had no figures in it, so scrolling
+//      back through a conversation showed turns that described runs without
+//      saying what they cost;
+//   2. the band and the settled turn said the same thing twice;
+//   3. "New chat" deletes the transcript and NOT the run, so the band outlived
+//      the turn it described.
+//
+// The figures live on the run's own transcript entry now
+// (`AgentFootprint.tsx`), which is where "the running scope total is shown
+// continuously" still holds, the entry is on the turn from the first frame of
+// the run and ticks while it works.
+//
+// ── What is left here, and why it is still OUT of the scroller ──────────────
+// The scope-expansion dialog. It is the entire bound `docs/decisions/ai/0515`
+// puts on model-originated scope growth, and mounting it inside the scrolling
+// region put it below whatever the reader had scrolled to. A dialog is not a
+// strip: it is modal, it steals focus, and its lifetime is the QUESTION rather
+// than the turn, which is why it stays tied to the run.
 //
 // The cancel control sets the same flag the vault-lock teardown sets: one
 // mechanism, two callers.
@@ -29,6 +43,7 @@ import {
   providerLabelOf,
 } from "../../../lib/ai-capability";
 import { usePrefs } from "../../../hooks/usePrefs";
+import { providerErrorKey } from "../../../lib/engine-error";
 import {
   currentRunEpoch,
   failRun,
@@ -36,8 +51,7 @@ import {
   resumeRun,
   useAgent,
 } from "../agentStore";
-import { settleRunIntoChat } from "../../ai/agentToChat";
-import { RunCostLine } from "./RunCostLine";
+import { legFailureSentence, settleRunIntoChat } from "../../ai/agentToChat";
 import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
 
 /** How a stopped run is described, given the tag its loop ended on.
@@ -159,9 +173,6 @@ export function AgentProgress() {
   // keeps the message after the next run replaces this store's copy.
   if (!agent.view) return null;
 
-  const { view, running, end } = agent;
-  const status = running ? t("agent.progress.working") : endStatusLabel(end?.kind, t);
-
   return (
     <>
       {/* NOT gated on `preview`. The preview is a nicety; the dialog is the only
@@ -204,113 +215,32 @@ export function AgentProgress() {
               // the success path is guarded transitively by `settleStep`, and a
               // failure that lands after the run was let go of would otherwise
               // clear a NEWER run's `running` and record its message.
-              .catch(() => {
+              .catch((failure: unknown) => {
                 if (epoch !== currentRunEpoch()) return;
-                failRun(t("agent.progress.expandFailed"));
+                // **The leg's OWN failure, not a scope refusal**
+                // (myne-md/myne#848, on the user's report). This reported every
+                // failure of the approved leg as "The scope could not be
+                // widened", so a user who had just pressed Allow was told their
+                // permission had not been taken, while `modelGrants` on the
+                // very same turn showed it had, and the real cause (a provider
+                // that refused the request, a timeout, an engine failure) was
+                // thrown away. `RootGrant` is the one tag the scope sentence is
+                // about, and the host's tag decides; see
+                // `legFailureSentence`.
+                failRun(
+                  legFailureSentence(failure, {
+                    providerRejected: t("agent.composer.providerRejected"),
+                    scopeExcluded: t(providerErrorKey("empty_grant")),
+                    rootGrant: t("agent.progress.expandFailed"),
+                    generic: t("agent.progress.legFailed"),
+                    byCause: (cause) => t(providerErrorKey(cause)),
+                  }),
+                );
               });
           }}
           onDecline={() => void agentCancel(runId)}
         />
       ) : null}
-    <div
-      data-testid="agentProgress.root"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        rowGap: "var(--space-1)",
-        columnGap: "var(--space-2)",
-        padding: "var(--space-2) var(--space-3)",
-        background: "var(--bg-1)",
-        color: "var(--fg-2)",
-      }}
-    >
-      {/* **Three catalog strings, one sentence** (myne-md/myne#621). They used
-          to sit side by side with nothing between them, rendering as "Finished
-          can change 1 note 1 scope you set, 0 it asked for", three facts with
-          no boundary, of which the middle one is load-bearing.
-
-          Fixed with punctuation and hierarchy rather than by merging the keys:
-          a merged key would drop all 32 catalogs and write i18n-coverage debt
-          for a legibility fix, and the words were never the problem. The
-          separator and the parentheses live here because they are marks, not
-          copy, the same reason the `", "` between the two grant counts already
-          did.
-
-          The hierarchy is the design canon's own: the outcome reads at
-          `--fg-1`, the scope total keeps the strip's `--fg-2`, and the grant
-          breakdown drops to `--fg-3`, which `docs/design/README.md` uses for
-          exactly this kind of caption. That is what makes the scope total the
-          thing the eye lands on, which is the point: it is documented as the
-          only bound on scope accumulation across repeated approvals. */}
-      <span data-testid="agentProgress.status" style={{ color: "var(--fg-1)" }}>
-        {status}
-      </span>
-
-      <span aria-hidden="true" style={{ color: "var(--fg-3)" }}>
-        &middot;
-      </span>
-
-      {/* Continuously visible, by design. See the module note. */}
-      <span data-testid="agentProgress.scopeTotal" style={{ whiteSpace: "nowrap" }}>
-        {t("agent.progress.scopeTotal", { count: view.scopeTotal })}
-      </span>
-
-      {/* How the scope got that big, split by who asked. A run whose model-grant
-          count is climbing is the shape the no-cap decision leaves visible.
-          Parenthesised because it qualifies the total beside it rather than
-          standing as a third independent fact. */}
-      <span
-        data-testid="agentProgress.grants"
-        style={{ color: "var(--fg-3)", whiteSpace: "nowrap" }}
-      >
-        {"("}
-        {t("agent.progress.grantsUser", { count: view.userGrants })}
-        {", "}
-        {t("agent.progress.grantsModel", { count: view.modelGrants })}
-        {")"}
-      </span>
-
-      {/* **The run's cost, WHILE it runs** (myne-md/myne#456).
-       *
-       *  `docs/decisions/ai/0515` rests the remote arm's lack of a volume bound
-       *  on this disclosure: "the residual is disclosed rather than capped: a
-       *  finished run reports the requests it made, the notes it read, and how
-       *  much text left the device". Rendering it only on a FINISHED turn is
-       *  what that entry said and it is not enough, because a run that does not
-       *  finish has still spent its requests. On mobile that case is ordinary
-       *  rather than exotic: a run dies with the foreground, so locking the
-       *  vault or pocketing the phone mid-run leaves a user who paid for four
-       *  provider round-trips and was told about none of them.
-       *
-       *  The figures need no new plumbing. The store already accumulates them
-       *  per settled step, so this is the same three numbers the finished turn
-       *  reports, read one step earlier, the same COMPONENT, too, so the two
-       *  cannot word the control differently.
-       *
-       *  Deliberately not gated on `running`: a cancelled or failed run keeps
-       *  its figures on screen, which is the case this exists for. */}
-      <RunCostLine
-        testId="agentProgress.runCost"
-        iterations={agent.iterations}
-        notesRead={agent.notesRead}
-        charsOffDevice={agent.charsOffDevice}
-        style={{
-          color: "var(--fg-3)",
-          fontSize: "var(--text-xs)",
-          flexBasis: "100%",
-        }}
-      />
-
-      {/* No Stop control here: stopping lives on the composer's Send button,
-          which turns into Stop while a run works, so there is exactly one
-          place to end a run and it sits under the user's hands. */}
-      {agent.error ? (
-        <span data-testid="agentProgress.error" style={{ color: "var(--danger)" }}>
-          {agent.error}
-        </span>
-      ) : null}
-    </div>
     </>
   );
 }

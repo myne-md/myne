@@ -37,7 +37,16 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { join, extname } from "node:path";
 
 const REPO_ROOT = process.cwd();
@@ -99,6 +108,38 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Read a file that a WALK of a live tree named, tolerating one that vanished.
+ *
+ * **The tree is not static while the suite runs, and this is a flake rather
+ * than a finding.** `walk()` lists a directory and reads each path it found, and
+ * a sibling test file injects a scratch source into `src/` and deletes it again
+ * (`tests/scripts/manualTestRosterCli.test.ts` writes and removes
+ * `src/screens/ZzRecordProbe.tsx`, and did the same under the earlier name
+ * `ZzGuardProbe.tsx`). ENOENT between the readdir and the open is that scratch
+ * file's lifecycle: it passes alone, it passes on re-run, and it reddened a full
+ * run twice in one session, both times on this spec, both times with
+ * `manualTestRosterCli` running in parallel.
+ *
+ * **One errno wide, deliberately.** Only a vanished file is skipped; any other
+ * read error still fails the spec, because the alternative, swallowing every
+ * failure, is how a walk quietly stops covering what it claims to.
+ *
+ * Exported for its own spec: the tolerance is the whole point of the helper, and
+ * a race that only appears under parallel load cannot be driven any other way.
+ */
+export function readWalked(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (err) {
+    // Structural cast, not `NodeJS.ErrnoException`: this tree has no
+    // @types/node, so the namespace does not resolve here (the shape
+    // e2e/support/xwindow.ts uses for the same reason).
+    if ((err as { code?: unknown }).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
 /** The defines referenced across `trees`, ignoring the ones that appear only
  *  inside a comment — a `//` or a doc block naming one is documentation, and
  *  three of this repo's configs explain themselves that way. */
@@ -106,23 +147,8 @@ function referencedIn(trees: readonly string[]): Map<string, string> {
   const found = new Map<string, string>();
   for (const tree of trees) {
     for (const file of walk(join(REPO_ROOT, tree))) {
-      // A walk of a LIVE tree races sibling tests that inject scratch files
-      // into it (manualTestRosterCli.test.ts writes and deletes
-      // src/screens/ZzGuardProbe.tsx). ENOENT between the readdir and the open
-      // is that scratch file's lifecycle, not a defines finding; skip THIS
-      // file only, and any file whose read fails for another reason still
-      // fails the spec. Observed once as a full-suite red in pre-push (myne#567's
-      // load-shape: passes alone, passes on re-run).
-      let source: string;
-      try {
-        source = readFileSync(file, "utf8");
-      } catch (err) {
-        // Structural cast, not `NodeJS.ErrnoException`: this tree has no
-        // @types/node, so the namespace does not resolve here (the shape
-        // e2e/support/xwindow.ts uses for the same reason).
-        if ((err as { code?: unknown }).code === "ENOENT") continue;
-        throw err;
-      }
+      const source = readWalked(file);
+      if (source === null) continue;
       for (const line of source.split("\n")) {
         const code = line.replace(/^\s*(\/\/|\*|\/\*).*$/, "");
         for (const m of code.matchAll(DEFINE_RE)) {
@@ -192,7 +218,12 @@ describe("compile-time defines are provided by every build that needs them", () 
     // config that should have it).
     const raw = new Set<string>();
     for (const file of walk(join(REPO_ROOT, "src"))) {
-      for (const m of readFileSync(file, "utf8").matchAll(DEFINE_RE)) raw.add(m[1]!);
+      // Through `readWalked`, not `readFileSync`: this is the second walk over
+      // the same live tree, and it is the one that reddened, a scratch file
+      // deleted between the readdir and the open is not a defines finding.
+      const source = readWalked(file);
+      if (source === null) continue;
+      for (const m of source.matchAll(DEFINE_RE)) raw.add(m[1]!);
     }
     expect(
       [...raw].filter(RUNTIME_GLOBALS),
@@ -224,6 +255,57 @@ describe("compile-time defines are provided by every build that needs them", () 
         `surface that reads it — which for these is About and diagnostics, i.e. the ` +
         `screens somebody opens when something has already gone wrong.`,
     ).toEqual([]);
+  });
+
+  describe("a walk of a live tree tolerates a file that vanished under it", () => {
+    // **The race that reddened a full run twice in one session.** Sibling test
+    // files inject scratch sources into `src/` and delete them again
+    // (`tests/scripts/manualTestRosterCli.test.ts` writes and removes
+    // `src/screens/ZzRecordProbe.tsx`), and this spec walks that tree. The
+    // window is the readdir-to-open gap, so it cannot be driven from the
+    // outside; what can be driven is the tolerance itself.
+    it("returns null for a file that is gone", () => {
+      const dir: string = mkdtempSync(join(tmpdir(), "myne-defines-"));
+      try {
+        const file = join(dir, "ZzScratch.tsx");
+        writeFileSync(file, "export const x = __TAURI_INTERNALS__;\n");
+        // Present, then gone, exactly what the parallel spec does.
+        expect(readWalked(file)).toContain("__TAURI_INTERNALS__");
+        rmSync(file);
+        expect(readWalked(file)).toBeNull();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("no walk reads around the tolerant helper", () => {
+      // **The half a behavioural test cannot reach.** Both walks are one call
+      // apart from the helper, and a revert to `readFileSync` at either would
+      // make the tolerance decorative, while staying green, because the race it
+      // guards is a flake. So the file is scanned for the shape instead: exactly
+      // ONE `readFileSync(file` in this module, and it is the helper's own. The
+      // other reads here take a CONFIG path, not a walked one.
+      const self: string = readFileSync(fileURLToPath(import.meta.url), "utf8");
+      expect(
+        // `file` followed by a comma or a close, so this test's own
+        // `readFileSync(fileURLToPath(…))` and the prose above it do not count.
+        self.match(/readFileSync\(file[,)]/g)?.length ?? 0,
+        "a walk reads around `readWalked`, so a scratch file deleted mid-walk " +
+          "reddens a full run again, pass the path through the helper instead",
+      ).toBe(1);
+    });
+
+    it("still fails a read error that is not a vanished file", () => {
+      // One errno wide, and this is the half that keeps the tolerance from
+      // becoming a walk that silently covers less than it claims: reading a
+      // DIRECTORY is EISDIR, and it must throw rather than skip.
+      const dir: string = mkdtempSync(join(tmpdir(), "myne-defines-"));
+      try {
+        expect(() => readWalked(dir)).toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   it("mobile really does compile a different tree set, so its shorter list is not laxity", () => {

@@ -61,7 +61,7 @@ import {
 } from "../../src/notes/agent/agentStore";
 
 function awaitingScope() {
-  beginRun();
+  beginRun(null);
   settleStep({
     view: {
       runId: "run-1",

@@ -2900,6 +2900,7 @@ mod tests {
             ConversationEntry {
                 created_at: 1_000,
                 deleted_at: None,
+                folder: None,
                 title: "migrate me".to_string(),
                 updated_at: 2_000,
                 version: 2,

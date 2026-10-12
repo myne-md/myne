@@ -4,7 +4,7 @@
 // or variant change is visible here the moment it lands. Primitives are pure and
 // host-free, so no fixture is needed.
 
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@app/components/primitives/Button";
 import { IconButton } from "@app/components/primitives/IconButton";
 import { Input } from "@app/components/primitives/Input";
@@ -16,6 +16,7 @@ import { Spinner } from "@app/components/Spinner";
 import { CredentialField } from "@app/components/primitives/CredentialField";
 import { EmptyState } from "@app/components/primitives/EmptyState";
 import { Skeleton } from "@app/components/primitives/Skeleton";
+import { AnchoredPanel } from "@app/components/primitives/AnchoredPanel";
 import type { StoryDescriptor } from "../types";
 import { action } from "../actions";
 
@@ -37,6 +38,47 @@ function Row({ children }: { children: ReactNode }) {
     >
       {children}
     </div>
+  );
+}
+
+/** A panel that hangs off its trigger has to be OPEN to be looked at, so the
+ *  story carries the trigger's own state (myne-md/myne#848). */
+function AnchoredPanelDemo() {
+  const [open, setOpen] = useState(true);
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  return (
+    <Row>
+      <span ref={anchorRef} style={{ display: "inline-flex" }}>
+        <IconButton
+          icon="more-horizontal"
+          label="Conversation actions"
+          expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        />
+      </span>
+      <AnchoredPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={anchorRef}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-1)",
+          padding: "var(--space-1)",
+          background: "var(--bg-2)",
+          border: "1px solid var(--line-1)",
+          borderRadius: "var(--radius-1)",
+        }}
+        testId="story.anchored-panel"
+      >
+        <Button variant="ghost" onClick={action("onRename")}>
+          Rename
+        </Button>
+        <Button variant="ghost" onClick={action("onDelete")}>
+          Delete
+        </Button>
+      </AnchoredPanel>
+    </Row>
   );
 }
 
@@ -236,6 +278,24 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
         </Tooltip>
       </Row>
     ),
+  },
+  {
+    id: "primitives/anchoredpanel/open",
+    group: "primitives",
+    surface: "AnchoredPanel",
+    state: "open",
+    description: "Anchored Panel, an open state.",
+    tags: ["primitives", "anchoredpanel", "open"],
+    // The authored half of the Documentation page, on the surface where the
+    // judgement is real (myne-md/myne#848).
+    docs: {
+      whenNotToUse:
+        "Not for content that belongs in the flow, and not for a full dialog: a ModalShell owns the screen and takes focus, where this panel is dismissed by the next press anywhere.",
+      content:
+        "For a small panel that hangs off a trigger inside a scrolling or clipping container: it renders in the body, so no ancestor can cut it off, and it owns the dismissal. The panel carries its own chrome; this component owns placement, the portal and the three ways out, and nothing else.",
+      related: ["Tooltip", "Select"],
+    },
+    render: () => <AnchoredPanelDemo />,
   },
   {
     id: "primitives/spinner/default",

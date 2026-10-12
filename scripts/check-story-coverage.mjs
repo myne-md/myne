@@ -26,7 +26,21 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
 /** The trees whose modules are user-visible surfaces. */
-export const SURFACE_ROOTS = ["src/components", "src/screens", "src/notes/components"];
+export const SURFACE_ROOTS = [
+  "src/components",
+  "src/screens",
+  "src/notes/components",
+  // **The agent tree joined the catalogue** (myne-md/myne#848). These files were
+  // outside every surface root, so the surfaces this branch spent most of its
+  // time on (the hub's cards, the run's footprint, the review takeover) had no
+  // story and nothing said so: a tree outside the denominator is not a gap the
+  // guard can report, which is the same blindness `check-prefs-nonce.mjs`
+  // records about a whole missing client. Every surface here now carries a story
+  // (this guard has no debt escape, by design, `--record` refuses to grow the
+  // set), which is what makes the agent UI reviewable in the catalogue rather
+  // than only in the app.
+  "src/notes/agent",
+];
 
 /** The directory the coverage scan reads story surfaces from. */
 export const STORIES_DIR = "stories/src/stories";

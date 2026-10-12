@@ -37,10 +37,12 @@ vi.mock("../../src/lib/agent-run", () => ({
   agentPreviewGrant: (...a: unknown[]) => agentPreviewGrant(...a),
 }));
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { ChatComposer } from "../../src/notes/components/ChatComposer";
+import {
+  ChatComposer,
+  VAULT_SCOPE_SENTINEL,
+} from "../../src/notes/components/ChatComposer";
 import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
+import { bumpIndexNonce } from "../../src/notes/indexNonce";
 import {
   clearChat,
   getChat,
@@ -72,7 +74,7 @@ const STEP = {
 };
 
 function mount(props: Partial<Parameters<typeof ChatComposer>[0]> = {}) {
-  render(<ChatComposer openNoteId="n1" folders={["Projects"]} {...props} />);
+  render(<ChatComposer surface="agent" openNoteId="n1" folders={["Projects"]} {...props} />);
 }
 
 function type(text: string) {
@@ -135,7 +137,7 @@ describe("ChatComposer", () => {
     fireEvent.click(option!);
 
     // The trigger names what was chosen — no second element to read it from.
-    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toContain("Projects");
     await waitFor(() =>
       expect(screen.getByTestId("ai.composer-scope-count").textContent).toContain("12"),
     );
@@ -151,52 +153,47 @@ describe("ChatComposer", () => {
     expect(agentCapability).not.toHaveBeenCalled();
   });
 
-  it("counts the probe's attempts on the button while it waits", async () => {
-    // myne-md/myne#575. The probe was measured at 40 seconds on a remote
-    // provider, and the button said one unchanging thing for the whole of it,
-    // which reads as a hang. Driven through the real binding's callback rather
-    // than by setting state, so deleting the `onAttempt` argument in
-    // `ensureCapability` fails this rather than leaving it green.
-    let announce: ((p: { attempt: number; of: number }) => void) | undefined;
+  it("says it is checking, ON the button, while the probe runs", async () => {
+    // **The reversal, and the reason** (myne-md/myne#848, on the user's read):
+    // the probe used to print a caption under the row, "Checking the model…
+    // (2/3)", which is a line of prose for a state the user is already looking
+    // at the control for, and the fraction described Myne's retry loop rather
+    // than anything the user could act on. The button says one word instead.
+    //
+    // The note this replaces said the label must NOT change, because the
+    // sentence it changed to collapsed the textarea beside it mid-keystroke.
+    // That is still true of a sentence. This is one word, swapped in a window
+    // that OPENS when the user has just pressed Send and CLOSES when the field
+    // is cleared, not one they are typing into.
     let settle: ((v: unknown) => void) | undefined;
-    agentCapability.mockImplementation((onAttempt: unknown) => {
-      announce = onAttempt as (p: { attempt: number; of: number }) => void;
-      return new Promise((resolve) => {
-        settle = resolve;
-      });
-    });
+    agentCapability.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
     mount();
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
 
-    // Before the host has announced anything there is no number to show, and a
-    // "0 of 3" would describe nothing.
-    await waitFor(() => expect(announce).toBeDefined());
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+        "agent.composer.checking",
+      ),
+    );
+    // The caption is gone, and so is the progress it carried: `ensureCapability`
+    // no longer passes an `onAttempt` sink at all.
     expect(screen.queryByTestId("ai.composer-probe-at")).toBeNull();
 
-    act(() => announce!({ attempt: 2, of: 3 }));
-    expect(screen.getByTestId("ai.composer-probe-at").textContent).toContain(
-      "agent.composer.checkingAt",
-    );
-
-    // **It is NOT on the button** (myne-md/myne#771). The label grew to
-    // "Checking the model… (2/3)", and in a flex row with a `flex: 1` textarea
-    // that collapsed the input to three characters wide mid-keystroke: the
-    // user's own text squeezed out of the way by a status about the model. The
-    // button keeps one label and gains a spinner; the count lives in a row
-    // that already exists.
-    expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
-      "agent.composer.checkingAt",
-    );
-
-    // And it goes away when the probe does, rather than sticking on the last
-    // attempt it happened to see.
+    // And it goes back to Send when the probe does, rather than sticking.
     await act(async () => {
       settle!(PASSING);
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(screen.queryByTestId("ai.composer-probe-at")).toBeNull(),
+      expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
+        "agent.composer.checking",
+      ),
     );
   });
 
@@ -463,7 +460,7 @@ describe("ChatComposer", () => {
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(getChat().turns).toHaveLength(2));
     const agentTurn = getChat().turns[1]!;
-    // The store's copy of the failure dies with the next `beginRun()`, so the
+    // The store's copy of the failure dies with the next `beginRun(null)`, so the
     // turn keeps its own. Otherwise a second run erases what happened to the
     // first one from a transcript that is still showing it.
     expect(agentTurn.error).toBe(true);
@@ -507,6 +504,65 @@ describe("ChatComposer: the settings sit under the input", () => {
       (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     );
   }
+
+  it("makes the permission mode a dropdown, not a button that toggles", async () => {
+    // **A control whose value is a word from a set is a dropdown**
+    // (myne-md/myne#848). It was a button that CHANGED the mode on press, which
+    // made the row hold two idioms for the same kind of choice: the scope
+    // control said what it was set to and offered the alternatives, and this one
+    // said what it was set to and hid the alternative behind the press that also
+    // changed it.
+    mount();
+    const trigger = screen.getByTestId("ai.composer-permission");
+    // The value is written on the trigger, and there is a menu to open.
+    expect(screen.getByTestId("ai.composer-permission-value").textContent).toBe(
+      "agent.composer.permissionAsk",
+    );
+    expect(screen.queryByTestId("ai.composer-permission-menu")).toBeNull();
+    fireEvent.click(trigger);
+    const options = screen.getAllByTestId("ai.composer-permission-option");
+    expect(options.map((o) => o.getAttribute("data-value"))).toEqual(["ask", "auto"]);
+    // …and the other option is where the mode changes.
+    expect(getAgent().autoApply).toBe(false);
+    fireEvent.click(options[1]!);
+    expect(getAgent().autoApply).toBe(true);
+    expect(screen.getByTestId("ai.composer-permission-value").textContent).toBe(
+      "agent.composer.permissionAuto",
+    );
+    // The menu closes on the pick, and the way back is the same menu.
+    expect(screen.queryByTestId("ai.composer-permission-menu")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.composer-permission"));
+    fireEvent.click(
+      screen
+        .getAllByTestId("ai.composer-permission-option")
+        .find((o) => o.getAttribute("data-value") === "ask")!,
+    );
+    expect(getAgent().autoApply).toBe(false);
+  });
+
+  it("keeps the row's captions SHORT, which is what keeps it on one line", async () => {
+    // jsdom has no layout, so the assertion is on the mechanism. The full
+    // sentence the composer used to render, "N notes are excluded from AI and
+    // stay out", is ~220px at this font and pushed the row past the composer's
+    // ~493px, wrapping the caption onto its own line as soon as the permission
+    // read "Apply automatically" (myne-md/myne#848). The row keeps the compact
+    // form; the expansion dialog and mobile keep the sentence, where there is
+    // room for it and it is not a status line.
+    agentPreviewGrant.mockResolvedValue({
+      noteCount: 431,
+      excludedCount: 0,
+      unknownCount: 0,
+      newTotal: 431,
+    });
+    mount();
+    await waitFor(() => expect(screen.getByTestId("ai.composer-scope-count")).toBeTruthy());
+    expect(screen.getByTestId("ai.composer-scope-count").textContent).toBe(
+      "agent.composer.scopeCount:431",
+    );
+    expect(screen.getByTestId("ai.composer-scope-excluded").textContent).toBe(
+      "agent.composer.scopeExcluded:0",
+    );
+  });
 
   it("puts the scope and the permission mode after the composer input", () => {
     mount();
@@ -614,7 +670,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
 
   function noteless(folders: readonly string[] = ["Projects", "Archive"]) {
     render(
-      <ChatComposer openNoteId={null} folders={folders} />,
+      <ChatComposer surface="agent" openNoteId={null} folders={folders} />,
     );
   }
 
@@ -625,14 +681,16 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
       .getAllByTestId("ai.composer-scope-option")
       .map((o) => o.getAttribute("data-value"));
     expect(labels, "the open-note entry is still offered").not.toContain("");
-    expect(labels).toEqual(["Projects", "Archive"]);
+    // The vault entry is FIRST since myne-md/myne#848: it is the default, so it
+    // is the one the trigger reads back most of the time.
+    expect(labels).toEqual([VAULT_SCOPE_SENTINEL, "Projects", "Archive"]);
   });
 
   it("still offers it when there IS one", () => {
     // The gate is on the NOTE, not on the surface: the light panel has one
     // open almost always, and removing the entry there would take away the
     // common case's default.
-    render(<ChatComposer openNoteId="n-1" folders={["Projects"]} />);
+    render(<ChatComposer surface="agent" openNoteId="n-1" folders={["Projects"]} />);
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     expect(
       screen.getAllByTestId("ai.composer-scope-option").map((o) => o.getAttribute("data-value")),
@@ -641,55 +699,49 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
 
   it("names the choice rather than a value it does not have", () => {
     noteless();
-    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain(
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).not.toContain(
       "agent.composer.scopeOpenNote",
     );
   });
 
-  it("says why Send is off, once there is something to send", () => {
-    // A greyed button and nothing else reads as a broken app. A scope missing
-    // while the box is EMPTY is not yet a problem, so the line waits for the
-    // user to have typed — a scolding that arrives before the mistake is a
-    // scolding about nothing.
+  it("opens on the whole vault when no note is open", () => {
+    // myne-md/myne#848. The default IS a scope now: with no folder attached and
+    // no note open, the run covers the vault minus the excluded folders, and the
+    // trigger says so rather than reading "nothing selected".
     noteless();
-    expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
-    type("selam");
-    expect(screen.getByTestId("ai.composer-needs-scope")).toBeTruthy();
-    expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
-      true,
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toContain(
+      "agent.composer.scopeAllVault",
     );
+    // An icon-only control states the KIND in its glyph and the value in its
+    // name, which is the trade this change made (myne-md/myne#848).
+    expect(screen.getByTestId("ai.composer-scope").querySelector("svg")).not.toBeNull();
   });
 
-  it("points the right WAY at the control it names", () => {
-    // The sentence said "above" while the settings row sat under the composer:
-    // they moved down in this same epic and the copy was written against where
-    // they used to be. A direction in copy is a fact about the layout, and
-    // nothing else in the tree compares the two — the string renders, the row
-    // renders, and only a reader looking in the wrong place finds out.
+  it("sends the vault grant, and shows what it excludes, including zero", async () => {
+    // The count is the reason the scope control exists
+    // (`docs/decisions/ai/0515`): a number the user did not expect has to be
+    // explainable in place. Rendering the excluded line at ZERO is the other
+    // half, an absent line cannot be told apart from "we did not check".
+    agentPreviewGrant.mockResolvedValue({
+      noteCount: 40,
+      excludedCount: 0,
+      unknownCount: 0,
+      newTotal: 40,
+    });
     noteless();
-    type("selam");
-    const line = screen.getByTestId("ai.composer-needs-scope");
-    const picker = screen.getByTestId("ai.composer-scope");
-    const pickerIsBelow =
-      (line.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    // The catalog is stubbed to echo keys here, so the English wording is read
-    // from `locales/en` directly: what is under test is that the word and the
-    // DOM order agree, which a key alone cannot say.
-    const english: string = JSON.parse(
-      readFileSync(resolve(process.cwd(), "locales/en/common.json"), "utf8"),
-    ).agent.composer.needsScope;
-    expect(english.includes(pickerIsBelow ? "below" : "above"), english).toBe(true);
+    await waitFor(() => expect(screen.getByTestId("ai.composer-scope-count")).toBeTruthy());
+    expect(agentPreviewGrant).toHaveBeenCalledWith({ kind: "vault" });
+    expect(screen.getByTestId("ai.composer-scope-count").textContent).toContain("40");
+    expect(screen.getByTestId("ai.composer-scope-excluded").textContent).toContain("0");
   });
 
-  it("stops saying it once a folder is chosen, and Send comes alive", () => {
+  it("has no needs-scope line at all, because a scope always exists", () => {
+    // The line is gone rather than unreachable-but-present: it warned about a
+    // disabled Send with no scope, and with the vault default that state cannot
+    // arise. A rule that renders nowhere is a rule nobody will notice being
+    // wrong.
     noteless();
     type("selam");
-    fireEvent.click(screen.getByTestId("ai.composer-scope"));
-    fireEvent.click(
-      screen
-        .getAllByTestId("ai.composer-scope-option")
-        .find((o) => o.getAttribute("data-value") === "Projects")!,
-    );
     expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
     expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(
       false,
@@ -713,7 +765,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
         .getAllByTestId("ai.composer-scope-option")
         .find((o) => o.getAttribute("data-value") === "Projects")!,
     );
-    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toContain("Projects");
   }
 
   it("drops the folder when a new conversation is started", () => {
@@ -722,7 +774,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
     act(() => {
       clearChat();
     });
-    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).not.toContain("Projects");
   });
 
   it("drops the folder when another conversation is opened", () => {
@@ -744,7 +796,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
         },
       ]);
     });
-    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).not.toContain("Projects");
   });
 
   it("actually SENDS under the dropped scope, not merely relabels the trigger", () => {
@@ -781,7 +833,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
     act(() => {
       sendChatMessage("ilk mesaj");
     });
-    expect(screen.getByTestId("ai.composer-scope").textContent).toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toContain("Projects");
   });
 
   it("crosses the boundary even when the transcript was already empty", () => {
@@ -796,6 +848,257 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
     act(() => {
       clearChat();
     });
-    expect(screen.getByTestId("ai.composer-scope").textContent).not.toContain("Projects");
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).not.toContain("Projects");
+  });
+});
+
+// myne-md/myne#848. The composer's zero state and its controls.
+//
+// The two claims worth testing here are both about WHERE a fact lives rather
+// than whether it renders: the field refuses the keystroke instead of the send
+// (so a user finds out before typing a paragraph), and the sentence that says
+// what is missing is the field's PLACEHOLDER rather than a line under it, which
+// is why the assertion is on the placeholder and on the ABSENCE of the old
+// caption, not on a new caption's wording.
+describe("ChatComposer, a session anchored to a note pins its scope (myne-md/myne#848)", () => {
+  // The user's read: a session opened FROM a note is about that note, so the
+  // scope is settled and the picker would only invite a mistake. Widening is a
+  // session-level decision, a new conversation starts vault-wide.
+  it("renders no picker at all", () => {
+    mount({ anchoredNoteId: "n7" });
+    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
+    expect(screen.queryByTestId("ai.composer-scope-wrap")).toBeNull();
+    // The DISCLOSURE is untouched: the count and the excluded figure are what
+    // `docs/decisions/ai/0515` names as the mitigation, and they are not the
+    // picker.
+    expect(screen.getByTestId("ai.composer-permission")).toBeTruthy();
+  });
+
+  it("sends the anchored note, whatever the picker was left on", async () => {
+    // A scope chosen for a previous, unanchored session must not survive into
+    // this one. `attached` is still reset on the conversation epoch; this
+    // asserts the stronger claim, the picker cannot move an anchored scope.
+    mount({ anchoredNoteId: "n7" });
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    expect(agentStart.mock.calls.at(-1)![1]).toEqual({
+      kind: "notes",
+      value: ["n7"],
+    });
+  });
+
+  it("keeps the picker when the session is not anchored", () => {
+    // The LIGHT panel's composer: the note is whatever the editor has open
+    // beside the box, and changing the scope for one message is the idiom.
+    mount({ openNoteId: "n1", anchoredNoteId: null });
+    expect(screen.getByTestId("ai.composer-scope")).toBeTruthy();
+  });
+});
+
+describe("ChatComposer, the blocked zero state", () => {
+  function emptyScope() {
+    agentPreviewGrant.mockResolvedValue({
+      noteCount: 0,
+      excludedCount: 0,
+      unknownCount: 0,
+      newTotal: 0,
+    });
+  }
+
+  it("refuses the keystroke and highlights the picker when the scope is empty", async () => {
+    emptyScope();
+    mount();
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.composer-scope-wrap").getAttribute("data-blocked")).toBe(
+        "true",
+      ),
+    );
+    expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
+      true,
+    );
+    // The highlight is the accent ring, and it has to be visible: a state that
+    // only sets `data-blocked` tells a reader and nobody else.
+    const wrap = screen.getByTestId("ai.composer-scope-wrap");
+    expect(wrap.style.outline).toContain("2px solid");
+  });
+
+  it("says what is needed in the placeholder, with no line under the field", async () => {
+    emptyScope();
+    mount();
+    await waitFor(() =>
+      expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
+        true,
+      ),
+    );
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+    ).toBe("agent.composer.blockedScope");
+    // The caption is gone, and this is the half that keeps it gone: the graph
+    // had a warning line under the field, and reviving one would satisfy the
+    // first assertion above while undoing the decision.
+    expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
+  });
+
+  it("shows the sidebar its own sentence about what is missing", async () => {
+    emptyScope();
+    render(<ChatComposer surface="sidebar" openNoteId="n1" folders={["Projects"]} />);
+    await waitFor(() =>
+      expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
+        true,
+      ),
+    );
+    // Different copy, same state: the sidebar has a note open beside the box, so
+    // "every note is excluded, or the vault is empty" is the wrong sentence for
+    // what the user is looking at.
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+    ).toBe("agent.composer.blockedScopeSidebar");
+  });
+
+  it("says it is GETTING READY while the scope's size is unknown", async () => {
+    // **Unanswered is not empty** (myne-md/myne#848, on the user's report). The
+    // size comes from the host, and while that read is in flight the composer
+    // knows nothing about the scope. It used to say so in the vault's words,
+    // "every note is excluded from AI, or the vault is empty", which is a claim
+    // about the vault made before the vault was asked.
+    let settle: ((p: unknown) => void) | undefined;
+    agentPreviewGrant.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
+    mount();
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+    ).toBe("agent.composer.preparing");
+    // Still enabled: the field is not blocked, it is waiting, and a user can
+    // type while the count arrives.
+    expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
+      false,
+    );
+
+    await act(async () => {
+      settle!({ noteCount: 431, excludedCount: 0, unknownCount: 0, newTotal: 431 });
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+      ).toBe("agent.composer.placeholder"),
+    );
+  });
+
+  it("does NOT fall back to 'getting ready' while the index catches up", async () => {
+    // **The flicker** (myne-md/myne#848, on the user's report: "it still goes
+    // back and forth between getting ready and ask ai while the note count
+    // progresses"). An index bump re-asks for the count, and clearing the
+    // previous answer on every ask made the placeholder oscillate once per
+    // re-indexed note. The clearing is for a SCOPE change, a stale number
+    // under a new scope's name, and an index bump is the same scope.
+    mount();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+      ).toBe("agent.composer.placeholder"),
+    );
+    // The re-ask HANGS, so the in-flight window is observable: an immediately
+    // resolving mock would hide the very state this is about.
+    agentPreviewGrant.mockImplementation(() => new Promise(() => {}));
+    await act(async () => {
+      bumpIndexNonce();
+      await Promise.resolve();
+    });
+    // The previous answer stays up while the new one is in flight, so neither
+    // the placeholder nor the count moves.
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
+    ).toBe("agent.composer.placeholder");
+    expect(screen.getByTestId("ai.composer-scope-count")).toBeTruthy();
+  });
+
+  it("re-asks for the count when the vault INDEX changes", async () => {
+    // **The bug behind the report** (myne-md/myne#848): `vault.indices` hydrates
+    // at unlock and the notes changed since its snapshot are re-applied after
+    // it, so a count asked for in that window is answered against a half-filled
+    // index, 0 notes on a vault that has 431, and nothing was going to re-ask.
+    // The index's own nonce (myne#277) is the signal that the answer moved.
+    mount();
+    await waitFor(() => expect(agentPreviewGrant).toHaveBeenCalledTimes(1));
+    act(() => bumpIndexNonce());
+    await waitFor(() => expect(agentPreviewGrant).toHaveBeenCalledTimes(2));
+  });
+
+  it("closes the scope menu when the user looks away from it", () => {
+    // myne-md/myne#848. It used to close only by pressing its own trigger again,
+    // so a user who opened it and then pressed anywhere else had to find the
+    // trigger and press it twice. Escape is the keyboard half of the same ask.
+    mount();
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    expect(screen.getByTestId("ai.composer-scope-menu")).toBeTruthy();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId("ai.composer-scope-menu")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    expect(screen.getByTestId("ai.composer-scope-menu")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("ai.composer-scope-menu")).toBeNull();
+  });
+
+  it("keeps the menu open when the press is INSIDE it", () => {
+    // The other direction: a dismissal that also closed on the menu's own
+    // presses would make the control unusable.
+    mount();
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    fireEvent.mouseDown(screen.getByTestId("ai.composer-scope-menu"));
+    expect(screen.getByTestId("ai.composer-scope-menu")).toBeTruthy();
+  });
+
+  it("writes the current scope beside its icon, not only in its name", () => {
+    mount();
+    // `This note` when a note is open and nothing is attached: the value the run
+    // will use, as text, which is what the user asked for.
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
+      "agent.composer.scopeOpenNote",
+    );
+  });
+
+  it("DOES size itself from the copy when the field is blocked", async () => {
+    // The one exception to the rule above, and the reason is the copy itself: a
+    // blocked field has nothing else to say, and clipping its sentence at the
+    // first line hides the only explanation on screen (myne-md/myne#848).
+    agentPreviewGrant.mockResolvedValue({
+      noteCount: 0,
+      excludedCount: 0,
+      unknownCount: 0,
+      newTotal: 0,
+    });
+    // The stub has to stay in place across the await: the preview resolves
+    // asynchronously, and the measure-and-write runs on the render after it.
+    Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 64,
+    });
+    const box = () => screen.getByTestId("ai.composer-input") as HTMLTextAreaElement;
+    try {
+      mount();
+      await waitFor(() => expect(box().disabled).toBe(true));
+      await waitFor(() => expect(box().style.height).toBe("64px"));
+    } finally {
+      delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>)
+        .scrollHeight;
+    }
+  });
+
+  it("grows to exactly five lines and then scrolls", () => {
+    mount();
+    const input = screen.getByTestId("ai.composer-input") as HTMLTextAreaElement;
+    // Asserted as a RATIO rather than as the literal "7em": the ceiling is
+    // expressed in `em` so it follows the type scale, and a test pinning the
+    // string would pass at any line height while the comment claimed five.
+    const lines = parseFloat(input.style.maxHeight) / parseFloat(input.style.lineHeight);
+    expect(lines).toBe(5);
+    expect(input.style.overflowY).toBe("auto");
   });
 });
